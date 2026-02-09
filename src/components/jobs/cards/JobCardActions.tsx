@@ -1,5 +1,5 @@
 import React from 'react';
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
@@ -16,10 +16,11 @@ import { TechnicianIncidentReportDialog } from "@/components/incident-reports/Te
 import { Department } from "@/types/department";
 import { useQuery } from "@tanstack/react-query";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { createQueryKey } from "@/lib/optimized-react-query";
 import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
 import { getMainFlexElementIdSync, resolveTourFolderForTourdate } from "@/utils/flexMainFolderId";
 import { ArchiveToFlexAction } from "./job-card-actions/ArchiveToFlexAction";
@@ -160,15 +161,17 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     return 'sin ubicación';
   }, [job]);
 
+  const TZ = 'Europe/Madrid' as const;
+
   const resolveSuggestedCallTime = React.useCallback((): string => {
     try {
       if (!job?.start_time) return '';
-      // Use 24h HH:mm.
-      return format(new Date(job.start_time), 'HH:mm');
+      // Use 24h HH:mm in Europe/Madrid to match operational expectation.
+      return formatInTimeZone(new Date(job.start_time), TZ, 'HH:mm');
     } catch {
       return '';
     }
-  }, [job]);
+  }, [job, TZ]);
 
   type WaProdAssignment = {
     technician_id: string;
@@ -178,7 +181,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   };
 
   const { data: waProdAssignments = [], isLoading: waProdAssignmentsLoading } = useQuery({
-    queryKey: ['wa-prod-assignments', job?.id],
+    queryKey: createQueryKey.whatsapp.prodAssignmentsByJob(job.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_assignments')
@@ -223,15 +226,20 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     const list = Array.from(keys).map((key) => {
       if (key === 'all') {
         const range = job?.start_time && job?.end_time
-          ? `${format(new Date(job.start_time), 'dd/MM/yyyy')} – ${format(new Date(job.end_time), 'dd/MM/yyyy')}`
+          ? `${formatInTimeZone(new Date(job.start_time), TZ, 'dd/MM/yyyy')} – ${formatInTimeZone(new Date(job.end_time), TZ, 'dd/MM/yyyy')}`
           : job?.start_time
-            ? `${format(new Date(job.start_time), 'dd/MM/yyyy')}`
+            ? `${formatInTimeZone(new Date(job.start_time), TZ, 'dd/MM/yyyy')}`
             : '';
         return { key, label: range ? `Todos los días (${range})` : 'Todos los días' };
       }
       const date = key.replace(/^day:/, '');
       const label = (() => {
-        try { return format(new Date(date), 'dd/MM/yyyy'); } catch { return date; }
+        try {
+          // Date-only strings should not shift; interpret as local midnight.
+          return formatInTimeZone(new Date(`${date}T00:00:00`), TZ, 'dd/MM/yyyy');
+        } catch {
+          return date;
+        }
       })();
       return { key, label: label };
     });
@@ -258,13 +266,13 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     let dateLabel = '';
     if (opts.groupKey === 'all') {
       if (job?.start_time && job?.end_time) {
-        dateLabel = `${format(new Date(job.start_time), 'dd/MM/yyyy')} – ${format(new Date(job.end_time), 'dd/MM/yyyy')}`;
+        dateLabel = `${formatInTimeZone(new Date(job.start_time), TZ, 'dd/MM/yyyy')} – ${formatInTimeZone(new Date(job.end_time), TZ, 'dd/MM/yyyy')}`;
       } else if (job?.start_time) {
-        dateLabel = `${format(new Date(job.start_time), 'dd/MM/yyyy')}`;
+        dateLabel = `${formatInTimeZone(new Date(job.start_time), TZ, 'dd/MM/yyyy')}`;
       }
     } else if (opts.groupKey.startsWith('day:')) {
       const d = opts.groupKey.replace(/^day:/, '');
-      try { dateLabel = format(new Date(d), 'dd/MM/yyyy'); } catch { dateLabel = d; }
+      try { dateLabel = formatInTimeZone(new Date(`${d}T00:00:00`), TZ, 'dd/MM/yyyy'); } catch { dateLabel = d; }
     }
 
     const callTimeLabel = opts.callTime ? `${opts.callTime}` : '';
@@ -279,24 +287,56 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     return lines.join('\n');
   }, [job, resolveJobLocation]);
 
-  // Initialize/refresh modal state when opened (without clobbering edits).
-  React.useEffect(() => {
-    if (!waProdOpen) return;
-    const suggested = resolveSuggestedCallTime();
-    setWaProdCallTime((prev) => prev || suggested);
+  type WaSendResult = {
+    success: boolean;
+    sentCount: number;
+    failed: Array<{ recipient_id: string; reason: string }>;
+    job_id: string | null;
+  };
 
-    setWaProdDateGroup((prev) => prev || 'all');
+  const handleWaProdSend = React.useCallback(async () => {
+    try {
+      if (!waProdRecipientIds.length) {
+        toast({ title: 'Selecciona destinatarios', description: 'Elige al menos una persona.', variant: 'destructive' });
+        return;
+      }
+      const trimmed = (waProdMessage || '').trim();
+      if (!trimmed) {
+        toast({ title: 'Mensaje vacío', description: 'Escribe un mensaje antes de enviar.', variant: 'destructive' });
+        return;
+      }
 
-    setWaProdMessage((prev) => {
-      if (waProdDirty && prev.trim().length > 0) return prev;
-      return buildWaProdTemplate({ groupKey: waProdDateGroup || 'all', callTime: (waProdCallTime || suggested) });
-    });
+      setWaProdSending(true);
+      const { data, error } = await supabase.functions.invoke<WaSendResult>('send-job-whatsapp-message', {
+        body: {
+          job_id: job?.id,
+          message: trimmed,
+          recipient_ids: waProdRecipientIds,
+        }
+      });
 
-    // Only reset recipients/date-group when opening
-    setWaProdRecipientIds([]);
-    setWaProdDirty(false);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [waProdOpen]);
+      if (error) {
+        toast({ title: 'Error al enviar', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      const sent = data?.sentCount ?? null;
+      const failed = data?.failed?.length ?? 0;
+      toast({
+        title: 'Enviado',
+        description: sent !== null
+          ? `Enviados: ${sent}. Fallos: ${failed}.`
+          : `Mensaje enviado. Fallos: ${failed}.`,
+      });
+      setWaProdOpen(false);
+    } catch (e: any) {
+      toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+    } finally {
+      setWaProdSending(false);
+    }
+  }, [job?.id, toast, waProdMessage, waProdRecipientIds]);
+
+  // Modal state is initialized in the button click handler to avoid stale state reads.
 
   React.useEffect(() => {
     if (!waProdOpen) return;
@@ -1293,7 +1333,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                       setWaProdMessage(buildWaProdTemplate({ groupKey: waProdDateGroup || 'all', callTime: waProdCallTime }));
                     }}
                   >
-                    Reset
+                    Restablecer
                   </Button>
                 </div>
                 <Textarea
@@ -1310,47 +1350,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             <DialogFooter>
               <Button variant="outline" onClick={() => setWaProdOpen(false)} disabled={waProdSending}>Cancelar</Button>
               <Button
-                onClick={async () => {
-                  try {
-                    if (!waProdRecipientIds.length) {
-                      toast({ title: 'Selecciona destinatarios', description: 'Elige al menos una persona.', variant: 'destructive' });
-                      return;
-                    }
-                    const trimmed = (waProdMessage || '').trim();
-                    if (!trimmed) {
-                      toast({ title: 'Mensaje vacío', description: 'Escribe un mensaje antes de enviar.', variant: 'destructive' });
-                      return;
-                    }
-
-                    setWaProdSending(true);
-                    const { data, error } = await supabase.functions.invoke('send-job-whatsapp-message', {
-                      body: {
-                        job_id: job?.id,
-                        message: trimmed,
-                        recipient_ids: waProdRecipientIds,
-                      }
-                    });
-
-                    if (error) {
-                      toast({ title: 'Error al enviar', description: error.message, variant: 'destructive' });
-                      return;
-                    }
-
-                    const sent = (data as any)?.sentCount ?? (data as any)?.sent ?? null;
-                    const failed = Array.isArray((data as any)?.failed) ? (data as any).failed.length : 0;
-                    toast({
-                      title: 'Enviado',
-                      description: sent !== null
-                        ? `Enviados: ${sent}. Fallos: ${failed}.`
-                        : `Mensaje enviado. Fallos: ${failed}.`,
-                    });
-                    setWaProdOpen(false);
-                  } catch (e: any) {
-                    toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
-                  } finally {
-                    setWaProdSending(false);
-                  }
-                }}
+                onClick={handleWaProdSend}
                 disabled={waProdSending}
               >
                 {waProdSending ? 'Enviando…' : 'Enviar'}

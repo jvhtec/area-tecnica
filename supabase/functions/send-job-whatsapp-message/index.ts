@@ -1,25 +1,26 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 
+/** Request payload for sending a WhatsApp message to multiple assigned users. */
 type SendRequest = {
+  /** Message to send (required). */
   message?: string;
+  /** Recipient profile IDs (required). */
   recipient_ids?: string[];
+  /** Optional job ID for telemetry/debugging. */
   job_id?: string;
 };
 
+/** Normalize a WAHA base URL (ensures protocol, strips trailing slashes). */
 const normalizeBase = (s: string) => {
   let b = (s || "").trim();
   if (!/^https?:\/\//i.test(b)) b = "https://" + b;
   return b.replace(/\/+$/, "");
 };
 
+/** Normalize department values to the canonical production label when applicable. */
 function normalizeDept(value: string | null | undefined): "production" | null {
   if (!value) return null;
   const lower = value.toLowerCase().replace(/_warehouse$/, "");
@@ -27,6 +28,16 @@ function normalizeDept(value: string | null | undefined): "production" | null {
   return null;
 }
 
+/**
+ * Normalize a phone number to E.164.
+ *
+ * NOTE: The `/^[67]\d{8}$/` shortcut is intentionally Spain-only. It prepends `+34` for
+ * mobile-like numbers that omit the country code. `defaultCountry` is used for all
+ * other non-E.164 inputs (and is normalized to include a leading '+').
+ *
+ * If you change `WA_DEFAULT_COUNTRY_CODE`, this Spain shortcut will still force `+34`
+ * for numbers matching the regex.
+ */
 function normalizePhone(raw: string, defaultCountry: string): { ok: true; value: string } | { ok: false; reason: string } {
   if (!raw) return { ok: false, reason: "empty" } as const;
   const trimmed = raw.trim();
@@ -36,7 +47,7 @@ function normalizePhone(raw: string, defaultCountry: string): { ok: true; value:
   if (digits.startsWith("00")) digits = "+" + digits.slice(2);
   if (!digits.startsWith("+")) {
     const dc = defaultCountry.startsWith("+") ? defaultCountry : `+${defaultCountry}`;
-    // Spain-friendly: if it looks like a mobile without CC, default to +34
+    // Spain-only shortcut for common mobile formats without country code.
     if (/^[67]\d{8}$/.test(digits)) digits = "+34" + digits;
     else digits = dc + digits;
   }
@@ -44,6 +55,7 @@ function normalizePhone(raw: string, defaultCountry: string): { ok: true; value:
   return { ok: true, value: digits } as const;
 }
 
+/** Fetch helper with a hard timeout. */
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(new DOMException("timeout", "AbortError")), timeoutMs);
@@ -56,7 +68,7 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
 
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
+  if (req.method !== "POST") return jsonResponse({ error: "Method Not Allowed" }, { status: 405 });
 
   const supabaseAdmin = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
@@ -66,20 +78,17 @@ serve(async (req: Request) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized", reason: "Missing Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized", reason: "Missing Authorization header" }, { status: 401 });
+    }
+    if (!authHeader.startsWith("Bearer ")) {
+      return jsonResponse({ error: "Unauthorized", reason: "Invalid auth scheme" }, { status: 401 });
     }
 
-    const token = authHeader.replace("Bearer ", "").trim();
+    const token = authHeader.slice(7).trim();
     const { data: userData } = await supabaseAdmin.auth.getUser(token);
     const actorId = userData?.user?.id || null;
     if (!actorId) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { data: actorProfile } = await supabaseAdmin
@@ -92,17 +101,11 @@ serve(async (req: Request) => {
     const dept = normalizeDept(actorProfile?.department || null);
 
     if (!(role === "admin" || dept === "production")) {
-      return new Response(JSON.stringify({ error: "Forbidden" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Forbidden" }, { status: 403 });
     }
 
     if (!actorProfile?.waha_endpoint) {
-      return new Response(JSON.stringify({ error: "Forbidden", reason: "User not authorized for WhatsApp operations" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Forbidden", reason: "User not authorized for WhatsApp operations" }, { status: 403 });
     }
 
     const body = (await req.json().catch(() => ({}))) as SendRequest;
@@ -110,24 +113,15 @@ serve(async (req: Request) => {
     const recipientIds = Array.isArray(body.recipient_ids) ? body.recipient_ids.filter(Boolean) : [];
 
     if (!message) {
-      return new Response(JSON.stringify({ error: "Bad Request", reason: "Empty message" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Bad Request", reason: "Empty message" }, { status: 400 });
     }
 
     if (recipientIds.length === 0) {
-      return new Response(JSON.stringify({ error: "Bad Request", reason: "No recipients" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Bad Request", reason: "No recipients" }, { status: 400 });
     }
 
     if (recipientIds.length > 80) {
-      return new Response(JSON.stringify({ error: "Bad Request", reason: "Too many recipients" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return jsonResponse({ error: "Bad Request", reason: "Too many recipients" }, { status: 400 });
     }
 
     const { data: recipients, error: recErr } = await supabaseAdmin
@@ -137,10 +131,13 @@ serve(async (req: Request) => {
 
     if (recErr) throw recErr;
 
+    type WahaConfigRow = { session?: string; api_key?: string };
+
     const base = normalizeBase(actorProfile.waha_endpoint);
     const { data: cfg } = await supabaseAdmin.rpc("get_waha_config", { base_url: base });
-    const session = (cfg?.[0] as any)?.session || Deno.env.get("WAHA_SESSION") || "default";
-    const apiKey = (cfg?.[0] as any)?.api_key || Deno.env.get("WAHA_API_KEY") || "";
+    const row = (cfg as WahaConfigRow[] | null)?.[0];
+    const session = row?.session || Deno.env.get("WAHA_SESSION") || "default";
+    const apiKey = row?.api_key || Deno.env.get("WAHA_API_KEY") || "";
     const defaultCC = Deno.env.get("WA_DEFAULT_COUNTRY_CODE") || "+34";
 
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -162,6 +159,8 @@ serve(async (req: Request) => {
     const failed: Array<{ recipient_id: string; reason: string }> = [];
     let sentCount = 0;
 
+    // Concurrency note: Deno JS is single-threaded, so mutating `queue`/`sentCount` is safe
+    // as long as we only do it between `await` points (which we do in this loop).
     const queue = [...(recipients || [])];
     const concurrency = Math.max(1, Math.min(4, Number(Deno.env.get("WAHA_SEND_CONCURRENCY") || 4)));
 
@@ -224,15 +223,9 @@ serve(async (req: Request) => {
 
     await Promise.all(Array.from({ length: concurrency }).map(() => worker()));
 
-    return new Response(JSON.stringify({ success: true, sentCount, failed, job_id: body.job_id || null }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ success: true, sentCount, failed, job_id: body.job_id || null }, { status: 200 });
   } catch (err) {
     console.error("send-job-whatsapp-message error:", err);
-    return new Response(JSON.stringify({ error: "Internal Server Error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return jsonResponse({ error: "Internal Server Error" }, { status: 500 });
   }
 });
