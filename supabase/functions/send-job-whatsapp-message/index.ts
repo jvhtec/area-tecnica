@@ -111,6 +111,7 @@ serve(async (req: Request) => {
     const body = (await req.json().catch(() => ({}))) as SendRequest;
     const message = (body.message || "").toString().trim();
     const recipientIds = Array.isArray(body.recipient_ids) ? body.recipient_ids.filter(Boolean) : [];
+    const dedupedRecipientIds = Array.from(new Set(recipientIds));
     const jobId = (body.job_id || "").toString().trim();
 
     if (!message) {
@@ -121,11 +122,11 @@ serve(async (req: Request) => {
       return jsonResponse({ error: "Bad Request", reason: "Missing job_id" }, { status: 400 });
     }
 
-    if (recipientIds.length === 0) {
+    if (dedupedRecipientIds.length === 0) {
       return jsonResponse({ error: "Bad Request", reason: "No recipients" }, { status: 400 });
     }
 
-    if (recipientIds.length > 80) {
+    if (dedupedRecipientIds.length > 80) {
       return jsonResponse({ error: "Bad Request", reason: "Too many recipients" }, { status: 400 });
     }
 
@@ -134,12 +135,12 @@ serve(async (req: Request) => {
       .from("job_assignments")
       .select("technician_id")
       .eq("job_id", jobId)
-      .in("technician_id", recipientIds);
+      .in("technician_id", dedupedRecipientIds);
 
     if (asgErr) throw asgErr;
 
     const allowedIds = new Set((assignmentRows || []).map((r) => r.technician_id as string));
-    const disallowed = recipientIds.filter((id) => !allowedIds.has(id));
+    const disallowed = dedupedRecipientIds.filter((id) => !allowedIds.has(id));
     if (disallowed.length > 0) {
       return jsonResponse(
         {
@@ -154,7 +155,7 @@ serve(async (req: Request) => {
     const { data: recipients, error: recErr } = await supabaseAdmin
       .from("profiles")
       .select("id, first_name, last_name, phone")
-      .in("id", recipientIds);
+      .in("id", dedupedRecipientIds);
 
     if (recErr) throw recErr;
 

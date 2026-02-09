@@ -173,7 +173,19 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     }
   }, [job, TZ]);
 
+  type JobAssignmentRow = {
+    id: string;
+    technician_id: string;
+    single_day: boolean;
+    assignment_date: string | null;
+    profiles:
+      | { first_name: string | null; last_name: string | null; phone: string | null }
+      | { first_name: string | null; last_name: string | null; phone: string | null }[]
+      | null;
+  };
+
   type WaProdAssignment = {
+    id: string;
     technician_id: string;
     single_day: boolean;
     assignment_date: string | null;
@@ -185,13 +197,14 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_assignments')
-        .select('technician_id, single_day, assignment_date, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
+        .select('id, technician_id, single_day, assignment_date, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
         .eq('job_id', job.id);
       if (error) throw error;
 
-      const rows = (data || []).map((r: any) => {
+      const rows = (data as JobAssignmentRow[] | null || []).map((r) => {
         const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
         return {
+          id: r.id,
           technician_id: r.technician_id,
           single_day: Boolean(r.single_day),
           assignment_date: r.assignment_date || null,
@@ -1294,7 +1307,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                         const hasPhone = Boolean((a.profile?.phone || '').trim());
                         const checked = waProdRecipientIds.includes(a.technician_id);
                         return (
-                          <div key={a.technician_id} className={cn('flex items-start gap-2 p-2 rounded') }>
+                          <div key={`${a.technician_id}-${a.id}`} className={cn('flex items-start gap-2 p-2 rounded') }>
                             <Checkbox
                               checked={checked}
                               onCheckedChange={(next) => {
