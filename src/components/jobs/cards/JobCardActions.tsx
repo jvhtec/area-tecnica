@@ -889,7 +889,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           {transportButtonLabel}
         </Button>
       )}
-      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'dryhire' && (
+      {isProjectManagementPage && department !== 'production' && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'dryhire' && (
         <>
           {/* Show retry button if there's a request but no group (failed creation) */}
           {whatsappRequest && !whatsappGroup && onRetryWhatsappGroup ? (
@@ -918,7 +918,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           )}
         </>
       )}
-      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && (
+      {isProjectManagementPage && department !== 'production' && (userRole === 'management' || userRole === 'admin') && (
         <Button
           variant="outline"
           size="sm"
