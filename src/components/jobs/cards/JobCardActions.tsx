@@ -122,7 +122,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const { toast } = useToast();
   const { userDepartment } = useOptimizedAuth();
 
-  const normalizedUserDepartment = typeof userDepartment === 'string' ? userDepartment.toLowerCase() : '';
+  const normalizedUserDepartment = typeof userDepartment === 'string'
+    ? userDepartment.toLowerCase().replace(/_warehouse$/, '')
+    : '';
   const canSendProductionWhatsapp = Boolean(
     isProjectManagementPage
     && department === 'production'
@@ -150,6 +152,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   } | null>(null);
   const dryHirePresupuestoElementRef = React.useRef<string | null>(null);
 
+  /** Resolve job location label with priority: location_data > location > 'sin ubicación'. */
   const resolveJobLocation = React.useCallback((): string => {
     if (typeof job?.location_data === 'object' && job.location_data) {
       return job.location_data.name || job.location_data.formatted_address || 'sin ubicación';
@@ -163,6 +166,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
   const TZ = 'Europe/Madrid' as const;
 
+  /** Suggest call time from job start_time formatted in Europe/Madrid (still marked REVISAR in template). */
   const resolveSuggestedCallTime = React.useCallback((): string => {
     try {
       if (!job?.start_time) return '';
@@ -230,6 +234,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     staleTime: 30_000,
   });
 
+  /** Build selectable date groups for WhatsApp recipients: all-days vs specific assignment_date. */
   const waProdGroups = React.useMemo(() => {
     const keys = new Set<string>();
     keys.add('all');
@@ -267,11 +272,13 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     return list;
   }, [waProdAssignments, job]);
 
+  /** Map an assignment to its WhatsApp date-group key (used for filtering and selection). */
   const getAssignmentGroupKey = React.useCallback((a: WaProdAssignment): string => {
     if (a.single_day && a.assignment_date) return `day:${a.assignment_date}`;
     return 'all';
   }, []);
 
+  /** Build the prefilled WhatsApp message template for the selected job/date group/call time. */
   const buildWaProdTemplate = React.useCallback((opts: { groupKey: string; callTime: string }) => {
     const jobName = job?.title || job?.name || job?.job_name || 'Trabajo';
     const location = resolveJobLocation();
@@ -307,6 +314,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     job_id: string | null;
   };
 
+  /** Submit the WhatsApp message to the edge function after local validation. */
   const handleWaProdSend = React.useCallback(async () => {
     try {
       if (!waProdRecipientIds.length) {
@@ -342,8 +350,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           : `Mensaje enviado. Fallos: ${failed}.`,
       });
       setWaProdOpen(false);
-    } catch (e: any) {
-      toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast({ title: 'Error', description: message, variant: 'destructive' });
     } finally {
       setWaProdSending(false);
     }
@@ -367,7 +376,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         .map((a) => a.technician_id)
     );
     const filtered = waProdRecipientIds.filter((id) => allowedIds.has(id));
-    if (filtered.length !== waProdRecipientIds.length) setWaProdRecipientIds(filtered);
+    const isSame = filtered.length === waProdRecipientIds.length
+      && filtered.every((id, idx) => id === waProdRecipientIds[idx]);
+    if (!isSame) setWaProdRecipientIds(filtered);
   }, [waProdOpen, waProdAssignments, waProdDateGroup, waProdRecipientIds, getAssignmentGroupKey]);
 
   React.useEffect(() => {
@@ -1410,8 +1421,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                     toast({ title: 'Enviado', description: 'Mensaje enviado a Almacén sonido.' });
                     setWaAlmacenOpen(false);
                   }
-                } catch (e: any) {
-                  toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+                } catch (e: unknown) {
+                  const message = e instanceof Error ? e.message : String(e);
+                  toast({ title: 'Error', description: message, variant: 'destructive' });
                 } finally {
                   setIsSendingWa(false);
                 }

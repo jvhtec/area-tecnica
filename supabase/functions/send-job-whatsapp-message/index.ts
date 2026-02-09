@@ -70,12 +70,11 @@ serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method Not Allowed" }, { status: 405 });
 
-  const supabaseAdmin = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
-  );
-
   try {
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    );
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return jsonResponse({ error: "Unauthorized", reason: "Missing Authorization header" }, { status: 401 });
@@ -176,7 +175,8 @@ serve(async (req: Request) => {
     type WahaConfigRow = { session?: string; api_key?: string };
 
     const base = normalizeBase(actorProfile.waha_endpoint);
-    const { data: cfg } = await supabaseAdmin.rpc("get_waha_config", { base_url: base });
+    const { data: cfg, error: cfgErr } = await supabaseAdmin.rpc("get_waha_config", { base_url: base });
+    if (cfgErr) console.warn("get_waha_config RPC failed, falling back to env vars:", cfgErr.message);
     const row = (cfg as WahaConfigRow[] | null)?.[0];
     const session = row?.session || Deno.env.get("WAHA_SESSION") || "default";
     const apiKey = row?.api_key || Deno.env.get("WAHA_API_KEY") || "";
