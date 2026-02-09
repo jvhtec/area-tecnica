@@ -7,6 +7,7 @@ import {
   monitorConnectionHealth,
   supabase,
 } from '@/integrations/supabase/client';
+import { createQueryKey } from '@/lib/optimized-react-query';
 import { normalizeDept } from '@/utils/tasks';
 
 export interface PendingTask {
@@ -87,7 +88,9 @@ export function usePendingTasks(userId: string | null, userRole: string | null, 
     let channelRef: ReturnType<typeof supabase.channel> | undefined;
 
     const invalidatePendingTasks = () => {
-      queryClient.invalidateQueries({ queryKey: ['pending-tasks', userId, normalizedDepartment] });
+      queryClient.invalidateQueries({
+        queryKey: createQueryKey.pendingTasks.byUser(userId, normalizedDepartment),
+      });
     };
 
     (async () => {
@@ -177,7 +180,7 @@ export function usePendingTasks(userId: string | null, userRole: string | null, 
   }, [userId, isEligibleRole, normalizedDepartment, queryClient]);
 
   return useQuery({
-    queryKey: ['pending-tasks', userId, normalizedDepartment],
+    queryKey: createQueryKey.pendingTasks.byUser(userId, normalizedDepartment),
     enabled: !!userId && isEligibleRole,
     queryFn: async (): Promise<GroupedPendingTask[]> => {
       // Fetch both individually-assigned tasks and department-shared tasks

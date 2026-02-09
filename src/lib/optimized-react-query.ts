@@ -70,6 +70,11 @@ export const updateQueryClientForRole = (queryClient: QueryClient, isLeader: boo
 
 // Query key factory for consistent key generation
 export const createQueryKey = {
+  pendingTasks: {
+    all: ['pending-tasks'] as const,
+    byUser: (userId: string, dept: string | null) =>
+      [...createQueryKey.pendingTasks.all, userId, dept] as const,
+  },
   jobs: {
     all: ['jobs'] as const,
     lists: () => [...createQueryKey.jobs.all, 'list'] as const,

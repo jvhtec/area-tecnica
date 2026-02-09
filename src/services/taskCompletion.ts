@@ -1,18 +1,17 @@
 import { supabase } from '@/integrations/supabase/client';
+import { type Dept as Department } from '@/utils/tasks';
 
 /**
  * Task completion service
- * 
+ *
  * Provides centralized task completion logic for both manual and automated flows.
  * Handles Supabase updates, completion metadata tracking, and push notifications.
- * 
+ *
  * This service is used by:
  * - useTaskMutations (manual status changes in UI)
  * - useCompleteTask hook (pending tasks modal)
  * - taskAutoCompletion utility (document upload flows)
  */
-
-export type Department = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 
 export type CompletionSource = 
   | 'manual'

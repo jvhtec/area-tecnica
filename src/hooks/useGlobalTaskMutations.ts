@@ -159,7 +159,25 @@ export function useGlobalTaskMutations(department: Dept) {
     params: Parameters<typeof createTask>[0],
   ) => {
     const targetTable = TASK_TABLE[targetDept];
-    const { data } = await createTaskInTable(targetTable, params);
+    const { data, payload, userId } = await createTaskInTable(targetTable, params);
+
+    if ((payload as any).assigned_to && userId) {
+      try {
+        await supabase.functions.invoke('push', {
+          body: {
+            action: 'broadcast',
+            type: 'task.assigned',
+            recipient_id: (payload as any).assigned_to,
+            user_ids: [userId, (payload as any).assigned_to],
+            task_id: (data as any).id,
+            task_type: params.task_type,
+          },
+        });
+      } catch (e) {
+        console.warn('[useGlobalTaskMutations] push failed', e);
+      }
+    }
+
     return data;
   };
 
