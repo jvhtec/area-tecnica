@@ -5,6 +5,7 @@ import { SubscriptionProvider } from "@/providers/SubscriptionProvider";
 import { AppInit } from "@/components/AppInit";
 import { useActivityPushFallback } from "@/hooks/useActivityPushFallback";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { AchievementBanner } from "@/components/achievements/AchievementBanner";
 
 function ActivityPushFallbackInit() {
   useActivityPushFallback();
@@ -24,6 +25,7 @@ function TechnicianRouteGuard() {
     const isAllowedTechnicianRoute =
       location.pathname === "/tech-app" ||
       location.pathname === "/syscalc" ||
+      location.pathname === "/achievements" ||
       location.pathname === "/auth" ||
       location.pathname.startsWith("/auth");
 
@@ -44,6 +46,7 @@ export default function AuthenticatedShell() {
         <AppInit />
         <ActivityPushFallbackInit />
         <TechnicianRouteGuard />
+        <AchievementBanner />
         <Outlet />
       </SubscriptionProvider>
     </RequireAuth>
