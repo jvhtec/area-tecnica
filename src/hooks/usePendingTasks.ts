@@ -7,7 +7,7 @@ export interface PendingTask {
   id: string;
   job_id: string | null;
   tour_id: string | null;
-  department: 'sound' | 'lights' | 'video';
+  department: 'sound' | 'lights' | 'video' | 'production' | 'administrative';
   task_type: string;
   description: string | null;
   assigned_to: string;
@@ -32,7 +32,7 @@ export interface GroupedPendingTask {
   client?: string;
   tasks: Array<{
     id: string;
-    department: 'sound' | 'lights' | 'video';
+    department: 'sound' | 'lights' | 'video' | 'production' | 'administrative';
     taskType: string;
     description: string | null;
     status: 'not_started' | 'in_progress';
@@ -49,16 +49,22 @@ export interface GroupedPendingTask {
   }>;
 }
 
-const TASK_TABLES = ['sound_job_tasks', 'lights_job_tasks', 'video_job_tasks'] as const;
+const TASK_TABLES = [
+  'sound_job_tasks',
+  'lights_job_tasks',
+  'video_job_tasks',
+  'production_job_tasks',
+  'administrative_job_tasks',
+] as const;
 
 type TaskRow = Record<string, unknown> & { assigned_to?: string | null };
 
 /**
  * Hook to fetch pending tasks for the current user
- * Only runs when a logged-in management/admin/logistics user is detected
+ * Only runs when a logged-in task-coordinator role is detected
  */
 export function usePendingTasks(userId: string | null, userRole: string | null) {
-  const isEligibleRole = !!userRole && ['management', 'admin', 'logistics'].includes(userRole);
+  const isEligibleRole = !!userRole && ['management', 'admin', 'logistics', 'oscar'].includes(userRole);
   const queryClient = useQueryClient();
 
   useEffect(() => {

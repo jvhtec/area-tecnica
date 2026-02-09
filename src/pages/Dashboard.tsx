@@ -53,6 +53,8 @@ const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   });
 };
 
+const DASHBOARD_ROLES = ['admin', 'management', 'logistics', 'oscar'] as const;
+
 const Dashboard = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -64,11 +66,11 @@ const Dashboard = () => {
     </div>
   );
 
-  // Early security check: Only allow admin, management, logistics
+  // Early security check: Only allow dashboard-capable roles
   useEffect(() => {
     if (authLoading) return;
 
-    if (userRole && !['admin', 'management', 'logistics'].includes(userRole)) {
+    if (userRole && !DASHBOARD_ROLES.includes(userRole as typeof DASHBOARD_ROLES[number])) {
       const redirectPath = getDashboardPath(userRole as any);
       navigate(redirectPath, { replace: true });
     }
@@ -99,7 +101,7 @@ const Dashboard = () => {
 
   const { data: pendingExpensesSummary, isLoading: isLoadingPendingExpenses } = useQuery({
     queryKey: ['dashboard-expenses-summary'],
-    enabled: !!userRole && ['admin', 'management', 'logistics'].includes(userRole),
+    enabled: !!userRole && DASHBOARD_ROLES.includes(userRole as typeof DASHBOARD_ROLES[number]),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_expenses')
@@ -150,7 +152,7 @@ const Dashboard = () => {
   }, [jobs]);
 
   const handleEditClick = useCallback((job: any) => {
-    if (userRole === "logistics") return;
+    if (userRole === "logistics" || userRole === "oscar") return;
     setSelectedJob(job);
     setIsEditDialogOpen(true);
   }, [userRole]);
@@ -207,7 +209,7 @@ const Dashboard = () => {
   }
 
   // Don't render anything if user is unauthorized (they'll be redirected)
-  if (!userRole || !['admin', 'management', 'logistics'].includes(userRole)) {
+  if (!userRole || !DASHBOARD_ROLES.includes(userRole as typeof DASHBOARD_ROLES[number])) {
     return null;
   }
 

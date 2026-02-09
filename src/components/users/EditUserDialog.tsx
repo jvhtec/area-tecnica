@@ -298,6 +298,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="management">Management</SelectItem>
                   <SelectItem value="logistics">Logistics</SelectItem>
+                  <SelectItem value="oscar">Oscar</SelectItem>
                   <SelectItem value="technician">Technician</SelectItem>
                   <SelectItem value="house_tech">House Tech</SelectItem>
                 </SelectContent>

@@ -2,7 +2,7 @@ import React from 'react';
 import { useGlobalTasks, GlobalTaskFilters, GlobalTask } from '@/hooks/useGlobalTasks';
 import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { canEditTasks, canAssignTasks } from '@/utils/tasks';
+import { canAssignTasks, canCreateTasks, canEditTasks } from '@/utils/tasks';
 import { CreateGlobalTaskDialog } from '@/components/tasks/CreateGlobalTaskDialog';
 import { LinkJobDialog } from '@/components/tasks/LinkJobDialog';
 import { Button } from '@/components/ui/button';
@@ -42,7 +42,7 @@ import {
   localInputToUTC,
 } from '@/utils/timezoneUtils';
 
-type Dept = 'sound' | 'lights' | 'video';
+type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 
 interface DeptUser {
   id: string;
@@ -54,7 +54,10 @@ const DEPARTMENT_LABELS: Record<string, string> = {
   sound: 'Sonido',
   lights: 'Luces',
   video: 'Vídeo',
+  production: 'Producción',
+  administrative: 'Administración',
 };
+const DEPARTMENT_OPTIONS: Dept[] = ['sound', 'lights', 'video', 'production', 'administrative'];
 
 const PRIORITY_LABELS: Record<number, { label: string; class: string }> = {
   1: { label: 'Alta', class: 'bg-red-500/10 text-red-600 border-red-500/20' },
@@ -87,7 +90,7 @@ function useAllEligibleUsers(userDepartment: string | null) {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, department')
-        .in('role', ['management', 'admin', 'logistics', 'house_tech'])
+        .in('role', ['management', 'admin', 'logistics', 'house_tech', 'oscar'])
         .order('first_name');
       if (error) throw error;
       const all = (data || []) as (DeptUser & { department: string | null })[];
@@ -117,6 +120,8 @@ function normalizeDept(raw: string | null): Dept {
   const lower = raw?.toLowerCase() ?? '';
   if (lower === 'lights' || lower === 'luces') return 'lights';
   if (lower === 'video' || lower === 'vídeo') return 'video';
+  if (lower === 'production' || lower === 'produccion' || lower === 'producción') return 'production';
+  if (lower === 'administrative' || lower === 'administracion' || lower === 'administración') return 'administrative';
   return 'sound';
 }
 
@@ -144,8 +149,18 @@ function isOverdueMadrid(isoDate: string): boolean {
 
 export default function GlobalTasks() {
   const { userRole, userId, userDepartment } = useOptimizedAuth();
-  const dept = normalizeDept(userDepartment);
+  const defaultDept = React.useMemo(() => normalizeDept(userDepartment), [userDepartment]);
+  const canChooseDepartment = userRole === 'oscar';
+  const [selectedDept, setSelectedDept] = React.useState<Dept>(defaultDept);
+  const dept = canChooseDepartment ? selectedDept : defaultDept;
+  React.useEffect(() => {
+    if (!canChooseDepartment) {
+      setSelectedDept(defaultDept);
+    }
+  }, [canChooseDepartment, defaultDept]);
+
   const canEdit = canEditTasks(userRole);
+  const canCreate = canCreateTasks(userRole);
   const canAssign = canAssignTasks(userRole);
   const { toast } = useToast();
 
@@ -356,7 +371,21 @@ export default function GlobalTasks() {
             <Filter className="h-4 w-4 mr-1" />
             Filtros
           </Button>
-          {canEdit && (
+          {canChooseDepartment && (
+            <Select value={dept} onValueChange={(value) => setSelectedDept(value as Dept)}>
+              <SelectTrigger className="w-[130px] h-9">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DEPARTMENT_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {DEPARTMENT_LABELS[option]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {canCreate && (
             <Button size="sm" onClick={() => setShowCreate(true)}>
               <Plus className="h-4 w-4 mr-1" />
               Nueva tarea

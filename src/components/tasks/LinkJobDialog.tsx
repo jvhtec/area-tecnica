@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 
-type Dept = 'sound' | 'lights' | 'video';
+type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;

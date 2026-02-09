@@ -25,7 +25,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/dashboard',
     keybind: 'Ctrl+1',
     icon: 'LayoutDashboard',
-    requiredRoles: ['admin', 'management', 'logistics'],
+    requiredRoles: ['admin', 'management', 'logistics', 'oscar'],
   },
   {
     id: 'nav-technician-dashboard',

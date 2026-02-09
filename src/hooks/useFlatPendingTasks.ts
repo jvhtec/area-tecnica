@@ -3,7 +3,7 @@ import { usePendingTasks, GroupedPendingTask } from './usePendingTasks';
 
 export interface FlatPendingTask {
   id: string;
-  department: 'sound' | 'lights' | 'video';
+  department: 'sound' | 'lights' | 'video' | 'production' | 'administrative';
   taskType: string;
   status: 'not_started' | 'in_progress';
   progress: number;

@@ -209,7 +209,7 @@ export default function App() {
                             <Route element={<Layout />}>
                               <Route path="/sound" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Sound /></ProtectedRoute>} />
                               <Route path="/personal" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><Personal /></ProtectedRoute>} />
-                              <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><Dashboard /></ProtectedRoute>} />
+                              <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'oscar']}><Dashboard /></ProtectedRoute>} />
                               {/* House tech dashboard routes (regular technicians use /tech-app) */}
                               <Route path="/technician-dashboard" element={<ProtectedRoute allowedRoles={['house_tech']}><TechnicianDashboard /></ProtectedRoute>} />
                               <Route path="/dashboard/unavailability" element={<ProtectedRoute allowedRoles={['house_tech']}><TechnicianUnavailability /></ProtectedRoute>} />
@@ -220,7 +220,7 @@ export default function App() {
                               <Route path="/profile" element={<Profile />} />
                               <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin', 'management']}><Settings /></ProtectedRoute>} />
                               <Route path="/project-management" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><ProjectManagement /></ProtectedRoute>} />
-                              <Route path="/tasks" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><GlobalTasks /></ProtectedRoute>} />
+                              <Route path="/tasks" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech', 'oscar']}><GlobalTasks /></ProtectedRoute>} />
                               <Route path="/equipment-management" element={<EquipmentManagement />} />
                               <Route path="/job-assignment-matrix" element={<ProtectedRoute allowedRoles={['admin', 'management']}><JobAssignmentMatrix /></ProtectedRoute>} />
                               <Route path="/activity" element={<ProtectedRoute allowedRoles={['admin']}><ActivityCenter /></ProtectedRoute>} />

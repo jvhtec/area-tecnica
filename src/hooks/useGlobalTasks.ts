@@ -7,18 +7,22 @@ import {
   monitorConnectionHealth,
 } from '@/lib/enhanced-supabase-client';
 
-type Dept = 'sound' | 'lights' | 'video';
+type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 
 const TASK_TABLE: Record<Dept, string> = {
   sound: 'sound_job_tasks',
   lights: 'lights_job_tasks',
   video: 'video_job_tasks',
+  production: 'production_job_tasks',
+  administrative: 'administrative_job_tasks',
 };
 
 const DOC_FK: Record<Dept, string> = {
   sound: 'sound_task_id',
   lights: 'lights_task_id',
   video: 'video_task_id',
+  production: 'production_task_id',
+  administrative: 'administrative_task_id',
 };
 
 export interface GlobalTaskFilters {
@@ -70,7 +74,7 @@ export interface GlobalTask {
  * Fetches global tasks for the specified department with optional filters.
  * Subscribes to realtime changes and monitors connection health.
  *
- * @param department - The department to fetch tasks for ('sound', 'lights', or 'video')
+ * @param department - The department to fetch tasks for
  * @param filters - Optional filters (status, assignedTo, jobId, tourId, unlinked)
  * @returns Object containing tasks array, loading state, error, and refetch function
  */
@@ -90,7 +94,7 @@ export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTas
     queryKey: ['global-tasks', dept, filters],
     queryFn: async () => {
       let q = supabase
-        .from(table)
+        .from(table as any)
         .select(`
           *,
           assigned_to_profile:assigned_to(id, first_name, last_name),

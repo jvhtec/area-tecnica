@@ -281,90 +281,74 @@ BEGIN
   RETURN v_result;
 END;
 $function$;
-
 REVOKE EXECUTE ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) FROM anon;
 GRANT EXECUTE ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) TO authenticated, service_role;
-
 COMMENT ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) IS
   'Calculates timesheet amounts based on rate cards. Special rules: (1) Rehearsal jobs (tour_date_type=rehearsal) use flat €180 rate regardless of time/category, (2) Extended shifts over 20.5 hours use double base rate with no plus/overtime. Checks custom_tech_rates first for overrides, falls back to rate_cards_2025.';
-
 -- Ensure deterministic lookups by enforcing uniqueness on category columns
 CREATE UNIQUE INDEX IF NOT EXISTS rate_cards_2025_category_unique_idx
   ON public.rate_cards_2025 (category);
-
 CREATE UNIQUE INDEX IF NOT EXISTS rate_cards_tour_2025_category_unique_idx
   ON public.rate_cards_tour_2025 (category);
-
 -- -----------------------------------------------------------------------------
 -- Row Level Security for rate_cards_2025
 -- -----------------------------------------------------------------------------
 ALTER TABLE public.rate_cards_2025 ENABLE ROW LEVEL SECURITY;
-
 -- Drop existing policies if any (idempotent)
 DROP POLICY IF EXISTS "rate_cards_2025_select_policy" ON public.rate_cards_2025;
 DROP POLICY IF EXISTS "rate_cards_2025_insert_policy" ON public.rate_cards_2025;
 DROP POLICY IF EXISTS "rate_cards_2025_update_policy" ON public.rate_cards_2025;
 DROP POLICY IF EXISTS "rate_cards_2025_delete_policy" ON public.rate_cards_2025;
-
 -- Allow authenticated users to read rate cards
 CREATE POLICY "rate_cards_2025_select_policy"
   ON public.rate_cards_2025
   FOR SELECT
   TO authenticated
   USING (true);
-
 -- Only admin/management can modify rate cards
 CREATE POLICY "rate_cards_2025_insert_policy"
   ON public.rate_cards_2025
   FOR INSERT
   TO authenticated
   WITH CHECK (public.is_admin_or_management());
-
 CREATE POLICY "rate_cards_2025_update_policy"
   ON public.rate_cards_2025
   FOR UPDATE
   TO authenticated
   USING (public.is_admin_or_management())
   WITH CHECK (public.is_admin_or_management());
-
 CREATE POLICY "rate_cards_2025_delete_policy"
   ON public.rate_cards_2025
   FOR DELETE
   TO authenticated
   USING (public.is_admin_or_management());
-
 -- -----------------------------------------------------------------------------
 -- Row Level Security for rate_cards_tour_2025
 -- -----------------------------------------------------------------------------
 ALTER TABLE public.rate_cards_tour_2025 ENABLE ROW LEVEL SECURITY;
-
 -- Drop existing policies if any (idempotent)
 DROP POLICY IF EXISTS "rate_cards_tour_2025_select_policy" ON public.rate_cards_tour_2025;
 DROP POLICY IF EXISTS "rate_cards_tour_2025_insert_policy" ON public.rate_cards_tour_2025;
 DROP POLICY IF EXISTS "rate_cards_tour_2025_update_policy" ON public.rate_cards_tour_2025;
 DROP POLICY IF EXISTS "rate_cards_tour_2025_delete_policy" ON public.rate_cards_tour_2025;
-
 -- Allow authenticated users to read tour rate cards
 CREATE POLICY "rate_cards_tour_2025_select_policy"
   ON public.rate_cards_tour_2025
   FOR SELECT
   TO authenticated
   USING (true);
-
 -- Only admin/management can modify tour rate cards
 CREATE POLICY "rate_cards_tour_2025_insert_policy"
   ON public.rate_cards_tour_2025
   FOR INSERT
   TO authenticated
   WITH CHECK (public.is_admin_or_management());
-
 CREATE POLICY "rate_cards_tour_2025_update_policy"
   ON public.rate_cards_tour_2025
   FOR UPDATE
   TO authenticated
   USING (public.is_admin_or_management())
   WITH CHECK (public.is_admin_or_management());
-
 CREATE POLICY "rate_cards_tour_2025_delete_policy"
   ON public.rate_cards_tour_2025
   FOR DELETE

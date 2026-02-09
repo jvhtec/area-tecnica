@@ -45,6 +45,8 @@ export const useOptimizedDashboardSubscriptions = () => {
     { table: 'sound_job_tasks', queryKey: [...createQueryKey.tasks.all], priority: 'medium' as const },
     { table: 'lights_job_tasks', queryKey: [...createQueryKey.tasks.all], priority: 'low' as const },
     { table: 'video_job_tasks', queryKey: [...createQueryKey.tasks.all], priority: 'low' as const },
+    { table: 'production_job_tasks', queryKey: [...createQueryKey.tasks.all], priority: 'low' as const },
+    { table: 'administrative_job_tasks', queryKey: [...createQueryKey.tasks.all], priority: 'low' as const },
   ];
 
   return useOptimizedTableSubscriptions(subscriptions);

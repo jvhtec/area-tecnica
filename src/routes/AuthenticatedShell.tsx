@@ -39,6 +39,32 @@ function TechnicianRouteGuard() {
   return null;
 }
 
+function OscarRouteGuard() {
+  const { userRole, isLoading } = useOptimizedAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (isLoading) return;
+    if (userRole !== "oscar") return;
+
+    const isAllowedOscarRoute =
+      location.pathname === "/dashboard" ||
+      location.pathname === "/tasks" ||
+      location.pathname === "/profile" ||
+      location.pathname === "/auth" ||
+      location.pathname.startsWith("/auth");
+
+    if (isAllowedOscarRoute) {
+      return;
+    }
+
+    navigate("/dashboard", { replace: true });
+  }, [userRole, isLoading, location.pathname, navigate]);
+
+  return null;
+}
+
 export default function AuthenticatedShell() {
   return (
     <RequireAuth>
@@ -46,6 +72,7 @@ export default function AuthenticatedShell() {
         <AppInit />
         <ActivityPushFallbackInit />
         <TechnicianRouteGuard />
+        <OscarRouteGuard />
         <AchievementBanner />
         <Outlet />
       </SubscriptionProvider>

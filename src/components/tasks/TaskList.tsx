@@ -373,7 +373,7 @@ function useManagementUsers() {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
-        .in('role', ['management','admin','logistics']);
+        .in('role', ['management', 'admin', 'logistics', 'oscar']);
       if (error) throw error;
       return data || [];
     }

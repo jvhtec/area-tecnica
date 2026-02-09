@@ -18,7 +18,7 @@ import { es } from 'date-fns/locale';
 
 interface Task {
   id: string;
-  department: 'sound' | 'lights' | 'video';
+  department: 'sound' | 'lights' | 'video' | 'production' | 'administrative';
   taskType: string;
   status: 'not_started' | 'in_progress';
   progress: number;
@@ -44,6 +44,8 @@ const DEPARTMENT_COLORS: Record<string, string> = {
   sound: 'bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-400',
   lights: 'bg-amber-500/10 text-amber-700 border-amber-500/20 dark:text-amber-400',
   video: 'bg-purple-500/10 text-purple-700 border-purple-500/20 dark:text-purple-400',
+  production: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-400',
+  administrative: 'bg-rose-500/10 text-rose-700 border-rose-500/20 dark:text-rose-400',
 };
 
 const STATUS_LABELS: Record<string, string> = {

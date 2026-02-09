@@ -26,8 +26,6 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE staffing_campaign_events;
   END IF;
 END $$;
-
 ALTER TABLE staffing_campaigns REPLICA IDENTITY FULL;
 ALTER TABLE staffing_campaign_roles REPLICA IDENTITY FULL;
 ALTER TABLE staffing_campaign_events REPLICA IDENTITY FULL;
-

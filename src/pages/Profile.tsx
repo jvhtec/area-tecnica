@@ -53,7 +53,7 @@ export const Profile = () => {
   const hasSubscription = Boolean(subscription);
   const showEnableButton = canEnable && !isInitializing;
   const isBlocked = permission === 'denied';
-  const showPushControls = ['technician', 'house_tech'].includes(profile?.role);
+  const showPushControls = ['technician', 'house_tech', 'oscar'].includes(profile?.role);
   const showIcsCard = ['technician', 'house_tech', 'management', 'admin'].includes(profile?.role);
 
   // Fetch user profile on component mount

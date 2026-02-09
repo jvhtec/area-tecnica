@@ -12,10 +12,8 @@ CREATE TABLE IF NOT EXISTS public.role_skill_mapping (
   created_at timestamptz DEFAULT now() NOT NULL,
   UNIQUE(role_prefix, skill_name)
 );
-
 -- Enable Row Level Security
 ALTER TABLE public.role_skill_mapping ENABLE ROW LEVEL SECURITY;
-
 -- Create SELECT policy for authenticated users
 DROP POLICY IF EXISTS "role_skill_mapping_select_for_authenticated" ON public.role_skill_mapping;
 CREATE POLICY "role_skill_mapping_select_for_authenticated"
@@ -23,14 +21,11 @@ CREATE POLICY "role_skill_mapping_select_for_authenticated"
   FOR SELECT
   TO authenticated
   USING (true);
-
 -- Grant access (service_role bypasses RLS)
 GRANT SELECT ON public.role_skill_mapping TO authenticated;
 GRANT SELECT ON public.role_skill_mapping TO service_role;
-
 -- Create index for faster lookups
 CREATE INDEX IF NOT EXISTS idx_role_skill_mapping_prefix ON public.role_skill_mapping(role_prefix);
-
 -- Now update the ranking function to use the mapping
 CREATE OR REPLACE FUNCTION public.rank_staffing_candidates(
   p_job_id uuid,

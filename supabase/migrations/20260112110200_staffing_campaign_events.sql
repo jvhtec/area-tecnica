@@ -13,15 +13,11 @@ CREATE TABLE IF NOT EXISTS staffing_campaign_events (
   reasons jsonb,
   created_at timestamptz DEFAULT now()
 );
-
 CREATE INDEX IF NOT EXISTS staffing_campaign_events_campaign_phase
   ON staffing_campaign_events(campaign_id, phase);
-
 CREATE INDEX IF NOT EXISTS staffing_campaign_events_profile_created
   ON staffing_campaign_events(profile_id, created_at);
-
 ALTER TABLE staffing_campaign_events ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "staffing_campaign_events_select_management"
   ON staffing_campaign_events
   FOR SELECT

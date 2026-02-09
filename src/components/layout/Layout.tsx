@@ -265,7 +265,7 @@ const Layout = () => {
     }
 
     // Only show for eligible roles
-    const isEligibleRole = ['management', 'admin', 'logistics'].includes(userRole)
+    const isEligibleRole = ['management', 'admin', 'logistics', 'oscar'].includes(userRole)
     if (!isEligibleRole) {
       return
     }
@@ -483,7 +483,7 @@ const Layout = () => {
                       display="icon"
                     />
                   )}
-                  {userId && userRole && ['management', 'admin', 'logistics'].includes(userRole) && (
+                  {userId && userRole && ['management', 'admin', 'logistics', 'oscar'].includes(userRole) && (
                     <PendingTasksBadge
                       userId={userId}
                       userRole={userRole}

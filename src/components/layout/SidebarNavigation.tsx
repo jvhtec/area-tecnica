@@ -91,7 +91,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 1,
     mobileSlot: "primary",
     getPath: () => "/dashboard",
-    isVisible: ({ userRole }) => userRole === "management",
+    isVisible: ({ userRole }) => userRole === "management" || userRole === "oscar",
   },
   {
     id: "technician-dashboard",
@@ -148,7 +148,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 2,
     mobileSlot: "secondary",
     getPath: () => "/personal",
-    isVisible: ({ userRole }) => userRole !== "technician",
+    isVisible: ({ userRole }) => userRole !== "technician" && userRole !== "oscar",
   },
   {
     id: "job-assignment-matrix",
@@ -281,8 +281,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 6,
     mobileSlot: "secondary",
     getPath: () => "/festivals",
-    isVisible: ({ userDepartment }) =>
-      userDepartment?.toLowerCase() === "sound",
+    isVisible: ({ userDepartment, userRole }) =>
+      userRole !== "oscar" && userDepartment?.toLowerCase() === "sound",
   },
   {
     id: "disponibilidad",
@@ -328,7 +328,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
       userRole === "admin" ||
       userRole === "management" ||
       userRole === "logistics" ||
-      userRole === "house_tech",
+      userRole === "house_tech" ||
+      userRole === "oscar",
   },
   {
     id: "logistics",
@@ -403,7 +404,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 16,
     mobileSlot: "secondary",
     getPath: () => "/feedback",
-    isVisible: ({ userRole }) => userRole !== "technician",
+    isVisible: ({ userRole }) => userRole !== "technician" && userRole !== "oscar",
   },
   {
     id: "settings",

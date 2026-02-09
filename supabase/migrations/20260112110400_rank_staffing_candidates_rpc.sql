@@ -174,52 +174,52 @@ BEGIN
   ),
   scored AS (
     SELECT
-      wc.profile_id,
-      wc.full_name,
-      wc.department,
-      wc.user_role,
-      wc.is_primary,
-      wc.proficiency,
-      wc.jobs_worked,
-      wc.current_month_days,
+      profile_id,
+      full_name,
+      department,
+      user_role,
+      is_primary,
+      proficiency,
+      jobs_worked,
+      current_month_days,
       -- Component scores (skills is 0-100, others 0-10)
       (
         CASE
-          WHEN wc.proficiency > 0 THEN LEAST(
+          WHEN proficiency > 0 THEN LEAST(
             100,
-            (CASE WHEN wc.is_primary THEN 60 ELSE 40 END) + (wc.proficiency * 8)
+            (CASE WHEN is_primary THEN 60 ELSE 40 END) + (proficiency * 8)
           )
           ELSE 10
         END
       )::int AS skills_score,
       NULL::double precision AS distance_to_madrid_km,
       0::int AS proximity_score,
-      LEAST(wc.jobs_worked, 10)::int AS experience_score,
+      LEAST(jobs_worked, 10)::int AS experience_score,
       (
         CASE
-          WHEN wc.avail_total > 0 OR wc.offer_total > 0 THEN
+          WHEN avail_total > 0 OR offer_total > 0 THEN
             ROUND(
-              COALESCE(wc.avail_yes::numeric / NULLIF(wc.avail_total, 0), 0) * 5 +
-              COALESCE(wc.offer_yes::numeric / NULLIF(wc.offer_total, 0), 0) * 5
+              COALESCE(avail_yes::numeric / NULLIF(avail_total, 0), 0) * 5 +
+              COALESCE(offer_yes::numeric / NULLIF(offer_total, 0), 0) * 5
             )
           ELSE 5
         END
       )::int AS reliability_score,
       (
         CASE
-          WHEN wc.user_role = 'house_tech' AND wc.current_month_days < 4 THEN 10
-          WHEN wc.last_work_date IS NULL THEN 10
-          WHEN (now()::date - wc.last_work_date) > 30 THEN 10
-          WHEN (now()::date - wc.last_work_date) > 14 THEN 7
+          WHEN user_role = 'house_tech' AND current_month_days < 4 THEN 10
+          WHEN last_work_date IS NULL THEN 10
+          WHEN (now()::date - last_work_date) > 30 THEN 10
+          WHEN (now()::date - last_work_date) > 14 THEN 7
           ELSE 3
         END
       )::int AS fairness_score,
-      COALESCE((wc.conflict_json->>'hasSoftConflict')::boolean, false) AS soft_conflict,
+      COALESCE((conflict_json->>'hasSoftConflict')::boolean, false) AS soft_conflict,
       (
-        COALESCE((wc.conflict_json->>'hasHardConflict')::boolean, false)
-        OR jsonb_array_length(COALESCE(wc.conflict_json->'unavailabilityConflicts', '[]'::jsonb)) > 0
+        COALESCE((conflict_json->>'hasHardConflict')::boolean, false)
+        OR jsonb_array_length(COALESCE(conflict_json->'unavailabilityConflicts', '[]'::jsonb)) > 0
       ) AS hard_conflict
-    FROM with_conflicts wc
+    FROM with_conflicts
   ),
   filtered AS (
     SELECT
@@ -282,6 +282,5 @@ BEGIN
   LIMIT 50;
 END;
 $$;
-
 GRANT EXECUTE ON FUNCTION public.rank_staffing_candidates(uuid, text, text, text, jsonb)
   TO authenticated, service_role;

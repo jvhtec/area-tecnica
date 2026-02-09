@@ -17,17 +17,13 @@ CREATE TABLE IF NOT EXISTS staffing_campaigns (
 
   UNIQUE(job_id, department)
 );
-
 -- Create indexes
 CREATE INDEX IF NOT EXISTS staffing_campaigns_status_next_run
   ON staffing_campaigns(status, next_run_at);
-
 CREATE INDEX IF NOT EXISTS staffing_campaigns_dept_status
   ON staffing_campaigns(department, status);
-
 -- Enable RLS
 ALTER TABLE staffing_campaigns ENABLE ROW LEVEL SECURITY;
-
 -- Read: allow admin/management/logistics, scoped to department (unless admin/logistics or no dept set)
 CREATE POLICY "staffing_campaigns_select_management"
   ON staffing_campaigns
@@ -47,7 +43,6 @@ CREATE POLICY "staffing_campaigns_select_management"
         )
     )
   );
-
 -- Write: allow admin/management/logistics, scoped to department (unless admin/logistics or no dept set)
 CREATE POLICY "staffing_campaigns_write_management"
   ON staffing_campaigns

@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { fromZonedTime } from 'date-fns-tz';
 
-type Dept = 'sound' | 'lights' | 'video';
+type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
 const ASSIGN_SELECTED_DEPARTMENTS = '__selected_departments__';
@@ -22,13 +22,27 @@ const DEPARTMENT_NAME: Record<Dept, string> = {
   sound: 'sonido',
   lights: 'luces',
   video: 'video',
+  production: 'producción',
+  administrative: 'administración',
 };
 
 const TASK_TYPES: Record<Dept, string[]> = {
   sound: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
   lights: ['QT', 'Rigging Plot', 'Pesos', 'Consumos', 'PS'],
   video: ['QT', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
+  production: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
+  administrative: ['QT', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
 };
+
+function normalizeDept(value: string | null | undefined): Dept | null {
+  const lower = (value || '').toLowerCase();
+  if (lower === 'sound' || lower === 'sonido') return 'sound';
+  if (lower === 'lights' || lower === 'luces') return 'lights';
+  if (lower === 'video' || lower === 'vídeo') return 'video';
+  if (lower === 'production' || lower === 'produccion' || lower === 'producción') return 'production';
+  if (lower === 'administrative' || lower === 'administracion' || lower === 'administración') return 'administrative';
+  return null;
+}
 
 interface CreateGlobalTaskDialogProps {
   open: boolean;
@@ -74,7 +88,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, role, department')
-        .in('role', ['management', 'admin', 'logistics', 'house_tech'])
+        .in('role', ['management', 'admin', 'logistics', 'house_tech', 'oscar'])
         .order('first_name');
       if (error) throw error;
       const all = data || [];
@@ -230,7 +244,10 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
         const assigneeIds = Array.from(
           new Set(
             eligibleUsers
-              .filter((u) => selectedDepartments.includes((u.department || '').toLowerCase() as Dept))
+              .filter((u) => {
+                const normalized = normalizeDept(u.department);
+                return normalized ? selectedDepartments.includes(normalized) : false;
+              })
               .filter((u) => !TECHNICIAN_LEVEL_ROLES.has(String(u.role || '')))
               .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
               .filter((id): id is string => id.length > 0)
@@ -354,7 +371,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
                 <div className="mt-2 rounded-md border p-2 space-y-2">
                   <p className="text-xs text-muted-foreground">Selecciona departamentos para asignación masiva</p>
                   <div className="grid grid-cols-1 gap-1 text-sm">
-                    {(['sound', 'lights', 'video'] as Dept[]).map((dep) => (
+                    {(['sound', 'lights', 'video', 'production', 'administrative'] as Dept[]).map((dep) => (
                       <label key={dep} className="flex items-center gap-2">
                         <input
                           type="checkbox"
@@ -365,7 +382,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
                             )
                           }
                         />
-                        <span>{dep}</span>
+                        <span>{DEPARTMENT_NAME[dep]}</span>
                       </label>
                     ))}
                   </div>

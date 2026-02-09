@@ -2,7 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { completeTask, revertTask, Department } from '@/services/taskCompletion';
 import type { Database } from '@/integrations/supabase/types';
 
-type Dept = 'sound' | 'lights' | 'video';
+type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 
 type SoundTaskUpdate = Database['public']['Tables']['sound_job_tasks']['Update'];
 type LightsTaskUpdate = Database['public']['Tables']['lights_job_tasks']['Update'];
@@ -13,12 +13,16 @@ const TASK_TABLE: Record<Dept, string> = {
   sound: 'sound_job_tasks',
   lights: 'lights_job_tasks',
   video: 'video_job_tasks',
+  production: 'production_job_tasks',
+  administrative: 'administrative_job_tasks',
 };
 
 const DOC_FK: Record<Dept, string> = {
   sound: 'sound_task_id',
   lights: 'lights_task_id',
   video: 'video_task_id',
+  production: 'production_task_id',
+  administrative: 'administrative_task_id',
 };
 
 /**
@@ -57,7 +61,7 @@ export { resolveTaskDocBucket };
  * Handles task CRUD operations, assignments, status changes, linking to jobs/tours,
  * and document attachments with mirroring to linked entities.
  *
- * @param department - The department ('sound', 'lights', or 'video') to operate on
+ * @param department - The department to operate on
  * @returns Object containing mutation functions: createTask, updateTask, deleteTask,
  *          assignUser, setStatus, setDueDate, linkTask, uploadAttachment, deleteAttachment
  */
@@ -95,7 +99,7 @@ export function useGlobalTaskMutations(department: Dept) {
     if (params.tour_id) payload.tour_id = params.tour_id;
 
     const { data, error } = await supabase
-      .from(table)
+      .from(table as any)
       .insert(payload)
       .select()
       .single();
@@ -165,7 +169,7 @@ export function useGlobalTaskMutations(department: Dept) {
     if (params.tour_id) payloadBase.tour_id = params.tour_id;
 
     let existingQuery = supabase
-      .from(table)
+      .from(table as any)
       .select('assigned_to')
       .eq('task_type', params.task_type)
       .in('assigned_to', normalizedAssigneeIds);
@@ -197,7 +201,7 @@ export function useGlobalTaskMutations(department: Dept) {
       assigned_to: assigneeId,
     }));
 
-    const { data, error } = await supabase.from(table).insert(payloads).select('id, assigned_to');
+    const { data, error } = await supabase.from(table as any).insert(payloads).select('id, assigned_to');
     if (error) throw error;
 
     return { created: data || [], skippedAssigneeIds };
@@ -205,7 +209,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
   const updateTask = async (id: string, fields: TaskUpdate) => {
     const sanitized: TaskUpdate = { ...fields, updated_at: nowUTC() };
-    const { error } = await supabase.from(table).update(sanitized).eq('id', id);
+    const { error } = await supabase.from(table as any).update(sanitized).eq('id', id);
     if (error) throw error;
   };
 
@@ -214,7 +218,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     // First, get the task to know job_id/tour_id for mirror cleanup
     const { data: task } = await supabase
-      .from(table)
+      .from(table as any)
       .select('job_id, tour_id')
       .eq('id', id)
       .maybeSingle();
@@ -280,7 +284,7 @@ export function useGlobalTaskMutations(department: Dept) {
     }
 
     // Finally, delete the task row
-    const { error } = await supabase.from(table).delete().eq('id', id);
+    const { error } = await supabase.from(table as any).delete().eq('id', id);
     if (error) {
       failures.push(`task ${id}: failed to delete task row (${error.message})`);
     }
@@ -299,7 +303,7 @@ export function useGlobalTaskMutations(department: Dept) {
     const assignerId = authData?.user?.id ?? null;
 
     const { data, error } = await supabase
-      .from(table)
+      .from(table as any)
       .update({ assigned_to: userId, updated_at: nowUTC() })
       .eq('id', id)
       .select('id, task_type, created_by')
@@ -334,7 +338,7 @@ export function useGlobalTaskMutations(department: Dept) {
     const userId = authData?.user?.id ?? null;
 
     const { data: task } = await supabase
-      .from(table)
+      .from(table as any)
       .select('id, task_type, assigned_to, created_by, job_id, tour_id')
       .eq('id', id)
       .maybeSingle();
@@ -386,7 +390,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
   const setDueDate = async (id: string, due_at: string | null) => {
     const { error } = await supabase
-      .from(table)
+      .from(table as any)
       .update({ due_at, updated_at: nowUTC() })
       .eq('id', id);
     if (error) throw error;
@@ -404,13 +408,13 @@ export function useGlobalTaskMutations(department: Dept) {
 
     // Get the previous link state so we can clean up old mirrors
     const { data: prevTask } = await supabase
-      .from(table)
+      .from(table as any)
       .select('job_id, tour_id')
       .eq('id', id)
       .maybeSingle();
 
     const { error } = await supabase
-      .from(table)
+      .from(table as any)
       .update({ job_id: jobId, tour_id: tourId, updated_at: nowUTC() })
       .eq('id', id);
     if (error) throw error;

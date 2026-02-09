@@ -80,10 +80,8 @@ BEGIN
   RETURN v_result;
 END;
 $$;
-
 -- Grant execute permission to authenticated users
 GRANT EXECUTE ON FUNCTION clear_whatsapp_group_request(uuid, text) TO authenticated;
-
 -- Add comment for documentation
 COMMENT ON FUNCTION clear_whatsapp_group_request IS
 'Clears a failed WhatsApp group creation request lock, allowing admins to retry group creation. Only admin and management roles can execute this function.';

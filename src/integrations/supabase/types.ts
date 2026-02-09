@@ -8733,6 +8733,7 @@ export type Database = {
         | "user"
         | "management"
         | "logistics"
+        | "oscar"
         | "technician"
         | "house_tech"
         | "wallboard"
@@ -9057,6 +9058,7 @@ export const Constants = {
         "user",
         "management",
         "logistics",
+        "oscar",
         "technician",
         "house_tech",
         "wallboard",
