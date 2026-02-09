@@ -152,15 +152,28 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   } | null>(null);
   const dryHirePresupuestoElementRef = React.useRef<string | null>(null);
 
-  /** Resolve job location label with priority: location_data > location > 'sin ubicación'. */
+  /**
+   * Resolve job location label with priority: location_data > location > 'sin ubicación'.
+   * If structured location data is available, include both venue name and formatted address when possible.
+   */
   const resolveJobLocation = React.useCallback((): string => {
-    if (typeof job?.location_data === 'object' && job.location_data) {
-      return job.location_data.name || job.location_data.formatted_address || 'sin ubicación';
-    }
+    const pick = (loc: any): string | null => {
+      if (!loc || typeof loc !== 'object') return null;
+      const name = typeof loc.name === 'string' ? loc.name.trim() : '';
+      const addr = typeof loc.formatted_address === 'string' ? loc.formatted_address.trim() : '';
+
+      if (name && addr) {
+        if (name.toLowerCase() === addr.toLowerCase()) return name;
+        return `${name} — ${addr}`;
+      }
+      return name || addr || null;
+    };
+
+    const structured = pick(job?.location_data) || pick(job?.location);
+    if (structured) return structured;
+
     if (typeof job?.location === 'string' && job.location.trim()) return job.location.trim();
-    if (typeof job?.location === 'object' && job.location) {
-      return job.location.name || job.location.formatted_address || 'sin ubicación';
-    }
+
     return 'sin ubicación';
   }, [job]);
 
