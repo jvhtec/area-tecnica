@@ -34,6 +34,14 @@ const TASK_TYPES: Record<Dept, string[]> = {
   administrative: ['QT', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
 };
 
+const DEPT_TASK_TABLE: Record<Dept, string> = {
+  sound: 'sound_job_tasks',
+  lights: 'lights_job_tasks',
+  video: 'video_job_tasks',
+  production: 'production_job_tasks',
+  administrative: 'administrative_job_tasks',
+};
+
 function normalizeDept(value: string | null | undefined): Dept | null {
   const lower = (value || '').toLowerCase();
   if (lower === 'sound' || lower === 'sonido') return 'sound';
@@ -208,32 +216,56 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
           description: `Tarea compartida creada para almacén de ${deptName}. Cualquier miembro del departamento puede actualizarla o completarla.`,
         });
       } else if (assignedTo === ASSIGN_SELECTED_DEPARTMENTS) {
-        const assigneeIds = Array.from(
-          new Set(
-            eligibleUsers
-              .filter((u) => {
-                const normalized = normalizeDept(u.department);
-                return normalized ? selectedDepartments.includes(normalized) : false;
-              })
-              .filter((u) => !TECHNICIAN_LEVEL_ROLES.has(String(u.role || '')))
-              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
-              .filter((id): id is string => id.length > 0)
-          )
-        );
-        if (!assigneeIds.length) {
+        if (!selectedDepartments.length) {
           toast({
-            title: 'Sin usuarios válidos',
-            description: 'No hay usuarios válidos en los departamentos seleccionados (se excluyen technician y house_tech).',
+            title: 'Sin departamentos seleccionados',
+            description: 'Selecciona al menos un departamento.',
             variant: 'destructive',
           });
           return;
         }
 
-        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
-        toast({
-          title: 'Asignación por departamentos completada',
-          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.`,
-        });
+        const { data: authData } = await supabase.auth.getUser();
+        const createdBy = authData?.user?.id ?? null;
+
+        // Create one shared department task per selected department,
+        // each in the corresponding department's task table.
+        const results = await Promise.allSettled(
+          selectedDepartments.map((dep) => {
+            const table = DEPT_TASK_TABLE[dep];
+            const row: Record<string, unknown> = {
+              task_type: payload.task_type,
+              description: payload.description,
+              due_at: payload.due_at,
+              priority: payload.priority,
+              assigned_to: null,
+              assigned_department: dep,
+              status: 'not_started',
+              progress: 0,
+              created_by: createdBy,
+            };
+            if (payload.job_id) row.job_id = payload.job_id;
+            if (payload.tour_id) row.tour_id = payload.tour_id;
+            return supabase.from(table as any).insert(row).select('id').single();
+          })
+        );
+
+        const created = results.filter((r) => r.status === 'fulfilled').length;
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        const deptLabels = selectedDepartments.map((d) => DEPARTMENT_NAME[d]).join(', ');
+
+        if (failed === 0) {
+          toast({
+            title: 'Tareas de departamento creadas',
+            description: `${created} tarea(s) compartida(s) creada(s) para: ${deptLabels}.`,
+          });
+        } else {
+          toast({
+            title: 'Creación parcial',
+            description: `${created} creada(s), ${failed} fallida(s) para: ${deptLabels}.`,
+            variant: 'destructive',
+          });
+        }
       } else if (assignedTo === ASSIGN_SELECTED_USERS) {
         const assigneeIds = Array.from(
           new Set(
