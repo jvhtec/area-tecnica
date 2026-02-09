@@ -727,6 +727,7 @@ export async function createAllFoldersForJob(
           .from("flex_folders")
           .insert({
             job_id: job.id,
+            tour_date_id: job.tour_date_id || null,
             parent_id: parentRow.id,
             element_id: tourDateFolder.elementId,
             department: dept,
@@ -735,8 +736,12 @@ export async function createAllFoldersForJob(
           .select("*");
 
         if (childErr) {
-          console.error("Error inserting child folder row:", childErr);
-          continue;
+          console.error(`Failed to persist tourdate folder for ${dept}:`, childErr);
+          console.error(`Orphaned Flex folder created with element_id: ${tourDateFolder.elementId}`);
+          throw new Error(
+            `Failed to persist tourdate folder for ${dept} (element_id: ${tourDateFolder.elementId}). ` +
+            `Flex folder was created but could not be recorded in database. Original error: ${childErr}`
+          );
         }
 
         deptFolderId = insertedRow.element_id;
@@ -791,6 +796,7 @@ export async function createAllFoldersForJob(
           try {
             await supabase.from("flex_folders").insert({
               job_id: job.id,
+              tour_date_id: job.tour_date_id || null,
               parent_id: childRow.id,
               element_id: hojaInfoResponse.elementId,
               department: dept,
@@ -860,6 +866,7 @@ export async function createAllFoldersForJob(
           try {
             await supabase.from("flex_folders").insert({
               job_id: job.id,
+              tour_date_id: job.tour_date_id || null,
               parent_id: childRow.id,
               element_id: subFolderResponse.elementId,
               department: dept,
@@ -958,6 +965,7 @@ export async function createAllFoldersForJob(
               try {
                 await supabase.from("flex_folders").insert({
                   job_id: job.id,
+                  tour_date_id: job.tour_date_id || null,
                   parent_id: childRow.id,
                   element_id: pullsheetResponse.elementId,
                   department: dept,
@@ -1020,18 +1028,42 @@ export async function createAllFoldersForJob(
             personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
           };
 
-          await createFlexFolder(subPayload);
+          const created = await createFlexFolder(subPayload);
+
+          try {
+            await supabase.from("flex_folders").insert({
+              job_id: job.id,
+              tour_date_id: job.tour_date_id || null,
+              parent_id: childRow.id,
+              element_id: created.elementId,
+              department: dept,
+              folder_type: sf.folderType,
+            });
+            console.log(`Persisted ${sf.folderType} for personnel with element_id: ${created.elementId}`);
+          } catch (err) {
+            console.error(`Failed to persist ${sf.folderType} for personnel:`, err);
+            console.error(`Orphaned Flex folder created with element_id: ${created.elementId}`);
+            throw new Error(
+              `Failed to persist ${sf.folderType} for personnel (element_id: ${created.elementId}). ` +
+              `Flex folder was created but could not be recorded in database. Original error: ${err}`
+            );
+          }
         }
 
-        const personnelcrewCall: { name: string; suffix: "CCS" | "CCL" }[] = [];
+        const personnelcrewCall: { name: string; suffix: "CCS" | "CCL"; folderType: string }[] = [];
         if (shouldCreateItem("personnel", "crewCallSound", options)) {
-          personnelcrewCall.push({ name: `Crew Call Sonido - ${job.title}`, suffix: "CCS" });
+          personnelcrewCall.push({ name: `Crew Call Sonido - ${job.title}`, suffix: "CCS", folderType: "crew_call_sound" });
         }
         if (shouldCreateItem("personnel", "crewCallLights", options)) {
-          personnelcrewCall.push({ name: `Crew Call Luces - ${job.title}`, suffix: "CCL" });
+          personnelcrewCall.push({ name: `Crew Call Luces - ${job.title}`, suffix: "CCL", folderType: "crew_call_lights" });
         }
 
         for (const sf of personnelcrewCall) {
+          if (deptExistingSubs.has(sf.folderType)) {
+            console.log(`Skipping ${sf.folderType} for personnel - already exists`);
+            continue;
+          }
+
           const subPayload = {
             definitionId: FLEX_FOLDER_IDS.crewCall,
             parentElementId: deptFolderId,
@@ -1049,6 +1081,25 @@ export async function createAllFoldersForJob(
           const cc = await createFlexFolder(subPayload);
           const mappedDept = sf.suffix === 'CCS' ? 'sound' : 'lights';
           await upsertCrewCall(job.id, mappedDept, cc.elementId);
+
+          try {
+            await supabase.from("flex_folders").insert({
+              job_id: job.id,
+              tour_date_id: job.tour_date_id || null,
+              parent_id: childRow.id,
+              element_id: cc.elementId,
+              department: dept,
+              folder_type: sf.folderType,
+            });
+            console.log(`Persisted ${sf.folderType} for personnel with element_id: ${cc.elementId}`);
+          } catch (err) {
+            console.error(`Failed to persist ${sf.folderType} for personnel:`, err);
+            console.error(`Orphaned Flex folder created with element_id: ${cc.elementId}`);
+            throw new Error(
+              `Failed to persist ${sf.folderType} for personnel (element_id: ${cc.elementId}). ` +
+              `Flex folder was created but could not be recorded in database. Original error: ${err}`
+            );
+          }
         }
       }
     }
@@ -1395,37 +1446,27 @@ export async function createAllFoldersForJob(
         console.log(`Skipping comercial extras for ${dept} - already exist`);
       }
     } else if (dept === "personnel") {
+      // Non-crew-call personnel subfolders
       const personnelSubfolders = [
-        {
-          name: `Crew Call Sonido - ${job.title}`,
-          suffix: "CCS",
-          key: "crewCallSound" as const,
-          definitionId: FLEX_FOLDER_IDS.crewCall,
-          crewCallDepartment: "sound" as const,
-        },
-        {
-          name: `Crew Call Luces - ${job.title}`,
-          suffix: "CCL",
-          key: "crewCallLights" as const,
-          definitionId: FLEX_FOLDER_IDS.crewCall,
-          crewCallDepartment: "lights" as const,
-        },
         {
           name: `Orden de Trabajo - ${job.title}`,
           suffix: "OT",
           key: "workOrder" as const,
           definitionId: FLEX_FOLDER_IDS.ordenTrabajo,
+          folderType: "work_orders",
         },
         {
           name: `Gastos de Personal - ${job.title}`,
           suffix: "GP",
           key: "gastosDePersonal" as const,
           definitionId: FLEX_FOLDER_IDS.hojaGastos,
+          folderType: "hoja_gastos",
         },
       ];
 
       for (const sf of personnelSubfolders) {
         if (!shouldCreateItem("personnel", sf.key, options)) continue;
+
         if (sf.key === "workOrder") {
           const existingWorkOrder = existingWorkOrderMap.get(dept);
           if (existingWorkOrder?.element_id) {
@@ -1440,6 +1481,7 @@ export async function createAllFoldersForJob(
           console.log(`Skipping gastos de personal for ${dept} - already exists`);
           continue;
         }
+
         const subPayload = {
           definitionId: sf.definitionId,
           parentElementId: deptFolderId,
@@ -1455,9 +1497,7 @@ export async function createAllFoldersForJob(
         };
 
         const created = await createFlexFolder(subPayload);
-        if (sf.crewCallDepartment) {
-          await upsertCrewCall(job.id, sf.crewCallDepartment, created.elementId);
-        }
+
         if (sf.key === "workOrder") {
           try {
             const { data: insertedRow, error: insertError } = await supabase
@@ -1500,6 +1540,58 @@ export async function createAllFoldersForJob(
               `Flex folder was created but could not be recorded in database. Original error: ${err}`
             );
           }
+        }
+      }
+
+      // Crew call subfolders (with dedup guards and DB persistence)
+      const personnelCrewCalls: { name: string; suffix: "CCS" | "CCL"; folderType: string; crewCallDepartment: "sound" | "lights" }[] = [];
+      if (shouldCreateItem("personnel", "crewCallSound", options)) {
+        personnelCrewCalls.push({ name: `Crew Call Sonido - ${job.title}`, suffix: "CCS", folderType: "crew_call_sound", crewCallDepartment: "sound" });
+      }
+      if (shouldCreateItem("personnel", "crewCallLights", options)) {
+        personnelCrewCalls.push({ name: `Crew Call Luces - ${job.title}`, suffix: "CCL", folderType: "crew_call_lights", crewCallDepartment: "lights" });
+      }
+
+      for (const sf of personnelCrewCalls) {
+        if (deptExistingSubs.has(sf.folderType)) {
+          console.log(`Skipping ${sf.folderType} for personnel - already exists`);
+          continue;
+        }
+
+        const subPayload = {
+          definitionId: FLEX_FOLDER_IDS.crewCall,
+          parentElementId: deptFolderId,
+          open: true,
+          locked: false,
+          name: sf.name,
+          plannedStartDate: formattedStartDate,
+          plannedEndDate: formattedEndDate,
+          locationId: FLEX_FOLDER_IDS.location,
+          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
+          departmentId: DEPARTMENT_IDS[dept as Department],
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+        };
+
+        const cc = await createFlexFolder(subPayload);
+        await upsertCrewCall(job.id, sf.crewCallDepartment, cc.elementId);
+
+        const parentFolderRow = existingDepartmentMap.get(dept);
+        try {
+          await supabase.from("flex_folders").insert({
+            job_id: job.id,
+            parent_id: parentFolderRow?.id ?? null,
+            element_id: cc.elementId,
+            department: dept,
+            folder_type: sf.folderType,
+          });
+          console.log(`Persisted ${sf.folderType} for personnel with element_id: ${cc.elementId}`);
+        } catch (err) {
+          console.error(`Failed to persist ${sf.folderType} for personnel:`, err);
+          console.error(`Orphaned Flex folder created with element_id: ${cc.elementId}`);
+          throw new Error(
+            `Failed to persist ${sf.folderType} for personnel (element_id: ${cc.elementId}). ` +
+            `Flex folder was created but could not be recorded in database. Original error: ${err}`
+          );
         }
       }
     }
