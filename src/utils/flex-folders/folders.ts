@@ -1,5 +1,6 @@
 import { format } from "date-fns";
-import { supabase } from "@/lib/supabase";
+import { toZonedTime } from "date-fns-tz";
+import { supabase } from "@/integrations/supabase/client";
 import { Department } from "@/types/department";
 import {
   CreateFoldersOptions,
@@ -74,26 +75,18 @@ async function getTourJobDepartments(tourId: string): Promise<string[]> {
 
 // Save or update the Flex crew call element id for a job/department
 async function upsertCrewCall(jobId: string, dept: 'sound' | 'lights', elementId: string) {
-  try {
-    const { data: existing } = await supabase
-      .from('flex_crew_calls')
-      .select('id')
-      .eq('job_id', jobId)
-      .eq('department', dept)
-      .maybeSingle();
+  const { error } = await supabase
+    .from('flex_crew_calls')
+    .upsert(
+      { job_id: jobId, department: dept, flex_element_id: elementId },
+      { onConflict: 'job_id,department' }
+    );
 
-    if (existing?.id) {
-      await supabase
-        .from('flex_crew_calls')
-        .update({ flex_element_id: elementId })
-        .eq('id', existing.id);
-    } else {
-      await supabase
-        .from('flex_crew_calls')
-        .insert({ job_id: jobId, department: dept, flex_element_id: elementId });
-    }
-  } catch (err) {
-    console.error('Failed to upsert flex_crew_calls:', { jobId, dept, elementId, err });
+  if (error) {
+    console.error('Failed to upsert flex_crew_calls:', { jobId, dept, elementId, error });
+    throw new Error(
+      `Failed to upsert crew call for ${dept} (job_id: ${jobId}, element_id: ${elementId}). Original error: ${error.message}`
+    );
   }
 }
 
@@ -554,7 +547,7 @@ export async function createAllFoldersForJob(
     });
 
     // Save both dryhire parent and presupuesto folders
-    await supabase
+    const { error: dryHireInsertErr } = await supabase
       .from("flex_folders")
       .insert([
         {
@@ -572,6 +565,15 @@ export async function createAllFoldersForJob(
           folder_type: "dryhire_presupuesto",
         }
       ]);
+
+    if (dryHireInsertErr) {
+      console.error("Failed to persist dryhire folders:", dryHireInsertErr);
+      console.error(`Orphaned Flex folders: dryhire=${dryHireFolder.elementId}, presupuesto=${presupuestoFolder.elementId}`);
+      throw new Error(
+        `Failed to persist dryhire folders (dryhire=${dryHireFolder.elementId}, presupuesto=${presupuestoFolder.elementId}). ` +
+        `Flex folders were created but could not be recorded in database. Original error: ${dryHireInsertErr.message}`
+      );
+    }
 
     return;
   }
@@ -664,7 +666,7 @@ export async function createAllFoldersForJob(
 
       return "No Location";
     })();
-    const formattedDate = format(new Date(job.start_time), "MMM d, yyyy");
+    const formattedDate = format(toZonedTime(new Date(job.start_time), "Europe/Madrid"), "MMM d, yyyy");
 
     for (const dept of allDepartments) {
       // Check if this department should have a folder created
@@ -723,7 +725,7 @@ export async function createAllFoldersForJob(
         console.log(`Creating tour date folder for ${dept}:`, tourDateFolderPayload);
         const tourDateFolder = await createFlexFolder(tourDateFolderPayload);
 
-        const { data: [insertedRow], error: childErr } = await supabase
+        const { data, error: childErr } = await supabase
           .from("flex_folders")
           .insert({
             job_id: job.id,
@@ -735,7 +737,9 @@ export async function createAllFoldersForJob(
           })
           .select("*");
 
-        if (childErr) {
+        const insertedRow = data?.[0] ?? null;
+
+        if (childErr || !insertedRow) {
           console.error(`Failed to persist tourdate folder for ${dept}:`, childErr);
           console.error(`Orphaned Flex folder created with element_id: ${tourDateFolder.elementId}`);
           throw new Error(
@@ -897,89 +901,93 @@ export async function createAllFoldersForJob(
         }
       }
       if (["sound", "lights", "video"].includes(dept)) {
-        // Skip pullsheets if any already exist for this department
-        if (deptExistingSubs.has("pull_sheet")) {
-          console.log(`Skipping pullsheets for ${dept} - already exist`);
-        } else {
-          const metadataEntries = getDepartmentCustomPullsheetMetadata(options?.[dept]);
-          const defaultPullsheets: PullsheetTemplate[] = [];
+        const metadataEntries = getDepartmentCustomPullsheetMetadata(options?.[dept]);
+        const defaultPullsheets: PullsheetTemplate[] = [];
 
-          if (dept === "sound") {
-            const isTourPackOnly = tourDateInfo?.is_tour_pack_only || false;
-            console.log(`Tour pack only setting for sound folder:`, isTourPackOnly);
+        if (dept === "sound") {
+          const isTourPackOnly = tourDateInfo?.is_tour_pack_only || false;
+          console.log(`Tour pack only setting for sound folder:`, isTourPackOnly);
 
-            if (shouldCreateItem("sound", "pullSheetTP", options)) {
-              defaultPullsheets.push({
-                name: `${safeJobTitle} - Tour Pack`,
-                suffix: "TP",
-                plannedStartDate: formattedStartDate,
-                plannedEndDate: formattedEndDate,
-              });
-            }
-
-            if (!isTourPackOnly && shouldCreateItem("sound", "pullSheetPA", options)) {
-              defaultPullsheets.push({
-                name: `${safeJobTitle} - PA`,
-                suffix: "PA",
-                plannedStartDate: formattedStartDate,
-                plannedEndDate: formattedEndDate,
-              });
-            }
+          if (shouldCreateItem("sound", "pullSheetTP", options)) {
+            defaultPullsheets.push({
+              name: `${safeJobTitle} - Tour Pack`,
+              suffix: "TP",
+              plannedStartDate: formattedStartDate,
+              plannedEndDate: formattedEndDate,
+            });
           }
 
-          if (defaultPullsheets.length > 0 || metadataEntries.length > 0) {
-            const fallbackNameForIndex = (index: number, defaultEntry?: PullsheetTemplate) => {
-              if (defaultEntry?.name) return defaultEntry.name;
-              const base = `${parentName} - Pullsheet`;
-              return `${base}${index > 0 ? ` ${index + 1}` : ""}`;
+          if (!isTourPackOnly && shouldCreateItem("sound", "pullSheetPA", options)) {
+            defaultPullsheets.push({
+              name: `${safeJobTitle} - PA`,
+              suffix: "PA",
+              plannedStartDate: formattedStartDate,
+              plannedEndDate: formattedEndDate,
+            });
+          }
+        }
+
+        if (defaultPullsheets.length > 0 || metadataEntries.length > 0) {
+          const fallbackNameForIndex = (index: number, defaultEntry?: PullsheetTemplate) => {
+            if (defaultEntry?.name) return defaultEntry.name;
+            const base = `${parentName} - Pullsheet`;
+            return `${base}${index > 0 ? ` ${index + 1}` : ""}`;
+          };
+
+          const templates = buildPullsheetTemplates(
+            defaultPullsheets,
+            metadataEntries,
+            formattedStartDate,
+            formattedEndDate,
+            fallbackNameForIndex
+          );
+
+          // Legacy records use generic "pull_sheet"; if present, skip all pullsheets
+          const hasLegacyPullSheet = deptExistingSubs.has("pull_sheet");
+
+          const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
+
+          for (const template of templates) {
+            const specificType = `pull_sheet_${template.suffix.toLowerCase()}`;
+            if (hasLegacyPullSheet || deptExistingSubs.has(specificType)) {
+              console.log(`Skipping pullsheet ${template.suffix} for ${dept} - already exists`);
+              continue;
+            }
+
+            const pullsheetPayload = {
+              definitionId: FLEX_FOLDER_IDS.pullSheet,
+              parentElementId: deptFolderId,
+              open: true,
+              locked: false,
+              name: template.name,
+              plannedStartDate: template.plannedStartDate,
+              plannedEndDate: template.plannedEndDate,
+              locationId: FLEX_FOLDER_IDS.location,
+              departmentId: DEPARTMENT_IDS[dept as Department],
+              documentNumber: `${documentPrefix}${template.suffix}`,
+              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
             };
 
-            const templates = buildPullsheetTemplates(
-              defaultPullsheets,
-              metadataEntries,
-              formattedStartDate,
-              formattedEndDate,
-              fallbackNameForIndex
-            );
+            const pullsheetResponse = await createFlexFolder(pullsheetPayload);
 
-            const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
-
-            for (const template of templates) {
-              const pullsheetPayload = {
-                definitionId: FLEX_FOLDER_IDS.pullSheet,
-                parentElementId: deptFolderId,
-                open: true,
-                locked: false,
-                name: template.name,
-                plannedStartDate: template.plannedStartDate,
-                plannedEndDate: template.plannedEndDate,
-                locationId: FLEX_FOLDER_IDS.location,
-                departmentId: DEPARTMENT_IDS[dept as Department],
-                documentNumber: `${documentPrefix}${template.suffix}`,
-                personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
-              };
-
-              const pullsheetResponse = await createFlexFolder(pullsheetPayload);
-
-              // Persist pullsheet element ID to database
-              try {
-                await supabase.from("flex_folders").insert({
-                  job_id: job.id,
-                  tour_date_id: job.tour_date_id || null,
-                  parent_id: childRow.id,
-                  element_id: pullsheetResponse.elementId,
-                  department: dept,
-                  folder_type: "pull_sheet",
-                });
-                console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
-              } catch (err) {
-                console.error(`Failed to persist pullsheet ${template.name}:`, err);
-                console.error(`Orphaned Flex folder created with element_id: ${pullsheetResponse.elementId}`);
-                throw new Error(
-                  `Failed to persist pullsheet ${template.name} (element_id: ${pullsheetResponse.elementId}). ` +
-                  `Flex folder was created but could not be recorded in database. Original error: ${err}`
-                );
-              }
+            // Persist pullsheet element ID to database with specific folder_type
+            try {
+              await supabase.from("flex_folders").insert({
+                job_id: job.id,
+                tour_date_id: job.tour_date_id || null,
+                parent_id: childRow.id,
+                element_id: pullsheetResponse.elementId,
+                department: dept,
+                folder_type: specificType,
+              });
+              console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
+            } catch (err) {
+              console.error(`Failed to persist pullsheet ${template.name}:`, err);
+              console.error(`Orphaned Flex folder created with element_id: ${pullsheetResponse.elementId}`);
+              throw new Error(
+                `Failed to persist pullsheet ${template.name} (element_id: ${pullsheetResponse.elementId}). ` +
+                `Flex folder was created but could not be recorded in database. Original error: ${err}`
+              );
             }
           }
         }
@@ -1135,13 +1143,22 @@ export async function createAllFoldersForJob(
     const topFolder = await createFlexFolder(topPayload);
     topFolderId = topFolder.elementId;
 
-    await supabase
+    const { error: mainInsertErr } = await supabase
       .from("flex_folders")
       .insert({
         job_id: job.id,
         element_id: topFolderId,
         folder_type: "main_event",
       });
+
+    if (mainInsertErr) {
+      console.error("Failed to persist main folder:", mainInsertErr);
+      console.error(`Orphaned Flex folder created with element_id: ${topFolderId}`);
+      throw new Error(
+        `Failed to persist main folder (element_id: ${topFolderId}). ` +
+        `Flex folder was created but could not be recorded in database. Original error: ${mainInsertErr.message}`
+      );
+    }
   } else {
     console.log("Reusing existing main Flex folder for job:", topFolderId);
   }
@@ -1186,7 +1203,7 @@ export async function createAllFoldersForJob(
       console.log(`Creating department folder for ${dept}:`, deptPayload);
       const deptFolder = await createFlexFolder(deptPayload);
 
-      const { data: [childRow], error: childErr } = await supabase
+      const { data, error: childErr } = await supabase
         .from("flex_folders")
         .insert({
           job_id: job.id,
@@ -1197,13 +1214,20 @@ export async function createAllFoldersForJob(
         })
         .select("*");
 
-      if (childErr) {
-        console.error("Error inserting department folder row:", childErr);
+      const childRow = data?.[0] ?? null;
+
+      if (childErr || !childRow) {
+        console.error(`Failed to persist department folder for ${dept}:`, childErr);
+        console.error(`Orphaned Flex folder created with element_id: ${deptFolder.elementId}`);
+        throw new Error(
+          `Failed to persist department folder for ${dept} (element_id: ${deptFolder.elementId}). ` +
+          `Flex folder was created but could not be recorded in database. Original error: ${childErr}`
+        );
       }
 
-      deptFolderId = childRow?.element_id ?? deptFolder.elementId;
+      deptFolderId = childRow.element_id ?? deptFolder.elementId;
 
-      if (childRow?.department) {
+      if (childRow.department) {
         existingDepartmentMap.set(childRow.department, childRow as FlexFolderRow);
       }
     } else {
@@ -1279,86 +1303,90 @@ export async function createAllFoldersForJob(
     }
 
     if (["sound", "lights", "video"].includes(dept)) {
-      // Skip pullsheets if any already exist for this department
-      if (deptExistingSubs.has("pull_sheet")) {
-        console.log(`Skipping pullsheets for ${dept} - already exist`);
-      } else {
-        const metadataEntries = getDepartmentCustomPullsheetMetadata(options?.[dept]);
-        const defaultPullsheets: PullsheetTemplate[] = [];
+      const metadataEntries = getDepartmentCustomPullsheetMetadata(options?.[dept]);
+      const defaultPullsheets: PullsheetTemplate[] = [];
 
-        if (dept === "sound") {
-          if (shouldCreateItem("sound", "pullSheetTP", options)) {
-            defaultPullsheets.push({
-              name: `${safeJobTitle} - Tour Pack`,
-              suffix: "TP",
-              plannedStartDate: formattedStartDate,
-              plannedEndDate: formattedEndDate,
-            });
-          }
-
-          if (shouldCreateItem("sound", "pullSheetPA", options)) {
-            defaultPullsheets.push({
-              name: `${safeJobTitle} - PA`,
-              suffix: "PA",
-              plannedStartDate: formattedStartDate,
-              plannedEndDate: formattedEndDate,
-            });
-          }
+      if (dept === "sound") {
+        if (shouldCreateItem("sound", "pullSheetTP", options)) {
+          defaultPullsheets.push({
+            name: `${safeJobTitle} - Tour Pack`,
+            suffix: "TP",
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+          });
         }
 
-        if (defaultPullsheets.length > 0 || metadataEntries.length > 0) {
-          const fallbackNameForIndex = (index: number, defaultEntry?: PullsheetTemplate) => {
-            if (defaultEntry?.name) return defaultEntry.name;
-            const base = `${safeJobTitle} - ${deptLabel} Pullsheet`;
-            return `${base}${index > 0 ? ` ${index + 1}` : ""}`;
+        if (shouldCreateItem("sound", "pullSheetPA", options)) {
+          defaultPullsheets.push({
+            name: `${safeJobTitle} - PA`,
+            suffix: "PA",
+            plannedStartDate: formattedStartDate,
+            plannedEndDate: formattedEndDate,
+          });
+        }
+      }
+
+      if (defaultPullsheets.length > 0 || metadataEntries.length > 0) {
+        const fallbackNameForIndex = (index: number, defaultEntry?: PullsheetTemplate) => {
+          if (defaultEntry?.name) return defaultEntry.name;
+          const base = `${safeJobTitle} - ${deptLabel} Pullsheet`;
+          return `${base}${index > 0 ? ` ${index + 1}` : ""}`;
+        };
+
+        const templates = buildPullsheetTemplates(
+          defaultPullsheets,
+          metadataEntries,
+          formattedStartDate,
+          formattedEndDate,
+          fallbackNameForIndex
+        );
+
+        // Legacy records use generic "pull_sheet"; if present, skip all pullsheets
+        const hasLegacyPullSheet = deptExistingSubs.has("pull_sheet");
+
+        const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
+
+        for (const template of templates) {
+          const specificType = `pull_sheet_${template.suffix.toLowerCase()}`;
+          if (hasLegacyPullSheet || deptExistingSubs.has(specificType)) {
+            console.log(`Skipping pullsheet ${template.suffix} for ${dept} - already exists`);
+            continue;
+          }
+
+          const pullsheetPayload = {
+            definitionId: FLEX_FOLDER_IDS.pullSheet,
+            parentElementId: deptFolderId,
+            open: true,
+            locked: false,
+            name: template.name,
+            plannedStartDate: template.plannedStartDate,
+            plannedEndDate: template.plannedEndDate,
+            locationId: FLEX_FOLDER_IDS.location,
+            departmentId: DEPARTMENT_IDS[dept as Department],
+            documentNumber: `${documentPrefix}${template.suffix}`,
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
           };
 
-          const templates = buildPullsheetTemplates(
-            defaultPullsheets,
-            metadataEntries,
-            formattedStartDate,
-            formattedEndDate,
-            fallbackNameForIndex
-          );
+          const pullsheetResponse = await createFlexFolder(pullsheetPayload);
 
-          const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
-
-          for (const template of templates) {
-            const pullsheetPayload = {
-              definitionId: FLEX_FOLDER_IDS.pullSheet,
-              parentElementId: deptFolderId,
-              open: true,
-              locked: false,
-              name: template.name,
-              plannedStartDate: template.plannedStartDate,
-              plannedEndDate: template.plannedEndDate,
-              locationId: FLEX_FOLDER_IDS.location,
-              departmentId: DEPARTMENT_IDS[dept as Department],
-              documentNumber: `${documentPrefix}${template.suffix}`,
-              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
-            };
-
-            const pullsheetResponse = await createFlexFolder(pullsheetPayload);
-
-            // Persist pullsheet element ID to database
-            const parentFolderRow = existingDepartmentMap.get(dept);
-            try {
-              await supabase.from("flex_folders").insert({
-                job_id: job.id,
-                parent_id: parentFolderRow?.id ?? null,
-                element_id: pullsheetResponse.elementId,
-                department: dept,
-                folder_type: "pull_sheet",
-              });
-              console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
-            } catch (err) {
-              console.error(`Failed to persist pullsheet ${template.name}:`, err);
-              console.error(`Orphaned Flex folder created with element_id: ${pullsheetResponse.elementId}`);
-              throw new Error(
-                `Failed to persist pullsheet ${template.name} (element_id: ${pullsheetResponse.elementId}). ` +
-                `Flex folder was created but could not be recorded in database. Original error: ${err}`
-              );
-            }
+          // Persist pullsheet element ID to database with specific folder_type
+          const parentFolderRow = existingDepartmentMap.get(dept);
+          try {
+            await supabase.from("flex_folders").insert({
+              job_id: job.id,
+              parent_id: parentFolderRow?.id ?? null,
+              element_id: pullsheetResponse.elementId,
+              department: dept,
+              folder_type: specificType,
+            });
+            console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
+          } catch (err) {
+            console.error(`Failed to persist pullsheet ${template.name}:`, err);
+            console.error(`Orphaned Flex folder created with element_id: ${pullsheetResponse.elementId}`);
+            throw new Error(
+              `Failed to persist pullsheet ${template.name} (element_id: ${pullsheetResponse.elementId}). ` +
+              `Flex folder was created but could not be recorded in database. Original error: ${err}`
+            );
           }
         }
       }
