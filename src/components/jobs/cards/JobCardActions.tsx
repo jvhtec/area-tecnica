@@ -1270,9 +1270,11 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        const ids = waProdAssignments
-                          .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
-                          .map((a) => a.technician_id);
+                        const ids = Array.from(new Set(
+                          waProdAssignments
+                            .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
+                            .map((a) => a.technician_id)
+                        ));
                         setWaProdRecipientIds(ids);
                       }}
                       disabled={waProdAssignmentsLoading}

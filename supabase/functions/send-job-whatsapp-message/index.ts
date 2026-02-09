@@ -159,6 +159,20 @@ serve(async (req: Request) => {
 
     if (recErr) throw recErr;
 
+    const recipientIdSet = new Set(dedupedRecipientIds);
+    const foundIdSet = new Set((recipients || []).map((r) => r.id as string));
+    const missingProfileIds = dedupedRecipientIds.filter((id) => !foundIdSet.has(id));
+
+    const failed: Array<{ recipient_id: string; reason: string }> = missingProfileIds.map((id) => ({
+      recipient_id: id,
+      reason: 'profile_not_found',
+    }));
+
+    let sentCount = 0;
+
+    // Only send to recipients we could load.
+    const sendTargets = (recipients || []).filter((r) => recipientIdSet.has(r.id as string));
+
     type WahaConfigRow = { session?: string; api_key?: string };
 
     const base = normalizeBase(actorProfile.waha_endpoint);
@@ -184,12 +198,9 @@ serve(async (req: Request) => {
 
     const timeoutMs = Number(Deno.env.get("WAHA_FETCH_TIMEOUT_MS") || 9000);
 
-    const failed: Array<{ recipient_id: string; reason: string }> = [];
-    let sentCount = 0;
-
     // Concurrency note: Deno JS is single-threaded, so mutating `queue`/`sentCount` is safe
     // as long as we only do it between `await` points (which we do in this loop).
-    const queue = [...(recipients || [])];
+    const queue = [...sendTargets];
     const concurrency = Math.max(1, Math.min(4, Number(Deno.env.get("WAHA_SEND_CONCURRENCY") || 4)));
 
     const worker = async () => {
