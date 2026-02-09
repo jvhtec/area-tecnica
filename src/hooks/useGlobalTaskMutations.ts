@@ -75,6 +75,12 @@ export function useGlobalTaskMutations(department: Dept) {
   const table = TASK_TABLE[department];
   const docFk = DOC_FK[department];
 
+  /**
+   * Internal helper that inserts a task into a specific department table.
+   *
+   * Centralizes validation + created_by population to keep behavior consistent
+   * between createTask and createTaskForDepartment.
+   */
   const createTaskInTable = async (targetTable: string, params: {
     task_type: string;
     description?: string | null;

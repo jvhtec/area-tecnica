@@ -30,7 +30,10 @@ const createOptimizedQueryOptions = (isLeader: boolean = true): DefaultOptions =
 // Default options for backwards compatibility
 const optimizedQueryOptions = createOptimizedQueryOptions(true);
 
-// Create optimized query client with deduplication and multi-tab support
+/**
+ * Create a React Query client configured for this app's realtime + multi-tab
+ * behavior.
+ */
 export const createOptimizedQueryClient = (isLeader: boolean = true) => {
   const queryClientOptions = createOptimizedQueryOptions(isLeader);
   const queryClient = new QueryClient({
@@ -62,16 +65,22 @@ export const createOptimizedQueryClient = (isLeader: boolean = true) => {
   return queryClient;
 };
 
-// Update query client options based on tab role
+/**
+ * Update the client's default options when leadership changes (multi-tab).
+ */
 export const updateQueryClientForRole = (queryClient: QueryClient, isLeader: boolean) => {
   const newOptions = createOptimizedQueryOptions(isLeader);
   queryClient.setDefaultOptions(newOptions);
 };
 
-// Query key factory for consistent key generation
+/**
+ * Query key factory for consistent key generation.
+ */
 export const createQueryKey = {
   pendingTasks: {
+    /** All pending-task query keys. */
     all: ['pending-tasks'] as const,
+    /** Pending tasks for a user, optionally scoped by a normalized department. */
     byUser: (userId: string, dept: string | null) =>
       [...createQueryKey.pendingTasks.all, userId, dept] as const,
   },
