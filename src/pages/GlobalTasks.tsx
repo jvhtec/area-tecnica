@@ -2,7 +2,7 @@ import React from 'react';
 import { useGlobalTasks, GlobalTaskFilters, GlobalTask } from '@/hooks/useGlobalTasks';
 import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { canAssignTasks, canCreateTasks, canEditTasks } from '@/utils/tasks';
+import { canAssignTasks, canCreateTasks, canEditTasks, normalizeDept, type Dept } from '@/utils/tasks';
 import { CreateGlobalTaskDialog } from '@/components/tasks/CreateGlobalTaskDialog';
 import { LinkJobDialog } from '@/components/tasks/LinkJobDialog';
 import { Button } from '@/components/ui/button';
@@ -41,8 +41,6 @@ import {
   utcToLocalInput,
   localInputToUTC,
 } from '@/utils/timezoneUtils';
-
-type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 
 interface DeptUser {
   id: string;
@@ -115,13 +113,9 @@ function useAllEligibleUsers(userDepartment: string | null) {
   });
 }
 
-function normalizeDept(raw: string | null): Dept {
-  const lower = raw?.toLowerCase() ?? '';
-  if (lower === 'lights' || lower === 'luces') return 'lights';
-  if (lower === 'video' || lower === 'vídeo') return 'video';
-  if (lower === 'production' || lower === 'produccion' || lower === 'producción') return 'production';
-  if (lower === 'administrative' || lower === 'administracion' || lower === 'administración') return 'administrative';
-  return 'sound';
+/** Safe normalizeDept wrapper that defaults to 'sound' for page-level routing. */
+function normalizeDeptOrDefault(raw: string | null): Dept {
+  return normalizeDept(raw) ?? 'sound';
 }
 
 const MADRID_TZ = 'Europe/Madrid';
@@ -148,7 +142,7 @@ function isOverdueMadrid(isoDate: string): boolean {
 
 export default function GlobalTasks() {
   const { userRole, userId, userDepartment } = useOptimizedAuth();
-  const defaultDept = React.useMemo(() => normalizeDept(userDepartment), [userDepartment]);
+  const defaultDept = React.useMemo(() => normalizeDeptOrDefault(userDepartment), [userDepartment]);
   const isProductionDepartmentUser = defaultDept === 'production';
   const canChooseDepartment = userRole === 'oscar' || isProductionDepartmentUser;
   const [selectedDept, setSelectedDept] = React.useState<Dept>(defaultDept);

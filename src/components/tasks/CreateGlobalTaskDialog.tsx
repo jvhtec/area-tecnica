@@ -11,8 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { fromZonedTime } from 'date-fns-tz';
+import { type Dept } from '@/utils/tasks';
 
-type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
 const ASSIGN_SELECTED_DEPARTMENTS = '__selected_departments__';
@@ -33,24 +33,6 @@ const TASK_TYPES: Record<Dept, string[]> = {
   production: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
   administrative: ['QT', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
 };
-
-const DEPT_TASK_TABLE: Record<Dept, string> = {
-  sound: 'sound_job_tasks',
-  lights: 'lights_job_tasks',
-  video: 'video_job_tasks',
-  production: 'production_job_tasks',
-  administrative: 'administrative_job_tasks',
-};
-
-function normalizeDept(value: string | null | undefined): Dept | null {
-  const lower = (value || '').toLowerCase();
-  if (lower === 'sound' || lower === 'sonido') return 'sound';
-  if (lower === 'lights' || lower === 'luces') return 'lights';
-  if (lower === 'video' || lower === 'vídeo') return 'video';
-  if (lower === 'production' || lower === 'produccion' || lower === 'producción') return 'production';
-  if (lower === 'administrative' || lower === 'administracion' || lower === 'administración') return 'administrative';
-  return null;
-}
 
 interface CreateGlobalTaskDialogProps {
   open: boolean;
@@ -76,7 +58,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   onCreated,
 }) => {
   const { toast } = useToast();
-  const { createTask, createTasksForUsers } = useGlobalTaskMutations(department);
+  const { createTask, createTaskForDepartment, createTasksForUsers } = useGlobalTaskMutations(department);
   const [loading, setLoading] = React.useState(false);
   const [taskType, setTaskType] = React.useState<string>('');
   const [customType, setCustomType] = React.useState('');
@@ -194,7 +176,8 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       };
 
       if (assignedTo === ASSIGN_ALL_DEPARTMENT) {
-        // Create a single shared department task instead of one per user
+        // Shared task for the office team (management / admin / logistics).
+        // assigned_department = "sound" (the department key).
         await createTask({
           ...payload,
           assigned_to: null,
@@ -205,15 +188,16 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
           description: `Tarea compartida creada para ${deptName}. Cualquier miembro del departamento puede actualizarla o completarla.`,
         });
       } else if (assignedTo === ASSIGN_ALL_DEPARTMENT_HOUSE_TECH) {
-        // Create a single shared department task for warehouse/house_tech
+        // Shared task targeted at the warehouse / house_tech team.
+        // Uses a "_warehouse" suffix to distinguish from office-team tasks.
         await createTask({
           ...payload,
           assigned_to: null,
-          assigned_department: department,
+          assigned_department: `${department}_warehouse`,
         });
         toast({
-          title: 'Tarea de departamento creada',
-          description: `Tarea compartida creada para almacén de ${deptName}. Cualquier miembro del departamento puede actualizarla o completarla.`,
+          title: 'Tarea de almacén creada',
+          description: `Tarea compartida creada para almacén de ${deptName}. Cualquier house tech del departamento puede actualizarla o completarla.`,
         });
       } else if (assignedTo === ASSIGN_SELECTED_DEPARTMENTS) {
         if (!selectedDepartments.length) {
@@ -225,29 +209,17 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
           return;
         }
 
-        const { data: authData } = await supabase.auth.getUser();
-        const createdBy = authData?.user?.id ?? null;
-
-        // Create one shared department task per selected department,
-        // each in the corresponding department's task table.
+        // Create one shared department task per selected department using the
+        // centralized createTaskForDepartment helper (handles auth, defaults,
+        // validation, and the insert in the correct department table).
         const results = await Promise.allSettled(
-          selectedDepartments.map((dep) => {
-            const table = DEPT_TASK_TABLE[dep];
-            const row: Record<string, unknown> = {
-              task_type: payload.task_type,
-              description: payload.description,
-              due_at: payload.due_at,
-              priority: payload.priority,
+          selectedDepartments.map((dep) =>
+            createTaskForDepartment(dep, {
+              ...payload,
               assigned_to: null,
               assigned_department: dep,
-              status: 'not_started',
-              progress: 0,
-              created_by: createdBy,
-            };
-            if (payload.job_id) row.job_id = payload.job_id;
-            if (payload.tour_id) row.tour_id = payload.tour_id;
-            return supabase.from(table as any).insert(row).select('id').single();
-          })
+            })
+          )
         );
 
         const created = results.filter((r) => r.status === 'fulfilled').length;

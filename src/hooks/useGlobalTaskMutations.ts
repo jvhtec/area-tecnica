@@ -127,6 +127,48 @@ export function useGlobalTaskMutations(department: Dept) {
     return data;
   };
 
+  /**
+   * Create a task in a specific department's table. Identical to createTask but
+   * allows the caller to specify a target department different from the one
+   * this hook was instantiated with. Used by ASSIGN_SELECTED_DEPARTMENTS to
+   * create shared tasks across multiple departments from a single call-site.
+   */
+  const createTaskForDepartment = async (
+    targetDept: Dept,
+    params: Parameters<typeof createTask>[0],
+  ) => {
+    if (params.job_id != null && params.tour_id != null) {
+      throw new Error('Validation error: job_id and tour_id are mutually exclusive');
+    }
+
+    const { data: authData } = await supabase.auth.getUser();
+    const userId = authData?.user?.id ?? null;
+
+    const targetTable = TASK_TABLE[targetDept];
+    const payload: Record<string, unknown> = {
+      task_type: params.task_type,
+      description: params.description || null,
+      assigned_to: params.assigned_to || null,
+      assigned_department: params.assigned_department || null,
+      due_at: params.due_at || null,
+      priority: params.priority ?? null,
+      status: 'not_started',
+      progress: 0,
+      created_by: userId,
+    };
+    if (params.job_id) payload.job_id = params.job_id;
+    if (params.tour_id) payload.tour_id = params.tour_id;
+
+    const { data, error } = await supabase
+      .from(targetTable as any)
+      .insert(payload)
+      .select()
+      .single();
+    if (error) throw error;
+
+    return data;
+  };
+
   const createTasksForUsers = async (
     params: {
       task_type: string;
@@ -627,6 +669,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
   return {
     createTask,
+    createTaskForDepartment,
     createTasksForUsers,
     updateTask,
     deleteTask,

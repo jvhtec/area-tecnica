@@ -100,7 +100,7 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
             )}
           </DialogTitle>
           <DialogDescription>
-            Tareas asignadas a ti que aún no están completadas
+            Tareas asignadas a ti o a tu departamento que aún no están completadas
           </DialogDescription>
         </DialogHeader>
 

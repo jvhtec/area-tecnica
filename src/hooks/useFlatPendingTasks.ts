@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { usePendingTasks, GroupedPendingTask } from './usePendingTasks';
+import { usePendingTasks, GroupedPendingTask } from '@/hooks/usePendingTasks';
 
 export interface FlatPendingTask {
   id: string;
