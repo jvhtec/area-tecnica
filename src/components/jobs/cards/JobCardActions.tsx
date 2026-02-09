@@ -1,18 +1,26 @@
 import React from 'react';
+import { formatInTimeZone } from "date-fns-tz";
+
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { Edit, Trash2, Upload, RefreshCw, Users, Loader2, FolderPlus, Clock, FileText, Scale, Zap, MessageCircle, ExternalLink, Info, ListChecks, Settings, ScrollText } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { Department } from "@/types/department";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { supabase } from "@/integrations/supabase/client";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { createQueryKey } from "@/lib/optimized-react-query";
 import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
 import { getMainFlexElementIdSync, resolveTourFolderForTourdate } from "@/utils/flexMainFolderId";
 import { ArchiveToFlexAction } from "./job-card-actions/ArchiveToFlexAction";
@@ -112,6 +120,28 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { userDepartment } = useOptimizedAuth();
+
+  const normalizedUserDepartment = typeof userDepartment === 'string'
+    ? userDepartment.toLowerCase().replace(/_warehouse$/, '')
+    : '';
+  const canSendProductionWhatsapp = Boolean(
+    isProjectManagementPage
+    && department === 'production'
+    && (userRole === 'admin'
+      || normalizedUserDepartment === 'production'
+      || normalizedUserDepartment === 'produccion'
+      || normalizedUserDepartment === 'producción')
+  );
+
+  const [waProdOpen, setWaProdOpen] = React.useState(false);
+  const [waProdDateGroup, setWaProdDateGroup] = React.useState<string>('all');
+  const [waProdRecipientIds, setWaProdRecipientIds] = React.useState<string[]>([]);
+  const [waProdCallTime, setWaProdCallTime] = React.useState<string>('');
+  const [waProdMessage, setWaProdMessage] = React.useState<string>('');
+  const [waProdDirty, setWaProdDirty] = React.useState(false);
+  const [waProdSending, setWaProdSending] = React.useState(false);
+
   const [waAlmacenOpen, setWaAlmacenOpen] = React.useState(false);
   const [waMessage, setWaMessage] = React.useState<string>("");
   const [isSendingWa, setIsSendingWa] = React.useState(false);
@@ -121,6 +151,254 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     filterDate: string;
   } | null>(null);
   const dryHirePresupuestoElementRef = React.useRef<string | null>(null);
+
+  /**
+   * Resolve job location label with priority: location_data > location > 'sin ubicación'.
+   * If structured location data is available, include both venue name and formatted address when possible.
+   */
+  const resolveJobLocation = React.useCallback((): string => {
+    const pick = (loc: any): string | null => {
+      if (!loc || typeof loc !== 'object') return null;
+      const name = typeof loc.name === 'string' ? loc.name.trim() : '';
+      const addr = typeof loc.formatted_address === 'string' ? loc.formatted_address.trim() : '';
+
+      if (name && addr) {
+        if (name.toLowerCase() === addr.toLowerCase()) return name;
+        return `${name} — ${addr}`;
+      }
+      return name || addr || null;
+    };
+
+    const structured = pick(job?.location_data) || pick(job?.location);
+    if (structured) return structured;
+
+    if (typeof job?.location === 'string' && job.location.trim()) return job.location.trim();
+
+    return 'sin ubicación';
+  }, [job]);
+
+  const TZ = 'Europe/Madrid' as const;
+
+  /** Suggest call time from job start_time formatted in Europe/Madrid (still marked REVISAR in template). */
+  const resolveSuggestedCallTime = React.useCallback((): string => {
+    try {
+      if (!job?.start_time) return '';
+      // Use 24h HH:mm in Europe/Madrid to match operational expectation.
+      return formatInTimeZone(new Date(job.start_time), TZ, 'HH:mm');
+    } catch {
+      return '';
+    }
+  }, [job, TZ]);
+
+  type JobAssignmentRow = {
+    id: string;
+    technician_id: string;
+    single_day: boolean;
+    assignment_date: string | null;
+    profiles:
+      | { first_name: string | null; last_name: string | null; phone: string | null }
+      | { first_name: string | null; last_name: string | null; phone: string | null }[]
+      | null;
+  };
+
+  type WaProdAssignment = {
+    id: string;
+    technician_id: string;
+    single_day: boolean;
+    assignment_date: string | null;
+    profile: { first_name: string | null; last_name: string | null; phone: string | null } | null;
+  };
+
+  const { data: waProdAssignments = [], isLoading: waProdAssignmentsLoading } = useQuery({
+    queryKey: createQueryKey.whatsapp.prodAssignmentsByJob(job.id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_assignments')
+        .select('id, technician_id, single_day, assignment_date, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
+        .eq('job_id', job.id);
+      if (error) throw error;
+
+      const rows = (data as JobAssignmentRow[] | null || []).map((r) => {
+        const profile = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+        return {
+          id: r.id,
+          technician_id: r.technician_id,
+          single_day: Boolean(r.single_day),
+          assignment_date: r.assignment_date || null,
+          profile: profile
+            ? { first_name: profile.first_name ?? null, last_name: profile.last_name ?? null, phone: profile.phone ?? null }
+            : null,
+        } as WaProdAssignment;
+      });
+
+      // Stable ordering: all-days first, then by date, then by name.
+      rows.sort((a, b) => {
+        const aKey = a.single_day && a.assignment_date ? a.assignment_date : '';
+        const bKey = b.single_day && b.assignment_date ? b.assignment_date : '';
+        if (aKey !== bKey) return aKey.localeCompare(bKey);
+        const aName = `${a.profile?.first_name ?? ''} ${a.profile?.last_name ?? ''}`.trim();
+        const bName = `${b.profile?.first_name ?? ''} ${b.profile?.last_name ?? ''}`.trim();
+        return aName.localeCompare(bName);
+      });
+
+      return rows;
+    },
+    enabled: Boolean(waProdOpen && canSendProductionWhatsapp && job?.id),
+    staleTime: 30_000,
+  });
+
+  /** Build selectable date groups for WhatsApp recipients: all-days vs specific assignment_date. */
+  const waProdGroups = React.useMemo(() => {
+    const keys = new Set<string>();
+    keys.add('all');
+    for (const a of waProdAssignments) {
+      if (a.single_day && a.assignment_date) keys.add(`day:${a.assignment_date}`);
+    }
+    const list = Array.from(keys).map((key) => {
+      if (key === 'all') {
+        const range = job?.start_time && job?.end_time
+          ? `${formatInTimeZone(new Date(job.start_time), TZ, 'dd/MM/yyyy')} – ${formatInTimeZone(new Date(job.end_time), TZ, 'dd/MM/yyyy')}`
+          : job?.start_time
+            ? `${formatInTimeZone(new Date(job.start_time), TZ, 'dd/MM/yyyy')}`
+            : '';
+        return { key, label: range ? `Todos los días (${range})` : 'Todos los días' };
+      }
+      const date = key.replace(/^day:/, '');
+      const label = (() => {
+        try {
+          // Date-only strings should not shift; interpret as local midnight.
+          return formatInTimeZone(new Date(`${date}T00:00:00`), TZ, 'dd/MM/yyyy');
+        } catch {
+          return date;
+        }
+      })();
+      return { key, label: label };
+    });
+
+    // Put 'all' first, then sorted by date.
+    list.sort((a, b) => {
+      if (a.key === 'all') return -1;
+      if (b.key === 'all') return 1;
+      return a.key.localeCompare(b.key);
+    });
+
+    return list;
+  }, [waProdAssignments, job]);
+
+  /** Map an assignment to its WhatsApp date-group key (used for filtering and selection). */
+  const getAssignmentGroupKey = React.useCallback((a: WaProdAssignment): string => {
+    if (a.single_day && a.assignment_date) return `day:${a.assignment_date}`;
+    return 'all';
+  }, []);
+
+  /** Build the prefilled WhatsApp message template for the selected job/date group/call time. */
+  const buildWaProdTemplate = React.useCallback((opts: { groupKey: string; callTime: string }) => {
+    const jobName = job?.title || job?.name || job?.job_name || 'Trabajo';
+    const location = resolveJobLocation();
+
+    let dateLabel = '';
+    if (opts.groupKey === 'all') {
+      if (job?.start_time && job?.end_time) {
+        dateLabel = `${formatInTimeZone(new Date(job.start_time), TZ, 'dd/MM/yyyy')} – ${formatInTimeZone(new Date(job.end_time), TZ, 'dd/MM/yyyy')}`;
+      } else if (job?.start_time) {
+        dateLabel = `${formatInTimeZone(new Date(job.start_time), TZ, 'dd/MM/yyyy')}`;
+      }
+    } else if (opts.groupKey.startsWith('day:')) {
+      const d = opts.groupKey.replace(/^day:/, '');
+      try { dateLabel = formatInTimeZone(new Date(`${d}T00:00:00`), TZ, 'dd/MM/yyyy'); } catch { dateLabel = d; }
+    }
+
+    const callTimeLabel = opts.callTime ? `${opts.callTime}` : '';
+
+    const lines = [
+      `Buenas,`,
+      ``,
+      `Para el trabajo “${jobName}”:`,
+      ``,
+      `• Ubicación: ${location}`,
+      dateLabel ? `• Fecha(s): ${dateLabel}` : undefined,
+      `• Hora de citación (REVISAR): ${callTimeLabel || '—'}`,
+      ``,
+      `Si alguien llega más tarde / necesita algo, que me diga por aquí.`,
+      `Gracias.`,
+    ].filter(Boolean);
+
+    return lines.join('\n');
+  }, [job, resolveJobLocation]);
+
+  type WaSendResult = {
+    success: boolean;
+    sentCount: number;
+    failed: Array<{ recipient_id: string; reason: string }>;
+    job_id: string | null;
+  };
+
+  /** Submit the WhatsApp message to the edge function after local validation. */
+  const handleWaProdSend = React.useCallback(async () => {
+    try {
+      if (!waProdRecipientIds.length) {
+        toast({ title: 'Selecciona destinatarios', description: 'Elige al menos una persona.', variant: 'destructive' });
+        return;
+      }
+      const trimmed = (waProdMessage || '').trim();
+      if (!trimmed) {
+        toast({ title: 'Mensaje vacío', description: 'Escribe un mensaje antes de enviar.', variant: 'destructive' });
+        return;
+      }
+
+      setWaProdSending(true);
+      const { data, error } = await supabase.functions.invoke<WaSendResult>('send-job-whatsapp-message', {
+        body: {
+          job_id: job?.id,
+          message: trimmed,
+          recipient_ids: waProdRecipientIds,
+        }
+      });
+
+      if (error) {
+        toast({ title: 'Error al enviar', description: error.message, variant: 'destructive' });
+        return;
+      }
+
+      const sent = data?.sentCount ?? null;
+      const failed = data?.failed?.length ?? 0;
+      toast({
+        title: 'Enviado',
+        description: sent !== null
+          ? `Enviados: ${sent}. Fallos: ${failed}.`
+          : `Mensaje enviado. Fallos: ${failed}.`,
+      });
+      setWaProdOpen(false);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      toast({ title: 'Error', description: message, variant: 'destructive' });
+    } finally {
+      setWaProdSending(false);
+    }
+  }, [job?.id, toast, waProdMessage, waProdRecipientIds]);
+
+  // Modal state is initialized in the button click handler to avoid stale state reads.
+
+  React.useEffect(() => {
+    if (!waProdOpen) return;
+    if (waProdDirty) return;
+    setWaProdMessage(buildWaProdTemplate({ groupKey: waProdDateGroup || 'all', callTime: waProdCallTime }));
+  }, [waProdOpen, waProdDirty, waProdDateGroup, waProdCallTime, buildWaProdTemplate]);
+
+  React.useEffect(() => {
+    if (!waProdOpen) return;
+    // If the current selection doesn't match the chosen date group, clear it.
+    if (!waProdRecipientIds.length) return;
+    const allowedIds = new Set(
+      waProdAssignments
+        .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
+        .map((a) => a.technician_id)
+    );
+    const filtered = waProdRecipientIds.filter((id) => allowedIds.has(id));
+    const isSame = filtered.length === waProdRecipientIds.length
+      && filtered.every((id, idx) => id === waProdRecipientIds[idx]);
+    if (!isSame) setWaProdRecipientIds(filtered);
+  }, [waProdOpen, waProdAssignments, waProdDateGroup, waProdRecipientIds, getAssignmentGroupKey]);
 
   React.useEffect(() => {
     if (job?.job_type !== "dryhire") {
@@ -624,7 +902,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           {transportButtonLabel}
         </Button>
       )}
-      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'dryhire' && (
+      {isProjectManagementPage && department !== 'production' && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'dryhire' && (
         <>
           {/* Show retry button if there's a request but no group (failed creation) */}
           {whatsappRequest && !whatsappGroup && onRetryWhatsappGroup ? (
@@ -653,7 +931,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           )}
         </>
       )}
-      {isProjectManagementPage && (userRole === 'management' || userRole === 'admin') && (
+      {isProjectManagementPage && department !== 'production' && (userRole === 'management' || userRole === 'admin') && (
         <Button
           variant="outline"
           size="sm"
@@ -667,6 +945,28 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         >
           <MessageCircle className="h-4 w-4" />
           <span className="hidden sm:inline">Almacén</span>
+        </Button>
+      )}
+
+      {/* WhatsApp coordinación (Producción / Admin) */}
+      {canSendProductionWhatsapp && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const suggested = resolveSuggestedCallTime();
+            setWaProdDateGroup('all');
+            setWaProdRecipientIds([]);
+            setWaProdCallTime(suggested);
+            setWaProdDirty(false);
+            setWaProdMessage(buildWaProdTemplate({ groupKey: 'all', callTime: suggested }));
+            setWaProdOpen(true);
+          }}
+          className="gap-2"
+          title="Enviar WhatsApp a personal asignado"
+        >
+          <MessageCircle className="h-4 w-4" />
+          <span className="hidden sm:inline">Aviso WA</span>
         </Button>
       )}
       {/* View Details - available in dashboard/department contexts for all roles */}
@@ -940,6 +1240,172 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         </Button>
       )}
 
+      {/* WhatsApp coordinación dialog */}
+      {waProdOpen && (
+        <Dialog open={waProdOpen} onOpenChange={(open) => {
+          setWaProdOpen(open);
+          if (!open) {
+            setWaProdRecipientIds([]);
+            setWaProdDirty(false);
+          }
+        }}>
+          <DialogContent className="sm:max-w-[640px]">
+            <DialogHeader>
+              <DialogTitle>Enviar WhatsApp</DialogTitle>
+              <DialogDescription>
+                Mensaje pre-rellenado (editable). La <b>hora de citación</b> se sugiere desde el inicio del trabajo y está marcada como <b>REVISAR</b>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label>Grupo de fechas</Label>
+                  <RadioGroup
+                    value={waProdDateGroup}
+                    onValueChange={(value) => {
+                      setWaProdDateGroup(value);
+                      setWaProdRecipientIds([]);
+                    }}
+                    className="gap-2"
+                  >
+                    {waProdGroups.map((g) => (
+                      <div key={g.key} className="flex items-center space-x-2">
+                        <RadioGroupItem value={g.key} id={`wa-date-${g.key}`} />
+                        <Label htmlFor={`wa-date-${g.key}`} className="font-normal">{g.label}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="wa-calltime">Hora de citación (REVISAR)</Label>
+                  <Input
+                    id="wa-calltime"
+                    value={waProdCallTime}
+                    onChange={(e) => setWaProdCallTime(e.target.value)}
+                    placeholder="HH:mm"
+                    inputMode="numeric"
+                  />
+                  <p className="text-xs text-muted-foreground">Sugerida desde el inicio del trabajo. Ajusta si es necesario.</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Destinatarios (asignados)</Label>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const ids = Array.from(new Set(
+                          waProdAssignments
+                            .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
+                            .map((a) => a.technician_id)
+                        ));
+                        setWaProdRecipientIds(ids);
+                      }}
+                      disabled={waProdAssignmentsLoading}
+                    >
+                      Seleccionar todos
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setWaProdRecipientIds([])}
+                    >
+                      Limpiar
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="border rounded-md p-2 max-h-[220px] overflow-y-auto space-y-2">
+                  <div className="text-xs text-muted-foreground px-2">
+                    Nota: el teléfono puede no ser visible aquí por permisos; el envío valida teléfonos en servidor.
+                  </div>
+                  {waProdAssignmentsLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground p-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Cargando asignaciones…
+                    </div>
+                  ) : (
+                    waProdAssignments
+                      .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
+                      .map((a) => {
+                        const full = `${a.profile?.first_name ?? ''} ${a.profile?.last_name ?? ''}`.trim() || 'Sin nombre';
+                        const hasPhone = Boolean((a.profile?.phone || '').trim());
+                        const checked = waProdRecipientIds.includes(a.technician_id);
+                        return (
+                          <div key={`${a.technician_id}-${a.id}`} className={cn('flex items-start gap-2 p-2 rounded') }>
+                            <Checkbox
+                              checked={checked}
+                              onCheckedChange={(next) => {
+                                const isChecked = Boolean(next);
+                                setWaProdRecipientIds((prev) => {
+                                  if (isChecked) return Array.from(new Set([...prev, a.technician_id]));
+                                  return prev.filter((id) => id !== a.technician_id);
+                                });
+                              }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate" title={full}>{full}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {hasPhone ? a.profile?.phone : 'Teléfono no disponible (se intentará enviar igualmente)'}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                  )}
+
+                  {!waProdAssignmentsLoading && waProdAssignments.filter((a) => getAssignmentGroupKey(a) === waProdDateGroup).length === 0 && (
+                    <div className="text-sm text-muted-foreground p-2">No hay asignados en este grupo de fechas.</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Mensaje</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setWaProdDirty(false);
+                      setWaProdMessage(buildWaProdTemplate({ groupKey: waProdDateGroup || 'all', callTime: waProdCallTime }));
+                    }}
+                  >
+                    Restablecer
+                  </Button>
+                </div>
+                <Textarea
+                  value={waProdMessage}
+                  onChange={(e) => {
+                    setWaProdDirty(true);
+                    setWaProdMessage(e.target.value);
+                  }}
+                  className="min-h-[140px]"
+                />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setWaProdOpen(false)} disabled={waProdSending}>Cancelar</Button>
+              <Button
+                onClick={handleWaProdSend}
+                disabled={waProdSending}
+              >
+                {waProdSending ? 'Enviando…' : 'Enviar'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
       {/* Send to Almacén sonido dialog */}
       {waAlmacenOpen && (
         <Dialog open={waAlmacenOpen} onOpenChange={setWaAlmacenOpen}>
@@ -974,8 +1440,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                     toast({ title: 'Enviado', description: 'Mensaje enviado a Almacén sonido.' });
                     setWaAlmacenOpen(false);
                   }
-                } catch (e: any) {
-                  toast({ title: 'Error', description: e?.message || String(e), variant: 'destructive' });
+                } catch (e: unknown) {
+                  const message = e instanceof Error ? e.message : String(e);
+                  toast({ title: 'Error', description: message, variant: 'destructive' });
                 } finally {
                   setIsSendingWa(false);
                 }

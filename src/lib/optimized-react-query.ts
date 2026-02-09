@@ -103,7 +103,12 @@ export const createQueryKey = {
   assignments: {
     all: ['assignments'] as const,
     byJob: (jobId: string) => [...createQueryKey.assignments.all, 'job', jobId] as const,
-  }
+  },
+  whatsapp: {
+    all: ['whatsapp'] as const,
+    /** Job assignments used for WhatsApp recipient selection on JobCards. */
+    prodAssignmentsByJob: (jobId: string) => [...createQueryKey.whatsapp.all, 'prod-assignments', jobId] as const,
+  },
 };
 
 // Optimized invalidation strategies
