@@ -11,8 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { fromZonedTime } from 'date-fns-tz';
+import { type Dept } from '@/utils/tasks';
 
-type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
 const ASSIGN_SELECTED_DEPARTMENTS = '__selected_departments__';
@@ -33,16 +33,6 @@ const TASK_TYPES: Record<Dept, string[]> = {
   production: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
   administrative: ['QT', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
 };
-
-function normalizeDept(value: string | null | undefined): Dept | null {
-  const lower = (value || '').toLowerCase();
-  if (lower === 'sound' || lower === 'sonido') return 'sound';
-  if (lower === 'lights' || lower === 'luces') return 'lights';
-  if (lower === 'video' || lower === 'vídeo') return 'video';
-  if (lower === 'production' || lower === 'produccion' || lower === 'producción') return 'production';
-  if (lower === 'administrative' || lower === 'administracion' || lower === 'administración') return 'administrative';
-  return null;
-}
 
 interface CreateGlobalTaskDialogProps {
   open: boolean;
@@ -68,7 +58,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   onCreated,
 }) => {
   const { toast } = useToast();
-  const { createTask, createTasksForUsers } = useGlobalTaskMutations(department);
+  const { createTask, createTaskForDepartment, createTasksForUsers } = useGlobalTaskMutations(department);
   const [loading, setLoading] = React.useState(false);
   const [taskType, setTaskType] = React.useState<string>('');
   const [customType, setCustomType] = React.useState('');
@@ -186,86 +176,68 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       };
 
       if (assignedTo === ASSIGN_ALL_DEPARTMENT) {
-        const assigneeIds = Array.from(
-          new Set(
-            (departmentUsers || [])
-              .filter((u) => !TECHNICIAN_LEVEL_ROLES.has(String(u.role || '')))
-              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
-              .filter((id): id is string => id.length > 0)
-          )
-        );
-        if (!assigneeIds.length) {
-          toast({
-            title: 'No se encontraron usuarios',
-            description: 'No hay usuarios disponibles en este departamento (excluyendo technician y house_tech).',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
-        const skippedText =
-          skippedAssigneeIds.length > 0
-            ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
-            : '';
+        // Shared task for the office team (management / admin / logistics).
+        // assigned_department = "sound" (the department key).
+        await createTask({
+          ...payload,
+          assigned_to: null,
+          assigned_department: department,
+        });
         toast({
-          title: 'Asignación de departamento completada',
-          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.${skippedText}`,
+          title: 'Tarea de departamento creada',
+          description: `Tarea compartida creada para ${deptName}. Cualquier miembro del departamento puede actualizarla o completarla.`,
         });
       } else if (assignedTo === ASSIGN_ALL_DEPARTMENT_HOUSE_TECH) {
-        const assigneeIds = Array.from(
-          new Set(
-            (departmentUsers || [])
-              .filter((u) => u.role === 'house_tech')
-              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
-              .filter((id): id is string => id.length > 0)
-          )
-        );
-        if (!assigneeIds.length) {
-          toast({
-            title: 'No se encontraron house techs',
-            description: 'No hay house techs disponibles en este departamento.',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
-        const skippedText =
-          skippedAssigneeIds.length > 0
-            ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
-            : '';
+        // Shared task targeted at the warehouse / house_tech team.
+        // Uses a "_warehouse" suffix to distinguish from office-team tasks.
+        await createTask({
+          ...payload,
+          assigned_to: null,
+          assigned_department: `${department}_warehouse`,
+        });
         toast({
-          title: 'Asignación de house techs completada',
-          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.${skippedText}`,
+          title: 'Tarea de almacén creada',
+          description: `Tarea compartida creada para almacén de ${deptName}. Cualquier house tech del departamento puede actualizarla o completarla.`,
         });
       } else if (assignedTo === ASSIGN_SELECTED_DEPARTMENTS) {
-        const assigneeIds = Array.from(
-          new Set(
-            eligibleUsers
-              .filter((u) => {
-                const normalized = normalizeDept(u.department);
-                return normalized ? selectedDepartments.includes(normalized) : false;
-              })
-              .filter((u) => !TECHNICIAN_LEVEL_ROLES.has(String(u.role || '')))
-              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
-              .filter((id): id is string => id.length > 0)
-          )
-        );
-        if (!assigneeIds.length) {
+        if (!selectedDepartments.length) {
           toast({
-            title: 'Sin usuarios válidos',
-            description: 'No hay usuarios válidos en los departamentos seleccionados (se excluyen technician y house_tech).',
+            title: 'Sin departamentos seleccionados',
+            description: 'Selecciona al menos un departamento.',
             variant: 'destructive',
           });
           return;
         }
 
-        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
-        toast({
-          title: 'Asignación por departamentos completada',
-          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.`,
-        });
+        // Create one shared department task per selected department using the
+        // centralized createTaskForDepartment helper (handles auth, defaults,
+        // validation, and the insert in the correct department table).
+        const results = await Promise.allSettled(
+          selectedDepartments.map((dep) =>
+            createTaskForDepartment(dep, {
+              ...payload,
+              assigned_to: null,
+              assigned_department: dep,
+            })
+          )
+        );
+
+        const created = results.filter((r) => r.status === 'fulfilled').length;
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        const deptLabels = selectedDepartments.map((d) => DEPARTMENT_NAME[d]).join(', ');
+
+        if (failed === 0) {
+          toast({
+            title: 'Tareas de departamento creadas',
+            description: `${created} tarea(s) compartida(s) creada(s) para: ${deptLabels}.`,
+          });
+        } else {
+          toast({
+            title: 'Creación parcial',
+            description: `${created} creada(s), ${failed} fallida(s) para: ${deptLabels}.`,
+            variant: 'destructive',
+          });
+        }
       } else if (assignedTo === ASSIGN_SELECTED_USERS) {
         const assigneeIds = Array.from(
           new Set(

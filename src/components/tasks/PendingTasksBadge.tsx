@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 interface PendingTasksBadgeProps {
   userId: string | null;
   userRole: string | null;
+  userDepartment?: string | null;
   onClick: () => void;
   className?: string;
 }
@@ -14,10 +15,11 @@ interface PendingTasksBadgeProps {
 export const PendingTasksBadge: React.FC<PendingTasksBadgeProps> = ({
   userId,
   userRole,
+  userDepartment,
   onClick,
   className,
 }) => {
-  const { data: groupedTasks, isLoading } = usePendingTasks(userId, userRole);
+  const { data: groupedTasks, isLoading } = usePendingTasks(userId, userRole, userDepartment);
 
   const totalTaskCount = useMemo(() => {
     return groupedTasks?.reduce((sum, group) => sum + group.tasks.length, 0) || 0;
