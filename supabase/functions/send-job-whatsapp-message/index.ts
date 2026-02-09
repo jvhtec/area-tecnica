@@ -111,9 +111,14 @@ serve(async (req: Request) => {
     const body = (await req.json().catch(() => ({}))) as SendRequest;
     const message = (body.message || "").toString().trim();
     const recipientIds = Array.isArray(body.recipient_ids) ? body.recipient_ids.filter(Boolean) : [];
+    const jobId = (body.job_id || "").toString().trim();
 
     if (!message) {
       return jsonResponse({ error: "Bad Request", reason: "Empty message" }, { status: 400 });
+    }
+
+    if (!jobId) {
+      return jsonResponse({ error: "Bad Request", reason: "Missing job_id" }, { status: 400 });
     }
 
     if (recipientIds.length === 0) {
@@ -122,6 +127,28 @@ serve(async (req: Request) => {
 
     if (recipientIds.length > 80) {
       return jsonResponse({ error: "Bad Request", reason: "Too many recipients" }, { status: 400 });
+    }
+
+    // Security: restrict recipients to technicians assigned to this job.
+    const { data: assignmentRows, error: asgErr } = await supabaseAdmin
+      .from("job_assignments")
+      .select("technician_id")
+      .eq("job_id", jobId)
+      .in("technician_id", recipientIds);
+
+    if (asgErr) throw asgErr;
+
+    const allowedIds = new Set((assignmentRows || []).map((r) => r.technician_id as string));
+    const disallowed = recipientIds.filter((id) => !allowedIds.has(id));
+    if (disallowed.length > 0) {
+      return jsonResponse(
+        {
+          error: "Forbidden",
+          reason: "Some recipients are not assigned to this job",
+          disallowed_recipient_ids: disallowed,
+        },
+        { status: 403 },
+      );
     }
 
     const { data: recipients, error: recErr } = await supabaseAdmin
@@ -223,7 +250,7 @@ serve(async (req: Request) => {
 
     await Promise.all(Array.from({ length: concurrency }).map(() => worker()));
 
-    return jsonResponse({ success: true, sentCount, failed, job_id: body.job_id || null }, { status: 200 });
+    return jsonResponse({ success: true, sentCount, failed, job_id: jobId || null }, { status: 200 });
   } catch (err) {
     console.error("send-job-whatsapp-message error:", err);
     return jsonResponse({ error: "Internal Server Error" }, { status: 500 });
