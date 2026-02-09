@@ -88,7 +88,6 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, role, department')
-        .in('role', ['management', 'admin', 'logistics', 'house_tech', 'oscar'])
         .order('first_name');
       if (error) throw error;
       const all = data || [];

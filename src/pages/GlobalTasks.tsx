@@ -90,7 +90,6 @@ function useAllEligibleUsers(userDepartment: string | null) {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, department')
-        .in('role', ['management', 'admin', 'logistics', 'house_tech', 'oscar'])
         .order('first_name');
       if (error) throw error;
       const all = (data || []) as (DeptUser & { department: string | null })[];
@@ -150,7 +149,8 @@ function isOverdueMadrid(isoDate: string): boolean {
 export default function GlobalTasks() {
   const { userRole, userId, userDepartment } = useOptimizedAuth();
   const defaultDept = React.useMemo(() => normalizeDept(userDepartment), [userDepartment]);
-  const canChooseDepartment = userRole === 'oscar';
+  const isProductionDepartmentUser = defaultDept === 'production';
+  const canChooseDepartment = userRole === 'oscar' || isProductionDepartmentUser;
   const [selectedDept, setSelectedDept] = React.useState<Dept>(defaultDept);
   const dept = canChooseDepartment ? selectedDept : defaultDept;
   React.useEffect(() => {
@@ -160,8 +160,8 @@ export default function GlobalTasks() {
   }, [canChooseDepartment, defaultDept]);
 
   const canEdit = canEditTasks(userRole);
-  const canCreate = canCreateTasks(userRole);
-  const canAssign = canAssignTasks(userRole);
+  const canCreate = canCreateTasks(userRole) || isProductionDepartmentUser;
+  const canAssign = canAssignTasks(userRole) || isProductionDepartmentUser;
   const { toast } = useToast();
 
   // Filters
