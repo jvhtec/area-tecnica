@@ -521,14 +521,18 @@ export default function GlobalTasks() {
                 const job = task.job;
                 const tour = task.tour;
                 const docs = task.task_documents || [];
-                const canUpdate = canEdit || (!!userId && (task.assigned_to === userId || task.created_by === userId));
+                const isDeptShared = !!task.assigned_department;
+                const userBelongsToDept = isDeptShared && userDepartment && normalizeDept(userDepartment) === normalizeDept(task.assigned_department);
+                const canUpdate = canEdit || (!!userId && (task.assigned_to === userId || task.created_by === userId)) || !!userBelongsToDept;
                 const isOverdue =
                   task.due_at &&
                   task.status !== 'completed' &&
                   isOverdueMadrid(task.due_at);
                 const isPendingTask = task.status !== 'completed';
                 const isEditingDescription = editingDescriptionTaskId === task.id;
-                const assigneeLabel = assignee
+                const assigneeLabel = isDeptShared
+                  ? `Dpto. ${DEPARTMENT_LABELS[task.assigned_department!] || task.assigned_department}`
+                  : assignee
                   ? `${assignee.first_name || ''} ${assignee.last_name || ''}`.trim()
                   : 'Sin asignar';
                 const creatorLabel = task.created_by_profile
@@ -646,7 +650,11 @@ export default function GlobalTasks() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {canAssign ? (
+                      {isDeptShared ? (
+                        <Badge variant="outline" className="text-xs font-medium">
+                          {assigneeLabel}
+                        </Badge>
+                      ) : canAssign ? (
                         <Combobox
                           groups={userGroups}
                           value={task.assigned_to || ''}

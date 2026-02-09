@@ -55,6 +55,7 @@ export interface GlobalTask {
   priority: number | null;
   due_at: string | null;
   assigned_to: string | null;
+  assigned_department: string | null;
   created_by: string | null;
   job_id: string | null;
   tour_id: string | null;

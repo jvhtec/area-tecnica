@@ -201,7 +201,7 @@ const Layout = () => {
   const userId = session?.user?.id ?? null
 
   // Fetch pending tasks for eligible roles
-  const { data: flatPendingTasks } = useFlatPendingTasks(userId, userRole)
+  const { data: flatPendingTasks } = useFlatPendingTasks(userId, userRole, userDepartment)
 
   // Track acknowledged tasks
   const { acknowledgedTaskIds, acknowledgeTask, clearAcknowledgedTasks, isTaskAcknowledged } =
@@ -487,6 +487,7 @@ const Layout = () => {
                     <PendingTasksBadge
                       userId={userId}
                       userRole={userRole}
+                      userDepartment={userDepartment}
                       onClick={handlePendingTasksBadgeClick}
                     />
                   )}
@@ -532,6 +533,7 @@ const Layout = () => {
         onOpenChange={setShowPendingTasksModal}
         userId={userId}
         userRole={userRole}
+        userDepartment={userDepartment}
       />
       {unacknowledgedTasks && unacknowledgedTasks.length > 0 && (
         <SingleTaskPopup

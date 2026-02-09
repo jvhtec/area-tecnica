@@ -186,58 +186,26 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       };
 
       if (assignedTo === ASSIGN_ALL_DEPARTMENT) {
-        const assigneeIds = Array.from(
-          new Set(
-            (departmentUsers || [])
-              .filter((u) => !TECHNICIAN_LEVEL_ROLES.has(String(u.role || '')))
-              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
-              .filter((id): id is string => id.length > 0)
-          )
-        );
-        if (!assigneeIds.length) {
-          toast({
-            title: 'No se encontraron usuarios',
-            description: 'No hay usuarios disponibles en este departamento (excluyendo technician y house_tech).',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
-        const skippedText =
-          skippedAssigneeIds.length > 0
-            ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
-            : '';
+        // Create a single shared department task instead of one per user
+        await createTask({
+          ...payload,
+          assigned_to: null,
+          assigned_department: department,
+        });
         toast({
-          title: 'Asignación de departamento completada',
-          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.${skippedText}`,
+          title: 'Tarea de departamento creada',
+          description: `Tarea compartida creada para ${deptName}. Cualquier miembro del departamento puede actualizarla o completarla.`,
         });
       } else if (assignedTo === ASSIGN_ALL_DEPARTMENT_HOUSE_TECH) {
-        const assigneeIds = Array.from(
-          new Set(
-            (departmentUsers || [])
-              .filter((u) => u.role === 'house_tech')
-              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
-              .filter((id): id is string => id.length > 0)
-          )
-        );
-        if (!assigneeIds.length) {
-          toast({
-            title: 'No se encontraron house techs',
-            description: 'No hay house techs disponibles en este departamento.',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
-        const skippedText =
-          skippedAssigneeIds.length > 0
-            ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
-            : '';
+        // Create a single shared department task for warehouse/house_tech
+        await createTask({
+          ...payload,
+          assigned_to: null,
+          assigned_department: department,
+        });
         toast({
-          title: 'Asignación de house techs completada',
-          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.${skippedText}`,
+          title: 'Tarea de departamento creada',
+          description: `Tarea compartida creada para almacén de ${deptName}. Cualquier miembro del departamento puede actualizarla o completarla.`,
         });
       } else if (assignedTo === ASSIGN_SELECTED_DEPARTMENTS) {
         const assigneeIds = Array.from(

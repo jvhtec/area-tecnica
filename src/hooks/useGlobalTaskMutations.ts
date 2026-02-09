@@ -73,6 +73,7 @@ export function useGlobalTaskMutations(department: Dept) {
     task_type: string;
     description?: string | null;
     assigned_to?: string | null;
+    assigned_department?: string | null;
     job_id?: string | null;
     tour_id?: string | null;
     due_at?: string | null;
@@ -89,6 +90,7 @@ export function useGlobalTaskMutations(department: Dept) {
       task_type: params.task_type,
       description: params.description || null,
       assigned_to: params.assigned_to || null,
+      assigned_department: params.assigned_department || null,
       due_at: params.due_at || null,
       priority: params.priority ?? null,
       status: 'not_started',

@@ -24,6 +24,7 @@ interface PendingTasksModalProps {
   onOpenChange: (open: boolean) => void;
   userId: string | null;
   userRole: string | null;
+  userDepartment?: string | null;
 }
 
 const DEPARTMENT_COLORS: Record<string, string> = {
@@ -55,9 +56,10 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
   onOpenChange,
   userId,
   userRole,
+  userDepartment,
 }) => {
   const navigate = useNavigate();
-  const { data: groupedTasks, isLoading, error } = usePendingTasks(userId, userRole);
+  const { data: groupedTasks, isLoading, error } = usePendingTasks(userId, userRole, userDepartment);
   const { mutate: completeTask, isPending: isCompletingTask } = useCompleteTask();
   const [completingTaskId, setCompletingTaskId] = React.useState<string | null>(null);
 

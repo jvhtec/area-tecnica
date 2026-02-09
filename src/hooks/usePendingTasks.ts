@@ -10,7 +10,8 @@ export interface PendingTask {
   department: 'sound' | 'lights' | 'video' | 'production' | 'administrative';
   task_type: string;
   description: string | null;
-  assigned_to: string;
+  assigned_to: string | null;
+  assigned_department: string | null;
   status: 'not_started' | 'in_progress';
   progress: number;
   due_at: string | null;
@@ -44,7 +45,8 @@ export interface GroupedPendingTask {
     detailLink: string;
     jobId: string | null;
     tourId: string | null;
-    assignedTo: string;
+    assignedTo: string | null;
+    assignedDepartment: string | null;
     assigneeRole: string | null;
   }>;
 }
@@ -60,10 +62,11 @@ const TASK_TABLES = [
 type TaskRow = Record<string, unknown> & { assigned_to?: string | null };
 
 /**
- * Hook to fetch pending tasks for the current user
- * Only runs when a logged-in task-coordinator role is detected
+ * Hook to fetch pending tasks for the current user.
+ * Includes both individually-assigned tasks and department-shared tasks.
+ * Only runs when a logged-in task-coordinator role is detected.
  */
-export function usePendingTasks(userId: string | null, userRole: string | null) {
+export function usePendingTasks(userId: string | null, userRole: string | null, userDepartment?: string | null) {
   const isEligibleRole = !!userRole && ['management', 'admin', 'logistics', 'oscar'].includes(userRole);
   const queryClient = useQueryClient();
 
@@ -81,11 +84,21 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
     };
 
     TASK_TABLES.forEach((table) => {
+      // Listen for changes to tasks assigned to this user
       channel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table, filter: `assigned_to=eq.${userId}` },
         invalidatePendingTasks
       );
+
+      // Listen for changes to department-shared tasks
+      if (userDepartment) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table, filter: `assigned_department=eq.${userDepartment}` },
+          invalidatePendingTasks
+        );
+      }
 
       channel.on(
         'postgres_changes',
@@ -106,16 +119,22 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [userId, isEligibleRole, queryClient]);
+  }, [userId, isEligibleRole, userDepartment, queryClient]);
 
   return useQuery({
-    queryKey: ['pending-tasks', userId],
+    queryKey: ['pending-tasks', userId, userDepartment],
     enabled: !!userId && isEligibleRole,
     queryFn: async (): Promise<GroupedPendingTask[]> => {
+      // Fetch both individually-assigned tasks and department-shared tasks
+      const orFilters = [`assigned_to.eq.${userId}`];
+      if (userDepartment) {
+        orFilters.push(`assigned_department.eq.${userDepartment}`);
+      }
+
       const { data, error } = await supabase
         .from('pending_tasks_view')
         .select('*')
-        .eq('assigned_to', userId)
+        .or(orFilters.join(','))
         .order('due_at', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true });
 
@@ -180,6 +199,7 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
           jobId: task.job_id,
           tourId: task.tour_id,
           assignedTo: task.assigned_to,
+          assignedDepartment: task.assigned_department,
           assigneeRole: task.assignee_role,
         });
       });

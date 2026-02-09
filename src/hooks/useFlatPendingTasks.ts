@@ -20,8 +20,8 @@ export interface FlatPendingTask {
  * Hook to get a flat list of pending tasks with their job/tour context
  * Useful for displaying tasks individually rather than grouped
  */
-export function useFlatPendingTasks(userId: string | null, userRole: string | null) {
-  const { data: groupedTasks, isLoading, error } = usePendingTasks(userId, userRole);
+export function useFlatPendingTasks(userId: string | null, userRole: string | null, userDepartment?: string | null) {
+  const { data: groupedTasks, isLoading, error } = usePendingTasks(userId, userRole, userDepartment);
 
   const flatTasks = useMemo<FlatPendingTask[]>(() => {
     if (!groupedTasks) return [];
