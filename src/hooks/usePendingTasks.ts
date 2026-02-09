@@ -9,6 +9,7 @@ export interface PendingTask {
   tour_id: string | null;
   department: 'sound' | 'lights' | 'video';
   task_type: string;
+  description: string | null;
   assigned_to: string;
   status: 'not_started' | 'in_progress';
   progress: number;
@@ -33,10 +34,13 @@ export interface GroupedPendingTask {
     id: string;
     department: 'sound' | 'lights' | 'video';
     taskType: string;
+    description: string | null;
     status: 'not_started' | 'in_progress';
     progress: number;
     dueDate: string | null;
     priority: number | null;
+    createdAt: string;
+    updatedAt: string;
     detailLink: string;
     jobId: string | null;
     tourId: string | null;
@@ -159,10 +163,13 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
           id: task.id,
           department: task.department,
           taskType: task.task_type || 'Task',
+          description: task.description || null,
           status: task.status,
           progress: task.progress || 0,
           dueDate: task.due_at,
           priority: task.priority,
+          createdAt: task.created_at,
+          updatedAt: task.updated_at,
           detailLink,
           jobId: task.job_id,
           tourId: task.tour_id,

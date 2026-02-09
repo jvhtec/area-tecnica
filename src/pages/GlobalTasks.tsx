@@ -7,11 +7,13 @@ import { CreateGlobalTaskDialog } from '@/components/tasks/CreateGlobalTaskDialo
 import { LinkJobDialog } from '@/components/tasks/LinkJobDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox, ComboboxGroup, ComboboxItem } from '@/components/ui/combobox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   Plus,
@@ -23,6 +25,9 @@ import {
   CheckCircle2,
   Clock,
   CircleDashed,
+  Pencil,
+  Save,
+  X,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { resolveTaskDocBucket } from '@/hooks/useGlobalTaskMutations';
@@ -61,6 +66,12 @@ const STATUS_ICONS: Record<string, React.ReactNode> = {
   not_started: <CircleDashed className="h-4 w-4 text-muted-foreground" />,
   in_progress: <Clock className="h-4 w-4 text-blue-500" />,
   completed: <CheckCircle2 className="h-4 w-4 text-green-500" />,
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  not_started: 'Sin empezar',
+  in_progress: 'En progreso',
+  completed: 'Completada',
 };
 
 function getErrorMessage(err: unknown): string {
@@ -115,6 +126,10 @@ function formatDateMadrid(isoDate: string): string {
   return formatInJobTimezone(isoDate, 'dd/MM/yyyy', MADRID_TZ);
 }
 
+function formatDateTimeMadrid(isoDate: string): string {
+  return formatInJobTimezone(isoDate, 'dd/MM/yyyy HH:mm', MADRID_TZ);
+}
+
 function dateInputValue(isoDate: string): string {
   // utcToLocalInput returns 'yyyy-MM-ddTHH:mm', we only need the date part
   return utcToLocalInput(isoDate, MADRID_TZ).slice(0, 10);
@@ -140,6 +155,9 @@ export default function GlobalTasks() {
   const [showFilters, setShowFilters] = React.useState(false);
   const [bulkDeleteType, setBulkDeleteType] = React.useState<string>('');
   const [bulkDeleteScope, setBulkDeleteScope] = React.useState<'all' | 'unassigned'>('all');
+  const [editingDescriptionTaskId, setEditingDescriptionTaskId] = React.useState<string | null>(null);
+  const [descriptionDraft, setDescriptionDraft] = React.useState('');
+  const [isSavingDescription, setIsSavingDescription] = React.useState(false);
 
   // Dialogs
   const [showCreate, setShowCreate] = React.useState(false);
@@ -295,6 +313,32 @@ export default function GlobalTasks() {
       });
     }
     await refetch();
+  };
+
+  const startDescriptionEdit = (task: GlobalTask) => {
+    setEditingDescriptionTaskId(task.id);
+    setDescriptionDraft(task.description ?? '');
+  };
+
+  const cancelDescriptionEdit = () => {
+    setEditingDescriptionTaskId(null);
+    setDescriptionDraft('');
+  };
+
+  const saveDescription = async (task: GlobalTask) => {
+    if (!editingDescriptionTaskId || editingDescriptionTaskId !== task.id) return;
+    setIsSavingDescription(true);
+    try {
+      const nextDescription = descriptionDraft.trim();
+      await mutations.updateTask(task.id, { description: nextDescription || null });
+      toast({ title: 'Descripción actualizada' });
+      cancelDescriptionEdit();
+      await refetch();
+    } catch (err: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+    } finally {
+      setIsSavingDescription(false);
+    }
   };
 
   return (
@@ -453,6 +497,15 @@ export default function GlobalTasks() {
                   task.due_at &&
                   task.status !== 'completed' &&
                   isOverdueMadrid(task.due_at);
+                const isPendingTask = task.status !== 'completed';
+                const isEditingDescription = editingDescriptionTaskId === task.id;
+                const assigneeLabel = assignee
+                  ? `${assignee.first_name || ''} ${assignee.last_name || ''}`.trim()
+                  : 'Sin asignar';
+                const creatorLabel = task.created_by_profile
+                  ? `${task.created_by_profile.first_name || ''} ${task.created_by_profile.last_name || ''}`.trim()
+                  : 'Desconocido';
+                const linkedContext = job ? job.title : tour ? tour.name : 'Sin vínculo';
 
                 return (
                   <TableRow key={task.id} className={cn(task.status === 'completed' && 'opacity-60')}>
@@ -460,10 +513,101 @@ export default function GlobalTasks() {
                       {STATUS_ICONS[task.status || ''] || null}
                     </TableCell>
                     <TableCell>
-                      <div>
-                        <div className="font-medium text-sm">{task.task_type}</div>
-                        {task.description && (
-                          <div className="text-xs text-muted-foreground line-clamp-1">{task.description}</div>
+                      <div className="space-y-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <HoverCard openDelay={120}>
+                            <HoverCardTrigger asChild>
+                              <button
+                                type="button"
+                                className="text-left min-w-0"
+                                aria-label={`Ver metadata de la tarea ${task.task_type}`}
+                              >
+                                <div className="font-medium text-sm">{task.task_type}</div>
+                                {!isEditingDescription && (
+                                  <div className="text-xs text-muted-foreground line-clamp-2">
+                                    {task.description || 'Sin descripción'}
+                                  </div>
+                                )}
+                              </button>
+                            </HoverCardTrigger>
+                            <HoverCardContent className="w-[360px] space-y-3">
+                              <div>
+                                <div className="text-sm font-semibold">{task.task_type}</div>
+                                <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">
+                                  {task.description || 'Sin descripción'}
+                                </p>
+                              </div>
+                              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                                <span className="text-muted-foreground">Estado</span>
+                                <span>{STATUS_LABELS[task.status || ''] || task.status || '-'}</span>
+                                <span className="text-muted-foreground">Progreso</span>
+                                <span>{task.progress || 0}%</span>
+                                <span className="text-muted-foreground">Prioridad</span>
+                                <span>{priorityInfo?.label || '-'}</span>
+                                <span className="text-muted-foreground">Asignado</span>
+                                <span>{assigneeLabel || 'Sin asignar'}</span>
+                                <span className="text-muted-foreground">Creada por</span>
+                                <span>{creatorLabel || 'Desconocido'}</span>
+                                <span className="text-muted-foreground">Vínculo</span>
+                                <span>{linkedContext}</span>
+                                <span className="text-muted-foreground">Creada</span>
+                                <span>{task.created_at ? formatDateTimeMadrid(task.created_at) : '-'}</span>
+                                <span className="text-muted-foreground">Actualizada</span>
+                                <span>{task.updated_at ? formatDateTimeMadrid(task.updated_at) : '-'}</span>
+                                <span className="text-muted-foreground">Fecha límite</span>
+                                <span>{task.due_at ? formatDateMadrid(task.due_at) : '-'}</span>
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
+                          {canUpdate && isPendingTask && !isEditingDescription && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6"
+                              onClick={() => startDescriptionEdit(task)}
+                              aria-label={`Editar descripción de ${task.task_type}`}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
+                        {isEditingDescription ? (
+                          <div className="space-y-2 pt-1">
+                            <Textarea
+                              rows={3}
+                              value={descriptionDraft}
+                              onChange={(e) => setDescriptionDraft(e.target.value)}
+                              placeholder="Añade una descripción"
+                              className="text-xs"
+                            />
+                            <div className="flex items-center gap-1">
+                              <Button
+                                size="sm"
+                                className="h-7 text-xs"
+                                onClick={() => saveDescription(task)}
+                                disabled={isSavingDescription}
+                              >
+                                <Save className="h-3 w-3 mr-1" />
+                                Guardar
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 text-xs"
+                                onClick={cancelDescriptionEdit}
+                                disabled={isSavingDescription}
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          isPendingTask && (
+                            <div className="text-[11px] text-muted-foreground">
+                              Pendiente: pasa el cursor para ver metadata completa.
+                            </div>
+                          )
                         )}
                         {priorityInfo && (
                           <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0 mt-1', priorityInfo.class)}>

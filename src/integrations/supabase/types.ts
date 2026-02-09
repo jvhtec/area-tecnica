@@ -8004,6 +8004,7 @@ export type Database = {
           progress: number | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_type: string | null
+          description: string | null
           tour_id: string | null
           tour_name: string | null
           updated_at: string | null

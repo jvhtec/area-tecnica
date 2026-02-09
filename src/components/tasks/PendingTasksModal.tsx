@@ -10,12 +10,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AlertCircle, Calendar, ExternalLink, Loader2, CheckCircle } from 'lucide-react';
 import { usePendingTasks, GroupedPendingTask } from '@/hooks/usePendingTasks';
 import { useCompleteTask, Department } from '@/hooks/useCompleteTask';
 import { cn } from '@/lib/utils';
-import { formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 interface PendingTasksModalProps {
@@ -39,6 +40,12 @@ const STATUS_LABELS: Record<string, string> = {
 const STATUS_COLORS: Record<string, string> = {
   not_started: 'bg-slate-500/10 text-slate-700 border-slate-500/20 dark:text-slate-400',
   in_progress: 'bg-orange-500/10 text-orange-700 border-orange-500/20 dark:text-orange-400',
+};
+
+const PRIORITY_LABELS: Record<number, string> = {
+  1: 'Alta',
+  2: 'Media',
+  3: 'Baja',
 };
 
 export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
@@ -171,7 +178,42 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                                 {task.department}
                               </Badge>
                             </TableCell>
-                            <TableCell className="font-medium">{task.taskType}</TableCell>
+                            <TableCell>
+                              <HoverCard openDelay={120}>
+                                <HoverCardTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="text-left min-w-0"
+                                    aria-label={`Ver metadata de la tarea ${task.taskType}`}
+                                  >
+                                    <div className="font-medium">{task.taskType}</div>
+                                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
+                                      {task.description || 'Sin descripción'}
+                                    </p>
+                                  </button>
+                                </HoverCardTrigger>
+                                <HoverCardContent className="w-[340px] space-y-2">
+                                  <div className="space-y-1">
+                                    <div className="text-sm font-semibold">{task.taskType}</div>
+                                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">
+                                      {task.description || 'Sin descripción'}
+                                    </p>
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                                    <span className="text-muted-foreground">Estado</span>
+                                    <span>{STATUS_LABELS[task.status] || task.status}</span>
+                                    <span className="text-muted-foreground">Progreso</span>
+                                    <span>{task.progress}%</span>
+                                    <span className="text-muted-foreground">Prioridad</span>
+                                    <span>{task.priority ? PRIORITY_LABELS[task.priority] || task.priority : '-'}</span>
+                                    <span className="text-muted-foreground">Creada</span>
+                                    <span>{task.createdAt ? format(new Date(task.createdAt), 'dd/MM/yyyy HH:mm') : '-'}</span>
+                                    <span className="text-muted-foreground">Actualizada</span>
+                                    <span>{task.updatedAt ? format(new Date(task.updatedAt), 'dd/MM/yyyy HH:mm') : '-'}</span>
+                                  </div>
+                                </HoverCardContent>
+                              </HoverCard>
+                            </TableCell>
                             <TableCell>
                               <Badge
                                 variant="outline"
