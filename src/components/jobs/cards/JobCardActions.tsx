@@ -298,10 +298,16 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     const callTimeLabel = opts.callTime ? `${opts.callTime}` : '';
 
     const lines = [
-      `Trabajo: ${jobName}`,
-      `Ubicación: ${location}`,
-      dateLabel ? `Fecha(s): ${dateLabel}` : undefined,
-      `Hora de citación (REVISAR): ${callTimeLabel || '—'}`,
+      `Buenas,`,
+      ``,
+      `Para el trabajo “${jobName}”:`,
+      ``,
+      `• Ubicación: ${location}`,
+      dateLabel ? `• Fecha(s): ${dateLabel}` : undefined,
+      `• Hora de citación (REVISAR): ${callTimeLabel || '—'}`,
+      ``,
+      `Si alguien llega más tarde / necesita algo, que me diga por aquí.`,
+      `Gracias.`,
     ].filter(Boolean);
 
     return lines.join('\n');
