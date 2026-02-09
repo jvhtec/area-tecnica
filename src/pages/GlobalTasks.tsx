@@ -463,7 +463,9 @@ export default function GlobalTasks() {
                       <div>
                         <div className="font-medium text-sm">{task.task_type}</div>
                         {task.description && (
-                          <div className="text-xs text-muted-foreground line-clamp-1">{task.description}</div>
+                          <div className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                            {task.description}
+                          </div>
                         )}
                         {priorityInfo && (
                           <Badge variant="outline" className={cn('text-[10px] px-1.5 py-0 mt-1', priorityInfo.class)}>
