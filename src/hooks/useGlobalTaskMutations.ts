@@ -1,13 +1,19 @@
 import { supabase } from '@/integrations/supabase/client';
 import { completeTask, revertTask, Department } from '@/services/taskCompletion';
 import type { Database } from '@/integrations/supabase/types';
-
-type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
+import { type Dept } from '@/utils/tasks';
 
 type SoundTaskUpdate = Database['public']['Tables']['sound_job_tasks']['Update'];
 type LightsTaskUpdate = Database['public']['Tables']['lights_job_tasks']['Update'];
 type VideoTaskUpdate = Database['public']['Tables']['video_job_tasks']['Update'];
-type TaskUpdate = SoundTaskUpdate | LightsTaskUpdate | VideoTaskUpdate;
+type ProductionTaskUpdate = Database['public']['Tables']['production_job_tasks']['Update'];
+type AdministrativeTaskUpdate = Database['public']['Tables']['administrative_job_tasks']['Update'];
+type TaskUpdate =
+  | SoundTaskUpdate
+  | LightsTaskUpdate
+  | VideoTaskUpdate
+  | ProductionTaskUpdate
+  | AdministrativeTaskUpdate;
 
 const TASK_TABLE: Record<Dept, string> = {
   sound: 'sound_job_tasks',
@@ -69,7 +75,7 @@ export function useGlobalTaskMutations(department: Dept) {
   const table = TASK_TABLE[department];
   const docFk = DOC_FK[department];
 
-  const createTask = async (params: {
+  const createTaskInTable = async (targetTable: string, params: {
     task_type: string;
     description?: string | null;
     assigned_to?: string | null;
@@ -101,11 +107,26 @@ export function useGlobalTaskMutations(department: Dept) {
     if (params.tour_id) payload.tour_id = params.tour_id;
 
     const { data, error } = await supabase
-      .from(table as any)
+      .from(targetTable as any)
       .insert(payload)
       .select()
       .single();
     if (error) throw error;
+
+    return { data, payload, userId };
+  };
+
+  const createTask = async (params: {
+    task_type: string;
+    description?: string | null;
+    assigned_to?: string | null;
+    assigned_department?: string | null;
+    job_id?: string | null;
+    tour_id?: string | null;
+    due_at?: string | null;
+    priority?: number | null;
+  }) => {
+    const { data, payload, userId } = await createTaskInTable(table, params);
 
     if (payload.assigned_to && userId) {
       try {
@@ -137,35 +158,8 @@ export function useGlobalTaskMutations(department: Dept) {
     targetDept: Dept,
     params: Parameters<typeof createTask>[0],
   ) => {
-    if (params.job_id != null && params.tour_id != null) {
-      throw new Error('Validation error: job_id and tour_id are mutually exclusive');
-    }
-
-    const { data: authData } = await supabase.auth.getUser();
-    const userId = authData?.user?.id ?? null;
-
     const targetTable = TASK_TABLE[targetDept];
-    const payload: Record<string, unknown> = {
-      task_type: params.task_type,
-      description: params.description || null,
-      assigned_to: params.assigned_to || null,
-      assigned_department: params.assigned_department || null,
-      due_at: params.due_at || null,
-      priority: params.priority ?? null,
-      status: 'not_started',
-      progress: 0,
-      created_by: userId,
-    };
-    if (params.job_id) payload.job_id = params.job_id;
-    if (params.tour_id) payload.tour_id = params.tour_id;
-
-    const { data, error } = await supabase
-      .from(targetTable as any)
-      .insert(payload)
-      .select()
-      .single();
-    if (error) throw error;
-
+    const { data } = await createTaskInTable(targetTable, params);
     return data;
   };
 

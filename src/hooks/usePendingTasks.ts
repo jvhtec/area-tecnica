@@ -1,7 +1,13 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import {
+  checkNetworkConnection,
+  ensureRealtimeConnection,
+  monitorConnectionHealth,
+  supabase,
+} from '@/integrations/supabase/client';
+import { normalizeDept } from '@/utils/tasks';
 
 export interface PendingTask {
   id: string;
@@ -68,67 +74,117 @@ type TaskRow = Record<string, unknown> & { assigned_to?: string | null };
  */
 export function usePendingTasks(userId: string | null, userRole: string | null, userDepartment?: string | null) {
   const isEligibleRole = !!userRole && ['management', 'admin', 'logistics', 'oscar'].includes(userRole);
+  const normalizedDepartment = useMemo(() => normalizeDept(userDepartment) ?? null, [userDepartment]);
   const queryClient = useQueryClient();
+  const healthCleanupRef = useRef<null | (() => void)>(null);
 
   useEffect(() => {
     if (!userId || !isEligibleRole) {
       return;
     }
 
-    const channel = supabase.channel(
-      `pending-tasks-${userId}-${Math.random().toString(36).slice(2, 10)}`
-    );
+    let isMounted = true;
+    let channelRef: ReturnType<typeof supabase.channel> | undefined;
 
     const invalidatePendingTasks = () => {
-      queryClient.invalidateQueries({ queryKey: ['pending-tasks', userId] });
+      queryClient.invalidateQueries({ queryKey: ['pending-tasks', userId, normalizedDepartment] });
     };
 
-    TASK_TABLES.forEach((table) => {
-      // Listen for changes to tasks assigned to this user
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table, filter: `assigned_to=eq.${userId}` },
-        invalidatePendingTasks
+    (async () => {
+      const isOnline = await checkNetworkConnection();
+      if (!isOnline || !isMounted) return;
+
+      await ensureRealtimeConnection();
+      if (!isMounted) return;
+
+      const channel = supabase.channel(
+        `pending-tasks-${userId}-${Math.random().toString(36).slice(2, 10)}`
       );
 
-      // Listen for changes to department-shared tasks
-      if (userDepartment) {
+      TASK_TABLES.forEach((table) => {
+        // Listen for changes to tasks assigned to this user
         channel.on(
           'postgres_changes',
-          { event: '*', schema: 'public', table, filter: `assigned_department=eq.${userDepartment}` },
+          { event: '*', schema: 'public', table, filter: `assigned_to=eq.${userId}` },
           invalidatePendingTasks
         );
+
+        // Listen for changes to department-shared tasks
+        if (normalizedDepartment) {
+          channel.on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table,
+              filter: `assigned_department=eq.${normalizedDepartment}`,
+            },
+            invalidatePendingTasks
+          );
+
+          channel.on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table,
+              filter: `assigned_department=eq.${normalizedDepartment}_warehouse`,
+            },
+            invalidatePendingTasks
+          );
+        }
+
+        channel.on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table },
+          (payload: RealtimePostgresChangesPayload<TaskRow>) => {
+            const previousAssignee = (payload.old as TaskRow)?.assigned_to ?? null;
+            const nextAssignee = (payload.new as TaskRow)?.assigned_to ?? null;
+
+            if (previousAssignee === userId && nextAssignee !== userId) {
+              invalidatePendingTasks();
+            }
+          }
+        );
+      });
+
+      channel.subscribe();
+
+      // If unmount happened while awaiting, clean up immediately
+      if (!isMounted) {
+        void supabase.removeChannel(channel);
+        return;
       }
 
-      channel.on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table },
-        (payload: RealtimePostgresChangesPayload<TaskRow>) => {
-          const previousAssignee = (payload.old as TaskRow)?.assigned_to ?? null;
-          const nextAssignee = (payload.new as TaskRow)?.assigned_to ?? null;
+      channelRef = channel;
 
-          if (previousAssignee === userId && nextAssignee !== userId) {
-            invalidatePendingTasks();
-          }
+      // Monitor connection health and refetch on reconnection
+      healthCleanupRef.current = monitorConnectionHealth((isConnected) => {
+        if (isConnected && isMounted) {
+          invalidatePendingTasks();
         }
-      );
-    });
-
-    channel.subscribe();
+      });
+    })();
 
     return () => {
-      void supabase.removeChannel(channel);
+      isMounted = false;
+      if (channelRef) {
+        void supabase.removeChannel(channelRef);
+      }
+      healthCleanupRef.current?.();
+      healthCleanupRef.current = null;
     };
-  }, [userId, isEligibleRole, userDepartment, queryClient]);
+  }, [userId, isEligibleRole, normalizedDepartment, queryClient]);
 
   return useQuery({
-    queryKey: ['pending-tasks', userId, userDepartment],
+    queryKey: ['pending-tasks', userId, normalizedDepartment],
     enabled: !!userId && isEligibleRole,
     queryFn: async (): Promise<GroupedPendingTask[]> => {
       // Fetch both individually-assigned tasks and department-shared tasks
       const orFilters = [`assigned_to.eq.${userId}`];
-      if (userDepartment) {
-        orFilters.push(`assigned_department.eq.${userDepartment}`);
+      if (normalizedDepartment) {
+        orFilters.push(`assigned_department.eq.${normalizedDepartment}`);
+        orFilters.push(`assigned_department.eq.${normalizedDepartment}_warehouse`);
       }
 
       const { data, error } = await supabase

@@ -184,16 +184,14 @@ const Layout = () => {
     logout,
   } = useOptimizedAuth()
 
-  // Synchronous redirect for technician users - prevent any Layout rendering.
+  // Redirect technician users to the technician app (after all hooks run).
   // Preserve showAbout query param for deeplinks.
   // Allow-list technician-accessible routes that still live under Layout (e.g. SysCalc).
   const isAllowedTechnicianLayoutRoute = location.pathname === '/syscalc'
-
-  if (!isLoading && userRole === 'technician' && !isAllowedTechnicianLayoutRoute) {
-    const showAboutParam = searchParams.get('showAbout')
-    const redirectPath = showAboutParam ? `/tech-app?showAbout=${showAboutParam}` : '/tech-app'
-    return <Navigate to={redirectPath} replace />;
-  }
+  const showAboutParam = searchParams.get('showAbout')
+  const technicianRedirectPath = showAboutParam ? `/tech-app?showAbout=${showAboutParam}` : '/tech-app'
+  const shouldRedirectTechnician =
+    !isLoading && userRole === 'technician' && !isAllowedTechnicianLayoutRoute
 
   const { requiredTables } = useRouteSubscriptions()
   const { forceSubscribe } = useSubscriptionContext()
@@ -325,18 +323,6 @@ const Layout = () => {
     setShowPendingTasksModal(true)
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900 dark:border-white" />
-      </div>
-    )
-  }
-
-  if (!session) {
-    navigate("/auth", { replace: true })
-    return null
-  }
 
   const navigationProps = useMemo<SidebarNavigationProps>(
     () => ({
@@ -421,6 +407,22 @@ const Layout = () => {
     !mobileFullscreenRoutes &&
     Boolean(userRole) &&
     (primaryItems.length > 0 || trayItems.length > 0)
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900 dark:border-white" />
+      </div>
+    )
+  }
+
+  if (!session) {
+    return <Navigate to="/auth" replace />
+  }
+
+  if (shouldRedirectTechnician) {
+    return <Navigate to={technicianRedirectPath} replace />
+  }
+
 
   return (
     <SidebarProvider defaultOpen={showSidebar}>

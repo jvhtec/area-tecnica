@@ -7,7 +7,9 @@ export type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative
  * Returns null for unrecognized input.
  */
 export function normalizeDept(value: string | null | undefined): Dept | null {
-  const lower = (value || '').toLowerCase();
+  const raw = (value ?? '').toString().toLowerCase().trim();
+  const lower = raw.endsWith('_warehouse') ? raw.slice(0, -'_warehouse'.length) : raw;
+
   if (lower === 'sound' || lower === 'sonido') return 'sound';
   if (lower === 'lights' || lower === 'luces') return 'lights';
   if (lower === 'video' || lower === 'vídeo') return 'video';
