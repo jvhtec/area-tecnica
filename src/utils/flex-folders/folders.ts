@@ -494,6 +494,7 @@ export async function createAllFoldersForJob(
     const dryHireFolder = await createFlexFolder(dryHireFolderPayload);
 
     const dryHireDocumentSuffix = department === "sound" ? "SDH" : "LDH";
+    const dryHirePresupuestoDocumentNumber = `${documentNumber}${dryHireDocumentSuffix}`;
     const presupuestoFolder = await createFlexFolder({
       definitionId: FLEX_FOLDER_IDS.presupuestoDryHire,
       parentElementId: dryHireFolder.elementId,
@@ -504,7 +505,7 @@ export async function createAllFoldersForJob(
       plannedEndDate: dryHireFolderPayload.plannedEndDate,
       locationId: dryHireFolderPayload.locationId,
       departmentId: dryHireFolderPayload.departmentId,
-      documentNumber: `${parentDocumentNumber}${dryHireDocumentSuffix}`,
+      documentNumber: dryHirePresupuestoDocumentNumber,
       personResponsibleId: dryHireFolderPayload.personResponsibleId,
     });
 
