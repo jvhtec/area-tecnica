@@ -1259,7 +1259,6 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                       onClick={() => {
                         const ids = waProdAssignments
                           .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
-                          .filter((a) => (a.profile?.phone || '').trim().length > 0)
                           .map((a) => a.technician_id);
                         setWaProdRecipientIds(ids);
                       }}
@@ -1279,6 +1278,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                 </div>
 
                 <div className="border rounded-md p-2 max-h-[220px] overflow-y-auto space-y-2">
+                  <div className="text-xs text-muted-foreground px-2">
+                    Nota: el teléfono puede no ser visible aquí por permisos; el envío valida teléfonos en servidor.
+                  </div>
                   {waProdAssignmentsLoading ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground p-2">
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1292,10 +1294,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                         const hasPhone = Boolean((a.profile?.phone || '').trim());
                         const checked = waProdRecipientIds.includes(a.technician_id);
                         return (
-                          <div key={a.technician_id} className={cn('flex items-start gap-2 p-2 rounded', !hasPhone && 'opacity-60')}>
+                          <div key={a.technician_id} className={cn('flex items-start gap-2 p-2 rounded') }>
                             <Checkbox
                               checked={checked}
-                              disabled={!hasPhone}
                               onCheckedChange={(next) => {
                                 const isChecked = Boolean(next);
                                 setWaProdRecipientIds((prev) => {
@@ -1307,7 +1308,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                             <div className="flex-1 min-w-0">
                               <div className="text-sm font-medium truncate" title={full}>{full}</div>
                               <div className="text-xs text-muted-foreground">
-                                {hasPhone ? a.profile?.phone : 'Sin teléfono (no se puede enviar)'}
+                                {hasPhone ? a.profile?.phone : 'Teléfono no disponible (se intentará enviar igualmente)'}
                               </div>
                             </div>
                           </div>
