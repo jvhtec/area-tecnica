@@ -490,7 +490,7 @@ export async function generateRateQuotePDF(
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
     doc.setTextColor(...CORPORATE_RED);
-    doc.text('⚠️ Algunos pagos tienen override manual aplicado (ver detalles en tabla).', 14, disclaimerY);
+    doc.text('⚠️ Hay overrides manuales de pago (excepción). Administración debe validar con Dirección.', 14, disclaimerY);
   }
 
   const footerLogo = companyLogo ?? headerLogo;
@@ -985,7 +985,7 @@ export async function generateJobPayoutPDF(
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(...CORPORATE_RED);
-      doc.text('⚠️ Algunos pagos tienen override manual aplicado (ver detalles en tabla).', 14, disclaimerY);
+      doc.text('⚠️ Hay overrides manuales de pago (excepción). Administración debe validar con Dirección.', 14, disclaimerY);
       disclaimerY += 6;
   }
 

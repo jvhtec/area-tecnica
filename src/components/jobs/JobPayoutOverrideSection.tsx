@@ -63,6 +63,9 @@ export const JobPayoutOverrideSection: React.FC<{
             </div>
           </div>
           <div className="text-xs mt-1 opacity-75">Calculado: {formatCurrency(calculatedTotalEur)}</div>
+          <div className="text-[11px] mt-1 opacity-80">
+            ⚠️ Excepción: Administración debe validar este override con Dirección.
+          </div>
         </div>
       )}
 
@@ -91,6 +94,9 @@ export const JobPayoutOverrideSection: React.FC<{
             </Button>
           </div>
           <div className="text-xs text-amber-700 dark:text-amber-200">Calculado: {formatCurrency(calculatedTotalEur)}</div>
+          <div className="text-[11px] text-amber-700 dark:text-amber-200 opacity-90">
+            ⚠️ Excepción: Administración debe validar este override con Dirección.
+          </div>
         </div>
       )}
 
