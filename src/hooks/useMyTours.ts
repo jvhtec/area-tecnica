@@ -25,7 +25,8 @@ export const useMyTours = () => {
     queryFn: async () => {
       if (!user?.id) throw new Error("User not authenticated");
 
-      const { data, error } = await supabase
+      // 1) Tours where the technician is explicitly assigned as tour crew
+      const { data: crewAssignments, error: crewError } = await supabase
         .from('tour_assignments')
         .select(`
           role,
@@ -49,35 +50,126 @@ export const useMyTours = () => {
         .eq('tours.status', 'active')
         .order('tours(start_date)', { ascending: true });
 
-      if (error) throw error;
+      if (crewError) throw crewError;
 
-      const transformedTours: MyTour[] = data.map(assignment => {
-        // Access the tour object correctly - it should be a single object, not an array
-        const tour = assignment.tours as any;
+      // 2) Tours where the technician is assigned to at least one job in the tour
+      // (even if they are not part of the tour crew)
+      const { data: jobAssignments, error: jobError } = await supabase
+        .from('job_assignments')
+        .select(`
+          sound_role,
+          lights_role,
+          video_role,
+          status,
+          jobs!inner (
+            id,
+            start_time,
+            end_time,
+            tour_id,
+            tour:tours (
+              id,
+              name,
+              description,
+              color,
+              status,
+              start_date,
+              end_date,
+              tour_dates (
+                id,
+                date
+              )
+            )
+          )
+        `)
+        .eq('technician_id', user.id)
+        .eq('status', 'confirmed')
+        .eq('jobs.tour.status', 'active');
+
+      if (jobError) {
+        // If this secondary query fails, we still return the crew tours.
+        console.warn('[useMyTours] job-based tour lookup failed:', jobError);
+      }
+
+      const now = new Date();
+
+      const byTourId = new Map<string, MyTour>();
+
+      const upsert = (tour: any, meta: Partial<MyTour>) => {
+        if (!tour?.id) return;
         const tourDates = tour.tour_dates || [];
-        const now = new Date();
         const upcomingDates = tourDates.filter(
           (dateEntry: any) => new Date(dateEntry.date) >= now
         ).length;
 
-        return {
+        const existing = byTourId.get(tour.id);
+        if (existing) {
+          // Keep the strongest assignment type (crew beats job-based)
+          const isExistingCrew = existing.assignment_role !== 'Por bolo';
+          const isNewCrew = meta.assignment_role !== 'Por bolo';
+          if (!isExistingCrew && isNewCrew) {
+            byTourId.set(tour.id, {
+              ...existing,
+              ...meta,
+              total_dates: existing.total_dates,
+              upcoming_dates: existing.upcoming_dates,
+            } as MyTour);
+          }
+          return;
+        }
+
+        byTourId.set(tour.id, {
           id: tour.id,
           name: tour.name,
           description: tour.description,
           color: tour.color,
           start_date: tour.start_date,
           end_date: tour.end_date,
+          assignment_role: meta.assignment_role || 'Por bolo',
+          assignment_department: meta.assignment_department || 'unknown',
+          assignment_notes: meta.assignment_notes,
+          total_dates: tourDates.length,
+          upcoming_dates: upcomingDates,
+        });
+      };
+
+      // Crew tours
+      (crewAssignments || []).forEach((assignment: any) => {
+        const tour = assignment.tours as any;
+        upsert(tour, {
           assignment_role: assignment.role,
           assignment_department: assignment.department,
           assignment_notes: assignment.notes,
-          total_dates: tourDates.length,
-          upcoming_dates: upcomingDates
-        };
+        });
       });
 
-      return transformedTours;
+      // Job-based tours
+      (jobAssignments || []).forEach((assignment: any) => {
+        const job = assignment.jobs as any;
+        const tour = job?.tour as any;
+        if (!tour) return;
+
+        const department = assignment.sound_role
+          ? 'sound'
+          : assignment.lights_role
+            ? 'lights'
+            : assignment.video_role
+              ? 'video'
+              : 'unknown';
+
+        upsert(tour, {
+          assignment_role: 'Por bolo',
+          assignment_department: department,
+        });
+      });
+
+      // Return sorted by start_date
+      return Array.from(byTourId.values()).sort((a, b) => {
+        const aT = a.start_date ? new Date(a.start_date).getTime() : 0;
+        const bT = b.start_date ? new Date(b.start_date).getTime() : 0;
+        return aT - bT;
+      });
     },
-    enabled: !!user?.id
+    enabled: !!user?.id,
   });
 
   const activeTours = tours.filter(tour => {
