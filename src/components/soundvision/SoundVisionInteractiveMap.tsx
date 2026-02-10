@@ -819,7 +819,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                         type="button"
                         onClick={onClose}
                         aria-label="Volver"
-                        className="absolute top-6 left-6 z-20 p-3 bg-black/60 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-colors"
+                        className="absolute top-[calc(1.5rem+env(safe-area-inset-top))] left-[calc(1.5rem+env(safe-area-inset-left))] z-20 p-3 bg-black/60 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-colors"
                     >
                         <ArrowLeft size={20} />
                     </button>
@@ -827,7 +827,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
 
                 {/* File count badge */}
                 {!mapLoading && !mapError && (
-                    <div className="absolute top-6 right-6 z-20 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
+                    <div className="absolute top-[calc(1.5rem+env(safe-area-inset-top))] right-[calc(1.5rem+env(safe-area-inset-right))] z-20 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
                         <span className="text-white text-sm font-medium">
                             {venuesWithCoordinates} {venuesWithCoordinates === 1 ? 'recinto' : 'recintos'}
                         </span>
@@ -840,7 +840,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                         type="button"
                         onClick={() => setUploadOpen(true)}
                         aria-label="Subir archivo"
-                        className="absolute top-20 right-6 z-20 p-3 bg-black/60 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-colors"
+                        className="absolute top-[calc(5rem+env(safe-area-inset-top))] right-[calc(1.5rem+env(safe-area-inset-right))] z-20 p-3 bg-black/60 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-colors"
                         title="Subir nuevo archivo"
                     >
                         <Upload size={20} />
@@ -853,7 +853,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
             {/* Drawer */}
             <div
                 ref={drawerRef}
-                className={`absolute bottom-0 w-full ${isDark ? 'bg-[#0f1219]' : 'bg-white'} border-t ${theme.divider} rounded-t-3xl shadow-2xl flex flex-col transition-all duration-500 z-30`}
+                className={`absolute bottom-0 w-full ${isDark ? 'bg-[#0f1219]' : 'bg-white'} border-t ${theme.divider} rounded-t-3xl shadow-2xl flex flex-col transition-all duration-500 z-30 pb-[max(0px,env(safe-area-inset-bottom))]`}
                 style={getDrawerStyle()}
             >
                 {/* Drawer handle */}
@@ -1209,6 +1209,24 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
         }
         .soundvision-popup .mapboxgl-popup-tip {
           border-top-color: #1a1a2e;
+        }
+
+        /* Safe areas (iOS notch / home indicator) */
+        .mapboxgl-ctrl-top-left {
+          top: env(safe-area-inset-top);
+          left: env(safe-area-inset-left);
+        }
+        .mapboxgl-ctrl-top-right {
+          top: env(safe-area-inset-top);
+          right: env(safe-area-inset-right);
+        }
+        .mapboxgl-ctrl-bottom-left {
+          left: env(safe-area-inset-left);
+          bottom: env(safe-area-inset-bottom);
+        }
+        .mapboxgl-ctrl-bottom-right {
+          right: env(safe-area-inset-right);
+          bottom: env(safe-area-inset-bottom);
         }
       `}</style>
         </div>
