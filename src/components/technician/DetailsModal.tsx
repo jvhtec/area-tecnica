@@ -61,7 +61,9 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         enabled: !!job?.id,
     });
 
-    const tourId = (jobDetails as any)?.tour_id || (job as any)?.tour_id;
+    const tourId: string | undefined =
+        (jobDetails as { tour_id?: string } | null)?.tour_id ??
+        (job as { tour_id?: string })?.tour_id;
 
     // Fetch staff assignments for this job
     const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({

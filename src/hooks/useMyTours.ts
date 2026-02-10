@@ -4,6 +4,7 @@ import { formatInTimeZone } from "date-fns-tz";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { createQueryKey } from "@/lib/optimized-react-query";
 
 export interface MyTour {
   id: string;
@@ -23,7 +24,7 @@ export const useMyTours = () => {
   const { user, userDepartment } = useOptimizedAuth();
 
   const { data: tours = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['my-tours', user?.id],
+    queryKey: user?.id ? createQueryKey.tours.byUser(user.id) : createQueryKey.tours.all,
     queryFn: async () => {
       if (!user?.id) throw new Error("User not authenticated");
 
