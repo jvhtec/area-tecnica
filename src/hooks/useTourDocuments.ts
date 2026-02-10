@@ -13,11 +13,15 @@ export interface TourDocument {
   file_size?: number;
   uploaded_by?: string;
   uploaded_at: string;
+  visible_to_tech?: boolean;
 }
 
 export const useTourDocuments = (tourId: string) => {
   const { user, userRole } = useOptimizedAuth();
   const queryClient = useQueryClient();
+
+  const isManager = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const canManageVisibility = ['admin', 'management'].includes(userRole || '');
 
   const { data: documents = [], isLoading, error } = useQuery({
     queryKey: ['tour-documents', tourId],
@@ -33,11 +37,11 @@ export const useTourDocuments = (tourId: string) => {
         console.error('Error fetching tour documents:', error);
         throw error;
       }
-      
+
       console.log('Fetched documents:', data);
       return data as TourDocument[];
     },
-    enabled: !!tourId
+    enabled: !!tourId,
   });
 
   const uploadDocument = useMutation({
@@ -48,6 +52,9 @@ export const useTourDocuments = (tourId: string) => {
       const fileId = crypto.randomUUID();
       const filePath = `tours/${tourId}/${fileId}.${fileExt}`;
       const finalFileName = fileName || file.name;
+
+      // Technician uploads should default to visible-to-tech (otherwise they can't create a hidden doc).
+      const visibleToTech = !isManager;
 
       console.log('Uploading file:', finalFileName, 'to path:', filePath);
 
@@ -70,7 +77,8 @@ export const useTourDocuments = (tourId: string) => {
           file_path: filePath,
           file_type: file.type,
           file_size: file.size,
-          uploaded_by: user.id
+          uploaded_by: user.id,
+          visible_to_tech: visibleToTech,
         })
         .select()
         .single();
@@ -79,7 +87,7 @@ export const useTourDocuments = (tourId: string) => {
         console.error('Database insert error:', dbError);
         throw dbError;
       }
-      
+
       console.log('Document uploaded successfully:', data);
       return data;
     },
@@ -91,6 +99,29 @@ export const useTourDocuments = (tourId: string) => {
       console.error('Upload error:', error);
       toast.error('Failed to upload document');
     }
+  });
+
+  const updateVisibility = useMutation({
+    mutationFn: async ({ documentId, visibleToTech }: { documentId: string; visibleToTech: boolean }) => {
+      if (!canManageVisibility) {
+        throw new Error('Not allowed');
+      }
+
+      const { error } = await supabase
+        .from('tour_documents')
+        .update({ visible_to_tech: visibleToTech })
+        .eq('id', documentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tour-documents', tourId] });
+      toast.success('Visibility updated');
+    },
+    onError: (error: any) => {
+      console.error('Update visibility error:', error);
+      toast.error('Failed to update visibility');
+    },
   });
 
   const deleteDocument = useMutation({
@@ -162,17 +193,24 @@ export const useTourDocuments = (tourId: string) => {
     // User can delete their own documents
     if (document.uploaded_by === user.id) return true;
     
-    // Admins and management can delete any document
-    return ['admin', 'management'].includes(userRole || '');
+    // Admins/management/logistics can delete any document
+    return ['admin', 'management', 'logistics'].includes(userRole || '');
   };
+
+  const canUpload =
+    Boolean(user?.id) &&
+    (isManager || ['technician', 'house_tech'].includes(userRole || ''));
 
   return {
     documents,
     isLoading,
     error,
     uploadDocument,
+    updateVisibility,
     deleteDocument,
     getDocumentUrl,
-    canDelete
+    canDelete,
+    canManageVisibility,
+    canUpload,
   };
 };
