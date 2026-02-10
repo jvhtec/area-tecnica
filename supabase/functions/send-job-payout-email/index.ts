@@ -140,7 +140,25 @@ serve(async (req) => {
 
   try {
     const body = (await req.json()) as JobPayoutRequestBody;
-    console.log('[send-job-payout-email] Incoming payload', JSON.stringify(body, null, 2));
+    const DEBUG = Deno.env.get('DEBUG_PAYOUT_EMAILS') === 'true';
+
+    // Avoid dumping base64 PDFs / PII into logs.
+    console.log('[send-job-payout-email] Incoming payload', JSON.stringify({
+      job: { id: body.job?.id, title: body.job?.title },
+      technicians: body.technicians?.map(t => ({
+        technician_id: t.technician_id,
+        has_pdf: Boolean(t.pdf_base64),
+        pdf_length: t.pdf_base64?.length ?? 0,
+      })),
+      technicians_count: body.technicians?.length ?? 0,
+    }));
+
+    if (DEBUG) {
+      console.log('[send-job-payout-email][debug] Incoming payload (full)', {
+        job: body.job,
+        technicians_count: body.technicians?.length ?? 0,
+      });
+    }
 
     if (!body || !body.job || !body.job.id) {
       return new Response(
@@ -182,9 +200,8 @@ serve(async (req) => {
     }
 
     // Corporate assets (logos)
-    const SUPABASE_URL_RAW = Deno.env.get('SUPABASE_URL') || '';
-    const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || (SUPABASE_URL_RAW ? `${SUPABASE_URL_RAW}/storage/v1/object/public/company-assets/sectorlogow.png` : '');
-    const AT_LOGO_URL = Deno.env.get('AT_LOGO_URL') || (SUPABASE_URL_RAW ? `${SUPABASE_URL_RAW}/storage/v1/object/public/company-assets/area-tecnica-logo.png` : '');
+    const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || `${SUPABASE_URL}/storage/v1/object/public/company-assets/sectorlogow.png`;
+    const AT_LOGO_URL = Deno.env.get('AT_LOGO_URL') || `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
 
     for (const tech of body.technicians) {
       const trimmedEmail = (tech.email || '').trim();
@@ -199,7 +216,11 @@ serve(async (req) => {
         results.push({ technician_id: tech.technician_id, sent: false, error: 'missing_pdf' });
         continue;
       }
-      console.log(`[send-job-payout-email] PDF for ${tech.technician_id}: ${pdfBase64.length} chars, starts with: ${pdfBase64.substring(0, 50)}...`);
+      if (DEBUG) {
+        console.log(`[send-job-payout-email][debug] PDF length for technician: ${tech.technician_id}`, {
+          pdfLength: pdfBase64.length,
+        });
+      }
 
       const subject = `Resumen de pagos · ${body.job.title}`;
 
@@ -222,13 +243,10 @@ serve(async (req) => {
       const grand = formatCurrency(effectiveTotal);
       const invoicingCompany = body.job.invoicing_company;
 
-      // Debug logging
-      console.log('[send-job-payout-email] Invoicing company raw value:', JSON.stringify(invoicingCompany));
-      console.log('[send-job-payout-email] Type:', typeof invoicingCompany);
-      console.log('[send-job-payout-email] Length:', invoicingCompany?.length);
-
       const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
-      console.log('[send-job-payout-email] Company details result:', companyDetails ? 'FOUND' : 'NULL');
+      if (DEBUG) {
+        console.log('[send-job-payout-email][debug] Company details resolved:', companyDetails ? 'FOUND' : 'NULL');
+      }
 
       const htmlContent = `<!DOCTYPE html>
       <html lang="es">
@@ -337,13 +355,13 @@ serve(async (req) => {
       // Always CC administration
       emailPayload['cc'] = [{ email: 'administracion@mfo-producciones.com' }];
 
-      // Debug: log attachment info
-      console.log('[send-job-payout-email] Sending email with attachment:', {
-        to: trimmedEmail,
-        pdfLength: pdfBase64.length,
-        pdfStartsWith: pdfBase64.substring(0, 30),
-        filename: tech.filename || `pago_${body.job.id}_${tech.technician_id}.pdf`
-      });
+      if (DEBUG) {
+        console.log('[send-job-payout-email][debug] Sending email with attachment:', {
+          to: '***',
+          pdfLength: pdfBase64.length,
+          filename: tech.filename || `pago_${body.job.id}_${tech.technician_id}.pdf`,
+        });
+      }
 
       try {
         const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {

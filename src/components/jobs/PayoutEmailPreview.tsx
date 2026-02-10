@@ -1,5 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { createQueryKey } from '@/lib/optimized-react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, X } from 'lucide-react';
@@ -28,27 +29,31 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
     }
   }, [context, selectedTechId]);
 
-  if (!context) return null;
-
-  const selectedAttachment = context.attachments.find(a => a.technician_id === selectedTechId);
+  const selectedAttachment = context?.attachments.find(a => a.technician_id === selectedTechId);
 
   // Preview should match the final email sent by the Edge Function.
   // Fetch override directly from DB to avoid stale/cached client context.
+  const jobId = context?.job?.id;
+  const technicianId = selectedAttachment?.technician_id;
+
   const { data: overrideAmountEur } = useQuery({
-    queryKey: ['job-payout-override', context.job.id, selectedAttachment?.technician_id],
-    enabled: Boolean(context.job.id && selectedAttachment?.technician_id),
+    queryKey: createQueryKey.payoutOverrides.byJobAndTechnician(jobId, technicianId),
+    enabled: Boolean(jobId && technicianId),
     queryFn: async () => {
+      if (!jobId || !technicianId) return null;
       const { data, error } = await supabase
         .from('job_technician_payout_overrides')
         .select('override_amount_eur')
-        .eq('job_id', context.job.id)
-        .eq('technician_id', selectedAttachment!.technician_id)
+        .eq('job_id', jobId)
+        .eq('technician_id', technicianId)
         .maybeSingle();
       if (error) throw error;
       const value = data?.override_amount_eur;
       return value == null ? null : Number(value);
     },
   });
+
+  if (!context) return null;
 
   const formatDateLong = (value?: string | Date | null) => {
     if (!value) return null;
