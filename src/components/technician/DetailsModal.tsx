@@ -8,6 +8,7 @@ import { es } from 'date-fns/locale';
 import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TourDocumentUploader } from '@/components/tours/TourDocumentUploader';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Theme } from './types';
@@ -37,9 +38,10 @@ interface TourDocument {
 type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
 
 export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
-    const { user } = useOptimizedAuth();
+    const { user, userRole } = useOptimizedAuth();
     const [activeTab, setActiveTab] = useState<TabId>('Info');
     const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
+    const [isUploadingTourDocument, setIsUploadingTourDocument] = useState(false);
     const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
     const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
     const [isMapLoading, setIsMapLoading] = useState(false);
@@ -721,10 +723,32 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                             {/* Tour docs entrypoint (A+B): allows eventual techs to access tour docs from the job */}
                             {tourId ? (
                                 <div>
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <FileText size={18} className={theme.textMuted} />
-                                        <h3 className={`text-lg font-bold ${theme.textMain}`}>Documentos de la gira</h3>
+                                    <div className="flex items-center justify-between gap-2 mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <FileText size={18} className={theme.textMuted} />
+                                            <h3 className={`text-lg font-bold ${theme.textMain}`}>Documentos de la gira</h3>
+                                        </div>
+
+                                        {['technician', 'house_tech'].includes(userRole || '') ? (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setIsUploadingTourDocument((v) => !v)}
+                                            >
+                                                {isUploadingTourDocument ? 'Cancelar' : 'Añadir'}
+                                            </Button>
+                                        ) : null}
                                     </div>
+
+                                    {isUploadingTourDocument && ['technician', 'house_tech'].includes(userRole || '') ? (
+                                        <div className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-3 mb-3`}>
+                                            <TourDocumentUploader
+                                                tourId={tourId}
+                                                onSuccess={() => setIsUploadingTourDocument(false)}
+                                                onCancel={() => setIsUploadingTourDocument(false)}
+                                            />
+                                        </div>
+                                    ) : null}
 
                                     {tourDocumentsLoading ? (
                                         <div className="flex items-center justify-center py-6">
