@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import {
     Loader2,
@@ -17,10 +17,18 @@ import {
     ChevronUp,
     ChevronDown,
     MoreVertical,
+    Upload,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     Select,
     SelectContent,
@@ -31,6 +39,7 @@ import {
 import { useSoundVisionFiles, useDownloadSoundVisionFile, SoundVisionFile } from '@/hooks/useSoundVisionFiles';
 import { StarRating } from '@/components/soundvision/StarRating';
 import { SoundVisionReviewDialog } from '@/components/soundvision/SoundVisionReviewDialog';
+import { SoundVisionFileUploader } from '@/components/soundvision/SoundVisionFileUploader';
 import { useVenues } from '@/hooks/useVenues';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -58,7 +67,9 @@ interface ContextMenuData {
 }
 
 export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisionInteractiveMapProps) => {
+    const queryClient = useQueryClient();
     const [drawerHeight, setDrawerHeight] = useState<'collapsed' | 'half' | 'full'>('half');
+    const [uploadOpen, setUploadOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [city, setCity] = useState('');
     const [country, setCountry] = useState('');
@@ -389,6 +400,14 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
         else setDrawerHeight('collapsed');
     };
 
+    const handleUploadComplete = async () => {
+        // Refresh file list + venues so filters/markers update.
+        await queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
+        await queryClient.invalidateQueries({ queryKey: ['venues'] });
+        await refetch();
+        setUploadOpen(false);
+    };
+
     return (
         <div className="relative w-full h-full bg-black overflow-hidden">
             {/* Map Layer */}
@@ -431,6 +450,19 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                             {filesWithCoordinates.length} {filesWithCoordinates.length === 1 ? 'ubicación' : 'ubicaciones'}
                         </span>
                     </div>
+                )}
+
+                {/* Upload button (available to anyone with SoundVision access; access is enforced upstream) */}
+                {!mapLoading && !mapError && (
+                    <button
+                        type="button"
+                        onClick={() => setUploadOpen(true)}
+                        aria-label="Subir archivo"
+                        className="absolute top-20 right-6 z-20 p-3 bg-black/60 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-colors"
+                        title="Subir nuevo archivo"
+                    >
+                        <Upload size={20} />
+                    </button>
                 )}
             </div>
 
@@ -737,6 +769,21 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                     )}
                 </ScrollArea>
             </div>
+
+            {/* Upload Dialog */}
+            <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+                <DialogContent
+                    className={`w-[95vw] max-w-3xl ${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-white'} ${theme.textMain}`}
+                >
+                    <DialogHeader>
+                        <DialogTitle>Subir nuevo archivo SoundVision</DialogTitle>
+                        <DialogDescription>
+                            Añade un archivo a la base de datos. Se asociará al recinto que indiques.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <SoundVisionFileUploader onUploadComplete={handleUploadComplete} />
+                </DialogContent>
+            </Dialog>
 
             {/* Review Dialog */}
             {selectedFile && (
