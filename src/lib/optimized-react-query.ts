@@ -112,7 +112,7 @@ export const createQueryKey = {
   profiles: {
     all: ['profiles'] as const,
     /** Current user's profile (role/permissions). */
-    currentUser: [...createQueryKey.profiles.all, 'current-user'] as const,
+    currentUser: ['profiles', 'current-user'] as const,
   },
 };
 
