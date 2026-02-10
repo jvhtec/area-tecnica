@@ -130,6 +130,20 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     match: (pathname, _, to) => pathname === "/technician-dashboard" && to.includes("tab=availability") && window.location.search.includes("tab=availability"),
   },
   {
+    id: "technician-unavailability",
+    label: "Mi disponibilidad",
+    mobileLabel: "Disponib.",
+    icon: CalendarCheck,
+    mobilePriority: 4,
+    mobileSlot: "primary",
+    getPath: () => "/dashboard/unavailability",
+    isVisible: ({ userRole, assignableAsTech }) =>
+      userRole === "house_tech" ||
+      (userRole === "admin" && assignableAsTech === true) ||
+      (userRole === "management" && assignableAsTech === true),
+    match: (pathname) => pathname === "/dashboard/unavailability",
+  },
+  {
     id: "technician-profile",
     label: "Perfil",
     mobileLabel: "Perfil",
@@ -497,8 +511,12 @@ export const buildNavigationItems = (
   if (isAdmin) {
     return navigationConfig
       .map((config) => {
-        // Allow technician-dashboard for admins with assignableAsTech flag
-        if (config.id === "technician-dashboard" && context.assignableAsTech) {
+        // Allow limited technician navigation for admins with assignableAsTech flag
+        if (
+          (config.id === "technician-dashboard" ||
+            config.id === "technician-unavailability") &&
+          context.assignableAsTech
+        ) {
           return createNavigationItem(config)
         }
         if (adminExcludedIds.has(config.id)) {
