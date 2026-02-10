@@ -341,12 +341,19 @@ export async function generateRateQuotePDF(
     const displayMultiplier =
       !usedFallbackBase && rawMultiplier != null && shouldDisplayMultiplier(rawMultiplier);
 
-    // Check if timesheet exists for this date
-    // Note: TourJobRateQuote.start_time is the date. TimesheetLine.date is YYYY-MM-DD.
-    // For tour rate quotes, server already applies autonomo discount to base before multipliers
-    // No additional client-side deduction needed
-    const deduction = 0;
-    const effectiveTotal = effectiveBase + extrasTotal;
+    // For tour rate quotes, server already applies autonomo discount to base before multipliers.
+    // Also, manual overrides are applied server-side (see v_tour_job_rate_quotes_2025).
+    const computedTotal = effectiveBase + extrasTotal;
+    const serverTotal =
+      quote.total_with_extras_eur != null
+        ? Number(quote.total_with_extras_eur)
+        : quote.total_eur != null
+          ? Number(quote.total_eur)
+          : null;
+    const effectiveTotal =
+      quote.has_override && quote.override_amount_eur != null
+        ? Number(quote.override_amount_eur)
+        : (serverTotal ?? computedTotal);
 
     let baseCell: string;
     if (hasError) {
@@ -423,13 +430,23 @@ export async function generateRateQuotePDF(
     0
   );
   
-  // Grand total - no client-side deduction needed (server applies discount to base before multipliers)
-  const grandTotal = quotesWithComputed.reduce(
-    (sum, { quote, computed }) => {
-      return sum + computed.effectiveBase + computed.extrasTotal;
-    },
-    0
-  );
+  // Grand total
+  // Use server totals when available so PDFs match the DB source-of-truth (incl. manual overrides).
+  const grandTotal = quotesWithComputed.reduce((sum, { quote, computed }) => {
+    const computedTotal = computed.effectiveBase + computed.extrasTotal;
+    const serverTotal =
+      quote.total_with_extras_eur != null
+        ? Number(quote.total_with_extras_eur)
+        : quote.total_eur != null
+          ? Number(quote.total_eur)
+          : null;
+    const effectiveTotal =
+      quote.has_override && quote.override_amount_eur != null
+        ? Number(quote.override_amount_eur)
+        : (serverTotal ?? computedTotal);
+
+    return sum + effectiveTotal;
+  }, 0);
 
   // Check if any quotes have autonomo discount applied by server
   const anyDeductionApplied = quotesWithComputed.some(({ quote }) => {
