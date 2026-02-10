@@ -1,5 +1,7 @@
 
 import { useQuery } from "@tanstack/react-query";
+import { formatInTimeZone } from "date-fns-tz";
+
 import { supabase } from "@/lib/supabase";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
@@ -24,6 +26,8 @@ export const useMyTours = () => {
     queryKey: ['my-tours', user?.id],
     queryFn: async () => {
       if (!user?.id) throw new Error("User not authenticated");
+
+      const today = formatInTimeZone(new Date(), 'Europe/Madrid', 'yyyy-MM-dd');
 
       // 1) Tours where the technician is explicitly assigned as tour crew
       const { data: crewAssignments, error: crewError } = await supabase
@@ -90,26 +94,52 @@ export const useMyTours = () => {
 
       const now = new Date();
 
+      const personalStatsByTourId = new Map<string, { total: number; upcoming: number }>();
+      (timeRows || []).forEach((row: any) => {
+        const job = row.jobs as any;
+        const tour = job?.tour as any;
+        const tourId = tour?.id as string | undefined;
+        const dateStr = row.date as string | undefined;
+        if (!tourId || !dateStr) return;
+        if (tour?.status !== 'active') return;
+
+        const existing = personalStatsByTourId.get(tourId) ?? { total: 0, upcoming: 0 };
+        existing.total += 1;
+        if (dateStr >= today) {
+          existing.upcoming += 1;
+        }
+        personalStatsByTourId.set(tourId, existing);
+      });
+
       const byTourId = new Map<string, MyTour>();
 
       const upsert = (tour: any, meta: Partial<MyTour>) => {
         if (!tour?.id) return;
+
         const tourDates = tour.tour_dates || [];
-        const upcomingDates = tourDates.filter(
+        const tourUpcomingDates = tourDates.filter(
           (dateEntry: any) => new Date(dateEntry.date) >= now
         ).length;
+
+        const personalStats = personalStatsByTourId.get(tour.id);
+        const usePersonalStats = meta.assignment_role === 'Por bolo' && Boolean(personalStats);
+
+        const total_dates = usePersonalStats ? personalStats!.total : tourDates.length;
+        const upcoming_dates = usePersonalStats ? personalStats!.upcoming : tourUpcomingDates;
 
         const existing = byTourId.get(tour.id);
         if (existing) {
           // Keep the strongest assignment type (crew beats job-based)
           const isExistingCrew = existing.assignment_role !== 'Por bolo';
           const isNewCrew = meta.assignment_role !== 'Por bolo';
+
           if (!isExistingCrew && isNewCrew) {
+            // Promote from job-based to crew: switch to tour-wide counts.
             byTourId.set(tour.id, {
               ...existing,
               ...meta,
-              total_dates: existing.total_dates,
-              upcoming_dates: existing.upcoming_dates,
+              total_dates: tourDates.length,
+              upcoming_dates: tourUpcomingDates,
             } as MyTour);
           }
           return;
@@ -125,8 +155,8 @@ export const useMyTours = () => {
           assignment_role: meta.assignment_role || 'Por bolo',
           assignment_department: meta.assignment_department || 'unknown',
           assignment_notes: meta.assignment_notes,
-          total_dates: tourDates.length,
-          upcoming_dates: upcomingDates,
+          total_dates,
+          upcoming_dates,
         });
       };
 
@@ -163,12 +193,22 @@ export const useMyTours = () => {
     enabled: !!user?.id,
   });
 
-  const activeTours = tours.filter(tour => {
+  const activeTours = tours.filter((tour) => {
+    // If the tour appears because of timesheets only ("Por bolo"), hide it once the
+    // technician has no upcoming worked days in that tour.
+    if (tour.assignment_role === 'Por bolo') {
+      return tour.upcoming_dates > 0;
+    }
+
     if (!tour.end_date) return true;
     return new Date(tour.end_date) >= new Date();
   });
 
-  const completedTours = tours.filter(tour => {
+  const completedTours = tours.filter((tour) => {
+    if (tour.assignment_role === 'Por bolo') {
+      return tour.upcoming_dates === 0;
+    }
+
     if (!tour.end_date) return false;
     return new Date(tour.end_date) < new Date();
   });

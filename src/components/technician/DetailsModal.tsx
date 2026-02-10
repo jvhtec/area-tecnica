@@ -26,6 +26,14 @@ interface DetailsModalProps {
     onClose: () => void;
 }
 
+interface TourDocument {
+    id: string;
+    file_name: string;
+    file_path: string;
+    uploaded_at: string;
+    file_type?: string;
+}
+
 type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
 
 export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
@@ -54,6 +62,8 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         },
         enabled: !!job?.id,
     });
+
+    const tourId = (jobDetails as any)?.tour_id || (job as any)?.tour_id;
 
     // Fetch staff assignments for this job
     const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({
@@ -107,6 +117,24 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
             return data || [];
         },
         enabled: !!job?.id,
+    });
+
+    // Fetch tour documents (visible to technicians) when the job belongs to a tour
+    const { data: tourDocuments = [], isLoading: tourDocumentsLoading } = useQuery({
+        queryKey: ['tour-documents-for-job', tourId],
+        queryFn: async () => {
+            if (!tourId) return [];
+            const { data, error } = await supabase
+                .from('tour_documents')
+                .select('id, file_name, file_path, uploaded_at, file_type')
+                .eq('tour_id', tourId)
+                .eq('visible_to_tech', true)
+                .order('uploaded_at', { ascending: false })
+                .limit(10);
+            if (error) throw error;
+            return (data || []) as TourDocument[];
+        },
+        enabled: !!tourId,
     });
 
     // Fetch nearby restaurants using Google Places API
@@ -241,6 +269,49 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
             toast.error(`No se pudo descargar el documento: ${message}`);
         } finally {
             setDocumentLoading(prev => { const s = new Set(prev); s.delete(docId); return s; });
+        }
+    };
+
+    const handleViewTourDocument = async (doc: TourDocument) => {
+        const key = `tour:${doc.id}`;
+        setDocumentLoading(prev => new Set(prev).add(key));
+        try {
+            const { data, error } = await supabase.storage
+                .from('tour-documents')
+                .createSignedUrl(doc.file_path, 60);
+            if (error || !data?.signedUrl) {
+                throw error || new Error('No se pudo generar la URL');
+            }
+            window.open(data.signedUrl, '_blank');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            toast.error(`No se pudo abrir el documento de gira: ${message}`);
+        } finally {
+            setDocumentLoading(prev => { const s = new Set(prev); s.delete(key); return s; });
+        }
+    };
+
+    const handleDownloadTourDocument = async (doc: TourDocument) => {
+        const key = `tour:${doc.id}`;
+        setDocumentLoading(prev => new Set(prev).add(key));
+        try {
+            const { data, error } = await supabase.storage
+                .from('tour-documents')
+                .createSignedUrl(doc.file_path, 60);
+            if (error || !data?.signedUrl) {
+                throw error || new Error('No se pudo generar la URL');
+            }
+            const link = document.createElement('a');
+            link.href = data.signedUrl;
+            link.download = doc.file_name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            toast.error(`No se pudo descargar el documento de gira: ${message}`);
+        } finally {
+            setDocumentLoading(prev => { const s = new Set(prev); s.delete(key); return s; });
         }
     };
 
@@ -646,6 +717,85 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                     </div>
                                 )}
                             </div>
+
+                            {/* Tour docs entrypoint (A+B): allows eventual techs to access tour docs from the job */}
+                            {tourId ? (
+                                <div>
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <FileText size={18} className={theme.textMuted} />
+                                        <h3 className={`text-lg font-bold ${theme.textMain}`}>Documentos de la gira</h3>
+                                    </div>
+
+                                    {tourDocumentsLoading ? (
+                                        <div className="flex items-center justify-center py-6">
+                                            <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                                        </div>
+                                    ) : tourDocuments.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {tourDocuments.map((doc) => {
+                                                const key = `tour:${doc.id}`;
+                                                return (
+                                                    <div
+                                                        key={doc.id}
+                                                        className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-3`}
+                                                    >
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="min-w-0 flex-1">
+                                                                <div
+                                                                    className={`text-sm font-bold ${theme.textMain} leading-snug break-words line-clamp-2 mb-1`}
+                                                                    title={doc.file_name}
+                                                                >
+                                                                    {doc.file_name}
+                                                                </div>
+                                                                <div className={`text-xs ${theme.textMuted}`}>
+                                                                    {doc.uploaded_at && `Subido el ${format(new Date(doc.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-3 shrink-0">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="icon"
+                                                                    onClick={() => handleViewTourDocument(doc)}
+                                                                    disabled={documentLoading.has(key)}
+                                                                    className="h-10 w-10 p-0"
+                                                                    title={`Ver ${doc.file_name}`}
+                                                                    aria-label={`Ver ${doc.file_name}`}
+                                                                >
+                                                                    {documentLoading.has(key) ? (
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    ) : (
+                                                                        <Eye size={18} />
+                                                                    )}
+                                                                </Button>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="icon"
+                                                                    onClick={() => handleDownloadTourDocument(doc)}
+                                                                    disabled={documentLoading.has(key)}
+                                                                    className="h-10 w-10 p-0"
+                                                                    title={`Descargar ${doc.file_name}`}
+                                                                    aria-label={`Descargar ${doc.file_name}`}
+                                                                >
+                                                                    {documentLoading.has(key) ? (
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    ) : (
+                                                                        <Download size={18} />
+                                                                    )}
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className={`h-32 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                                            <FileText size={24} className="mb-2 opacity-50" />
+                                            <span className="text-xs">No hay documentos de gira visibles</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : null}
                         </div>
                     )}
 
