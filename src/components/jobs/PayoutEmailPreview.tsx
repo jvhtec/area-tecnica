@@ -6,6 +6,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { JobPayoutEmailContextResult } from '@/lib/job-payout-email';
+import { effectiveTotal } from '@/lib/job-payout-email';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 import { HOUSE_TECH_LABEL } from '@/utils/autonomo';
 
@@ -114,13 +115,9 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
     const parts = formatCurrency(selectedAttachment.payout.timesheets_total_eur);
     const extras = formatCurrency(selectedAttachment.payout.extras_total_eur);
 
-    const payoutAny = selectedAttachment.payout as any;
-    const totalBeforeDeduction =
-      payoutAny?.has_override && payoutAny?.override_amount_eur != null
-        ? Number(payoutAny.override_amount_eur)
-        : Number(selectedAttachment.payout.total_eur ?? 0);
-
-    const grand = formatCurrency(totalBeforeDeduction - (selectedAttachment.deduction_eur || 0));
+    const grand = formatCurrency(
+      effectiveTotal(selectedAttachment.payout, selectedAttachment.deduction_eur || 0)
+    );
     const deductionAmount = selectedAttachment.deduction_eur ?? 0;
     const deductionFormatted = formatCurrency(deductionAmount);
     const hasDeduction = deductionAmount > 0;

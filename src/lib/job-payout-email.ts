@@ -134,6 +134,13 @@ async function fetchPayouts(
   return (data || []) as JobPayoutTotals[];
 }
 
+/**
+ * Enrich payouts with override metadata (who/when + override amount).
+ *
+ * Notes:
+ * - `v_job_tech_payout_2025` already applies the override to `total_eur`, but does not expose audit fields.
+ * - We pull `v_job_tech_payout_2025_base.total_eur` as the "calculated" baseline for context.
+ */
 async function attachOverrideMetadata(
   client: SupabaseClient,
   jobId: string,
@@ -198,14 +205,14 @@ async function attachOverrideMetadata(
     const calculated = baseTotalMap.get(p.technician_id);
 
     return {
-      ...(p as any),
+      ...p,
       has_override: true,
       override_amount_eur: Number(ov.override_amount_eur),
       calculated_total_eur: calculated != null ? calculated : undefined,
       override_set_at: ov.set_at,
       override_actor_name: actor?.name,
-      override_actor_email: actor?.email ?? null,
-    } as JobPayoutTotals;
+      override_actor_email: actor?.email ?? undefined,
+    };
   });
 }
 
@@ -380,6 +387,21 @@ export interface SendJobPayoutEmailsInput extends JobPayoutEmailInput {
   existingContext?: JobPayoutEmailContextResult;
 }
 
+/**
+ * Compute the total that should be shown in payout emails.
+ *
+ * If there's a manual override, prefer `override_amount_eur` over `total_eur`.
+ * (Some sources already bake the override into `total_eur`, but we treat the
+ * override value as the explicit source of truth for email display.)
+ */
+export function effectiveTotal(payout: JobPayoutTotals, deduction = 0): number {
+  const base =
+    payout.has_override && payout.override_amount_eur != null
+      ? Number(payout.override_amount_eur)
+      : Number(payout.total_eur ?? 0);
+  return base - Number(deduction || 0);
+}
+
 export async function sendJobPayoutEmails(
   input: SendJobPayoutEmailsInput
 ): Promise<SendJobPayoutEmailsResult> {
@@ -410,18 +432,12 @@ export async function sendJobPayoutEmails(
       const workedDates = Array.from(
         new Set(
           timesheetLines
-            .map(line => line.date)
+            .map((line) => line.date)
             .filter((date): date is string => date != null)
         )
       ).sort();
       // Check if any timesheet is an evento type
-      const hasEventoTimesheet = timesheetLines.some(line => line.is_evento === true);
-
-      const payoutAny = attachment.payout as any;
-      const totalBeforeDeduction =
-        payoutAny?.has_override && payoutAny?.override_amount_eur != null
-          ? Number(payoutAny.override_amount_eur)
-          : Number(attachment.payout.total_eur ?? 0);
+      const hasEventoTimesheet = timesheetLines.some((line) => line.is_evento === true);
 
       return {
         technician_id: attachment.technician_id,
@@ -430,7 +446,7 @@ export async function sendJobPayoutEmails(
         totals: {
           timesheets_total_eur: attachment.payout.timesheets_total_eur,
           extras_total_eur: attachment.payout.extras_total_eur,
-          total_eur: totalBeforeDeduction - (attachment.deduction_eur || 0),
+          total_eur: effectiveTotal(attachment.payout, attachment.deduction_eur || 0),
           deduction_eur: attachment.deduction_eur,
         },
         pdf_base64: attachment.pdfBase64,

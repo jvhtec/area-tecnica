@@ -47,6 +47,14 @@ export interface JobPayoutTotals {
   vehicle_disclaimer: boolean;
   vehicle_disclaimer_text?: string;
   payout_approved?: boolean;
+
+  // Manual payout override metadata (enriched client-side / for exports)
+  has_override?: boolean;
+  override_amount_eur?: number;
+  calculated_total_eur?: number;
+  override_set_at?: string;
+  override_actor_name?: string;
+  override_actor_email?: string;
 }
 
 export const EXTRA_TYPE_LABELS: Record<JobExtraType, string> = {
