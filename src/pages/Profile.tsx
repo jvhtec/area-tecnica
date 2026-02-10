@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Department, ALL_DEPARTMENTS, DEPARTMENT_LABELS, getDepartmentLabel } from "@/types/department";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, RefreshCcw, Shield, ExternalLink, Trophy } from "lucide-react";
+import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, CalendarCheck, RefreshCcw, Shield, ExternalLink, Trophy } from "lucide-react";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
@@ -55,6 +55,9 @@ export const Profile = () => {
   const isBlocked = permission === 'denied';
   const showPushControls = ['technician', 'house_tech', 'oscar'].includes(profile?.role);
   const showIcsCard = ['technician', 'house_tech', 'management', 'admin'].includes(profile?.role);
+  const showTechnicianSelfTools =
+    (profile?.role === 'admin' || profile?.role === 'management') &&
+    profile?.assignable_as_tech === true;
 
   // Fetch user profile on component mount
   useEffect(() => {
@@ -520,6 +523,32 @@ export const Profile = () => {
                     Ver mis logros
                   </Button>
                 </Link>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Technician self tools (assignable admin/management) */}
+          {showTechnicianSelfTools && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CalendarCheck className="h-5 w-5" />
+                  Herramientas de técnico
+                </CardTitle>
+                <CardDescription>
+                  Accesos personales (no confundir con la Disponibilidad del departamento).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <Link to="/dashboard/unavailability">
+                  <Button className="w-full" variant="outline">
+                    <CalendarCheck className="mr-2 h-4 w-4" />
+                    Mi disponibilidad
+                  </Button>
+                </Link>
+                <p className="text-xs text-muted-foreground">
+                  Solo afecta a tu usuario.
+                </p>
               </CardContent>
             </Card>
           )}

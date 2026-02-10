@@ -130,6 +130,19 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     match: (pathname, _, to) => pathname === "/technician-dashboard" && to.includes("tab=availability") && window.location.search.includes("tab=availability"),
   },
   {
+    id: "technician-unavailability",
+    label: "Mi disponibilidad",
+    mobileLabel: "Disponib.",
+    icon: CalendarCheck,
+    mobilePriority: 4,
+    mobileSlot: "primary",
+    getPath: () => "/dashboard/unavailability",
+    // For admin/management this can be confused with the department-level "Disponibilidad" page.
+    // Keep it in the main nav only for house_tech; privileged users (assignable) get access via Profile.
+    isVisible: ({ userRole }) => userRole === "house_tech",
+    match: (pathname) => pathname === "/dashboard/unavailability",
+  },
+  {
     id: "technician-profile",
     label: "Perfil",
     mobileLabel: "Perfil",
