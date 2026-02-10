@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, X } from 'lucide-react';
@@ -7,6 +8,7 @@ import { es } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { JobPayoutEmailContextResult } from '@/lib/job-payout-email';
 import { effectiveTotal } from '@/lib/job-payout-email';
+import { supabase } from '@/integrations/supabase/client';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 import { HOUSE_TECH_LABEL } from '@/utils/autonomo';
 
@@ -29,6 +31,24 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
   if (!context) return null;
 
   const selectedAttachment = context.attachments.find(a => a.technician_id === selectedTechId);
+
+  // Preview should match the final email sent by the Edge Function.
+  // Fetch override directly from DB to avoid stale/cached client context.
+  const { data: overrideAmountEur } = useQuery({
+    queryKey: ['job-payout-override', context.job.id, selectedAttachment?.technician_id],
+    enabled: Boolean(context.job.id && selectedAttachment?.technician_id),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_technician_payout_overrides')
+        .select('override_amount_eur')
+        .eq('job_id', context.job.id)
+        .eq('technician_id', selectedAttachment!.technician_id)
+        .maybeSingle();
+      if (error) throw error;
+      const value = data?.override_amount_eur;
+      return value == null ? null : Number(value);
+    },
+  });
 
   const formatDateLong = (value?: string | Date | null) => {
     if (!value) return null;
@@ -115,9 +135,12 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
     const parts = formatCurrency(selectedAttachment.payout.timesheets_total_eur);
     const extras = formatCurrency(selectedAttachment.payout.extras_total_eur);
 
-    const grand = formatCurrency(
-      effectiveTotal(selectedAttachment.payout, selectedAttachment.deduction_eur || 0)
-    );
+    const totalOverrideApplied =
+      overrideAmountEur != null
+        ? overrideAmountEur - (selectedAttachment.deduction_eur || 0)
+        : effectiveTotal(selectedAttachment.payout, selectedAttachment.deduction_eur || 0);
+
+    const grand = formatCurrency(totalOverrideApplied);
     const deductionAmount = selectedAttachment.deduction_eur ?? 0;
     const deductionFormatted = formatCurrency(deductionAmount);
     const hasDeduction = deductionAmount > 0;
