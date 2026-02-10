@@ -260,36 +260,67 @@ export const useHojaDeRutaInitialization = (
           assigned: StaffEntry[] = [],
         ) => {
           const norm = (s?: string) => (s || '').trim().toLowerCase();
-          const keyOf = (p: StaffEntry) => {
-            const tid = p?.technician_id;
-            if (tid) return `id:${tid}`;
-            return `${norm(p?.name)}|${norm(p?.surname1)}`;
-          };
-          const map = new Map<string, StaffEntry>();
-          // Seed with saved staff
-          for (const p of saved) {
-            map.set(keyOf(p), { ...p });
-          }
-          // Merge in assignments
-          for (const a of assigned) {
-            const k = keyOf(a);
-            if (map.has(k)) {
-              const s = map.get(k) as StaffEntry;
-              map.set(k, {
-                ...a,
-                ...s,
-                // Prefer saved DNI/position if present; otherwise take the assignment-derived values
-                dni: s.dni || a.dni || '',
-                position: s.position || a.position || '',
-                technician_id: s.technician_id || a.technician_id,
-                phone: s.phone || a.phone || '',
-                role: s.role || a.role,
-              } as StaffEntry);
-            } else {
-              map.set(k, { ...a });
-            }
-          }
-          return Array.from(map.values());
+          const nameKey = (p: StaffEntry) => `${norm(p?.name)}|${norm(p?.surname1)}`;
+
+          const mergeTwo = (a: StaffEntry, s: StaffEntry): StaffEntry => ({
+            ...a,
+            ...s,
+            // Prefer saved DNI/position if present; otherwise take the assignment-derived values
+            dni: s.dni || a.dni || '',
+            position: s.position || a.position || '',
+            technician_id: s.technician_id || a.technician_id,
+            phone: s.phone || a.phone || '',
+            role: s.role || a.role,
+          });
+
+          // Start from saved order.
+          const result: StaffEntry[] = (saved || []).map((p) => ({ ...p }));
+          const usedAssigned = new Set<number>();
+
+          // PASS 1: match by technician_id (reliable)
+          const savedIndexByTechId = new Map<string, number>();
+          result.forEach((p, idx) => {
+            if (p?.technician_id) savedIndexByTechId.set(p.technician_id, idx);
+          });
+
+          assigned.forEach((a, aIdx) => {
+            const tid = a?.technician_id;
+            if (!tid) return;
+            const sIdx = savedIndexByTechId.get(tid);
+            if (sIdx == null) return;
+            result[sIdx] = mergeTwo(a, result[sIdx]);
+            usedAssigned.add(aIdx);
+          });
+
+          // PASS 2: match remaining legacy saved entries (no technician_id) by name|surname1
+          const legacySavedByName = new Map<string, number[]>();
+          result.forEach((p, idx) => {
+            if (p?.technician_id) return;
+            const k = nameKey(p);
+            if (!k || k === '|') return;
+            const arr = legacySavedByName.get(k) || [];
+            arr.push(idx);
+            legacySavedByName.set(k, arr);
+          });
+
+          assigned.forEach((a, aIdx) => {
+            if (usedAssigned.has(aIdx)) return;
+            const k = nameKey(a);
+            const arr = legacySavedByName.get(k);
+            if (!arr || arr.length === 0) return;
+            const sIdx = arr.shift()!;
+            result[sIdx] = mergeTwo(a, result[sIdx]);
+            usedAssigned.add(aIdx);
+            if (arr.length === 0) legacySavedByName.delete(k);
+          });
+
+          // Append any remaining assigned staff not present in saved data.
+          assigned.forEach((a, aIdx) => {
+            if (usedAssigned.has(aIdx)) return;
+            result.push({ ...a });
+          });
+
+          return result;
         };
 
         const mergedStaff = mergeStaff(savedEventData?.staff || [], staffFromAssignments || []);
