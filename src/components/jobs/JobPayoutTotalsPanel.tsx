@@ -1197,7 +1197,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
                 ? {
                     ...rawOverride,
                     actor_name: actor?.name,
-                    actor_email: actor?.email ?? null,
+                    actor_email: actor?.email ?? undefined,
                   }
                 : undefined;
               const isEditing = editingTechId === payout.technician_id;

@@ -1,5 +1,7 @@
 import React from 'react';
 import { Edit2 } from 'lucide-react';
+import { formatInTimeZone } from 'date-fns-tz';
+import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { formatCurrency } from '@/lib/utils';
@@ -12,6 +14,15 @@ export type JobPayoutOverride = {
   updated_at?: string;
   actor_name?: string;
   actor_email?: string;
+};
+
+const formatOverrideTimestamp = (value?: string) => {
+  if (!value) return '';
+  try {
+    return formatInTimeZone(new Date(value), 'Europe/Madrid', 'PPP p', { locale: es });
+  } catch {
+    return value;
+  }
 };
 
 export const JobPayoutOverrideSection: React.FC<{
@@ -70,7 +81,7 @@ export const JobPayoutOverrideSection: React.FC<{
           <div className="text-xs mt-1 opacity-75">Calculado: {formatCurrency(calculatedTotalEur)}</div>
           {(override.actor_name || override.actor_email || override.set_at) && (
             <div className="text-[11px] mt-1 opacity-80">
-              {`Override por ${override.actor_name || '—'}${override.actor_email ? ` (${override.actor_email})` : ''}${override.set_at ? ` · ${new Date(override.set_at).toLocaleString('es-ES')}` : ''}`}
+              {`Override por ${override.actor_name || '—'}${override.actor_email ? ` (${override.actor_email})` : ''}${override.set_at ? ` · ${formatOverrideTimestamp(override.set_at)}` : ''}`}
             </div>
           )}
           <div className="text-[11px] mt-1 opacity-80">
@@ -106,7 +117,7 @@ export const JobPayoutOverrideSection: React.FC<{
           <div className="text-xs text-amber-700 dark:text-amber-200">Calculado: {formatCurrency(calculatedTotalEur)}</div>
           {(override?.actor_name || override?.actor_email || override?.set_at) && (
             <div className="text-[11px] text-amber-700 dark:text-amber-200 opacity-90">
-              {`Override por ${override?.actor_name || '—'}${override?.actor_email ? ` (${override.actor_email})` : ''}${override?.set_at ? ` · ${new Date(override.set_at).toLocaleString('es-ES')}` : ''}`}
+              {`Override por ${override?.actor_name || '—'}${override?.actor_email ? ` (${override.actor_email})` : ''}${override?.set_at ? ` · ${formatOverrideTimestamp(override.set_at)}` : ''}`}
             </div>
           )}
           <div className="text-[11px] text-amber-700 dark:text-amber-200 opacity-90">

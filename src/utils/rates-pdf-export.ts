@@ -400,9 +400,9 @@ export async function generateRateQuotePDF(
     if (quote.has_override && quote.override_amount_eur != null && quote.calculated_total_eur != null) {
       nameCellContent += `\n⚠️ OVERRIDE: ${formatCurrency(quote.override_amount_eur)} (calc: ${formatCurrency(quote.calculated_total_eur)})`;
 
-      const actor = (quote as any).override_actor_name as string | undefined;
-      const actorEmail = (quote as any).override_actor_email as string | undefined;
-      const at = (quote as any).override_set_at as string | undefined;
+      const actor = quote.override_actor_name;
+      const actorEmail = quote.override_actor_email;
+      const at = quote.override_set_at;
       if (actor || actorEmail || at) {
         const who = `${actor || '—'}${actorEmail ? ` (${actorEmail})` : ''}`;
         const when = at ? format(new Date(at), 'PPP p', { locale: es }) : '';
@@ -955,9 +955,9 @@ export async function generateJobPayoutPDF(
     if (payout.has_override && payout.override_amount_eur != null && payout.calculated_total_eur != null) {
       nameCellContent += `\n⚠️ OVERRIDE: ${formatCurrency(payout.override_amount_eur)} (calc: ${formatCurrency(payout.calculated_total_eur)})`;
 
-      const actor = (payout as any).override_actor_name as string | undefined;
-      const actorEmail = (payout as any).override_actor_email as string | undefined;
-      const at = (payout as any).override_set_at as string | undefined;
+      const actor = payout.override_actor_name;
+      const actorEmail = payout.override_actor_email;
+      const at = payout.override_set_at;
       if (actor || actorEmail || at) {
         const who = `${actor || '—'}${actorEmail ? ` (${actorEmail})` : ''}`;
         const when = at ? format(new Date(at), 'PPP p', { locale: es }) : '';
