@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import {
     Loader2,
     Search,
@@ -72,6 +72,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
 
     // Single-selection state (map + list)
     const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
+    const activeVenueIdRef = useRef<string | null>(null);
     const [venueDetailOpen, setVenueDetailOpen] = useState(false);
 
     // Map state
@@ -79,7 +80,8 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
     const mapboxglRef = useRef<any>(null);
     const map = useRef<MapboxMap | null>(null);
     const popupRef = useRef<any>(null);
-    const prevActiveVenueIdRef = useRef<string | null>(null);
+    const manualPopupDismissRef = useRef(false);
+    const prevActiveVenueFeatureIdRef = useRef<number | null>(null);
     const programmaticMoveRef = useRef(false);
     const drawerRef = useRef<HTMLDivElement>(null);
 
@@ -114,7 +116,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
 
     const downloadFile = useDownloadSoundVisionFile();
 
-    const { venueGroups, venueList, filesByVenueId, venueGeoJson } = useMemo(() => {
+    const { venueGroups, venueList, filesByVenueId, venueGeoJson, venueIdToFeatureId } = useMemo(() => {
         const groups = new Map<string, VenueGroup>();
         const byVenueId = new Map<string, SoundVisionFile[]>();
 
@@ -149,6 +151,9 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
             return (a.venue.name || '').localeCompare(b.venue.name || '');
         });
 
+        const idMap = new Map<string, number>();
+        let nextId = 1;
+
         const featureCollection = {
             type: 'FeatureCollection',
             features: list
@@ -156,10 +161,13 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                 .map((g) => {
                     const { lat, lng } = g.venue.coordinates!;
                     const avg = g.ratingsCount > 0 ? g.ratingTotal / g.ratingsCount : null;
+                    const featureId = nextId++;
+                    idMap.set(g.venue.id, featureId);
                     return {
                         type: 'Feature',
-                        id: g.venue.id,
+                        id: featureId,
                         properties: {
+                            featureId,
                             venueId: g.venue.id,
                             name: g.venue.name,
                             city: g.venue.city,
@@ -182,8 +190,14 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
             venueList: list,
             filesByVenueId: byVenueId,
             venueGeoJson: featureCollection,
+            venueIdToFeatureId: idMap,
         };
     }, [files]);
+
+    const activeVenueFeatureId = useMemo(() => {
+        if (!activeVenueId) return null;
+        return venueIdToFeatureId.get(activeVenueId) ?? null;
+    }, [activeVenueId, venueIdToFeatureId]);
 
     const activeVenueGroup = useMemo(() => {
         if (!activeVenueId) return null;
@@ -232,6 +246,11 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
 
     // (context menu removed)
 
+    // Keep refs in sync
+    useEffect(() => {
+        activeVenueIdRef.current = activeVenueId;
+    }, [activeVenueId]);
+
     // Update selected file when files change
     useEffect(() => {
         if (!selectedFile) return;
@@ -241,13 +260,22 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
         }
     }, [files, selectedFile]);
 
-    const closePopup = useCallback(() => {
+    const closePopup = useCallback((opts?: { preserveSelection?: boolean }) => {
+        if (opts?.preserveSelection) {
+            manualPopupDismissRef.current = true;
+        }
         try {
             popupRef.current?.remove?.();
         } catch {
             // ignore
         }
         popupRef.current = null;
+        // Allow the popup close handler to run normally next time
+        if (opts?.preserveSelection) {
+            setTimeout(() => {
+                manualPopupDismissRef.current = false;
+            }, 0);
+        }
     }, []);
 
     const centerOn = useCallback(
@@ -367,6 +395,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                 .addTo(mapInstance);
 
             popup.on('close', () => {
+                if (manualPopupDismissRef.current) return;
                 setActiveVenueId(null);
             });
 
@@ -378,17 +407,18 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
     const toggleVenueSelection = useCallback(
         (venueId: string, lng: number, lat: number, opts?: { openPopup?: boolean }) => {
             const openPopup = opts?.openPopup ?? true;
-            setActiveVenueId((current) => {
-                const next = current === venueId ? null : venueId;
-                if (next) {
-                    centerOn(lng, lat);
-                    if (openPopup) openVenuePopup(venueId, lng, lat);
-                } else {
-                    closePopup();
-                    setVenueDetailOpen(false);
-                }
-                return next;
-            });
+            const current = activeVenueIdRef.current;
+            const next = current === venueId ? null : venueId;
+
+            setActiveVenueId(next);
+
+            if (next) {
+                centerOn(lng, lat);
+                if (openPopup) openVenuePopup(venueId, lng, lat);
+            } else {
+                closePopup();
+                setVenueDetailOpen(false);
+            }
         },
         [centerOn, closePopup, openVenuePopup]
     );
@@ -401,14 +431,19 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchTerm, city, country, stateRegion, fileType]);
 
+    const toggleVenueSelectionRef = useRef(toggleVenueSelection);
+    useEffect(() => {
+        toggleVenueSelectionRef.current = toggleVenueSelection;
+    }, [toggleVenueSelection]);
+
     // Keep feature-state updated for the active venue
     useEffect(() => {
         if (!mapLoaded || !map.current) return;
         const mapInstance: any = map.current;
 
         const sourceId = 'soundvision-venues';
-        const prev = prevActiveVenueIdRef.current;
-        if (prev) {
+        const prev = prevActiveVenueFeatureIdRef.current;
+        if (prev != null) {
             try {
                 mapInstance.setFeatureState({ source: sourceId, id: prev }, { active: false });
             } catch {
@@ -416,16 +451,16 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
             }
         }
 
-        if (activeVenueId) {
+        if (activeVenueFeatureId != null) {
             try {
-                mapInstance.setFeatureState({ source: sourceId, id: activeVenueId }, { active: true });
+                mapInstance.setFeatureState({ source: sourceId, id: activeVenueFeatureId }, { active: true });
             } catch {
                 // ignore
             }
         }
 
-        prevActiveVenueIdRef.current = activeVenueId;
-    }, [activeVenueId, mapLoaded]);
+        prevActiveVenueFeatureIdRef.current = activeVenueFeatureId;
+    }, [activeVenueFeatureId, mapLoaded]);
 
     // Sync map selection -> list scroll
     useEffect(() => {
@@ -498,12 +533,8 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                 // Close popup on manual map pan (keep selection)
                 mapInstance.on('movestart', () => {
                     if (programmaticMoveRef.current) return;
-                    try {
-                        popupRef.current?.remove?.();
-                    } catch {
-                        // ignore
-                    }
-                    popupRef.current = null;
+                    // Close the visual popup but keep selection
+                    closePopup({ preserveSelection: true });
                 });
                 mapInstance.on('moveend', () => {
                     programmaticMoveRef.current = false;
@@ -559,6 +590,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
             mapInstance.addSource(SOURCE_ID, {
                 type: 'geojson',
                 data: venueGeoJson,
+                promoteId: 'featureId',
                 cluster: true,
                 clusterMaxZoom: 14,
                 clusterRadius: 55,
@@ -713,7 +745,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                 const coords = feature.geometry?.coordinates;
                 if (!venueId || !coords) return;
                 const [lng, lat] = coords;
-                toggleVenueSelection(String(venueId), Number(lng), Number(lat), { openPopup: true });
+                toggleVenueSelectionRef.current(String(venueId), Number(lng), Number(lat), { openPopup: true });
             });
 
             mapInstance.on('mouseenter', LAYER_CLUSTER, () => {
@@ -759,7 +791,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                 });
             }
         }
-    }, [mapLoaded, venueGeoJson, venueList, drawerPx, activeVenueId, toggleVenueSelection]);
+    }, [mapLoaded, venueGeoJson, venueList, drawerPx, activeVenueId]);
 
     const filesWithCoordinates = files.filter((f) => f.venue?.coordinates);
     const venuesWithCoordinates = venueList.length;
@@ -1014,6 +1046,13 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                                             if (!coords) return;
                                             toggleVenueSelection(group.venue.id, coords.lng, coords.lat, { openPopup: true });
                                         }}
+                                        onKeyDown={(e) => {
+                                            if (!coords) return;
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                if (e.key === ' ') e.preventDefault();
+                                                toggleVenueSelection(group.venue.id, coords.lng, coords.lat, { openPopup: true });
+                                            }
+                                        }}
                                     >
                                         <div className="flex items-start justify-between gap-3 mb-2">
                                             <div className="flex-1 min-w-0">
@@ -1045,11 +1084,13 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         if (coords) {
+                                                            const willBeActive = !isActive;
                                                             toggleVenueSelection(group.venue.id, coords.lng, coords.lat, { openPopup: false });
+                                                            if (willBeActive) setVenueDetailOpen(true);
                                                         } else {
                                                             setActiveVenueId(group.venue.id);
+                                                            setVenueDetailOpen(true);
                                                         }
-                                                        setVenueDetailOpen(true);
                                                     }}
                                                     className="text-xs"
                                                 >
