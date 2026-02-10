@@ -78,12 +78,71 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     window.location.reload();
   };
 
-  private handleClearStorage = () => {
+  private handleClearStorage = async () => {
     try {
       localStorage.clear();
     } catch (storageError) {
       console.warn('Failed to clear localStorage after an error', storageError);
     }
+
+    try {
+      sessionStorage.clear();
+    } catch {
+      // ignore
+    }
+
+    // Best-effort: clear Service Worker + Cache Storage to avoid stale JS bundles.
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.allSettled(regs.map((r) => r.unregister()));
+      }
+    } catch {
+      // ignore
+    }
+
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.allSettled(keys.map((k) => caches.delete(k)));
+      }
+    } catch {
+      // ignore
+    }
+
+    // Best-effort: clear IndexedDB (some browsers support databases()).
+    try {
+      const anyIDB: any = indexedDB as any;
+      if (typeof anyIDB?.databases === 'function') {
+        const dbs = await anyIDB.databases();
+        await Promise.allSettled(
+          (dbs || [])
+            .map((d: any) => d?.name)
+            .filter(Boolean)
+            .map((name: string) =>
+              new Promise<void>((resolve) => {
+                const req = indexedDB.deleteDatabase(name);
+                req.onsuccess = () => resolve();
+                req.onerror = () => resolve();
+                req.onblocked = () => resolve();
+              })
+            )
+        );
+      }
+    } catch {
+      // ignore
+    }
+
+    // Hard reload with cache-bust.
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('cb', Date.now().toString());
+      window.location.replace(url.toString());
+      return;
+    } catch {
+      // fallback
+    }
+
     this.handleReload();
   };
 
