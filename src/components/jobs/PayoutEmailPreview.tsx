@@ -29,6 +29,18 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
 
   const selectedAttachment = context.attachments.find(a => a.technician_id === selectedTechId);
 
+  const formatDateLong = (value?: string | Date | null) => {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return formatInTimeZone(date, 'Europe/Madrid', "d 'de' MMMM 'de' yyyy", { locale: es });
+  };
+
+  const formatFallbackJobDateText = () => {
+    const formatted = formatDateLong(context.job.start_time);
+    return formatted ? `el ${formatted}` : 'en fecha desconocida';
+  };
+
   const handleDownloadPDF = () => {
     if (!selectedAttachment) return;
 
@@ -65,12 +77,12 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
       }).format(Number(amount ?? 0));
     };
 
-    const formatDateLong = (date: Date) =>
-      formatInTimeZone(date, 'Europe/Madrid', "d 'de' MMMM 'de' yyyy", { locale: es });
+    const formatDateLongOrUnknown = (value?: string | Date | null) =>
+      formatDateLong(value) ?? 'fecha desconocida';
 
     const formatWorkedDates = (dates: string[]) => {
       if (!dates || dates.length === 0) {
-        return 'el ' + formatDateLong(new Date(context.job.start_time));
+        return formatFallbackJobDateText();
       }
 
       const parsed = dates
@@ -79,19 +91,19 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
         .sort((a, b) => a.getTime() - b.getTime());
 
       if (parsed.length === 0) {
-        return 'el ' + formatDateLong(new Date(context.job.start_time));
+        return formatFallbackJobDateText();
       }
 
       if (parsed.length === 1) {
-        return 'el ' + formatDateLong(parsed[0]);
+        return 'el ' + formatDateLongOrUnknown(parsed[0]);
       }
 
       if (parsed.length === 2) {
-        return `los días ${formatDateLong(parsed[0])} y ${formatDateLong(parsed[1])}`;
+        return `los días ${formatDateLongOrUnknown(parsed[0])} y ${formatDateLongOrUnknown(parsed[1])}`;
       }
 
-      const firstDate = formatDateLong(parsed[0]);
-      const lastDate = formatDateLong(parsed[parsed.length - 1]);
+      const firstDate = formatDateLongOrUnknown(parsed[0]);
+      const lastDate = formatDateLongOrUnknown(parsed[parsed.length - 1]);
       return `los días ${firstDate} - ${lastDate} (${parsed.length} días)`;
     };
 
@@ -270,7 +282,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
                         const lines = context.timesheetMap.get(selectedAttachment.technician_id) || [];
                         const dates = Array.from(new Set(lines.map(l => l.date).filter(Boolean)));
                         return dates.length > 0
-                          ? dates.map(d => <div key={d}>{new Date(d!).toLocaleDateString('es-ES')}</div>)
+                          ? dates.map(d => <div key={d}>{formatDateLong(d) ?? d}</div>)
                           : <div className="text-muted-foreground">Sin partes registrados</div>;
                       })()}
                     </div>
