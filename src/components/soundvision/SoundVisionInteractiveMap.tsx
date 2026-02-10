@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { createQueryKey } from '@/lib/optimized-react-query';
 import { supabase } from '@/integrations/supabase/client';
 import {
     Loader2,
@@ -92,7 +93,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
 
     // Get current user profile for permissions
     const { data: profile } = useQuery({
-        queryKey: ['current-user-profile'],
+        queryKey: createQueryKey.profiles.currentUser,
         queryFn: async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return null;
@@ -430,6 +431,13 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
         closePopup();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [searchTerm, city, country, stateRegion, fileType]);
+
+    // Ensure detail dialog doesn't stay open without a venue
+    useEffect(() => {
+        if (venueDetailOpen && !activeVenueGroup) {
+            setVenueDetailOpen(false);
+        }
+    }, [venueDetailOpen, activeVenueGroup]);
 
     const toggleVenueSelectionRef = useRef(toggleVenueSelection);
     useEffect(() => {
@@ -769,29 +777,37 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
             source.setData(venueGeoJson);
         }
 
-        // Fit bounds for the current dataset (only if nothing is selected)
-        if (!activeVenueId && venueList.length > 0) {
-            const bounds = new mapboxgl.LngLatBounds();
-            venueList.forEach((g) => {
-                const coords = g.venue.coordinates;
-                if (!coords) return;
-                bounds.extend([coords.lng, coords.lat]);
-            });
-            if (!bounds.isEmpty()) {
-                programmaticMoveRef.current = true;
-                mapInstance.fitBounds(bounds, {
-                    padding: {
-                        top: 90,
-                        bottom: Math.min(drawerPx + 30, window.innerHeight * 0.85),
-                        left: 50,
-                        right: 50,
-                    },
-                    maxZoom: 12,
-                    duration: 280,
-                });
-            }
-        }
-    }, [mapLoaded, venueGeoJson, venueList, drawerPx, activeVenueId]);
+    }, [mapLoaded, venueGeoJson]);
+
+    // Fit bounds for the current dataset (only if nothing is selected)
+    useEffect(() => {
+        if (!mapLoaded || !map.current || !mapboxglRef.current) return;
+        if (activeVenueId) return;
+        if (venueList.length === 0) return;
+
+        const mapInstance: any = map.current;
+        const mapboxgl: any = mapboxglRef.current;
+
+        const bounds = new mapboxgl.LngLatBounds();
+        venueList.forEach((g) => {
+            const coords = g.venue.coordinates;
+            if (!coords) return;
+            bounds.extend([coords.lng, coords.lat]);
+        });
+        if (bounds.isEmpty()) return;
+
+        programmaticMoveRef.current = true;
+        mapInstance.fitBounds(bounds, {
+            padding: {
+                top: 90,
+                bottom: Math.min(drawerPx + 30, window.innerHeight * 0.85),
+                left: 50,
+                right: 50,
+            },
+            maxZoom: 12,
+            duration: 280,
+        });
+    }, [mapLoaded, venueList, drawerPx, activeVenueId]);
 
     const filesWithCoordinates = files.filter((f) => f.venue?.coordinates);
     const venuesWithCoordinates = venueList.length;
