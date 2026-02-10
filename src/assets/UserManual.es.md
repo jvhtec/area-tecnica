@@ -1,25 +1,26 @@
-# Manual de usuario
+# Manual de usuario (Área Técnica)
 
-Este manual explica **cómo usar Área Técnica** en el día a día.
+Este manual es **para usar la app**, no para desarrollarla.
 
-> Consejo: guarda **/manual** en favoritos y usa el buscador de la izquierda.
-
-## Inicio rápido
-
-1. **Inicia sesión** con tu cuenta.
-2. Ve a **Dashboard** para ver el trabajo próximo.
-3. Abre un **bolo/trabajo** para ver info, documentos, personal y tareas.
-4. Si trabajas con giras, usa **Giras** para los documentos de gira.
+- Ruta: **/manual**
+- Usa el buscador de la izquierda para encontrar cualquier cosa rápido.
 
 ![Dashboard](/manual/dashboard.png)
+
+## Glosario rápido
+
+- **Bolo / Job**: un día/trabajo concreto (lo que abres para ver ubicación, documentos, personal, etc.).
+- **Gira / Tour**: agrupa bolos y sus documentos comunes.
+- **Fechas de gira (tour_dates)**: calendario de días de la gira.
+- **Parte / Timesheet**: la fuente canónica de “qué día trabaja” un técnico.
 
 ## Roles y permisos
 
 El acceso depende de tu **rol** (y a veces del **departamento**).
 
 - **admin**: acceso total.
-- **management**: planificación/asignaciones y la mayoría de herramientas.
-- **logistics**: flujos de logística (bolos, docs, gastos, etc.).
+- **management**: planificación/asignaciones y gestión.
+- **logistics**: flujos de logística (documentación, gastos, etc.).
 - **house_tech**: técnico interno con acceso ampliado.
 - **technician**: acceso a lo asignado (vista móvil + detalles de bolo).
 
@@ -28,51 +29,64 @@ Si no ves una página, normalmente es porque **no está habilitada para tu rol**
 ## Navegación (lo básico)
 
 - **Dashboard**: resumen y punto de entrada.
-- **Giras (Tours)**: calendario de gira + documentos.
-- **Festivales**: gestión por bolo.
-- **Hoja de Ruta**: generador y PDF.
+- **Giras (Tours)**: gestión de giras + documentos de gira.
+- **Festivales**: gestión por bolo de festival.
+- **Hoja de Ruta**: generador y exportación a PDF.
 - **Partes (Timesheets)**: días trabajados/confirmaciones.
 - **Herramientas**: utilidades técnicas internas.
 
-## Bolos / trabajos (lo principal)
+## Flujo básico (para todo el mundo)
 
-Un **Job** es la unidad central. Desde un bolo puedes:
+1. Entra a **Dashboard** y localiza tu trabajo.
+2. Abre el **bolo**.
+3. Revisa:
+   - hora/ubicación
+   - personal asignado
+   - documentos
+   - tareas pendientes
 
-- revisar **hora y ubicación**
-- ver el **personal**
-- abrir **documentos del bolo**
-- acceder a **documentos de gira** (si el bolo pertenece a una gira)
+## Técnicos: vista móvil y documentos
 
-## Documentos de gira (visibilidad + acceso de técnicos)
+Los técnicos normalmente trabajan desde la vista móvil (**/tech-app**).
 
-Las giras pueden tener documentos a nivel de gira.
+En un bolo → pestaña **Docs** puedes:
+- ver/descargar **documentos del bolo**
+- si el bolo pertenece a una gira: ver **Documentos de la gira** (siempre que estén marcados como visibles)
+
+![Portal técnico](/manual/freelancer-portal.png)
+
+## Documentos de gira (visibilidad)
+
+Los documentos de gira se suben a nivel de gira y luego se controlan con una bandera:
 
 - Gestión puede marcar cada documento como **Visible a técnicos**.
-- Los técnicos **solo** ven los documentos marcados como visibles.
-- Los técnicos pueden entrar a los docs de gira desde:
-  - **Giras → documentos**, y
-  - **Detalle del bolo → Docs → “Documentos de la gira”** (si hay gira)
+- Los técnicos **solo** verán/descargarán los documentos marcados como visibles.
+
+**Dónde se ven los documentos de gira:**
+- En **Giras → documentos**.
+- En el **detalle del bolo → Docs → “Documentos de la gira”** (si el bolo tiene gira).
 
 ![Gestión de gira](/manual/tour-management.png)
 
-## Gestión de festivales (básico)
+## Festivales (básico)
 
-Para bolos de festival:
-
-- artistas
-- necesidades de material
-- documentación imprimible
+En un bolo de festival puedes:
+- gestionar artistas
+- gestionar necesidades de material
+- imprimir/generar documentación
 
 ![Gestión de festival](/manual/festival-management.png)
 
 ## Hoja de Ruta + PDF
 
-La Hoja de Ruta es el **generador de documentación**. Flujo típico:
+La Hoja de Ruta es el **generador de documentación** (day sheet). Flujo típico:
 
-1. Abre un bolo/festival.
+1. Abre el bolo/festival.
 2. Completa contactos, staff, viajes y programa.
-3. Guarda.
+3. Guarda cambios.
 4. Genera el **PDF**.
+
+Si falta algún dato, revisa las secciones de **Contactos**, **Personal** y **Ubicación**.
 
 ![Hoja de ruta](/manual/day-sheet.png)
 
@@ -80,16 +94,18 @@ La Hoja de Ruta es el **generador de documentación**. Flujo típico:
 
 Los partes son la fuente canónica de **qué días trabaja un técnico**.
 
-- Si eres técnico, tus días futuros controlan lo que aparece en **Mis giras**.
-- Si dejas de tener días futuros, la gira puede desaparecer de tu lista.
+- Si eres técnico, tus días futuros (timesheets activos) afectan a:
+  - qué te aparece en “Mis giras”
+  - si una gira desaparece cuando ya no tienes ningún día futuro
 
 ## Tareas pendientes
 
-Algunos flujos generan tareas/validaciones. Si ves un badge o un modal:
+Algunos flujos generan **tareas pendientes** o validaciones.
 
-- abre la tarea
-- revisa el contexto
-- completa / aprueba
+Cuando veas un badge o un modal:
+1. ábrelo
+2. lee el contexto
+3. completa / aprueba
 
 ## Herramientas técnicas
 
@@ -97,8 +113,15 @@ Algunos flujos generan tareas/validaciones. Si ves un badge o un modal:
 
 ![Herramientas técnicas](/manual/technical-tools.png)
 
+## Wallboard / Señalización (si lo usas)
+
+Hay vistas de **señalización** y wallboard pensadas para pantallas (acceso restringido según rol).
+
+![Digital signage](/manual/digital-signage.png)
+
 ## Solución de problemas
 
 - **No veo una página** → permisos por rol/departamento.
 - **No me aparece un doc de gira** → quizá no está marcado *Visible a técnicos*.
+- **Subí un doc y no lo veo** → refresca; debería actualizar al momento.
 - **Veo datos desactualizados** → refresca; la app también refresca automáticamente.
