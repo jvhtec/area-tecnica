@@ -181,6 +181,16 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
     }));
   }, [setEventData]);
 
+  const removeContact = useCallback((index: number) => {
+    setEventData(prev => {
+      const next = (prev.contacts || []).filter((_, i) => i !== index);
+      return {
+        ...prev,
+        contacts: next.length > 0 ? next : [{ name: '', role: '', phone: '' }],
+      };
+    });
+  }, [setEventData]);
+
   const handleStaffChange = useCallback((index: number, field: string, value: string) => {
     setEventData(prev => ({
       ...prev,
@@ -195,6 +205,16 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
       ...prev,
       staff: [...(prev.staff || []), { name: '', surname1: '', surname2: '', position: '', dni: '' }]
     }));
+  }, [setEventData]);
+
+  const removeStaffMember = useCallback((index: number) => {
+    setEventData(prev => {
+      const next = (prev.staff || []).filter((_, i) => i !== index);
+      return {
+        ...prev,
+        staff: next.length > 0 ? next : [{ name: '', surname1: '', surname2: '', position: '', dni: '' }],
+      };
+    });
   }, [setEventData]);
 
   const updateTravelArrangement = useCallback((index: number, field: string, value: string) => {
@@ -375,8 +395,10 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
     // Form handlers (for backward compatibility)
     handleContactChange,
     addContact,
+    removeContact,
     handleStaffChange,
     addStaffMember,
+    removeStaffMember,
     updateTravelArrangement,
     addTravelArrangement,
     removeTravelArrangement,
