@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { TourJobRateQuote } from '@/types/tourRates';
+import { attachPayoutOverridesToTourQuotes } from '@/services/tourPayoutOverrides';
 
 export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: string) {
   return useQuery({
@@ -41,10 +42,10 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
                 is_house_tech: false,
                 is_tour_team_member: false,
                 category: '',
-              base_day_eur: 0,
-              week_count: 1,
-              multiplier: 1,
-              per_job_multiplier: 1,
+                base_day_eur: 0,
+                week_count: 1,
+                multiplier: 1,
+                per_job_multiplier: 1,
                 iso_year: null,
                 iso_week: null,
                 total_eur: 0,
@@ -83,7 +84,8 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
             } as TourJobRateQuote;
           })
         );
-        return results as TourJobRateQuote[];
+
+        return attachPayoutOverridesToTourQuotes(jobId, results as TourJobRateQuote[]);
       }
 
       // Single/festival jobs within a tour: use payout totals view
