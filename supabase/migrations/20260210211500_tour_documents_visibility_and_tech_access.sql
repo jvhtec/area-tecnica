@@ -23,7 +23,7 @@ DROP POLICY IF EXISTS "p_tour_documents_public_delete_6ae05b" ON public.tour_doc
 
 -- Select:
 --  - admin/management/logistics: always
---  - technicians/house_tech: only when visible_to_tech AND (tour crew OR assigned to a job in tour)
+--  - technicians/house_tech: only when visible_to_tech AND (tour crew OR has active timesheets in tour)
 CREATE POLICY "p_tour_documents_select"
 ON public.tour_documents
 FOR SELECT
@@ -41,10 +41,11 @@ USING (
       )
       OR EXISTS (
         SELECT 1
-        FROM public.job_assignments ja
-        JOIN public.jobs j ON j.id = ja.job_id
+        FROM public.timesheets ts
+        JOIN public.jobs j ON j.id = ts.job_id
         LEFT JOIN public.tour_dates td ON td.id = j.tour_date_id
-        WHERE ja.technician_id = auth.uid()
+        WHERE ts.technician_id = auth.uid()
+          AND ts.is_active = true
           AND (j.tour_id = tour_documents.tour_id OR td.tour_id = tour_documents.tour_id)
       )
     )
@@ -75,10 +76,11 @@ WITH CHECK (
       )
       OR EXISTS (
         SELECT 1
-        FROM public.job_assignments ja
-        JOIN public.jobs j ON j.id = ja.job_id
+        FROM public.timesheets ts
+        JOIN public.jobs j ON j.id = ts.job_id
         LEFT JOIN public.tour_dates td ON td.id = j.tour_date_id
-        WHERE ja.technician_id = auth.uid()
+        WHERE ts.technician_id = auth.uid()
+          AND ts.is_active = true
           AND (j.tour_id = tour_documents.tour_id OR td.tour_id = tour_documents.tour_id)
       )
     )
@@ -136,10 +138,11 @@ USING (
           )
           OR EXISTS (
             SELECT 1
-            FROM public.job_assignments ja
-            JOIN public.jobs j ON j.id = ja.job_id
+            FROM public.timesheets ts
+            JOIN public.jobs j ON j.id = ts.job_id
             LEFT JOIN public.tour_dates tdates ON tdates.id = j.tour_date_id
-            WHERE ja.technician_id = auth.uid()
+            WHERE ts.technician_id = auth.uid()
+              AND ts.is_active = true
               AND (j.tour_id = td.tour_id OR tdates.tour_id = td.tour_id)
           )
         )
@@ -171,10 +174,11 @@ WITH CHECK (
         )
         OR EXISTS (
           SELECT 1
-          FROM public.job_assignments ja
-          JOIN public.jobs j ON j.id = ja.job_id
+          FROM public.timesheets ts
+          JOIN public.jobs j ON j.id = ts.job_id
           LEFT JOIN public.tour_dates tdates ON tdates.id = j.tour_date_id
-          WHERE ja.technician_id = auth.uid()
+          WHERE ts.technician_id = auth.uid()
+            AND ts.is_active = true
             AND ((j.tour_id = (split_part(name, '/', 2))::uuid) OR (tdates.tour_id = (split_part(name, '/', 2))::uuid))
         )
       )

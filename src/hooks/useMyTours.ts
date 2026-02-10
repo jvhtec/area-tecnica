@@ -18,7 +18,7 @@ export interface MyTour {
 }
 
 export const useMyTours = () => {
-  const { user } = useOptimizedAuth();
+  const { user, userDepartment } = useOptimizedAuth();
 
   const { data: tours = [], isLoading, error, refetch } = useQuery({
     queryKey: ['my-tours', user?.id],
@@ -52,15 +52,14 @@ export const useMyTours = () => {
 
       if (crewError) throw crewError;
 
-      // 2) Tours where the technician is assigned to at least one job in the tour
-      // (even if they are not part of the tour crew)
-      const { data: jobAssignments, error: jobError } = await supabase
-        .from('job_assignments')
+      // 2) Tours where the technician has at least one active timesheet entry in the tour
+      // (timesheets are the canonical source of which days a tech actually works).
+      const { data: timeRows, error: timeError } = await supabase
+        .from('timesheets')
         .select(`
-          sound_role,
-          lights_role,
-          video_role,
-          status,
+          job_id,
+          date,
+          is_active,
           jobs!inner (
             id,
             start_time,
@@ -82,12 +81,11 @@ export const useMyTours = () => {
           )
         `)
         .eq('technician_id', user.id)
-        .eq('status', 'confirmed')
-        .eq('jobs.tour.status', 'active');
+        .eq('is_active', true);
 
-      if (jobError) {
+      if (timeError) {
         // If this secondary query fails, we still return the crew tours.
-        console.warn('[useMyTours] job-based tour lookup failed:', jobError);
+        console.warn('[useMyTours] timesheet-based tour lookup failed:', timeError);
       }
 
       const now = new Date();
@@ -142,23 +140,16 @@ export const useMyTours = () => {
         });
       });
 
-      // Job-based tours
-      (jobAssignments || []).forEach((assignment: any) => {
-        const job = assignment.jobs as any;
+      // Timesheet-based tours (canonical)
+      (timeRows || []).forEach((row: any) => {
+        const job = row.jobs as any;
         const tour = job?.tour as any;
         if (!tour) return;
-
-        const department = assignment.sound_role
-          ? 'sound'
-          : assignment.lights_role
-            ? 'lights'
-            : assignment.video_role
-              ? 'video'
-              : 'unknown';
+        if (tour.status !== 'active') return;
 
         upsert(tour, {
           assignment_role: 'Por bolo',
-          assignment_department: department,
+          assignment_department: (userDepartment || 'unknown') as any,
         });
       });
 
