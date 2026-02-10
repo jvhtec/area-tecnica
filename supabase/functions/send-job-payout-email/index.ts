@@ -1,5 +1,15 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
+
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  throw new Error(
+    "Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"
+  );
+}
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -37,6 +47,11 @@ interface TechnicianPayload {
   autonomo?: boolean | null;
   is_house_tech?: boolean | null;
   is_evento?: boolean;
+}
+
+interface PayoutOverrideRow {
+  technician_id: string;
+  override_amount_eur: number | null;
 }
 
 interface JobPayoutRequestBody {
@@ -125,7 +140,25 @@ serve(async (req) => {
 
   try {
     const body = (await req.json()) as JobPayoutRequestBody;
-    console.log('[send-job-payout-email] Incoming payload', JSON.stringify(body, null, 2));
+    const DEBUG = Deno.env.get('DEBUG_PAYOUT_EMAILS') === 'true';
+
+    // Avoid dumping base64 PDFs / PII into logs.
+    console.log('[send-job-payout-email] Incoming payload', JSON.stringify({
+      job: { id: body.job?.id, title: body.job?.title },
+      technicians: body.technicians?.map(t => ({
+        technician_id: t.technician_id,
+        has_pdf: Boolean(t.pdf_base64),
+        pdf_length: t.pdf_base64?.length ?? 0,
+      })),
+      technicians_count: body.technicians?.length ?? 0,
+    }));
+
+    if (DEBUG) {
+      console.log('[send-job-payout-email][debug] Incoming payload (full)', {
+        job: body.job,
+        technicians_count: body.technicians?.length ?? 0,
+      });
+    }
 
     if (!body || !body.job || !body.job.id) {
       return new Response(
@@ -143,10 +176,32 @@ serve(async (req) => {
 
     const results: Array<{ technician_id: string; sent: boolean; error?: string }> = [];
 
+    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+    // Preload payout overrides for this job (so email totals never depend on client-side enrichment)
+    const technicianIds = body.technicians.map((t) => t.technician_id).filter(Boolean);
+    const overrideMap = new Map<string, number>();
+    if (technicianIds.length > 0) {
+      const { data: overrides, error: overrideError } = await supabase
+        .from("job_technician_payout_overrides")
+        .select("technician_id, override_amount_eur")
+        .eq("job_id", body.job.id)
+        .in("technician_id", technicianIds);
+
+      if (overrideError) {
+        console.error('[send-job-payout-email] Failed to fetch overrides', overrideError);
+      } else {
+        (overrides as PayoutOverrideRow[] | null | undefined)?.forEach((row) => {
+          if (!row?.technician_id) return;
+          if (row.override_amount_eur == null) return;
+          overrideMap.set(row.technician_id, Number(row.override_amount_eur));
+        });
+      }
+    }
+
     // Corporate assets (logos)
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
-    const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || (SUPABASE_URL ? `${SUPABASE_URL}/storage/v1/object/public/company-assets/sectorlogow.png` : '');
-    const AT_LOGO_URL = Deno.env.get('AT_LOGO_URL') || (SUPABASE_URL ? `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png` : '');
+    const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || `${SUPABASE_URL}/storage/v1/object/public/company-assets/sectorlogow.png`;
+    const AT_LOGO_URL = Deno.env.get('AT_LOGO_URL') || `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
 
     for (const tech of body.technicians) {
       const trimmedEmail = (tech.email || '').trim();
@@ -161,7 +216,11 @@ serve(async (req) => {
         results.push({ technician_id: tech.technician_id, sent: false, error: 'missing_pdf' });
         continue;
       }
-      console.log(`[send-job-payout-email] PDF for ${tech.technician_id}: ${pdfBase64.length} chars, starts with: ${pdfBase64.substring(0, 50)}...`);
+      if (DEBUG) {
+        console.log(`[send-job-payout-email][debug] PDF length for technician: ${tech.technician_id}`, {
+          pdfLength: pdfBase64.length,
+        });
+      }
 
       const subject = `Resumen de pagos · ${body.job.title}`;
 
@@ -172,19 +231,22 @@ serve(async (req) => {
       const dateText = workedDatesText || `el ${fallbackJobDate}`;
       const parts = formatCurrency(tech.totals?.timesheets_total_eur);
       const extras = formatCurrency(tech.totals?.extras_total_eur);
-      const grand = formatCurrency(tech.totals?.total_eur);
+
       const deductionAmount = tech.totals?.deduction_eur ?? 0;
       const deductionFormatted = formatCurrency(deductionAmount);
       const hasDeduction = deductionAmount > 0;
+
+      // Prefer DB overrides when present (PDF already reflects override; email body must match)
+      const overrideAmount = overrideMap.get(tech.technician_id);
+      const totalFromPayload = Number(tech.totals?.total_eur ?? 0);
+      const effectiveTotal = overrideAmount != null ? overrideAmount - deductionAmount : totalFromPayload;
+      const grand = formatCurrency(effectiveTotal);
       const invoicingCompany = body.job.invoicing_company;
 
-      // Debug logging
-      console.log('[send-job-payout-email] Invoicing company raw value:', JSON.stringify(invoicingCompany));
-      console.log('[send-job-payout-email] Type:', typeof invoicingCompany);
-      console.log('[send-job-payout-email] Length:', invoicingCompany?.length);
-
       const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
-      console.log('[send-job-payout-email] Company details result:', companyDetails ? 'FOUND' : 'NULL');
+      if (DEBUG) {
+        console.log('[send-job-payout-email][debug] Company details resolved:', companyDetails ? 'FOUND' : 'NULL');
+      }
 
       const htmlContent = `<!DOCTYPE html>
       <html lang="es">
@@ -293,13 +355,13 @@ serve(async (req) => {
       // Always CC administration
       emailPayload['cc'] = [{ email: 'administracion@mfo-producciones.com' }];
 
-      // Debug: log attachment info
-      console.log('[send-job-payout-email] Sending email with attachment:', {
-        to: trimmedEmail,
-        pdfLength: pdfBase64.length,
-        pdfStartsWith: pdfBase64.substring(0, 30),
-        filename: tech.filename || `pago_${body.job.id}_${tech.technician_id}.pdf`
-      });
+      if (DEBUG) {
+        console.log('[send-job-payout-email][debug] Sending email with attachment:', {
+          to: '***',
+          pdfLength: pdfBase64.length,
+          filename: tech.filename || `pago_${body.job.id}_${tech.technician_id}.pdf`,
+        });
+      }
 
       try {
         const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {

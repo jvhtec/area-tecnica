@@ -114,6 +114,11 @@ export const createQueryKey = {
     /** Current user's profile (role/permissions). */
     currentUser: ['profiles', 'current-user'] as const,
   },
+  payoutOverrides: {
+    all: ['payout-overrides'] as const,
+    byJobAndTechnician: (jobId?: string | null, technicianId?: string | null) =>
+      [...createQueryKey.payoutOverrides.all, jobId ?? null, technicianId ?? null] as const,
+  },
 };
 
 // Optimized invalidation strategies
