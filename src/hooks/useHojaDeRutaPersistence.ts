@@ -350,8 +350,9 @@ export const useHojaDeRutaPersistence = (
           hoja_de_ruta_id: hojaDeRutaId,
           name: contact.name || '',
           role: contact.role || '',
-          phone: contact.phone || ''
-        }));
+          phone: contact.phone || '',
+          technician_id: (contact as any).technician_id || null,
+        } as any));
 
         console.log("🔄 SAVE: Inserting contacts data:", contactsData);
 
@@ -383,12 +384,13 @@ export const useHojaDeRutaPersistence = (
       if (validStaff.length > 0) {
         const staffData = validStaff.map(staff => ({
           hoja_de_ruta_id: hojaDeRutaId,
+          technician_id: (staff as any).technician_id || null,
           name: staff.name || '',
           surname1: staff.surname1 || '',
           surname2: staff.surname2 || '',
           position: staff.position || '',
           dni: staff.dni || ''
-        }));
+        } as any));
 
         console.log("🔄 SAVE: Inserting staff data:", staffData);
 

@@ -137,8 +137,10 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     // Form handlers
     handleContactChange,
     addContact,
+    removeContact,
     handleStaffChange,
     addStaffMember,
+    removeStaffMember,
     updateTravelArrangement,
     addTravelArrangement,
     removeTravelArrangement,
@@ -647,6 +649,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                         eventData={eventData}
                         onContactChange={handleContactChange}
                         onAddContact={addContact}
+                        onRemoveContact={removeContact}
                       />
                     </TabsContent>
 
@@ -655,6 +658,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                         eventData={eventData}
                         onStaffChange={handleStaffChange}
                         onAddStaff={addStaffMember}
+                        onRemoveStaff={removeStaffMember}
                       />
                     </TabsContent>
 

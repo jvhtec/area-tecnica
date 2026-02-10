@@ -111,6 +111,8 @@ export interface EventData {
     role?: string;
     phone?: string;
     email?: string;
+    // Optional link to a technician profile when the contact originates from job staffing
+    technician_id?: string;
   }>;
   staff?: Array<{
     id?: string;
@@ -122,6 +124,8 @@ export interface EventData {
     dni?: string;
     department?: string;
     role?: string;
+    // Optional link to a technician profile when the staff row originates from job staffing
+    technician_id?: string;
   }>;
   logistics?: {
     transport?: Transport[];

@@ -11,12 +11,14 @@ interface ModernContactsSectionProps {
   eventData: EventData;
   onContactChange: (index: number, field: string, value: string) => void;
   onAddContact: () => void;
+  onRemoveContact: (index: number) => void;
 }
 
 export const ModernContactsSection: React.FC<ModernContactsSectionProps> = ({
   eventData,
   onContactChange,
   onAddContact,
+  onRemoveContact,
 }) => {
   return (
     <motion.div
@@ -91,13 +93,11 @@ export const ModernContactsSection: React.FC<ModernContactsSectionProps> = ({
                           placeholder="+34 xxx xxx xxx"
                           className="border-2 focus:border-purple-300"
                         />
-                        {index > 0 && (
+                        {eventData.contacts.length > 1 && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              // Remove contact logic would go here
-                            }}
+                            onClick={() => onRemoveContact(index)}
                             className="px-3"
                           >
                             <Trash2 className="w-4 h-4" />

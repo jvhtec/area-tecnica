@@ -14,6 +14,7 @@ interface ModernStaffSectionProps {
   eventData: EventData;
   onStaffChange: (index: number, field: string, value: string) => void;
   onAddStaff: () => void;
+  onRemoveStaff: (index: number) => void;
   onProfileSelect?: (index: number, profileData: any) => void;
 }
 
@@ -21,6 +22,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
   eventData,
   onStaffChange,
   onAddStaff,
+  onRemoveStaff,
   onProfileSelect,
 }) => {
   const handleProfileSelect = async (index: number, profile: any) => {
@@ -146,13 +148,11 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
                           placeholder="Técnico, Jefe..."
                           className="border-2 focus:border-orange-300"
                         />
-                        {index > 0 && (
+                        {eventData.staff.length > 1 && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => {
-                              // Remove staff logic would go here
-                            }}
+                            onClick={() => onRemoveStaff(index)}
                             className="px-3"
                           >
                             <Trash2 className="w-4 h-4" />

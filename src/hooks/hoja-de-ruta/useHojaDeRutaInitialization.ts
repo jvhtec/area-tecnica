@@ -92,7 +92,7 @@ export const useHojaDeRutaInitialization = (
           location:locations(name, formatted_address, latitude, longitude),
           job_assignments(
             *,
-            profiles:technician_id(first_name, last_name, dni)
+            profiles:technician_id(first_name, last_name, dni, phone, email)
           )
         `)
         .eq('id', jobId)
@@ -104,11 +104,14 @@ export const useHojaDeRutaInitialization = (
       }
 
       const staffFromAssignments = jobData.job_assignments?.map((assignment: any) => ({
+        technician_id: assignment.technician_id,
         name: assignment.profiles?.first_name || "",
         surname1: assignment.profiles?.last_name || "",
         surname2: "",
         position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico",
-        dni: assignment.profiles?.dni || ""
+        dni: assignment.profiles?.dni || "",
+        phone: assignment.profiles?.phone || "",
+        role: "house_tech",
       })) || [];
 
       console.log("✅ INITIALIZATION: Loaded current assignments:", staffFromAssignments);
@@ -252,8 +255,8 @@ export const useHojaDeRutaInitialization = (
         const savedEventData = hojaDeRuta.eventData;
         // Merge saved staff with current assignments, preserving saved DNI and manual entries
         const mergeStaff = (
-          saved: Array<{ name?: string; surname1?: string; surname2?: string; position?: string; dni?: string }> = [],
-          assigned: Array<{ name?: string; surname1?: string; surname2?: string; position?: string; dni?: string }> = []
+          saved: any[] = [],
+          assigned: any[] = [],
         ) => {
           const norm = (s?: string) => (s || '').trim().toLowerCase();
           const keyOf = (p: any) => `${norm(p?.name)}|${norm(p?.surname1)}`;
@@ -268,11 +271,14 @@ export const useHojaDeRutaInitialization = (
             if (map.has(k)) {
               const s = map.get(k);
               map.set(k, {
+                technician_id: s.technician_id || a.technician_id,
                 name: s.name || a.name || '',
                 surname1: s.surname1 || a.surname1 || '',
                 surname2: s.surname2 || a.surname2 || '',
                 position: s.position || a.position || '',
-                dni: s.dni || a.dni || ''
+                dni: s.dni || a.dni || '',
+                phone: s.phone || a.phone || '',
+                role: s.role || a.role,
               });
             } else {
               map.set(k, { ...a });
