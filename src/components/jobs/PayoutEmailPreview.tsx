@@ -2,8 +2,11 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, X } from 'lucide-react';
+import { formatInTimeZone } from 'date-fns-tz';
+import { es } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { JobPayoutEmailContextResult } from '@/lib/job-payout-email';
+import { effectiveTotal } from '@/lib/job-payout-email';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 import { HOUSE_TECH_LABEL } from '@/utils/autonomo';
 
@@ -26,6 +29,18 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
   if (!context) return null;
 
   const selectedAttachment = context.attachments.find(a => a.technician_id === selectedTechId);
+
+  const formatDateLong = (value?: string | Date | null) => {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return formatInTimeZone(date, 'Europe/Madrid', "d 'de' MMMM 'de' yyyy", { locale: es });
+  };
+
+  const formatFallbackJobDateText = () => {
+    const formatted = formatDateLong(context.job.start_time);
+    return formatted ? `el ${formatted}` : 'en fecha desconocida';
+  };
 
   const handleDownloadPDF = () => {
     if (!selectedAttachment) return;
@@ -63,21 +78,33 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
       }).format(Number(amount ?? 0));
     };
 
-    const formatWorkedDates = (dates: string[]) => {
-      if (!dates || dates.length === 0) return 'el ' + new Date(context.job.start_time).toLocaleDateString('es-ES', { dateStyle: 'long' });
+    const formatDateLongOrUnknown = (value?: string | Date | null) =>
+      formatDateLong(value) ?? 'fecha desconocida';
 
-      const parsed = dates.map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
+    const formatWorkedDates = (dates: string[]) => {
+      if (!dates || dates.length === 0) {
+        return formatFallbackJobDateText();
+      }
+
+      const parsed = dates
+        .map((d) => new Date(d))
+        .filter((d) => !Number.isNaN(d.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime());
+
+      if (parsed.length === 0) {
+        return formatFallbackJobDateText();
+      }
 
       if (parsed.length === 1) {
-        return 'el ' + parsed[0].toLocaleDateString('es-ES', { dateStyle: 'long' });
+        return 'el ' + formatDateLongOrUnknown(parsed[0]);
       }
 
       if (parsed.length === 2) {
-        return `los días ${parsed[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })} y ${parsed[1].toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+        return `los días ${formatDateLongOrUnknown(parsed[0])} y ${formatDateLongOrUnknown(parsed[1])}`;
       }
 
-      const firstDate = parsed[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-      const lastDate = parsed[parsed.length - 1].toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+      const firstDate = formatDateLongOrUnknown(parsed[0]);
+      const lastDate = formatDateLongOrUnknown(parsed[parsed.length - 1]);
       return `los días ${firstDate} - ${lastDate} (${parsed.length} días)`;
     };
 
@@ -87,7 +114,10 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
 
     const parts = formatCurrency(selectedAttachment.payout.timesheets_total_eur);
     const extras = formatCurrency(selectedAttachment.payout.extras_total_eur);
-    const grand = formatCurrency(selectedAttachment.payout.total_eur - (selectedAttachment.deduction_eur || 0));
+
+    const grand = formatCurrency(
+      effectiveTotal(selectedAttachment.payout, selectedAttachment.deduction_eur || 0)
+    );
     const deductionAmount = selectedAttachment.deduction_eur ?? 0;
     const deductionFormatted = formatCurrency(deductionAmount);
     const hasDeduction = deductionAmount > 0;
@@ -249,7 +279,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
                         const lines = context.timesheetMap.get(selectedAttachment.technician_id) || [];
                         const dates = Array.from(new Set(lines.map(l => l.date).filter(Boolean)));
                         return dates.length > 0
-                          ? dates.map(d => <div key={d}>{new Date(d!).toLocaleDateString('es-ES')}</div>)
+                          ? dates.map(d => <div key={d}>{formatDateLong(d) ?? d}</div>)
                           : <div className="text-muted-foreground">Sin partes registrados</div>;
                       })()}
                     </div>
