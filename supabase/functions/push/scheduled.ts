@@ -66,23 +66,21 @@ async function getMorningSummaryDataForDepartment(
   department: string,
   targetDate: string, // YYYY-MM-DD
 ): Promise<MorningSummaryData> {
-  const nextDate = new Date(targetDate);
-  nextDate.setDate(nextDate.getDate() + 1);
-  const tomorrowDate = nextDate.toISOString().split('T')[0];
-
-  // 1) Get today's assignments for this department (house tech only)
+  // 1) Get today's assignments for this department.
+  // Source of truth: timesheets (NOT job_assignments), which matches the Personal agenda.
+  // Important: do NOT filter by job.start_time here — multi-day jobs may have a start_time on a
+  // different day, but the technician is still working today if they have an active timesheet row.
   const { data: assignments = [] } = await client
-    .from('job_assignments')
+    .from('timesheets')
     .select(`
       technician_id,
       job:jobs!inner(title, start_time),
-      profile:profiles!job_assignments_technician_id_fkey!inner(first_name, last_name, nickname, department, role)
+      profile:profiles!fk_timesheets_technician_id!inner(first_name, last_name, nickname, department, role)
     `)
-    .eq('status', 'confirmed')
+    .eq('is_active', true)
+    .eq('date', targetDate)
     .eq('profile.department', department)
-    .eq('profile.role', 'house_tech')
-    .gte('job.start_time', targetDate)
-    .lt('job.start_time', tomorrowDate);
+    .eq('profile.role', 'house_tech');
 
   // 2) Get today's unavailability for this department (primary source)
   const { data: unavailable = [] } = await client
