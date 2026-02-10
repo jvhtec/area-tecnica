@@ -1,22 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { createQueryKey } from '@/lib/optimized-react-query';
+import { supabase } from '@/integrations/supabase/client';
 import {
     Loader2,
     Search,
     ArrowLeft,
     Download,
     Star as StarIcon,
-    MapPin,
-    User,
-    Calendar,
     RefreshCw,
     AlertCircle,
     Filter,
     X,
     ChevronUp,
     ChevronDown,
-    MoreVertical,
     Upload,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -43,7 +40,7 @@ import { SoundVisionFileUploader } from '@/components/soundvision/SoundVisionFil
 import { useVenues } from '@/hooks/useVenues';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
-import type { Map as MapboxMap, Marker as MapboxMarker } from 'mapbox-gl';
+import type { Map as MapboxMap } from 'mapbox-gl';
 import { Theme } from '@/components/technician/types';
 
 export interface SoundVisionInteractiveMapProps {
@@ -59,12 +56,7 @@ interface VenueGroup {
     ratingTotal: number;
 }
 
-interface ContextMenuData {
-    x: number;
-    y: number;
-    venueName: string;
-    files: SoundVisionFile[];
-}
+// (context menu removed; selection is handled via activeVenueId)
 
 export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisionInteractiveMapProps) => {
     const queryClient = useQueryClient();
@@ -78,20 +70,30 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
     const [showFilters, setShowFilters] = useState(false);
     const [selectedFile, setSelectedFile] = useState<SoundVisionFile | null>(null);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [contextMenu, setContextMenu] = useState<ContextMenuData | null>(null);
+
+    // Single-selection state (map + list)
+    const [activeVenueId, setActiveVenueId] = useState<string | null>(null);
+    const activeVenueIdRef = useRef<string | null>(null);
+    const [venueDetailOpen, setVenueDetailOpen] = useState(false);
 
     // Map state
     const mapContainer = useRef<HTMLDivElement>(null);
     const mapboxglRef = useRef<any>(null);
     const map = useRef<MapboxMap | null>(null);
-    const markers = useRef<MapboxMarker[]>([]);
+    const popupRef = useRef<any>(null);
+    const manualPopupDismissRef = useRef(false);
+    const prevActiveVenueFeatureIdRef = useRef<number | null>(null);
+    const programmaticMoveRef = useRef(false);
+    const drawerRef = useRef<HTMLDivElement>(null);
+
     const [mapLoading, setMapLoading] = useState(true);
     const [mapError, setMapError] = useState<string | null>(null);
     const [mapLoaded, setMapLoaded] = useState(false);
+    const [drawerPx, setDrawerPx] = useState(0);
 
     // Get current user profile for permissions
     const { data: profile } = useQuery({
-        queryKey: ['current-user-profile'],
+        queryKey: createQueryKey.profiles.currentUser,
         queryFn: async () => {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return null;
@@ -114,6 +116,94 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
     });
 
     const downloadFile = useDownloadSoundVisionFile();
+
+    const { venueGroups, venueList, filesByVenueId, venueGeoJson, venueIdToFeatureId } = useMemo(() => {
+        const groups = new Map<string, VenueGroup>();
+        const byVenueId = new Map<string, SoundVisionFile[]>();
+
+        files.forEach((file) => {
+            const venue = file.venue;
+            if (!venue?.id || !venue.coordinates) return;
+
+            if (!byVenueId.has(venue.id)) byVenueId.set(venue.id, []);
+            byVenueId.get(venue.id)!.push(file);
+
+            const fileRatingsCount = file.ratings_count ?? 0;
+            const fileRatingTotal = file.rating_total ?? 0;
+
+            const existing = groups.get(venue.id);
+            if (!existing) {
+                groups.set(venue.id, {
+                    venue,
+                    fileCount: 1,
+                    ratingsCount: fileRatingsCount,
+                    ratingTotal: fileRatingTotal,
+                });
+            } else {
+                existing.fileCount++;
+                existing.ratingsCount += fileRatingsCount;
+                existing.ratingTotal += fileRatingTotal;
+            }
+        });
+
+        const list = Array.from(groups.values()).sort((a, b) => {
+            // Prefer higher density, then alphabetically
+            if (b.fileCount !== a.fileCount) return b.fileCount - a.fileCount;
+            return (a.venue.name || '').localeCompare(b.venue.name || '');
+        });
+
+        const idMap = new Map<string, number>();
+        let nextId = 1;
+
+        const featureCollection = {
+            type: 'FeatureCollection',
+            features: list
+                .filter((g) => g.venue.coordinates)
+                .map((g) => {
+                    const { lat, lng } = g.venue.coordinates!;
+                    const avg = g.ratingsCount > 0 ? g.ratingTotal / g.ratingsCount : null;
+                    const featureId = nextId++;
+                    idMap.set(g.venue.id, featureId);
+                    return {
+                        type: 'Feature',
+                        id: featureId,
+                        properties: {
+                            featureId,
+                            venueId: g.venue.id,
+                            name: g.venue.name,
+                            city: g.venue.city,
+                            country: g.venue.country,
+                            state_region: g.venue.state_region,
+                            fileCount: g.fileCount,
+                            averageRating: avg,
+                            ratingsCount: g.ratingsCount,
+                        },
+                        geometry: {
+                            type: 'Point',
+                            coordinates: [lng, lat],
+                        },
+                    };
+                }),
+        } as any;
+
+        return {
+            venueGroups: groups,
+            venueList: list,
+            filesByVenueId: byVenueId,
+            venueGeoJson: featureCollection,
+            venueIdToFeatureId: idMap,
+        };
+    }, [files]);
+
+    const activeVenueFeatureId = useMemo(() => {
+        if (!activeVenueId) return null;
+        return venueIdToFeatureId.get(activeVenueId) ?? null;
+    }, [activeVenueId, venueIdToFeatureId]);
+
+    const activeVenueGroup = useMemo(() => {
+        if (!activeVenueId) return null;
+        return venueGroups.get(activeVenueId) ?? null;
+    }, [activeVenueId, venueGroups]);
 
     // Get venues for filter dropdowns
     const { data: venues } = useVenues();
@@ -144,16 +234,23 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
         }
     };
 
-    // Close context menu on global click/map move
+    // Keep drawer height in px for map padding calculations
     useEffect(() => {
-        const closeMenu = () => setContextMenu(null);
-        window.addEventListener('click', closeMenu);
-        window.addEventListener('resize', closeMenu);
-        return () => {
-            window.removeEventListener('click', closeMenu);
-            window.removeEventListener('resize', closeMenu);
+        const update = () => {
+            const rect = drawerRef.current?.getBoundingClientRect();
+            setDrawerPx(rect?.height ?? 0);
         };
-    }, []);
+        update();
+        window.addEventListener('resize', update);
+        return () => window.removeEventListener('resize', update);
+    }, [drawerHeight, isLoading, showFilters, venueList.length]);
+
+    // (context menu removed)
+
+    // Keep refs in sync
+    useEffect(() => {
+        activeVenueIdRef.current = activeVenueId;
+    }, [activeVenueId]);
 
     // Update selected file when files change
     useEffect(() => {
@@ -163,6 +260,222 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
             setSelectedFile(updated);
         }
     }, [files, selectedFile]);
+
+    const closePopup = useCallback((opts?: { preserveSelection?: boolean }) => {
+        if (opts?.preserveSelection) {
+            manualPopupDismissRef.current = true;
+        }
+        try {
+            popupRef.current?.remove?.();
+        } catch {
+            // ignore
+        }
+        popupRef.current = null;
+        // Allow the popup close handler to run normally next time
+        if (opts?.preserveSelection) {
+            setTimeout(() => {
+                manualPopupDismissRef.current = false;
+            }, 0);
+        }
+    }, []);
+
+    const centerOn = useCallback(
+        (lng: number, lat: number) => {
+            if (!map.current) return;
+            programmaticMoveRef.current = true;
+            map.current.easeTo({
+                center: [lng, lat],
+                duration: 250,
+                padding: {
+                    top: 90,
+                    bottom: Math.min(drawerPx + 30, window.innerHeight * 0.85),
+                    left: 30,
+                    right: 30,
+                },
+            });
+        },
+        [drawerPx]
+    );
+
+    const openVenuePopup = useCallback(
+        (venueId: string, lng: number, lat: number) => {
+            const mapboxgl = mapboxglRef.current;
+            const mapInstance = map.current;
+            const group = venueGroups.get(venueId);
+            if (!mapboxgl || !mapInstance || !group) return;
+
+            closePopup();
+
+            const avg = group.ratingsCount > 0 ? group.ratingTotal / group.ratingsCount : null;
+
+            const container = document.createElement('div');
+            container.style.padding = '10px';
+            container.style.minWidth = '220px';
+            container.style.color = '#fff';
+            container.style.background = '#1a1a2e';
+            container.style.borderRadius = '10px';
+
+            const title = document.createElement('div');
+            title.textContent = group.venue.name;
+            title.style.fontWeight = '700';
+            title.style.fontSize = '14px';
+            title.style.marginBottom = '4px';
+
+            const subtitle = document.createElement('div');
+            subtitle.textContent = [group.venue.city, group.venue.state_region, group.venue.country]
+                .filter(Boolean)
+                .join(', ');
+            subtitle.style.fontSize = '12px';
+            subtitle.style.color = '#9ca3af';
+            subtitle.style.marginBottom = '10px';
+
+            const meta = document.createElement('div');
+            meta.style.display = 'flex';
+            meta.style.justifyContent = 'space-between';
+            meta.style.gap = '10px';
+            meta.style.fontSize = '12px';
+            meta.style.color = '#cbd5e1';
+
+            const filesEl = document.createElement('div');
+            filesEl.textContent = `${group.fileCount} ${group.fileCount === 1 ? 'archivo' : 'archivos'}`;
+
+            const ratingEl = document.createElement('div');
+            ratingEl.textContent = avg != null ? `${avg.toFixed(1)} ⭐ (${group.ratingsCount})` : 'Sin reseñas';
+
+            meta.appendChild(filesEl);
+            meta.appendChild(ratingEl);
+
+            const actions = document.createElement('div');
+            actions.style.display = 'flex';
+            actions.style.gap = '8px';
+            actions.style.marginTop = '12px';
+
+            const openBtn = document.createElement('button');
+            openBtn.textContent = 'Abrir';
+            openBtn.style.flex = '1';
+            openBtn.style.background = '#2563eb';
+            openBtn.style.color = '#fff';
+            openBtn.style.border = '0';
+            openBtn.style.borderRadius = '8px';
+            openBtn.style.padding = '8px 10px';
+            openBtn.style.cursor = 'pointer';
+            openBtn.onclick = () => {
+                setVenueDetailOpen(true);
+            };
+
+            const navBtn = document.createElement('button');
+            navBtn.textContent = 'Navegar';
+            navBtn.style.flex = '1';
+            navBtn.style.background = 'rgba(255,255,255,0.08)';
+            navBtn.style.color = '#fff';
+            navBtn.style.border = '1px solid rgba(255,255,255,0.12)';
+            navBtn.style.borderRadius = '8px';
+            navBtn.style.padding = '8px 10px';
+            navBtn.style.cursor = 'pointer';
+            navBtn.onclick = () => {
+                const url = `https://www.google.com/maps?q=${lat},${lng}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+            };
+
+            actions.appendChild(openBtn);
+            actions.appendChild(navBtn);
+
+            container.appendChild(title);
+            container.appendChild(subtitle);
+            container.appendChild(meta);
+            container.appendChild(actions);
+
+            const popup = new mapboxgl.Popup({
+                offset: 20,
+                closeButton: true,
+                closeOnClick: false,
+                className: 'soundvision-popup',
+            })
+                .setLngLat([lng, lat])
+                .setDOMContent(container)
+                .addTo(mapInstance);
+
+            popup.on('close', () => {
+                if (manualPopupDismissRef.current) return;
+                setActiveVenueId(null);
+            });
+
+            popupRef.current = popup;
+        },
+        [closePopup, venueGroups]
+    );
+
+    const toggleVenueSelection = useCallback(
+        (venueId: string, lng: number, lat: number, opts?: { openPopup?: boolean }) => {
+            const openPopup = opts?.openPopup ?? true;
+            const current = activeVenueIdRef.current;
+            const next = current === venueId ? null : venueId;
+
+            setActiveVenueId(next);
+
+            if (next) {
+                centerOn(lng, lat);
+                if (openPopup) openVenuePopup(venueId, lng, lat);
+            } else {
+                closePopup();
+                setVenueDetailOpen(false);
+            }
+        },
+        [centerOn, closePopup, openVenuePopup]
+    );
+
+    // Clear selection on filter/search changes
+    useEffect(() => {
+        setActiveVenueId(null);
+        setVenueDetailOpen(false);
+        closePopup();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchTerm, city, country, stateRegion, fileType]);
+
+    // Ensure detail dialog doesn't stay open without a venue
+    useEffect(() => {
+        if (venueDetailOpen && !activeVenueGroup) {
+            setVenueDetailOpen(false);
+        }
+    }, [venueDetailOpen, activeVenueGroup]);
+
+    const toggleVenueSelectionRef = useRef(toggleVenueSelection);
+    useEffect(() => {
+        toggleVenueSelectionRef.current = toggleVenueSelection;
+    }, [toggleVenueSelection]);
+
+    // Keep feature-state updated for the active venue
+    useEffect(() => {
+        if (!mapLoaded || !map.current) return;
+        const mapInstance: any = map.current;
+
+        const sourceId = 'soundvision-venues';
+        const prev = prevActiveVenueFeatureIdRef.current;
+        if (prev != null) {
+            try {
+                mapInstance.setFeatureState({ source: sourceId, id: prev }, { active: false });
+            } catch {
+                // ignore
+            }
+        }
+
+        if (activeVenueFeatureId != null) {
+            try {
+                mapInstance.setFeatureState({ source: sourceId, id: activeVenueFeatureId }, { active: true });
+            } catch {
+                // ignore
+            }
+        }
+
+        prevActiveVenueFeatureIdRef.current = activeVenueFeatureId;
+    }, [activeVenueFeatureId, mapLoaded]);
+
+    // Sync map selection -> list scroll
+    useEffect(() => {
+        if (!activeVenueId) return;
+        const el = document.getElementById(`venue-card-${activeVenueId}`);
+        el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, [activeVenueId]);
 
     // Initialize Mapbox
     useEffect(() => {
@@ -225,9 +538,15 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                     mapInstance.resize();
                 });
 
-                // Close context menu on map interaction
-                mapInstance.on('movestart', () => setContextMenu(null));
-                mapInstance.on('click', () => setContextMenu(null));
+                // Close popup on manual map pan (keep selection)
+                mapInstance.on('movestart', () => {
+                    if (programmaticMoveRef.current) return;
+                    // Close the visual popup but keep selection
+                    closePopup({ preserveSelection: true });
+                });
+                mapInstance.on('moveend', () => {
+                    programmaticMoveRef.current = false;
+                });
 
                 mapInstance.on('error', (event) => {
                     if (!isMounted) return;
@@ -247,140 +566,251 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
 
         return () => {
             isMounted = false;
-            markers.current.forEach((marker) => marker.remove());
-            markers.current = [];
+            try {
+                popupRef.current?.remove?.();
+            } catch {
+                // ignore
+            }
+            popupRef.current = null;
             map.current?.remove();
             map.current = null;
             mapboxglRef.current = null;
         };
     }, []);
 
-    // Update markers when files change
+    // Venue clustering + marker rendering (Mapbox layers, not DOM markers)
     useEffect(() => {
-        if (!mapLoaded || !map.current) return;
+        if (!mapLoaded || !map.current || !mapboxglRef.current) return;
 
-        const venueMap = new Map<string, VenueGroup>();
-        const filesByVenueKey = new Map<string, SoundVisionFile[]>();
+        const mapInstance: any = map.current;
+        const mapboxgl: any = mapboxglRef.current;
 
-        files.forEach((file) => {
-            if (!file.venue?.coordinates) return;
+        const SOURCE_ID = 'soundvision-venues';
+        const LAYER_CLUSTER = 'soundvision-clusters';
+        const LAYER_CLUSTER_COUNT = 'soundvision-cluster-count';
+        const LAYER_HALO = 'soundvision-venue-halo';
+        const LAYER_POINT = 'soundvision-venue-point';
+        const LAYER_POINT_COUNT = 'soundvision-venue-point-count';
 
-            const { lat, lng } = file.venue.coordinates;
-            const key = `${lat.toFixed(6)},${lng.toFixed(6)}`;
+        const ensureLayers = () => {
+            if (mapInstance.getSource(SOURCE_ID)) return;
 
-            // Group files by location key
-            if (!filesByVenueKey.has(key)) {
-                filesByVenueKey.set(key, []);
-            }
-            filesByVenueKey.get(key)!.push(file);
+            mapInstance.addSource(SOURCE_ID, {
+                type: 'geojson',
+                data: venueGeoJson,
+                promoteId: 'featureId',
+                cluster: true,
+                clusterMaxZoom: 14,
+                clusterRadius: 55,
+            });
 
-            const fileRatingsCount = file.ratings_count ?? 0;
-            const fileRatingTotal = file.rating_total ?? 0;
+            mapInstance.addLayer({
+                id: LAYER_CLUSTER,
+                type: 'circle',
+                source: SOURCE_ID,
+                filter: ['has', 'point_count'],
+                paint: {
+                    'circle-color': [
+                        'step',
+                        ['get', 'point_count'],
+                        'rgba(37, 99, 235, 0.55)',
+                        10,
+                        'rgba(37, 99, 235, 0.70)',
+                        25,
+                        'rgba(37, 99, 235, 0.85)',
+                    ],
+                    'circle-radius': [
+                        'step',
+                        ['get', 'point_count'],
+                        18,
+                        10,
+                        24,
+                        25,
+                        30,
+                    ],
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': 'rgba(255,255,255,0.65)',
+                },
+            });
 
-            if (!venueMap.has(key)) {
-                venueMap.set(key, {
-                    venue: file.venue!,
-                    fileCount: 1,
-                    ratingsCount: fileRatingsCount,
-                    ratingTotal: fileRatingTotal,
+            mapInstance.addLayer({
+                id: LAYER_CLUSTER_COUNT,
+                type: 'symbol',
+                source: SOURCE_ID,
+                filter: ['has', 'point_count'],
+                layout: {
+                    'text-field': ['get', 'point_count_abbreviated'],
+                    'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                    'text-size': 12,
+                },
+                paint: {
+                    'text-color': '#ffffff',
+                },
+            });
+
+            // Halo for selected venue (and high-density venues)
+            mapInstance.addLayer({
+                id: LAYER_HALO,
+                type: 'circle',
+                source: SOURCE_ID,
+                filter: ['!', ['has', 'point_count']],
+                paint: {
+                    'circle-color': 'rgba(37, 99, 235, 0.30)',
+                    'circle-blur': 0.8,
+                    'circle-radius': [
+                        'case',
+                        ['boolean', ['feature-state', 'active'], false],
+                        [
+                            '+',
+                            [
+                                'case',
+                                ['>=', ['get', 'fileCount'], 6],
+                                18,
+                                ['>=', ['get', 'fileCount'], 3],
+                                14,
+                                12,
+                            ],
+                            10,
+                        ],
+                        ['>=', ['get', 'fileCount'], 6],
+                        26,
+                        0,
+                    ],
+                    'circle-opacity': [
+                        'case',
+                        ['boolean', ['feature-state', 'active'], false],
+                        1,
+                        ['>=', ['get', 'fileCount'], 6],
+                        0.8,
+                        0,
+                    ],
+                },
+            });
+
+            mapInstance.addLayer({
+                id: LAYER_POINT,
+                type: 'circle',
+                source: SOURCE_ID,
+                filter: ['!', ['has', 'point_count']],
+                paint: {
+                    'circle-color': 'hsl(217, 91%, 60%)',
+                    'circle-stroke-width': 2.5,
+                    'circle-stroke-color': '#ffffff',
+                    'circle-radius': [
+                        'case',
+                        ['>=', ['get', 'fileCount'], 6],
+                        ['case', ['boolean', ['feature-state', 'active'], false], 20, 18],
+                        ['>=', ['get', 'fileCount'], 3],
+                        ['case', ['boolean', ['feature-state', 'active'], false], 16, 14],
+                        ['case', ['boolean', ['feature-state', 'active'], false], 13, 11],
+                    ],
+                },
+            });
+
+            mapInstance.addLayer({
+                id: LAYER_POINT_COUNT,
+                type: 'symbol',
+                source: SOURCE_ID,
+                filter: ['!', ['has', 'point_count']],
+                layout: {
+                    'text-field': ['to-string', ['get', 'fileCount']],
+                    'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+                    'text-size': 11,
+                },
+                paint: {
+                    'text-color': '#ffffff',
+                },
+            });
+
+            // Cluster interaction: zoom into cluster (no popup)
+            mapInstance.on('click', LAYER_CLUSTER, (e: any) => {
+                const features = mapInstance.queryRenderedFeatures(e.point, {
+                    layers: [LAYER_CLUSTER],
                 });
-            } else {
-                const existing = venueMap.get(key)!;
-                existing.fileCount++;
-                existing.ratingsCount += fileRatingsCount;
-                existing.ratingTotal += fileRatingTotal;
-            }
-        });
+                const clusterFeature = features?.[0];
+                if (!clusterFeature) return;
 
-        // Clear existing markers
-        markers.current.forEach((marker) => marker.remove());
-        markers.current = [];
+                const clusterId = clusterFeature.properties?.cluster_id;
+                const source: any = mapInstance.getSource(SOURCE_ID);
+                if (!source || clusterId == null) return;
 
-        const mapboxgl = mapboxglRef.current;
-        if (!mapboxgl) return;
-
-        const bounds = new mapboxgl.LngLatBounds();
-
-        venueMap.forEach(({ venue, fileCount, ratingsCount, ratingTotal }, key) => {
-            if (!venue.coordinates) return;
-
-            const { lat, lng } = venue.coordinates;
-            bounds.extend([lng, lat]);
-
-            const el = document.createElement('div');
-            el.className = 'custom-marker';
-            el.style.width = '28px';
-            el.style.height = '28px';
-            el.style.borderRadius = '50%';
-            el.style.backgroundColor = 'hsl(217, 91%, 60%)';
-            el.style.border = '3px solid white';
-            el.style.cursor = 'pointer';
-            el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.4)';
-            el.style.display = 'flex';
-            el.style.alignItems = 'center';
-            el.style.justifyContent = 'center';
-            el.style.color = 'white';
-            el.style.fontSize = '11px';
-            el.style.fontWeight = 'bold';
-            el.innerHTML = `${fileCount}`;
-
-            // Add right-click listener
-            el.addEventListener('contextmenu', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-
-                const venueFiles = filesByVenueKey.get(key) || [];
-
-                setContextMenu({
-                    x: e.clientX,
-                    y: e.clientY,
-                    venueName: venue.name,
-                    files: venueFiles
+                source.getClusterExpansionZoom(clusterId, (err: any, zoom: number) => {
+                    if (err) return;
+                    programmaticMoveRef.current = true;
+                    mapInstance.easeTo({
+                        center: clusterFeature.geometry.coordinates,
+                        zoom,
+                        duration: 250,
+                    });
                 });
             });
 
-            const averageRating = ratingsCount > 0 ? ratingTotal / ratingsCount : null;
-            const ratingLine = ratingsCount > 0
-                ? `<p style="font-size: 0.8rem; color: #888; margin-top: 6px;">Valoración: <strong>${averageRating?.toFixed(1)}</strong> ⭐ (${ratingsCount} ${ratingsCount === 1 ? 'reseña' : 'reseñas'})</p>`
-                : `<p style="font-size: 0.8rem; color: #888; margin-top: 6px;">Sin reseñas</p>`;
+            // Venue interaction: single selection + popup
+            mapInstance.on('click', LAYER_POINT, (e: any) => {
+                const feature = e.features?.[0];
+                if (!feature) return;
+                const venueId = feature.properties?.venueId;
+                const coords = feature.geometry?.coordinates;
+                if (!venueId || !coords) return;
+                const [lng, lat] = coords;
+                toggleVenueSelectionRef.current(String(venueId), Number(lng), Number(lat), { openPopup: true });
+            });
 
-            const popupContent = `
-        <div style="padding: 8px; min-width: 180px; color: #fff; background: #1a1a2e; border-radius: 8px;">
-          <h3 style="font-weight: bold; margin-bottom: 4px; font-size: 0.95rem;">${venue.name}</h3>
-          <p style="font-size: 0.8rem; color: #888; margin-bottom: 8px;">
-            ${[venue.city, venue.state_region, venue.country].filter(Boolean).join(', ')}
-          </p>
-          <p style="font-size: 0.8rem; color: #888;">
-            <strong>${fileCount}</strong> ${fileCount === 1 ? 'archivo' : 'archivos'}
-          </p>
-          ${ratingLine}
-          <p style="font-size: 0.7rem; color: #666; margin-top: 8px; font-style: italic;">
-            Click derecho para opciones
-          </p>
-        </div>
-      `;
+            mapInstance.on('mouseenter', LAYER_CLUSTER, () => {
+                mapInstance.getCanvas().style.cursor = 'pointer';
+            });
+            mapInstance.on('mouseleave', LAYER_CLUSTER, () => {
+                mapInstance.getCanvas().style.cursor = '';
+            });
+            mapInstance.on('mouseenter', LAYER_POINT, () => {
+                mapInstance.getCanvas().style.cursor = 'pointer';
+            });
+            mapInstance.on('mouseleave', LAYER_POINT, () => {
+                mapInstance.getCanvas().style.cursor = '';
+            });
+        };
 
-            const popup = new mapboxgl.Popup({
-                offset: 25,
-                closeButton: true,
-                closeOnClick: false,
-                className: 'soundvision-popup',
-            }).setHTML(popupContent);
+        ensureLayers();
 
-            const marker = new mapboxgl.Marker(el)
-                .setLngLat([lng, lat])
-                .setPopup(popup)
-                .addTo(map.current!);
-
-            markers.current.push(marker);
-        });
-
-        if (!bounds.isEmpty() && venueMap.size > 0) {
-            map.current!.fitBounds(bounds, { padding: 80, maxZoom: 12, duration: 800 });
+        const source: any = mapInstance.getSource(SOURCE_ID);
+        if (source?.setData) {
+            source.setData(venueGeoJson);
         }
-    }, [files, mapLoaded]);
+
+    }, [mapLoaded, venueGeoJson]);
+
+    // Fit bounds for the current dataset (only if nothing is selected)
+    useEffect(() => {
+        if (!mapLoaded || !map.current || !mapboxglRef.current) return;
+        if (activeVenueId) return;
+        if (venueList.length === 0) return;
+
+        const mapInstance: any = map.current;
+        const mapboxgl: any = mapboxglRef.current;
+
+        const bounds = new mapboxgl.LngLatBounds();
+        venueList.forEach((g) => {
+            const coords = g.venue.coordinates;
+            if (!coords) return;
+            bounds.extend([coords.lng, coords.lat]);
+        });
+        if (bounds.isEmpty()) return;
+
+        programmaticMoveRef.current = true;
+        mapInstance.fitBounds(bounds, {
+            padding: {
+                top: 90,
+                bottom: Math.min(drawerPx + 30, window.innerHeight * 0.85),
+                left: 50,
+                right: 50,
+            },
+            maxZoom: 12,
+            duration: 280,
+        });
+    }, [mapLoaded, venueList, drawerPx, activeVenueId]);
 
     const filesWithCoordinates = files.filter((f) => f.venue?.coordinates);
+    const venuesWithCoordinates = venueList.length;
     const filesWithoutCoordinates = files.length - filesWithCoordinates.length;
 
     const getDrawerStyle = () => {
@@ -437,7 +867,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                         type="button"
                         onClick={onClose}
                         aria-label="Volver"
-                        className="absolute top-6 left-6 z-20 p-3 bg-black/60 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-colors"
+                        className="absolute top-[calc(1.5rem+env(safe-area-inset-top))] left-[calc(1.5rem+env(safe-area-inset-left))] z-20 p-3 bg-black/60 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-colors"
                     >
                         <ArrowLeft size={20} />
                     </button>
@@ -445,9 +875,9 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
 
                 {/* File count badge */}
                 {!mapLoading && !mapError && (
-                    <div className="absolute top-6 right-6 z-20 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
+                    <div className="absolute top-[calc(1.5rem+env(safe-area-inset-top))] right-[calc(1.5rem+env(safe-area-inset-right))] z-20 px-4 py-2 bg-black/60 backdrop-blur-md rounded-full border border-white/10">
                         <span className="text-white text-sm font-medium">
-                            {filesWithCoordinates.length} {filesWithCoordinates.length === 1 ? 'ubicación' : 'ubicaciones'}
+                            {venuesWithCoordinates} {venuesWithCoordinates === 1 ? 'recinto' : 'recintos'}
                         </span>
                     </div>
                 )}
@@ -458,7 +888,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                         type="button"
                         onClick={() => setUploadOpen(true)}
                         aria-label="Subir archivo"
-                        className="absolute top-20 right-6 z-20 p-3 bg-black/60 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-colors"
+                        className="absolute top-[calc(5rem+env(safe-area-inset-top))] right-[calc(1.5rem+env(safe-area-inset-right))] z-20 p-3 bg-black/60 text-white rounded-full backdrop-blur-md border border-white/10 hover:bg-black/80 transition-colors"
                         title="Subir nuevo archivo"
                     >
                         <Upload size={20} />
@@ -466,67 +896,12 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                 )}
             </div>
 
-            {/* Context Menu */}
-            {contextMenu && (
-                <div
-                    className={`fixed z-50 min-w-[280px] max-w-[320px] rounded-lg shadow-xl overflow-hidden border ${theme.divider} ${isDark ? 'bg-[#1a1a2e]' : 'bg-white'}`}
-                    style={{
-                        left: Math.min(contextMenu.x, window.innerWidth - 320),
-                        top: Math.min(contextMenu.y, window.innerHeight - (contextMenu.files.length * 60 + 50))
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <div className={`p-3 border-b ${theme.divider} ${isDark ? 'bg-black/20' : 'bg-slate-50'}`}>
-                        <h3 className={`font-semibold text-sm ${theme.textMain}`}>{contextMenu.venueName}</h3>
-                        <p className={`text-xs ${theme.textMuted}`}>{contextMenu.files.length} archivos disponibles</p>
-                    </div>
-                    <ScrollArea className="max-h-[300px]">
-                        <div className="p-1">
-                            {contextMenu.files.map(file => (
-                                <div key={file.id} className={`p-2 hover:${isDark ? 'bg-white/5' : 'bg-slate-50'} rounded flex items-center justify-between gap-3 group transition-colors`}>
-                                    <div className="min-w-0 flex-1">
-                                        <p className={`text-sm font-medium truncate ${theme.textMain}`}>{file.file_name}</p>
-                                        <div className="flex items-center gap-1 mt-0.5">
-                                            <StarIcon size={10} className={file.average_rating ? "text-yellow-500 fill-yellow-500" : theme.textMuted} />
-                                            <span className={`text-xs ${theme.textMuted}`}>
-                                                {file.average_rating ? file.average_rating.toFixed(1) : '-'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-1">
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            className="h-8 w-8 text-blue-500 hover:text-blue-400 hover:bg-blue-500/10"
-                                            onClick={() => downloadFile.mutate(file)}
-                                            title="Descargar"
-                                        >
-                                            <Download size={14} />
-                                        </Button>
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            className={`h-8 w-8 ${file.hasReviewed ? 'text-yellow-500 hover:text-yellow-400' : theme.textMuted} hover:bg-yellow-500/10`}
-                                            onClick={() => {
-                                                setSelectedFile(file);
-                                                setContextMenu(null);
-                                            }}
-                                            disabled={!canOpenReviews(file)}
-                                            title={canOpenReviews(file) ? "Reseñas" : "Descarga para reseñar"}
-                                        >
-                                            <StarIcon size={14} />
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </ScrollArea>
-                </div>
-            )}
+            {/* (context menu removed; use single-venue popup + Abrir) */}
 
             {/* Drawer */}
             <div
-                className={`absolute bottom-0 w-full ${isDark ? 'bg-[#0f1219]' : 'bg-white'} border-t ${theme.divider} rounded-t-3xl shadow-2xl flex flex-col transition-all duration-500 z-30`}
+                ref={drawerRef}
+                className={`absolute bottom-0 w-full ${isDark ? 'bg-[#0f1219]' : 'bg-white'} border-t ${theme.divider} rounded-t-3xl shadow-2xl flex flex-col transition-all duration-500 z-30 pb-[max(0px,env(safe-area-inset-bottom))]`}
                 style={getDrawerStyle()}
             >
                 {/* Drawer handle */}
@@ -664,111 +1039,190 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                         <div className="flex items-center justify-center py-8">
                             <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
                         </div>
-                    ) : files.length === 0 ? (
+                    ) : venueList.length === 0 ? (
                         <div className={`text-center py-8 ${theme.textMuted}`}>
-                            <p className="text-lg mb-2">No se encontraron archivos</p>
+                            <p className="text-lg mb-2">No se encontraron recintos</p>
                             <p className="text-sm">Intenta ajustar los filtros</p>
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {files.map((file) => (
-                                <div
-                                    key={file.id}
-                                    className={`p-4 rounded-2xl border ${theme.divider} ${isDark ? 'bg-white/5' : 'bg-slate-50'}`}
-                                >
-                                    {/* File header */}
-                                    <div className="flex items-start justify-between gap-3 mb-3">
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <p className={`font-semibold truncate ${theme.textMain}`}>
-                                                    {file.venue?.name || 'Sin recinto'}
+                            {venueList.map((group) => {
+                                const coords = group.venue.coordinates;
+                                const isActive = activeVenueId === group.venue.id;
+                                const avg = group.ratingsCount > 0 ? group.ratingTotal / group.ratingsCount : null;
+
+                                return (
+                                    <div
+                                        key={group.venue.id}
+                                        id={`venue-card-${group.venue.id}`}
+                                        className={`p-4 rounded-2xl border ${theme.divider} ${isDark ? 'bg-white/5' : 'bg-slate-50'} ${isActive ? 'ring-2 ring-blue-500/60' : ''}`}
+                                        role="button"
+                                        tabIndex={0}
+                                        onClick={() => {
+                                            if (!coords) return;
+                                            toggleVenueSelection(group.venue.id, coords.lng, coords.lat, { openPopup: true });
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (!coords) return;
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                if (e.key === ' ') e.preventDefault();
+                                                toggleVenueSelection(group.venue.id, coords.lng, coords.lat, { openPopup: true });
+                                            }
+                                        }}
+                                    >
+                                        <div className="flex items-start justify-between gap-3 mb-2">
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`font-semibold truncate ${theme.textMain}`}>{group.venue.name}</p>
+                                                <p className={`text-xs mt-1 truncate ${theme.textMuted}`}>
+                                                    {[group.venue.city, group.venue.state_region, group.venue.country].filter(Boolean).join(', ')}
                                                 </p>
-                                                {!file.venue?.coordinates && (
-                                                    <AlertCircle size={14} className={theme.textMuted} />
-                                                )}
                                             </div>
-                                            <p className={`text-xs mt-1 truncate ${theme.textMuted}`}>
-                                                {file.file_name}
-                                            </p>
+                                            <div className="flex flex-col items-end gap-1 shrink-0">
+                                                <div className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                                                    {group.fileCount}
+                                                </div>
+                                                <div className={`text-[10px] ${theme.textMuted}`}>arch.</div>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-1 shrink-0">
-                                            <StarRating value={file.average_rating ?? 0} readOnly size="sm" />
-                                            {file.ratings_count > 0 && (
+
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <StarRating value={avg ?? 0} readOnly size="sm" />
                                                 <span className={`text-xs ${theme.textMuted}`}>
-                                                    ({file.ratings_count})
+                                                    {avg != null ? `${avg.toFixed(1)} (${group.ratingsCount})` : 'Sin reseñas'}
                                                 </span>
-                                            )}
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant={isActive ? 'secondary' : 'outline'}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (coords) {
+                                                            const willBeActive = !isActive;
+                                                            toggleVenueSelection(group.venue.id, coords.lng, coords.lat, { openPopup: false });
+                                                            if (willBeActive) setVenueDetailOpen(true);
+                                                        } else {
+                                                            setActiveVenueId(group.venue.id);
+                                                            setVenueDetailOpen(true);
+                                                        }
+                                                    }}
+                                                    className="text-xs"
+                                                >
+                                                    Abrir
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (!coords) return;
+                                                        const url = `https://www.google.com/maps?q=${coords.lat},${coords.lng}`;
+                                                        window.open(url, '_blank', 'noopener,noreferrer');
+                                                    }}
+                                                    className="text-xs"
+                                                >
+                                                    Navegar
+                                                </Button>
+                                            </div>
                                         </div>
+
+                                        {!coords && (
+                                            <div className={`mt-2 flex items-center gap-2 text-xs ${theme.textMuted}`}>
+                                                <AlertCircle size={12} />
+                                                <span>Sin coordenadas</span>
+                                            </div>
+                                        )}
                                     </div>
-
-                                    {/* File details */}
-                                    <div className="grid grid-cols-2 gap-2 mb-3">
-                                        <div className={`flex items-center gap-2 text-xs ${theme.textMuted}`}>
-                                            <MapPin size={12} />
-                                            <span className="truncate">
-                                                {file.venue?.city}, {file.venue?.country}
-                                            </span>
-                                        </div>
-                                        <div className={`flex items-center gap-2 text-xs ${theme.textMuted}`}>
-                                            <User size={12} />
-                                            <span className="truncate">
-                                                {file.uploader?.first_name} {file.uploader?.last_name}
-                                            </span>
-                                        </div>
-                                        <div className={`flex items-center gap-2 text-xs ${theme.textMuted} col-span-2`}>
-                                            <Calendar size={12} />
-                                            <span>
-                                                {formatDistanceToNow(new Date(file.uploaded_at), {
-                                                    addSuffix: true,
-                                                    locale: es,
-                                                })}
-                                            </span>
-                                        </div>
-                                    </div>
-
-                                    {/* User's review indicator */}
-                                    {file.hasReviewed && file.current_user_review && (
-                                        <div className="mb-3 text-xs text-emerald-500 font-medium">
-                                            Tu valoración: {file.current_user_review.rating} ⭐
-                                        </div>
-                                    )}
-
-                                    {/* Actions */}
-                                    <div className="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant={file.hasReviewed ? 'secondary' : 'outline'}
-                                            onClick={() => setSelectedFile(file)}
-                                            disabled={!canOpenReviews(file)}
-                                            className="flex-1 text-xs"
-                                        >
-                                            <StarIcon size={14} className="mr-1" />
-                                            Reseñas
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => downloadFile.mutate(file)}
-                                            disabled={downloadFile.isPending}
-                                            className="flex-1 text-xs"
-                                        >
-                                            <Download size={14} className="mr-1" />
-                                            Descargar
-                                        </Button>
-                                    </div>
-
-                                    {/* Download hint */}
-                                    {!canOpenReviews(file) && (
-                                        <p className={`mt-2 text-xs ${theme.textMuted}`}>
-                                            Descarga el archivo para dejar una reseña
-                                        </p>
-                                    )}
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </ScrollArea>
             </div>
+
+            {/* Venue Detail Dialog */}
+            <Dialog open={venueDetailOpen} onOpenChange={setVenueDetailOpen}>
+                <DialogContent
+                    className={`w-[95vw] max-w-3xl ${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-white'} ${theme.textMain}`}
+                >
+                    <DialogHeader>
+                        <DialogTitle>{activeVenueGroup?.venue.name || 'Recinto'}</DialogTitle>
+                        <DialogDescription>
+                            {activeVenueGroup?.venue
+                                ? [activeVenueGroup.venue.city, activeVenueGroup.venue.state_region, activeVenueGroup.venue.country]
+                                      .filter(Boolean)
+                                      .join(', ')
+                                : ''}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3">
+                        <div className={`text-sm ${theme.textMuted}`}>
+                            {activeVenueGroup ? (
+                                <span>
+                                    {activeVenueGroup.fileCount} {activeVenueGroup.fileCount === 1 ? 'archivo' : 'archivos'}
+                                </span>
+                            ) : null}
+                        </div>
+
+                        <ScrollArea className="max-h-[60vh] pr-2">
+                            <div className="space-y-2">
+                                {(activeVenueId ? filesByVenueId.get(activeVenueId) || [] : []).map((file) => (
+                                    <div
+                                        key={file.id}
+                                        className={`p-3 rounded-xl border ${theme.divider} ${isDark ? 'bg-white/5' : 'bg-slate-50'}`}
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <div className={`font-semibold truncate ${theme.textMain}`}>{file.file_name}</div>
+                                                <div className={`text-xs mt-1 ${theme.textMuted}`}>
+                                                    Subido {formatDistanceToNow(new Date(file.uploaded_at), { addSuffix: true, locale: es })}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => downloadFile.mutate(file)}
+                                                    disabled={downloadFile.isPending}
+                                                    className="text-xs"
+                                                >
+                                                    <Download size={14} className="mr-1" />
+                                                    Descargar
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant={file.hasReviewed ? 'secondary' : 'outline'}
+                                                    onClick={() => setSelectedFile(file)}
+                                                    disabled={!canOpenReviews(file)}
+                                                    className="text-xs"
+                                                >
+                                                    <StarIcon size={14} className="mr-1" />
+                                                    Reseñas
+                                                </Button>
+                                            </div>
+                                        </div>
+
+                                        {!canOpenReviews(file) && (
+                                            <div className={`mt-2 text-xs ${theme.textMuted}`}>
+                                                Descarga el archivo para dejar una reseña
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+
+                                {(activeVenueId ? (filesByVenueId.get(activeVenueId) || []).length : 0) === 0 && (
+                                    <div className={`text-center py-8 ${theme.textMuted}`}>
+                                        No hay archivos en este recinto.
+                                    </div>
+                                )}
+                            </div>
+                        </ScrollArea>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Upload Dialog */}
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
@@ -812,6 +1266,24 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
         }
         .soundvision-popup .mapboxgl-popup-tip {
           border-top-color: #1a1a2e;
+        }
+
+        /* Safe areas (iOS notch / home indicator) */
+        .mapboxgl-ctrl-top-left {
+          top: env(safe-area-inset-top);
+          left: env(safe-area-inset-left);
+        }
+        .mapboxgl-ctrl-top-right {
+          top: env(safe-area-inset-top);
+          right: env(safe-area-inset-right);
+        }
+        .mapboxgl-ctrl-bottom-left {
+          left: env(safe-area-inset-left);
+          bottom: env(safe-area-inset-bottom);
+        }
+        .mapboxgl-ctrl-bottom-right {
+          right: env(safe-area-inset-right);
+          bottom: env(safe-area-inset-bottom);
         }
       `}</style>
         </div>
