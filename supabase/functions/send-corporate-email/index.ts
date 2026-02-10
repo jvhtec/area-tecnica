@@ -56,6 +56,8 @@ interface PdfAttachment {
 
 interface RecipientCriteria {
   profileIds?: string[];
+  /** Direct recipient emails (bypass profiles lookup). */
+  emails?: string[];
   departments?: string[];
   roles?: Array<'admin' | 'management' | 'staff' | 'freelance'>;
 }
@@ -180,6 +182,20 @@ function getSenderName(department: string | null): string {
 async function fetchRecipientEmails(criteria: RecipientCriteria): Promise<string[]> {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const emails = new Set<string>();
+
+  // 0. Always include explicit emails (if any)
+  if (criteria.emails && criteria.emails.length > 0) {
+    criteria.emails.forEach((email) => {
+      if (!email) return;
+      const trimmed = String(email).trim();
+      if (!trimmed) return;
+      if (!isValidEmail(trimmed)) {
+        console.warn('[fetchRecipientEmails] Invalid explicit email:', trimmed);
+        return;
+      }
+      emails.add(trimmed);
+    });
+  }
 
   // 1. Always include explicit profile IDs (if any)
   if (criteria.profileIds && criteria.profileIds.length > 0) {

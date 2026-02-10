@@ -299,6 +299,29 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const isManager = userRole === 'admin' || userRole === 'management';
 
   const { data: payoutOverrides = [] } = useJobTechnicianPayoutOverrides(jobId);
+
+  const { data: overrideActorMap = new Map<string, { name: string; email: string | null }>() } = useQuery({
+    queryKey: ['job-tech-payout-overrides', jobId, 'actors'],
+    enabled: isManager && payoutOverrides.length > 0,
+    queryFn: async () => {
+      const actorIds = Array.from(new Set(payoutOverrides.map((o) => o.set_by).filter(Boolean))) as string[];
+      if (!actorIds.length) return new Map();
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', actorIds);
+      if (error) throw error;
+
+      const map = new Map<string, { name: string; email: string | null }>();
+      (data || []).forEach((p: any) => {
+        const name = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || p.id;
+        map.set(p.id, { name, email: p.email ?? null });
+      });
+      return map;
+    },
+    staleTime: 60_000,
+  });
   const setOverrideMutation = useSetTechnicianPayoutOverride();
   const removeOverrideMutation = useRemoveTechnicianPayoutOverride();
   const toggleApprovalMutation = useToggleTechnicianPayoutApproval();
@@ -1168,7 +1191,15 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
 
             {/* Payout Override Section (Admin/Management only) */}
             {isManager && (() => {
-              const override = getTechOverride(payout.technician_id) as JobPayoutOverride | undefined;
+              const rawOverride = getTechOverride(payout.technician_id) as JobPayoutOverride | undefined;
+              const actor = rawOverride?.set_by ? overrideActorMap.get(rawOverride.set_by) : null;
+              const override = rawOverride
+                ? {
+                    ...rawOverride,
+                    actor_name: actor?.name,
+                    actor_email: actor?.email ?? null,
+                  }
+                : undefined;
               const isEditing = editingTechId === payout.technician_id;
               const techName = getTechName(payout.technician_id);
 

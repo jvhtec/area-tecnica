@@ -74,7 +74,11 @@ interface PayoutData {
   has_override?: boolean; // True if override_amount_eur is set
   override_amount_eur?: number; // Manual override amount (if set)
   calculated_total_eur?: number; // Original calculated amount (before override)
+  override_set_at?: string;
+  override_actor_name?: string;
+  override_actor_email?: string;
 }
+
 
 export interface TimesheetLine {
   date?: string | null;
@@ -395,6 +399,15 @@ export async function generateRateQuotePDF(
     // Show override info if applicable
     if (quote.has_override && quote.override_amount_eur != null && quote.calculated_total_eur != null) {
       nameCellContent += `\n⚠️ OVERRIDE: ${formatCurrency(quote.override_amount_eur)} (calc: ${formatCurrency(quote.calculated_total_eur)})`;
+
+      const actor = (quote as any).override_actor_name as string | undefined;
+      const actorEmail = (quote as any).override_actor_email as string | undefined;
+      const at = (quote as any).override_set_at as string | undefined;
+      if (actor || actorEmail || at) {
+        const who = `${actor || '—'}${actorEmail ? ` (${actorEmail})` : ''}`;
+        const when = at ? format(new Date(at), 'PPP p', { locale: es }) : '';
+        nameCellContent += `\n(Override por ${who}${when ? ` · ${when}` : ''})`;
+      }
     }
 
     return [
@@ -941,6 +954,15 @@ export async function generateJobPayoutPDF(
     // Show override info if applicable
     if (payout.has_override && payout.override_amount_eur != null && payout.calculated_total_eur != null) {
       nameCellContent += `\n⚠️ OVERRIDE: ${formatCurrency(payout.override_amount_eur)} (calc: ${formatCurrency(payout.calculated_total_eur)})`;
+
+      const actor = (payout as any).override_actor_name as string | undefined;
+      const actorEmail = (payout as any).override_actor_email as string | undefined;
+      const at = (payout as any).override_set_at as string | undefined;
+      if (actor || actorEmail || at) {
+        const who = `${actor || '—'}${actorEmail ? ` (${actorEmail})` : ''}`;
+        const when = at ? format(new Date(at), 'PPP p', { locale: es }) : '';
+        nameCellContent += `\n(Override por ${who}${when ? ` · ${when}` : ''})`;
+      }
     }
 
     return [

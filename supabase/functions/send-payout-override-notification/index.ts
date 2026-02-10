@@ -399,6 +399,7 @@ serve(async (req) => {
           recipients: {
             roles: ["admin"],
             profileIds: finanzasProfileId ? [finanzasProfileId] : [],
+            emails: ["finanzas@sector-pro.com"],
           },
         },
       }

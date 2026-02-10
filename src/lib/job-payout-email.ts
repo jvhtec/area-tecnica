@@ -134,6 +134,81 @@ async function fetchPayouts(
   return (data || []) as JobPayoutTotals[];
 }
 
+async function attachOverrideMetadata(
+  client: SupabaseClient,
+  jobId: string,
+  payouts: JobPayoutTotals[]
+): Promise<JobPayoutTotals[]> {
+  const techIds = Array.from(new Set(payouts.map((p) => p.technician_id).filter(Boolean)));
+  if (!jobId || techIds.length === 0) return payouts;
+
+  const [{ data: overrides, error: oErr }, { data: baseRows, error: bErr }] = await Promise.all([
+    client
+      .from('job_technician_payout_overrides')
+      .select('technician_id, override_amount_eur, set_by, set_at, updated_at')
+      .eq('job_id', jobId)
+      .in('technician_id', techIds),
+    client
+      .from('v_job_tech_payout_2025_base')
+      .select('technician_id, total_eur')
+      .eq('job_id', jobId)
+      .in('technician_id', techIds),
+  ]);
+
+  if (oErr) throw oErr;
+  if (bErr) throw bErr;
+
+  const baseTotalMap = new Map<string, number>();
+  (baseRows || []).forEach((r: any) => {
+    if (!r?.technician_id) return;
+    baseTotalMap.set(r.technician_id, Number(r.total_eur ?? 0));
+  });
+
+  const overrideByTech = new Map<string, any>();
+  const actorIds = new Set<string>();
+  (overrides || []).forEach((row: any) => {
+    if (!row?.technician_id) return;
+    overrideByTech.set(row.technician_id, row);
+    if (row.set_by) actorIds.add(row.set_by);
+  });
+
+  let actorMap = new Map<string, { name: string; email: string | null }>();
+  if (actorIds.size > 0) {
+    const { data: actors, error: aErr } = await client
+      .from('profiles')
+      .select('id, first_name, last_name, email')
+      .in('id', Array.from(actorIds));
+    if (aErr) throw aErr;
+    actorMap = new Map(
+      (actors || []).map((a: any) => [
+        a.id,
+        {
+          name: `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim() || a.id,
+          email: a.email ?? null,
+        },
+      ])
+    );
+  }
+
+  return payouts.map((p) => {
+    const ov = overrideByTech.get(p.technician_id);
+    if (!ov) return p;
+
+    const actor = ov.set_by ? actorMap.get(ov.set_by) : null;
+    const calculated = baseTotalMap.get(p.technician_id);
+
+    return {
+      ...(p as any),
+      has_override: true,
+      override_amount_eur: Number(ov.override_amount_eur),
+      calculated_total_eur: calculated != null ? calculated : undefined,
+      override_set_at: ov.set_at,
+      override_actor_name: actor?.name,
+      override_actor_email: actor?.email ?? null,
+    } as JobPayoutTotals;
+  });
+}
+
 async function fetchProfiles(
   client: SupabaseClient,
   techIds: string[],
@@ -208,7 +283,8 @@ export async function prepareJobPayoutEmailContext(
   const { jobId, supabase, jobDetails: providedJob, payouts: providedPayouts, profiles: providedProfiles, lpoMap: providedLpoMap } =
     input;
   const job = await fetchJobDetails(supabase, jobId, providedJob);
-  const payouts = await fetchPayouts(supabase, jobId, providedPayouts);
+  const payoutsRaw = await fetchPayouts(supabase, jobId, providedPayouts);
+  const payouts = await attachOverrideMetadata(supabase, jobId, payoutsRaw);
   const technicianIds = Array.from(new Set(payouts.map((p) => p.technician_id).filter(Boolean)));
   const profiles = await fetchProfiles(supabase, technicianIds, providedProfiles);
   const lpoMap = await fetchLpoMap(supabase, jobId, technicianIds, providedLpoMap);

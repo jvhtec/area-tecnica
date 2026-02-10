@@ -7,6 +7,11 @@ import { formatCurrency } from '@/lib/utils';
 export type JobPayoutOverride = {
   technician_id: string;
   override_amount_eur: number;
+  set_by?: string;
+  set_at?: string;
+  updated_at?: string;
+  actor_name?: string;
+  actor_email?: string;
 };
 
 export const JobPayoutOverrideSection: React.FC<{
@@ -63,6 +68,11 @@ export const JobPayoutOverrideSection: React.FC<{
             </div>
           </div>
           <div className="text-xs mt-1 opacity-75">Calculado: {formatCurrency(calculatedTotalEur)}</div>
+          {(override.actor_name || override.actor_email || override.set_at) && (
+            <div className="text-[11px] mt-1 opacity-80">
+              {`Override por ${override.actor_name || '—'}${override.actor_email ? ` (${override.actor_email})` : ''}${override.set_at ? ` · ${new Date(override.set_at).toLocaleString('es-ES')}` : ''}`}
+            </div>
+          )}
           <div className="text-[11px] mt-1 opacity-80">
             ⚠️ Excepción: Administración debe validar este override con Dirección.
           </div>
@@ -94,6 +104,11 @@ export const JobPayoutOverrideSection: React.FC<{
             </Button>
           </div>
           <div className="text-xs text-amber-700 dark:text-amber-200">Calculado: {formatCurrency(calculatedTotalEur)}</div>
+          {(override?.actor_name || override?.actor_email || override?.set_at) && (
+            <div className="text-[11px] text-amber-700 dark:text-amber-200 opacity-90">
+              {`Override por ${override?.actor_name || '—'}${override?.actor_email ? ` (${override.actor_email})` : ''}${override?.set_at ? ` · ${new Date(override.set_at).toLocaleString('es-ES')}` : ''}`}
+            </div>
+          )}
           <div className="text-[11px] text-amber-700 dark:text-amber-200 opacity-90">
             ⚠️ Excepción: Administración debe validar este override con Dirección.
           </div>
