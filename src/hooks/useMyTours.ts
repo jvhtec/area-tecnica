@@ -2,7 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { formatInTimeZone } from "date-fns-tz";
 
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 export interface MyTour {
@@ -69,7 +69,7 @@ export const useMyTours = () => {
             start_time,
             end_time,
             tour_id,
-            tour:tours (
+            tour:tours!inner (
               id,
               name,
               description,
@@ -85,14 +85,15 @@ export const useMyTours = () => {
           )
         `)
         .eq('technician_id', user.id)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('jobs.tour.status', 'active');
 
       if (timeError) {
         // If this secondary query fails, we still return the crew tours.
         console.warn('[useMyTours] timesheet-based tour lookup failed:', timeError);
       }
 
-      const now = new Date();
+      // NOTE: Use Madrid-local 'today' (yyyy-MM-dd) for date-only comparisons.
 
       const personalStatsByTourId = new Map<string, { total: number; upcoming: number }>();
       (timeRows || []).forEach((row: any) => {
@@ -101,7 +102,7 @@ export const useMyTours = () => {
         const tourId = tour?.id as string | undefined;
         const dateStr = row.date as string | undefined;
         if (!tourId || !dateStr) return;
-        if (tour?.status !== 'active') return;
+        // tour.status already filtered server-side
 
         const existing = personalStatsByTourId.get(tourId) ?? { total: 0, upcoming: 0 };
         existing.total += 1;
@@ -118,7 +119,7 @@ export const useMyTours = () => {
 
         const tourDates = tour.tour_dates || [];
         const tourUpcomingDates = tourDates.filter(
-          (dateEntry: any) => new Date(dateEntry.date) >= now
+          (dateEntry: any) => (dateEntry?.date as string | undefined) ? dateEntry.date >= today : false
         ).length;
 
         const personalStats = personalStatsByTourId.get(tour.id);
@@ -175,7 +176,7 @@ export const useMyTours = () => {
         const job = row.jobs as any;
         const tour = job?.tour as any;
         if (!tour) return;
-        if (tour.status !== 'active') return;
+        // tour.status already filtered server-side
 
         upsert(tour, {
           assignment_role: 'Por bolo',
@@ -193,6 +194,8 @@ export const useMyTours = () => {
     enabled: !!user?.id,
   });
 
+  const today = formatInTimeZone(new Date(), 'Europe/Madrid', 'yyyy-MM-dd');
+
   const activeTours = tours.filter((tour) => {
     // If the tour appears because of timesheets only ("Por bolo"), hide it once the
     // technician has no upcoming worked days in that tour.
@@ -201,7 +204,7 @@ export const useMyTours = () => {
     }
 
     if (!tour.end_date) return true;
-    return new Date(tour.end_date) >= new Date();
+    return tour.end_date >= today;
   });
 
   const completedTours = tours.filter((tour) => {
@@ -210,7 +213,7 @@ export const useMyTours = () => {
     }
 
     if (!tour.end_date) return false;
-    return new Date(tour.end_date) < new Date();
+    return tour.end_date < today;
   });
 
   return {

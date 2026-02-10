@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
@@ -17,6 +17,7 @@ import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-re
 import { createSignedUrl } from '@/utils/jobDocuments';
 import { labelForCode } from '@/utils/roles';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import type { TourDocument } from '@/hooks/useTourDocuments';
 import type { Restaurant, WeatherData } from '@/types/hoja-de-ruta';
 import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from '@/types/job';
 
@@ -27,18 +28,13 @@ interface DetailsModalProps {
     onClose: () => void;
 }
 
-interface TourDocument {
-    id: string;
-    file_name: string;
-    file_path: string;
-    uploaded_at: string;
-    file_type?: string;
-}
+// (TourDocument type imported from useTourDocuments)
 
 type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
 
 export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
     const { user, userRole } = useOptimizedAuth();
+    const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<TabId>('Info');
     const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
     const [isUploadingTourDocument, setIsUploadingTourDocument] = useState(false);
@@ -131,8 +127,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                 .select('id, file_name, file_path, uploaded_at, file_type')
                 .eq('tour_id', tourId)
                 .eq('visible_to_tech', true)
-                .order('uploaded_at', { ascending: false })
-                .limit(10);
+                .order('uploaded_at', { ascending: false });
             if (error) throw error;
             return (data || []) as TourDocument[];
         },
@@ -744,7 +739,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                         <div className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-3 mb-3`}>
                                             <TourDocumentUploader
                                                 tourId={tourId}
-                                                onSuccess={() => setIsUploadingTourDocument(false)}
+                                                onSuccess={() => {
+                                                    setIsUploadingTourDocument(false);
+                                                    queryClient.invalidateQueries({ queryKey: ['tour-documents-for-job', tourId] });
+                                                }}
                                                 onCancel={() => setIsUploadingTourDocument(false)}
                                             />
                                         </div>
