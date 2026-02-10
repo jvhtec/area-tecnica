@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { syncFlexWorkOrdersForJob } from '@/services/flexWorkOrders';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { adjustRehearsalQuotesForMultiDay } from '@/lib/tour-payout-email';
+import { attachPayoutOverridesToTourQuotes } from '@/services/tourPayoutOverrides';
 
 export interface TourRatesExportJob {
   id: string;
@@ -233,6 +234,9 @@ export async function buildTourRatesExportPayload(
       const daysCounts = new Map<string, number>();
       techDates.forEach((dates, techId) => daysCounts.set(techId, dates.size));
       filteredQuotes = adjustRehearsalQuotesForMultiDay(filteredQuotes, daysCounts);
+
+      // Attach manual payout overrides (so PDFs reflect exceptions)
+      filteredQuotes = await attachPayoutOverridesToTourQuotes(job.id, filteredQuotes);
 
       // Attach timesheet-derived hours/OT breakdown when available (informational only)
       const { data: ts } = await supabase

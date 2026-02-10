@@ -73,6 +73,8 @@ export function adjustRehearsalQuotesForMultiDay(
       base_day_eur: adjustedBaseDayEur,
       total_eur: adjustedTotalEur,
       total_with_extras_eur: adjustedTotalEur + extrasTotal,
+      calculated_total_eur:
+        quote.calculated_total_eur != null ? Number(quote.calculated_total_eur) * days : quote.calculated_total_eur,
       breakdown: {
         ...quote.breakdown,
         ...(quote.breakdown?.after_discount != null
@@ -281,10 +283,16 @@ export async function sendTourJobEmails(
       const extrasTotal = Number(
         q.extras_total_eur ?? (q.extras?.total_eur != null ? q.extras.total_eur : 0)
       );
-      const grandTotal =
+      const computedGrandTotal =
         q.total_with_extras_eur != null
           ? Number(q.total_with_extras_eur)
           : baseTotal + extrasTotal;
+
+      // Manual payout override should be the source of truth for the amount communicated to the technician.
+      const grandTotal =
+        q.has_override && q.override_amount_eur != null
+          ? Number(q.override_amount_eur)
+          : computedGrandTotal;
       const deduction = attachment.deduction_eur || 0;
 
       // Extract unique worked dates from timesheets
