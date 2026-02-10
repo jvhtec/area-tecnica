@@ -150,6 +150,27 @@ const DisponibilidadAccessGuard = () => {
   return <Disponibilidad />;
 };
 
+const TechnicianUnavailabilityAccessGuard = () => {
+  const { userRole, assignableAsTech, isLoading } = useOptimizedAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  // House techs always manage their own availability here.
+  if (userRole === 'house_tech') {
+    return <TechnicianUnavailability />;
+  }
+
+  // Admin/management can only access if they are assignable as technician.
+  const isPrivileged = userRole === 'admin' || userRole === 'management';
+  if (isPrivileged && assignableAsTech) {
+    return <TechnicianUnavailability />;
+  }
+
+  return <Navigate to="/dashboard" replace />;
+};
+
 export default function App() {
   // Initialize multi-tab coordinator
   React.useEffect(() => {
@@ -212,7 +233,7 @@ export default function App() {
                               <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'oscar']}><Dashboard /></ProtectedRoute>} />
                               {/* House tech dashboard routes (regular technicians use /tech-app) */}
                               <Route path="/technician-dashboard" element={<ProtectedRoute allowedRoles={['house_tech']}><TechnicianDashboard /></ProtectedRoute>} />
-                              <Route path="/dashboard/unavailability" element={<ProtectedRoute allowedRoles={['house_tech']}><TechnicianUnavailability /></ProtectedRoute>} />
+                              <Route path="/dashboard/unavailability" element={<ProtectedRoute allowedRoles={['house_tech','admin','management']}><TechnicianUnavailabilityAccessGuard /></ProtectedRoute>} />
                               <Route path="/morning-summary" element={<MorningSummary />} />
                               <Route path="/lights" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Lights /></ProtectedRoute>} />
                               <Route path="/video" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Video /></ProtectedRoute>} />
