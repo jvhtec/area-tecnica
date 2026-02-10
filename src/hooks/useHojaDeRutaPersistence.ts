@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { EventData, TravelArrangement, Accommodation } from "@/types/hoja-de-ruta";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -132,7 +132,8 @@ export const useHojaDeRutaPersistence = (
         contacts: contacts?.length ? contacts.map(c => ({
           name: c.name,
           role: c.role || '',
-          phone: c.phone || ''
+          phone: c.phone || '',
+          technician_id: c.technician_id || undefined,
         })) : [{ name: '', role: '', phone: '' }],
         logistics: {
           transport: transport?.length ? transport.map(t => ({
@@ -155,7 +156,8 @@ export const useHojaDeRutaPersistence = (
           surname1: s.surname1 || '',
           surname2: s.surname2 || '',
           position: s.position || '',
-          dni: s.dni || ''
+          dni: s.dni || '',
+          technician_id: s.technician_id || undefined,
         })) : [{ name: '', surname1: '', surname2: '', position: '', dni: '' }],
         schedule: mainData.schedule || '',
         // Load multi-day program if available
@@ -346,13 +348,13 @@ export const useHojaDeRutaPersistence = (
       ) || [];
 
       if (validContacts.length > 0) {
-        const contactsData = validContacts.map(contact => ({
+        const contactsData = validContacts.map((contact) => ({
           hoja_de_ruta_id: hojaDeRutaId,
           name: contact.name || '',
           role: contact.role || '',
           phone: contact.phone || '',
-          technician_id: (contact as any).technician_id || null,
-        } as any));
+          technician_id: contact.technician_id || null,
+        }));
 
         console.log("🔄 SAVE: Inserting contacts data:", contactsData);
 
@@ -382,15 +384,15 @@ export const useHojaDeRutaPersistence = (
       ) || [];
 
       if (validStaff.length > 0) {
-        const staffData = validStaff.map(staff => ({
+        const staffData = validStaff.map((staff) => ({
           hoja_de_ruta_id: hojaDeRutaId,
-          technician_id: (staff as any).technician_id || null,
+          technician_id: staff.technician_id || null,
           name: staff.name || '',
           surname1: staff.surname1 || '',
           surname2: staff.surname2 || '',
           position: staff.position || '',
-          dni: staff.dni || ''
-        } as any));
+          dni: staff.dni || '',
+        }));
 
         console.log("🔄 SAVE: Inserting staff data:", staffData);
 

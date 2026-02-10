@@ -40,6 +40,10 @@ begin
     from public.profiles
     where id = p_technician_id;
 
+    if v_first_name is null or v_last_name is null then
+      raise warning 'remove_assignment_with_timesheets: profile not found or missing name for technician_id=%', p_technician_id;
+    end if;
+
     -- Prefer reliable technician_id match; fall back to name/surname for legacy rows.
     delete from public.hoja_de_ruta_staff s
     using public.hoja_de_ruta h
@@ -59,7 +63,14 @@ begin
     using public.hoja_de_ruta h
     where h.job_id = p_job_id
       and c.hoja_de_ruta_id = h.id
-      and c.technician_id = p_technician_id;
+      and (
+        c.technician_id = p_technician_id
+        or (
+          v_first_name is not null
+          and v_last_name is not null
+          and lower(coalesce(c.name, '')) = lower(trim(coalesce(v_first_name, '') || ' ' || coalesce(v_last_name, '')))
+        )
+      );
   end if;
 
   return query select v_deleted_timesheets, v_deleted_assignment;

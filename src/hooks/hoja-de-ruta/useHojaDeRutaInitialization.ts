@@ -1,6 +1,6 @@
 import { useCallback, useEffect } from 'react';
 import { EventData } from '@/types/hoja-de-ruta';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export const useHojaDeRutaInitialization = (
@@ -92,7 +92,7 @@ export const useHojaDeRutaInitialization = (
           location:locations(name, formatted_address, latitude, longitude),
           job_assignments(
             *,
-            profiles:technician_id(first_name, last_name, dni, phone, email)
+            profiles:technician_id(first_name, last_name, dni, phone)
           )
         `)
         .eq('id', jobId)
@@ -254,13 +254,18 @@ export const useHojaDeRutaInitialization = (
         
         const savedEventData = hojaDeRuta.eventData;
         // Merge saved staff with current assignments, preserving saved DNI and manual entries
+        type StaffEntry = NonNullable<EventData['staff']>[number];
         const mergeStaff = (
-          saved: any[] = [],
-          assigned: any[] = [],
+          saved: StaffEntry[] = [],
+          assigned: StaffEntry[] = [],
         ) => {
           const norm = (s?: string) => (s || '').trim().toLowerCase();
-          const keyOf = (p: any) => `${norm(p?.name)}|${norm(p?.surname1)}`;
-          const map = new Map<string, any>();
+          const keyOf = (p: StaffEntry) => {
+            const tid = p?.technician_id;
+            if (tid) return `id:${tid}`;
+            return `${norm(p?.name)}|${norm(p?.surname1)}`;
+          };
+          const map = new Map<string, StaffEntry>();
           // Seed with saved staff
           for (const p of saved) {
             map.set(keyOf(p), { ...p });
@@ -269,17 +274,17 @@ export const useHojaDeRutaInitialization = (
           for (const a of assigned) {
             const k = keyOf(a);
             if (map.has(k)) {
-              const s = map.get(k);
+              const s = map.get(k) as StaffEntry;
               map.set(k, {
-                technician_id: s.technician_id || a.technician_id,
-                name: s.name || a.name || '',
-                surname1: s.surname1 || a.surname1 || '',
-                surname2: s.surname2 || a.surname2 || '',
-                position: s.position || a.position || '',
+                ...a,
+                ...s,
+                // Prefer saved DNI/position if present; otherwise take the assignment-derived values
                 dni: s.dni || a.dni || '',
+                position: s.position || a.position || '',
+                technician_id: s.technician_id || a.technician_id,
                 phone: s.phone || a.phone || '',
                 role: s.role || a.role,
-              });
+              } as StaffEntry);
             } else {
               map.set(k, { ...a });
             }
