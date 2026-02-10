@@ -74,9 +74,7 @@ export default function MorningSummary() {
       setLoading(true);
       setError(null);
 
-      const nextDate = new Date(date);
-      nextDate.setDate(nextDate.getDate() + 1);
-      const tomorrowDate = nextDate.toISOString().split('T')[0];
+      // timesheets are per-day; no need to compute tomorrowDate or filter by jobs.start_time
 
       const summaries: MorningSummaryData[] = [];
 
@@ -94,9 +92,7 @@ export default function MorningSummary() {
           .eq('date', date)
           .eq('is_active', true)
           .eq('profiles.department', dept)
-          .eq('profiles.role', 'house_tech')
-          .gte('jobs.start_time', date)
-          .lt('jobs.start_time', tomorrowDate) as { data: TimesheetWithRelations[] | null };
+          .eq('profiles.role', 'house_tech') as { data: TimesheetWithRelations[] | null };
 
         // Get unavailable
       const { data: unavailable } = await supabase
