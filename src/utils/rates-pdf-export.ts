@@ -278,6 +278,29 @@ const computeEffectiveBase = (quote: TourJobRateQuote) => {
   };
 };
 
+const resolveEffectiveTotal = (
+  quote: TourJobRateQuote,
+  computed?: ReturnType<typeof computeEffectiveBase>
+): number => {
+  if (quote.breakdown?.error) return 0;
+
+  const { effectiveBase, extrasTotal } = computed ?? computeEffectiveBase(quote);
+  const computedTotal = effectiveBase + extrasTotal;
+
+  const serverTotal =
+    quote.total_with_extras_eur != null
+      ? Number(quote.total_with_extras_eur)
+      : quote.total_eur != null
+        ? Number(quote.total_eur)
+        : null;
+
+  if (quote.has_override && quote.override_amount_eur != null) {
+    return Number(quote.override_amount_eur);
+  }
+
+  return serverTotal ?? computedTotal;
+};
+
 const withLpo = (name: string, lpo?: string | null) => (lpo ? `${name}\nLPO: ${lpo}` : name);
 
 // Generate PDF for individual rate quote (single job date)
@@ -342,18 +365,8 @@ export async function generateRateQuotePDF(
       !usedFallbackBase && rawMultiplier != null && shouldDisplayMultiplier(rawMultiplier);
 
     // For tour rate quotes, server already applies autonomo discount to base before multipliers.
-    // Also, manual overrides are applied server-side (see v_tour_job_rate_quotes_2025).
-    const computedTotal = effectiveBase + extrasTotal;
-    const serverTotal =
-      quote.total_with_extras_eur != null
-        ? Number(quote.total_with_extras_eur)
-        : quote.total_eur != null
-          ? Number(quote.total_eur)
-          : null;
-    const effectiveTotal =
-      quote.has_override && quote.override_amount_eur != null
-        ? Number(quote.override_amount_eur)
-        : (serverTotal ?? computedTotal);
+    // Manual overrides are applied server-side (see v_tour_job_rate_quotes_2025).
+    const effectiveTotal = resolveEffectiveTotal(quote, computed);
 
     let baseCell: string;
     if (hasError) {
@@ -563,8 +576,8 @@ export async function generateTourRatesSummaryPDF(
       const hasError = quote.breakdown?.error;
       if (hasError) return;
 
-      const { effectiveBase, extrasTotal } = computeEffectiveBase(quote);
-      const effectiveTotal = effectiveBase + extrasTotal;
+      const computed = computeEffectiveBase(quote);
+      const effectiveTotal = resolveEffectiveTotal(quote, computed);
       const info = getTechName(techId);
       const existing =
         techTotals.get(techId) || {
@@ -720,7 +733,7 @@ export async function generateTourRatesSummaryPDF(
         quote.is_house_tech ? 'Plantilla' : quote.category || '—',
         baseText,
         hasError ? '—' : formatCurrency(extrasTotal),
-        hasError ? '€0.00' : formatCurrency(effectiveBase + extrasTotal),
+        hasError ? '€0.00' : formatCurrency(resolveEffectiveTotal(quote)),
       ];
     });
 
@@ -749,10 +762,10 @@ export async function generateTourRatesSummaryPDF(
 
     const { jobBaseTotal, jobExtrasTotal, jobGrandTotal } = item.quotes.reduce(
       (acc, quote) => {
-        const { effectiveBase, extrasTotal } = computeEffectiveBase(quote);
-        acc.jobBaseTotal += effectiveBase;
-        acc.jobExtrasTotal += extrasTotal;
-        acc.jobGrandTotal += effectiveBase + extrasTotal;
+        const computed = computeEffectiveBase(quote);
+        acc.jobBaseTotal += computed.effectiveBase;
+        acc.jobExtrasTotal += computed.extrasTotal;
+        acc.jobGrandTotal += resolveEffectiveTotal(quote, computed);
         return acc;
       },
       { jobBaseTotal: 0, jobExtrasTotal: 0, jobGrandTotal: 0 }
