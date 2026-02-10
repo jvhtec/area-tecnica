@@ -2,6 +2,8 @@ import React from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, X } from 'lucide-react';
+import { formatInTimeZone } from 'date-fns-tz';
+import { es } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { JobPayoutEmailContextResult } from '@/lib/job-payout-email';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
@@ -63,21 +65,33 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
       }).format(Number(amount ?? 0));
     };
 
-    const formatWorkedDates = (dates: string[]) => {
-      if (!dates || dates.length === 0) return 'el ' + new Date(context.job.start_time).toLocaleDateString('es-ES', { dateStyle: 'long' });
+    const formatDateLong = (date: Date) =>
+      formatInTimeZone(date, 'Europe/Madrid', "d 'de' MMMM 'de' yyyy", { locale: es });
 
-      const parsed = dates.map(d => new Date(d)).sort((a, b) => a.getTime() - b.getTime());
+    const formatWorkedDates = (dates: string[]) => {
+      if (!dates || dates.length === 0) {
+        return 'el ' + formatDateLong(new Date(context.job.start_time));
+      }
+
+      const parsed = dates
+        .map((d) => new Date(d))
+        .filter((d) => !Number.isNaN(d.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime());
+
+      if (parsed.length === 0) {
+        return 'el ' + formatDateLong(new Date(context.job.start_time));
+      }
 
       if (parsed.length === 1) {
-        return 'el ' + parsed[0].toLocaleDateString('es-ES', { dateStyle: 'long' });
+        return 'el ' + formatDateLong(parsed[0]);
       }
 
       if (parsed.length === 2) {
-        return `los días ${parsed[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })} y ${parsed[1].toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}`;
+        return `los días ${formatDateLong(parsed[0])} y ${formatDateLong(parsed[1])}`;
       }
 
-      const firstDate = parsed[0].toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-      const lastDate = parsed[parsed.length - 1].toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+      const firstDate = formatDateLong(parsed[0]);
+      const lastDate = formatDateLong(parsed[parsed.length - 1]);
       return `los días ${firstDate} - ${lastDate} (${parsed.length} días)`;
     };
 
