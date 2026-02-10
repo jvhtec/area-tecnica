@@ -134,6 +134,13 @@ async function fetchPayouts(
   return (data || []) as JobPayoutTotals[];
 }
 
+/**
+ * Enrich payouts with override metadata (who/when + override amount).
+ *
+ * Notes:
+ * - `v_job_tech_payout_2025` already applies the override to `total_eur`, but does not expose audit fields.
+ * - We pull `v_job_tech_payout_2025_base.total_eur` as the "calculated" baseline for context.
+ */
 async function attachOverrideMetadata(
   client: SupabaseClient,
   jobId: string,
@@ -198,14 +205,14 @@ async function attachOverrideMetadata(
     const calculated = baseTotalMap.get(p.technician_id);
 
     return {
-      ...(p as any),
+      ...p,
       has_override: true,
       override_amount_eur: Number(ov.override_amount_eur),
       calculated_total_eur: calculated != null ? calculated : undefined,
       override_set_at: ov.set_at,
       override_actor_name: actor?.name,
-      override_actor_email: actor?.email ?? null,
-    } as JobPayoutTotals;
+      override_actor_email: actor?.email ?? undefined,
+    } satisfies JobPayoutTotals;
   });
 }
 

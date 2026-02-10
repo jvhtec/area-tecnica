@@ -16,6 +16,9 @@ export type JobPayoutOverride = {
   actor_email?: string;
 };
 
+/**
+ * Format an override timestamp in Europe/Madrid so the UI is consistent across clients.
+ */
 const formatOverrideTimestamp = (value?: string) => {
   if (!value) return '';
   try {
