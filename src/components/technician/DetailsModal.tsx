@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
@@ -8,6 +8,7 @@ import { es } from 'date-fns/locale';
 import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { TourDocumentUploader } from '@/components/tours/TourDocumentUploader';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Theme } from './types';
@@ -16,6 +17,7 @@ import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-re
 import { createSignedUrl } from '@/utils/jobDocuments';
 import { labelForCode } from '@/utils/roles';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import type { TourDocument } from '@/hooks/useTourDocuments';
 import type { Restaurant, WeatherData } from '@/types/hoja-de-ruta';
 import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from '@/types/job';
 
@@ -26,12 +28,16 @@ interface DetailsModalProps {
     onClose: () => void;
 }
 
+// (TourDocument type imported from useTourDocuments)
+
 type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
 
 export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
-    const { user } = useOptimizedAuth();
+    const { user, userRole } = useOptimizedAuth();
+    const queryClient = useQueryClient();
     const [activeTab, setActiveTab] = useState<TabId>('Info');
     const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
+    const [isUploadingTourDocument, setIsUploadingTourDocument] = useState(false);
     const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
     const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
     const [isMapLoading, setIsMapLoading] = useState(false);
@@ -54,6 +60,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         },
         enabled: !!job?.id,
     });
+
+    const tourId: string | undefined =
+        (jobDetails as { tour_id?: string } | null)?.tour_id ??
+        (job as { tour_id?: string })?.tour_id;
 
     // Fetch staff assignments for this job
     const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({
@@ -107,6 +117,23 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
             return data || [];
         },
         enabled: !!job?.id,
+    });
+
+    // Fetch tour documents (visible to technicians) when the job belongs to a tour
+    const { data: tourDocuments = [], isLoading: tourDocumentsLoading } = useQuery({
+        queryKey: ['tour-documents-for-job', tourId],
+        queryFn: async () => {
+            if (!tourId) return [];
+            const { data, error } = await supabase
+                .from('tour_documents')
+                .select('id, file_name, file_path, uploaded_at, file_type')
+                .eq('tour_id', tourId)
+                .eq('visible_to_tech', true)
+                .order('uploaded_at', { ascending: false });
+            if (error) throw error;
+            return (data || []) as TourDocument[];
+        },
+        enabled: !!tourId,
     });
 
     // Fetch nearby restaurants using Google Places API
@@ -241,6 +268,49 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
             toast.error(`No se pudo descargar el documento: ${message}`);
         } finally {
             setDocumentLoading(prev => { const s = new Set(prev); s.delete(docId); return s; });
+        }
+    };
+
+    const handleViewTourDocument = async (doc: TourDocument) => {
+        const key = `tour:${doc.id}`;
+        setDocumentLoading(prev => new Set(prev).add(key));
+        try {
+            const { data, error } = await supabase.storage
+                .from('tour-documents')
+                .createSignedUrl(doc.file_path, 60);
+            if (error || !data?.signedUrl) {
+                throw error || new Error('No se pudo generar la URL');
+            }
+            window.open(data.signedUrl, '_blank');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            toast.error(`No se pudo abrir el documento de gira: ${message}`);
+        } finally {
+            setDocumentLoading(prev => { const s = new Set(prev); s.delete(key); return s; });
+        }
+    };
+
+    const handleDownloadTourDocument = async (doc: TourDocument) => {
+        const key = `tour:${doc.id}`;
+        setDocumentLoading(prev => new Set(prev).add(key));
+        try {
+            const { data, error } = await supabase.storage
+                .from('tour-documents')
+                .createSignedUrl(doc.file_path, 60);
+            if (error || !data?.signedUrl) {
+                throw error || new Error('No se pudo generar la URL');
+            }
+            const link = document.createElement('a');
+            link.href = data.signedUrl;
+            link.download = doc.file_name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            toast.error(`No se pudo descargar el documento de gira: ${message}`);
+        } finally {
+            setDocumentLoading(prev => { const s = new Set(prev); s.delete(key); return s; });
         }
     };
 
@@ -646,6 +716,110 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                     </div>
                                 )}
                             </div>
+
+                            {/* Tour docs entrypoint (A+B): allows eventual techs to access tour docs from the job */}
+                            {tourId ? (
+                                <div>
+                                    <div className="flex items-center justify-between gap-2 mb-3">
+                                        <div className="flex items-center gap-2">
+                                            <FileText size={18} className={theme.textMuted} />
+                                            <h3 className={`text-lg font-bold ${theme.textMain}`}>Documentos de la gira</h3>
+                                        </div>
+
+                                        {['technician', 'house_tech'].includes(userRole || '') ? (
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setIsUploadingTourDocument((v) => !v)}
+                                            >
+                                                {isUploadingTourDocument ? 'Cancelar' : 'Añadir'}
+                                            </Button>
+                                        ) : null}
+                                    </div>
+
+                                    {isUploadingTourDocument && ['technician', 'house_tech'].includes(userRole || '') ? (
+                                        <div className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-3 mb-3`}>
+                                            <TourDocumentUploader
+                                                tourId={tourId}
+                                                onSuccess={() => {
+                                                    setIsUploadingTourDocument(false);
+                                                    queryClient.invalidateQueries({ queryKey: ['tour-documents-for-job', tourId] });
+                                                }}
+                                                onCancel={() => setIsUploadingTourDocument(false)}
+                                            />
+                                        </div>
+                                    ) : null}
+
+                                    {tourDocumentsLoading ? (
+                                        <div className="flex items-center justify-center py-6">
+                                            <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                                        </div>
+                                    ) : tourDocuments.length > 0 ? (
+                                        <div className="space-y-2">
+                                            {tourDocuments.map((doc) => {
+                                                const key = `tour:${doc.id}`;
+                                                return (
+                                                    <div
+                                                        key={doc.id}
+                                                        className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-3`}
+                                                    >
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="min-w-0 flex-1">
+                                                                <div
+                                                                    className={`text-sm font-bold ${theme.textMain} leading-snug break-words line-clamp-2 mb-1`}
+                                                                    title={doc.file_name}
+                                                                >
+                                                                    {doc.file_name}
+                                                                </div>
+                                                                <div className={`text-xs ${theme.textMuted}`}>
+                                                                    {doc.uploaded_at && `Subido el ${format(new Date(doc.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex gap-3 shrink-0">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="icon"
+                                                                    onClick={() => handleViewTourDocument(doc)}
+                                                                    disabled={documentLoading.has(key)}
+                                                                    className="h-10 w-10 p-0"
+                                                                    title={`Ver ${doc.file_name}`}
+                                                                    aria-label={`Ver ${doc.file_name}`}
+                                                                >
+                                                                    {documentLoading.has(key) ? (
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    ) : (
+                                                                        <Eye size={18} />
+                                                                    )}
+                                                                </Button>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="icon"
+                                                                    onClick={() => handleDownloadTourDocument(doc)}
+                                                                    disabled={documentLoading.has(key)}
+                                                                    className="h-10 w-10 p-0"
+                                                                    title={`Descargar ${doc.file_name}`}
+                                                                    aria-label={`Descargar ${doc.file_name}`}
+                                                                >
+                                                                    {documentLoading.has(key) ? (
+                                                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                                                    ) : (
+                                                                        <Download size={18} />
+                                                                    )}
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className={`h-32 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                                            <FileText size={24} className="mb-2 opacity-50" />
+                                            <span className="text-xs">No hay documentos de gira visibles</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : null}
                         </div>
                     )}
 
