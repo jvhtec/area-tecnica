@@ -87,7 +87,14 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
 
     const parts = formatCurrency(selectedAttachment.payout.timesheets_total_eur);
     const extras = formatCurrency(selectedAttachment.payout.extras_total_eur);
-    const grand = formatCurrency(selectedAttachment.payout.total_eur - (selectedAttachment.deduction_eur || 0));
+
+    const payoutAny = selectedAttachment.payout as any;
+    const totalBeforeDeduction =
+      payoutAny?.has_override && payoutAny?.override_amount_eur != null
+        ? Number(payoutAny.override_amount_eur)
+        : Number(selectedAttachment.payout.total_eur ?? 0);
+
+    const grand = formatCurrency(totalBeforeDeduction - (selectedAttachment.deduction_eur || 0));
     const deductionAmount = selectedAttachment.deduction_eur ?? 0;
     const deductionFormatted = formatCurrency(deductionAmount);
     const hasDeduction = deductionAmount > 0;

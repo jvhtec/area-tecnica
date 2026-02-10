@@ -417,6 +417,12 @@ export async function sendJobPayoutEmails(
       // Check if any timesheet is an evento type
       const hasEventoTimesheet = timesheetLines.some(line => line.is_evento === true);
 
+      const payoutAny = attachment.payout as any;
+      const totalBeforeDeduction =
+        payoutAny?.has_override && payoutAny?.override_amount_eur != null
+          ? Number(payoutAny.override_amount_eur)
+          : Number(attachment.payout.total_eur ?? 0);
+
       return {
         technician_id: attachment.technician_id,
         email: attachment.email,
@@ -424,7 +430,7 @@ export async function sendJobPayoutEmails(
         totals: {
           timesheets_total_eur: attachment.payout.timesheets_total_eur,
           extras_total_eur: attachment.payout.extras_total_eur,
-          total_eur: attachment.payout.total_eur - (attachment.deduction_eur || 0),
+          total_eur: totalBeforeDeduction - (attachment.deduction_eur || 0),
           deduction_eur: attachment.deduction_eur,
         },
         pdf_base64: attachment.pdfBase64,
