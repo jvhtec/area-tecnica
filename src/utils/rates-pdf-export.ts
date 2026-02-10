@@ -687,13 +687,14 @@ export async function generateTourRatesSummaryPDF(
       const lpo = item.lpoMap?.get(quote.technician_id) ?? null;
       const nameWithStatus = appendAutonomoLabel(baseName, autonomo, { isHouseTech: is_house_tech });
       const hasError = quote.breakdown?.error;
+      const computed = computeEffectiveBase(quote);
       const {
         effectiveBase,
         extrasTotal,
         preMultiplierBase,
         rawMultiplier,
         usedFallbackBase,
-      } = computeEffectiveBase(quote);
+      } = computed;
 
       let baseText: string;
       if (hasError) {
@@ -733,7 +734,7 @@ export async function generateTourRatesSummaryPDF(
         quote.is_house_tech ? 'Plantilla' : quote.category || '—',
         baseText,
         hasError ? '—' : formatCurrency(extrasTotal),
-        hasError ? '€0.00' : formatCurrency(resolveEffectiveTotal(quote)),
+        hasError ? '€0.00' : formatCurrency(resolveEffectiveTotal(quote, computed)),
       ];
     });
 
@@ -899,30 +900,37 @@ export async function generateJobPayoutPDF(
 
   doc.setTextColor(...TEXT_PRIMARY);
 
+  const resolveIrpfDeduction = (
+    payout: PayoutData,
+    opts: { autonomo: boolean; is_house_tech: boolean }
+  ) => {
+    // Calculate deduction - only for non-autonomo contracted workers (not house techs)
+    let deduction = 0;
+    let daysCount = 0;
+    const isNonAutonomoContracted = !opts.autonomo && !opts.is_house_tech;
+
+    if (isNonAutonomoContracted) {
+      // Count unique days from timesheets
+      const lines = timesheetMap?.get(payout.technician_id) || [];
+      if (lines.length > 0) {
+        const uniqueDates = new Set(lines.map((l) => l.date).filter(Boolean));
+        daysCount = uniqueDates.size > 0 ? uniqueDates.size : 1;
+      } else if (payout.timesheets_total_eur > 0) {
+        // Fallback if no details (should rarely happen)
+        daysCount = 1;
+      }
+      deduction = daysCount * NON_AUTONOMO_DEDUCTION_EUR;
+    }
+
+    return { deduction, daysCount };
+  };
+
   const tableData = payouts.map((payout) => {
     const { name: baseName, autonomo, is_house_tech } = getTechName(payout.technician_id);
     const lpo = lpoMap?.get(payout.technician_id) ?? null;
     const nameWithStatus = appendAutonomoLabel(baseName, autonomo, { isHouseTech: is_house_tech });
 
-    // Calculate deduction - only for non-autonomo contracted workers (not house techs)
-    let deduction = 0;
-    let daysCount = 0;
-    const isNonAutonomoContracted = !autonomo && !is_house_tech;
-
-    if (isNonAutonomoContracted) {
-        // Count unique days from timesheets
-        const lines = timesheetMap?.get(payout.technician_id) || [];
-        // If timesheets available, count unique dates
-        if (lines.length > 0) {
-            const uniqueDates = new Set(lines.map(l => l.date).filter(Boolean));
-            daysCount = uniqueDates.size > 0 ? uniqueDates.size : 1; 
-        } else if (payout.timesheets_total_eur > 0) {
-            // Fallback if no details (should rarely happen)
-            daysCount = 1; 
-        }
-        deduction = daysCount * NON_AUTONOMO_DEDUCTION_EUR;
-    }
-
+    const { deduction, daysCount } = resolveIrpfDeduction(payout, { autonomo: !!autonomo, is_house_tech: !!is_house_tech });
     const effectiveTotal = payout.total_eur - deduction;
 
     let nameCellContent = withLpo(nameWithStatus, lpo);
@@ -1220,7 +1228,11 @@ export async function generateJobPayoutPDF(
   const totalTimesheets = payouts.reduce((sum, payout) => sum + payout.timesheets_total_eur, 0);
   const totalExtras = payouts.reduce((sum, payout) => sum + payout.extras_total_eur, 0);
   const totalExpenses = payouts.reduce((sum, payout) => sum + (payout.expenses_total_eur || 0), 0);
-  const grandTotal = payouts.reduce((sum, payout) => sum + payout.total_eur, 0);
+  const grandTotal = payouts.reduce((sum, payout) => {
+    const { autonomo, is_house_tech } = getTechName(payout.technician_id);
+    const { deduction } = resolveIrpfDeduction(payout, { autonomo: !!autonomo, is_house_tech: !!is_house_tech });
+    return sum + (payout.total_eur - deduction);
+  }, 0);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const summaryWidth = pageWidth - 28;
