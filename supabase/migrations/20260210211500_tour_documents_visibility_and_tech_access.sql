@@ -164,7 +164,7 @@ WITH CHECK (
     OR (
       -- Path: tours/<tourId>/<file>
       split_part(name, '/', 1) = 'tours'
-      AND split_part(name, '/', 2) ~ '^[0-9a-fA-F-]{36}$'
+      AND split_part(name, '/', 2) ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
       AND (
         EXISTS (
           SELECT 1
@@ -186,7 +186,7 @@ WITH CHECK (
   )
 );
 
--- UPDATE/DELETE: allow management/logistics; allow uploader to delete via tour_documents row.
+-- DELETE: allow management/logistics; allow uploader to delete via tour_documents row.
 DROP POLICY IF EXISTS "p_storage_tour_documents_delete_uploader_or_mgmt" ON storage.objects;
 CREATE POLICY "p_storage_tour_documents_delete_uploader_or_mgmt"
 ON storage.objects
