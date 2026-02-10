@@ -137,10 +137,9 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 4,
     mobileSlot: "primary",
     getPath: () => "/dashboard/unavailability",
-    isVisible: ({ userRole, assignableAsTech }) =>
-      userRole === "house_tech" ||
-      (userRole === "admin" && assignableAsTech === true) ||
-      (userRole === "management" && assignableAsTech === true),
+    // For admin/management this can be confused with the department-level "Disponibilidad" page.
+    // Keep it in the main nav only for house_tech; privileged users (assignable) get access via Profile.
+    isVisible: ({ userRole }) => userRole === "house_tech",
     match: (pathname) => pathname === "/dashboard/unavailability",
   },
   {
@@ -511,12 +510,8 @@ export const buildNavigationItems = (
   if (isAdmin) {
     return navigationConfig
       .map((config) => {
-        // Allow limited technician navigation for admins with assignableAsTech flag
-        if (
-          (config.id === "technician-dashboard" ||
-            config.id === "technician-unavailability") &&
-          context.assignableAsTech
-        ) {
+        // Allow technician-dashboard for admins with assignableAsTech flag
+        if (config.id === "technician-dashboard" && context.assignableAsTech) {
           return createNavigationItem(config)
         }
         if (adminExcludedIds.has(config.id)) {
