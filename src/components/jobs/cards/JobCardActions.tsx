@@ -247,52 +247,60 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     staleTime: 30_000,
   });
 
+  type WaProdTimesheetRow = { technician_id: string; date: string | null };
+
+  const { data: waProdTimesheets = [] } = useQuery({
+    queryKey: createQueryKey.whatsapp.prodTimesheetsByJob(job.id),
+    queryFn: async () => {
+      const techIds = Array.from(new Set(waProdAssignments.map((a) => a.technician_id)));
+      // Source of truth: timesheets (active) determine which dates each tech actually works.
+      let q = supabase
+        .from('timesheets')
+        .select('technician_id,date')
+        .eq('job_id', job.id)
+        .eq('is_active', true);
+      if (techIds.length) q = q.in('technician_id', techIds);
+
+      const { data, error } = await q;
+      if (error) throw error;
+      return (data as WaProdTimesheetRow[] | null) || [];
+    },
+    enabled: Boolean(waProdOpen && canSendProductionWhatsapp && job?.id),
+    staleTime: 30_000,
+  });
+
+  const waProdWorkDates = React.useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const row of waProdTimesheets) {
+      const tid = row.technician_id;
+      const d = row.date || null;
+      if (!tid || !d) continue;
+      if (!map.has(tid)) map.set(tid, new Set());
+      map.get(tid)!.add(d);
+    }
+    return map;
+  }, [waProdTimesheets]);
+
   /**
    * Check if an assignment is applicable to a WhatsApp date group.
    *
    * - groupKey=all: everyone assigned to the job.
-   * - groupKey=day:YYYY-MM-DD:
-   *   - single-day assignments only for that date
-   *   - PLUS all-days assignments (they apply to every date)
+   * - groupKey=day:YYYY-MM-DD: only technicians with ACTIVE timesheets on that date.
    */
   const assignmentMatchesWaGroup = React.useCallback((a: WaProdAssignment, groupKey: string): boolean => {
     if (groupKey === 'all') return true;
     if (!groupKey.startsWith('day:')) return true;
     const d = groupKey.replace(/^day:/, '');
-    if (a.single_day) return Boolean(a.assignment_date) && a.assignment_date === d;
-    return true;
-  }, []);
+    return Boolean(waProdWorkDates.get(a.technician_id)?.has(d));
+  }, [waProdWorkDates]);
 
-  /** Build selectable date groups for WhatsApp recipients (include weekends in job range). */
+  /** Build selectable date groups for WhatsApp recipients based on timesheets (includes weekends if worked). */
   const waProdGroups = React.useMemo(() => {
     const keys = new Set<string>();
     keys.add('all');
 
-    // Include all days between job.start_time and job.end_time (inclusive), even if there are no single_day assignments.
-    try {
-      if (job?.start_time && job?.end_time) {
-        const startIso = formatInTimeZone(new Date(job.start_time), TZ, 'yyyy-MM-dd');
-        const endIso = formatInTimeZone(new Date(job.end_time), TZ, 'yyyy-MM-dd');
-
-        // Iterate date-only strings without timezone shifts.
-        let cur = new Date(`${startIso}T00:00:00`);
-        const end = new Date(`${endIso}T00:00:00`);
-        // Guard: avoid infinite loops on bad dates.
-        for (let i = 0; i < 370 && cur <= end; i++) {
-          const y = cur.getFullYear();
-          const m = String(cur.getMonth() + 1).padStart(2, '0');
-          const d = String(cur.getDate()).padStart(2, '0');
-          keys.add(`day:${y}-${m}-${d}`);
-          cur.setDate(cur.getDate() + 1);
-        }
-      }
-    } catch {
-      // best-effort; fall back to assignment-derived dates only
-    }
-
-    // Also include any explicit single-day assignment dates (even if outside the job range).
-    for (const a of waProdAssignments) {
-      if (a.single_day && a.assignment_date) keys.add(`day:${a.assignment_date}`);
+    for (const row of waProdTimesheets) {
+      if (row?.date) keys.add(`day:${row.date}`);
     }
 
     const list = Array.from(keys).map((key) => {
@@ -324,7 +332,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     });
 
     return list;
-  }, [waProdAssignments, job]);
+  }, [waProdTimesheets, job]);
 
   /** Build the prefilled WhatsApp message template for the selected job/date group/call time. */
   const buildWaProdTemplate = React.useCallback((opts: { groupKey: string; callTime: string }) => {
