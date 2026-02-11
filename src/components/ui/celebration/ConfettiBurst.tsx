@@ -39,13 +39,17 @@ export function ConfettiBurst({ seed, ttlMs = 1600 }: ConfettiBurstProps) {
   const [alive, setAlive] = React.useState(true);
 
   React.useEffect(() => {
+    // Each new seed should produce a fresh burst.
+    setAlive(true);
+
     if (reducedMotion) {
       setAlive(false);
       return;
     }
+
     const t = setTimeout(() => setAlive(false), ttlMs);
     return () => clearTimeout(t);
-  }, [ttlMs, reducedMotion]);
+  }, [seed, ttlMs, reducedMotion]);
 
   const pieces = React.useMemo(() => {
     const rand = mulberry32(seed);

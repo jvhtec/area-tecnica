@@ -280,7 +280,7 @@ export function JobCardNewView({
         }}
       >
         {isAndreaWeddingJob && celebrateSeed > 0 && typeof document !== 'undefined' && (
-          createPortal(<ConfettiBurst seed={celebrateSeed} />, document.body)
+          createPortal(<ConfettiBurst key={celebrateSeed} seed={celebrateSeed} />, document.body)
         )}
 
         {isJobBeingDeleted && (
