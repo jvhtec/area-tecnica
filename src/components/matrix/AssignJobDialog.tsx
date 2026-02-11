@@ -116,14 +116,18 @@ export const AssignJobDialog = ({
   const selectedJob = filteredJobs.find(job => job.id === selectedJobId);
   const roleOptions = technician ? roleOptionsForDiscipline(technician.department) : [];
   const isReassignment = !!existingAssignment;
-  const isModifyingSameJob = isReassignment && existingAssignment?.job_id === selectedJobId;
+  // NOTE: existingAssignment is only present when clicking a day that already has an assignment.
+  // When adding a new day to an already-assigned job from an *empty* cell, existingAssignment is undefined,
+  // but timesheets for (job_id, technician_id) already exist. We treat that as "modifying the same job".
+  const isModifyingSameJobByContext = isReassignment && existingAssignment?.job_id === selectedJobId;
   // IMPORTANT: use local yyyy-MM-dd, not toISOString (which is UTC)
   const assignmentDate = React.useMemo(() => format((singleDate ?? date), 'yyyy-MM-dd'), [date, singleDate]);
 
-  // Fetch existing timesheets when modifying the same job
+  // Fetch existing timesheets for this job+technician.
+  // This is needed even when existingAssignment is undefined (adding a new day to an existing job).
   const { data: existingTimesheets, isLoading: isLoadingExistingTimesheets } = useQuery({
     queryKey: ['existing-timesheets', selectedJobId, technicianId],
-    enabled: isModifyingSameJob && !!selectedJobId && !!technicianId,
+    enabled: open && !!selectedJobId && !!technicianId,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('timesheets')
@@ -133,8 +137,12 @@ export const AssignJobDialog = ({
         .eq('is_active', true);
       if (error) throw error;
       return data?.map(t => t.date) || [];
-    }
+    },
+    staleTime: 10_000,
   });
+
+  const hasExistingTimesheetsForSelectedJob = (existingTimesheets?.length ?? 0) > 0;
+  const isModifyingSelectedJob = isModifyingSameJobByContext || hasExistingTimesheetsForSelectedJob;
 
   // Set initial role if reassigning
   React.useEffect(() => {
@@ -225,8 +233,8 @@ export const AssignJobDialog = ({
       return;
     }
 
-    // Wait for existing timesheets query to complete when modifying same job
-    if (isModifyingSameJob && isLoadingExistingTimesheets) {
+    // Wait for existing timesheets query to complete when we need it
+    if (isLoadingExistingTimesheets) {
       console.log('Waiting for existing timesheets to load...');
       toast.error('Cargando hojas de hora existentes, por favor espera...');
       return;
@@ -256,7 +264,7 @@ export const AssignJobDialog = ({
 
       console.log('Role assignments:', { soundRole, lightsRole, videoRole, department: technician.department });
 
-      if (isReassignment && !isModifyingSameJob) {
+      if (isReassignment && !isModifyingSameJobByContext) {
         const { deleted_assignment } = await removeTimesheetAssignment({ jobId: existingAssignment.job_id, technicianId });
 
         if (!deleted_assignment) {
@@ -377,9 +385,9 @@ export const AssignJobDialog = ({
         }
       }
 
-      // Handle timesheet updates based on whether we're modifying the same job
+      // Handle timesheet updates based on whether we're modifying the selected job
       let existingDates: string[] = [];
-      if (isModifyingSameJob) {
+      if (isModifyingSelectedJob) {
         const { data: freshTimesheets, error: freshTimesheetsError } = await supabase
           .from('timesheets')
           .select('date')
@@ -427,7 +435,7 @@ export const AssignJobDialog = ({
       })();
 
       // Smart timesheet management based on modification mode
-      if (isModifyingSameJob) {
+      if (isModifyingSelectedJob) {
         if (modificationMode === 'add') {
           // Add mode: Keep existing dates + add new ones
           const datesToCreate = coverageDates.filter(d => !existingDates.includes(d));
@@ -815,7 +823,7 @@ export const AssignJobDialog = ({
             {selectedJobId && selectedRole && (
               <div className="space-y-4">
                 {/* Modification mode toggle - only show when modifying the same job */}
-                {isModifyingSameJob && coverageMode !== 'full' && existingTimesheets && existingTimesheets.length > 0 && (
+                {isModifyingSelectedJob && coverageMode !== 'full' && existingTimesheets && existingTimesheets.length > 0 && (
                   <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <label className="text-sm font-medium text-blue-900 block mb-2">
                       Modo de Modificación
