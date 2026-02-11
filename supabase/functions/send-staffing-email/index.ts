@@ -516,7 +516,7 @@ serve(async (req) => {
           if (existingFirst?.id) {
             existingFirstRowId = existingFirst.id as string;
             rid = existingFirstRowId;
-            batchId = (existingFirst as any).batch_id || null;
+            batchId = ((existingFirst as unknown as { batch_id?: string | null })?.batch_id) ?? null;
           }
         }
       }
@@ -582,8 +582,52 @@ serve(async (req) => {
             idempotency_key: idempotency_key || null,
           });
           if (firstInsert.error) {
-            console.error('❌ STAFFING REQUEST BATCH FIRST INSERT ERROR:', firstInsert.error);
-            return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            const code = (firstInsert.error as any)?.code;
+            const msg = String((firstInsert.error as any)?.message || '');
+            const isDuplicate = code === '23505' || /duplicate key/i.test(msg);
+
+            if (isDuplicate) {
+              console.warn('🔄 BATCH FIRST INSERT DUPLICATE (race) - reselecting existing row and updating token');
+              const { data: existingAfterRace, error: existingAfterRaceErr } = await supabase
+                .from('staffing_requests')
+                .select('id')
+                .eq('job_id', job_id)
+                .eq('profile_id', profile_id)
+                .eq('phase', phase)
+                .eq('status', 'pending')
+                .eq('single_day', true)
+                .eq('target_date', firstDate)
+                .maybeSingle();
+
+              if (existingAfterRaceErr || !existingAfterRace?.id) {
+                console.error('❌ STAFFING REQUEST BATCH DUPLICATE - FAILED TO FIND EXISTING ROW AFTER RACE:', { existingAfterRaceErr });
+                return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+              }
+
+              // Reuse the existing row id as insertedId (confirm link)
+              insertedId = existingAfterRace.id as string;
+
+              const upd = await supabase
+                .from('staffing_requests')
+                .update({
+                  token_hash,
+                  token_expires_at: exp,
+                  updated_at: new Date().toISOString(),
+                  batch_id: batchId,
+                  idempotency_key: idempotency_key || null,
+                })
+                .eq('id', insertedId)
+                .select('id')
+                .maybeSingle();
+
+              if (upd.error) {
+                console.error('❌ STAFFING REQUEST BATCH DUPLICATE - UPDATE ERROR:', upd.error);
+                return new Response(JSON.stringify({ error: 'Database error updating first batch request', details: upd.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+              }
+            } else {
+              console.error('❌ STAFFING REQUEST BATCH FIRST INSERT ERROR:', firstInsert.error);
+              return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
           }
         }
 
@@ -610,6 +654,21 @@ serve(async (req) => {
           } else {
             console.log('✅ Successfully inserted batch dates');
           }
+        }
+
+        // Ensure all rows for this batch share the same batch_id (ignoreDuplicates won't update existing rows)
+        try {
+          await supabase
+            .from('staffing_requests')
+            .update({ batch_id: batchId, updated_at: new Date().toISOString() })
+            .eq('job_id', job_id)
+            .eq('profile_id', profile_id)
+            .eq('phase', phase)
+            .eq('status', 'pending')
+            .eq('single_day', true)
+            .in('target_date', normalizedDates);
+        } catch (e) {
+          console.warn('⚠️ Failed to enforce batch_id cohesion (non-fatal):', e);
         }
       } else {
         // Single request as before
