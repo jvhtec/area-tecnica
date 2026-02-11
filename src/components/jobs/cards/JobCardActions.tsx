@@ -247,13 +247,54 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     staleTime: 30_000,
   });
 
-  /** Build selectable date groups for WhatsApp recipients: all-days vs specific assignment_date. */
+  /**
+   * Check if an assignment is applicable to a WhatsApp date group.
+   *
+   * - groupKey=all: everyone assigned to the job.
+   * - groupKey=day:YYYY-MM-DD:
+   *   - single-day assignments only for that date
+   *   - PLUS all-days assignments (they apply to every date)
+   */
+  const assignmentMatchesWaGroup = React.useCallback((a: WaProdAssignment, groupKey: string): boolean => {
+    if (groupKey === 'all') return true;
+    if (!groupKey.startsWith('day:')) return true;
+    const d = groupKey.replace(/^day:/, '');
+    if (a.single_day) return Boolean(a.assignment_date) && a.assignment_date === d;
+    return true;
+  }, []);
+
+  /** Build selectable date groups for WhatsApp recipients (include weekends in job range). */
   const waProdGroups = React.useMemo(() => {
     const keys = new Set<string>();
     keys.add('all');
+
+    // Include all days between job.start_time and job.end_time (inclusive), even if there are no single_day assignments.
+    try {
+      if (job?.start_time && job?.end_time) {
+        const startIso = formatInTimeZone(new Date(job.start_time), TZ, 'yyyy-MM-dd');
+        const endIso = formatInTimeZone(new Date(job.end_time), TZ, 'yyyy-MM-dd');
+
+        // Iterate date-only strings without timezone shifts.
+        let cur = new Date(`${startIso}T00:00:00`);
+        const end = new Date(`${endIso}T00:00:00`);
+        // Guard: avoid infinite loops on bad dates.
+        for (let i = 0; i < 370 && cur <= end; i++) {
+          const y = cur.getFullYear();
+          const m = String(cur.getMonth() + 1).padStart(2, '0');
+          const d = String(cur.getDate()).padStart(2, '0');
+          keys.add(`day:${y}-${m}-${d}`);
+          cur.setDate(cur.getDate() + 1);
+        }
+      }
+    } catch {
+      // best-effort; fall back to assignment-derived dates only
+    }
+
+    // Also include any explicit single-day assignment dates (even if outside the job range).
     for (const a of waProdAssignments) {
       if (a.single_day && a.assignment_date) keys.add(`day:${a.assignment_date}`);
     }
+
     const list = Array.from(keys).map((key) => {
       if (key === 'all') {
         const range = job?.start_time && job?.end_time
@@ -284,12 +325,6 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
     return list;
   }, [waProdAssignments, job]);
-
-  /** Map an assignment to its WhatsApp date-group key (used for filtering and selection). */
-  const getAssignmentGroupKey = React.useCallback((a: WaProdAssignment): string => {
-    if (a.single_day && a.assignment_date) return `day:${a.assignment_date}`;
-    return 'all';
-  }, []);
 
   /** Build the prefilled WhatsApp message template for the selected job/date group/call time. */
   const buildWaProdTemplate = React.useCallback((opts: { groupKey: string; callTime: string }) => {
@@ -391,14 +426,14 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     if (!waProdRecipientIds.length) return;
     const allowedIds = new Set(
       waProdAssignments
-        .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
+        .filter((a) => assignmentMatchesWaGroup(a, waProdDateGroup))
         .map((a) => a.technician_id)
     );
     const filtered = waProdRecipientIds.filter((id) => allowedIds.has(id));
     const isSame = filtered.length === waProdRecipientIds.length
       && filtered.every((id, idx) => id === waProdRecipientIds[idx]);
     if (!isSame) setWaProdRecipientIds(filtered);
-  }, [waProdOpen, waProdAssignments, waProdDateGroup, waProdRecipientIds, getAssignmentGroupKey]);
+  }, [waProdOpen, waProdAssignments, waProdDateGroup, waProdRecipientIds, assignmentMatchesWaGroup]);
 
   React.useEffect(() => {
     if (job?.job_type !== "dryhire") {
@@ -1302,7 +1337,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                       onClick={() => {
                         const ids = Array.from(new Set(
                           waProdAssignments
-                            .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
+                            .filter((a) => assignmentMatchesWaGroup(a, waProdDateGroup))
                             .map((a) => a.technician_id)
                         ));
                         setWaProdRecipientIds(ids);
@@ -1333,8 +1368,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                     </div>
                   ) : (
                     waProdAssignments
-                      .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
-                      .map((a) => {
+                      .filter((a) => assignmentMatchesWaGroup(a, waProdDateGroup))
+                      .map((a) => { 
                         const full = `${a.profile?.first_name ?? ''} ${a.profile?.last_name ?? ''}`.trim() || 'Sin nombre';
                         const hasPhone = Boolean((a.profile?.phone || '').trim());
                         const checked = waProdRecipientIds.includes(a.technician_id);
@@ -1361,7 +1396,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                       })
                   )}
 
-                  {!waProdAssignmentsLoading && waProdAssignments.filter((a) => getAssignmentGroupKey(a) === waProdDateGroup).length === 0 && (
+                  {!waProdAssignmentsLoading && waProdAssignments.filter((a) => assignmentMatchesWaGroup(a, waProdDateGroup)).length === 0 && (
                     <div className="text-sm text-muted-foreground p-2">No hay asignados en este grupo de fechas.</div>
                   )}
                 </div>
