@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
@@ -319,7 +319,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       const label = (() => {
         try {
           // Date-only strings should not shift; interpret as local midnight.
-          return formatInTimeZone(new Date(`${date}T00:00:00`), TZ, 'dd/MM/yyyy');
+          return formatInTimeZone(fromZonedTime(`${date}T00:00:00`, TZ), TZ, 'dd/MM/yyyy');
         } catch {
           return date;
         }
@@ -351,7 +351,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       }
     } else if (opts.groupKey.startsWith('day:')) {
       const d = opts.groupKey.replace(/^day:/, '');
-      try { dateLabel = formatInTimeZone(new Date(`${d}T00:00:00`), TZ, 'dd/MM/yyyy'); } catch { dateLabel = d; }
+      try { dateLabel = formatInTimeZone(fromZonedTime(`${d}T00:00:00`, TZ), TZ, 'dd/MM/yyyy'); } catch { dateLabel = d; }
     }
 
     const callTimeLabel = opts.callTime ? `${opts.callTime}` : '';
