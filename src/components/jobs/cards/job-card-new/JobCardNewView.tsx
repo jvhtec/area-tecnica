@@ -239,6 +239,7 @@ export function JobCardNewView({
   const reducedMotion = useReducedMotion();
   const isAndreaWeddingJob = job?.id === "eeb00e4d-7d38-4687-9d04-31471b89adfc";
   const [celebrateSeed, setCelebrateSeed] = React.useState(0);
+  const [celebrateOrigin, setCelebrateOrigin] = React.useState<{ xPct: number; yPct: number } | null>(null);
   const lastCelebrateAtRef = React.useRef(0);
 
   /** Trigger a celebratory confetti burst on actionable interactions (wedding job only). */
@@ -258,6 +259,11 @@ export function JobCardNewView({
     const now = Date.now();
     if (now - lastCelebrateAtRef.current < 700) return; // throttle
     lastCelebrateAtRef.current = now;
+
+    // Origin near the click so the effect is obvious (and not always from the top).
+    const xPct = (e.clientX / Math.max(1, window.innerWidth)) * 100;
+    const yPct = (e.clientY / Math.max(1, window.innerHeight)) * 100;
+    setCelebrateOrigin({ xPct, yPct });
 
     setCelebrateSeed((s) => (s + 1) % 1_000_000);
   }, [isAndreaWeddingJob, reducedMotion]);
@@ -281,7 +287,15 @@ export function JobCardNewView({
         }}
       >
         {isAndreaWeddingJob && celebrateSeed > 0 && typeof document !== 'undefined' && (
-          createPortal(<ConfettiBurst key={celebrateSeed} seed={celebrateSeed} />, document.body)
+          createPortal(
+            <ConfettiBurst
+              key={celebrateSeed}
+              seed={celebrateSeed}
+              origin={celebrateOrigin ?? undefined}
+              ttlMs={2400}
+            />,
+            document.body
+          )
         )}
 
         {isJobBeingDeleted && (

@@ -4,14 +4,21 @@ import { motion, useReducedMotion } from 'framer-motion';
 type ConfettiBurstProps = {
   /** A value that changes per burst to vary the pattern. */
   seed: number;
+  /**
+   * Origin in viewport percentages.
+   * Defaults to top-center-ish if not provided.
+   */
+  origin?: { xPct: number; yPct: number };
   /** Milliseconds until the burst auto-unmounts. */
   ttlMs?: number;
 };
 
 type Piece = {
   id: string;
-  xPct: number;
+  startOffsetPx: { x: number; y: number };
   driftPx: number;
+  popUpPx: number;
+  fallPx: number;
   sizePx: number;
   rotateDeg: number;
   durationS: number;
@@ -43,7 +50,7 @@ const BALLOONS = ['🎈', '🎉'];
  *
  * Intended to be rendered via a portal (document.body) so it appears above dialogs.
  */
-export function ConfettiBurst({ seed, ttlMs = 1600 }: ConfettiBurstProps) {
+export function ConfettiBurst({ seed, origin, ttlMs = 2200 }: ConfettiBurstProps) {
   const reducedMotion = useReducedMotion();
   const [alive, setAlive] = React.useState(true);
 
@@ -64,21 +71,28 @@ export function ConfettiBurst({ seed, ttlMs = 1600 }: ConfettiBurstProps) {
     const rand = mulberry32(seed);
     const out: Piece[] = [];
 
-    const count = 26;
+    const count = 90;
     for (let i = 0; i < count; i++) {
-      const kind: Piece['kind'] = rand() < 0.12 ? 'emoji' : rand() < 0.55 ? 'rect' : 'circle';
-      const xPct = 8 + rand() * 84;
-      const driftPx = (rand() - 0.5) * 140;
-      const sizePx = kind === 'emoji' ? 16 + rand() * 10 : 6 + rand() * 7;
-      const rotateDeg = (rand() - 0.5) * 720;
-      const durationS = 0.9 + rand() * 0.7;
-      const delayS = rand() * 0.08;
+      const kind: Piece['kind'] = rand() < 0.22 ? 'emoji' : rand() < 0.58 ? 'rect' : 'circle';
+      const startOffsetPx = {
+        x: (rand() - 0.5) * 60,
+        y: (rand() - 0.5) * 40,
+      };
+      const driftPx = (rand() - 0.5) * 320;
+      const popUpPx = 35 + rand() * 55;
+      const fallPx = 520 + rand() * 560;
+      const sizePx = kind === 'emoji' ? 22 + rand() * 12 : 8 + rand() * 9;
+      const rotateDeg = (rand() - 0.5) * 1080;
+      const durationS = 1.4 + rand() * 0.9;
+      const delayS = rand() * 0.06;
       const color = COLORS[Math.floor(rand() * COLORS.length)]!;
       const emoji = kind === 'emoji' ? BALLOONS[Math.floor(rand() * BALLOONS.length)]! : undefined;
       out.push({
         id: `${seed}-${i}`,
-        xPct,
+        startOffsetPx,
         driftPx,
+        popUpPx,
+        fallPx,
         sizePx,
         rotateDeg,
         durationS,
@@ -94,13 +108,24 @@ export function ConfettiBurst({ seed, ttlMs = 1600 }: ConfettiBurstProps) {
 
   if (!alive) return null;
 
+  const safeOrigin = origin && Number.isFinite(origin.xPct) && Number.isFinite(origin.yPct)
+    ? { xPct: Math.min(98, Math.max(2, origin.xPct)), yPct: Math.min(92, Math.max(6, origin.yPct)) }
+    : { xPct: 50, yPct: 18 };
+
   return (
     <div className="pointer-events-none fixed inset-0 overflow-hidden z-[9999]">
       {pieces.map((p) => {
-        const common = {
-          position: 'absolute' as const,
-          left: `${p.xPct}%`,
-          top: '-8px',
+        const common: React.CSSProperties = {
+          position: 'absolute',
+          left: `calc(${safeOrigin.xPct}% + ${p.startOffsetPx.x}px)`,
+          top: `calc(${safeOrigin.yPct}% + ${p.startOffsetPx.y}px)`,
+        };
+
+        const animate = {
+          y: [0, -p.popUpPx, p.fallPx],
+          x: [0, p.driftPx],
+          opacity: [1, 1, 0],
+          rotate: p.rotateDeg,
         };
 
         if (p.kind === 'emoji' && p.emoji) {
@@ -108,13 +133,8 @@ export function ConfettiBurst({ seed, ttlMs = 1600 }: ConfettiBurstProps) {
             <motion.span
               key={p.id}
               style={{ ...common, fontSize: p.sizePx }}
-              initial={{ y: -10, opacity: 1, rotate: 0 }}
-              animate={{
-                y: '110%',
-                x: p.driftPx,
-                opacity: [1, 1, 0],
-                rotate: p.rotateDeg,
-              }}
+              initial={{ y: 0, x: 0, opacity: 1, rotate: 0, scale: 1 }}
+              animate={animate}
               transition={{ duration: p.durationS, delay: p.delayS, ease: 'easeOut' }}
               aria-hidden
             >
@@ -136,13 +156,8 @@ export function ConfettiBurst({ seed, ttlMs = 1600 }: ConfettiBurstProps) {
           <motion.div
             key={p.id}
             style={baseStyle}
-            initial={{ y: -10, opacity: 1, rotate: 0 }}
-            animate={{
-              y: '110%',
-              x: p.driftPx,
-              opacity: [1, 1, 0],
-              rotate: p.rotateDeg,
-            }}
+            initial={{ y: 0, x: 0, opacity: 1, rotate: 0, scale: 1 }}
+            animate={animate}
             transition={{ duration: p.durationS, delay: p.delayS, ease: 'easeOut' }}
             aria-hidden
           />
