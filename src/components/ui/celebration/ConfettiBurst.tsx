@@ -82,7 +82,7 @@ export function ConfettiBurst({ seed, ttlMs = 1600 }: ConfettiBurstProps) {
   if (!alive) return null;
 
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden z-20">
+    <div className="pointer-events-none fixed inset-0 overflow-hidden z-[9999]">
       {pieces.map((p) => {
         const common = {
           position: 'absolute' as const,

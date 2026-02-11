@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { useReducedMotion } from "framer-motion";
 import { ChevronDown, ChevronRight, Download, Eye } from "lucide-react";
 
@@ -278,8 +279,8 @@ export function JobCardNewView({
           backgroundColor: appliedBgColor,
         }}
       >
-        {isAndreaWeddingJob && celebrateSeed > 0 && (
-          <ConfettiBurst seed={celebrateSeed} />
+        {isAndreaWeddingJob && celebrateSeed > 0 && typeof document !== 'undefined' && (
+          createPortal(<ConfettiBurst seed={celebrateSeed} />, document.body)
         )}
 
         {isJobBeingDeleted && (
