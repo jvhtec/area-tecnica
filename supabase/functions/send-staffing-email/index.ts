@@ -516,7 +516,7 @@ serve(async (req) => {
           if (existingFirst?.id) {
             existingFirstRowId = existingFirst.id as string;
             rid = existingFirstRowId;
-            batchId = ((existingFirst as unknown as { batch_id?: string | null })?.batch_id) ?? null;
+            batchId = ((existingFirst as Record<string, unknown>)?.batch_id as (string | null | undefined)) ?? null;
           }
         }
       }
@@ -528,11 +528,11 @@ serve(async (req) => {
         { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
       const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key,
         new TextEncoder().encode(`${rid}:${phase}:${exp}`)));
-      const token = b64url(sig);
+      let token = b64url(sig);
 
       // Store only hash of token bytes
       const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", sig));
-      const token_hash = Array.from(digest).map(x=>x.toString(16).padStart(2,'0')).join('');
+      let token_hash = Array.from(digest).map(x=>x.toString(16).padStart(2,'0')).join('');
       console.log('🔐 TOKEN GENERATED:', { rid, expires: exp });
 
       // Step 5: Insert/update staffing request(s)
@@ -582,8 +582,8 @@ serve(async (req) => {
             idempotency_key: idempotency_key || null,
           });
           if (firstInsert.error) {
-            const code = (firstInsert.error as any)?.code;
-            const msg = String((firstInsert.error as any)?.message || '');
+            const code = firstInsert.error.code;
+            const msg = firstInsert.error.message ?? '';
             const isDuplicate = code === '23505' || /duplicate key/i.test(msg);
 
             if (isDuplicate) {
@@ -606,6 +606,18 @@ serve(async (req) => {
 
               // Reuse the existing row id as insertedId (confirm link)
               insertedId = existingAfterRace.id as string;
+
+              // IMPORTANT: token is signed with rid, so if we switch to an existing row id
+              // we must re-derive token + token_hash so the confirm link validates.
+              rid = insertedId;
+              const sig2 = new Uint8Array(await crypto.subtle.sign(
+                "HMAC",
+                key,
+                new TextEncoder().encode(`${rid}:${phase}:${exp}`)
+              ));
+              token = b64url(sig2);
+              const digest2 = new Uint8Array(await crypto.subtle.digest("SHA-256", sig2));
+              token_hash = Array.from(digest2).map(x => x.toString(16).padStart(2, '0')).join('');
 
               const upd = await supabase
                 .from('staffing_requests')
@@ -658,7 +670,7 @@ serve(async (req) => {
 
         // Ensure all rows for this batch share the same batch_id (ignoreDuplicates won't update existing rows)
         try {
-          await supabase
+          const cohesion = await supabase
             .from('staffing_requests')
             .update({ batch_id: batchId, updated_at: new Date().toISOString() })
             .eq('job_id', job_id)
@@ -667,6 +679,9 @@ serve(async (req) => {
             .eq('status', 'pending')
             .eq('single_day', true)
             .in('target_date', normalizedDates);
+          if (cohesion.error) {
+            console.warn('⚠️ batch_id cohesion update returned error (non-fatal):', cohesion.error);
+          }
         } catch (e) {
           console.warn('⚠️ Failed to enforce batch_id cohesion (non-fatal):', e);
         }
