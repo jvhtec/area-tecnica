@@ -486,9 +486,43 @@ serve(async (req) => {
         console.warn('⚠️ Timesheet check encountered an error, continuing:', timesheetCheckErr);
       }
 
-      // Step 3: Generate token
+      // Step 3: Determine request id (rid) and batch shape
+      // For batch requests, we may already have a pending row for the first date.
+      // In that case we reuse its id so the confirm link points at a real row.
+      const isBatch = normalizedDates.length > 1;
+      let batchId: string | null = null;
+      let rid = crypto.randomUUID();
+      let firstDate: string | null = null;
+      let existingFirstRowId: string | null = null;
+
+      if (isBatch) {
+        firstDate = normalizedDates[0] || null;
+        if (firstDate) {
+          const { data: existingFirst, error: existingFirstErr } = await supabase
+            .from('staffing_requests')
+            .select('id,batch_id')
+            .eq('job_id', job_id)
+            .eq('profile_id', profile_id)
+            .eq('phase', phase)
+            .eq('status', 'pending')
+            .eq('single_day', true)
+            .eq('target_date', firstDate)
+            .maybeSingle();
+
+          if (existingFirstErr) {
+            console.warn('⚠️ Failed to check existing first batch row, continuing with new rid:', existingFirstErr);
+          }
+
+          if (existingFirst?.id) {
+            existingFirstRowId = existingFirst.id as string;
+            rid = existingFirstRowId;
+            batchId = (existingFirst as any).batch_id || null;
+          }
+        }
+      }
+
+      // Step 4: Generate token (must use the final rid)
       console.log('🔐 GENERATING TOKEN...');
-      const rid = crypto.randomUUID();
       const exp = new Date(Date.now() + 1000*60*60*48).toISOString();
       const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(TOKEN_SECRET),
         { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -501,34 +535,59 @@ serve(async (req) => {
       const token_hash = Array.from(digest).map(x=>x.toString(16).padStart(2,'0')).join('');
       console.log('🔐 TOKEN GENERATED:', { rid, expires: exp });
 
-      // Step 4: Insert/update staffing request(s)
+      // Step 5: Insert/update staffing request(s)
       console.log('💾 SAVING STAFFING REQUEST...');
       let insertedId = rid;
+
       // If multiple dates are provided, create a batch of single-day requests and use one of them for the email link
-      const isBatch = normalizedDates.length > 1;
-      let batchId: string | null = null;
       if (isBatch) {
-        batchId = crypto.randomUUID();
-        // Choose the first date to own the clickable rid
-        const firstDate = normalizedDates[0];
-        const firstInsert = await supabase.from('staffing_requests').insert({
-          id: rid,
-          job_id,
-          profile_id,
-          phase,
-          status: 'pending',
-          token_hash,
-          token_expires_at: exp,
-          single_day: true,
-          target_date: firstDate,
-          batch_id: batchId,
-          idempotency_key: idempotency_key || null,
-        });
-        if (firstInsert.error) {
-          console.error('❌ STAFFING REQUEST BATCH FIRST INSERT ERROR:', firstInsert.error);
-          return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        if (!batchId) batchId = crypto.randomUUID();
+        if (!firstDate) firstDate = normalizedDates[0] || null;
+        if (!firstDate) {
+          return new Response(JSON.stringify({ error: 'Bad Request', details: { reason: 'Missing first batch date' } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
-        // Insert remaining dates - use insert with ignoreDuplicates since the unique constraint 
+
+        if (existingFirstRowId) {
+          // Reuse existing row: refresh token + expiry + batch association.
+          const upd = await supabase
+            .from('staffing_requests')
+            .update({
+              token_hash,
+              token_expires_at: exp,
+              updated_at: new Date().toISOString(),
+              batch_id: batchId,
+              idempotency_key: idempotency_key || null,
+            })
+            .eq('id', existingFirstRowId)
+            .select('id')
+            .maybeSingle();
+
+          if (upd.error) {
+            console.error('❌ STAFFING REQUEST BATCH FIRST UPDATE ERROR:', upd.error);
+            return new Response(JSON.stringify({ error: 'Database error updating first batch request', details: upd.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        } else {
+          // Insert first date as the clickable rid row
+          const firstInsert = await supabase.from('staffing_requests').insert({
+            id: rid,
+            job_id,
+            profile_id,
+            phase,
+            status: 'pending',
+            token_hash,
+            token_expires_at: exp,
+            single_day: true,
+            target_date: firstDate,
+            batch_id: batchId,
+            idempotency_key: idempotency_key || null,
+          });
+          if (firstInsert.error) {
+            console.error('❌ STAFFING REQUEST BATCH FIRST INSERT ERROR:', firstInsert.error);
+            return new Response(JSON.stringify({ error: 'Database error saving first batch request', details: firstInsert.error }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
+
+        // Insert remaining dates - use insert with ignoreDuplicates since the unique constraint
         // is a partial index that upsert's onConflict can't properly match
         const rest = normalizedDates.slice(1).map(d => ({
           job_id,
