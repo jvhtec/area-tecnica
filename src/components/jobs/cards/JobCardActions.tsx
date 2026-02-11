@@ -252,16 +252,14 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const { data: waProdTimesheets = [] } = useQuery({
     queryKey: createQueryKey.whatsapp.prodTimesheetsByJob(job.id),
     queryFn: async () => {
-      const techIds = Array.from(new Set(waProdAssignments.map((a) => a.technician_id)));
       // Source of truth: timesheets (active) determine which dates each tech actually works.
-      let q = supabase
+      // Note: we intentionally do NOT scope by technician_id here; job_id is the stable filter.
+      const { data, error } = await supabase
         .from('timesheets')
         .select('technician_id,date')
         .eq('job_id', job.id)
         .eq('is_active', true);
-      if (techIds.length) q = q.in('technician_id', techIds);
 
-      const { data, error } = await q;
       if (error) throw error;
       return (data as WaProdTimesheetRow[] | null) || [];
     },
@@ -289,9 +287,14 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
    */
   const assignmentMatchesWaGroup = React.useCallback((a: WaProdAssignment, groupKey: string): boolean => {
     if (groupKey === 'all') return true;
-    if (!groupKey.startsWith('day:')) return true;
-    const d = groupKey.replace(/^day:/, '');
-    return Boolean(waProdWorkDates.get(a.technician_id)?.has(d));
+    if (groupKey.startsWith('day:')) {
+      const d = groupKey.replace(/^day:/, '');
+      return Boolean(waProdWorkDates.get(a.technician_id)?.has(d));
+    }
+
+    // Fail closed on unknown group keys to avoid silently masking bugs.
+    console.warn('[WhatsApp production] Unknown date group key:', groupKey);
+    return false;
   }, [waProdWorkDates]);
 
   /** Build selectable date groups for WhatsApp recipients based on timesheets (includes weekends if worked). */
