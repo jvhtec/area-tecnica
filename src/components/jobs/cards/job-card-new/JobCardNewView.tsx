@@ -241,6 +241,7 @@ export function JobCardNewView({
   const [celebrateSeed, setCelebrateSeed] = React.useState(0);
   const lastCelebrateAtRef = React.useRef(0);
 
+  /** Trigger a celebratory confetti burst on actionable interactions (wedding job only). */
   const handleCelebrateCapture = React.useCallback((e: React.MouseEvent) => {
     if (!isAndreaWeddingJob) return;
     if (reducedMotion) return;

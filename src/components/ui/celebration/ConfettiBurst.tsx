@@ -21,6 +21,10 @@ type Piece = {
   emoji?: string;
 };
 
+/**
+ * Small, fast seeded PRNG so confetti patterns are deterministic per burst.
+ * (Not crypto-safe.)
+ */
 function mulberry32(a: number) {
   let t = a >>> 0;
   return () => {
@@ -34,6 +38,11 @@ function mulberry32(a: number) {
 const COLORS = ['#f97316', '#eab308', '#22c55e', '#3b82f6', '#a855f7', '#ec4899'];
 const BALLOONS = ['🎈', '🎉'];
 
+/**
+ * Full-screen, short-lived confetti/balloon burst overlay.
+ *
+ * Intended to be rendered via a portal (document.body) so it appears above dialogs.
+ */
 export function ConfettiBurst({ seed, ttlMs = 1600 }: ConfettiBurstProps) {
   const reducedMotion = useReducedMotion();
   const [alive, setAlive] = React.useState(true);
