@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 import { Button } from "@/components/ui/button";
 import createFolderIcon from "@/assets/icons/icon.png";
@@ -247,13 +247,65 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     staleTime: 30_000,
   });
 
-  /** Build selectable date groups for WhatsApp recipients: all-days vs specific assignment_date. */
+  type WaProdTimesheetRow = { technician_id: string; date: string | null };
+
+  const { data: waProdTimesheets = [] } = useQuery({
+    queryKey: createQueryKey.whatsapp.prodTimesheetsByJob(job.id),
+    queryFn: async () => {
+      // Source of truth: timesheets (active) determine which dates each tech actually works.
+      // Note: we intentionally do NOT scope by technician_id here; job_id is the stable filter.
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('technician_id,date')
+        .eq('job_id', job.id)
+        .eq('is_active', true);
+
+      if (error) throw error;
+      return (data as WaProdTimesheetRow[] | null) || [];
+    },
+    enabled: Boolean(waProdOpen && canSendProductionWhatsapp && job?.id),
+    staleTime: 30_000,
+  });
+
+  const waProdWorkDates = React.useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const row of waProdTimesheets) {
+      const tid = row.technician_id;
+      const d = row.date || null;
+      if (!tid || !d) continue;
+      if (!map.has(tid)) map.set(tid, new Set());
+      map.get(tid)!.add(d);
+    }
+    return map;
+  }, [waProdTimesheets]);
+
+  /**
+   * Check if an assignment is applicable to a WhatsApp date group.
+   *
+   * - groupKey=all: everyone assigned to the job.
+   * - groupKey=day:YYYY-MM-DD: only technicians with ACTIVE timesheets on that date.
+   */
+  const assignmentMatchesWaGroup = React.useCallback((a: WaProdAssignment, groupKey: string): boolean => {
+    if (groupKey === 'all') return true;
+    if (groupKey.startsWith('day:')) {
+      const d = groupKey.replace(/^day:/, '');
+      return Boolean(waProdWorkDates.get(a.technician_id)?.has(d));
+    }
+
+    // Fail closed on unknown group keys to avoid silently masking bugs.
+    console.warn('[WhatsApp production] Unknown date group key:', groupKey);
+    return false;
+  }, [waProdWorkDates]);
+
+  /** Build selectable date groups for WhatsApp recipients based on timesheets (includes weekends if worked). */
   const waProdGroups = React.useMemo(() => {
     const keys = new Set<string>();
     keys.add('all');
-    for (const a of waProdAssignments) {
-      if (a.single_day && a.assignment_date) keys.add(`day:${a.assignment_date}`);
+
+    for (const row of waProdTimesheets) {
+      if (row?.date) keys.add(`day:${row.date}`);
     }
+
     const list = Array.from(keys).map((key) => {
       if (key === 'all') {
         const range = job?.start_time && job?.end_time
@@ -267,7 +319,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       const label = (() => {
         try {
           // Date-only strings should not shift; interpret as local midnight.
-          return formatInTimeZone(new Date(`${date}T00:00:00`), TZ, 'dd/MM/yyyy');
+          return formatInTimeZone(fromZonedTime(`${date}T00:00:00`, TZ), TZ, 'dd/MM/yyyy');
         } catch {
           return date;
         }
@@ -283,13 +335,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     });
 
     return list;
-  }, [waProdAssignments, job]);
-
-  /** Map an assignment to its WhatsApp date-group key (used for filtering and selection). */
-  const getAssignmentGroupKey = React.useCallback((a: WaProdAssignment): string => {
-    if (a.single_day && a.assignment_date) return `day:${a.assignment_date}`;
-    return 'all';
-  }, []);
+  }, [waProdTimesheets, job]);
 
   /** Build the prefilled WhatsApp message template for the selected job/date group/call time. */
   const buildWaProdTemplate = React.useCallback((opts: { groupKey: string; callTime: string }) => {
@@ -305,7 +351,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       }
     } else if (opts.groupKey.startsWith('day:')) {
       const d = opts.groupKey.replace(/^day:/, '');
-      try { dateLabel = formatInTimeZone(new Date(`${d}T00:00:00`), TZ, 'dd/MM/yyyy'); } catch { dateLabel = d; }
+      try { dateLabel = formatInTimeZone(fromZonedTime(`${d}T00:00:00`, TZ), TZ, 'dd/MM/yyyy'); } catch { dateLabel = d; }
     }
 
     const callTimeLabel = opts.callTime ? `${opts.callTime}` : '';
@@ -391,14 +437,14 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     if (!waProdRecipientIds.length) return;
     const allowedIds = new Set(
       waProdAssignments
-        .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
+        .filter((a) => assignmentMatchesWaGroup(a, waProdDateGroup))
         .map((a) => a.technician_id)
     );
     const filtered = waProdRecipientIds.filter((id) => allowedIds.has(id));
     const isSame = filtered.length === waProdRecipientIds.length
       && filtered.every((id, idx) => id === waProdRecipientIds[idx]);
     if (!isSame) setWaProdRecipientIds(filtered);
-  }, [waProdOpen, waProdAssignments, waProdDateGroup, waProdRecipientIds, getAssignmentGroupKey]);
+  }, [waProdOpen, waProdAssignments, waProdDateGroup, waProdRecipientIds, assignmentMatchesWaGroup]);
 
   React.useEffect(() => {
     if (job?.job_type !== "dryhire") {
@@ -1302,7 +1348,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                       onClick={() => {
                         const ids = Array.from(new Set(
                           waProdAssignments
-                            .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
+                            .filter((a) => assignmentMatchesWaGroup(a, waProdDateGroup))
                             .map((a) => a.technician_id)
                         ));
                         setWaProdRecipientIds(ids);
@@ -1333,8 +1379,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                     </div>
                   ) : (
                     waProdAssignments
-                      .filter((a) => getAssignmentGroupKey(a) === waProdDateGroup)
-                      .map((a) => {
+                      .filter((a) => assignmentMatchesWaGroup(a, waProdDateGroup))
+                      .map((a) => { 
                         const full = `${a.profile?.first_name ?? ''} ${a.profile?.last_name ?? ''}`.trim() || 'Sin nombre';
                         const hasPhone = Boolean((a.profile?.phone || '').trim());
                         const checked = waProdRecipientIds.includes(a.technician_id);
@@ -1361,7 +1407,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                       })
                   )}
 
-                  {!waProdAssignmentsLoading && waProdAssignments.filter((a) => getAssignmentGroupKey(a) === waProdDateGroup).length === 0 && (
+                  {!waProdAssignmentsLoading && waProdAssignments.filter((a) => assignmentMatchesWaGroup(a, waProdDateGroup)).length === 0 && (
                     <div className="text-sm text-muted-foreground p-2">No hay asignados en este grupo de fechas.</div>
                   )}
                 </div>

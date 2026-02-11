@@ -112,6 +112,8 @@ export const createQueryKey = {
     all: ['whatsapp'] as const,
     /** Job assignments used for WhatsApp recipient selection on JobCards. */
     prodAssignmentsByJob: (jobId: string) => [...createQueryKey.whatsapp.all, 'prod-assignments', jobId] as const,
+    /** Timesheets (source of truth) used to derive worked dates for WhatsApp date grouping. */
+    prodTimesheetsByJob: (jobId: string) => [...createQueryKey.whatsapp.all, 'prod-timesheets', jobId] as const,
   },
   profiles: {
     all: ['profiles'] as const,
