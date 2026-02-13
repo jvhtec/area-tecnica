@@ -25,7 +25,7 @@ export const ViewAchievementsDialog: React.FC<ViewAchievementsDialogProps> = ({ 
           <DialogHeader>
             <div className="flex items-center justify-between">
               <DialogTitle>Logros{fullName ? ` — ${fullName}` : ''}</DialogTitle>
-              {canAwardAchievements && profileId && (
+              {canAwardAchievements && profileId && fullName && (
                 <Button
                   variant="outline"
                   size="sm"

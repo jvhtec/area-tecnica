@@ -5,20 +5,39 @@
 
 CREATE OR REPLACE FUNCTION manually_award_achievement(
   p_user_id uuid,
-  p_achievement_id uuid,
-  p_awarded_by uuid
+  p_achievement_id uuid
 )
 RETURNS jsonb AS $$
 DECLARE
+  v_requester_id uuid;
   v_awarded_by_role user_role;
   v_achievement_exists boolean;
   v_already_unlocked boolean;
   v_unlock_id uuid;
 BEGIN
-  -- Check if awarder is admin or management
+  -- Get the current user from auth context
+  v_requester_id := auth.uid();
+
+  -- Reject if no authenticated user
+  IF v_requester_id IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Authentication required to award achievements'
+    );
+  END IF;
+
+  -- Check if requester is admin or management
   SELECT role INTO v_awarded_by_role
   FROM profiles
-  WHERE id = p_awarded_by;
+  WHERE id = v_requester_id;
+
+  -- Reject if no profile found or role is not admin/management
+  IF v_awarded_by_role IS NULL THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'User profile not found'
+    );
+  END IF;
 
   IF v_awarded_by_role NOT IN ('admin', 'management') THEN
     RETURN jsonb_build_object(
@@ -66,5 +85,5 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Grant execute to authenticated users (function checks role internally)
-GRANT EXECUTE ON FUNCTION manually_award_achievement TO authenticated;
+-- Grant execute to authenticated users (function derives caller from auth.uid() and checks role internally)
+GRANT EXECUTE ON FUNCTION manually_award_achievement(uuid, uuid) TO authenticated;

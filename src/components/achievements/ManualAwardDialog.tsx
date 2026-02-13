@@ -44,6 +44,14 @@ export function ManualAwardDialog({
     (a) => a.id === selectedAchievementId
   );
 
+  // Intercept dialog close to clear selection
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      setSelectedAchievementId('');
+    }
+    onOpenChange(newOpen);
+  };
+
   const handleAward = async () => {
     if (!selectedAchievementId) return;
 
@@ -58,8 +66,7 @@ export function ManualAwardDialog({
         description: `El logro "${selectedAchievement?.title}" ha sido otorgado a ${targetUserName}.`,
       });
 
-      onOpenChange(false);
-      setSelectedAchievementId('');
+      handleOpenChange(false);
     } catch (error) {
       toast({
         title: 'Error',
@@ -71,7 +78,7 @@ export function ManualAwardDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Otorgar logro</DialogTitle>
@@ -126,10 +133,7 @@ export function ManualAwardDialog({
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => {
-              onOpenChange(false);
-              setSelectedAchievementId('');
-            }}
+            onClick={() => handleOpenChange(false)}
           >
             Cancelar
           </Button>

@@ -307,18 +307,8 @@ serve(async (req) => {
       );
     }
 
-    // Evaluate achievements for the reporter (if authenticated)
-    if (user?.id) {
-      try {
-        console.log("[submit-bug-report] Evaluating achievements for user:", user.id);
-        await supabase.rpc("evaluate_user_achievements", {
-          p_user_id: user.id,
-        });
-      } catch (evalError) {
-        // Log but don't fail the request if achievement evaluation fails
-        console.error("[submit-bug-report] Failed to evaluate achievements:", evalError);
-      }
-    }
+    // Note: Achievement evaluation is handled automatically by database trigger
+    // on_bug_report_submitted_evaluate_achievements (see migration 20260213000000)
 
     // Send confirmation email (optional - can be implemented later)
     // TODO: Send confirmation email to reporter

@@ -144,10 +144,14 @@ export function useManuallyAwardAchievement() {
       userId: string;
       achievementId: string;
     }) => {
+      if (!user?.id) {
+        throw new Error('You must be logged in to award achievements');
+      }
+
+      // Note: Function derives caller from auth.uid(), no need to pass p_awarded_by
       const { data, error } = await supabase.rpc('manually_award_achievement', {
         p_user_id: userId,
         p_achievement_id: achievementId,
-        p_awarded_by: user?.id,
       });
 
       if (error) throw error;
