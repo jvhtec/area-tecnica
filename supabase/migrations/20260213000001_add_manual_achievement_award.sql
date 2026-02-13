@@ -15,6 +15,9 @@ DECLARE
   v_already_unlocked boolean;
   v_unlock_id uuid;
 BEGIN
+  -- Set explicit search_path for security (prevent schema hijacking)
+  SET search_path = public, pg_catalog;
+
   -- Get the current user from auth context
   v_requester_id := auth.uid();
 

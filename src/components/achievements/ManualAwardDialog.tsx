@@ -55,6 +55,9 @@ export function ManualAwardDialog({
   const handleAward = async () => {
     if (!selectedAchievementId) return;
 
+    // Capture title before async call to avoid stale reference after query invalidation
+    const achievementTitle = selectedAchievement?.title;
+
     try {
       await awardMutation.mutateAsync({
         userId: targetUserId,
@@ -63,7 +66,7 @@ export function ManualAwardDialog({
 
       toast({
         title: 'Logro otorgado',
-        description: `El logro "${selectedAchievement?.title}" ha sido otorgado a ${targetUserName}.`,
+        description: `El logro "${achievementTitle}" ha sido otorgado a ${targetUserName}.`,
       });
 
       handleOpenChange(false);
