@@ -15,12 +15,12 @@ function ActivityPushFallbackInit() {
 // Redirect 'technician' role to /tech-app (house_tech can access Layout routes).
 // Allow-list a small set of technician-accessible routes outside /tech-app (e.g. tools like SysCalc).
 function TechnicianRouteGuard() {
-  const { userRole, isLoading } = useOptimizedAuth();
+  const { userRole, isLoading, isProfileLoading } = useOptimizedAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   React.useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || isProfileLoading) return;
     if (userRole !== "technician") return;
     const isAllowedTechnicianRoute =
       location.pathname === "/tech-app" ||
@@ -34,18 +34,18 @@ function TechnicianRouteGuard() {
     }
 
     navigate("/tech-app", { replace: true });
-  }, [userRole, isLoading, location.pathname, navigate]);
+  }, [userRole, isLoading, isProfileLoading, location.pathname, navigate]);
 
   return null;
 }
 
 function OscarRouteGuard() {
-  const { userRole, isLoading } = useOptimizedAuth();
+  const { userRole, isLoading, isProfileLoading } = useOptimizedAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
   React.useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || isProfileLoading) return;
     if (userRole !== "oscar") return;
 
     const isAllowedOscarRoute =
@@ -60,7 +60,7 @@ function OscarRouteGuard() {
     }
 
     navigate("/dashboard", { replace: true });
-  }, [userRole, isLoading, location.pathname, navigate]);
+  }, [userRole, isLoading, isProfileLoading, location.pathname, navigate]);
 
   return null;
 }
