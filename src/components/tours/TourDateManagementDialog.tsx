@@ -330,10 +330,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           type: tourDateType
         });
       }
-      
+
       const { error: dateTypeError } = await supabase
         .from("job_date_types")
-        .insert(jobDateTypes);
+        .upsert(jobDateTypes, { onConflict: 'job_id,date' });
+
       if (dateTypeError) {
         console.error("Error creating job date types:", dateTypeError);
         throw dateTypeError;
@@ -488,11 +489,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
               type: tourDateType
             });
           }
-          
+
           if (jobDateTypes.length > 0) {
             const { error: dateTypeError } = await supabase
               .from("job_date_types")
-              .insert(jobDateTypes);
+              .upsert(jobDateTypes, { onConflict: 'job_id,date' });
+
             if (dateTypeError) {
               console.error("Error updating job date types:", dateTypeError);
             }
