@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS achievements (
   title text NOT NULL,
   description text NOT NULL,
   hint text,
-  category text NOT NULL CHECK (category IN ('volume', 'house', 'reliability', 'endurance', 'diversity', 'hidden')),
+  category text NOT NULL CHECK (category IN ('volume', 'house', 'reliability', 'endurance', 'diversity', 'community', 'hidden')),
   evaluation_type text NOT NULL,
   metric_key text NOT NULL,
   threshold integer NOT NULL,
@@ -127,7 +127,10 @@ INSERT INTO achievements (code, title, description, hint, category, evaluation_t
 ('venues_15',         'Viajero',                   '15 venues diferentes. Conoces media ciudad.',                  NULL,                            'diversity', 'venue_count',        'venue_count',        15, NULL, false, '✈️', 270),
 ('festival_day',      'Día de Festival',           'Tu primer festival completado.',                               'Completa un trabajo de festival','diversity', 'festival_job_count', 'festival_job_count', 1,  NULL, false, '🎪', 280),
 ('festival_regular',  'Festivalero',               '10 días de festival. Ya tienes botas de barro propias.',       NULL,                            'diversity', 'festival_job_count', 'festival_job_count', 10, NULL, false, '🎶', 290),
-('festival_veteran',  'Veterano de Festivales',    '25 días de festival. Tu tienda de campaña tiene wifi.',        NULL,                            'diversity', 'festival_job_count', 'festival_job_count', 25, NULL, false, '⛺', 300);
+('festival_veteran',  'Veterano de Festivales',    '25 días de festival. Tu tienda de campaña tiene wifi.',        NULL,                            'diversity', 'festival_job_count', 'festival_job_count', 25, NULL, false, '⛺', 300),
+
+-- Community (1)
+('bug_hunter',        'Cazador de Bugs',           'Has reportado 5 o más bugs para ayudar a mejorar la plataforma.', 'Reporta bugs desde la página de Soporte', 'community', 'threshold', 'bug_reports_submitted', 5, NULL, false, '🐛', 310);
 
 -- ============================================================================
 -- Evaluation Function: evaluate one user's achievements
@@ -308,6 +311,16 @@ BEGIN
 
   INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
   VALUES (p_user_id, 'no_cancel_streak', v_metric_value, now())
+  ON CONFLICT (user_id, metric_key)
+  DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+  -- ---- Metric: bug_reports_submitted ----
+  SELECT COUNT(*) INTO v_metric_value
+  FROM bug_reports
+  WHERE created_by = p_user_id;
+
+  INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+  VALUES (p_user_id, 'bug_reports_submitted', v_metric_value, now())
   ON CONFLICT (user_id, metric_key)
   DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
 

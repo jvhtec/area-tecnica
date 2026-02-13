@@ -128,3 +128,44 @@ export function useMarkAchievementSeen() {
     },
   });
 }
+
+/**
+ * Manually award an achievement to a user (admin/management only).
+ */
+export function useManuallyAwardAchievement() {
+  const queryClient = useQueryClient();
+  const { user } = useOptimizedAuth();
+
+  return useMutation({
+    mutationFn: async ({
+      userId,
+      achievementId,
+    }: {
+      userId: string;
+      achievementId: string;
+    }) => {
+      const { data, error } = await supabase.rpc('manually_award_achievement', {
+        p_user_id: userId,
+        p_achievement_id: achievementId,
+        p_awarded_by: user?.id,
+      });
+
+      if (error) throw error;
+
+      const result = data as { success: boolean; error?: string; message?: string };
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to award achievement');
+      }
+
+      return result;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: achievementsQueryKey(variables.userId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: unseenQueryKey(variables.userId),
+      });
+    },
+  });
+}
