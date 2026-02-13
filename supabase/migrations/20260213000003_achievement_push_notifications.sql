@@ -1,6 +1,7 @@
 -- ============================================================================
--- Achievement Push Notification System
--- Sends push notifications when achievements are unlocked with deep links
+-- Achievement Push Notification Integration
+-- Creates notification records when achievements are unlocked
+-- Integrates with existing push notification system
 -- ============================================================================
 
 -- Trigger function to create notification record when achievement is unlocked
@@ -8,19 +9,14 @@ CREATE OR REPLACE FUNCTION notify_achievement_unlocked()
 RETURNS TRIGGER AS $$
 DECLARE
   v_achievement achievements%ROWTYPE;
-  v_user_profile profiles%ROWTYPE;
 BEGIN
   -- Get achievement details
   SELECT * INTO v_achievement
   FROM achievements
   WHERE id = NEW.achievement_id;
 
-  -- Get user profile
-  SELECT * INTO v_user_profile
-  FROM profiles
-  WHERE id = NEW.user_id;
-
-  -- Create notification record for push notification system
+  -- Create notification record for existing push notification system
+  -- The existing system will handle sending push notifications to all user devices
   INSERT INTO notifications (
     user_id,
     title,
@@ -40,7 +36,8 @@ BEGIN
     false
   );
 
-  -- Note: Push notification will be sent by Edge Function via trigger on notifications table
+  -- Note: Existing push notification system will handle delivery
+  -- No need for custom Edge Function - leverages existing infrastructure
 
   RETURN NEW;
 END;

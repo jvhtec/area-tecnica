@@ -170,7 +170,33 @@ INSERT INTO achievements (code, title, description, hint, category, evaluation_t
 ('equipment_guru',         'Gurú del Equipamiento',     'Has gestionado 25 elementos de equipamiento.',                   'Gestiona el inventario de equipos',       'management', 'threshold', 'equipment_managed',   25,  NULL, false, '🎚️', 580),
 ('subrental_specialist',   'Especialista en Subrental', '10 subrentals gestionados. Sabes cuándo pedir refuerzos.',       NULL,                                      'management', 'threshold', 'subrentals_managed',  10,  NULL, false, '📦', 590),
 ('preset_creator',         'Creador de Presets',        '5 presets de equipamiento creados. Eficientas el sistema.',      'Crea presets de equipos reutilizables',   'management', 'threshold', 'presets_created',     5,   NULL, false, '⚡', 600),
-('operations_mastermind',  'Cerebro de Operaciones',    '1000 acciones totales de gestión. Eres el corazón del sistema.', NULL,                                      'management', 'threshold', 'total_mgmt_actions',  1000,NULL, false, '🧠', 610);
+('operations_mastermind',  'Cerebro de Operaciones',    '1000 acciones totales de gestión. Eres el corazón del sistema.', NULL,                                      'management', 'threshold', 'total_mgmt_actions',  1000,NULL, false, '🧠', 610),
+
+-- Management Only - Production Documents (5)
+('first_hoja_ruta',        'Primera Hoja de Ruta',      'Has creado tu primera hoja de ruta para una gira.',              'Genera una hoja de ruta desde Tours',    'management', 'threshold', 'hojas_ruta_created',  1,   NULL, false, '🗺️', 620),
+('route_master',           'Maestro de Rutas',          '10 hojas de ruta. Planificas giras como un pro.',               NULL,                                      'management', 'threshold', 'hojas_ruta_created',  10,  NULL, false, '🧭', 630),
+('first_rider',            'Primer Rider',              'Has creado tu primer rider técnico de artista.',                 'Crea un rider desde Festivales',         'management', 'threshold', 'riders_created',      1,   NULL, false, '🎸', 640),
+('rider_specialist',       'Especialista en Riders',    '25 riders creados. Conoces cada detalle técnico.',               NULL,                                      'management', 'threshold', 'riders_created',      25,  NULL, false, '🎛️', 650),
+('incident_handler',       'Gestor de Incidencias',     '5 informes de incidencias documentados.',                        'Documenta incidencias desde la app',     'management', 'threshold', 'incidents_reported',  5,   NULL, false, '⚠️', 660),
+
+-- Management Only - Technical Specs (5)
+('first_consumo',          'Primer Consumo',            'Has calculado tu primer consumo de potencia.',                   'Calcula consumos de luces o sonido',     'management', 'threshold', 'consumos_created',    1,   NULL, false, '⚡', 670),
+('power_calculator',       'Calculador de Potencia',    '10 consumos calculados. Dominas los amperios.',                  NULL,                                      'management', 'threshold', 'consumos_created',    10,  NULL, false, '🔌', 680),
+('first_peso',             'Primer Cálculo de Peso',    'Has calculado pesos para logística por primera vez.',            'Calcula pesos para transporte',          'management', 'threshold', 'pesos_calculated',    1,   NULL, false, '⚖️', 690),
+('logistics_engineer',     'Ingeniero Logístico',       '15 cálculos de peso. Optimizas cada camión.',                    NULL,                                      'management', 'threshold', 'pesos_calculated',    15,  NULL, false, '🚛', 700),
+('stage_plotter',          'Diseñador de Escenario',    'Has creado 5 stage plots para montajes.',                        'Diseña stage plots desde la app',        'management', 'threshold', 'stage_plots_created', 5,   NULL, false, '🎭', 710),
+
+-- Management Only - Warehouse & Logistics (3)
+('warehouse_warrior',      'Guerrero del Almacén',      '20 operaciones de load-in/load-out gestionadas.',                'Gestiona entradas/salidas de almacén',   'management', 'threshold', 'warehouse_ops',       20,  NULL, false, '📦', 720),
+('transport_coordinator',  'Coordinador de Transporte', 'Has coordinado transporte para 10 eventos.',                     NULL,                                      'management', 'threshold', 'transport_coordinated',10, NULL, false, '🚚', 730),
+('flex_integrator',        'Integrador Flex',           'Has sincronizado 15 elementos con Flex Rental.',                 'Integra trabajos con Flex',              'management', 'threshold', 'flex_syncs',          15,  NULL, false, '🔗', 740),
+
+-- Management Only - Festival & Tour Operations (5)
+('festival_scheduler',     'Programador de Festivales', 'Has programado tu primer festival multi-día.',                   'Programa un festival en la app',         'management', 'threshold', 'festivals_scheduled', 1,   NULL, false, '🎪', 750),
+('festival_maestro',       'Maestro de Festivales',     '5 festivales programados. Organizas eventos épicos.',            NULL,                                      'management', 'threshold', 'festivals_scheduled', 5,   NULL, false, '🎉', 760),
+('artist_coordinator',     'Coordinador de Artistas',   'Has gestionado 30 artistas en festivales.',                      'Gestiona artistas y requisitos',         'management', 'threshold', 'artists_managed',     30,  NULL, false, '🎤', 770),
+('tour_architect',         'Arquitecto de Giras',       'Has creado 10 giras completas con fechas e itinerarios.',        NULL,                                      'management', 'threshold', 'tours_created',       10,  NULL, false, '🗓️', 780),
+('presupuesto_pro',        'Pro de Presupuestos',       '20 presupuestos/quotes generados. Cierras deals.',               'Genera presupuestos para clientes',      'management', 'threshold', 'quotes_generated',    20,  NULL, false, '💼', 790);
 
 -- ============================================================================
 -- Evaluation Function: evaluate one user's achievements
@@ -486,6 +512,118 @@ BEGIN
 
     INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
     VALUES (p_user_id, 'pdfs_generated', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Production Document Metrics ----
+    -- Note: These use placeholder counts - adjust based on actual table schemas
+
+    -- hojas_ruta_created: Tour route sheets/day sheets created
+    SELECT 0 INTO v_metric_value;  -- Placeholder
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'hojas_ruta_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- riders_created: Technical riders for artists
+    SELECT COUNT(*) INTO v_metric_value
+    FROM artist_requirements
+    WHERE created_by = p_user_id;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'riders_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- incidents_reported: Incident reports filed
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need incident_reports table
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'incidents_reported', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Technical Spec Metrics ----
+
+    -- consumos_created: Power consumption sheets
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need consumos tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'consumos_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- pesos_calculated: Weight calculations for logistics
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need weight calc tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'pesos_calculated', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- stage_plots_created: Stage plot designs
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need stage plot tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'stage_plots_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Warehouse & Logistics Metrics ----
+
+    -- warehouse_ops: Load-in/load-out operations
+    SELECT COUNT(*) INTO v_metric_value
+    FROM load_in_load_out
+    WHERE created_by = p_user_id;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'warehouse_ops', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- transport_coordinated: Transport coordination
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need transport tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'transport_coordinated', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- flex_syncs: Flex Rental integrations
+    SELECT COUNT(*) INTO v_metric_value
+    FROM flex_folders
+    WHERE created_by = p_user_id;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'flex_syncs', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Festival & Tour Operations Metrics ----
+
+    -- festivals_scheduled: Festivals created
+    SELECT COUNT(*) INTO v_metric_value
+    FROM tours
+    WHERE created_by = p_user_id AND tour_type = 'festival';
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'festivals_scheduled', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- artists_managed: Artists in festivals
+    SELECT COUNT(*) INTO v_metric_value
+    FROM festival_artists
+    WHERE created_by = p_user_id;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'artists_managed', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- tours_created: Tours created
+    SELECT COUNT(*) INTO v_metric_value
+    FROM tours
+    WHERE created_by = p_user_id AND tour_type = 'tour';
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'tours_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- quotes_generated: Quotes/presupuestos generated
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need quotes tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'quotes_generated', v_metric_value, now())
     ON CONFLICT (user_id, metric_key)
     DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
 
