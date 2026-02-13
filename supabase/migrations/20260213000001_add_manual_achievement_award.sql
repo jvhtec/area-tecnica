@@ -12,7 +12,6 @@ DECLARE
   v_requester_id uuid;
   v_awarded_by_role user_role;
   v_achievement_exists boolean;
-  v_already_unlocked boolean;
   v_unlock_id uuid;
 BEGIN
   -- Set explicit search_path for security (prevent schema hijacking)
@@ -49,6 +48,14 @@ BEGIN
     );
   END IF;
 
+  -- Validate target user exists
+  IF NOT EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id) THEN
+    RETURN jsonb_build_object(
+      'success', false,
+      'error', 'Target user not found'
+    );
+  END IF;
+
   -- Check if achievement exists and is active
   SELECT EXISTS (
     SELECT 1 FROM achievements
@@ -62,23 +69,20 @@ BEGIN
     );
   END IF;
 
-  -- Check if user already has this achievement
-  SELECT EXISTS (
-    SELECT 1 FROM achievement_unlocks
-    WHERE user_id = p_user_id AND achievement_id = p_achievement_id
-  ) INTO v_already_unlocked;
+  -- Atomically create unlock record (prevents TOCTOU race)
+  -- ON CONFLICT handles concurrent requests gracefully
+  INSERT INTO achievement_unlocks (user_id, achievement_id, unlocked_at, seen)
+  VALUES (p_user_id, p_achievement_id, now(), false)
+  ON CONFLICT (user_id, achievement_id) DO NOTHING
+  RETURNING id INTO v_unlock_id;
 
-  IF v_already_unlocked THEN
+  -- If v_unlock_id IS NULL, the conflict occurred (user already has achievement)
+  IF v_unlock_id IS NULL THEN
     RETURN jsonb_build_object(
       'success', false,
       'error', 'User already has this achievement'
     );
   END IF;
-
-  -- Create unlock record
-  INSERT INTO achievement_unlocks (user_id, achievement_id, unlocked_at, seen)
-  VALUES (p_user_id, p_achievement_id, now(), false)
-  RETURNING id INTO v_unlock_id;
 
   RETURN jsonb_build_object(
     'success', true,
