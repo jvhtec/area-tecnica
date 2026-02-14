@@ -161,8 +161,27 @@ export const TechnicianIncidentReportDialog = ({
   const handleSaveSignature = () => {
     if (!signaturePadRef.current) return;
 
-    const signatureData = signaturePadRef.current.toDataURL();
-    setFormData(prev => ({ ...prev, signature: signatureData }));
+    // Always produce a black-on-white signature for PDF compatibility.
+    // In dark mode the pen is white on transparent — we need to invert it.
+    const rawDataUrl = signaturePadRef.current.toDataURL();
+    const sigCanvas = signaturePadRef.current.getCanvas();
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = sigCanvas.width;
+    outCanvas.height = sigCanvas.height;
+    const ctx = outCanvas.getContext('2d');
+    if (ctx) {
+      // White background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, outCanvas.width, outCanvas.height);
+      if (isDark) {
+        // Invert dark-mode white strokes to black
+        ctx.filter = 'invert(1)';
+      }
+      ctx.drawImage(sigCanvas, 0, 0);
+      setFormData(prev => ({ ...prev, signature: outCanvas.toDataURL('image/png') }));
+    } else {
+      setFormData(prev => ({ ...prev, signature: rawDataUrl }));
+    }
     setIsSignatureDialogOpen(false);
 
     toast.success("Firma guardada correctamente");
@@ -258,8 +277,8 @@ export const TechnicianIncidentReportDialog = ({
       </div>
 
       {isOpen && (
-        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${t.modalOverlay} p-4 animate-in fade-in duration-200`}>
-          <div className={`w-full max-w-2xl max-h-[90vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${t.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
+        <div className={`fixed inset-0 z-[70] flex items-end sm:items-center justify-center ${t.modalOverlay} p-2 sm:p-4 animate-in fade-in duration-200`}>
+          <div className={`w-full max-w-2xl max-h-[95dvh] sm:max-h-[90vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${t.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
 
             {/* Header */}
             <div className={`p-4 border-b ${t.divider} flex justify-between items-center shrink-0`}>
@@ -278,7 +297,7 @@ export const TechnicianIncidentReportDialog = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 sm:space-y-5 min-h-0">
 
               {/* Equipment Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -430,7 +449,7 @@ export const TechnicianIncidentReportDialog = ({
             </div>
 
             {/* Footer */}
-            <div className={`p-4 border-t ${t.divider} flex gap-3 bg-opacity-50 ${isDark ? 'bg-[#0f1219]' : 'bg-white'}`}>
+            <div className={`p-3 sm:p-4 border-t ${t.divider} flex gap-3 shrink-0 ${isDark ? 'bg-[#0f1219]' : 'bg-white'}`}>
               <Button
                 variant="outline"
                 onClick={() => setIsOpen(false)}

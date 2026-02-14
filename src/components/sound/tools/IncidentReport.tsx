@@ -150,8 +150,20 @@ export const IncidentReport = () => {
   const handleSaveSignature = () => {
     if (!signaturePadRef.current) return;
 
-    const signatureData = signaturePadRef.current.toDataURL();
-    setFormData(prev => ({ ...prev, signature: signatureData }));
+    // Ensure black-on-white output for PDF compatibility
+    const sigCanvas = signaturePadRef.current.getCanvas();
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = sigCanvas.width;
+    outCanvas.height = sigCanvas.height;
+    const ctx = outCanvas.getContext('2d');
+    if (ctx) {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, outCanvas.width, outCanvas.height);
+      ctx.drawImage(sigCanvas, 0, 0);
+      setFormData(prev => ({ ...prev, signature: outCanvas.toDataURL('image/png') }));
+    } else {
+      setFormData(prev => ({ ...prev, signature: signaturePadRef.current!.toDataURL() }));
+    }
     setIsSignatureDialogOpen(false);
 
     toast({
