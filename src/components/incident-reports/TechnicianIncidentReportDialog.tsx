@@ -1,14 +1,18 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, PenTool, X, Check, ClipboardList, AlertTriangle, Loader2, Save } from "lucide-react";
+import { FileText, PenTool, X, Check, ClipboardList, AlertTriangle, Loader2, Save, Camera, ImagePlus, Trash2 } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { toast } from "sonner";
 import { generateIncidentReportPDF } from "@/utils/incident-report/pdf-generator";
 import { Job } from "@/types/job";
 import { Theme } from "@/components/technician/types";
+
+const MAX_PHOTOS = 4;
+const MAX_PHOTO_SIZE_MB = 10;
+const OPTIMIZED_MAX_DIMENSION = 1200;
+const OPTIMIZED_QUALITY = 0.8;
 
 interface TechnicianIncidentReportDialogProps {
   job: Job;
@@ -25,6 +29,44 @@ interface IncidentReportData {
   issue: string;
   actionsTaken: string;
   signature: string;
+  photos: string[];
+}
+
+/**
+ * Optimizes a photo file to a JPEG base64 data URL, resized to fit within maxDimension.
+ */
+function optimizePhotoForPDF(file: File, maxDimension: number, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round(height * (maxDimension / width));
+            width = maxDimension;
+          } else {
+            width = Math.round(width * (maxDimension / height));
+            height = maxDimension;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { reject(new Error('No canvas context')); return; }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+  });
 }
 
 export const TechnicianIncidentReportDialog = ({
@@ -35,7 +77,6 @@ export const TechnicianIncidentReportDialog = ({
   theme,
   isDark = false
 }: TechnicianIncidentReportDialogProps) => {
-  // Provide fallback for techName to ensure PDF always has a non-empty name
   const effectiveTechName = techName?.trim() || "Técnico desconocido";
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState<IncidentReportData>({
@@ -43,14 +84,16 @@ export const TechnicianIncidentReportDialog = ({
     brand: '',
     issue: '',
     actionsTaken: '',
-    signature: ''
+    signature: '',
+    photos: []
   });
 
   const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
   const signaturePadRef = useRef<SignatureCanvas>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // Default theme fallback if not provided
   const defaultTheme: Theme = {
     bg: isDark ? "bg-[#05070a]" : "bg-slate-50",
     nav: isDark ? "bg-[#0f1219] border-t border-[#1f232e]" : "bg-white border-t border-slate-200",
@@ -71,6 +114,49 @@ export const TechnicianIncidentReportDialog = ({
   const handleInputChange = (field: keyof IncidentReportData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const handlePhotoSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remaining = MAX_PHOTOS - formData.photos.length;
+    if (remaining <= 0) {
+      toast.error(`Máximo ${MAX_PHOTOS} fotos permitidas`);
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remaining);
+    const oversized = filesToProcess.filter(f => f.size > MAX_PHOTO_SIZE_MB * 1024 * 1024);
+    if (oversized.length > 0) {
+      toast.error(`Algunas fotos exceden ${MAX_PHOTO_SIZE_MB}MB y serán omitidas`);
+    }
+
+    const validFiles = filesToProcess.filter(f => f.size <= MAX_PHOTO_SIZE_MB * 1024 * 1024);
+    if (validFiles.length === 0) return;
+
+    setIsProcessingPhotos(true);
+    try {
+      const optimized = await Promise.all(
+        validFiles.map(f => optimizePhotoForPDF(f, OPTIMIZED_MAX_DIMENSION, OPTIMIZED_QUALITY))
+      );
+      setFormData(prev => ({ ...prev, photos: [...prev.photos, ...optimized] }));
+      toast.success(`${optimized.length} foto${optimized.length > 1 ? 's' : ''} añadida${optimized.length > 1 ? 's' : ''}`);
+    } catch (error) {
+      console.error('Error processing photos:', error);
+      toast.error("Error al procesar las fotos");
+    } finally {
+      setIsProcessingPhotos(false);
+      // Reset input so same file can be selected again
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  }, [formData.photos.length]);
+
+  const removePhoto = useCallback((index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      photos: prev.photos.filter((_, i) => i !== index)
+    }));
+  }, []);
 
   const handleSaveSignature = () => {
     if (!signaturePadRef.current) return;
@@ -94,14 +180,15 @@ export const TechnicianIncidentReportDialog = ({
       brand: '',
       issue: '',
       actionsTaken: '',
-      signature: ''
+      signature: '',
+      photos: []
     });
   };
 
   const validateForm = (): boolean => {
-    const requiredFields = ['equipmentModel', 'brand', 'issue', 'actionsTaken'];
+    const requiredFields = ['equipmentModel', 'brand', 'issue', 'actionsTaken'] as const;
     const missingFields = requiredFields.filter(field =>
-      !formData[field as keyof IncidentReportData].trim()
+      !formData[field].trim()
     );
 
     if (missingFields.length > 0) {
@@ -128,7 +215,12 @@ export const TechnicianIncidentReportDialog = ({
           jobTitle: job.title,
           jobStartDate: job.start_time,
           jobEndDate: job.end_time,
-          ...formData,
+          equipmentModel: formData.equipmentModel,
+          brand: formData.brand,
+          issue: formData.issue,
+          actionsTaken: formData.actionsTaken,
+          signature: formData.signature,
+          photos: formData.photos,
           techName: effectiveTechName
         },
         { saveToDatabase: true, downloadLocal: true }
@@ -232,6 +324,73 @@ export const TechnicianIncidentReportDialog = ({
                   rows={4}
                   className={`${t.input} resize-none`}
                 />
+              </div>
+
+              {/* Photo Upload Section */}
+              <div>
+                <label className={`text-xs font-bold mb-1.5 block ml-1 ${t.textMuted}`}>
+                  Evidencia Fotográfica ({formData.photos.length}/{MAX_PHOTOS})
+                </label>
+
+                {/* Photo thumbnails grid */}
+                {formData.photos.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    {formData.photos.map((photo, index) => (
+                      <div
+                        key={index}
+                        className={`relative group rounded-lg overflow-hidden border ${t.divider} aspect-[4/3]`}
+                      >
+                        <img
+                          src={photo}
+                          alt={`Foto ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={() => removePhoto(index)}
+                          className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                        <span className={`absolute bottom-1 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-black/60 text-white' : 'bg-white/80 text-slate-700'}`}>
+                          Foto {index + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add photo button */}
+                {formData.photos.length < MAX_PHOTOS && (
+                  <>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      capture="environment"
+                      onChange={handlePhotoSelect}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={isProcessingPhotos}
+                      className={`w-full h-20 rounded-xl border-2 border-dashed ${t.divider} flex flex-col items-center justify-center ${t.textMuted} hover:bg-white/5 transition-colors disabled:opacity-50`}
+                    >
+                      {isProcessingPhotos ? (
+                        <>
+                          <Loader2 className="h-5 w-5 mb-1.5 animate-spin opacity-50" />
+                          <span className="text-xs font-bold uppercase">Procesando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="h-5 w-5 mb-1.5 opacity-50" />
+                          <span className="text-xs font-bold uppercase">Añadir fotos</span>
+                          <span className={`text-[10px] mt-0.5 ${t.textMuted}`}>Máx. {MAX_PHOTOS} fotos, {MAX_PHOTO_SIZE_MB}MB cada una</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
               </div>
 
               {/* Signature Section */}
