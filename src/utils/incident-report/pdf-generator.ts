@@ -1,6 +1,7 @@
 import { PDFDocument } from '../hoja-de-ruta/pdf/core/pdf-document';
 import { LogoService } from '../hoja-de-ruta/pdf/services/logo-service';
 import { uploadJobPdfWithCleanup } from '../jobDocumentsUpload';
+import { getCompanyLogo } from '../pdf/logoUtils';
 
 interface IncidentReportPDFData {
   jobId: string;
@@ -218,14 +219,17 @@ export const generateIncidentReportPDF = async (
 
   // ── PHOTO EVIDENCE ──────────────────────────────────────────────
   if (data.photos && data.photos.length > 0) {
-    yPosition = pdfDoc.checkPageBreak(yPosition, 80);
-    yPosition = addSectionHeader(pdfDoc, 'EVIDENCIA FOTOGRÁFICA', yPosition, pageWidth);
-
     const contentWidth = pageWidth - 40;
     const maxPhotosPerRow = 2;
     const photoGap = 8;
     const photoWidth = (contentWidth - photoGap * (maxPhotosPerRow - 1)) / maxPhotosPerRow;
     const photoHeight = photoWidth * 0.75; // 4:3 aspect ratio
+
+    // Check page break for header + first photo row together so they don't split
+    const sectionHeaderHeight = 22;
+    const firstRowHeight = photoHeight + 10; // photo + label space
+    yPosition = pdfDoc.checkPageBreak(yPosition, sectionHeaderHeight + firstRowHeight);
+    yPosition = addSectionHeader(pdfDoc, 'EVIDENCIA FOTOGRÁFICA', yPosition, pageWidth);
 
     for (let i = 0; i < data.photos.length; i++) {
       const col = i % maxPhotosPerRow;
@@ -233,11 +237,8 @@ export const generateIncidentReportPDF = async (
 
       if (isNewRow && i > 0) {
         yPosition += photoHeight + photoGap;
-      }
-
-      // Check page break before each new row
-      if (isNewRow) {
-        yPosition = pdfDoc.checkPageBreak(yPosition, photoHeight + 20);
+        // Check page break before subsequent rows
+        yPosition = pdfDoc.checkPageBreak(yPosition, photoHeight + 10);
       }
 
       const xOffset = 20 + col * (photoWidth + photoGap);
@@ -304,21 +305,63 @@ export const generateIncidentReportPDF = async (
   pdfDoc.addText(`Fecha y hora de firma: ${dateStr} ${timeStr}`, 20, yPosition + 5);
 
   // ── FOOTER ──────────────────────────────────────────────────────
-  // Footer on every page
+  // Load Sector Pro logo for footer
+  let footerLogoData: string | null = null;
+  let footerLogoDims = { width: 0, height: 0 };
+  try {
+    const companyLogoImg = await getCompanyLogo();
+    if (companyLogoImg) {
+      // Convert HTMLImageElement to data URL via canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = companyLogoImg.naturalWidth || companyLogoImg.width;
+      canvas.height = companyLogoImg.naturalHeight || companyLogoImg.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(companyLogoImg, 0, 0);
+        footerLogoData = canvas.toDataURL('image/png');
+        // Scale to fit footer: max 8px high, max 50px wide
+        const maxH = 8, maxW = 50;
+        const scale = Math.min(maxH / canvas.height, maxW / canvas.width);
+        footerLogoDims = {
+          width: Math.round(canvas.width * scale),
+          height: Math.round(canvas.height * scale)
+        };
+      }
+    }
+  } catch (error) {
+    console.warn('Could not load Sector Pro logo for footer:', error);
+  }
+
+  // Apply footer to every page
   const totalPages = pdfDoc.document.getNumberOfPages();
   for (let page = 1; page <= totalPages; page++) {
     pdfDoc.document.setPage(page);
-    const footerY = pageHeight - 22;
+    const footerY = pageHeight - 20;
+    const bottomTextY = pageHeight - 10;
 
-    // Footer line
+    // Footer separator line
     pdfDoc.document.setDrawColor(125, 1, 1);
     pdfDoc.document.setLineWidth(0.5);
     pdfDoc.document.line(20, footerY, pageWidth - 20, footerY);
 
-    // Footer text
+    // Sector Pro logo centered
+    if (footerLogoData && footerLogoDims.width > 0) {
+      const logoX = (pageWidth - footerLogoDims.width) / 2;
+      const logoY = footerY + 2;
+      pdfDoc.addImage(footerLogoData, 'PNG', logoX, logoY, footerLogoDims.width, footerLogoDims.height);
+    } else {
+      // Fallback text if logo not available
+      pdfDoc.setText(8, [125, 1, 1]);
+      pdfDoc.addText('Sector Pro', pageWidth / 2, bottomTextY, { align: 'center' });
+    }
+
+    // Page number on left
     pdfDoc.setText(7, [140, 140, 150]);
-    pdfDoc.addText('Reporte generado automáticamente por Sector Pro', 20, footerY + 8);
-    pdfDoc.addText(`Página ${page} de ${totalPages}`, pageWidth - 20, footerY + 8, { align: 'right' });
+    pdfDoc.addText(`Pág. ${page} de ${totalPages}`, 20, bottomTextY);
+
+    // Job name on right
+    const truncatedTitle = data.jobTitle.length > 40 ? data.jobTitle.substring(0, 40) + '...' : data.jobTitle;
+    pdfDoc.addText(truncatedTitle, pageWidth - 20, bottomTextY, { align: 'right' });
   }
 
   // ── OUTPUT ──────────────────────────────────────────────────────
