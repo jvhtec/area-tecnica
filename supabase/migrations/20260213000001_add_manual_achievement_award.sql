@@ -7,16 +7,17 @@ CREATE OR REPLACE FUNCTION manually_award_achievement(
   p_user_id uuid,
   p_achievement_id uuid
 )
-RETURNS jsonb AS $$
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_catalog
+AS $$
 DECLARE
   v_requester_id uuid;
   v_awarded_by_role user_role;
   v_achievement_exists boolean;
   v_unlock_id uuid;
 BEGIN
-  -- Set explicit search_path for security (prevent schema hijacking)
-  SET search_path = public, pg_catalog;
-
   -- Get the current user from auth context
   v_requester_id := auth.uid();
 
@@ -90,7 +91,7 @@ BEGIN
     'message', 'Achievement awarded successfully'
   );
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- Grant execute to authenticated users (function derives caller from auth.uid() and checks role internally)
+-- Grant execute to authenticated users (function checks role internally via auth.uid())
 GRANT EXECUTE ON FUNCTION manually_award_achievement(uuid, uuid) TO authenticated;
