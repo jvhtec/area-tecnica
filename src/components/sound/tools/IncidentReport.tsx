@@ -11,11 +11,15 @@ import SignatureCanvas from "react-signature-canvas";
 import { useJobSelection } from "@/hooks/useJobSelection";
 import { useToast } from "@/hooks/use-toast";
 import { generateIncidentReportPDF } from "@/utils/incident-report/pdf-generator";
-
-const MAX_PHOTOS = 4;
-const MAX_PHOTO_SIZE_MB = 10;
-const OPTIMIZED_MAX_DIMENSION = 1200;
-const OPTIMIZED_QUALITY = 0.8;
+import {
+  optimizePhotoForPDF,
+  MAX_PHOTOS,
+  MAX_PHOTO_SIZE_MB,
+  OPTIMIZED_MAX_DIMENSION,
+  OPTIMIZED_QUALITY
+} from "@/utils/incident-report/photo-utils";
+import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 
 interface IncidentReportData {
   jobId: string;
@@ -31,40 +35,6 @@ interface IncidentReportData {
 /**
  * Optimizes a photo file to a JPEG base64 data URL, resized to fit within maxDimension.
  */
-function optimizePhotoForPDF(file: File, maxDimension: number, quality: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round(height * (maxDimension / width));
-            width = maxDimension;
-          } else {
-            width = Math.round(width * (maxDimension / height));
-            height = maxDimension;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('No canvas context')); return; }
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
-}
-
 export const IncidentReport = () => {
   const [formData, setFormData] = useState<IncidentReportData>({
     jobId: '',
@@ -195,9 +165,8 @@ export const IncidentReport = () => {
     const requiredFields = ['jobId', 'equipmentModel', 'brand', 'issue', 'actionsTaken', 'techName'];
 
     for (const field of requiredFields) {
-      if (!formData[field as keyof IncidentReportData]) return false;
       const val = formData[field as keyof IncidentReportData];
-      if (typeof val === 'string' && !val.trim()) {
+      if (!val || (typeof val === 'string' && !val.trim())) {
         toast({
           title: "Campos requeridos",
           description: "Por favor complete todos los campos obligatorios.",
@@ -285,7 +254,7 @@ export const IncidentReport = () => {
               <SelectContent>
                 {jobs?.map((job) => (
                   <SelectItem key={job.id} value={job.id}>
-                    {job.title} - {new Date(job.start_time).toLocaleDateString('es-ES')}
+                    {job.title} - {format(toZonedTime(new Date(job.start_time), 'Europe/Madrid'), 'dd/MM/yyyy')}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -363,7 +332,7 @@ export const IncidentReport = () => {
                   />
                   <button
                     onClick={() => removePhoto(index)}
-                    className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                    className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/60 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-red-600"
                   >
                     <Trash2 size={12} />
                   </button>
@@ -382,6 +351,7 @@ export const IncidentReport = () => {
                 ref={photoInputRef}
                 type="file"
                 accept="image/*"
+                capture="environment"
                 multiple
                 onChange={handlePhotoSelect}
                 className="hidden"

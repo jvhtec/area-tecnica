@@ -2,17 +2,19 @@ import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { FileText, PenTool, X, Check, ClipboardList, AlertTriangle, Loader2, Save, Camera, ImagePlus, Trash2 } from "lucide-react";
+import { FileText, PenTool, X, Check, ClipboardList, AlertTriangle, Loader2, Save, Camera, Trash2 } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { toast } from "sonner";
 import { generateIncidentReportPDF } from "@/utils/incident-report/pdf-generator";
 import { Job } from "@/types/job";
 import { Theme } from "@/components/technician/types";
-
-const MAX_PHOTOS = 4;
-const MAX_PHOTO_SIZE_MB = 10;
-const OPTIMIZED_MAX_DIMENSION = 1200;
-const OPTIMIZED_QUALITY = 0.8;
+import {
+  optimizePhotoForPDF,
+  MAX_PHOTOS,
+  MAX_PHOTO_SIZE_MB,
+  OPTIMIZED_MAX_DIMENSION,
+  OPTIMIZED_QUALITY
+} from "@/utils/incident-report/photo-utils";
 
 interface TechnicianIncidentReportDialogProps {
   job: Job;
@@ -30,43 +32,6 @@ interface IncidentReportData {
   actionsTaken: string;
   signature: string;
   photos: string[];
-}
-
-/**
- * Optimizes a photo file to a JPEG base64 data URL, resized to fit within maxDimension.
- */
-function optimizePhotoForPDF(file: File, maxDimension: number, quality: number): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round(height * (maxDimension / width));
-            width = maxDimension;
-          } else {
-            width = Math.round(width * (maxDimension / height));
-            height = maxDimension;
-          }
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { reject(new Error('No canvas context')); return; }
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.onerror = () => reject(new Error('Failed to load image'));
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsDataURL(file);
-  });
 }
 
 export const TechnicianIncidentReportDialog = ({
@@ -277,8 +242,8 @@ export const TechnicianIncidentReportDialog = ({
       </div>
 
       {isOpen && (
-        <div className={`fixed inset-0 z-[70] flex items-end sm:items-center justify-center ${t.modalOverlay} p-2 sm:p-4 animate-in fade-in duration-200`}>
-          <div className={`w-full max-w-2xl max-h-[95dvh] sm:max-h-[90vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${t.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
+        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${t.modalOverlay} p-2 sm:p-4 animate-in fade-in duration-200 overflow-y-auto`}>
+          <div className={`w-full max-w-2xl max-h-[90dvh] my-auto ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${t.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
 
             {/* Header */}
             <div className={`p-4 border-b ${t.divider} flex justify-between items-center shrink-0`}>
@@ -366,7 +331,7 @@ export const TechnicianIncidentReportDialog = ({
                         />
                         <button
                           onClick={() => removePhoto(index)}
-                          className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                          className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/60 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-red-600"
                         >
                           <Trash2 size={12} />
                         </button>

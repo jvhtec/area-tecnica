@@ -1,7 +1,10 @@
-import { PDFDocument } from '../hoja-de-ruta/pdf/core/pdf-document';
-import { LogoService } from '../hoja-de-ruta/pdf/services/logo-service';
-import { uploadJobPdfWithCleanup } from '../jobDocumentsUpload';
-import { getCompanyLogo } from '../pdf/logoUtils';
+import { PDFDocument } from '@/utils/hoja-de-ruta/pdf/core/pdf-document';
+import { LogoService } from '@/utils/hoja-de-ruta/pdf/services/logo-service';
+import { uploadJobPdfWithCleanup } from '@/utils/jobDocumentsUpload';
+import { getCompanyLogo } from '@/utils/pdf/logoUtils';
+import { format } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+import { es } from 'date-fns/locale';
 
 interface IncidentReportPDFData {
   jobId: string;
@@ -43,6 +46,36 @@ function addSectionHeader(pdfDoc: PDFDocument, title: string, yPosition: number,
   return yPosition + 22;
 }
 
+// Content box styling constants
+const BOX_PADDING = 10;
+const LINE_HEIGHT = 5.5;
+
+/**
+ * Computes box metrics (lines and height) for text content.
+ */
+function computeBoxMetrics(
+  pdfDoc: PDFDocument,
+  text: string,
+  pageWidth: number
+): { lines: string[]; boxHeight: number } {
+  const contentWidth = pageWidth - 40;
+  const lines = pdfDoc.document.splitTextToSize(text, contentWidth - 16);
+  const boxHeight = Math.max(30, lines.length * LINE_HEIGHT + BOX_PADDING * 2);
+  return { lines, boxHeight };
+}
+
+/**
+ * Calculates the height needed for a content box without drawing it.
+ */
+function calculateContentBoxHeight(
+  pdfDoc: PDFDocument,
+  text: string,
+  pageWidth: number
+): number {
+  const { boxHeight } = computeBoxMetrics(pdfDoc, text, pageWidth);
+  return boxHeight + 12; // +12 for spacing after
+}
+
 /**
  * Draws a text content box with background and border.
  */
@@ -53,10 +86,7 @@ function addContentBox(
   pageWidth: number
 ): number {
   const contentWidth = pageWidth - 40;
-  const lines = pdfDoc.document.splitTextToSize(text, contentWidth - 16);
-  const lineHeight = 5.5;
-  const boxPadding = 10;
-  const boxHeight = Math.max(30, lines.length * lineHeight + boxPadding * 2);
+  const { lines, boxHeight } = computeBoxMetrics(pdfDoc, text, pageWidth);
 
   // Background
   pdfDoc.setFillColor(250, 250, 252);
@@ -69,7 +99,7 @@ function addContentBox(
 
   // Text
   pdfDoc.setText(10, [30, 30, 40]);
-  pdfDoc.document.text(lines, 28, yPosition + boxPadding + 3);
+  pdfDoc.document.text(lines, 28, yPosition + BOX_PADDING + 3);
 
   return yPosition + boxHeight + 12;
 }
@@ -122,11 +152,9 @@ export const generateIncidentReportPDF = async (
   pdfDoc.setFillColor(245, 245, 248);
   pdfDoc.addRect(0, 48, pageWidth, 18, 'F');
 
-  const currentDate = new Date();
-  const dateStr = currentDate.toLocaleDateString('es-ES', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  });
-  const timeStr = currentDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+  const currentDate = toZonedTime(new Date(), 'Europe/Madrid');
+  const dateStr = format(currentDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
+  const timeStr = format(currentDate, 'HH:mm');
 
   pdfDoc.setText(8, [100, 100, 110]);
   pdfDoc.addText(`Fecha: ${dateStr}  •  Hora: ${timeStr}  •  Técnico: ${data.techName}`, pageWidth / 2, 59, { align: 'center' });
@@ -141,8 +169,8 @@ export const generateIncidentReportPDF = async (
     head: [['Campo', 'Detalle']],
     body: [
       ['Trabajo', data.jobTitle],
-      ['Fecha de inicio', new Date(data.jobStartDate).toLocaleDateString('es-ES', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })],
-      ['Fecha de fin', new Date(data.jobEndDate).toLocaleDateString('es-ES', { weekday: 'short', year: 'numeric', month: 'long', day: 'numeric' })]
+      ['Fecha de inicio', format(toZonedTime(new Date(data.jobStartDate), 'Europe/Madrid'), "EEE, d 'de' MMMM 'de' yyyy", { locale: es })],
+      ['Fecha de fin', format(toZonedTime(new Date(data.jobEndDate), 'Europe/Madrid'), "EEE, d 'de' MMMM 'de' yyyy", { locale: es })]
     ],
     margin: { left: 20, right: 20 },
     styles: {
@@ -204,14 +232,16 @@ export const generateIncidentReportPDF = async (
   yPosition = pdfDoc.getLastAutoTableY() + 16;
 
   // ── INCIDENT DESCRIPTION ────────────────────────────────────────
-  yPosition = pdfDoc.checkPageBreak(yPosition, 60);
+  const issueBoxHeight = calculateContentBoxHeight(pdfDoc, data.issue, pageWidth);
+  yPosition = pdfDoc.checkPageBreak(yPosition, 22 + issueBoxHeight); // 22 for section header
   yPosition = addSectionHeader(pdfDoc, 'DESCRIPCIÓN DE LA INCIDENCIA', yPosition, pageWidth);
 
   pdfDoc.setText(10, [30, 30, 40]);
   yPosition = addContentBox(pdfDoc, data.issue, yPosition, pageWidth);
 
   // ── ACTIONS TAKEN ───────────────────────────────────────────────
-  yPosition = pdfDoc.checkPageBreak(yPosition, 60);
+  const actionsBoxHeight = calculateContentBoxHeight(pdfDoc, data.actionsTaken, pageWidth);
+  yPosition = pdfDoc.checkPageBreak(yPosition, 22 + actionsBoxHeight); // 22 for section header
   yPosition = addSectionHeader(pdfDoc, 'ACCIONES REALIZADAS', yPosition, pageWidth);
 
   pdfDoc.setText(10, [30, 30, 40]);
@@ -366,7 +396,7 @@ export const generateIncidentReportPDF = async (
 
   // ── OUTPUT ──────────────────────────────────────────────────────
   const safeJobTitle = data.jobTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-  const timeStamp = currentDate.toISOString().replace(/[:.]/g, '-');
+  const timeStamp = format(currentDate, 'yyyy-MM-dd_HH-mm-ss');
   const filename = `reporte_incidencia_${safeJobTitle}_${timeStamp}.pdf`;
 
   if (options.saveToDatabase) {
