@@ -6,9 +6,12 @@ import { format } from "date-fns";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { formatInTimeZone } from "date-fns-tz";
 import { es } from "date-fns/locale";
-import { RefreshCw, Clock, Eye, Download, FileText, ChevronDown, ChevronRight, Info, Dice5 } from "lucide-react";
+import { RefreshCw, Clock, Eye, Download, FileText, ChevronDown, ChevronRight, Info, Dice5, Receipt } from "lucide-react";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
+import { useExpensePermissions, isPermissionActive } from "@/hooks/useExpensePermissions";
+import { useJobExpenses } from "@/hooks/useJobExpenses";
+import { ExpenseForm, ExpenseList, ExpenseSummaryCard } from "@/components/expenses";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -37,6 +40,14 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
   const [showSpanish, setShowSpanish] = useState(false);
 
   const assignmentCategory = assignment.category ?? getCategoryFromAssignment(assignment);
+
+  // Expense permissions
+  const jobId = assignment.jobs?.id || assignment.festival_jobs?.id;
+  const { data: expensePermissions = [] } = useExpensePermissions(jobId);
+  const hasActiveExpensePermissions = expensePermissions.some(p => isPermissionActive(p));
+  const { data: expenses = [] } = useJobExpenses(hasActiveExpensePermissions ? jobId : undefined);
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
 
   const pickRandomStrategyIndex = () => {
     if (OBLIQUE_STRATEGIES.length === 0) {
@@ -187,6 +198,13 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
             <TechnicianIncidentReportDialog job={jobData} techName={techName} labeled className="w-full" />
           )}
 
+          {hasActiveExpensePermissions && (
+            <Button onClick={() => setExpenseDialogOpen(true)} variant="outline" size="sm" className="gap-2">
+              <Receipt className="h-3 w-3" />
+              Gastos
+            </Button>
+          )}
+
           {jobData.job_documents && jobData.job_documents.length > 0 && (
             <div className="flex flex-col gap-1">
               <Collapsible open={expandedDocuments} onOpenChange={() => setExpandedDocuments(!expandedDocuments)}>
@@ -237,6 +255,39 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
       </div>
 
       <JobDetailsDialog open={detailsOpen} onOpenChange={setDetailsOpen} job={{ id: jobData.id }} />
+
+      {/* Expense Dialog */}
+      <Dialog open={expenseDialogOpen} onOpenChange={(open) => { setExpenseDialogOpen(open); if (!open) setShowExpenseForm(false); }}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5" />
+              Mis Gastos — {jobData.title || "Sin título"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex justify-end">
+              <Button
+                onClick={() => setShowExpenseForm(!showExpenseForm)}
+                variant={showExpenseForm ? "outline" : "default"}
+                size="sm"
+              >
+                {showExpenseForm ? "Cerrar" : "Nuevo Gasto"}
+              </Button>
+            </div>
+            {showExpenseForm && (
+              <ExpenseForm
+                jobId={jobData.id}
+                onSuccess={() => setShowExpenseForm(false)}
+                onCancel={() => setShowExpenseForm(false)}
+              />
+            )}
+            <ExpenseSummaryCard expenses={expenses} />
+            <ExpenseList expenses={expenses} showActions />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={strategyOpen} onOpenChange={setStrategyOpen}>
         <DialogContent className="space-y-4">
           <DialogHeader>

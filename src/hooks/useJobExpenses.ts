@@ -272,5 +272,88 @@ export const useReceiptUpload = () => {
   };
 };
 
+/**
+ * Hook to fetch approved expenses for a job, grouped by technician and category.
+ * Used for payout totals when technicians should see their approved expenses.
+ */
+export const useJobApprovedExpenses = (jobId: string | null | undefined) => {
+  const { user, userRole } = useOptimizedAuth();
+  const isManager = userRole === 'admin' || userRole === 'management';
+
+  return useQuery({
+    queryKey: ['job-approved-expenses', jobId],
+    enabled: !!jobId,
+    queryFn: async () => {
+      if (!jobId) {
+        return [];
+      }
+
+      let query = supabase
+        .from('job_expenses')
+        .select(`
+          id,
+          job_id,
+          technician_id,
+          category_slug,
+          amount_eur,
+          status,
+          submitted_at,
+          approved_at,
+          rejected_at,
+          rejection_reason,
+          created_at,
+          updated_at,
+          category:expense_categories(label_es, requires_receipt)
+        `)
+        .eq('job_id', jobId)
+        .eq('status', 'approved');
+
+      // Managers see all approved expenses for the job
+      if (!isManager) {
+        query = query.eq('technician_id', user.id);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const rawExpenses = data || [];
+
+      // Group expenses by technician and category
+      const expensesByTechnicianAndCategory = new Map<string, Map<string, number>>();
+      rawExpenses.forEach((expense: JobExpense) => {
+        const techId = expense.technician_id;
+        const category = expense.category_slug || 'otros';
+
+        if (!expensesByTechnicianAndCategory.has(techId)) {
+          expensesByTechnicianAndCategory.set(techId, new Map());
+        }
+
+        const categoryMap = expensesByTechnicianAndCategory.get(techId);
+        const currentTotal = categoryMap.get(category) || 0;
+
+        // Only count approved expenses
+        if (expense.status === 'approved') {
+          categoryMap.set(category, currentTotal + expense.amount_eur);
+        }
+      });
+
+      // Convert to array format: [{ technician_id, category_slug, amount_eur }]
+      const groupedExpenses: Array<{ technician_id: string; category_slug: string; amount_eur: number }> = [];
+      expensesByTechnicianAndCategory.forEach((categoryMap, technicianId) => {
+        categoryMap.forEach((amount, categorySlug) => {
+          groupedExpenses.push({
+            technician_id,
+            category_slug: categorySlug || 'otros',
+            amount_eur: amount,
+          });
+        });
+      });
+
+      return groupedExpenses;
+    },
+    staleTime: 60 * 1000,
+  });
+};
+
 // Need to import React for useState
 import React from 'react';

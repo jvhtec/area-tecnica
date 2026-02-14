@@ -1,12 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MapPin, Clock, User, FileText, Lightbulb } from 'lucide-react';
+import { MapPin, Clock, User, FileText, Lightbulb, Receipt } from 'lucide-react';
 import { labelForCode } from '@/utils/roles';
 import { TechnicianIncidentReportDialog } from '@/components/incident-reports/TechnicianIncidentReportDialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { useExpensePermissions, isPermissionActive } from '@/hooks/useExpensePermissions';
+import { useJobExpenses } from '@/hooks/useJobExpenses';
+import { ExpenseForm, ExpenseList, ExpenseSummaryCard } from '@/components/expenses';
 import { JobCardProps } from './types';
 
 export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techName, onOpenObliqueStrategy }: JobCardProps) => {
     const jobData = job.jobs || job;
+    const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
+    const [showExpenseForm, setShowExpenseForm] = useState(false);
+
+    // Expense permissions check
+    const { data: expensePermissions = [] } = useExpensePermissions(jobData?.id);
+    const hasActiveExpensePermissions = expensePermissions.some(p => isPermissionActive(p));
+    const { data: expenses = [] } = useJobExpenses(hasActiveExpensePermissions ? jobData?.id : undefined);
     const jobTimezone = jobData?.timezone || 'Europe/Madrid';
 
     // Format time
@@ -111,7 +123,47 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
                         isDark={isDark}
                     />
                 )}
+                {hasActiveExpensePermissions && (
+                    <button
+                        onClick={() => setExpenseDialogOpen(true)}
+                        className={`py-2.5 rounded-lg border border-dashed ${theme.divider} ${theme.textMuted} text-xs font-bold hover:bg-white/5 transition-colors flex items-center justify-center gap-2 ${showTimesheetButton ? 'col-span-2' : ''}`}
+                    >
+                        <Receipt size={14} /> Gastos
+                    </button>
+                )}
             </div>
+
+            {/* Expense Dialog */}
+            <Dialog open={expenseDialogOpen} onOpenChange={(open) => { setExpenseDialogOpen(open); if (!open) setShowExpenseForm(false); }}>
+                <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Receipt className="h-5 w-5" />
+                            Mis Gastos — {jobData?.title || 'Sin título'}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="flex justify-end">
+                            <Button
+                                onClick={() => setShowExpenseForm(!showExpenseForm)}
+                                variant={showExpenseForm ? "outline" : "default"}
+                                size="sm"
+                            >
+                                {showExpenseForm ? "Cerrar" : "Nuevo Gasto"}
+                            </Button>
+                        </div>
+                        {showExpenseForm && (
+                            <ExpenseForm
+                                jobId={jobData.id}
+                                onSuccess={() => setShowExpenseForm(false)}
+                                onCancel={() => setShowExpenseForm(false)}
+                            />
+                        )}
+                        <ExpenseSummaryCard expenses={expenses} />
+                        <ExpenseList expenses={expenses} showActions />
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
