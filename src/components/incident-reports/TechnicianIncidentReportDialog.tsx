@@ -1,14 +1,20 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { FileText, PenTool, X, Check, ClipboardList, AlertTriangle, Loader2, Save } from "lucide-react";
+import { FileText, PenTool, X, Check, ClipboardList, AlertTriangle, Loader2, Save, Camera, Trash2 } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { toast } from "sonner";
 import { generateIncidentReportPDF } from "@/utils/incident-report/pdf-generator";
 import { Job } from "@/types/job";
 import { Theme } from "@/components/technician/types";
+import {
+  optimizePhotoForPDF,
+  MAX_PHOTOS,
+  MAX_PHOTO_SIZE_MB,
+  OPTIMIZED_MAX_DIMENSION,
+  OPTIMIZED_QUALITY
+} from "@/utils/incident-report/photo-utils";
 
 interface TechnicianIncidentReportDialogProps {
   job: Job;
@@ -25,6 +31,7 @@ interface IncidentReportData {
   issue: string;
   actionsTaken: string;
   signature: string;
+  photos: string[];
 }
 
 export const TechnicianIncidentReportDialog = ({
@@ -35,7 +42,6 @@ export const TechnicianIncidentReportDialog = ({
   theme,
   isDark = false
 }: TechnicianIncidentReportDialogProps) => {
-  // Provide fallback for techName to ensure PDF always has a non-empty name
   const effectiveTechName = techName?.trim() || "Técnico desconocido";
   const [isOpen, setIsOpen] = useState(false);
   const [formData, setFormData] = useState<IncidentReportData>({
@@ -43,14 +49,16 @@ export const TechnicianIncidentReportDialog = ({
     brand: '',
     issue: '',
     actionsTaken: '',
-    signature: ''
+    signature: '',
+    photos: []
   });
 
   const [isSignatureDialogOpen, setIsSignatureDialogOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isProcessingPhotos, setIsProcessingPhotos] = useState(false);
   const signaturePadRef = useRef<SignatureCanvas>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
-  // Default theme fallback if not provided
   const defaultTheme: Theme = {
     bg: isDark ? "bg-[#05070a]" : "bg-slate-50",
     nav: isDark ? "bg-[#0f1219] border-t border-[#1f232e]" : "bg-white border-t border-slate-200",
@@ -72,11 +80,73 @@ export const TechnicianIncidentReportDialog = ({
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const handlePhotoSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remaining = MAX_PHOTOS - formData.photos.length;
+    if (remaining <= 0) {
+      toast.error(`Máximo ${MAX_PHOTOS} fotos permitidas`);
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remaining);
+    const oversized = filesToProcess.filter(f => f.size > MAX_PHOTO_SIZE_MB * 1024 * 1024);
+    if (oversized.length > 0) {
+      toast.error(`Algunas fotos exceden ${MAX_PHOTO_SIZE_MB}MB y serán omitidas`);
+    }
+
+    const validFiles = filesToProcess.filter(f => f.size <= MAX_PHOTO_SIZE_MB * 1024 * 1024);
+    if (validFiles.length === 0) return;
+
+    setIsProcessingPhotos(true);
+    try {
+      const optimized = await Promise.all(
+        validFiles.map(f => optimizePhotoForPDF(f, OPTIMIZED_MAX_DIMENSION, OPTIMIZED_QUALITY))
+      );
+      setFormData(prev => ({ ...prev, photos: [...prev.photos, ...optimized] }));
+      toast.success(`${optimized.length} foto${optimized.length > 1 ? 's' : ''} añadida${optimized.length > 1 ? 's' : ''}`);
+    } catch (error) {
+      console.error('Error processing photos:', error);
+      toast.error("Error al procesar las fotos");
+    } finally {
+      setIsProcessingPhotos(false);
+      // Reset input so same file can be selected again
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  }, [formData.photos.length]);
+
+  const removePhoto = useCallback((index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      photos: prev.photos.filter((_, i) => i !== index)
+    }));
+  }, []);
+
   const handleSaveSignature = () => {
     if (!signaturePadRef.current) return;
 
-    const signatureData = signaturePadRef.current.toDataURL();
-    setFormData(prev => ({ ...prev, signature: signatureData }));
+    // Always produce a black-on-white signature for PDF compatibility.
+    // In dark mode the pen is white on transparent — we need to invert it.
+    const rawDataUrl = signaturePadRef.current.toDataURL();
+    const sigCanvas = signaturePadRef.current.getCanvas();
+    const outCanvas = document.createElement('canvas');
+    outCanvas.width = sigCanvas.width;
+    outCanvas.height = sigCanvas.height;
+    const ctx = outCanvas.getContext('2d');
+    if (ctx) {
+      // White background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, outCanvas.width, outCanvas.height);
+      if (isDark) {
+        // Invert dark-mode white strokes to black
+        ctx.filter = 'invert(1)';
+      }
+      ctx.drawImage(sigCanvas, 0, 0);
+      setFormData(prev => ({ ...prev, signature: outCanvas.toDataURL('image/png') }));
+    } else {
+      setFormData(prev => ({ ...prev, signature: rawDataUrl }));
+    }
     setIsSignatureDialogOpen(false);
 
     toast.success("Firma guardada correctamente");
@@ -94,14 +164,15 @@ export const TechnicianIncidentReportDialog = ({
       brand: '',
       issue: '',
       actionsTaken: '',
-      signature: ''
+      signature: '',
+      photos: []
     });
   };
 
   const validateForm = (): boolean => {
-    const requiredFields = ['equipmentModel', 'brand', 'issue', 'actionsTaken'];
+    const requiredFields = ['equipmentModel', 'brand', 'issue', 'actionsTaken'] as const;
     const missingFields = requiredFields.filter(field =>
-      !formData[field as keyof IncidentReportData].trim()
+      !formData[field].trim()
     );
 
     if (missingFields.length > 0) {
@@ -128,7 +199,12 @@ export const TechnicianIncidentReportDialog = ({
           jobTitle: job.title,
           jobStartDate: job.start_time,
           jobEndDate: job.end_time,
-          ...formData,
+          equipmentModel: formData.equipmentModel,
+          brand: formData.brand,
+          issue: formData.issue,
+          actionsTaken: formData.actionsTaken,
+          signature: formData.signature,
+          photos: formData.photos,
           techName: effectiveTechName
         },
         { saveToDatabase: true, downloadLocal: true }
@@ -166,8 +242,8 @@ export const TechnicianIncidentReportDialog = ({
       </div>
 
       {isOpen && (
-        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${t.modalOverlay} p-4 animate-in fade-in duration-200`}>
-          <div className={`w-full max-w-2xl max-h-[90vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${t.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
+        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${t.modalOverlay} p-2 sm:p-4 animate-in fade-in duration-200 overflow-y-auto`}>
+          <div className={`w-full max-w-2xl max-h-[90dvh] my-auto ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${t.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
 
             {/* Header */}
             <div className={`p-4 border-b ${t.divider} flex justify-between items-center shrink-0`}>
@@ -186,7 +262,7 @@ export const TechnicianIncidentReportDialog = ({
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-5">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 sm:space-y-5 min-h-0">
 
               {/* Equipment Details */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -234,6 +310,73 @@ export const TechnicianIncidentReportDialog = ({
                 />
               </div>
 
+              {/* Photo Upload Section */}
+              <div>
+                <label className={`text-xs font-bold mb-1.5 block ml-1 ${t.textMuted}`}>
+                  Evidencia Fotográfica ({formData.photos.length}/{MAX_PHOTOS})
+                </label>
+
+                {/* Photo thumbnails grid */}
+                {formData.photos.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    {formData.photos.map((photo, index) => (
+                      <div
+                        key={index}
+                        className={`relative group rounded-lg overflow-hidden border ${t.divider} aspect-[4/3]`}
+                      >
+                        <img
+                          src={photo}
+                          alt={`Foto ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={() => removePhoto(index)}
+                          className="absolute top-1.5 right-1.5 p-1.5 rounded-full bg-black/60 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                        <span className={`absolute bottom-1 left-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded ${isDark ? 'bg-black/60 text-white' : 'bg-white/80 text-slate-700'}`}>
+                          Foto {index + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add photo button */}
+                {formData.photos.length < MAX_PHOTOS && (
+                  <>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      capture="environment"
+                      onChange={handlePhotoSelect}
+                      className="hidden"
+                    />
+                    <button
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={isProcessingPhotos}
+                      className={`w-full h-20 rounded-xl border-2 border-dashed ${t.divider} flex flex-col items-center justify-center ${t.textMuted} hover:bg-white/5 transition-colors disabled:opacity-50`}
+                    >
+                      {isProcessingPhotos ? (
+                        <>
+                          <Loader2 className="h-5 w-5 mb-1.5 animate-spin opacity-50" />
+                          <span className="text-xs font-bold uppercase">Procesando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="h-5 w-5 mb-1.5 opacity-50" />
+                          <span className="text-xs font-bold uppercase">Añadir fotos</span>
+                          <span className={`text-[10px] mt-0.5 ${t.textMuted}`}>Máx. {MAX_PHOTOS} fotos, {MAX_PHOTO_SIZE_MB}MB cada una</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
+              </div>
+
               {/* Signature Section */}
               <div>
                 <label className={`text-xs font-bold mb-1.5 block ml-1 ${t.textMuted}`}>Firma del Técnico *</label>
@@ -271,7 +414,7 @@ export const TechnicianIncidentReportDialog = ({
             </div>
 
             {/* Footer */}
-            <div className={`p-4 border-t ${t.divider} flex gap-3 bg-opacity-50 ${isDark ? 'bg-[#0f1219]' : 'bg-white'}`}>
+            <div className={`p-3 sm:p-4 border-t ${t.divider} flex gap-3 shrink-0 ${isDark ? 'bg-[#0f1219]' : 'bg-white'}`}>
               <Button
                 variant="outline"
                 onClick={() => setIsOpen(false)}
