@@ -32,9 +32,20 @@ import {
   Filter,
   Loader2,
   Receipt,
+  Trash2,
   XCircle,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import type { ExpenseStatus } from '@/components/jobs/JobExpensesPanel';
 
 interface ExpenseRow {
@@ -81,7 +92,7 @@ const ExpensesPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [statusFilter, setStatusFilter] = React.useState<ExpenseStatus | 'all'>('submitted');
+  const [statusFilter, setStatusFilter] = React.useState<ExpenseStatus | 'all'>('all');
   const [technicianFilter, setTechnicianFilter] = React.useState<string>('all');
   const [jobFilter, setJobFilter] = React.useState<string>('all');
   const [fromDate, setFromDate] = React.useState<string>('');
@@ -90,8 +101,10 @@ const ExpensesPage: React.FC = () => {
   const [selectedExpenseIds, setSelectedExpenseIds] = React.useState<Set<string>>(new Set());
   const [rejectDialog, setRejectDialog] = React.useState<{ expenseId: string; technicianName: string; reason: string } | null>(null);
   const [viewReceiptState, setViewReceiptState] = React.useState<{ expenseId: string; loading: boolean } | null>(null);
+  const [deleteDialog, setDeleteDialog] = React.useState<{ expenseId: string; technicianName: string; amount: number } | null>(null);
 
   const canAccess = userRole ? ALLOWED_ROLES.includes(userRole) : false;
+  const canDeleteExpenses = userRole === 'admin' || userRole === 'management';
 
   React.useEffect(() => {
     if (!isLoading && userRole && !canAccess) {
@@ -283,6 +296,33 @@ const ExpensesPage: React.FC = () => {
       if (error) throw error;
     },
     []
+  );
+
+  const deleteExpense = React.useCallback(
+    async (expenseId: string) => {
+      const { error } = await supabase
+        .from('job_expenses')
+        .delete()
+        .eq('id', expenseId);
+      if (error) throw error;
+    },
+    []
+  );
+
+  const handleDeleteExpense = React.useCallback(
+    async (expenseId: string) => {
+      try {
+        await deleteExpense(expenseId);
+        toast.success('Gasto eliminado correctamente');
+        setDeleteDialog(null);
+        await invalidateExpenseContext();
+        refetch();
+      } catch (error) {
+        console.error('[ExpensesPage] Failed to delete expense', error);
+        toast.error('No se pudo eliminar el gasto');
+      }
+    },
+    [deleteExpense, invalidateExpenseContext, refetch]
   );
 
   const handleBatchApproval = React.useCallback(
@@ -604,6 +644,23 @@ const ExpensesPage: React.FC = () => {
                                 </Button>
                               </>
                             )}
+
+                            {canDeleteExpenses && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-rose-600 dark:text-rose-400 hover:text-rose-700 dark:hover:text-rose-300"
+                                onClick={() =>
+                                  setDeleteDialog({
+                                    expenseId: expense.id,
+                                    technicianName: technicianName,
+                                    amount: expense.amount_eur,
+                                  })
+                                }
+                              >
+                                <Trash2 className="h-4 w-4 mr-1" /> Eliminar
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -660,6 +717,33 @@ const ExpensesPage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={Boolean(deleteDialog)} onOpenChange={(open) => !open && setDeleteDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar gasto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Estás a punto de eliminar el gasto de <strong>{deleteDialog?.technicianName}</strong> por un importe de{' '}
+              <strong>{deleteDialog?.amount ? formatCurrency(deleteDialog.amount) : ''}</strong>.
+              <br />
+              Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (deleteDialog) {
+                  handleDeleteExpense(deleteDialog.expenseId);
+                }
+              }}
+            >
+              Eliminar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

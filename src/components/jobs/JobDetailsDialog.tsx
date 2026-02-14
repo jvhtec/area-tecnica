@@ -20,6 +20,7 @@ import { JobDetailsPersonnelTab } from "./job-details-dialog/tabs/JobDetailsPers
 import { JobDetailsRestaurantsTab } from "./job-details-dialog/tabs/JobDetailsRestaurantsTab";
 import { JobDetailsWeatherTab } from "./job-details-dialog/tabs/JobDetailsWeatherTab";
 import { StaffingOrchestratorPanel } from "@/components/matrix/StaffingOrchestratorPanel";
+import { useJobExpenses } from "@/hooks/useJobExpenses";
 
 export { enrichTimesheetsWithProfiles } from "./job-details-dialog/enrichTimesheetsWithProfiles";
 
@@ -91,6 +92,10 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
   const canManageExpenses = ["admin", "management", "logistics"].includes(userRole || "");
   const showExpensesTab = !isDryhire && canManageExpenses;
+
+  // Fetch expenses to check if there are any for highlighting the tab
+  const { data: jobExpenses = [] } = useJobExpenses(resolvedJobId);
+  const hasExpenses = jobExpenses.length > 0;
 
   const resolvedDocuments = jobDetails?.job_documents || job?.job_documents || [];
   const documentsLoading = isJobLoading;
@@ -238,8 +243,11 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
                 </TabsTrigger>
               )}
               {showExpensesTab && (
-                <TabsTrigger value="expenses" className="py-2">
+                <TabsTrigger value="expenses" className="py-2 relative">
                   Gastos
+                  {hasExpenses && (
+                    <span className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 bg-orange-500 rounded-full animate-pulse" />
+                  )}
                 </TabsTrigger>
               )}
             </TabsList>
