@@ -130,7 +130,7 @@ export const SoundVisionReviewDialog = ({ file, open, onOpenChange, currentUserR
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl !z-[70]">
         <DialogHeader>
           <DialogTitle>Reseñas para {file.file_name}</DialogTitle>
           <DialogDescription>

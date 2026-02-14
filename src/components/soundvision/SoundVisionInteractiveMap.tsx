@@ -1145,7 +1145,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
             {/* Venue Detail Dialog */}
             <Dialog open={venueDetailOpen} onOpenChange={setVenueDetailOpen}>
                 <DialogContent
-                    className={`w-[95vw] max-w-3xl ${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-white'} ${theme.textMain}`}
+                    className={`w-[95vw] max-w-3xl ${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-white'} ${theme.textMain} !z-[70]`}
                 >
                     <DialogHeader>
                         <DialogTitle>{activeVenueGroup?.venue.name || 'Recinto'}</DialogTitle>
@@ -1227,7 +1227,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
             {/* Upload Dialog */}
             <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
                 <DialogContent
-                    className={`w-[95vw] max-w-3xl ${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-white'} ${theme.textMain}`}
+                    className={`w-[95vw] max-w-3xl ${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-white'} ${theme.textMain} !z-[70]`}
                 >
                     <DialogHeader>
                         <DialogTitle>Subir nuevo archivo SoundVision</DialogTitle>
