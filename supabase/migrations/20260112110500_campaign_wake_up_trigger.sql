@@ -12,10 +12,8 @@ BEGIN
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-
 -- Create trigger on staffing_requests table
 DROP TRIGGER IF EXISTS staffing_requests_status_change ON staffing_requests;
-
 CREATE TRIGGER staffing_requests_status_change
 AFTER UPDATE OF status ON staffing_requests
 FOR EACH ROW

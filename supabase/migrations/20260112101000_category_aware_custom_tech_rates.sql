@@ -165,13 +165,10 @@ BEGIN
   RETURN v_result;
 END;
 $function$;
-
 REVOKE EXECUTE ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) FROM anon;
 GRANT EXECUTE ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) TO authenticated, service_role;
-
 COMMENT ON FUNCTION public.compute_timesheet_amount_2025(uuid,boolean) IS
   'Calculates timesheet amounts based on rate cards. Checks custom_tech_rates first for any custom overrides (works for both house_tech and technician roles). Supports per-category base day overrides for tecnico/especialista/responsable, then falls back to standard rate_cards_2025 by category.';
-
 -- -----------------------------------------------------------------------------
 -- Tour date quote computation (category-aware custom_tech_rates)
 -- -----------------------------------------------------------------------------
@@ -484,10 +481,7 @@ BEGIN
   );
 END;
 $function$;
-
 REVOKE EXECUTE ON FUNCTION public.compute_tour_job_rate_quote_2025(uuid,uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.compute_tour_job_rate_quote_2025(uuid,uuid) TO authenticated, service_role;
-
 COMMENT ON FUNCTION public.compute_tour_job_rate_quote_2025(uuid,uuid) IS
   'Calculates tour job rate quotes for technicians. Checks custom_tech_rates first (category-aware), then falls back to rate_cards_tour_2025 if no custom rate is set.';
-

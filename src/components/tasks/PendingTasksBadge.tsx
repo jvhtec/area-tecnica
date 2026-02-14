@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 interface PendingTasksBadgeProps {
   userId: string | null;
   userRole: string | null;
+  userDepartment?: string | null;
   onClick: () => void;
   className?: string;
 }
@@ -14,10 +15,11 @@ interface PendingTasksBadgeProps {
 export const PendingTasksBadge: React.FC<PendingTasksBadgeProps> = ({
   userId,
   userRole,
+  userDepartment,
   onClick,
   className,
 }) => {
-  const { data: groupedTasks, isLoading } = usePendingTasks(userId, userRole);
+  const { data: groupedTasks, isLoading } = usePendingTasks(userId, userRole, userDepartment);
 
   const totalTaskCount = useMemo(() => {
     return groupedTasks?.reduce((sum, group) => sum + group.tasks.length, 0) || 0;
@@ -40,8 +42,8 @@ export const PendingTasksBadge: React.FC<PendingTasksBadgeProps> = ({
       )}
       aria-label={
         hasPendingTasks
-          ? `${totalTaskCount} pending ${totalTaskCount === 1 ? 'task' : 'tasks'}`
-          : 'No pending tasks'
+          ? `${totalTaskCount} ${totalTaskCount === 1 ? 'tarea pendiente' : 'tareas pendientes'}`
+          : 'Sin tareas pendientes'
       }
     >
       <ListTodo className="h-5 w-5" aria-hidden="true" />

@@ -237,18 +237,22 @@ The database is extensive with 85+ migrations. Key tables:
 - `declined` - Technician declined
 - `cancelled` - Assignment cancelled
 
-#### Departments
-- `sound` - Audio/Sound department
-- `lights` - Lighting department
-- `video` - Video department
-- `backline` - Backline department
-- `stage` - Stage/rigging department
+#### Departments — `department` enum
+- `sound` - Audio/Sound
+- `lights` - Lighting
+- `video` - Video
+- `logistics` - Logistics
+- `production` - Production
+- `administrative` - Administrative
 
-#### Roles (User Permissions)
-- `super_admin` - Full system access
-- `admin` - Department admin access
-- `jefe` - Department head/manager
-- `tech` - Technician (read-only portal access)
+#### Roles — `user_role` enum
+- `admin` - Admin access
+- `management` - Management access
+- `house_tech` - In-house technician
+- `technician` - Freelance technician
+- `user` - Basic user
+- `logistics` - Logistics role
+- `wallboard` - Digital signage display
 
 ### Flex Rental Solutions Integration
 

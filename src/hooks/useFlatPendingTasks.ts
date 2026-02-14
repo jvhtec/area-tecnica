@@ -1,9 +1,9 @@
 import { useMemo } from 'react';
-import { usePendingTasks, GroupedPendingTask } from './usePendingTasks';
+import { usePendingTasks, GroupedPendingTask } from '@/hooks/usePendingTasks';
 
 export interface FlatPendingTask {
   id: string;
-  department: 'sound' | 'lights' | 'video';
+  department: 'sound' | 'lights' | 'video' | 'production' | 'administrative';
   taskType: string;
   status: 'not_started' | 'in_progress';
   progress: number;
@@ -12,7 +12,7 @@ export interface FlatPendingTask {
   detailLink: string;
   // Context from parent group
   jobOrTourName: string;
-  jobOrTourType: 'job' | 'tour';
+  jobOrTourType: 'job' | 'tour' | 'global';
   client?: string;
 }
 
@@ -20,8 +20,8 @@ export interface FlatPendingTask {
  * Hook to get a flat list of pending tasks with their job/tour context
  * Useful for displaying tasks individually rather than grouped
  */
-export function useFlatPendingTasks(userId: string | null, userRole: string | null) {
-  const { data: groupedTasks, isLoading, error } = usePendingTasks(userId, userRole);
+export function useFlatPendingTasks(userId: string | null, userRole: string | null, userDepartment?: string | null) {
+  const { data: groupedTasks, isLoading, error } = usePendingTasks(userId, userRole, userDepartment);
 
   const flatTasks = useMemo<FlatPendingTask[]>(() => {
     if (!groupedTasks) return [];

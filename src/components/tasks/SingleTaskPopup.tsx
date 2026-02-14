@@ -14,10 +14,11 @@ import { Progress } from '@/components/ui/progress';
 import { AlertCircle, Calendar, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Task {
   id: string;
-  department: 'sound' | 'lights' | 'video';
+  department: 'sound' | 'lights' | 'video' | 'production' | 'administrative';
   taskType: string;
   status: 'not_started' | 'in_progress';
   progress: number;
@@ -31,7 +32,7 @@ interface SingleTaskPopupProps {
   onOpenChange: (open: boolean) => void;
   task: Task | null;
   jobOrTourName: string;
-  jobOrTourType: 'job' | 'tour';
+  jobOrTourType: 'job' | 'tour' | 'global';
   client?: string;
   onDismiss: () => void;
   onViewAll: () => void;
@@ -43,11 +44,13 @@ const DEPARTMENT_COLORS: Record<string, string> = {
   sound: 'bg-blue-500/10 text-blue-700 border-blue-500/20 dark:text-blue-400',
   lights: 'bg-amber-500/10 text-amber-700 border-amber-500/20 dark:text-amber-400',
   video: 'bg-purple-500/10 text-purple-700 border-purple-500/20 dark:text-purple-400',
+  production: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20 dark:text-emerald-400',
+  administrative: 'bg-rose-500/10 text-rose-700 border-rose-500/20 dark:text-rose-400',
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  not_started: 'Not Started',
-  in_progress: 'In Progress',
+  not_started: 'Sin empezar',
+  in_progress: 'En progreso',
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -72,8 +75,10 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
   if (!task) return null;
 
   const handleViewTask = () => {
-    navigate(task.detailLink);
-    onOpenChange(false);
+    if (task.detailLink) {
+      navigate(task.detailLink);
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -82,15 +87,15 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-orange-500" />
-            Pending Task
+            Tarea Pendiente
             {totalPendingCount > 1 && (
               <Badge variant="secondary" className="ml-2">
-                {currentIndex + 1} of {totalPendingCount}
+                {currentIndex + 1} de {totalPendingCount}
               </Badge>
             )}
           </DialogTitle>
           <DialogDescription>
-            You have a task assigned to you that needs attention
+            Tienes una tarea asignada que requiere atención
           </DialogDescription>
         </DialogHeader>
 
@@ -98,9 +103,11 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
           {/* Job/Tour Context */}
           <div className="rounded-lg border bg-muted/40 p-4">
             <div className="flex items-center gap-2">
-              <Badge variant="outline" className="text-xs font-mono">
-                {jobOrTourType.toUpperCase()}
-              </Badge>
+              {jobOrTourType !== 'global' && (
+                <Badge variant="outline" className="text-xs font-mono">
+                  {jobOrTourType.toUpperCase()}
+                </Badge>
+              )}
               <h3 className="font-semibold">{jobOrTourName}</h3>
             </div>
             {client && (
@@ -111,7 +118,7 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
           {/* Task Details */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Department</span>
+              <span className="text-sm font-medium text-muted-foreground">Departamento</span>
               <Badge
                 variant="outline"
                 className={cn(
@@ -124,12 +131,12 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Task Type</span>
+              <span className="text-sm font-medium text-muted-foreground">Tipo de Tarea</span>
               <span className="text-sm font-medium">{task.taskType}</span>
             </div>
 
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-muted-foreground">Status</span>
+              <span className="text-sm font-medium text-muted-foreground">Estado</span>
               <Badge
                 variant="outline"
                 className={cn(
@@ -143,7 +150,7 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Progress</span>
+                <span className="text-sm font-medium text-muted-foreground">Progreso</span>
                 <span className="text-xs text-muted-foreground">{task.progress}%</span>
               </div>
               <Progress value={task.progress} className="h-2" />
@@ -151,7 +158,7 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
 
             {task.dueDate && (
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-muted-foreground">Due Date</span>
+                <span className="text-sm font-medium text-muted-foreground">Fecha Límite</span>
                 <div className="flex items-center gap-1">
                   <Calendar className="h-3 w-3 text-muted-foreground" />
                   <span
@@ -164,6 +171,7 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
                   >
                     {formatDistanceToNow(new Date(task.dueDate), {
                       addSuffix: true,
+                      locale: es,
                     })}
                   </span>
                 </div>
@@ -178,7 +186,7 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
             onClick={onDismiss}
             className="w-full sm:w-auto"
           >
-            Dismiss for Now
+            Descartar por ahora
           </Button>
           {totalPendingCount > 1 && (
             <Button
@@ -186,16 +194,18 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
               onClick={onViewAll}
               className="w-full sm:w-auto"
             >
-              View All Tasks ({totalPendingCount})
+              Ver Todas las Tareas ({totalPendingCount})
             </Button>
           )}
-          <Button
-            onClick={handleViewTask}
-            className="w-full sm:w-auto"
-          >
-            <ExternalLink className="h-4 w-4 mr-2" />
-            View Task Details
-          </Button>
+          {task.detailLink && (
+            <Button
+              onClick={handleViewTask}
+              className="w-full sm:w-auto"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Ver Detalles
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

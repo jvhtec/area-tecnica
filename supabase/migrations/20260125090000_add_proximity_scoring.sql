@@ -4,12 +4,10 @@
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS home_latitude double precision,
   ADD COLUMN IF NOT EXISTS home_longitude double precision;
-
 -- Add index for profiles with location data
 CREATE INDEX IF NOT EXISTS idx_profiles_home_location
   ON public.profiles(home_latitude, home_longitude)
   WHERE home_latitude IS NOT NULL AND home_longitude IS NOT NULL;
-
 -- Update the ranking function to include proximity scoring
 CREATE OR REPLACE FUNCTION public.rank_staffing_candidates(
   p_job_id uuid,
@@ -377,7 +375,6 @@ BEGIN
   LIMIT 50;
 END;
 $$;
-
 -- Grant execute permissions for the function
 GRANT EXECUTE ON FUNCTION public.rank_staffing_candidates(uuid, text, text, text, jsonb) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rank_staffing_candidates(uuid, text, text, text, jsonb) TO service_role;

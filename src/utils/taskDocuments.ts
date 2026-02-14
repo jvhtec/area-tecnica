@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase";
 
 export type SignedUrlResult = { signedUrl: string | null };
 
-export const resolveBucketForTaskDocs = (department?: 'sound'|'lights'|'video') => {
+export const resolveBucketForTaskDocs = (department?: 'sound'|'lights'|'video'|'production'|'administrative') => {
   // Keep compatibility with mixed bucket names during migration
   return 'task_documents';
 };
@@ -27,4 +27,3 @@ export async function upload(bucket: string, filePath: string, file: File | Blob
   const { error } = await supabase.storage.from(bucket).upload(filePath, file, { upsert: true });
   return !error;
 }
-

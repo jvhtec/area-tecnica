@@ -11,15 +11,27 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { fromZonedTime } from 'date-fns-tz';
+import { type Dept } from '@/utils/tasks';
 
-type Dept = 'sound' | 'lights' | 'video';
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
+const ASSIGN_SELECTED_DEPARTMENTS = '__selected_departments__';
+const ASSIGN_SELECTED_USERS = '__selected_users__';
+const TECHNICIAN_LEVEL_ROLES = new Set(['technician', 'house_tech']);
+const DEPARTMENT_NAME: Record<Dept, string> = {
+  sound: 'sonido',
+  lights: 'luces',
+  video: 'video',
+  production: 'producción',
+  administrative: 'administración',
+};
 
 const TASK_TYPES: Record<Dept, string[]> = {
   sound: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
   lights: ['QT', 'Rigging Plot', 'Pesos', 'Consumos', 'PS'],
   video: ['QT', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
+  production: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
+  administrative: ['QT', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
 };
 
 interface CreateGlobalTaskDialogProps {
@@ -30,6 +42,14 @@ interface CreateGlobalTaskDialogProps {
   onCreated?: () => void;
 }
 
+interface EligibleUser {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  role: string | null;
+  department: string | null;
+}
+
 export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   open,
   onOpenChange,
@@ -38,7 +58,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   onCreated,
 }) => {
   const { toast } = useToast();
-  const { createTask, createTasksForUsers } = useGlobalTaskMutations(department);
+  const { createTask, createTaskForDepartment, createTasksForUsers } = useGlobalTaskMutations(department);
   const [loading, setLoading] = React.useState(false);
   const [taskType, setTaskType] = React.useState<string>('');
   const [customType, setCustomType] = React.useState('');
@@ -48,15 +68,16 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   const [priority, setPriority] = React.useState<string>('');
   const [jobId, setJobId] = React.useState<string>('');
   const [tourId, setTourId] = React.useState<string>('');
+  const [selectedDepartments, setSelectedDepartments] = React.useState<Dept[]>([department]);
+  const [selectedUserIds, setSelectedUserIds] = React.useState<string[]>([]);
 
   // All eligible users, grouped by department-first vs others
-  const { data: userGroups } = useQuery<ComboboxGroup[]>({
+  const { data: usersData } = useQuery<{ groups: ComboboxGroup[]; users: EligibleUser[] }>({
     queryKey: ['assignable-users-grouped', userDepartment],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, role, department')
-        .in('role', ['management', 'admin', 'logistics', 'house_tech'])
         .order('first_name');
       if (error) throw error;
       const all = data || [];
@@ -73,9 +94,11 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       const groups: ComboboxGroup[] = [];
       if (mine.items.length > 0) groups.push(mine);
       if (others.items.length > 0) groups.push(others);
-      return groups;
+      return { groups, users: all as EligibleUser[] };
     },
   });
+  const userGroups = usersData?.groups || [];
+  const eligibleUsers = usersData?.users || [];
 
   const { data: departmentUsers } = useQuery<Array<{ id: string; role: string | null }>>({
     queryKey: ['department-users-global-task', department],
@@ -117,6 +140,7 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   });
 
   const types = TASK_TYPES[department] || TASK_TYPES.sound;
+  const deptName = DEPARTMENT_NAME[department];
   const isCustom = taskType === '__custom__';
   const resolvedType = isCustom ? customType.trim() : taskType;
 
@@ -129,6 +153,8 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
     setPriority('');
     setJobId('');
     setTourId('');
+    setSelectedDepartments([department]);
+    setSelectedUserIds([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -150,58 +176,89 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
       };
 
       if (assignedTo === ASSIGN_ALL_DEPARTMENT) {
-        const assigneeIds = Array.from(
-          new Set(
-            (departmentUsers || [])
-              .filter((u) => u.role !== 'house_tech')
-              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
-              .filter((id): id is string => id.length > 0)
-          )
-        );
-        if (!assigneeIds.length) {
-          toast({
-            title: 'No se encontraron usuarios',
-            description: 'No hay usuarios disponibles en este departamento (sin incluir house tech).',
-            variant: 'destructive',
-          });
-          return;
-        }
-
-        const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
-        const skippedText =
-          skippedAssigneeIds.length > 0
-            ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
-            : '';
+        // Shared task for the office team (management / admin / logistics).
+        // assigned_department = "sound" (the department key).
+        await createTask({
+          ...payload,
+          assigned_to: null,
+          assigned_department: department,
+        });
         toast({
-          title: 'Asignación de departamento completada',
-          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.${skippedText}`,
+          title: 'Tarea de departamento creada',
+          description: `Tarea compartida creada para ${deptName}. Cualquier miembro del departamento puede actualizarla o completarla.`,
         });
       } else if (assignedTo === ASSIGN_ALL_DEPARTMENT_HOUSE_TECH) {
+        // Shared task targeted at the warehouse / house_tech team.
+        // Uses a "_warehouse" suffix to distinguish from office-team tasks.
+        await createTask({
+          ...payload,
+          assigned_to: null,
+          assigned_department: `${department}_warehouse`,
+        });
+        toast({
+          title: 'Tarea de almacén creada',
+          description: `Tarea compartida creada para almacén de ${deptName}. Cualquier house tech del departamento puede actualizarla o completarla.`,
+        });
+      } else if (assignedTo === ASSIGN_SELECTED_DEPARTMENTS) {
+        if (!selectedDepartments.length) {
+          toast({
+            title: 'Sin departamentos seleccionados',
+            description: 'Selecciona al menos un departamento.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
+        // Create one shared department task per selected department using the
+        // centralized createTaskForDepartment helper (handles auth, defaults,
+        // validation, and the insert in the correct department table).
+        const results = await Promise.allSettled(
+          selectedDepartments.map((dep) =>
+            createTaskForDepartment(dep, {
+              ...payload,
+              assigned_to: null,
+              assigned_department: dep,
+            })
+          )
+        );
+
+        const created = results.filter((r) => r.status === 'fulfilled').length;
+        const failed = results.filter((r) => r.status === 'rejected').length;
+        const deptLabels = selectedDepartments.map((d) => DEPARTMENT_NAME[d]).join(', ');
+
+        if (failed === 0) {
+          toast({
+            title: 'Tareas de departamento creadas',
+            description: `${created} tarea(s) compartida(s) creada(s) para: ${deptLabels}.`,
+          });
+        } else {
+          toast({
+            title: 'Creación parcial',
+            description: `${created} creada(s), ${failed} fallida(s) para: ${deptLabels}.`,
+            variant: 'destructive',
+          });
+        }
+      } else if (assignedTo === ASSIGN_SELECTED_USERS) {
         const assigneeIds = Array.from(
           new Set(
-            (departmentUsers || [])
-              .filter((u) => u.role === 'house_tech')
-              .map((u) => (typeof u.id === 'string' ? u.id.trim() : ''))
+            selectedUserIds
+              .map((id) => (typeof id === 'string' ? id.trim() : ''))
               .filter((id): id is string => id.length > 0)
           )
         );
         if (!assigneeIds.length) {
           toast({
-            title: 'No se encontraron house techs',
-            description: 'No hay house techs disponibles en este departamento.',
+            title: 'Sin usuarios seleccionados',
+            description: 'Selecciona al menos un usuario para asignación masiva.',
             variant: 'destructive',
           });
           return;
         }
 
         const { created, skippedAssigneeIds } = await createTasksForUsers(payload, assigneeIds);
-        const skippedText =
-          skippedAssigneeIds.length > 0
-            ? ` IDs omitidos por duplicado: ${skippedAssigneeIds.join(', ')}.`
-            : '';
         toast({
-          title: 'Asignación de house techs completada',
-          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.${skippedText}`,
+          title: 'Asignación por usuarios completada',
+          description: `Creadas ${created.length} tarea(s), omitidas ${skippedAssigneeIds.length} por duplicado.`,
         });
       } else {
         await createTask({
@@ -267,11 +324,13 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
                   {
                     heading: 'Opciones',
                     items: [
-                      { value: ASSIGN_ALL_DEPARTMENT, label: `Todo ${department} (sin house tech)` },
-                      { value: ASSIGN_ALL_DEPARTMENT_HOUSE_TECH, label: `Todo ${department} (solo house techs)` },
+                      { value: ASSIGN_ALL_DEPARTMENT, label: `Oficina ${deptName}` },
+                      { value: ASSIGN_ALL_DEPARTMENT_HOUSE_TECH, label: `Almacen ${deptName}` },
+                      { value: ASSIGN_SELECTED_DEPARTMENTS, label: 'Departamentos seleccionados (masivo)' },
+                      { value: ASSIGN_SELECTED_USERS, label: 'Usuarios seleccionados (masivo)' },
                     ],
                   },
-                  ...(userGroups || []),
+                  ...userGroups,
                 ]}
                 value={assignedTo}
                 onValueChange={setAssignedTo}
@@ -279,6 +338,50 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
                 searchPlaceholder="Buscar persona..."
                 emptyMessage="Sin resultados."
               />
+              {assignedTo === ASSIGN_SELECTED_DEPARTMENTS && (
+                <div className="mt-2 rounded-md border p-2 space-y-2">
+                  <p className="text-xs text-muted-foreground">Selecciona departamentos para asignación masiva</p>
+                  <div className="grid grid-cols-1 gap-1 text-sm">
+                    {(['sound', 'lights', 'video', 'production', 'administrative'] as Dept[]).map((dep) => (
+                      <label key={dep} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedDepartments.includes(dep)}
+                          onChange={(e) =>
+                            setSelectedDepartments((prev) =>
+                              e.target.checked ? Array.from(new Set([...prev, dep])) : prev.filter((d) => d !== dep)
+                            )
+                          }
+                        />
+                        <span>{DEPARTMENT_NAME[dep]}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {assignedTo === ASSIGN_SELECTED_USERS && (
+                <div className="mt-2 rounded-md border p-2 space-y-2 max-h-40 overflow-auto">
+                  <p className="text-xs text-muted-foreground">Selecciona usuarios para asignación masiva</p>
+                  {eligibleUsers.map((u) => {
+                    const label = `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.id;
+                    return (
+                      <label key={u.id} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedUserIds.includes(u.id)}
+                          onChange={(e) =>
+                            setSelectedUserIds((prev) =>
+                              e.target.checked ? Array.from(new Set([...prev, u.id])) : prev.filter((id) => id !== u.id)
+                            )
+                          }
+                        />
+                        <span>{label}</span>
+                        <span className="text-xs text-muted-foreground">({u.department || 'sin dept'})</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Prioridad</Label>

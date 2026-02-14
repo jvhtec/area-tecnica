@@ -125,7 +125,10 @@ export default function TechnicianSuperApp() {
   );
 
   const toggleTheme = () => {
-    setTheme(isDark ? 'light' : 'dark');
+    const newTheme = isDark ? 'light' : 'dark';
+    setTheme(newTheme);
+    // Keep legacy key in sync for backward compat with useTechnicianTheme
+    localStorage.setItem('theme-preference', newTheme);
   };
 
   // Modal state
@@ -389,7 +392,7 @@ export default function TechnicianSuperApp() {
         <ObliqueStrategyModal theme={t} isDark={isDark} onClose={() => setShowObliqueStrategy(false)} />
       )}
       {showRatesModal && (
-        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${t.modalOverlay} p-4 animate-in fade-in duration-200`}>
+        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${t.modalOverlay} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
           <div className={`w-full max-w-2xl max-h-[90vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${t.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
             {/* Header */}
             <div className={`p-4 border-b ${t.divider} flex justify-between items-center shrink-0`}>

@@ -16,6 +16,7 @@ export const getDashboardPath = (userRole: UserRole | null): string => {
     case 'admin':
     case 'management':
     case 'logistics':
+    case 'oscar':
     default:
       return '/dashboard';
   }

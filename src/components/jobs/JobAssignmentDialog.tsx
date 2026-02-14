@@ -212,9 +212,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     enabled: isOpen && !!jobData && !!jobId
   });
 
-  // Filter technicians: include technicians, house techs, and flagged management
+  // Filter technicians: include technicians, house techs, and flagged admin/management
   const filteredTechnicians = availableTechnicians.filter(tech =>
-    tech.role === 'technician' || tech.role === 'house_tech' || tech.role === 'management'
+    tech.role === 'technician' || tech.role === 'house_tech' || tech.role === 'management' || tech.role === 'admin'
   );
 
   const jobDates = useMemo(() => {

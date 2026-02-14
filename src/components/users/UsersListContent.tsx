@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ManageSkillsDialog } from "@/components/users/ManageSkillsDialog";
+import { ViewAchievementsDialog } from "@/components/users/ViewAchievementsDialog";
 import { formatUserName } from "@/utils/userName";
 
 interface UsersListContentProps {
@@ -26,6 +27,7 @@ export const UsersListContent = ({ users, groupBy, isManagementUser = false }: U
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
   const [deletingUser, setDeletingUser] = useState<Profile | null>(null);
   const [skillsUser, setSkillsUser] = useState<Profile | null>(null);
+  const [achievementsUser, setAchievementsUser] = useState<Profile | null>(null);
   
   const { handleDelete, handleSaveEdit } = useUserManagement();
 
@@ -53,6 +55,7 @@ export const UsersListContent = ({ users, groupBy, isManagementUser = false }: U
                 onEdit={handleEdit}
                 onDelete={handleDeleteClick}
                 onManageSkills={isManagementUser ? setSkillsUser : undefined}
+                onViewAchievements={isManagementUser ? setAchievementsUser : undefined}
               />
             ) : null
           ))}
@@ -76,6 +79,14 @@ export const UsersListContent = ({ users, groupBy, isManagementUser = false }: U
           fullName={formatUserName(skillsUser?.first_name, skillsUser?.nickname, skillsUser?.last_name) || ''}
           open={!!skillsUser}
           onOpenChange={(open) => !open && setSkillsUser(null)}
+        />
+
+        {/* Achievements dialog */}
+        <ViewAchievementsDialog
+          profileId={achievementsUser?.id || null}
+          fullName={formatUserName(achievementsUser?.first_name, achievementsUser?.nickname, achievementsUser?.last_name) || ''}
+          open={!!achievementsUser}
+          onOpenChange={(open) => !open && setAchievementsUser(null)}
         />
       </ScrollArea>
     );
@@ -110,6 +121,7 @@ export const UsersListContent = ({ users, groupBy, isManagementUser = false }: U
                     onEdit={handleEdit}
                     onDelete={handleDeleteClick}
                     onManageSkills={isManagementUser ? setSkillsUser : undefined}
+                    onViewAchievements={isManagementUser ? setAchievementsUser : undefined}
                   />
                 ) : null
               ))}
@@ -138,6 +150,14 @@ export const UsersListContent = ({ users, groupBy, isManagementUser = false }: U
         fullName={formatUserName(skillsUser?.first_name, skillsUser?.nickname, skillsUser?.last_name) || ''}
         open={!!skillsUser}
         onOpenChange={(open) => !open && setSkillsUser(null)}
+      />
+
+      {/* Achievements dialog for grouped view */}
+      <ViewAchievementsDialog
+        profileId={achievementsUser?.id || null}
+        fullName={formatUserName(achievementsUser?.first_name, achievementsUser?.nickname, achievementsUser?.last_name) || ''}
+        open={!!achievementsUser}
+        onOpenChange={(open) => !open && setAchievementsUser(null)}
       />
     </>
   );

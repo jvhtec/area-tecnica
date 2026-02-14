@@ -127,7 +127,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
       const { data, error } = await supabase
         .from('profiles')
         .select('id, first_name, last_name')
-        .in('role', ['management', 'admin']);
+        .in('role', ['management', 'admin', 'oscar']);
       if (error) throw error;
       return data;
     }

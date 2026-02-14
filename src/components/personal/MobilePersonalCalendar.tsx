@@ -73,16 +73,16 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
 
   const getAssignmentsForDate = useCallback((targetDate: Date) => {
     return assignments.filter(assignment => {
-      // Check if this is a single-day assignment (legacy/fallback)
-      if (assignment.single_day && assignment.assignment_date) {
-        const assignmentDate = new Date(assignment.assignment_date);
-        return isSameDay(targetDate, assignmentDate);
-      }
-
-      // Check specific dates from timesheets if available
+      // Check specific dates from timesheets FIRST (source of truth)
       if (assignment.dates && assignment.dates.length > 0) {
         const dayString = format(targetDate, 'yyyy-MM-dd');
         return assignment.dates.includes(dayString);
+      }
+
+      // Fallback to single-day assignment check (legacy) only if no timesheet dates exist
+      if (assignment.single_day && assignment.assignment_date) {
+        const assignmentDate = new Date(assignment.assignment_date);
+        return isSameDay(targetDate, assignmentDate);
       }
 
       // No fallback - if there are no specific timesheet dates, don't show the assignment

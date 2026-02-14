@@ -3908,6 +3908,45 @@ export type Database = {
           },
         ]
       }
+      job_rehearsal_dates: {
+        Row: {
+          id: string
+          job_id: string
+          date: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          job_id: string
+          date: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: {
+          id?: string
+          job_id?: string
+          date?: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_rehearsal_dates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_rehearsal_dates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       jobs: {
         Row: {
           color: string | null
@@ -7965,6 +8004,7 @@ export type Database = {
           progress: number | null
           status: Database["public"]["Enums"]["task_status"] | null
           task_type: string | null
+          description: string | null
           tour_id: string | null
           tour_name: string | null
           updated_at: string | null
@@ -8693,6 +8733,7 @@ export type Database = {
         | "user"
         | "management"
         | "logistics"
+        | "oscar"
         | "technician"
         | "house_tech"
         | "wallboard"
@@ -9017,6 +9058,7 @@ export const Constants = {
         "user",
         "management",
         "logistics",
+        "oscar",
         "technician",
         "house_tech",
         "wallboard",

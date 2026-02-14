@@ -68,7 +68,7 @@ export async function getAvailableTechnicians(
     }
 
     const eligibleTechnicians = allTechnicians.filter((tech: any) => {
-      if (tech.role === 'management') {
+      if (tech.role === 'management' || tech.role === 'admin') {
         return !!tech.assignable_as_tech;
       }
       return tech.role === 'technician' || tech.role === 'house_tech';

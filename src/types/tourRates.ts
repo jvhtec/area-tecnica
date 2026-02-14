@@ -35,4 +35,7 @@ export interface TourJobRateQuote {
   has_override?: boolean; // True if override_amount_eur is set
   override_amount_eur?: number; // Manual override amount (if set)
   calculated_total_eur?: number; // Original calculated amount (before override)
+  override_set_at?: string;
+  override_actor_name?: string;
+  override_actor_email?: string;
 }

@@ -74,7 +74,11 @@ interface PayoutData {
   has_override?: boolean; // True if override_amount_eur is set
   override_amount_eur?: number; // Manual override amount (if set)
   calculated_total_eur?: number; // Original calculated amount (before override)
+  override_set_at?: string;
+  override_actor_name?: string;
+  override_actor_email?: string;
 }
+
 
 export interface TimesheetLine {
   date?: string | null;
@@ -278,6 +282,29 @@ const computeEffectiveBase = (quote: TourJobRateQuote) => {
   };
 };
 
+const resolveEffectiveTotal = (
+  quote: TourJobRateQuote,
+  computed?: ReturnType<typeof computeEffectiveBase>
+): number => {
+  if (quote.breakdown?.error) return 0;
+
+  const { effectiveBase, extrasTotal } = computed ?? computeEffectiveBase(quote);
+  const computedTotal = effectiveBase + extrasTotal;
+
+  const serverTotal =
+    quote.total_with_extras_eur != null
+      ? Number(quote.total_with_extras_eur)
+      : quote.total_eur != null
+        ? Number(quote.total_eur)
+        : null;
+
+  if (quote.has_override && quote.override_amount_eur != null) {
+    return Number(quote.override_amount_eur);
+  }
+
+  return serverTotal ?? computedTotal;
+};
+
 const withLpo = (name: string, lpo?: string | null) => (lpo ? `${name}\nLPO: ${lpo}` : name);
 
 // Generate PDF for individual rate quote (single job date)
@@ -341,12 +368,9 @@ export async function generateRateQuotePDF(
     const displayMultiplier =
       !usedFallbackBase && rawMultiplier != null && shouldDisplayMultiplier(rawMultiplier);
 
-    // Check if timesheet exists for this date
-    // Note: TourJobRateQuote.start_time is the date. TimesheetLine.date is YYYY-MM-DD.
-    // For tour rate quotes, server already applies autonomo discount to base before multipliers
-    // No additional client-side deduction needed
-    const deduction = 0;
-    const effectiveTotal = effectiveBase + extrasTotal;
+    // For tour rate quotes, server already applies autonomo discount to base before multipliers.
+    // Manual overrides are applied server-side (see v_tour_job_rate_quotes_2025).
+    const effectiveTotal = resolveEffectiveTotal(quote, computed);
 
     let baseCell: string;
     if (hasError) {
@@ -374,7 +398,16 @@ export async function generateRateQuotePDF(
 
     // Show override info if applicable
     if (quote.has_override && quote.override_amount_eur != null && quote.calculated_total_eur != null) {
-      nameCellContent += `\n⚠️ OVERRIDE: ${formatCurrency(quote.override_amount_eur)} (calc: ${formatCurrency(quote.calculated_total_eur)})`;
+      nameCellContent += `\n(!) OVERRIDE: ${formatCurrency(quote.override_amount_eur)} (calc: ${formatCurrency(quote.calculated_total_eur)})`;
+
+      const actor = quote.override_actor_name;
+      const actorEmail = quote.override_actor_email;
+      const at = quote.override_set_at;
+      if (actor || actorEmail || at) {
+        const who = `${actor || '—'}${actorEmail ? ` (${actorEmail})` : ''}`;
+        const when = at ? format(new Date(at), 'PPP p', { locale: es }) : '';
+        nameCellContent += `\n(Override por ${who}${when ? ` · ${when}` : ''})`;
+      }
     }
 
     return [
@@ -423,13 +456,23 @@ export async function generateRateQuotePDF(
     0
   );
   
-  // Grand total - no client-side deduction needed (server applies discount to base before multipliers)
-  const grandTotal = quotesWithComputed.reduce(
-    (sum, { quote, computed }) => {
-      return sum + computed.effectiveBase + computed.extrasTotal;
-    },
-    0
-  );
+  // Grand total
+  // Use server totals when available so PDFs match the DB source-of-truth (incl. manual overrides).
+  const grandTotal = quotesWithComputed.reduce((sum, { quote, computed }) => {
+    const computedTotal = computed.effectiveBase + computed.extrasTotal;
+    const serverTotal =
+      quote.total_with_extras_eur != null
+        ? Number(quote.total_with_extras_eur)
+        : quote.total_eur != null
+          ? Number(quote.total_eur)
+          : null;
+    const effectiveTotal =
+      quote.has_override && quote.override_amount_eur != null
+        ? Number(quote.override_amount_eur)
+        : (serverTotal ?? computedTotal);
+
+    return sum + effectiveTotal;
+  }, 0);
 
   // Check if any quotes have autonomo discount applied by server
   const anyDeductionApplied = quotesWithComputed.some(({ quote }) => {
@@ -473,7 +516,7 @@ export async function generateRateQuotePDF(
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
     doc.setTextColor(...CORPORATE_RED);
-    doc.text('⚠️ Algunos pagos tienen override manual aplicado (ver detalles en tabla).', 14, disclaimerY);
+    doc.text('AVISO: Hay overrides manuales de pago (excepción). Administración debe validar con Dirección.', 14, disclaimerY);
   }
 
   const footerLogo = companyLogo ?? headerLogo;
@@ -546,8 +589,8 @@ export async function generateTourRatesSummaryPDF(
       const hasError = quote.breakdown?.error;
       if (hasError) return;
 
-      const { effectiveBase, extrasTotal } = computeEffectiveBase(quote);
-      const effectiveTotal = effectiveBase + extrasTotal;
+      const computed = computeEffectiveBase(quote);
+      const effectiveTotal = resolveEffectiveTotal(quote, computed);
       const info = getTechName(techId);
       const existing =
         techTotals.get(techId) || {
@@ -657,13 +700,14 @@ export async function generateTourRatesSummaryPDF(
       const lpo = item.lpoMap?.get(quote.technician_id) ?? null;
       const nameWithStatus = appendAutonomoLabel(baseName, autonomo, { isHouseTech: is_house_tech });
       const hasError = quote.breakdown?.error;
+      const computed = computeEffectiveBase(quote);
       const {
         effectiveBase,
         extrasTotal,
         preMultiplierBase,
         rawMultiplier,
         usedFallbackBase,
-      } = computeEffectiveBase(quote);
+      } = computed;
 
       let baseText: string;
       if (hasError) {
@@ -703,7 +747,7 @@ export async function generateTourRatesSummaryPDF(
         quote.is_house_tech ? 'Plantilla' : quote.category || '—',
         baseText,
         hasError ? '—' : formatCurrency(extrasTotal),
-        hasError ? '€0.00' : formatCurrency(effectiveBase + extrasTotal),
+        hasError ? '€0.00' : formatCurrency(resolveEffectiveTotal(quote, computed)),
       ];
     });
 
@@ -732,10 +776,10 @@ export async function generateTourRatesSummaryPDF(
 
     const { jobBaseTotal, jobExtrasTotal, jobGrandTotal } = item.quotes.reduce(
       (acc, quote) => {
-        const { effectiveBase, extrasTotal } = computeEffectiveBase(quote);
-        acc.jobBaseTotal += effectiveBase;
-        acc.jobExtrasTotal += extrasTotal;
-        acc.jobGrandTotal += effectiveBase + extrasTotal;
+        const computed = computeEffectiveBase(quote);
+        acc.jobBaseTotal += computed.effectiveBase;
+        acc.jobExtrasTotal += computed.extrasTotal;
+        acc.jobGrandTotal += resolveEffectiveTotal(quote, computed);
         return acc;
       },
       { jobBaseTotal: 0, jobExtrasTotal: 0, jobGrandTotal: 0 }
@@ -869,30 +913,37 @@ export async function generateJobPayoutPDF(
 
   doc.setTextColor(...TEXT_PRIMARY);
 
+  const resolveIrpfDeduction = (
+    payout: PayoutData,
+    opts: { autonomo: boolean; is_house_tech: boolean }
+  ) => {
+    // Calculate deduction - only for non-autonomo contracted workers (not house techs)
+    let deduction = 0;
+    let daysCount = 0;
+    const isNonAutonomoContracted = !opts.autonomo && !opts.is_house_tech;
+
+    if (isNonAutonomoContracted) {
+      // Count unique days from timesheets
+      const lines = timesheetMap?.get(payout.technician_id) || [];
+      if (lines.length > 0) {
+        const uniqueDates = new Set(lines.map((l) => l.date).filter(Boolean));
+        daysCount = uniqueDates.size > 0 ? uniqueDates.size : 1;
+      } else if (payout.timesheets_total_eur > 0) {
+        // Fallback if no details (should rarely happen)
+        daysCount = 1;
+      }
+      deduction = daysCount * NON_AUTONOMO_DEDUCTION_EUR;
+    }
+
+    return { deduction, daysCount };
+  };
+
   const tableData = payouts.map((payout) => {
     const { name: baseName, autonomo, is_house_tech } = getTechName(payout.technician_id);
     const lpo = lpoMap?.get(payout.technician_id) ?? null;
     const nameWithStatus = appendAutonomoLabel(baseName, autonomo, { isHouseTech: is_house_tech });
 
-    // Calculate deduction - only for non-autonomo contracted workers (not house techs)
-    let deduction = 0;
-    let daysCount = 0;
-    const isNonAutonomoContracted = !autonomo && !is_house_tech;
-
-    if (isNonAutonomoContracted) {
-        // Count unique days from timesheets
-        const lines = timesheetMap?.get(payout.technician_id) || [];
-        // If timesheets available, count unique dates
-        if (lines.length > 0) {
-            const uniqueDates = new Set(lines.map(l => l.date).filter(Boolean));
-            daysCount = uniqueDates.size > 0 ? uniqueDates.size : 1; 
-        } else if (payout.timesheets_total_eur > 0) {
-            // Fallback if no details (should rarely happen)
-            daysCount = 1; 
-        }
-        deduction = daysCount * NON_AUTONOMO_DEDUCTION_EUR;
-    }
-
+    const { deduction, daysCount } = resolveIrpfDeduction(payout, { autonomo: !!autonomo, is_house_tech: !!is_house_tech });
     const effectiveTotal = payout.total_eur - deduction;
 
     let nameCellContent = withLpo(nameWithStatus, lpo);
@@ -902,7 +953,16 @@ export async function generateJobPayoutPDF(
 
     // Show override info if applicable
     if (payout.has_override && payout.override_amount_eur != null && payout.calculated_total_eur != null) {
-      nameCellContent += `\n⚠️ OVERRIDE: ${formatCurrency(payout.override_amount_eur)} (calc: ${formatCurrency(payout.calculated_total_eur)})`;
+      nameCellContent += `\n(!) OVERRIDE: ${formatCurrency(payout.override_amount_eur)} (calc: ${formatCurrency(payout.calculated_total_eur)})`;
+
+      const actor = payout.override_actor_name;
+      const actorEmail = payout.override_actor_email;
+      const at = payout.override_set_at;
+      if (actor || actorEmail || at) {
+        const who = `${actor || '—'}${actorEmail ? ` (${actorEmail})` : ''}`;
+        const when = at ? format(new Date(at), 'PPP p', { locale: es }) : '';
+        nameCellContent += `\n(Override por ${who}${when ? ` · ${when}` : ''})`;
+      }
     }
 
     return [
@@ -968,7 +1028,7 @@ export async function generateJobPayoutPDF(
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
       doc.setTextColor(...CORPORATE_RED);
-      doc.text('⚠️ Algunos pagos tienen override manual aplicado (ver detalles en tabla).', 14, disclaimerY);
+      doc.text('AVISO: Hay overrides manuales de pago (excepción). Administración debe validar con Dirección.', 14, disclaimerY);
       disclaimerY += 6;
   }
 
@@ -1190,7 +1250,11 @@ export async function generateJobPayoutPDF(
   const totalTimesheets = payouts.reduce((sum, payout) => sum + payout.timesheets_total_eur, 0);
   const totalExtras = payouts.reduce((sum, payout) => sum + payout.extras_total_eur, 0);
   const totalExpenses = payouts.reduce((sum, payout) => sum + (payout.expenses_total_eur || 0), 0);
-  const grandTotal = payouts.reduce((sum, payout) => sum + payout.total_eur, 0);
+  const grandTotal = payouts.reduce((sum, payout) => {
+    const { autonomo, is_house_tech } = getTechName(payout.technician_id);
+    const { deduction } = resolveIrpfDeduction(payout, { autonomo: !!autonomo, is_house_tech: !!is_house_tech });
+    return sum + (payout.total_eur - deduction);
+  }, 0);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const summaryWidth = pageWidth - 28;

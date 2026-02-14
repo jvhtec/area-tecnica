@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import type { TourJobRateQuote } from '@/types/tourRates'
+import { attachPayoutOverridesToTourQuotes } from '@/services/tourPayoutOverrides'
 
 /**
  * Manager-only hook: returns rate quotes for all assigned technicians on a tour date.
@@ -111,7 +112,7 @@ export function useTourJobRateQuotesForManager(jobId?: string, tourId?: string) 
         })
       )
 
-      return results
+      return attachPayoutOverridesToTourQuotes(jobId, results)
     },
     staleTime: 30 * 1000,
   })

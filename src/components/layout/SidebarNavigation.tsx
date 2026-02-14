@@ -91,7 +91,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 1,
     mobileSlot: "primary",
     getPath: () => "/dashboard",
-    isVisible: ({ userRole }) => userRole === "management",
+    isVisible: ({ userRole }) => userRole === "management" || userRole === "oscar",
   },
   {
     id: "technician-dashboard",
@@ -130,6 +130,19 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     match: (pathname, _, to) => pathname === "/technician-dashboard" && to.includes("tab=availability") && window.location.search.includes("tab=availability"),
   },
   {
+    id: "technician-unavailability",
+    label: "Mi disponibilidad",
+    mobileLabel: "Disponib.",
+    icon: CalendarCheck,
+    mobilePriority: 4,
+    mobileSlot: "primary",
+    getPath: () => "/dashboard/unavailability",
+    // For admin/management this can be confused with the department-level "Disponibilidad" page.
+    // Keep it in the main nav only for house_tech; privileged users (assignable) get access via Profile.
+    isVisible: ({ userRole }) => userRole === "house_tech",
+    match: (pathname) => pathname === "/dashboard/unavailability",
+  },
+  {
     id: "technician-profile",
     label: "Perfil",
     mobileLabel: "Perfil",
@@ -148,7 +161,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 2,
     mobileSlot: "secondary",
     getPath: () => "/personal",
-    isVisible: ({ userRole }) => userRole !== "technician",
+    isVisible: ({ userRole }) => userRole !== "technician" && userRole !== "oscar",
   },
   {
     id: "job-assignment-matrix",
@@ -281,8 +294,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 6,
     mobileSlot: "secondary",
     getPath: () => "/festivals",
-    isVisible: ({ userDepartment }) =>
-      userDepartment?.toLowerCase() === "sound",
+    isVisible: ({ userDepartment, userRole }) =>
+      userRole !== "oscar" && userDepartment?.toLowerCase() === "sound",
   },
   {
     id: "disponibilidad",
@@ -328,7 +341,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
       userRole === "admin" ||
       userRole === "management" ||
       userRole === "logistics" ||
-      userRole === "house_tech",
+      userRole === "house_tech" ||
+      userRole === "oscar",
   },
   {
     id: "logistics",
@@ -403,7 +417,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 16,
     mobileSlot: "secondary",
     getPath: () => "/feedback",
-    isVisible: ({ userRole }) => userRole !== "technician",
+    isVisible: ({ userRole }) => userRole !== "technician" && userRole !== "oscar",
   },
   {
     id: "settings",

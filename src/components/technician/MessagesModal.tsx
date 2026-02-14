@@ -17,7 +17,7 @@ export const MessagesModal = ({ theme, isDark, userProfile, onClose }: MessagesM
     const department = userProfile?.department || null;
 
     return (
-        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
+        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${theme.modalOverlay} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
             <div className={`w-full max-w-2xl max-h-[85vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
                 {/* Header */}
                 <div className={`p-4 border-b ${theme.divider} flex justify-between items-center shrink-0`}>

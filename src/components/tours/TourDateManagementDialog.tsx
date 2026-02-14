@@ -614,11 +614,15 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           { table: "task_documents", condition: "sound_task_id", subquery: "sound_job_tasks" },
           { table: "task_documents", condition: "lights_task_id", subquery: "lights_job_tasks" },
           { table: "task_documents", condition: "video_task_id", subquery: "video_job_tasks" },
+          { table: "task_documents", condition: "production_task_id", subquery: "production_job_tasks" },
+          { table: "task_documents", condition: "administrative_task_id", subquery: "administrative_job_tasks" },
 
           // Tasks
           { table: "sound_job_tasks", condition: "job_id" },
           { table: "lights_job_tasks", condition: "job_id" },
           { table: "video_job_tasks", condition: "job_id" },
+          { table: "production_job_tasks", condition: "job_id" },
+          { table: "administrative_job_tasks", condition: "job_id" },
 
           // Personnel
           { table: "sound_job_personnel", condition: "job_id" },

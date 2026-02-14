@@ -238,7 +238,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
   return (
     <div className={`fixed inset-0 z-[60] ${theme.bg} flex flex-col`}>
       {/* Header */}
-      <div className={`sticky top-0 z-10 px-5 py-4 border-b ${theme.divider} ${theme.bg}`}>
+      <div className={`sticky top-0 z-10 px-5 py-4 pt-[max(1rem,calc(env(safe-area-inset-top)+1rem))] border-b ${theme.divider} ${theme.bg}`}>
         <div className="flex justify-between items-center">
           <div>
             <button
@@ -254,7 +254,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
 
       {/* Content */}
       <ScrollArea className="flex-1">
-        <div className="p-5 space-y-5 pb-8">
+        <div className="p-5 space-y-5 pb-[max(2rem,calc(env(safe-area-inset-bottom)+1.5rem))]">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
@@ -702,7 +702,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
 
       {/* Signature Modal - Custom implementation matching incident report */}
       {signatureDialogOpen && (
-        <div className={`fixed inset-0 z-[80] flex items-center justify-center ${theme.modalOverlay || 'bg-black/90 backdrop-blur-md'} p-4 animate-in fade-in duration-200`}>
+        <div className={`fixed inset-0 z-[80] flex items-center justify-center ${theme.modalOverlay || 'bg-black/90 backdrop-blur-md'} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
           <div className={`w-full max-w-md ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}>
             <div className={`p-4 border-b ${theme.divider} flex justify-between items-center`}>
               <h3 className={`font-bold ${theme.textMain}`}>Firma Digital</h3>

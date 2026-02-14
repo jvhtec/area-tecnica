@@ -22,7 +22,6 @@ USING (
   )
   OR assigned_to = auth.uid()
 );
-
 DROP POLICY IF EXISTS "p_lights_job_tasks_public_select_3dc8d6" ON public.lights_job_tasks;
 CREATE POLICY "p_lights_job_tasks_public_select_3dc8d6"
 ON public.lights_job_tasks
@@ -44,7 +43,6 @@ USING (
   )
   OR assigned_to = auth.uid()
 );
-
 DROP POLICY IF EXISTS "p_video_job_tasks_public_select_493f44" ON public.video_job_tasks;
 CREATE POLICY "p_video_job_tasks_public_select_493f44"
 ON public.video_job_tasks
@@ -66,7 +64,6 @@ USING (
   OR (public.current_user_department() = ANY (ARRAY['video'::text, 'admin'::text, 'management'::text]))
   OR assigned_to = auth.uid()
 );
-
 DROP POLICY IF EXISTS "p_sound_job_tasks_public_update_18c15a" ON public.sound_job_tasks;
 CREATE POLICY "p_sound_job_tasks_public_update_18c15a"
 ON public.sound_job_tasks
@@ -88,7 +85,6 @@ WITH CHECK (
   OR (public.current_user_department() = ANY (ARRAY['sound'::text, 'admin'::text, 'management'::text]))
   OR assigned_to = auth.uid()
 );
-
 DROP POLICY IF EXISTS "p_lights_job_tasks_public_update_df739d" ON public.lights_job_tasks;
 CREATE POLICY "p_lights_job_tasks_public_update_df739d"
 ON public.lights_job_tasks
@@ -110,7 +106,6 @@ WITH CHECK (
   OR (public.current_user_department() = ANY (ARRAY['lights'::text, 'admin'::text, 'management'::text]))
   OR assigned_to = auth.uid()
 );
-
 DROP POLICY IF EXISTS "p_video_job_tasks_public_update_a68319" ON public.video_job_tasks;
 CREATE POLICY "p_video_job_tasks_public_update_a68319"
 ON public.video_job_tasks

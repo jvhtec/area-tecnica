@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import { Moon, Sun } from "lucide-react"
+import { useTheme } from "next-themes"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -16,53 +17,37 @@ export const ThemeToggle = ({
   className,
   ariaLabel,
 }: ThemeToggleProps = {}) => {
-  // Initialize from localStorage to avoid flash
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('theme-preference')
-      if (stored !== null) {
-        return stored === 'dark'
-      }
-    }
-    // Default to dark if no preference stored
-    return true
-  })
+  const { resolvedTheme, setTheme } = useTheme()
   const { preferences, updatePreferences } = useUserPreferences()
+  const [mounted, setMounted] = useState(false)
+  const hasManuallyToggled = useRef(false)
 
-  // Apply theme on mount and when it changes
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
-  }, [isDarkMode])
+  useEffect(() => setMounted(true), [])
 
-  // Sync with database preferences when they load
+  // Sync with database preferences on initial load only
   useEffect(() => {
+    if (hasManuallyToggled.current) return
     if (preferences?.dark_mode !== undefined) {
-      const prefersDark = preferences.dark_mode
-      setIsDarkMode(prefersDark)
-      localStorage.setItem('theme-preference', prefersDark ? 'dark' : 'light')
+      const preferred = preferences.dark_mode ? 'dark' : 'light'
+      setTheme(preferred)
+      // Keep legacy key in sync for backward compat with useTechnicianTheme
+      localStorage.setItem('theme-preference', preferred)
     }
-  }, [preferences])
+  }, [preferences, setTheme])
 
-  const toggleDarkMode = () => {
-    const newDarkMode = !isDarkMode
-    setIsDarkMode(newDarkMode)
+  const isDarkMode = mounted ? resolvedTheme === 'dark' : true
 
-    // Update localStorage immediately for instant feedback
-    localStorage.setItem('theme-preference', newDarkMode ? 'dark' : 'light')
+  const toggleDarkMode = useCallback(() => {
+    hasManuallyToggled.current = true
+    const newTheme = isDarkMode ? 'light' : 'dark'
+    setTheme(newTheme)
 
-    if (newDarkMode) {
-      document.documentElement.classList.add("dark")
-    } else {
-      document.documentElement.classList.remove("dark")
-    }
+    // Keep legacy key in sync for backward compat with useTechnicianTheme
+    localStorage.setItem('theme-preference', newTheme)
 
     // Update database in background
-    updatePreferences({ dark_mode: newDarkMode })
-  }
+    updatePreferences({ dark_mode: !isDarkMode })
+  }, [isDarkMode, setTheme, updatePreferences])
 
   // Global keyboard shortcut: Ctrl+Shift+D (Cmd+Shift+D on Mac)
   useEffect(() => {
@@ -103,7 +88,7 @@ export const ThemeToggle = ({
         <Sun className={iconSizeClass} aria-hidden="true" />
       )}
       {!isIconDisplay && (
-        <span>{isDarkMode ? "Dark Mode" : "Light Mode"}</span>
+        <span>{isDarkMode ? "Modo oscuro" : "Modo claro"}</span>
       )}
     </Button>
   )

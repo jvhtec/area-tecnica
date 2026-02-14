@@ -1,18 +1,17 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
+import { type Dept as Department } from '@/utils/tasks';
 
 /**
  * Task completion service
- * 
+ *
  * Provides centralized task completion logic for both manual and automated flows.
  * Handles Supabase updates, completion metadata tracking, and push notifications.
- * 
+ *
  * This service is used by:
  * - useTaskMutations (manual status changes in UI)
  * - useCompleteTask hook (pending tasks modal)
  * - taskAutoCompletion utility (document upload flows)
  */
-
-export type Department = 'sound' | 'lights' | 'video';
 
 export type CompletionSource = 
   | 'manual'
@@ -55,6 +54,8 @@ const TASK_TABLE: Record<Department, string> = {
   sound: 'sound_job_tasks',
   lights: 'lights_job_tasks',
   video: 'video_job_tasks',
+  production: 'production_job_tasks',
+  administrative: 'administrative_job_tasks',
 };
 
 /**
@@ -68,7 +69,7 @@ const TASK_TABLE: Record<Department, string> = {
  * 
  * @param params - Task completion parameters
  * @param params.taskId - The task ID to complete
- * @param params.department - The department (sound/lights/video) to determine the correct table
+ * @param params.department - The department to determine the correct table
  * @param params.actorId - Optional user ID who completed the task (defaults to current user)
  * @param params.source - Optional completion source (defaults to 'manual')
  * @param params.jobId - Optional job ID for push notification context
@@ -168,7 +169,7 @@ export async function completeTask(
  * 
  * @param params - Task reversion parameters
  * @param params.taskId - The task ID to revert
- * @param params.department - The department (sound/lights/video) to determine the correct table
+ * @param params.department - The department to determine the correct table
  * @param params.newStatus - The new active status ('not_started' or 'in_progress')
  * @returns Promise<CompleteTaskResult> - Result containing success status and optional error
  */

@@ -1,15 +1,24 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import {
+  checkNetworkConnection,
+  ensureRealtimeConnection,
+  monitorConnectionHealth,
+  supabase,
+} from '@/integrations/supabase/client';
+import { createQueryKey } from '@/lib/optimized-react-query';
+import { normalizeDept } from '@/utils/tasks';
 
 export interface PendingTask {
   id: string;
   job_id: string | null;
   tour_id: string | null;
-  department: 'sound' | 'lights' | 'video';
+  department: 'sound' | 'lights' | 'video' | 'production' | 'administrative';
   task_type: string;
-  assigned_to: string;
+  description: string | null;
+  assigned_to: string | null;
+  assigned_department: string | null;
   status: 'not_started' | 'in_progress';
   progress: number;
   due_at: string | null;
@@ -26,86 +35,165 @@ export interface PendingTask {
 
 export interface GroupedPendingTask {
   id: string;
-  type: 'job' | 'tour';
+  type: 'job' | 'tour' | 'global';
   name: string;
   client?: string;
   tasks: Array<{
     id: string;
-    department: 'sound' | 'lights' | 'video';
+    department: 'sound' | 'lights' | 'video' | 'production' | 'administrative';
     taskType: string;
+    description: string | null;
     status: 'not_started' | 'in_progress';
     progress: number;
     dueDate: string | null;
     priority: number | null;
+    createdAt: string;
+    updatedAt: string;
     detailLink: string;
     jobId: string | null;
     tourId: string | null;
-    assignedTo: string;
+    assignedTo: string | null;
+    assignedDepartment: string | null;
     assigneeRole: string | null;
   }>;
 }
 
-const TASK_TABLES = ['sound_job_tasks', 'lights_job_tasks', 'video_job_tasks'] as const;
+const TASK_TABLES = [
+  'sound_job_tasks',
+  'lights_job_tasks',
+  'video_job_tasks',
+  'production_job_tasks',
+  'administrative_job_tasks',
+] as const;
 
 type TaskRow = Record<string, unknown> & { assigned_to?: string | null };
 
 /**
- * Hook to fetch pending tasks for the current user
- * Only runs when a logged-in management/admin/logistics user is detected
+ * Hook to fetch pending tasks for the current user.
+ * Includes both individually-assigned tasks and department-shared tasks.
+ * Only runs when a logged-in task-coordinator role is detected.
  */
-export function usePendingTasks(userId: string | null, userRole: string | null) {
-  const isEligibleRole = !!userRole && ['management', 'admin', 'logistics'].includes(userRole);
+export function usePendingTasks(userId: string | null, userRole: string | null, userDepartment?: string | null) {
+  const isEligibleRole = !!userRole && ['management', 'admin', 'logistics', 'oscar'].includes(userRole);
+  const normalizedDepartment = useMemo(() => normalizeDept(userDepartment) ?? null, [userDepartment]);
   const queryClient = useQueryClient();
+  const healthCleanupRef = useRef<null | (() => void)>(null);
 
   useEffect(() => {
     if (!userId || !isEligibleRole) {
       return;
     }
 
-    const channel = supabase.channel(
-      `pending-tasks-${userId}-${Math.random().toString(36).slice(2, 10)}`
-    );
+    let isMounted = true;
+    let channelRef: ReturnType<typeof supabase.channel> | undefined;
 
     const invalidatePendingTasks = () => {
-      queryClient.invalidateQueries({ queryKey: ['pending-tasks', userId] });
+      queryClient.invalidateQueries({
+        queryKey: createQueryKey.pendingTasks.byUser(userId, normalizedDepartment),
+      });
     };
 
-    TASK_TABLES.forEach((table) => {
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table, filter: `assigned_to=eq.${userId}` },
-        invalidatePendingTasks
+    (async () => {
+      const isOnline = await checkNetworkConnection();
+      if (!isOnline || !isMounted) return;
+
+      await ensureRealtimeConnection();
+      if (!isMounted) return;
+
+      const channel = supabase.channel(
+        `pending-tasks-${userId}-${Math.random().toString(36).slice(2, 10)}`
       );
 
-      channel.on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table },
-        (payload: RealtimePostgresChangesPayload<TaskRow>) => {
-          const previousAssignee = (payload.old as TaskRow)?.assigned_to ?? null;
-          const nextAssignee = (payload.new as TaskRow)?.assigned_to ?? null;
+      TASK_TABLES.forEach((table) => {
+        // Listen for changes to tasks assigned to this user
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table, filter: `assigned_to=eq.${userId}` },
+          invalidatePendingTasks
+        );
 
-          if (previousAssignee === userId && nextAssignee !== userId) {
-            invalidatePendingTasks();
-          }
+        // Listen for changes to department-shared tasks
+        if (normalizedDepartment) {
+          channel.on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table,
+              filter: `assigned_department=eq.${normalizedDepartment}`,
+            },
+            invalidatePendingTasks
+          );
+
+          channel.on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table,
+              filter: `assigned_department=eq.${normalizedDepartment}_warehouse`,
+            },
+            invalidatePendingTasks
+          );
         }
-      );
-    });
 
-    channel.subscribe();
+        channel.on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table },
+          (payload: RealtimePostgresChangesPayload<TaskRow>) => {
+            const previousAssignee = (payload.old as TaskRow)?.assigned_to ?? null;
+            const nextAssignee = (payload.new as TaskRow)?.assigned_to ?? null;
+
+            if (previousAssignee === userId && nextAssignee !== userId) {
+              invalidatePendingTasks();
+            }
+          }
+        );
+      });
+
+      channel.subscribe();
+
+      // If unmount happened while awaiting, clean up immediately
+      if (!isMounted) {
+        void supabase.removeChannel(channel);
+        return;
+      }
+
+      channelRef = channel;
+
+      // Monitor connection health and refetch on reconnection
+      healthCleanupRef.current = monitorConnectionHealth((isConnected) => {
+        if (isConnected && isMounted) {
+          invalidatePendingTasks();
+        }
+      });
+    })();
 
     return () => {
-      void supabase.removeChannel(channel);
+      isMounted = false;
+      if (channelRef) {
+        void supabase.removeChannel(channelRef);
+      }
+      healthCleanupRef.current?.();
+      healthCleanupRef.current = null;
     };
-  }, [userId, isEligibleRole, queryClient]);
+  }, [userId, isEligibleRole, normalizedDepartment, queryClient]);
 
   return useQuery({
-    queryKey: ['pending-tasks', userId],
+    queryKey: createQueryKey.pendingTasks.byUser(userId, normalizedDepartment),
     enabled: !!userId && isEligibleRole,
     queryFn: async (): Promise<GroupedPendingTask[]> => {
+      // Fetch both individually-assigned tasks and department-shared tasks
+      const orFilters = [`assigned_to.eq.${userId}`];
+      if (normalizedDepartment) {
+        orFilters.push(`assigned_department.eq.${normalizedDepartment}`);
+        orFilters.push(`assigned_department.eq.${normalizedDepartment}_warehouse`);
+      }
+
       const { data, error } = await supabase
         .from('pending_tasks_view')
         .select('*')
-        .eq('assigned_to', userId)
+        .or(orFilters.join(','))
         .order('due_at', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: true });
 
@@ -119,18 +207,37 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
 
       (data || []).forEach((task: PendingTask) => {
         const isJob = !!task.job_id;
-        const groupId = isJob ? `job-${task.job_id}` : `tour-${task.tour_id}`;
-        const name = isJob ? task.job_name || 'Unknown Job' : task.tour_name || 'Unknown Tour';
-        const detailLink = isJob
-          ? `/festival-management/${task.job_id}`
-          : `/tour-management/${task.tour_id}`;
+        const isTour = !!task.tour_id;
+        const isGlobal = !isJob && !isTour;
+
+        let groupId: string;
+        let name: string;
+        let type: 'job' | 'tour' | 'global';
+        let detailLink: string;
+
+        if (isJob) {
+          groupId = `job-${task.job_id}`;
+          name = task.job_name || 'Trabajo desconocido';
+          type = 'job';
+          detailLink = `/festival-management/${task.job_id}`;
+        } else if (isTour) {
+          groupId = `tour-${task.tour_id}`;
+          name = task.tour_name || 'Gira desconocida';
+          type = 'tour';
+          detailLink = `/tour-management/${task.tour_id}`;
+        } else {
+          groupId = 'global';
+          name = 'Tareas Globales';
+          type = 'global';
+          detailLink = '';
+        }
 
         if (!grouped.has(groupId)) {
           grouped.set(groupId, {
             id: groupId,
-            type: isJob ? 'job' : 'tour',
+            type,
             name,
-            client: task.client || undefined,
+            client: isGlobal ? undefined : (task.client || undefined),
             tasks: [],
           });
         }
@@ -140,14 +247,18 @@ export function usePendingTasks(userId: string | null, userRole: string | null) 
           id: task.id,
           department: task.department,
           taskType: task.task_type || 'Task',
+          description: task.description || null,
           status: task.status,
           progress: task.progress || 0,
           dueDate: task.due_at,
           priority: task.priority,
+          createdAt: task.created_at,
+          updatedAt: task.updated_at,
           detailLink,
           jobId: task.job_id,
           tourId: task.tour_id,
           assignedTo: task.assigned_to,
+          assignedDepartment: task.assigned_department,
           assigneeRole: task.assignee_role,
         });
       });

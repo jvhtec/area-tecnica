@@ -490,6 +490,21 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                     )}
                 </div>
 
+                {/* Achievements */}
+                <div
+                    onClick={() => navigate('/achievements')}
+                    className={`p-4 rounded-xl border mb-3 flex items-center justify-between cursor-pointer ${isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'} transition-colors ${theme.card}`}
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400">🏆</div>
+                        <div>
+                            <div className={`font-bold text-sm ${theme.textMain}`}>Mis Logros</div>
+                            <div className={`text-xs ${theme.textMuted}`}>Logros profesionales y reconocimiento</div>
+                        </div>
+                    </div>
+                    <ChevronRight size={18} className={theme.textMuted} />
+                </div>
+
                 {/* Calendar Sync */}
                 <div
                     onClick={handleCalendarSync}

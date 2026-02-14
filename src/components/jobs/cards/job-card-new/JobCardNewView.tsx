@@ -1,4 +1,6 @@
 import React from "react";
+import { createPortal } from "react-dom";
+import { useReducedMotion } from "framer-motion";
 import { ChevronDown, ChevronRight, Download, Eye } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -27,6 +29,7 @@ import { JobCardAssignments } from "../JobCardAssignments";
 import { JobCardDocuments } from "../JobCardDocuments";
 import { JobCardHeader } from "../JobCardHeader";
 import { JobCardProgress } from "../JobCardProgress";
+import { ConfettiBurst } from "@/components/ui/celebration/ConfettiBurst";
 
 export interface JobCardNewViewProps {
   job: any;
@@ -233,16 +236,49 @@ export function JobCardNewView({
   flexPickerOptions,
   handleFlexPickerConfirm,
 }: JobCardNewViewProps) {
+  const reducedMotion = useReducedMotion();
+  const isAndreaWeddingJob = job?.id === "eeb00e4d-7d38-4687-9d04-31471b89adfc";
+  const [celebrateSeed, setCelebrateSeed] = React.useState(0);
+  const [celebrateOrigin, setCelebrateOrigin] = React.useState<{ xPct: number; yPct: number } | null>(null);
+  const lastCelebrateAtRef = React.useRef(0);
+
+  /** Trigger a celebratory confetti burst on actionable interactions (wedding job only). */
+  const handleCelebrateCapture = React.useCallback((e: React.MouseEvent) => {
+    if (!isAndreaWeddingJob) return;
+    if (reducedMotion) return;
+
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
+
+    // Only celebrate on "action" interactions, not on plain text clicks.
+    const actionable = target.closest(
+      'button,a,[role="button"],input[type="checkbox"],input[type="radio"],select'
+    ) as HTMLElement | null;
+    if (!actionable) return;
+
+    const now = Date.now();
+    if (now - lastCelebrateAtRef.current < 700) return; // throttle
+    lastCelebrateAtRef.current = now;
+
+    // Origin near the click so the effect is obvious (and not always from the top).
+    const xPct = (e.clientX / Math.max(1, window.innerWidth)) * 100;
+    const yPct = (e.clientY / Math.max(1, window.innerHeight)) * 100;
+    setCelebrateOrigin({ xPct, yPct });
+
+    setCelebrateSeed((s) => (s + 1) % 1_000_000);
+  }, [isAndreaWeddingJob, reducedMotion]);
+
   return (
     <div>
       <Card
         className={cn(
-          "mb-4 hover:shadow-md transition-all duration-200",
+          "mb-4 hover:shadow-md transition-all duration-200 relative overflow-hidden",
           !isHouseTech && !isJobBeingDeleted && "cursor-pointer",
           cardOpacity,
           pointerEvents,
           isSelected && "ring-2 ring-primary ring-offset-2 shadow-lg"
         )}
+        onClickCapture={handleCelebrateCapture}
         onClick={handleJobCardClick}
         style={{
           borderLeftColor: appliedBorderColor,
@@ -250,6 +286,18 @@ export function JobCardNewView({
           backgroundColor: appliedBgColor,
         }}
       >
+        {isAndreaWeddingJob && celebrateSeed > 0 && typeof document !== 'undefined' && (
+          createPortal(
+            <ConfettiBurst
+              key={celebrateSeed}
+              seed={celebrateSeed}
+              origin={celebrateOrigin ?? undefined}
+              ttlMs={2400}
+            />,
+            document.body
+          )
+        )}
+
         {isJobBeingDeleted && (
           <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 rounded">
             <div className="bg-white dark:bg-gray-800 px-4 py-2 rounded-md shadow-lg">

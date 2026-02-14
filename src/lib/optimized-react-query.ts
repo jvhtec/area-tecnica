@@ -30,7 +30,10 @@ const createOptimizedQueryOptions = (isLeader: boolean = true): DefaultOptions =
 // Default options for backwards compatibility
 const optimizedQueryOptions = createOptimizedQueryOptions(true);
 
-// Create optimized query client with deduplication and multi-tab support
+/**
+ * Create a React Query client configured for this app's realtime + multi-tab
+ * behavior.
+ */
 export const createOptimizedQueryClient = (isLeader: boolean = true) => {
   const queryClientOptions = createOptimizedQueryOptions(isLeader);
   const queryClient = new QueryClient({
@@ -62,14 +65,29 @@ export const createOptimizedQueryClient = (isLeader: boolean = true) => {
   return queryClient;
 };
 
-// Update query client options based on tab role
+/**
+ * Update the client's default options when leadership changes (multi-tab).
+ */
 export const updateQueryClientForRole = (queryClient: QueryClient, isLeader: boolean) => {
   const newOptions = createOptimizedQueryOptions(isLeader);
   queryClient.setDefaultOptions(newOptions);
 };
 
-// Query key factory for consistent key generation
+/**
+ * Query key factory for consistent key generation.
+ */
 export const createQueryKey = {
+  tours: {
+    all: ['tours'] as const,
+    byUser: (userId: string) => [...createQueryKey.tours.all, 'my', userId] as const,
+  },
+  pendingTasks: {
+    /** All pending-task query keys. */
+    all: ['pending-tasks'] as const,
+    /** Pending tasks for a user, optionally scoped by a normalized department. */
+    byUser: (userId: string, dept: string | null) =>
+      [...createQueryKey.pendingTasks.all, userId, dept] as const,
+  },
   jobs: {
     all: ['jobs'] as const,
     lists: () => [...createQueryKey.jobs.all, 'list'] as const,
@@ -89,7 +107,24 @@ export const createQueryKey = {
   assignments: {
     all: ['assignments'] as const,
     byJob: (jobId: string) => [...createQueryKey.assignments.all, 'job', jobId] as const,
-  }
+  },
+  whatsapp: {
+    all: ['whatsapp'] as const,
+    /** Job assignments used for WhatsApp recipient selection on JobCards. */
+    prodAssignmentsByJob: (jobId: string) => [...createQueryKey.whatsapp.all, 'prod-assignments', jobId] as const,
+    /** Timesheets (source of truth) used to derive worked dates for WhatsApp date grouping. */
+    prodTimesheetsByJob: (jobId: string) => [...createQueryKey.whatsapp.all, 'prod-timesheets', jobId] as const,
+  },
+  profiles: {
+    all: ['profiles'] as const,
+    /** Current user's profile (role/permissions). */
+    currentUser: ['profiles', 'current-user'] as const,
+  },
+  payoutOverrides: {
+    all: ['payout-overrides'] as const,
+    byJobAndTechnician: (jobId?: string | null, technicianId?: string | null) =>
+      [...createQueryKey.payoutOverrides.all, jobId ?? null, technicianId ?? null] as const,
+  },
 };
 
 // Optimized invalidation strategies
@@ -117,5 +152,12 @@ export const optimizedInvalidation = {
     jobIds.forEach(jobId => {
       optimizedInvalidation.invalidateJobRelated(queryClient, jobId);
     });
-  }
+  },
+
+  // Batch invalidation for arbitrary query keys
+  invalidateQueryKeys: (queryClient: QueryClient, queryKeys: QueryKey[]) => {
+    queryKeys.forEach(queryKey => {
+      queryClient.invalidateQueries({ queryKey });
+    });
+  },
 };

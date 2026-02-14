@@ -6,7 +6,6 @@
 DO $$ BEGIN
   RAISE NOTICE 'Applying house tech travel rate exception (€20 for travel days)';
 END $$;
-
 -- Update the extras_total_for_job_tech function to apply the house tech travel rate exception
 CREATE OR REPLACE FUNCTION public.extras_total_for_job_tech(_job_id uuid, _technician_id uuid)
 RETURNS jsonb
@@ -74,10 +73,8 @@ BEGIN
   RETURN COALESCE(v_result, '{"total_eur": 0, "items": []}'::jsonb);
 END;
 $function$;
-
 -- Revoke/grant permissions to match existing function
 REVOKE EXECUTE ON FUNCTION public.extras_total_for_job_tech(uuid, uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.extras_total_for_job_tech(uuid, uuid) TO authenticated, service_role;
-
 COMMENT ON FUNCTION public.extras_total_for_job_tech(uuid, uuid) IS
   'Calculates total rate extras for a specific job and technician. House techs receive a fixed €20 rate for travel days (both half and full) regardless of catalog rates.';

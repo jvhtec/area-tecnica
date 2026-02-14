@@ -662,31 +662,34 @@ export async function handleBroadcast(
 
   } else if (type === 'task.assigned') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
-    const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
+    const contextLabel = jobId ? (jobTitle || 'Trabajo') : tourName;
+    const context = contextLabel ? ` en "${contextLabel}"` : '';
     title = 'Tarea asignada';
     text = recipName
-      ? `${actor} asignó ${taskLabel} a ${recipName} en "${jobLabel}".`
-      : `${actor} asignó ${taskLabel} en "${jobLabel}".`;
+      ? `${actor} asignó ${taskLabel} a ${recipName}${context}.`
+      : `${actor} asignó ${taskLabel}${context}.`;
     // URL already resolved by resolveNotificationUrl(), no override needed
     addRecipients([body.recipient_id]);
   } else if (type === 'task.updated') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
-    const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
+    const contextLabel = jobId ? (jobTitle || 'Trabajo') : tourName;
+    const context = contextLabel ? ` en "${contextLabel}"` : '';
     title = 'Tarea actualizada';
     changeSummary = summarizeTaskChanges(body.changes);
     text = changeSummary
-      ? `${actor} actualizó ${taskLabel} en "${jobLabel}". Cambios: ${changeSummary}.`
-      : `${actor} actualizó ${taskLabel} en "${jobLabel}".`;
+      ? `${actor} actualizó ${taskLabel}${context}. Cambios: ${changeSummary}.`
+      : `${actor} actualizó ${taskLabel}${context}.`;
     // URL already resolved by resolveNotificationUrl(), no override needed
     clearAllRecipients();
     addRecipients([body.recipient_id]);
   } else if (type === 'task.completed') {
     const taskLabel = body.task_type ? `la tarea "${body.task_type}"` : 'una tarea';
-    const jobLabel = jobId ? (jobTitle || 'Trabajo') : (tourName || 'Tour');
+    const contextLabel = jobId ? (jobTitle || 'Trabajo') : tourName;
+    const context = contextLabel ? ` en "${contextLabel}"` : '';
     title = 'Tarea completada';
     text = recipName
-      ? `${actor} marcó como completada ${taskLabel} de ${recipName} en "${jobLabel}".`
-      : `${actor} marcó como completada ${taskLabel} en "${jobLabel}".`;
+      ? `${actor} marcó como completada ${taskLabel} de ${recipName}${context}.`
+      : `${actor} marcó como completada ${taskLabel}${context}.`;
     // URL already resolved by resolveNotificationUrl(), no override needed
     addRecipients([body.recipient_id]);
 

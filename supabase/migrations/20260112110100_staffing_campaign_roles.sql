@@ -17,14 +17,11 @@ CREATE TABLE IF NOT EXISTS staffing_campaign_roles (
 
   UNIQUE(campaign_id, role_code)
 );
-
 -- Create indexes
 CREATE INDEX IF NOT EXISTS staffing_campaign_roles_campaign_stage
   ON staffing_campaign_roles(campaign_id, stage);
-
 -- Enable RLS (inherits campaign permissions via foreign key)
 ALTER TABLE staffing_campaign_roles ENABLE ROW LEVEL SECURITY;
-
 CREATE POLICY "staffing_campaign_roles_select_management"
   ON staffing_campaign_roles
   FOR SELECT
@@ -44,7 +41,6 @@ CREATE POLICY "staffing_campaign_roles_select_management"
         )
     )
   );
-
 CREATE POLICY "staffing_campaign_roles_write_management"
   ON staffing_campaign_roles
   FOR ALL

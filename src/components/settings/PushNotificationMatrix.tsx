@@ -25,7 +25,7 @@ type RouteRow = {
 
 type EventInfo = { code: string; label: string };
 
-type ManagementUser = {
+type MatrixUser = {
   id: string;
   name: string;
   email: string;
@@ -142,7 +142,7 @@ export function PushNotificationMatrix() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [events, setEvents] = useState<EventInfo[]>([]);
-  const [users, setUsers] = useState<ManagementUser[]>([]);
+  const [users, setUsers] = useState<MatrixUser[]>([]);
   const [routesByEvent, setRoutesByEvent] = useState<Record<string, RouteRow[]>>({});
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [isOpen, setIsOpen] = useState(false);
@@ -317,7 +317,7 @@ export function PushNotificationMatrix() {
         supabase
           .from('profiles')
           .select('id, first_name, last_name, nickname, email, department, role')
-          .in('role', ['admin', 'management']),
+          .in('role', ['admin', 'management', 'oscar']),
         supabase
           .from('activity_catalog')
           .select('code, label')
@@ -333,7 +333,7 @@ export function PushNotificationMatrix() {
         name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || (u.nickname as string) || (u.email as string),
         email: u.email as string,
         department: (u as any).department ?? null,
-      })) as ManagementUser[];
+      })) as MatrixUser[];
       setUsers(uData);
 
       // events
@@ -454,10 +454,10 @@ export function PushNotificationMatrix() {
                               ))}
                             </div>
                           </div>
-                          {/* Individual management users */}
+                          {/* Individual matrix users (admin/management/oscar) */}
                           {sortedUsers.length > 0 && (
                             <div>
-                              <div className="text-xs font-medium text-muted-foreground mb-1">Management users</div>
+                              <div className="text-xs font-medium text-muted-foreground mb-1">Admin/Management/Oscar users</div>
                               <div className="space-y-2">
                                 {sortedUsers.map((u) => (
                                   <label key={`${ev.code}|${u.id}`} className="flex items-center justify-between rounded border px-2 py-1 text-sm">
@@ -496,7 +496,7 @@ export function PushNotificationMatrix() {
           <div>
             <CardTitle>Push Routing Matrix</CardTitle>
             <CardDescription>
-              Configure which management users, departments, and assigned technicians receive each event. Natural recipients toggle preserves default recipients.
+              Configure which admin/management/oscar users, departments, and assigned technicians receive each event. Natural recipients toggle preserves default recipients.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-sm min-w-0">
@@ -574,7 +574,7 @@ export function PushNotificationMatrix() {
                             />
                           </TableCell>
                         ))}
-                        {/* Individual management users */}
+                        {/* Individual matrix users (admin/management/oscar) */}
                         {sortedUsers.map((u) => (
                           <TableCell key={`${ev.code}|${u.id}`}>
                             <Checkbox

@@ -3,7 +3,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/h
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Profile } from "./types";
-import { AlertTriangle, Pencil, Trash2, Award } from "lucide-react";
+import { AlertTriangle, Pencil, Trash2, Award, Trophy } from "lucide-react";
 import { formatUserName } from "@/utils/userName";
 import { getDepartmentLabel } from "@/types/department";
 
@@ -13,9 +13,10 @@ interface UserCardProps {
   onDelete: (user: Profile) => void;
   showPasswordAlert?: boolean;
   onManageSkills?: (user: Profile) => void;
+  onViewAchievements?: (user: Profile) => void;
 }
 
-export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, onManageSkills }: UserCardProps) => {
+export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, onManageSkills, onViewAchievements }: UserCardProps) => {
   const fullName = formatUserName(user.first_name, user.nickname, user.last_name);
 
   return (
@@ -52,6 +53,17 @@ export const UserCard = ({ user, onEdit, onDelete, showPasswordAlert = false, on
         </HoverCard>
 
         <div className="flex gap-0.5 sm:gap-2 shrink-0 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity -mr-2 sm:mr-0">
+          {onViewAchievements && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onViewAchievements(user)}
+              className="h-6 px-1 sm:h-8 sm:px-3 text-[10px] sm:text-xs"
+              aria-label={`Ver logros de ${fullName || user.email}`}
+            >
+              <Trophy className="h-2.5 w-2.5 sm:h-4 sm:w-4" />
+            </Button>
+          )}
           {onManageSkills && (
             <Button
               variant="outline"

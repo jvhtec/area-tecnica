@@ -79,6 +79,7 @@ const VALID_USER_ROLES = new Set<UserRole>([
   'technician',
   'house_tech',
   'wallboard',
+  'oscar',
 ]);
 
 export const useOptimizedAuth = () => {

@@ -25,7 +25,7 @@ export const FilterBar = ({
   onDepartmentChange,
   onClearFilters,
 }: FilterBarProps) => {
-  const roles: UserRole[] = ['admin', 'management', 'logistics', 'technician', 'house_tech'];
+  const roles: UserRole[] = ['admin', 'management', 'logistics', 'oscar', 'technician', 'house_tech'];
 
   return (
     <div className="space-y-2 mb-3 md:mb-4">
