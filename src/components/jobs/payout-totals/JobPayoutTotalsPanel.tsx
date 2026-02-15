@@ -138,8 +138,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             onSaveOverride={actions.handleSaveOverride}
             onCancelEdit={actions.handleCancelEdit}
             onRemoveOverride={actions.handleRemoveOverride}
-            isSavingOverride={actions.setOverridePending}
-            isRemovingOverride={actions.removeOverridePending}
+            isSavingOverride={actions.isSavingOverride}
+            isRemovingOverride={actions.isRemovingOverride}
             toggleApprovalMutation={actions.toggleApprovalMutation}
             onSendEmailForTech={actions.handleSendEmailForTech}
           />

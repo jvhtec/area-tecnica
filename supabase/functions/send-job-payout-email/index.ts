@@ -62,6 +62,15 @@ interface JobPayoutRequestBody {
   requested_at?: string;
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function formatCurrency(amount?: number) {
   return new Intl.NumberFormat('es-ES', {
     style: 'currency',
@@ -257,10 +266,11 @@ serve(async (req) => {
         });
       }
 
+      const escapedJobTitle = escapeHtml(body.job.title || '');
       const subject = `Resumen de pagos · ${body.job.title}`;
 
       // Corporate-styled HTML, aligned with other emails
-      const safeName = tech.full_name || '';
+      const safeName = escapeHtml(tech.full_name || '');
       const workedDatesText = formatWorkedDates(tech.worked_dates);
       const fallbackJobDate = formatJobDate(body.job.start_time);
       const dateText = workedDatesText || `el ${fallbackJobDate}`;
@@ -291,7 +301,7 @@ serve(async (req) => {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>${subject}</title>
+        <title>${escapeHtml(subject)}</title>
       </head>
       <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f7fb;padding:24px;">
@@ -316,7 +326,7 @@ serve(async (req) => {
                   <td style="padding:24px 24px 8px 24px;">
                     <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeName || 'equipo'},</h2>
                       <p style="margin:0;color:#374151;line-height:1.55;">
-                        Adjuntamos tu resumen de pagos correspondiente al trabajo <b>${body.job.title}</b>, realizado <b>${dateText}</b>.
+                        Adjuntamos tu resumen de pagos correspondiente al trabajo <b>${escapedJobTitle}</b>, realizado <b>${dateText}</b>.
                       </p>
                   </td>
                 </tr>
@@ -346,7 +356,7 @@ serve(async (req) => {
                     <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:14px;">
                       <b>Nota de facturación:</b>
                       <p style="margin:8px 0 0 0;line-height:1.55;">
-                        ${companyDetails ? `Te rogamos emitas tu factura a: <b>${companyDetails.legalName}</b> (CIF: ${companyDetails.cif}, ${companyDetails.address})` : ''}${companyDetails && tech.lpo_number ? ' e incluyas el siguiente número de referencia: ' : ''}${tech.lpo_number ? `<b>${tech.lpo_number}</b>` : ''}.
+                        ${companyDetails ? `Te rogamos emitas tu factura a: <b>${escapeHtml(companyDetails.legalName)}</b> (CIF: ${escapeHtml(companyDetails.cif)}, ${escapeHtml(companyDetails.address)})` : ''}${companyDetails && tech.lpo_number ? ' e incluyas el siguiente número de referencia: ' : ''}${tech.lpo_number ? `<b>${escapeHtml(tech.lpo_number)}</b>` : ''}.
                       </p>
                     </div>
                   </td>

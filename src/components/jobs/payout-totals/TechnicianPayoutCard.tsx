@@ -6,7 +6,7 @@ import { Switch } from '@/components/ui/switch';
 import { AlertCircle, Clock, CheckCircle, ExternalLink, Send, Receipt } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
-import { JobPayoutOverrideSection, type JobPayoutOverride } from '../JobPayoutOverrideSection';
+import { JobPayoutOverrideSection, type JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
 import type { JobPayoutTotals } from '@/types/jobExtras';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { surface, controlButton, NON_AUTONOMO_DEDUCTION_EUR } from './types';

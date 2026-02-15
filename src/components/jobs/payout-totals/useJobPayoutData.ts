@@ -112,7 +112,8 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
       const { data, error } = await supabase
         .from('timesheets')
         .select('technician_id, date, approved_by_manager, status')
-        .eq('job_id', jobId);
+        .eq('job_id', jobId)
+        .eq('is_active', true);
       if (error) throw error;
 
       const approvedMap = new Map<string, Set<string>>();

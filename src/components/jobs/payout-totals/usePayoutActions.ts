@@ -522,8 +522,8 @@ export function usePayoutActions({
     handleRemoveOverride,
     handleCancelEdit,
     closePreview: () => setPreviewOpen(false),
-    setOverridePending: setOverrideMutation.isPending,
-    removeOverridePending: removeOverrideMutation.isPending,
+    isSavingOverride: setOverrideMutation.isPending,
+    isRemovingOverride: removeOverrideMutation.isPending,
     toggleApprovalMutation,
   };
 }

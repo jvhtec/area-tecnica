@@ -68,3 +68,6 @@ export const EXTRA_TYPE_LIMITS: Record<JobExtraType, number> = {
   travel_full: 1,
   day_off: 1
 };
+
+/** IRPF deduction per day for non-autónomo (cuenta ajena) workers. */
+export const NON_AUTONOMO_DEDUCTION_EUR = 30;

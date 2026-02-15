@@ -163,7 +163,7 @@ export async function prepareTourJobEmailContext(
       .from('v_job_expense_summary')
       .select('technician_id, approved_total_eur')
       .eq('job_id', jobId);
-    (expenseRows || []).forEach((row: any) => {
+    (expenseRows || []).forEach((row: { technician_id: string | null; approved_total_eur: number | null }) => {
       if (!row.technician_id) return;
       const current = expenseMap.get(row.technician_id) || 0;
       expenseMap.set(row.technician_id, current + Number(row.approved_total_eur ?? 0));
@@ -310,9 +310,11 @@ export async function sendTourJobEmails(
       const techExpenses = context.expenseMap.get(attachment.technician_id) ?? 0;
       const computedGrandTotalWithExpenses = computedGrandTotal + techExpenses;
 
+      // Overrides replace the base+extras portion; expenses are always added on top
+      // since they are reimbursements, not part of the negotiated rate.
       const grandTotal =
         q.has_override && q.override_amount_eur != null
-          ? Number(q.override_amount_eur)
+          ? Number(q.override_amount_eur) + techExpenses
           : computedGrandTotalWithExpenses;
       const deduction = attachment.deduction_eur || 0;
 

@@ -3,14 +3,13 @@ import type { TourJobRateQuote } from '@/types/tourRates';
 import type { TechnicianProfileWithEmail, JobPayoutEmailContextResult } from '@/lib/job-payout-email';
 import type { JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
 
+export { NON_AUTONOMO_DEDUCTION_EUR } from '@/types/jobExtras';
+
 /* ── Style tokens ── */
 export const cardBase = 'bg-card border-border text-card-foreground overflow-hidden';
 export const surface = 'bg-muted/30 border-border';
 export const subtleText = 'text-muted-foreground';
 export const controlButton = 'border-border';
-
-/* ── Domain constant ── */
-export const NON_AUTONOMO_DEDUCTION_EUR = 30;
 
 /* ── Props ── */
 export interface JobPayoutTotalsPanelProps {
@@ -81,7 +80,7 @@ export interface PayoutActions {
   handleRemoveOverride: (techId: string) => void;
   handleCancelEdit: () => void;
   closePreview: () => void;
-  setOverridePending: boolean;
-  removeOverridePending: boolean;
+  isSavingOverride: boolean;
+  isRemovingOverride: boolean;
   toggleApprovalMutation: { mutate: (args: { jobId: string; technicianId: string; approved: boolean }) => void; isPending: boolean };
 }
