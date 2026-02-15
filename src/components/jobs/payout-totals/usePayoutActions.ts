@@ -336,8 +336,14 @@ export function usePayoutActions({
             const extrasTotal = Number(
               a.quote.extras_total_eur ?? (a.quote.extras?.total_eur != null ? a.quote.extras.total_eur : 0)
             );
+            // Look up expenses from the enriched payoutTotals (which now fetches tour expenses)
+            const techPayout = payoutTotals.find(p => p.technician_id === a.technician_id);
+            const expensesTotal = techPayout?.expenses_total_eur ?? 0;
+            const expensesBreakdown = techPayout?.expenses_breakdown ?? [];
             const totalWithExtras =
-              a.quote.total_with_extras_eur != null ? Number(a.quote.total_with_extras_eur) : baseTotal + extrasTotal;
+              a.quote.total_with_extras_eur != null
+                ? Number(a.quote.total_with_extras_eur) + expensesTotal
+                : baseTotal + extrasTotal + expensesTotal;
 
             return {
               technician_id: a.technician_id,
@@ -350,8 +356,8 @@ export function usePayoutActions({
                 extras_total_eur: extrasTotal,
                 total_eur: totalWithExtras,
                 extras_breakdown: { items: a.quote.extras?.items ?? [], total_eur: extrasTotal },
-                expenses_total_eur: 0,
-                expenses_breakdown: [],
+                expenses_total_eur: expensesTotal,
+                expenses_breakdown: expensesBreakdown,
               },
               deduction_eur: a.deduction_eur,
               pdfBase64: a.pdfBase64,

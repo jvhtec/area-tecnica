@@ -49,6 +49,16 @@ export function PayoutGrandTotal({
             )}
           </span>
         </div>
+        {payoutTotals.reduce((sum, payout) => sum + (payout.expenses_total_eur || 0), 0) > 0 && (
+          <div className="flex justify-between">
+            <span>Total gastos:</span>
+            <span>
+              {formatCurrency(
+                payoutTotals.reduce((sum, payout) => sum + (payout.expenses_total_eur || 0), 0)
+              )}
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );

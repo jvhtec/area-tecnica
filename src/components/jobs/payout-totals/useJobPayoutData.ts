@@ -7,7 +7,7 @@ import { useJobTechnicianPayoutOverrides } from '@/hooks/useJobPayoutOverride';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
-import type { JobPayoutTotals } from '@/types/jobExtras';
+import type { JobPayoutTotals, JobExpenseBreakdownItem } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import type { JobMetadata, JobPayoutData } from './types';
 import { NON_AUTONOMO_DEDUCTION_EUR } from './types';
@@ -139,6 +139,40 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   const techDaysMap = techDaysMaps.approved;
   const techTotalDaysMap = techDaysMaps.total;
 
+  /* ── Tour date expenses (fetched separately since tour quotes don't include expenses) ── */
+  const { data: tourExpenseData = new Map<string, { total: number; breakdown: JobExpenseBreakdownItem[] }>() } = useQuery({
+    queryKey: ['job-tech-expenses', jobId],
+    enabled: !!jobId && isTourDate,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('v_job_expense_summary')
+        .select('*')
+        .eq('job_id', jobId);
+      if (error) throw error;
+
+      const map = new Map<string, { total: number; breakdown: JobExpenseBreakdownItem[] }>();
+      (data || []).forEach((row) => {
+        if (!row.technician_id) return;
+        const existing = map.get(row.technician_id) || { total: 0, breakdown: [] };
+        const approvedAmount = Number(row.approved_total_eur ?? 0);
+        existing.total += approvedAmount;
+        existing.breakdown.push({
+          category_slug: row.category_slug || 'otros',
+          status_counts: (row.status_counts ?? undefined) as Record<string, number> | undefined,
+          amount_totals: (row.amount_totals ?? undefined) as Record<string, number> | undefined,
+          approved_total_eur: approvedAmount,
+          submitted_total_eur: Number(row.submitted_total_eur ?? 0),
+          draft_total_eur: Number(row.draft_total_eur ?? 0),
+          rejected_total_eur: Number(row.rejected_total_eur ?? 0),
+          last_receipt_at: row.last_receipt_at ?? null,
+        });
+        map.set(row.technician_id, existing);
+      });
+      return map;
+    },
+    staleTime: 30_000,
+  });
+
   /* ── Tour quotes → visible + converted totals ── */
   const visibleTourQuotes = React.useMemo(() => {
     const quotes = (rawTourQuotes as TourJobRateQuote[]) || [];
@@ -160,18 +194,21 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
       const extrasTotal = Number(
         quote.extras_total_eur ?? (quote.extras?.total_eur != null ? quote.extras.total_eur : 0)
       );
-      const totalWithExtras = baseTotal + extrasTotal;
       const extrasBreakdown =
         quote.extras != null
           ? (quote.extras as JobPayoutTotals['extras_breakdown'])
           : ({ items: [], total_eur: extrasTotal } as JobPayoutTotals['extras_breakdown']);
+
+      const techExpenses = tourExpenseData.get(quote.technician_id);
+      const expensesTotal = techExpenses?.total ?? 0;
+      const totalWithExtrasAndExpenses = baseTotal + extrasTotal + expensesTotal;
 
       return {
         job_id: quote.job_id,
         technician_id: quote.technician_id,
         timesheets_total_eur: baseTotal,
         extras_total_eur: extrasTotal,
-        total_eur: totalWithExtras,
+        total_eur: totalWithExtrasAndExpenses,
         extras_breakdown: {
           items: extrasBreakdown.items ?? [],
           total_eur: extrasBreakdown.total_eur ?? extrasTotal,
@@ -179,11 +216,11 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
         vehicle_disclaimer: Boolean(quote.vehicle_disclaimer),
         vehicle_disclaimer_text: quote.vehicle_disclaimer_text ?? undefined,
         payout_approved: tourApprovals.get(quote.technician_id) ?? false,
-        expenses_total_eur: 0,
-        expenses_breakdown: [],
+        expenses_total_eur: expensesTotal,
+        expenses_breakdown: techExpenses?.breakdown ?? [],
       } satisfies JobPayoutTotals;
     });
-  }, [visibleTourQuotes, tourApprovals, tourTimesheetDays]);
+  }, [visibleTourQuotes, tourApprovals, tourTimesheetDays, tourExpenseData]);
 
   const payoutTotals = isTourDate ? tourPayoutTotals : standardPayoutTotals;
   const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading);

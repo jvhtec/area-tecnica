@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { AlertCircle, Clock, CheckCircle, ExternalLink, Send } from 'lucide-react';
+import { AlertCircle, Clock, CheckCircle, ExternalLink, Send, Receipt } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from '../JobPayoutOverrideSection';
@@ -264,6 +264,44 @@ export function TechnicianPayoutCard({
                     <span>{formatCurrency(item.amount_eur)}</span>
                   </div>
                 ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Expenses breakdown */}
+        {payout.expenses_total_eur > 0 && (
+          <>
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-muted-foreground" />
+                <span>Gastos aprobados:</span>
+              </div>
+              <Badge variant="outline">
+                {formatCurrency(payout.expenses_total_eur)}
+              </Badge>
+            </div>
+
+            {payout.expenses_breakdown && payout.expenses_breakdown.length > 0 && (
+              <div className="ml-6 space-y-1">
+                {payout.expenses_breakdown.map((category, idx) => {
+                  const categoryLabels: Record<string, string> = {
+                    'dietas': 'Dietas',
+                    'transporte': 'Transporte',
+                    'alojamiento': 'Alojamiento',
+                    'material': 'Material',
+                    'otros': 'Otros',
+                  };
+                  const label = categoryLabels[category.category_slug] || category.category_slug;
+                  const amount = category.approved_total_eur || 0;
+                  if (amount <= 0) return null;
+                  return (
+                    <div key={idx} className="flex justify-between text-xs text-muted-foreground">
+                      <span>{label}</span>
+                      <span>{formatCurrency(amount)}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </>

@@ -36,6 +36,7 @@ export interface TourJobEmailContextResult {
   profiles: (TechnicianProfile & { email?: string | null })[];
   lpoMap?: Map<string, string | null>;
   timesheetDateMap: Map<string, Set<string>>;
+  expenseMap: Map<string, number>;
   attachments: TourJobEmailAttachment[];
   missingEmails: string[];
 }
@@ -155,6 +156,22 @@ export async function prepareTourJobEmailContext(
   const lpoMap = await fetchLpoMap(supabase, jobId);
   const timesheetRows = await fetchTimesheets(supabase, jobId);
 
+  // Fetch expenses for tour date jobs
+  const expenseMap = new Map<string, number>();
+  try {
+    const { data: expenseRows } = await supabase
+      .from('v_job_expense_summary')
+      .select('technician_id, approved_total_eur')
+      .eq('job_id', jobId);
+    (expenseRows || []).forEach((row: any) => {
+      if (!row.technician_id) return;
+      const current = expenseMap.get(row.technician_id) || 0;
+      expenseMap.set(row.technician_id, current + Number(row.approved_total_eur ?? 0));
+    });
+  } catch {
+    // Non-critical: expenses may not be available
+  }
+
   // Build Timesheet Date Set Map
   const timesheetDateMap = new Map<string, Set<string>>();
   timesheetRows.forEach(row => {
@@ -236,6 +253,7 @@ export async function prepareTourJobEmailContext(
     profiles,
     lpoMap,
     timesheetDateMap,
+    expenseMap,
     attachments,
     missingEmails,
   };
@@ -289,10 +307,13 @@ export async function sendTourJobEmails(
           : baseTotal + extrasTotal;
 
       // Manual payout override should be the source of truth for the amount communicated to the technician.
+      const techExpenses = context.expenseMap.get(attachment.technician_id) ?? 0;
+      const computedGrandTotalWithExpenses = computedGrandTotal + techExpenses;
+
       const grandTotal =
         q.has_override && q.override_amount_eur != null
           ? Number(q.override_amount_eur)
-          : computedGrandTotal;
+          : computedGrandTotalWithExpenses;
       const deduction = attachment.deduction_eur || 0;
 
       // Extract unique worked dates from timesheets
@@ -306,6 +327,7 @@ export async function sendTourJobEmails(
         totals: {
           timesheets_total_eur: baseTotal, // base portion for tour rates
           extras_total_eur: extrasTotal,
+          expenses_total_eur: techExpenses,
           total_eur: grandTotal - deduction,
           deduction_eur: deduction,
         },

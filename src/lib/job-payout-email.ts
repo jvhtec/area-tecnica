@@ -446,6 +446,7 @@ export async function sendJobPayoutEmails(
         totals: {
           timesheets_total_eur: attachment.payout.timesheets_total_eur,
           extras_total_eur: attachment.payout.extras_total_eur,
+          expenses_total_eur: attachment.payout.expenses_total_eur ?? 0,
           total_eur: effectiveTotal(attachment.payout, attachment.deduction_eur || 0),
           deduction_eur: attachment.deduction_eur,
         },

@@ -37,6 +37,7 @@ interface TechnicianPayload {
   totals?: {
     timesheets_total_eur?: number;
     extras_total_eur?: number;
+    expenses_total_eur?: number;
     total_eur?: number;
     deduction_eur?: number;
   };
@@ -231,6 +232,9 @@ serve(async (req) => {
       const dateText = workedDatesText || `el ${fallbackJobDate}`;
       const parts = formatCurrency(tech.totals?.timesheets_total_eur);
       const extras = formatCurrency(tech.totals?.extras_total_eur);
+      const expensesAmount = tech.totals?.expenses_total_eur ?? 0;
+      const expensesFormatted = formatCurrency(expensesAmount);
+      const hasExpenses = expensesAmount > 0;
 
       const deductionAmount = tech.totals?.deduction_eur ?? 0;
       const deductionFormatted = formatCurrency(deductionAmount);
@@ -289,6 +293,7 @@ serve(async (req) => {
                       <ul style="margin:10px 0 0 18px;padding:0;line-height:1.55;">
                         <li><b>Partes aprobados:</b> ${parts}</li>
                         <li><b>Extras:</b> ${extras}</li>
+                        ${hasExpenses ? `<li><b>Gastos aprobados:</b> ${expensesFormatted}</li>` : ''}
                         ${hasDeduction ? `<li><b style="color:#b91c1c;">Deducción IRPF (estimada):</b> -${deductionFormatted}</li>` : ''}
                         <li><b>Total general:</b> ${grand}</li>
                       </ul>

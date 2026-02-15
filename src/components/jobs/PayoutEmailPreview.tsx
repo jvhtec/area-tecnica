@@ -139,6 +139,9 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
 
     const parts = formatCurrency(selectedAttachment.payout.timesheets_total_eur);
     const extras = formatCurrency(selectedAttachment.payout.extras_total_eur);
+    const expensesAmount = selectedAttachment.payout.expenses_total_eur ?? 0;
+    const expensesFormatted = formatCurrency(expensesAmount);
+    const hasExpenses = expensesAmount > 0;
 
     const totalOverrideApplied =
       overrideAmountEur != null
@@ -185,6 +188,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
                 <ul style="margin:10px 0 0 18px;padding:0;line-height:1.55;">
                   <li><b>Partes aprobados:</b> ${parts}</li>
                   <li><b>Extras:</b> ${extras}</li>
+                  ${hasExpenses ? `<li><b>Gastos aprobados:</b> ${expensesFormatted}</li>` : ''}
                   ${hasDeduction ? `<li><b style="color:#b91c1c;">Deducción IRPF (estimada):</b> -${deductionFormatted}</li>` : ''}
                   <li><b>Total general:</b> ${grand}</li>
                 </ul>
