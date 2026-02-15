@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enlace no válido - Sector Pro</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+            max-width: 500px;
+            width: 100%;
+            padding: 40px;
+            text-align: center;
+        }
+        .logo-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .logo { height: 40px; width: auto; }
+        .icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 40px;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+        }
+        h1 {
+            color: #991b1b;
+            margin-bottom: 12px;
+            font-size: 26px;
+            font-weight: 600;
+        }
+        .message {
+            font-size: 17px;
+            color: #374151;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+        .submessage {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        @media (max-width: 480px) {
+            .container { padding: 30px 20px; }
+            h1 { font-size: 22px; }
+            .message { font-size: 15px; }
+            .logo { height: 32px; }
+            .icon { width: 70px; height: 70px; font-size: 35px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo-container">
+            <img src="https://syldobdcdsgfgjtbuwxm.supabase.co/storage/v1/object/public/company-assets/sectorlogow.png" alt="Sector Pro" class="logo">
+            <img src="https://syldobdcdsgfgjtbuwxm.supabase.co/storage/v1/object/public/company-assets/area-tecnica-logo.png" alt="Area Tecnica" class="logo">
+        </div>
+        <div class="icon">✗</div>
+        <h1>Enlace no válido</h1>
+        <div class="message">Este enlace no existe o no es válido. Por favor, usa el enlace original de tu mensaje.</div>
+        <div class="submessage">Puedes cerrar esta pestaña.</div>
+    </div>
+</body>
+</html>
