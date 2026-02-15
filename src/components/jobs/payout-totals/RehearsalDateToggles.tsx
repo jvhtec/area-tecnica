@@ -40,7 +40,7 @@ export function RehearsalDateToggles({
               variant="ghost"
               size="sm"
               className="text-xs h-7 px-2"
-              disabled={toggleAllDatesRehearsalMutation.isPending}
+              disabled={isPending}
               onClick={() => toggleAllDatesRehearsalMutation.mutate({
                 jobId,
                 dates: jobTimesheetDates,
@@ -70,7 +70,7 @@ export function RehearsalDateToggles({
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer select-none',
                 isActive
-                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-200'
+                  ? 'bg-amber-500/20 border-amber-500/50 text-amber-800 dark:text-amber-200'
                   : 'bg-muted/30 border-border text-muted-foreground hover:bg-muted/50',
                 isPending && 'opacity-60'
               )}

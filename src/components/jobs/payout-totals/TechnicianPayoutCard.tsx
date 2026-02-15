@@ -11,6 +11,14 @@ import type { JobPayoutTotals } from '@/types/jobExtras';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { surface, controlButton, NON_AUTONOMO_DEDUCTION_EUR } from './types';
 
+const categoryLabels: Record<string, string> = {
+  'dietas': 'Dietas',
+  'transporte': 'Transporte',
+  'alojamiento': 'Alojamiento',
+  'material': 'Material',
+  'otros': 'Otros',
+};
+
 interface TechnicianPayoutCardProps {
   payout: JobPayoutTotals;
   jobId: string;
@@ -259,7 +267,7 @@ export function TechnicianPayoutCard({
                 {payout.extras_breakdown.items.map((item, idx) => (
                   <div key={idx} className="flex justify-between text-xs text-muted-foreground">
                     <span>
-                      {item.extra_type.replace('_', ' ')} \u00d7 {item.quantity}
+                      {item.extra_type.replaceAll('_', ' ')} \u00d7 {item.quantity}
                     </span>
                     <span>{formatCurrency(item.amount_eur)}</span>
                   </div>
@@ -285,13 +293,6 @@ export function TechnicianPayoutCard({
             {payout.expenses_breakdown && payout.expenses_breakdown.length > 0 && (
               <div className="ml-6 space-y-1">
                 {payout.expenses_breakdown.map((category, idx) => {
-                  const categoryLabels: Record<string, string> = {
-                    'dietas': 'Dietas',
-                    'transporte': 'Transporte',
-                    'alojamiento': 'Alojamiento',
-                    'material': 'Material',
-                    'otros': 'Otros',
-                  };
                   const label = categoryLabels[category.category_slug] || category.category_slug;
                   const amount = category.approved_total_eur || 0;
                   if (amount <= 0) return null;
@@ -349,7 +350,7 @@ export function TechnicianPayoutCard({
       <div className="flex items-center justify-between font-medium">
         <span>Total final:</span>
         <Badge variant="default" className="text-base px-3 py-1">
-          {formatCurrency(getTechOverride(techId)?.override_amount_eur ?? payout.total_eur)}
+          {formatCurrency(getTechOverride(techId)?.override_amount_eur ?? effectiveTotal)}
         </Badge>
       </div>
     </div>

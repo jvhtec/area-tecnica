@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Euro } from 'lucide-react';
-import { PayoutEmailPreview } from '../PayoutEmailPreview';
+import { PayoutEmailPreview } from '@/components/jobs/PayoutEmailPreview';
 import { useJobPayoutData } from './useJobPayoutData';
 import { usePayoutActions } from './usePayoutActions';
 import { PayoutPanelHeader } from './PayoutPanelHeader';
@@ -58,10 +58,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         </CardHeader>
         <CardContent>
           <div className="text-red-400">Error al cargar los pagos</div>
-          <div className="text-xs text-red-300 mt-2 font-mono whitespace-pre-wrap">
-            {data.error instanceof Error
-              ? data.error.message
-              : JSON.stringify(data.error, null, 2)}
+          <div className="text-xs text-red-300 mt-2">
+            No se pudo obtener la información de pagos. Inténtalo de nuevo o contacta con soporte.
           </div>
         </CardContent>
       </Card>

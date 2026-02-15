@@ -140,6 +140,40 @@ serve(async (req) => {
   }
 
   try {
+    // ── Authorization: verify caller is admin or management ──
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const authClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data: { user }, error: authError } = await authClient.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: callerProfile } = await createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+      .from('profiles')
+      .select('user_role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (!callerProfile || !['admin', 'management'].includes(callerProfile.user_role)) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Forbidden: insufficient permissions' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const body = (await req.json()) as JobPayoutRequestBody;
     const DEBUG = Deno.env.get('DEBUG_PAYOUT_EMAILS') === 'true';
 

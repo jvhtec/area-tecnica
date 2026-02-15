@@ -54,16 +54,18 @@ export function PayoutPanelHeader({
             {isLoadingPreview ? 'Cargando\u2026' : 'Previsualizar'}
           </Button>
         )}
-        <Button
-          size="sm"
-          onClick={onSendEmails}
-          disabled={isSendingEmails || !hasPayouts}
-          variant="default"
-          className="bg-blue-600 hover:bg-blue-500 text-white"
-        >
-          <Send className="h-4 w-4 mr-1" />
-          {isSendingEmails ? 'Enviando\u2026' : 'Enviar aprobados'}
-        </Button>
+        {isManager && (
+          <Button
+            size="sm"
+            onClick={onSendEmails}
+            disabled={isSendingEmails || !hasPayouts}
+            variant="default"
+            className="bg-blue-600 hover:bg-blue-500 text-white"
+          >
+            <Send className="h-4 w-4 mr-1" />
+            {isSendingEmails ? 'Enviando\u2026' : 'Enviar aprobados'}
+          </Button>
+        )}
       </div>
     </div>
   );

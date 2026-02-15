@@ -13,7 +13,7 @@ import {
   type TechnicianProfileWithEmail,
 } from '@/lib/job-payout-email';
 import { sendTourJobEmails, prepareTourJobEmailContext, adjustRehearsalQuotesForMultiDay } from '@/lib/tour-payout-email';
-import { generateJobPayoutPDF, generateRateQuotePDF } from '@/utils/rates-pdf-export';
+import { generateJobPayoutPDF, generateRateQuotePDF, type TechnicianProfile } from '@/utils/rates-pdf-export';
 import type { JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import type { JobMetadata, PayoutActions } from './types';
@@ -146,7 +146,7 @@ export function usePayoutActions({
             tour_id: jobMeta.tour_id ?? undefined,
             job_type: jobMeta.job_type ?? undefined,
           },
-          profilesWithEmail as any,
+          profilesWithEmail as TechnicianProfile[],
           lpoMap
         );
         toast.success('PDF de tarifas generado');
@@ -201,7 +201,7 @@ export function usePayoutActions({
           jobId,
           supabase,
           quotes: visibleTourQuotes,
-          profiles: profilesWithEmail as any,
+          profiles: profilesWithEmail as (TechnicianProfile & { email?: string | null })[],
           technicianIds: technicianId ? [technicianId] : undefined,
         });
         setMissingEmailTechIds(result.context.missingEmails);
@@ -283,7 +283,6 @@ export function usePayoutActions({
     jobId,
     isTourDate,
     visibleTourQuotes,
-    supabase,
     profilesWithEmail,
     technicianId,
     standardPayoutTotals,
@@ -307,7 +306,7 @@ export function usePayoutActions({
           jobId,
           supabase,
           quotes: visibleTourQuotes,
-          profiles: profilesWithEmail as any,
+          profiles: profilesWithEmail as (TechnicianProfile & { email?: string | null })[],
         });
 
         const standardContext: JobPayoutEmailContextResult = {
@@ -399,7 +398,7 @@ export function usePayoutActions({
     } finally {
       setIsLoadingPreview(false);
     }
-  }, [jobId, isTourDate, visibleTourQuotes, standardPayoutTotals, supabase, profilesWithEmail, lpoMap, jobMeta]);
+  }, [jobId, isTourDate, visibleTourQuotes, standardPayoutTotals, payoutTotals, profilesWithEmail, lpoMap, jobMeta]);
 
   /* ── Single technician email ── */
   const handleSendEmailForTech = React.useCallback(
@@ -430,7 +429,7 @@ export function usePayoutActions({
             jobId,
             supabase,
             quotes: quotesForTech,
-            profiles: profilesWithEmail as any,
+            profiles: profilesWithEmail as (TechnicianProfile & { email?: string | null })[],
             technicianIds: [techId],
           });
           setMissingEmailTechIds(result.context.missingEmails);
@@ -496,7 +495,6 @@ export function usePayoutActions({
       isTourDate,
       profileMap,
       visibleTourQuotes,
-      supabase,
       profilesWithEmail,
       standardPayoutTotals,
       lpoMap,

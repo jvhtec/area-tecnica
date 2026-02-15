@@ -9,10 +9,9 @@ import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehe
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import type { JobPayoutTotals, JobExpenseBreakdownItem } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
+import { FLEX_UI_BASE_URL } from '@/utils/flexUrlResolver';
 import type { JobMetadata, JobPayoutData } from './types';
 import { NON_AUTONOMO_DEDUCTION_EUR } from './types';
-
-const FLEX_UI_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
 const FIN_DOC_VIEW_ID = '8238f39c-f42e-11e0-a8de-00e08175e43e';
 
 export function useJobPayoutData(jobId: string, technicianId?: string): JobPayoutData {
@@ -96,7 +95,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
       });
 
       const daysCountMap = new Map<string, number>();
-      techDates.forEach((dates, techId) => daysCountMap.set(techId, dates.size));
+      techDates.forEach((dates, techId) => { daysCountMap.set(techId, dates.size); });
 
       return { approvals: approvalMap, daysCounts: daysCountMap };
     },
@@ -129,9 +128,9 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
       });
 
       const approvedCount = new Map<string, number>();
-      approvedMap.forEach((dates, tech) => approvedCount.set(tech, dates.size));
+      approvedMap.forEach((dates, tech) => { approvedCount.set(tech, dates.size); });
       const totalCount = new Map<string, number>();
-      totalMap.forEach((dates, tech) => totalCount.set(tech, dates.size));
+      totalMap.forEach((dates, tech) => { totalCount.set(tech, dates.size); });
       return { approved: approvedCount, total: totalCount };
     },
     staleTime: 60_000,
@@ -300,7 +299,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
       if (error) throw error;
 
       const map = new Map<string, { name: string; email: string | null }>();
-      (data || []).forEach((p: any) => {
+      (data || []).forEach((p: { id: string; first_name: string | null; last_name: string | null; email: string | null }) => {
         const name = `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || p.id;
         map.set(p.id, { name, email: p.email ?? null });
       });

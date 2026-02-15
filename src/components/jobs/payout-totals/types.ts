@@ -1,13 +1,13 @@
 import type { JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import type { TechnicianProfileWithEmail, JobPayoutEmailContextResult } from '@/lib/job-payout-email';
-import type { JobPayoutOverride } from '../JobPayoutOverrideSection';
+import type { JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
 
 /* ── Style tokens ── */
 export const cardBase = 'bg-card border-border text-card-foreground overflow-hidden';
 export const surface = 'bg-muted/30 border-border';
 export const subtleText = 'text-muted-foreground';
-export const controlButton = 'variant-outline border-border';
+export const controlButton = 'border-border';
 
 /* ── Domain constant ── */
 export const NON_AUTONOMO_DEDUCTION_EUR = 30;

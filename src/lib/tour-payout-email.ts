@@ -168,8 +168,8 @@ export async function prepareTourJobEmailContext(
       const current = expenseMap.get(row.technician_id) || 0;
       expenseMap.set(row.technician_id, current + Number(row.approved_total_eur ?? 0));
     });
-  } catch {
-    // Non-critical: expenses may not be available
+  } catch (e) {
+    console.warn('[tour-payout-email] Failed to fetch expenses:', e);
   }
 
   // Build Timesheet Date Set Map

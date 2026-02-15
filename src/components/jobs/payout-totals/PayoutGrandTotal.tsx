@@ -2,7 +2,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
 import type { JobPayoutTotals } from '@/types/jobExtras';
-import type { JobPayoutOverride } from '../JobPayoutOverrideSection';
+import type { JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
 
 interface PayoutGrandTotalProps {
   payoutTotals: JobPayoutTotals[];
@@ -17,6 +17,8 @@ export function PayoutGrandTotal({
 }: PayoutGrandTotalProps) {
   if (payoutTotals.length <= 1) return null;
 
+  const totalExpenses = payoutTotals.reduce((sum, payout) => sum + (payout.expenses_total_eur || 0), 0);
+
   return (
     <div className="mt-6 p-4 bg-muted/50 rounded-lg border border-border">
       <div className="flex justify-between items-center text-lg font-bold">
@@ -27,7 +29,7 @@ export function PayoutGrandTotal({
           </span>
           {payoutOverrides.length > 0 && (
             <Badge variant="outline" className="text-amber-700 border-amber-500/30 bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/40 dark:bg-amber-500/10">
-              {payoutOverrides.length} override{payoutOverrides.length > 1 ? 's' : ''}
+              {payoutOverrides.length} {payoutOverrides.length > 1 ? 'anulaciones' : 'anulación'}
             </Badge>
           )}
         </div>
@@ -49,14 +51,10 @@ export function PayoutGrandTotal({
             )}
           </span>
         </div>
-        {payoutTotals.reduce((sum, payout) => sum + (payout.expenses_total_eur || 0), 0) > 0 && (
+        {totalExpenses > 0 && (
           <div className="flex justify-between">
             <span>Total gastos:</span>
-            <span>
-              {formatCurrency(
-                payoutTotals.reduce((sum, payout) => sum + (payout.expenses_total_eur || 0), 0)
-              )}
-            </span>
+            <span>{formatCurrency(totalExpenses)}</span>
           </div>
         )}
       </div>
