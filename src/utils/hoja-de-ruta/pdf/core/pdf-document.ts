@@ -91,7 +91,60 @@ export class PDFDocument {
   }
 
   save(filename: string): void {
-    this.doc.save(filename);
+    try {
+      // Use the blob output method for more reliable downloads
+      const blob = this.outputBlob();
+      this.downloadBlob(blob, filename);
+    } catch (error) {
+      console.error('Error with blob download, falling back to direct save:', error);
+      // Fallback to direct save method
+      this.doc.save(filename);
+    }
+  }
+
+  private downloadBlob(blob: Blob, filename: string): void {
+    try {
+      // Check for browser compatibility
+      if (!window.URL || !document.createElement) {
+        throw new Error('Browser not supported for blob downloads');
+      }
+
+      // Check if user initiated the action (this should be called from a user action)
+      if (typeof document.hasFocus === 'function' && !document.hasFocus()) {
+        console.warn('Document not focused, download might be blocked');
+      }
+      
+      // Create a temporary URL for the blob
+      const url = URL.createObjectURL(blob);
+      
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      
+      // Force the browser to recognize the download attribute
+      link.setAttribute('download', filename);
+      
+      // Append to body, click, and remove
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      setTimeout(() => {
+        try {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        } catch (cleanupError) {
+          console.warn('Error during cleanup:', cleanupError);
+        }
+      }, 100);
+      
+      console.log('✅ PDF download triggered successfully');
+    } catch (error) {
+      console.error('❌ Error with blob download method:', error);
+      throw error;
+    }
   }
 
   output(type: 'dataurl' | 'datauri'): any {
