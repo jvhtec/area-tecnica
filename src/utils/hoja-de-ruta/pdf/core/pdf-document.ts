@@ -56,15 +56,21 @@ export class PDFDocument {
   }
 
   addText(text: string, x: number, y: number, options?: any): void {
-    this.doc.text(text, x, y, options);
+    if (text === null || text === undefined) return;
+    try {
+      this.doc.text(String(text), x, y, options);
+    } catch (e) {
+      console.warn('Error adding text to PDF:', e);
+    }
   }
 
   // Split a long text into multiple lines that fit within maxWidth
   splitText(text: string, maxWidth: number): string[] {
+    if (!text) return [];
     try {
-      return this.doc.splitTextToSize(text, maxWidth) as unknown as string[];
+      return this.doc.splitTextToSize(String(text), maxWidth) as unknown as string[];
     } catch {
-      return [text];
+      return [String(text)];
     }
   }
 
