@@ -2,14 +2,9 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  throw new Error(
-    "Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"
-  );
-}
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -158,25 +153,37 @@ serve(async (req) => {
       );
     }
 
-    const authClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    // Standard Supabase Edge Function auth pattern: anon key + user's Authorization header
+    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const { data: { user }, error: authError } = await authClient.auth.getUser(authHeader.replace('Bearer ', ''));
+    const { data: { user }, error: authError } = await authClient.auth.getUser();
     if (authError || !user) {
+      console.error('[send-job-payout-email] Auth verification failed:', authError?.message);
       return new Response(
         JSON.stringify({ success: false, error: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const { data: callerProfile } = await createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+    // Service-role client for DB queries (bypasses RLS)
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    const { data: callerProfile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('user_role')
       .eq('id', user.id)
       .maybeSingle();
 
+    if (profileError) {
+      console.error('[send-job-payout-email] Profile lookup failed:', profileError.message);
+    }
+
     if (!callerProfile || !['admin', 'management'].includes(callerProfile.user_role)) {
+      console.warn('[send-job-payout-email] Forbidden: user', user.id, 'role:', callerProfile?.user_role);
       return new Response(
         JSON.stringify({ success: false, error: 'Forbidden: insufficient permissions' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -220,13 +227,11 @@ serve(async (req) => {
 
     const results: Array<{ technician_id: string; sent: boolean; error?: string }> = [];
 
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-
     // Preload payout overrides for this job (so email totals never depend on client-side enrichment)
     const technicianIds = body.technicians.map((t) => t.technician_id).filter(Boolean);
     const overrideMap = new Map<string, number>();
     if (technicianIds.length > 0) {
-      const { data: overrides, error: overrideError } = await supabase
+      const { data: overrides, error: overrideError } = await supabaseAdmin
         .from("job_technician_payout_overrides")
         .select("technician_id, override_amount_eur")
         .eq("job_id", body.job.id)
