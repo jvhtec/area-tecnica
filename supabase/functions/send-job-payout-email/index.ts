@@ -148,6 +148,43 @@ serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
+    // ── Authorization: verify caller is admin or management ──
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing or malformed authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !user) {
+      console.error('[send-job-payout-email] Token verification failed:', authError?.message);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { data: callerProfile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError) {
+      console.error('[send-job-payout-email] Profile lookup failed:', profileError.message);
+    }
+
+    if (!callerProfile || !['admin', 'management'].includes(callerProfile.role)) {
+      console.warn('[send-job-payout-email] Forbidden: user', user.id, 'role:', callerProfile?.role);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Forbidden: insufficient permissions' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const body = (await req.json()) as JobPayoutRequestBody;
     const DEBUG = Deno.env.get('DEBUG_PAYOUT_EMAILS') === 'true';
 
