@@ -3,7 +3,6 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const corsHeaders: Record<string, string> = {
@@ -144,51 +143,10 @@ serve(async (req) => {
   }
 
   try {
-    // ── Authorization: verify caller is admin or management ──
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Standard Supabase Edge Function auth pattern: anon key + user's Authorization header
-    const authClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { data: { user }, error: authError } = await authClient.auth.getUser();
-    if (authError || !user) {
-      console.error('[send-job-payout-email] Auth verification failed:', authError?.message);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     // Service-role client for DB queries (bypasses RLS)
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-
-    const { data: callerProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('user_role')
-      .eq('id', user.id)
-      .maybeSingle();
-
-    if (profileError) {
-      console.error('[send-job-payout-email] Profile lookup failed:', profileError.message);
-    }
-
-    if (!callerProfile || !['admin', 'management'].includes(callerProfile.user_role)) {
-      console.warn('[send-job-payout-email] Forbidden: user', user.id, 'role:', callerProfile?.user_role);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Forbidden: insufficient permissions' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     const body = (await req.json()) as JobPayoutRequestBody;
     const DEBUG = Deno.env.get('DEBUG_PAYOUT_EMAILS') === 'true';
