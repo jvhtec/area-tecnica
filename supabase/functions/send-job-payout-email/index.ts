@@ -149,34 +149,42 @@ serve(async (req) => {
   }
 
   try {
+    // Service-role client for DB queries (bypasses RLS)
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
     // ── Authorization: verify caller is admin or management ──
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing authorization header' }),
+        JSON.stringify({ success: false, error: 'Missing or malformed authorization header' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const authClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-      global: { headers: { Authorization: authHeader } },
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    const { data: { user }, error: authError } = await authClient.auth.getUser(authHeader.replace('Bearer ', ''));
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) {
+      console.error('[send-job-payout-email] Token verification failed:', authError?.message);
       return new Response(
         JSON.stringify({ success: false, error: 'Invalid or expired token' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const { data: callerProfile } = await createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+    const { data: callerProfile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('user_role')
+      .select('role')
       .eq('id', user.id)
-      .maybeSingle();
+      .single();
 
-    if (!callerProfile || !['admin', 'management'].includes(callerProfile.user_role)) {
+    if (profileError) {
+      console.error('[send-job-payout-email] Profile lookup failed:', profileError.message);
+    }
+
+    if (!callerProfile || !['admin', 'management'].includes(callerProfile.role)) {
+      console.warn('[send-job-payout-email] Forbidden: user', user.id, 'role:', callerProfile?.role);
       return new Response(
         JSON.stringify({ success: false, error: 'Forbidden: insufficient permissions' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -220,13 +228,11 @@ serve(async (req) => {
 
     const results: Array<{ technician_id: string; sent: boolean; error?: string }> = [];
 
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
-
     // Preload payout overrides for this job (so email totals never depend on client-side enrichment)
     const technicianIds = body.technicians.map((t) => t.technician_id).filter(Boolean);
     const overrideMap = new Map<string, number>();
     if (technicianIds.length > 0) {
-      const { data: overrides, error: overrideError } = await supabase
+      const { data: overrides, error: overrideError } = await supabaseAdmin
         .from("job_technician_payout_overrides")
         .select("technician_id, override_amount_eur")
         .eq("job_id", body.job.id)
