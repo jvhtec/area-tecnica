@@ -54,10 +54,8 @@ const getTechnicianName = (tech: HouseTech): string => {
   if (firstName && lastName) {
     return `${firstName} ${lastName}`;
   }
-  return firstName || lastName || "Unknown";
+  return firstName || lastName || "Desconocido";
 };
-
-// hexToRgb and getContrastHexColor imported from @/utils/excelExport
 
 const getStatusColor = (status: string | null): string => {
   switch (status) {
@@ -208,7 +206,7 @@ export const generatePersonalCalendarPDF = async (
   const dayNumberHeight = 8;
   const cellPadding = 2;
 
-  const daysOfWeek = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
+  const daysOfWeek = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 
   const getTechsForDay = (day: Date) => {
     const dayAssignments = getAssignmentsForDate(day, assignments);
@@ -292,7 +290,8 @@ export const generatePersonalCalendarPDF = async (
     doc.setFontSize(20);
     doc.setTextColor(51, 51, 51);
     doc.text(
-      `PERSONAL CALENDAR - ${format(monthStart, "MMMM yyyy").toUpperCase()}`,
+      `CALENDARIO DE PERSONAL - ${format(monthStart, "MMMM yyyy", { locale: es }).toUpperCase()}`,
+,
       pageWidth / 2,
       monthTitleY,
       { align: "center" }
@@ -411,7 +410,7 @@ export const generatePersonalCalendarPDF = async (
             doc.setFont("helvetica", "italic");
             doc.setFontSize(6);
             doc.setTextColor(100);
-            const moreText = `+${dayTechsData.length - maxTechsToShow} more`;
+            const moreText = `+${dayTechsData.length - maxTechsToShow} más`;
             doc.text(moreText, x + 2, moreY + 2.5);
           }
         }

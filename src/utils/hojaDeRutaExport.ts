@@ -13,7 +13,9 @@ interface ExportData {
   jobDate?: string;
 }
 
-const TITLE_STYLE = { bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" as const, borderColor: "2980B9" };
+type SheetRow = (string | number | null | undefined)[];
+
+const TITLE_STYLE ={ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" as const, borderColor: "2980B9" };
 const HEADER_STYLE = { bold: true, bgColor: "34495E", textColor: "FFFFFF", borderColor: "000000" };
 const LABEL_STYLE = { bold: true, bgColor: "ECF0F1", borderColor: "000000" };
 const DATA_STYLE = { borderColor: "000000" } as const;
@@ -44,7 +46,7 @@ function applyLabelValueRows(ws: ExcelJS.Worksheet, startRow: number, endRow: nu
 
 // Event Information Sheet
 const createEventSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
-  const sheetData: any[][] = [
+  const sheetData: SheetRow[] = [
     ["INFORMACIÓN DEL EVENTO"],
     [],
     ["Campo", "Valor"],
@@ -81,7 +83,7 @@ const createEventSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 
 // Venue Information Sheet
 const createVenueSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
-  const sheetData: any[][] = [
+  const sheetData: SheetRow[] = [
     ["INFORMACIÓN DEL LUGAR"],
     [],
     ["Campo", "Valor"],
@@ -119,7 +121,7 @@ const createVenueSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 
 // Contacts Sheet
 const createContactsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
-  const sheetData: any[][] = [
+  const sheetData: SheetRow[] = [
     ["CONTACTOS"],
     [],
     ["Nombre", "Rol", "Teléfono", "Email"],
@@ -155,7 +157,7 @@ const createContactsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 
 // Staff Sheet
 const createStaffSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
-  const sheetData: any[][] = [
+  const sheetData: SheetRow[] = [
     ["PERSONAL"],
     [],
     ["Nombre", "Apellidos", "DNI", "Posición", "Departamento", "Teléfono", "Rol"],
@@ -198,7 +200,7 @@ const createStaffSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 
 // Travel Sheet
 const createTravelSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
-  const sheetData: any[][] = [
+  const sheetData: SheetRow[] = [
     ["VIAJES"],
     [],
     ["Tipo de Transporte", "Dirección Recogida", "Hora Recogida", "Hora Salida", "Hora Llegada", "Núm. Vuelo/Tren", "Compañía", "Notas"],
@@ -251,7 +253,7 @@ const createTravelSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 
 // Accommodation Sheet
 const createAccommodationSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
-  const sheetData: any[][] = [
+  const sheetData: SheetRow[] = [
     ["ALOJAMIENTO"],
     [],
   ];
@@ -340,7 +342,7 @@ const createAccommodationSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const transports = data.eventData.logistics?.transport || [];
 
-  const sheetData: any[][] = [
+  const sheetData: SheetRow[] = [
     ["LOGÍSTICA Y TRANSPORTE"],
     [],
     ["Tipo de Transporte", "Conductor", "Teléfono", "Matrícula", "Compañía", "Fecha/Hora", "¿Retorno?", "Fecha/Hora Retorno"],
@@ -406,8 +408,8 @@ const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   applyHeaderRow(ws, 3, 8);
 
   // Data rows for transport
-  const transportEndRow = 4 + transports.length - 1;
-  applyAlternatingRows(ws, 4, Math.max(transportEndRow, 4), 8);
+  const transportEndRow = Math.max(4, 4 + transports.length - 1);
+  applyAlternatingRows(ws, 4, transportEndRow, 8);
 
   // Logistics details section
   const detailsStartRow = transportEndRow + 2;
@@ -433,7 +435,7 @@ const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 
 // Schedule Sheet
 const createScheduleSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
-  const sheetData: any[][] = [
+  const sheetData: SheetRow[] = [
     ["PROGRAMA / HORARIO"],
     [],
   ];
@@ -532,7 +534,7 @@ const createScheduleSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 
 // Weather Sheet
 const createWeatherSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
-  const sheetData: any[][] = [
+  const sheetData: SheetRow[] = [
     ["PREVISIÓN METEOROLÓGICA"],
     [],
     ["Fecha", "Condición", "Temp. Máx. (°C)", "Temp. Mín. (°C)", "Prob. Precipitación (%)"],
@@ -570,7 +572,7 @@ const createWeatherSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 
 // Restaurants Sheet
 const createRestaurantsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
-  const sheetData: any[][] = [
+  const sheetData: SheetRow[] = [
     ["RESTAURANTES"],
     [],
     ["Nombre", "Dirección", "Tipo de Cocina", "Valoración", "Teléfono", "Sitio Web"],

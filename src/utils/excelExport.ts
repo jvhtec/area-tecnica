@@ -52,12 +52,14 @@ export function applyStyle(
   cell: ExcelJS.Cell,
   options: CellStyleOptions
 ): void {
-  if (options.bold || options.fontSize || options.textColor || options.italic) {
+if (options.bold !== undefined || options.fontSize !== undefined || options.textColor !== undefined || options.italic !== undefined) {
+    const existing = (cell.font as ExcelJS.Font) || {};
     cell.font = {
-      bold: options.bold ?? false,
-      size: options.fontSize ?? 11,
-      color: options.textColor ? { argb: toArgb(options.textColor) } : undefined,
-      italic: options.italic ?? false,
+      ...existing,
+      ...(options.bold !== undefined ? { bold: options.bold } : {}),
+      ...(options.fontSize !== undefined ? { size: options.fontSize } : {}),
+      ...(options.textColor !== undefined ? { color: { argb: toArgb(options.textColor) } } : {}),
+      ...(options.italic !== undefined ? { italic: options.italic } : {}),
     };
   }
 
@@ -122,7 +124,15 @@ export async function saveWorkbook(
  * Parses a hex color string (#RRGGBB or RRGGBB) into an [r, g, b] tuple.
  */
 export function hexToRgb(hex: string): [number, number, number] {
-  const clean = hex.replace(/^#/, "");
+  let clean = hex.replace(/^#/, "");
+  if (clean.length === 3) {
+    clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2];
+  } else if (clean.length === 8) {
+    // AARRGGBB – drop the alpha channel, use the trailing RRGGBB
+    clean = clean.slice(2);
+  } else if (clean.length !== 6) {
+    throw new Error(`hexToRgb: invalid hex color "${hex}" (expected 3, 6, or 8 hex chars)`);
+  }
   const r = parseInt(clean.slice(0, 2), 16);
   const g = parseInt(clean.slice(2, 4), 16);
   const b = parseInt(clean.slice(4, 6), 16);

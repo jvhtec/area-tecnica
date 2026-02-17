@@ -10,7 +10,7 @@ import type { CalendarExportRange, PrintSettings } from "./calendar-section/type
 import { supabase } from "@/lib/supabase";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 import { loadExceljs } from "@/utils/lazyExceljs";
-import { saveWorkbook, toArgb, tintColor, thinBorder } from "@/utils/excelExport";
+import { saveWorkbook, toArgb, tintColor, thinBorder, hexToRgb, getContrastHexColor } from "@/utils/excelExport";
 import {
   format,
   startOfMonth,
@@ -237,19 +237,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   }
 
 
-  const hexToRgb = (hex: string): [number, number, number] => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return [r, g, b];
-  };
-
-  const getContrastColor = (hex: string): string => {
-    const [r, g, b] = hexToRgb(hex);
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-    return luminance > 0.6 ? "#000000" : "#ffffff";
-  };
-
   // --- PDF Generation Logic (Existing) ---
   const generatePDF = async (range: CalendarExportRange) => {
     const filteredJobs = jobs.filter((job) => {
@@ -309,7 +296,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const dayNumberHeight = 8;
     const cellPadding = 2;
 
-    const daysOfWeek = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"];
+    const daysOfWeek = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
     const dateTypeLabels: Record<string, string> = {
       travel: "V",
       setup: "M",
@@ -478,7 +465,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             const typeLabel = dateType ? dateTypeLabels[dateType] : "";
             const baseColor = job.color || "#cccccc";
             const [r, g, b] = hexToRgb(baseColor);
-            const textColor = getContrastColor(baseColor);
+            const textColor = getContrastHexColor(baseColor);
 
             const yPos = eventY + index * (eventHeight + eventSpacing);
 
@@ -519,7 +506,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
               doc.setFont("helvetica", "italic");
               doc.setFontSize(6);
               doc.setTextColor(100);
-              const moreText = `+${dayJobs.length - maxEventsToShow} more`;
+              const moreText = `+${dayJobs.length - maxEventsToShow} más`;
               doc.text(moreText, x + 2, moreY + 2.2);
             }
           }

@@ -11,6 +11,7 @@ import {
   eachDayOfInterval,
 } from "date-fns";
 import { es } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 
 interface LogisticsEvent {
   id: string;
@@ -75,15 +76,13 @@ const getJobTitle = (event: LogisticsEvent): string => {
   return "-";
 };
 
-export const generateLogisticsCalendarXLS = async (
+function prepareLogisticsCalendarData(
   range: "current_week" | "next_week" | "month",
-  data: LogisticsExportData
-) => {
-  const { events, currentDate } = data;
-
+  events: LogisticsEvent[],
+  currentDate: Date
+): { startDate: Date; endDate: Date; rangeLabel: string; events: LogisticsEvent[] } {
+  const today = toZonedTime(new Date(), "Europe/Madrid");
   let startDate: Date, endDate: Date, rangeLabel: string;
-
-  const today = new Date();
 
   switch (range) {
     case "current_week":
@@ -107,19 +106,27 @@ export const generateLogisticsCalendarXLS = async (
       rangeLabel = format(currentDate, "MMMM yyyy", { locale: es });
   }
 
-  // Filter events within the date range
   const filteredEvents = events.filter((event) => {
     if (!event.event_date) return false;
     const eventDate = new Date(event.event_date);
     return eventDate >= startDate && eventDate <= endDate;
   });
 
-  // Sort events by date and time
   const sortedEvents = [...filteredEvents].sort((a, b) => {
     const dateCompare = a.event_date.localeCompare(b.event_date);
     if (dateCompare !== 0) return dateCompare;
     return a.event_time.localeCompare(b.event_time);
   });
+
+  return { startDate, endDate, rangeLabel, events: sortedEvents };
+}
+
+export const generateLogisticsCalendarXLS = async (
+  range: "current_week" | "next_week" | "month",
+  data: LogisticsExportData
+) => {
+  const { events, currentDate } = data;
+  const { rangeLabel, events: sortedEvents } = prepareLogisticsCalendarData(range, events, currentDate);
 
   // Create sheet data
   const sheetData: (string | null)[][] = [];
@@ -223,7 +230,8 @@ export const generateLogisticsCalendarXLS = async (
   }
 
   // Generate filename and save
-  const filename = `logistica-${range}-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+   const filename = `logistica-${range}-${format(toZonedTime(new Date(), "Europe/Madrid"), "yyyy-MM-dd")}.xlsx`;
+
   await saveWorkbook(workbook, filename);
 };
 
@@ -233,46 +241,7 @@ export const generateLogisticsCalendarPDF = async (
 ) => {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const { events, currentDate } = data;
-
-  let startDate: Date, endDate: Date, rangeLabel: string;
-
-  const today = new Date();
-
-  switch (range) {
-    case "current_week":
-      startDate = startOfWeek(today, { weekStartsOn: 1 });
-      endDate = endOfWeek(today, { weekStartsOn: 1 });
-      rangeLabel = `Semana Actual (${format(startDate, "d MMM", { locale: es })} - ${format(endDate, "d MMM yyyy", { locale: es })})`;
-      break;
-    case "next_week":
-      startDate = startOfWeek(addWeeks(today, 1), { weekStartsOn: 1 });
-      endDate = endOfWeek(addWeeks(today, 1), { weekStartsOn: 1 });
-      rangeLabel = `Próxima Semana (${format(startDate, "d MMM", { locale: es })} - ${format(endDate, "d MMM yyyy", { locale: es })})`;
-      break;
-    case "month":
-      startDate = startOfMonth(currentDate);
-      endDate = endOfMonth(currentDate);
-      rangeLabel = `Mes Completo - ${format(currentDate, "MMMM yyyy", { locale: es })}`;
-      break;
-    default:
-      startDate = startOfMonth(currentDate);
-      endDate = endOfMonth(currentDate);
-      rangeLabel = format(currentDate, "MMMM yyyy", { locale: es });
-  }
-
-  // Filter events within the date range
-  const filteredEvents = events.filter((event) => {
-    if (!event.event_date) return false;
-    const eventDate = new Date(event.event_date);
-    return eventDate >= startDate && eventDate <= endDate;
-  });
-
-  // Sort events by date and time
-  const sortedEvents = [...filteredEvents].sort((a, b) => {
-    const dateCompare = a.event_date.localeCompare(b.event_date);
-    if (dateCompare !== 0) return dateCompare;
-    return a.event_time.localeCompare(b.event_time);
-  });
+  const { rangeLabel, events: sortedEvents } = prepareLogisticsCalendarData(range, events, currentDate);
 
   // Create PDF
   const doc = new jsPDF("landscape", "mm", "a4");
