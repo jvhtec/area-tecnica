@@ -1,6 +1,6 @@
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 import { loadExceljs } from "@/utils/lazyExceljs";
-import { populateSheet, saveWorkbook } from "@/utils/excelExport";
+import { applyStyle, saveWorkbook, toArgb, tintColor } from "@/utils/excelExport";
 import {
   format,
   startOfMonth,
@@ -464,6 +464,28 @@ export const generatePersonalCalendarPDF = async (
   doc.save(`personal-calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.pdf`);
 };
 
+// Department colors matching the UI
+const DEPT_COLORS: Record<string, { bg: string; text: string }> = {
+  sound:  { bg: "DBEAFE", text: "1E40AF" }, // blue-100/blue-800
+  lights: { bg: "FEF9C3", text: "854D0E" }, // yellow-100/yellow-800
+  video:  { bg: "F3E8FF", text: "6B21A8" }, // purple-100/purple-800
+};
+const DEFAULT_DEPT_COLOR = { bg: "F3F4F6", text: "374151" }; // gray-100/gray-800
+
+// Availability status colors matching the UI
+const STATUS_COLORS: Record<string, { bg: string; text: string }> = {
+  warehouse: { bg: "E5E7EB", text: "374151" }, // Gray
+  vacation:  { bg: "FEE2E2", text: "DC2626" }, // Red
+  travel:    { bg: "DBEAFE", text: "2563EB" }, // Blue
+  sick:      { bg: "FCE7F3", text: "BE185D" }, // Pink
+  day_off:   { bg: "FEF9C3", text: "A16207" }, // Yellow
+};
+const JOB_ASSIGNMENT_COLOR = { bg: "BFDBFE", text: "1E40AF" }; // Light blue
+
+const WEEKEND_BG_PERSONAL = "F1F5F9"; // slate-100
+const HOLIDAY_BG = "FFFBEB"; // amber-50
+const HEADER_BG_PERSONAL = "2980B9";
+
 export const generatePersonalCalendarXLS = async (
   range: "month" | "quarter" | "year",
   data: PersonalCalendarExportData
@@ -491,7 +513,7 @@ export const generatePersonalCalendarXLS = async (
       endDate = endOfMonth(currentDate);
   }
 
-  const daysOfWeek = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
+  const daysOfWeek = ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO", "DOMINGO"];
 
   const getTechsForDayXls = (day: Date) => {
     const dayAssignments = getAssignmentsForDate(day, assignments);
@@ -519,72 +541,120 @@ export const generatePersonalCalendarXLS = async (
     });
   };
 
-  const generateSheetData = (monthStart: Date) => {
-    const sheetData: (string | null)[][] = [];
+  const thinBorder = (color = "D1D5DB") => ({
+    top: { style: "thin" as const, color: { argb: toArgb(color) } },
+    bottom: { style: "thin" as const, color: { argb: toArgb(color) } },
+    left: { style: "thin" as const, color: { argb: toArgb(color) } },
+    right: { style: "thin" as const, color: { argb: toArgb(color) } },
+  });
 
-    sheetData.push([
-      `PERSONAL CALENDAR - ${format(monthStart, "MMMM yyyy").toUpperCase()}`,
-      null,
-      null,
-      null,
-      null,
-      null,
-      null,
-    ]);
-
-    sheetData.push(daysOfWeek);
-
+  const buildStyledSheet = (wb: InstanceType<typeof ExcelJS.Workbook>, monthStart: Date, sheetName: string) => {
+    const ws = wb.addWorksheet(sheetName);
     const monthEnd = endOfMonth(monthStart);
     const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
-    const firstDayOfWeek = 1;
 
-    function getDayIndex(d: Date) {
-      return firstDayOfWeek === 1 ? (d.getDay() + 6) % 7 : d.getDay();
+    // Column widths
+    for (let i = 1; i <= 7; i++) {
+      ws.getColumn(i).width = 24;
     }
 
+    // Row 1: Month title
+    const titleRow = ws.addRow([`CALENDARIO DE PERSONAL - ${format(monthStart, "MMMM yyyy").toUpperCase()}`]);
+    ws.mergeCells("A1:G1");
+    const titleCell = titleRow.getCell(1);
+    titleCell.font = { bold: true, size: 14, color: { argb: toArgb("FFFFFF") } };
+    titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(HEADER_BG_PERSONAL) } };
+    titleCell.alignment = { horizontal: "center", vertical: "middle" };
+    titleRow.height = 26;
+
+    // Row 2: Day headers
+    const headerRow = ws.addRow(daysOfWeek);
+    headerRow.height = 20;
+    for (let c = 1; c <= 7; c++) {
+      const cell = headerRow.getCell(c);
+      const isWeekendCol = c >= 6;
+      cell.font = { bold: true, size: 10, color: { argb: toArgb(isWeekendCol ? "F59E0B" : "FFFFFF") } };
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(isWeekendCol ? "1E3A5F" : "34495E") } };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+    }
+
+    // Build weeks
+    function getDayIndex(d: Date) { return (d.getDay() + 6) % 7; }
     const offset = getDayIndex(monthStart);
-    const offsetDays = Array.from({ length: offset }, () => null);
-    const allMonthDaysWithPadding = [...offsetDays, ...monthDays];
+    const allDays: Array<Date | null> = [
+      ...Array.from({ length: offset }, () => null),
+      ...monthDays,
+    ];
     const weeks: Array<Array<Date | null>> = [];
-
-    while (allMonthDaysWithPadding.length > 0) {
-      weeks.push(allMonthDaysWithPadding.splice(0, 7));
+    while (allDays.length > 0) {
+      weeks.push(allDays.splice(0, 7));
     }
 
+    // Max techs per day
     let maxTechsInAnyDay = 0;
     for (const week of weeks) {
       for (const day of week) {
         if (day && isSameMonth(day, monthStart)) {
           const techs = getTechsForDayXls(day);
-          if (techs.length > maxTechsInAnyDay) {
-            maxTechsInAnyDay = techs.length;
-          }
+          if (techs.length > maxTechsInAnyDay) maxTechsInAnyDay = techs.length;
         }
       }
     }
+    const rowsPerDay = Math.max(2, maxTechsInAnyDay + 1);
 
-    const rowsPerDayCell = Math.max(1, maxTechsInAnyDay + 1);
-
+    // Render weeks
     for (const week of weeks) {
-      const weekRows = Array.from({ length: rowsPerDayCell }, () => Array(7).fill(null));
+      const startExcelRow = ws.rowCount + 1;
 
-      for (const [dayIndex, day] of week.entries()) {
-        if (!day) {
-          continue;
+      for (let r = 0; r < rowsPerDay; r++) {
+        ws.addRow(Array(7).fill(""));
+      }
+
+      for (const [colIdx, day] of week.entries()) {
+        const col = colIdx + 1;
+        const isWeekendCol = colIdx >= 5;
+        const isInMonth = day ? isSameMonth(day, monthStart) : false;
+        const holidayName = day ? getMadridHolidayName(day, madridHolidays) : null;
+        const isHoliday = !!holidayName;
+
+        // Day number
+        const dayNumCell = ws.getRow(startExcelRow).getCell(col);
+        if (day) {
+          const dayStr = format(day, "d");
+          dayNumCell.value = isHoliday ? `${dayStr} 🏖️ ${holidayName}` : parseInt(dayStr);
+        }
+        dayNumCell.font = {
+          bold: true,
+          size: isHoliday ? 9 : 10,
+          color: { argb: toArgb(
+            !isInMonth ? "9CA3AF"
+            : isHoliday ? "B45309"
+            : isWeekendCol ? "DC2626"
+            : "1F2937"
+          ) },
+        };
+        dayNumCell.alignment = { horizontal: "left", vertical: "top", wrapText: true };
+
+        // Background for all rows in this day
+        for (let r = 0; r < rowsPerDay; r++) {
+          const cell = ws.getRow(startExcelRow + r).getCell(col);
+          const bgColor = !isInMonth ? "F9FAFB"
+            : isHoliday ? HOLIDAY_BG
+            : isWeekendCol ? WEEKEND_BG_PERSONAL
+            : "FFFFFF";
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(bgColor) } };
+          cell.border = thinBorder("E5E7EB");
         }
 
-        const dayString = format(day, "d");
-        const dayTechs = getTechsForDayXls(day);
+        // Technician rows
+        if (day && isInMonth) {
+          const dayTechs = getTechsForDayXls(day);
 
-        // Add holiday indicator if it's a Madrid holiday
-        const holidayName = getMadridHolidayName(day, madridHolidays);
-        const dayDisplayString = holidayName ? `${dayString} 🏖️` : dayString;
-
-        weekRows[0][dayIndex] = isSameMonth(day, monthStart) ? dayDisplayString : format(day, "d");
-
-        for (let i = 0; i < dayTechs.length; i++) {
-          if (i + 1 < rowsPerDayCell) {
+          for (let i = 0; i < dayTechs.length && i + 1 < rowsPerDay; i++) {
             const { tech, assignment, availabilityStatus } = dayTechs[i];
+            const cell = ws.getRow(startExcelRow + i + 1).getCell(col);
+
+            // Determine text
             const statusLabel = availabilityStatus ? `[${getStatusLabel(availabilityStatus)}]` : "";
             const jobTitle = assignment?.jobs?.title || "";
             const techName = getTechnicianName(tech);
@@ -593,41 +663,80 @@ export const generatePersonalCalendarXLS = async (
               : jobTitle
               ? `${techName} (${jobTitle})`
               : techName;
-            weekRows[i + 1][dayIndex] = displayText;
-          } else {
-            weekRows[rowsPerDayCell - 1][dayIndex] = `+${dayTechs.length - i} more...`;
-            break;
+            cell.value = displayText;
+
+            // Color: status > job color > department color
+            let cellColors: { bg: string; text: string };
+            if (availabilityStatus && STATUS_COLORS[availabilityStatus]) {
+              cellColors = STATUS_COLORS[availabilityStatus];
+            } else if (assignment?.jobs?.color) {
+              const jobColor = assignment.jobs.color.replace(/^#/, "");
+              cellColors = { bg: tintColor(jobColor, 0.2), text: jobColor };
+            } else if (assignment) {
+              cellColors = JOB_ASSIGNMENT_COLOR;
+            } else {
+              const dept = tech.department?.trim().toLowerCase() || "";
+              cellColors = DEPT_COLORS[dept] || DEFAULT_DEPT_COLOR;
+            }
+
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(cellColors.bg) } };
+            cell.font = { size: 8, color: { argb: toArgb(cellColors.text) } };
+            cell.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+
+            // Preserve holiday/weekend bg blend
+            if (isHoliday || isWeekendCol) {
+              cell.border = thinBorder("E5E7EB");
+            }
+          }
+
+          // Overflow
+          if (dayTechs.length >= rowsPerDay) {
+            const moreCell = ws.getRow(startExcelRow + rowsPerDay - 1).getCell(col);
+            moreCell.value = `+${dayTechs.length - (rowsPerDay - 1)} más...`;
+            moreCell.font = { size: 7, italic: true, color: { argb: toArgb("6B7280") } };
           }
         }
       }
-      sheetData.push(...weekRows);
-    }
-    return sheetData;
-  };
 
-  const addSheetFromData = (workbook: InstanceType<typeof ExcelJS.Workbook>, sheetData: (string | null)[][], sheetName: string) => {
-    const ws = workbook.addWorksheet(sheetName);
-    populateSheet(ws, sheetData);
-
-    // Calculate column widths from content
-    const maxColWidths = sheetData.reduce(
-      (acc, row) => {
-        row.forEach((cell, i) => {
-          const cellText = cell ? cell.toString() : "";
-          const cellLength = cellText.split("\n").reduce((max, line) => Math.max(max, line.length), 0);
-          acc[i] = Math.max(acc[i] || 0, cellLength);
-        });
-        return acc;
-      },
-      Array(7).fill(0)
-    );
-
-    for (let i = 0; i < 7; i++) {
-      ws.getColumn(i + 1).width = maxColWidths[i] + 2;
+      // Row heights
+      ws.getRow(startExcelRow).height = 18;
+      for (let r = 1; r < rowsPerDay; r++) {
+        ws.getRow(startExcelRow + r).height = 14;
+      }
     }
 
-    if (sheetData.length > 0) {
-      ws.mergeCells("A1:G1");
+    // Legend
+    ws.addRow([]);
+    const legendHeader = ws.addRow(["Leyenda:"]);
+    legendHeader.getCell(1).font = { bold: true, size: 9 };
+
+    // Department legend
+    const deptLegendRow = ws.addRow(["Sonido", "Luces", "Vídeo", "", "", "", ""]);
+    const deptLegendColors = [DEPT_COLORS.sound, DEPT_COLORS.lights, DEPT_COLORS.video];
+    for (let i = 0; i < 3; i++) {
+      const cell = deptLegendRow.getCell(i + 1);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(deptLegendColors[i].bg) } };
+      cell.font = { bold: true, size: 8, color: { argb: toArgb(deptLegendColors[i].text) } };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = thinBorder("D1D5DB");
+    }
+
+    // Status legend
+    const statusItems = [
+      { label: "A = Almacén", key: "warehouse" },
+      { label: "VC = Vacaciones", key: "vacation" },
+      { label: "VJ = Viaje", key: "travel" },
+      { label: "E = Enfermo", key: "sick" },
+      { label: "L = Libre", key: "day_off" },
+    ];
+    const statusLegendRow = ws.addRow(statusItems.map((s) => s.label).concat(["", ""]));
+    for (let i = 0; i < statusItems.length; i++) {
+      const colors = STATUS_COLORS[statusItems[i].key];
+      const cell = statusLegendRow.getCell(i + 1);
+      cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(colors.bg) } };
+      cell.font = { bold: true, size: 8, color: { argb: toArgb(colors.text) } };
+      cell.alignment = { horizontal: "center", vertical: "middle" };
+      cell.border = thinBorder("D1D5DB");
     }
   };
 
@@ -636,12 +745,10 @@ export const generatePersonalCalendarXLS = async (
   if (range === "year" || range === "quarter") {
     const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
     for (const month of monthsInPeriod) {
-      const sheetData = generateSheetData(month);
-      addSheetFromData(workbook, sheetData, format(month, "MMM yyyy"));
+      buildStyledSheet(workbook, month, format(month, "MMM yyyy"));
     }
   } else {
-    const sheetData = generateSheetData(currentDate);
-    addSheetFromData(workbook, sheetData, format(currentDate, "MMMM yyyy"));
+    buildStyledSheet(workbook, currentDate, format(currentDate, "MMMM yyyy"));
   }
 
   await saveWorkbook(workbook, `personal-calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.xlsx`);

@@ -10,7 +10,7 @@ import type { CalendarExportRange, PrintSettings } from "./calendar-section/type
 import { supabase } from "@/lib/supabase";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 import { loadExceljs } from "@/utils/lazyExceljs";
-import { populateSheet, saveWorkbook } from "@/utils/excelExport";
+import { applyStyle, saveWorkbook, toArgb, getContrastTextColor, tintColor } from "@/utils/excelExport";
 import {
   format,
   startOfMonth,
@@ -554,7 +554,23 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     setShowPrintDialog(false);
   };
 
-  // --- XLS Generation Logic (New) ---
+  // --- XLS Generation Logic ---
+  // Date type colors matching the UI icons
+  const DATE_TYPE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
+    travel:    { bg: "DBEAFE", text: "2563EB", label: "V" },   // Blue
+    setup:     { bg: "FEF9C3", text: "A16207", label: "M" },   // Yellow
+    show:      { bg: "DCFCE7", text: "16A34A", label: "S" },   // Green
+    off:       { bg: "F3F4F6", text: "6B7280", label: "O" },   // Gray
+    rehearsal: { bg: "EDE9FE", text: "7C3AED", label: "E" },   // Violet
+  };
+
+  const WEEKEND_BG = "F1F5F9"; // slate-100
+  const TODAY_BORDER = "2563EB"; // primary blue
+  const HEADER_BG = "2980B9";
+  const HEADER_TEXT = "FFFFFF";
+  const OUT_OF_MONTH_TEXT = "9CA3AF"; // gray-400
+  const DEFAULT_JOB_COLOR = "6366F1"; // indigo
+
   const generateXLS = async (range: CalendarExportRange) => {
     const filteredJobs = jobs.filter((job) => {
       const jobType = job.job_type?.toLowerCase();
@@ -583,16 +599,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         endDate = endOfMonth(currentDate);
     }
 
-    const daysOfWeek = ["LUNES", "MARTES", "MIERCOLES", "JUEVES", "VIERNES", "SABADO", "DOMINGO"];
-    const dateTypeLabels: Record<string, string> = {
-      travel: "V",
-      setup: "M",
-      show: "S",
-      off: "O",
-      rehearsal: "E",
-    };
+    const daysOfWeek = ["LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO", "DOMINGO"];
 
-    const getEventsForDayXls = (day: Date) => { // Renamed for clarity
+    const getEventsForDayXls = (day: Date) => {
       return filteredJobs.filter((job) => {
         try {
           const jobTimezone = job.timezone || 'Europe/Madrid';
@@ -604,121 +613,205 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       });
     };
 
-    const generateSheetData = (monthStart: Date) => {
-      const sheetData: (string | null)[][] = [];
+    const thinBorder = (color = "D1D5DB") => ({
+      top: { style: "thin" as const, color: { argb: toArgb(color) } },
+      bottom: { style: "thin" as const, color: { argb: toArgb(color) } },
+      left: { style: "thin" as const, color: { argb: toArgb(color) } },
+      right: { style: "thin" as const, color: { argb: toArgb(color) } },
+    });
 
-      // Month title row (merged)
-      sheetData.push([format(monthStart, "MMMM yyyy").toUpperCase(), null, null, null, null, null, null]);
-
-      // Days of week header
-      sheetData.push(daysOfWeek);
-
+    const buildStyledSheet = (wb: InstanceType<typeof ExcelJS.Workbook>, monthStart: Date, sheetName: string) => {
+      const ws = wb.addWorksheet(sheetName);
       const monthEnd = endOfMonth(monthStart);
       const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
-      const firstDayOfWeek = 1; // Monday is the first day (0=Sunday, 1=Monday)
+      const today = new Date();
 
-      function getDayIndex(d: Date) {
-        return firstDayOfWeek === 1 ? (d.getDay() + 6) % 7 : d.getDay();
+      // Column widths - wide enough for job titles
+      for (let i = 1; i <= 7; i++) {
+        ws.getColumn(i).width = 22;
       }
 
+      // Row 1: Month title (merged)
+      const titleRow = ws.addRow([format(monthStart, "MMMM yyyy").toUpperCase()]);
+      ws.mergeCells("A1:G1");
+      const titleCell = titleRow.getCell(1);
+      titleCell.font = { bold: true, size: 16, color: { argb: toArgb(HEADER_TEXT) } };
+      titleCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(HEADER_BG) } };
+      titleCell.alignment = { horizontal: "center", vertical: "middle" };
+      titleCell.border = thinBorder(HEADER_BG);
+      titleRow.height = 28;
+
+      // Row 2: Day of week headers
+      const headerRow = ws.addRow(daysOfWeek);
+      headerRow.height = 20;
+      for (let c = 1; c <= 7; c++) {
+        const cell = headerRow.getCell(c);
+        const isWeekendCol = c >= 6; // Sat=6, Sun=7
+        cell.font = { bold: true, size: 10, color: { argb: toArgb(isWeekendCol ? "F59E0B" : HEADER_TEXT) } };
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(isWeekendCol ? "1E3A5F" : "34495E") } };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = thinBorder("34495E");
+      }
+
+      // Build week arrays
+      function getDayIndex(d: Date) { return (d.getDay() + 6) % 7; }
       const offset = getDayIndex(monthStart);
-      const offsetDays = Array.from({ length: offset }, () => null);
-      const allMonthDaysWithPadding = [...offsetDays, ...monthDays];
+      const allDays: Array<Date | null> = [
+        ...Array.from({ length: offset }, () => null),
+        ...monthDays,
+      ];
       const weeks: Array<Array<Date | null>> = [];
-
-      while (allMonthDaysWithPadding.length > 0) {
-        weeks.push(allMonthDaysWithPadding.splice(0, 7));
+      while (allDays.length > 0) {
+        weeks.push(allDays.splice(0, 7));
       }
 
-      // Determine max jobs in a single day across the month to dynamically adjust rows per day cell
+      // Determine max jobs in any day for row sizing
       let maxJobsInAnyDay = 0;
       for (const week of weeks) {
         for (const day of week) {
-          if (day && isSameMonth(day, monthStart)) { // Only count jobs for days in the current month
-            const jobs = getEventsForDayXls(day);
-            if (jobs.length > maxJobsInAnyDay) {
-              maxJobsInAnyDay = jobs.length;
-            }
+          if (day && isSameMonth(day, monthStart)) {
+            const dayJobs = getEventsForDayXls(day);
+            if (dayJobs.length > maxJobsInAnyDay) maxJobsInAnyDay = dayJobs.length;
           }
         }
       }
-      // Each day cell in Excel will need at least 1 row for the day number, plus rows for jobs.
-      // We'll set a minimum of 2 rows for job content to allow for day number + 1 job.
-      const rowsPerDayCell = Math.max(1, maxJobsInAnyDay + 1); // 1 for day number, plus max jobs
+      const rowsPerDay = Math.max(2, maxJobsInAnyDay + 1);
 
+      // Render each week
       for (const week of weeks) {
-        // Prepare rows for this week (number of rows equals rowsPerDayCell for each day)
-        // Each week will occupy `rowsPerDayCell` rows in the Excel sheet
-        const weekRows = Array.from({ length: rowsPerDayCell }, () => Array(7).fill(null));
+        const startExcelRow = ws.rowCount + 1;
 
-        for (const [dayIndex, day] of week.entries()) {
-          if (!day) {
-            continue; // Empty cell for padding days
+        // Add empty rows for this week block
+        for (let r = 0; r < rowsPerDay; r++) {
+          ws.addRow(Array(7).fill(""));
+        }
+
+        for (const [colIdx, day] of week.entries()) {
+          const col = colIdx + 1; // 1-based
+          const isWeekendCol = colIdx >= 5;
+          const isInMonth = day ? isSameMonth(day, monthStart) : false;
+          const isToday = day && format(day, "yyyy-MM-dd") === format(today, "yyyy-MM-dd");
+
+          // Day number row
+          const dayNumCell = ws.getRow(startExcelRow).getCell(col);
+          if (day) {
+            dayNumCell.value = parseInt(format(day, "d"));
+          }
+          dayNumCell.font = {
+            bold: true,
+            size: isToday ? 12 : 10,
+            color: { argb: toArgb(
+              !isInMonth ? OUT_OF_MONTH_TEXT
+              : isToday ? TODAY_BORDER
+              : isWeekendCol ? "DC2626"
+              : "1F2937"
+            ) },
+          };
+          dayNumCell.alignment = { horizontal: "left", vertical: "top" };
+
+          // Background for all rows in this day cell
+          for (let r = 0; r < rowsPerDay; r++) {
+            const cell = ws.getRow(startExcelRow + r).getCell(col);
+            const bgColor = !isInMonth ? "F9FAFB"
+              : isToday ? "EFF6FF"
+              : isWeekendCol ? WEEKEND_BG
+              : "FFFFFF";
+            cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(bgColor) } };
+
+            // Today: thick blue border
+            if (isToday) {
+              cell.border = {
+                top: r === 0 ? { style: "medium", color: { argb: toArgb(TODAY_BORDER) } } : thinBorder("D1D5DB").top,
+                bottom: r === rowsPerDay - 1 ? { style: "medium", color: { argb: toArgb(TODAY_BORDER) } } : thinBorder("D1D5DB").bottom,
+                left: { style: "medium", color: { argb: toArgb(TODAY_BORDER) } },
+                right: { style: "medium", color: { argb: toArgb(TODAY_BORDER) } },
+              };
+            } else {
+              cell.border = thinBorder("E5E7EB");
+            }
           }
 
-          const dayString = format(day, "d");
-          const dayJobs = getEventsForDayXls(day);
-
-          // Day number in the first row allocated for this day's cell
-          // Use 'MM-dd' for padding days to differentiate from current month
-          weekRows[0][dayIndex] = isSameMonth(day, monthStart) ? dayString : `${format(day, "d")}`; // Use format for padding days
-
-          // Add jobs to subsequent rows of the cell
-          for (let i = 0; i < dayJobs.length; i++) {
-            if (i + 1 < rowsPerDayCell) { // Ensure we don't go out of bounds for defined rows
+          // Job rows
+          if (day && isInMonth) {
+            const dayJobs = getEventsForDayXls(day);
+            for (let i = 0; i < dayJobs.length && i + 1 < rowsPerDay; i++) {
               const job = dayJobs[i];
               const key = `${job.id}-${format(day, "yyyy-MM-dd")}`;
               const dateType = dateTypes[key]?.type;
-              const typeLabel = dateType ? dateTypeLabels[dateType] + " " : ""; // "V " not "V - "
-              weekRows[i + 1][dayIndex] = `${typeLabel}${job.title}`;
-            } else {
-              // If we run out of allocated rows, add a "more" indicator to the last one
-              weekRows[rowsPerDayCell - 1][dayIndex] = `+${dayJobs.length - i} more...`;
-              break; // Stop adding jobs to this cell
+              const dtInfo = dateType ? DATE_TYPE_COLORS[dateType] : null;
+              const jobColor = (job.color || `#${DEFAULT_JOB_COLOR}`).replace(/^#/, "");
+
+              const cell = ws.getRow(startExcelRow + i + 1).getCell(col);
+              const label = dtInfo ? `${dtInfo.label} ` : "";
+              cell.value = `${label}${job.title}`;
+
+              // Use job color as tinted background (20% opacity equivalent)
+              const bgHex = dtInfo ? dtInfo.bg : tintColor(jobColor, 0.2);
+              const textHex = dtInfo ? dtInfo.text : jobColor;
+
+              cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(bgHex) } };
+              cell.font = { size: 9, bold: !!dtInfo, color: { argb: toArgb(textHex) } };
+              cell.alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+
+              // Preserve today border if applicable
+              if (isToday) {
+                cell.border = {
+                  top: thinBorder("D1D5DB").top,
+                  bottom: i + 2 === rowsPerDay ? { style: "medium", color: { argb: toArgb(TODAY_BORDER) } } : thinBorder("D1D5DB").bottom,
+                  left: { style: "medium", color: { argb: toArgb(TODAY_BORDER) } },
+                  right: { style: "medium", color: { argb: toArgb(TODAY_BORDER) } },
+                };
+              }
+            }
+
+            // Overflow indicator
+            if (dayJobs.length >= rowsPerDay) {
+              const moreCell = ws.getRow(startExcelRow + rowsPerDay - 1).getCell(col);
+              moreCell.value = `+${dayJobs.length - (rowsPerDay - 1)} más...`;
+              moreCell.font = { size: 8, italic: true, color: { argb: toArgb("6B7280") } };
             }
           }
         }
-        sheetData.push(...weekRows);
-      }
-      return sheetData;
-    };
 
-    const addSheetFromData = (wb: InstanceType<typeof ExcelJS.Workbook>, sheetData: (string | null)[][], sheetName: string) => {
-      const ws = wb.addWorksheet(sheetName);
-      populateSheet(ws, sheetData);
-
-      // Adjust column widths based on content
-      const maxColWidths = sheetData.reduce((acc, row) => {
-        row.forEach((cell, i) => {
-          const cellText = cell ? cell.toString() : '';
-          const cellLength = cellText.split('\n').reduce((max, line) => Math.max(max, line.length), 0);
-          acc[i] = Math.max(acc[i] || 0, cellLength);
-        });
-        return acc;
-      }, Array(7).fill(0));
-
-      for (let i = 0; i < 7; i++) {
-        ws.getColumn(i + 1).width = maxColWidths[i] + 2;
+        // Set row heights
+        ws.getRow(startExcelRow).height = 18; // Day number row
+        for (let r = 1; r < rowsPerDay; r++) {
+          ws.getRow(startExcelRow + r).height = 15;
+        }
       }
 
-      // Merge cells for month title
-      if (sheetData.length > 0) {
-        ws.mergeCells('A1:G1');
+      // Legend row at the bottom
+      const legendRow = ws.addRow([]);
+      legendRow.height = 8;
+      const legendHeaderRow = ws.addRow(["Leyenda:"]);
+      legendHeaderRow.getCell(1).font = { bold: true, size: 9, color: { argb: toArgb("374151") } };
+
+      const legendItems = [
+        { label: "V = Viaje", color: DATE_TYPE_COLORS.travel },
+        { label: "M = Montaje", color: DATE_TYPE_COLORS.setup },
+        { label: "S = Show", color: DATE_TYPE_COLORS.show },
+        { label: "O = Libre", color: DATE_TYPE_COLORS.off },
+        { label: "E = Ensayo", color: DATE_TYPE_COLORS.rehearsal },
+      ];
+      const legendDataRow = ws.addRow(legendItems.map((l) => l.label).concat(["", ""]));
+      for (let i = 0; i < legendItems.length; i++) {
+        const cell = legendDataRow.getCell(i + 1);
+        cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(legendItems[i].color.bg) } };
+        cell.font = { bold: true, size: 9, color: { argb: toArgb(legendItems[i].color.text) } };
+        cell.alignment = { horizontal: "center", vertical: "middle" };
+        cell.border = thinBorder("D1D5DB");
       }
     };
 
     const workbook = new ExcelJS.Workbook();
 
-    // If range is year or quarter, generate multiple sheets
     if (range === "year" || range === "quarter") {
       const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
       for (const month of monthsInPeriod) {
-        const sheetData = generateSheetData(month);
-        addSheetFromData(workbook, sheetData, format(month, "MMM yyyy"));
+        buildStyledSheet(workbook, month, format(month, "MMM yyyy"));
       }
-    } else { // Single month
-      const sheetData = generateSheetData(currentDate);
-      addSheetFromData(workbook, sheetData, format(currentDate, "MMMM yyyy"));
+    } else {
+      buildStyledSheet(workbook, currentDate, format(currentDate, "MMMM yyyy"));
     }
 
     await saveWorkbook(workbook, `calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.xlsx`);

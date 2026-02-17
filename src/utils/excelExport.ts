@@ -89,3 +89,31 @@ export async function saveWorkbook(
   });
   saveAs(blob, filename);
 }
+
+/**
+ * Given a hex color (#RRGGBB or RRGGBB), returns black or white hex
+ * for optimal text contrast.
+ */
+export function getContrastTextColor(hex: string): string {
+  const clean = hex.replace(/^#/, "");
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.6 ? "000000" : "FFFFFF";
+}
+
+/**
+ * Creates a lighter tint of a hex color (for cell backgrounds).
+ * Factor 0.0 = white, 1.0 = original color.
+ */
+export function tintColor(hex: string, factor: number): string {
+  const clean = hex.replace(/^#/, "");
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  const tr = Math.round(r + (255 - r) * (1 - factor));
+  const tg = Math.round(g + (255 - g) * (1 - factor));
+  const tb = Math.round(b + (255 - b) * (1 - factor));
+  return [tr, tg, tb].map((c) => c.toString(16).padStart(2, "0")).join("");
+}
