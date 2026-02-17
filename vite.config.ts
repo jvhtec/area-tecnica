@@ -45,7 +45,7 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('node_modules/mapbox-gl')) {
               return 'maps-lib';
             }
-            if (id.includes('node_modules/exceljs') || id.includes('node_modules/xlsx')) {
+            if (id.includes('node_modules/exceljs')) {
               return 'spreadsheet-libs';
             }
             if (id.includes('node_modules/quill')) {

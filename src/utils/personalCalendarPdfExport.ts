@@ -1,5 +1,6 @@
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
-import { loadXlsx } from "@/utils/lazyXlsx";
+import { loadExceljs } from "@/utils/lazyExceljs";
+import { populateSheet, saveWorkbook } from "@/utils/excelExport";
 import {
   format,
   startOfMonth,
@@ -467,7 +468,7 @@ export const generatePersonalCalendarXLS = async (
   range: "month" | "quarter" | "year",
   data: PersonalCalendarExportData
 ) => {
-  const XLSX = await loadXlsx();
+  const ExcelJS = await loadExceljs();
   const { houseTechs, assignments, getAvailabilityStatus, currentDate, selectedDepartments, madridHolidays = [] } = data;
 
   let startDate: Date, endDate: Date;
@@ -604,38 +605,11 @@ export const generatePersonalCalendarXLS = async (
     return sheetData;
   };
 
-  const workbook = XLSX.utils.book_new();
+  const addSheetFromData = (workbook: InstanceType<typeof ExcelJS.Workbook>, sheetData: (string | null)[][], sheetName: string) => {
+    const ws = workbook.addWorksheet(sheetName);
+    populateSheet(ws, sheetData);
 
-  if (range === "year" || range === "quarter") {
-    const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
-    for (const month of monthsInPeriod) {
-      const sheetData = generateSheetData(month);
-      const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-      const maxColWidths = sheetData.reduce(
-        (acc, row) => {
-          row.forEach((cell, i) => {
-            const cellText = cell ? cell.toString() : "";
-            const cellLength = cellText.split("\n").reduce((max, line) => Math.max(max, line.length), 0);
-            acc[i] = Math.max(acc[i] || 0, cellLength);
-          });
-          return acc;
-        },
-        Array(7).fill(0)
-      );
-
-      ws["!cols"] = maxColWidths.map((w) => ({ wch: w + 2 }));
-
-      if (sheetData.length > 0) {
-        ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
-      }
-
-      XLSX.utils.book_append_sheet(workbook, ws, format(month, "MMM yyyy"));
-    }
-  } else {
-    const sheetData = generateSheetData(currentDate);
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
+    // Calculate column widths from content
     const maxColWidths = sheetData.reduce(
       (acc, row) => {
         row.forEach((cell, i) => {
@@ -648,14 +622,27 @@ export const generatePersonalCalendarXLS = async (
       Array(7).fill(0)
     );
 
-    ws["!cols"] = maxColWidths.map((w) => ({ wch: w + 2 }));
-
-    if (sheetData.length > 0) {
-      ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+    for (let i = 0; i < 7; i++) {
+      ws.getColumn(i + 1).width = maxColWidths[i] + 2;
     }
 
-    XLSX.utils.book_append_sheet(workbook, ws, format(currentDate, "MMMM yyyy"));
+    if (sheetData.length > 0) {
+      ws.mergeCells("A1:G1");
+    }
+  };
+
+  const workbook = new ExcelJS.Workbook();
+
+  if (range === "year" || range === "quarter") {
+    const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
+    for (const month of monthsInPeriod) {
+      const sheetData = generateSheetData(month);
+      addSheetFromData(workbook, sheetData, format(month, "MMM yyyy"));
+    }
+  } else {
+    const sheetData = generateSheetData(currentDate);
+    addSheetFromData(workbook, sheetData, format(currentDate, "MMMM yyyy"));
   }
 
-  XLSX.writeFile(workbook, `personal-calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+  await saveWorkbook(workbook, `personal-calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
 };

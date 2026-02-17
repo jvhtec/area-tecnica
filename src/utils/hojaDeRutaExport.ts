@@ -1,10 +1,9 @@
-import type * as XLSXTypes from "xlsx";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import type { EventData, TravelArrangement, Accommodation, Transport } from "@/types/hoja-de-ruta";
-import { loadXlsx } from "@/utils/lazyXlsx";
-
-let XLSX: any;
+import { loadExceljs } from "@/utils/lazyExceljs";
+import { applyStyle, populateSheet, saveWorkbook, toArgb } from "@/utils/excelExport";
+import type ExcelJS from "exceljs";
 
 interface ExportData {
   eventData: EventData;
@@ -14,42 +13,37 @@ interface ExportData {
   jobDate?: string;
 }
 
-const createCellStyle = (options: {
-  bold?: boolean;
-  fontSize?: number;
-  bgColor?: string;
-  textColor?: string;
-  alignment?: "left" | "center" | "right";
-}) => {
-  return {
-    font: {
-      bold: options.bold || false,
-      sz: options.fontSize || 11,
-      color: options.textColor ? { rgb: options.textColor } : undefined,
-    },
-    fill: options.bgColor
-      ? { patternType: "solid", fgColor: { rgb: options.bgColor } }
-      : undefined,
-    alignment: {
-      horizontal: options.alignment || "left",
-      vertical: "center",
-    },
-    border: {
-      top: { style: "thin", color: { rgb: "000000" } },
-      bottom: { style: "thin", color: { rgb: "000000" } },
-      left: { style: "thin", color: { rgb: "000000" } },
-      right: { style: "thin", color: { rgb: "000000" } },
-    },
-  };
-};
+const TITLE_STYLE = { bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" as const };
+const HEADER_STYLE = { bold: true, bgColor: "34495E", textColor: "FFFFFF" };
+const LABEL_STYLE = { bold: true, bgColor: "ECF0F1" };
+const DATA_STYLE = {};
 
-const applyCellStyle = (ws: XLSXTypes.WorkSheet, cell: string, style: any) => {
-  if (!ws[cell]) ws[cell] = { t: "s", v: "" };
-  ws[cell].s = style;
-};
+function applyHeaderRow(ws: ExcelJS.Worksheet, rowNum: number, cols: number) {
+  const row = ws.getRow(rowNum);
+  for (let c = 1; c <= cols; c++) {
+    applyStyle(row.getCell(c), HEADER_STYLE);
+  }
+}
+
+function applyAlternatingRows(ws: ExcelJS.Worksheet, startRow: number, endRow: number, cols: number) {
+  for (let r = startRow; r <= endRow; r++) {
+    const bgColor = r % 2 === 0 ? "FFFFFF" : "F8F9FA";
+    const row = ws.getRow(r);
+    for (let c = 1; c <= cols; c++) {
+      applyStyle(row.getCell(c), { bgColor });
+    }
+  }
+}
+
+function applyLabelValueRows(ws: ExcelJS.Worksheet, startRow: number, endRow: number) {
+  for (let r = startRow; r <= endRow; r++) {
+    applyStyle(ws.getRow(r).getCell(1), LABEL_STYLE);
+    applyStyle(ws.getRow(r).getCell(2), DATA_STYLE);
+  }
+}
 
 // Event Information Sheet
-const createEventSheet = (data: ExportData): XLSXTypes.WorkSheet => {
+const createEventSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: any[][] = [
     ["INFORMACIÓN DEL EVENTO"],
     [],
@@ -68,33 +62,25 @@ const createEventSheet = (data: ExportData): XLSXTypes.WorkSheet => {
     ["Estado", data.eventData.eventStatus || ""],
   ];
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ws = wb.addWorksheet("Evento");
+  populateSheet(ws, sheetData);
 
-  // Title style
-  applyCellStyle(ws, "A1", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
+  // Title style + merge
+  applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A1:B1");
 
-  // Merge title row
-  if (!ws["!merges"]) ws["!merges"] = [];
-  ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } });
+  // Header row 3
+  applyHeaderRow(ws, 3, 2);
 
-  // Header style
-  applyCellStyle(ws, "A3", createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-  applyCellStyle(ws, "B3", createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
+  // Data rows 4..end
+  applyLabelValueRows(ws, 4, sheetData.length);
 
-  // Data rows
-  for (let i = 4; i <= sheetData.length; i++) {
-    applyCellStyle(ws, `A${i}`, createCellStyle({ bold: true, bgColor: "ECF0F1" }));
-    applyCellStyle(ws, `B${i}`, createCellStyle({}));
-  }
-
-  // Column widths
-  ws["!cols"] = [{ wch: 25 }, { wch: 50 }];
-
-  return ws;
+  ws.getColumn(1).width = 25;
+  ws.getColumn(2).width = 50;
 };
 
 // Venue Information Sheet
-const createVenueSheet = (data: ExportData): XLSXTypes.WorkSheet => {
+const createVenueSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: any[][] = [
     ["INFORMACIÓN DEL LUGAR"],
     [],
@@ -111,38 +97,28 @@ const createVenueSheet = (data: ExportData): XLSXTypes.WorkSheet => {
     ["Email", data.eventData.venueContact?.email || ""],
   ];
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ws = wb.addWorksheet("Recinto");
+  populateSheet(ws, sheetData);
 
-  // Title styles
-  applyCellStyle(ws, "A1", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
-  applyCellStyle(ws, "A9", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
+  // Title styles + merges
+  applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A1:B1");
+  applyStyle(ws.getRow(9).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A9:B9");
 
-  // Merge title rows
-  if (!ws["!merges"]) ws["!merges"] = [];
-  ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } });
-  ws["!merges"].push({ s: { r: 8, c: 0 }, e: { r: 8, c: 1 } });
-
-  // Header styles
-  applyCellStyle(ws, "A3", createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-  applyCellStyle(ws, "B3", createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
+  // Header row 3
+  applyHeaderRow(ws, 3, 2);
 
   // Data rows
-  for (let i = 4; i <= 7; i++) {
-    applyCellStyle(ws, `A${i}`, createCellStyle({ bold: true, bgColor: "ECF0F1" }));
-    applyCellStyle(ws, `B${i}`, createCellStyle({}));
-  }
-  for (let i = 11; i <= 13; i++) {
-    applyCellStyle(ws, `A${i}`, createCellStyle({ bold: true, bgColor: "ECF0F1" }));
-    applyCellStyle(ws, `B${i}`, createCellStyle({}));
-  }
+  applyLabelValueRows(ws, 4, 7);
+  applyLabelValueRows(ws, 11, 13);
 
-  ws["!cols"] = [{ wch: 25 }, { wch: 50 }];
-
-  return ws;
+  ws.getColumn(1).width = 25;
+  ws.getColumn(2).width = 50;
 };
 
 // Contacts Sheet
-const createContactsSheet = (data: ExportData): XLSXTypes.WorkSheet => {
+const createContactsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: any[][] = [
     ["CONTACTOS"],
     [],
@@ -162,34 +138,23 @@ const createContactsSheet = (data: ExportData): XLSXTypes.WorkSheet => {
     sheetData.push(["No hay contactos registrados", "", "", ""]);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ws = wb.addWorksheet("Contactos");
+  populateSheet(ws, sheetData);
 
-  // Title style
-  applyCellStyle(ws, "A1", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
+  applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A1:D1");
 
-  if (!ws["!merges"]) ws["!merges"] = [];
-  ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } });
+  applyHeaderRow(ws, 3, 4);
+  applyAlternatingRows(ws, 4, sheetData.length, 4);
 
-  // Header style
-  ["A3", "B3", "C3", "D3"].forEach((cell) => {
-    applyCellStyle(ws, cell, createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-  });
-
-  // Data rows with alternating colors
-  for (let i = 4; i <= sheetData.length; i++) {
-    const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
-    ["A", "B", "C", "D"].forEach((col) => {
-      applyCellStyle(ws, `${col}${i}`, createCellStyle({ bgColor }));
-    });
-  }
-
-  ws["!cols"] = [{ wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 30 }];
-
-  return ws;
+  ws.getColumn(1).width = 25;
+  ws.getColumn(2).width = 20;
+  ws.getColumn(3).width = 15;
+  ws.getColumn(4).width = 30;
 };
 
 // Staff Sheet
-const createStaffSheet = (data: ExportData): XLSXTypes.WorkSheet => {
+const createStaffSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: any[][] = [
     ["PERSONAL"],
     [],
@@ -213,34 +178,26 @@ const createStaffSheet = (data: ExportData): XLSXTypes.WorkSheet => {
     sheetData.push(["No hay personal registrado", "", "", "", "", "", ""]);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ws = wb.addWorksheet("Personal");
+  populateSheet(ws, sheetData);
 
-  // Title style
-  applyCellStyle(ws, "A1", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
+  applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A1:G1");
 
-  if (!ws["!merges"]) ws["!merges"] = [];
-  ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } });
+  applyHeaderRow(ws, 3, 7);
+  applyAlternatingRows(ws, 4, sheetData.length, 7);
 
-  // Header style
-  ["A3", "B3", "C3", "D3", "E3", "F3", "G3"].forEach((cell) => {
-    applyCellStyle(ws, cell, createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-  });
-
-  // Data rows
-  for (let i = 4; i <= sheetData.length; i++) {
-    const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
-    ["A", "B", "C", "D", "E", "F", "G"].forEach((col) => {
-      applyCellStyle(ws, `${col}${i}`, createCellStyle({ bgColor }));
-    });
-  }
-
-  ws["!cols"] = [{ wch: 15 }, { wch: 20 }, { wch: 12 }, { wch: 20 }, { wch: 15 }, { wch: 15 }, { wch: 15 }];
-
-  return ws;
+  ws.getColumn(1).width = 15;
+  ws.getColumn(2).width = 20;
+  ws.getColumn(3).width = 12;
+  ws.getColumn(4).width = 20;
+  ws.getColumn(5).width = 15;
+  ws.getColumn(6).width = 15;
+  ws.getColumn(7).width = 15;
 };
 
 // Travel Sheet
-const createTravelSheet = (data: ExportData): XLSXTypes.WorkSheet => {
+const createTravelSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: any[][] = [
     ["VIAJES"],
     [],
@@ -273,34 +230,27 @@ const createTravelSheet = (data: ExportData): XLSXTypes.WorkSheet => {
     sheetData.push(["No hay viajes registrados", "", "", "", "", "", "", ""]);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ws = wb.addWorksheet("Viajes");
+  populateSheet(ws, sheetData);
 
-  // Title style
-  applyCellStyle(ws, "A1", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
+  applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A1:H1");
 
-  if (!ws["!merges"]) ws["!merges"] = [];
-  ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } });
+  applyHeaderRow(ws, 3, 8);
+  applyAlternatingRows(ws, 4, sheetData.length, 8);
 
-  // Header style
-  ["A3", "B3", "C3", "D3", "E3", "F3", "G3", "H3"].forEach((cell) => {
-    applyCellStyle(ws, cell, createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-  });
-
-  // Data rows
-  for (let i = 4; i <= sheetData.length; i++) {
-    const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
-    ["A", "B", "C", "D", "E", "F", "G", "H"].forEach((col) => {
-      applyCellStyle(ws, `${col}${i}`, createCellStyle({ bgColor }));
-    });
-  }
-
-  ws["!cols"] = [{ wch: 18 }, { wch: 25 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 15 }, { wch: 20 }, { wch: 30 }];
-
-  return ws;
+  ws.getColumn(1).width = 18;
+  ws.getColumn(2).width = 25;
+  ws.getColumn(3).width = 18;
+  ws.getColumn(4).width = 18;
+  ws.getColumn(5).width = 18;
+  ws.getColumn(6).width = 15;
+  ws.getColumn(7).width = 20;
+  ws.getColumn(8).width = 30;
 };
 
 // Accommodation Sheet
-const createAccommodationSheet = (data: ExportData): XLSXTypes.WorkSheet => {
+const createAccommodationSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: any[][] = [
     ["ALOJAMIENTO"],
     [],
@@ -308,7 +258,7 @@ const createAccommodationSheet = (data: ExportData): XLSXTypes.WorkSheet => {
 
   if (data.accommodations && data.accommodations.length > 0) {
     data.accommodations.forEach((accommodation, index) => {
-      if (index > 0) sheetData.push([]); // Add spacing between hotels
+      if (index > 0) sheetData.push([]);
 
       sheetData.push([`HOTEL ${index + 1}`, ""]);
       sheetData.push(["Hotel", accommodation.hotel_name || ""]);
@@ -335,58 +285,59 @@ const createAccommodationSheet = (data: ExportData): XLSXTypes.WorkSheet => {
     sheetData.push(["No hay alojamientos registrados"]);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ws = wb.addWorksheet("Alojamiento");
+  populateSheet(ws, sheetData);
 
   // Title style
-  applyCellStyle(ws, "A1", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
-
-  if (!ws["!merges"]) ws["!merges"] = [];
-  ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } });
+  applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A1:D1");
 
   // Apply styles dynamically based on content
   let rowIndex = 3;
-  data.accommodations?.forEach(() => {
+  data.accommodations?.forEach((accommodation) => {
     // Hotel header
-    applyCellStyle(ws, `A${rowIndex}`, createCellStyle({ bold: true, bgColor: "3498DB", textColor: "FFFFFF" }));
-    if (!ws["!merges"]) ws["!merges"] = [];
-    ws["!merges"].push({ s: { r: rowIndex - 1, c: 0 }, e: { r: rowIndex - 1, c: 1 } });
+    applyStyle(ws.getRow(rowIndex).getCell(1), { bold: true, bgColor: "3498DB", textColor: "FFFFFF" });
+    ws.mergeCells(rowIndex, 1, rowIndex, 2);
     rowIndex++;
 
-    // Hotel details
+    // Hotel details (4 rows)
     for (let i = 0; i < 4; i++) {
-      applyCellStyle(ws, `A${rowIndex}`, createCellStyle({ bold: true, bgColor: "ECF0F1" }));
-      applyCellStyle(ws, `B${rowIndex}`, createCellStyle({}));
+      applyStyle(ws.getRow(rowIndex).getCell(1), LABEL_STYLE);
+      applyStyle(ws.getRow(rowIndex).getCell(2), DATA_STYLE);
       rowIndex++;
     }
 
     rowIndex++; // Empty row
 
     // Room header
-    ["A", "B", "C", "D"].forEach((col) => {
-      applyCellStyle(ws, `${col}${rowIndex}`, createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-    });
+    const roomHeaderRow = ws.getRow(rowIndex);
+    for (let c = 1; c <= 4; c++) {
+      applyStyle(roomHeaderRow.getCell(c), HEADER_STYLE);
+    }
     rowIndex++;
 
-    // Room data (estimate based on typical room count)
-    const roomCount = 5; // Adjust dynamically if needed
+    // Room data
+    const roomCount = accommodation.rooms?.length || 1;
     for (let i = 0; i < roomCount; i++) {
       const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
-      ["A", "B", "C", "D"].forEach((col) => {
-        applyCellStyle(ws, `${col}${rowIndex}`, createCellStyle({ bgColor }));
-      });
+      const row = ws.getRow(rowIndex);
+      for (let c = 1; c <= 4; c++) {
+        applyStyle(row.getCell(c), { bgColor });
+      }
       rowIndex++;
     }
 
     rowIndex++; // Empty row between hotels
   });
 
-  ws["!cols"] = [{ wch: 20 }, { wch: 20 }, { wch: 25 }, { wch: 25 }];
-
-  return ws;
+  ws.getColumn(1).width = 20;
+  ws.getColumn(2).width = 20;
+  ws.getColumn(3).width = 25;
+  ws.getColumn(4).width = 25;
 };
 
 // Logistics/Transport Sheet
-const createLogisticsSheet = (data: ExportData): XLSXTypes.WorkSheet => {
+const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const transports = data.eventData.logistics?.transport || [];
 
   const sheetData: any[][] = [
@@ -444,57 +395,52 @@ const createLogisticsSheet = (data: ExportData): XLSXTypes.WorkSheet => {
   sheetData.push(["Detalles de Descarga", data.eventData.logistics?.unloadingDetails || "No especificado"]);
   sheetData.push(["Logística de Equipamiento", data.eventData.logistics?.equipmentLogistics || "No especificado"]);
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ws = wb.addWorksheet("Logística");
+  populateSheet(ws, sheetData);
 
   // Title style
-  applyCellStyle(ws, "A1", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
+  applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A1:H1");
 
-  if (!ws["!merges"]) ws["!merges"] = [];
-  ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 7 } });
-
-  // Header style
-  ["A3", "B3", "C3", "D3", "E3", "F3", "G3", "H3"].forEach((cell) => {
-    applyCellStyle(ws, cell, createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-  });
+  // Header row
+  applyHeaderRow(ws, 3, 8);
 
   // Data rows for transport
-  const transportEndRow = 4 + transports.length;
-  for (let i = 4; i <= transportEndRow; i++) {
-    const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
-    ["A", "B", "C", "D", "E", "F", "G", "H"].forEach((col) => {
-      applyCellStyle(ws, `${col}${i}`, createCellStyle({ bgColor }));
-    });
-  }
+  const transportEndRow = 4 + transports.length - 1;
+  applyAlternatingRows(ws, 4, Math.max(transportEndRow, 4), 8);
 
   // Logistics details section
   const detailsStartRow = transportEndRow + 2;
-  applyCellStyle(ws, `A${detailsStartRow}`, createCellStyle({ bold: true, fontSize: 12, bgColor: "3498DB", textColor: "FFFFFF", alignment: "center" }));
-  ws["!merges"].push({ s: { r: detailsStartRow - 1, c: 0 }, e: { r: detailsStartRow - 1, c: 7 } });
+  applyStyle(ws.getRow(detailsStartRow).getCell(1), { bold: true, fontSize: 12, bgColor: "3498DB", textColor: "FFFFFF", alignment: "center" });
+  ws.mergeCells(detailsStartRow, 1, detailsStartRow, 8);
 
   for (let i = 0; i < 3; i++) {
     const row = detailsStartRow + 2 + i;
-    applyCellStyle(ws, `A${row}`, createCellStyle({ bold: true, bgColor: "ECF0F1" }));
-    applyCellStyle(ws, `B${row}`, createCellStyle({}));
-    ws["!merges"].push({ s: { r: row - 1, c: 1 }, e: { r: row - 1, c: 7 } });
+    applyStyle(ws.getRow(row).getCell(1), LABEL_STYLE);
+    applyStyle(ws.getRow(row).getCell(2), DATA_STYLE);
+    ws.mergeCells(row, 2, row, 8);
   }
 
-  ws["!cols"] = [{ wch: 18 }, { wch: 20 }, { wch: 15 }, { wch: 12 }, { wch: 20 }, { wch: 18 }, { wch: 10 }, { wch: 18 }];
-
-  return ws;
+  ws.getColumn(1).width = 18;
+  ws.getColumn(2).width = 20;
+  ws.getColumn(3).width = 15;
+  ws.getColumn(4).width = 12;
+  ws.getColumn(5).width = 20;
+  ws.getColumn(6).width = 18;
+  ws.getColumn(7).width = 10;
+  ws.getColumn(8).width = 18;
 };
 
 // Schedule Sheet
-const createScheduleSheet = (data: ExportData): XLSXTypes.WorkSheet => {
+const createScheduleSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: any[][] = [
     ["PROGRAMA / HORARIO"],
     [],
   ];
 
-  // Check for multi-day schedule
   if (data.eventData.programScheduleDays && data.eventData.programScheduleDays.length > 0) {
     data.eventData.programScheduleDays.forEach((day, dayIndex) => {
-      if (dayIndex > 0) sheetData.push([]); // Add spacing between days
-
+      if (dayIndex > 0) sheetData.push([]);
       sheetData.push([day.label || `Día ${dayIndex + 1}`, day.date || ""]);
       sheetData.push(["Hora", "Actividad", "Departamento", "Notas"]);
 
@@ -512,7 +458,6 @@ const createScheduleSheet = (data: ExportData): XLSXTypes.WorkSheet => {
       }
     });
   } else if (data.eventData.programSchedule && data.eventData.programSchedule.length > 0) {
-    // Single-day schedule
     sheetData.push(["Hora", "Actividad", "Departamento", "Notas"]);
     data.eventData.programSchedule.forEach((row) => {
       sheetData.push([
@@ -523,70 +468,70 @@ const createScheduleSheet = (data: ExportData): XLSXTypes.WorkSheet => {
       ]);
     });
   } else if (data.eventData.schedule) {
-    // Text-based schedule
     sheetData.push(["Programa"]);
     sheetData.push([data.eventData.schedule]);
   } else {
     sheetData.push(["No hay programa registrado"]);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ws = wb.addWorksheet("Programa");
+  populateSheet(ws, sheetData);
 
   // Title style
-  applyCellStyle(ws, "A1", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
-
-  if (!ws["!merges"]) ws["!merges"] = [];
-  ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } });
+  applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A1:D1");
 
   // Apply styles based on structure
   let currentRow = 3;
   if (data.eventData.programScheduleDays && data.eventData.programScheduleDays.length > 0) {
     data.eventData.programScheduleDays.forEach((day) => {
       // Day header
-      applyCellStyle(ws, `A${currentRow}`, createCellStyle({ bold: true, bgColor: "3498DB", textColor: "FFFFFF" }));
-      applyCellStyle(ws, `B${currentRow}`, createCellStyle({ bold: true, bgColor: "3498DB", textColor: "FFFFFF" }));
-      ws["!merges"].push({ s: { r: currentRow - 1, c: 0 }, e: { r: currentRow - 1, c: 1 } });
+      applyStyle(ws.getRow(currentRow).getCell(1), { bold: true, bgColor: "3498DB", textColor: "FFFFFF" });
+      applyStyle(ws.getRow(currentRow).getCell(2), { bold: true, bgColor: "3498DB", textColor: "FFFFFF" });
+      ws.mergeCells(currentRow, 1, currentRow, 2);
       currentRow++;
 
       // Column headers
-      ["A", "B", "C", "D"].forEach((col) => {
-        applyCellStyle(ws, `${col}${currentRow}`, createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-      });
+      const headerRow = ws.getRow(currentRow);
+      for (let c = 1; c <= 4; c++) {
+        applyStyle(headerRow.getCell(c), HEADER_STYLE);
+      }
       currentRow++;
 
       // Rows
       const rowCount = day.rows?.length || 1;
       for (let i = 0; i < rowCount; i++) {
         const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
-        ["A", "B", "C", "D"].forEach((col) => {
-          applyCellStyle(ws, `${col}${currentRow}`, createCellStyle({ bgColor }));
-        });
+        const row = ws.getRow(currentRow);
+        for (let c = 1; c <= 4; c++) {
+          applyStyle(row.getCell(c), { bgColor });
+        }
         currentRow++;
       }
       currentRow++; // Empty row between days
     });
   } else if (data.eventData.programSchedule) {
     // Header
-    ["A3", "B3", "C3", "D3"].forEach((cell) => {
-      applyCellStyle(ws, cell, createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-    });
+    applyHeaderRow(ws, 3, 4);
 
     // Data rows
     for (let i = 4; i <= 3 + data.eventData.programSchedule.length; i++) {
       const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
-      ["A", "B", "C", "D"].forEach((col) => {
-        applyCellStyle(ws, `${col}${i}`, createCellStyle({ bgColor }));
-      });
+      const row = ws.getRow(i);
+      for (let c = 1; c <= 4; c++) {
+        applyStyle(row.getCell(c), { bgColor });
+      }
     }
   }
 
-  ws["!cols"] = [{ wch: 12 }, { wch: 40 }, { wch: 15 }, { wch: 30 }];
-
-  return ws;
+  ws.getColumn(1).width = 12;
+  ws.getColumn(2).width = 40;
+  ws.getColumn(3).width = 15;
+  ws.getColumn(4).width = 30;
 };
 
 // Weather Sheet
-const createWeatherSheet = (data: ExportData): XLSXTypes.WorkSheet => {
+const createWeatherSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: any[][] = [
     ["PREVISIÓN METEOROLÓGICA"],
     [],
@@ -607,34 +552,24 @@ const createWeatherSheet = (data: ExportData): XLSXTypes.WorkSheet => {
     sheetData.push(["No hay datos meteorológicos disponibles", "", "", "", ""]);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ws = wb.addWorksheet("Meteorología");
+  populateSheet(ws, sheetData);
 
-  // Title style
-  applyCellStyle(ws, "A1", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
+  applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A1:E1");
 
-  if (!ws["!merges"]) ws["!merges"] = [];
-  ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 4 } });
+  applyHeaderRow(ws, 3, 5);
+  applyAlternatingRows(ws, 4, sheetData.length, 5);
 
-  // Header style
-  ["A3", "B3", "C3", "D3", "E3"].forEach((cell) => {
-    applyCellStyle(ws, cell, createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-  });
-
-  // Data rows
-  for (let i = 4; i <= sheetData.length; i++) {
-    const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
-    ["A", "B", "C", "D", "E"].forEach((col) => {
-      applyCellStyle(ws, `${col}${i}`, createCellStyle({ bgColor }));
-    });
-  }
-
-  ws["!cols"] = [{ wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 20 }];
-
-  return ws;
+  ws.getColumn(1).width = 15;
+  ws.getColumn(2).width = 25;
+  ws.getColumn(3).width = 15;
+  ws.getColumn(4).width = 15;
+  ws.getColumn(5).width = 20;
 };
 
 // Restaurants Sheet
-const createRestaurantsSheet = (data: ExportData): XLSXTypes.WorkSheet => {
+const createRestaurantsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: any[][] = [
     ["RESTAURANTES"],
     [],
@@ -662,66 +597,44 @@ const createRestaurantsSheet = (data: ExportData): XLSXTypes.WorkSheet => {
     sheetData.push(["No hay restaurantes registrados", "", "", "", "", ""]);
   }
 
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ws = wb.addWorksheet("Restaurantes");
+  populateSheet(ws, sheetData);
 
-  // Title style
-  applyCellStyle(ws, "A1", createCellStyle({ bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" }));
+  applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
+  ws.mergeCells("A1:F1");
 
-  if (!ws["!merges"]) ws["!merges"] = [];
-  ws["!merges"].push({ s: { r: 0, c: 0 }, e: { r: 0, c: 5 } });
+  applyHeaderRow(ws, 3, 6);
+  applyAlternatingRows(ws, 4, sheetData.length, 6);
 
-  // Header style
-  ["A3", "B3", "C3", "D3", "E3", "F3"].forEach((cell) => {
-    applyCellStyle(ws, cell, createCellStyle({ bold: true, bgColor: "34495E", textColor: "FFFFFF" }));
-  });
-
-  // Data rows
-  for (let i = 4; i <= sheetData.length; i++) {
-    const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
-    ["A", "B", "C", "D", "E", "F"].forEach((col) => {
-      applyCellStyle(ws, `${col}${i}`, createCellStyle({ bgColor }));
-    });
-  }
-
-  ws["!cols"] = [{ wch: 30 }, { wch: 35 }, { wch: 20 }, { wch: 12 }, { wch: 15 }, { wch: 30 }];
-
-  return ws;
+  ws.getColumn(1).width = 30;
+  ws.getColumn(2).width = 35;
+  ws.getColumn(3).width = 20;
+  ws.getColumn(4).width = 12;
+  ws.getColumn(5).width = 15;
+  ws.getColumn(6).width = 30;
 };
 
 // Main export function
 export const generateHojaDeRutaXLS = async (data: ExportData) => {
-  XLSX ??= await loadXlsx();
-  const wb = XLSX.utils.book_new();
+  const ExcelJS = await loadExceljs();
+  const wb = new ExcelJS.Workbook();
 
-  // Create sheets
-  const eventSheet = createEventSheet(data);
-  const venueSheet = createVenueSheet(data);
-  const contactsSheet = createContactsSheet(data);
-  const staffSheet = createStaffSheet(data);
-  const travelSheet = createTravelSheet(data);
-  const accommodationSheet = createAccommodationSheet(data);
-  const logisticsSheet = createLogisticsSheet(data);
-  const scheduleSheet = createScheduleSheet(data);
-  const weatherSheet = createWeatherSheet(data);
-  const restaurantsSheet = createRestaurantsSheet(data);
-
-  // Add sheets to workbook
-  XLSX.utils.book_append_sheet(wb, eventSheet, "Evento");
-  XLSX.utils.book_append_sheet(wb, venueSheet, "Recinto");
-  XLSX.utils.book_append_sheet(wb, contactsSheet, "Contactos");
-  XLSX.utils.book_append_sheet(wb, staffSheet, "Personal");
-  XLSX.utils.book_append_sheet(wb, travelSheet, "Viajes");
-  XLSX.utils.book_append_sheet(wb, accommodationSheet, "Alojamiento");
-  XLSX.utils.book_append_sheet(wb, logisticsSheet, "Logística");
-  XLSX.utils.book_append_sheet(wb, scheduleSheet, "Programa");
-  XLSX.utils.book_append_sheet(wb, weatherSheet, "Meteorología");
-  XLSX.utils.book_append_sheet(wb, restaurantsSheet, "Restaurantes");
+  // Create all sheets
+  createEventSheet(wb, data);
+  createVenueSheet(wb, data);
+  createContactsSheet(wb, data);
+  createStaffSheet(wb, data);
+  createTravelSheet(wb, data);
+  createAccommodationSheet(wb, data);
+  createLogisticsSheet(wb, data);
+  createScheduleSheet(wb, data);
+  createWeatherSheet(wb, data);
+  createRestaurantsSheet(wb, data);
 
   // Generate filename
   const timestamp = format(new Date(), "yyyy-MM-dd");
   const sanitizedTitle = data.jobTitle.replace(/[^a-z0-9]/gi, "_").toLowerCase();
   const filename = `hoja_de_ruta_${sanitizedTitle}_${timestamp}.xlsx`;
 
-  // Write file
-  XLSX.writeFile(wb, filename, { cellStyles: true });
+  await saveWorkbook(wb, filename);
 };

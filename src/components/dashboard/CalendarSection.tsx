@@ -9,7 +9,8 @@ import { PrintDialog } from "./calendar-section/PrintDialog";
 import type { CalendarExportRange, PrintSettings } from "./calendar-section/types";
 import { supabase } from "@/lib/supabase";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
-import { loadXlsx } from "@/utils/lazyXlsx";
+import { loadExceljs } from "@/utils/lazyExceljs";
+import { populateSheet, saveWorkbook } from "@/utils/excelExport";
 import {
   format,
   startOfMonth,
@@ -560,7 +561,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       return jobType && printSettings.jobTypes[jobType] === true;
     });
 
-    const XLSX = await loadXlsx();
+    const ExcelJS = await loadExceljs();
     const currentDate = date || new Date();
     let startDate: Date, endDate: Date;
 
@@ -682,38 +683,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       return sheetData;
     };
 
-    const workbook = XLSX.utils.book_new();
-
-    // If range is year or quarter, generate multiple sheets
-    if (range === "year" || range === "quarter") {
-      const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
-      for (const month of monthsInPeriod) {
-        const sheetData = generateSheetData(month);
-        const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-        // Adjust column widths based on content
-        const maxColWidths = sheetData.reduce((acc, row) => {
-          row.forEach((cell, i) => {
-            // Split by newline to get longest line for width calculation
-            const cellText = cell ? cell.toString() : '';
-            const cellLength = cellText.split('\n').reduce((max, line) => Math.max(max, line.length), 0);
-            acc[i] = Math.max(acc[i] || 0, cellLength);
-          });
-          return acc;
-        }, Array(7).fill(0)); // Initialize with 7 columns
-
-        ws['!cols'] = maxColWidths.map(w => ({ wch: w + 2 })); // Add some padding
-
-        // Merge cells for month title
-        if (sheetData.length > 0) {
-          ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
-        }
-
-        XLSX.utils.book_append_sheet(workbook, ws, format(month, "MMM yyyy"));
-      }
-    } else { // Single month
-      const sheetData = generateSheetData(currentDate);
-      const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    const addSheetFromData = (wb: InstanceType<typeof ExcelJS.Workbook>, sheetData: (string | null)[][], sheetName: string) => {
+      const ws = wb.addWorksheet(sheetName);
+      populateSheet(ws, sheetData);
 
       // Adjust column widths based on content
       const maxColWidths = sheetData.reduce((acc, row) => {
@@ -725,17 +697,31 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
         return acc;
       }, Array(7).fill(0));
 
-      ws['!cols'] = maxColWidths.map(w => ({ wch: w + 2 }));
+      for (let i = 0; i < 7; i++) {
+        ws.getColumn(i + 1).width = maxColWidths[i] + 2;
+      }
 
       // Merge cells for month title
       if (sheetData.length > 0) {
-        ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+        ws.mergeCells('A1:G1');
       }
+    };
 
-      XLSX.utils.book_append_sheet(workbook, ws, format(currentDate, "MMMM yyyy"));
+    const workbook = new ExcelJS.Workbook();
+
+    // If range is year or quarter, generate multiple sheets
+    if (range === "year" || range === "quarter") {
+      const monthsInPeriod = eachMonthOfInterval({ start: startDate, end: endDate });
+      for (const month of monthsInPeriod) {
+        const sheetData = generateSheetData(month);
+        addSheetFromData(workbook, sheetData, format(month, "MMM yyyy"));
+      }
+    } else { // Single month
+      const sheetData = generateSheetData(currentDate);
+      addSheetFromData(workbook, sheetData, format(currentDate, "MMMM yyyy"));
     }
 
-    XLSX.writeFile(workbook, `calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
+    await saveWorkbook(workbook, `calendar-${range}-${format(new Date(), "yyyy-MM-dd")}.xlsx`);
     setShowPrintDialog(false);
   };
   // --- End XLS Generation Logic ---

@@ -2,6 +2,14 @@
 
 ## Fixed Vulnerabilities
 
+### xlsx (SheetJS) - Prototype Pollution (HIGH)
+- **Status**: ✅ FIXED
+- **CVE**: CVE-2023-30533 (GHSA-4r6h-8v6p-xvw6)
+- **Severity**: High (CVSS 7.8)
+- **Fixed by**: Replaced xlsx@0.18.5 with exceljs@4.4.0
+- **Date**: 2026-02-17
+- **Details**: SheetJS stopped publishing fixes to npm; migrated all Excel export code to ExcelJS which is actively maintained. Also removed unused @supabase/auth-ui-react and @supabase/auth-ui-shared packages.
+
 ### jsPDF - Local File Inclusion/Path Traversal (CRITICAL)
 - **Status**: ✅ FIXED
 - **CVE**: GHSA-f8cm-6447-x5h2

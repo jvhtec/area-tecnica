@@ -1,5 +1,6 @@
 import { loadPdfLibs } from "@/utils/pdf/lazyPdf";
-import { loadXlsx } from "@/utils/lazyXlsx";
+import { loadExceljs } from "@/utils/lazyExceljs";
+import { applyStyle, populateSheet, saveWorkbook, toArgb } from "@/utils/excelExport";
 import {
   format,
   startOfWeek,
@@ -166,108 +167,64 @@ export const generateLogisticsCalendarXLS = async (
   }
 
   // Create workbook and worksheet
-  const XLSX = await loadXlsx();
-  const workbook = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const ExcelJS = await loadExceljs();
+  const workbook = new ExcelJS.Workbook();
+
+  const sheetName = range === "month" ? format(currentDate, "MMM yyyy", { locale: es }) : range === "current_week" ? "Semana Actual" : "Próxima Semana";
+  const ws = workbook.addWorksheet(sheetName);
+  populateSheet(ws, sheetData);
 
   // Set column widths
-  ws["!cols"] = [
-    { wch: 20 }, // Fecha
-    { wch: 30 }, // Trabajo/Título
-    { wch: 18 }, // Tipo de Transporte
-    { wch: 10 }, // Hora
-    { wch: 18 }, // Tipo de Operación
-    { wch: 22 }, // Proveedor de Transporte
-    { wch: 18 }, // Departamento
-  ];
+  ws.getColumn(1).width = 20; // Fecha
+  ws.getColumn(2).width = 30; // Trabajo/Título
+  ws.getColumn(3).width = 18; // Tipo de Transporte
+  ws.getColumn(4).width = 10; // Hora
+  ws.getColumn(5).width = 18; // Tipo de Operación
+  ws.getColumn(6).width = 22; // Proveedor de Transporte
+  ws.getColumn(7).width = 18; // Departamento
 
   // Merge title cell
   if (sheetData.length > 0) {
-    ws["!merges"] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 6 } }];
+    ws.mergeCells("A1:G1");
   }
 
-  // Apply styles to cells using XLSX format
-  const cellRange = XLSX.utils.decode_range(ws["!ref"] || "A1");
+  // Apply styles
+  const totalRows = sheetData.length;
+  for (let R = 1; R <= totalRows; R++) {
+    const row = ws.getRow(R);
+    for (let C = 1; C <= 7; C++) {
+      const cell = row.getCell(C);
 
-  for (let R = cellRange.s.r; R <= cellRange.e.r; ++R) {
-    for (let C = cellRange.s.c; C <= cellRange.e.c; ++C) {
-      const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
-      if (!ws[cellAddress]) continue;
-
-      // Initialize cell
-      if (!ws[cellAddress].s) ws[cellAddress].s = {};
-
-      // Title row (row 0) - Bold, centered, larger font, blue background
-      if (R === 0) {
-        ws[cellAddress].s = {
-          font: { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
-          fill: { patternType: "solid", fgColor: { rgb: "2980B9" } },
-          alignment: { horizontal: "center", vertical: "center" },
-          border: {
-            top: { style: "thin", color: { rgb: "000000" } },
-            bottom: { style: "thin", color: { rgb: "000000" } },
-            left: { style: "thin", color: { rgb: "000000" } },
-            right: { style: "thin", color: { rgb: "000000" } },
-          },
-        };
+      // Title row (row 1)
+      if (R === 1) {
+        applyStyle(cell, { bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" });
       }
-      // Header row (row 2) - Bold, centered, gray background
-      else if (R === 2) {
-        ws[cellAddress].s = {
-          font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
-          fill: { patternType: "solid", fgColor: { rgb: "34495E" } },
-          alignment: { horizontal: "center", vertical: "center" },
-          border: {
-            top: { style: "medium", color: { rgb: "000000" } },
-            bottom: { style: "medium", color: { rgb: "000000" } },
-            left: { style: "thin", color: { rgb: "000000" } },
-            right: { style: "thin", color: { rgb: "000000" } },
-          },
-        };
+      // Header row (row 3)
+      else if (R === 3) {
+        applyStyle(cell, { bold: true, bgColor: "34495E", textColor: "FFFFFF", alignment: "center", borderStyle: "medium" });
       }
-      // Data rows (row 3+) - Alternating colors
-      else if (R > 2) {
-        const isEvenRow = (R - 3) % 2 === 0;
+      // Data rows (row 4+)
+      else if (R > 3) {
+        const isEvenRow = (R - 4) % 2 === 0;
         const bgColor = isEvenRow ? "F8F9FA" : "FFFFFF";
+        const alignment = C === 1 ? "left" : C === 4 ? "center" : "left";
 
-        ws[cellAddress].s = {
-          font: { sz: 10 },
-          fill: { patternType: "solid", fgColor: { rgb: bgColor } },
-          alignment: {
-            horizontal: C === 0 ? "left" : C === 3 ? "center" : "left",
-            vertical: "center",
-            wrapText: true
-          },
-          border: {
-            top: { style: "thin", color: { rgb: "DDDDDD" } },
-            bottom: { style: "thin", color: { rgb: "DDDDDD" } },
-            left: { style: "thin", color: { rgb: "DDDDDD" } },
-            right: { style: "thin", color: { rgb: "DDDDDD" } },
-          },
-        };
+        applyStyle(cell, { bgColor, alignment, wrapText: true, borderColor: "DDDDDD" });
+        cell.font = { size: 10 };
 
-        // Special styling for operation type column (Carga/Descarga)
-        if (C === 4 && ws[cellAddress].v) {
-          const isLoad = ws[cellAddress].v.toString().includes("Carga");
-          ws[cellAddress].s.fill = { patternType: "solid", fgColor: { rgb: isLoad ? "D5E8D4" : "FFE6CC" } };
-          ws[cellAddress].s.font = { bold: true, sz: 10, color: { rgb: isLoad ? "0D7C31" : "D97700" } };
+        // Special styling for operation type column (col 5 = Carga/Descarga)
+        if (C === 5 && cell.value) {
+          const isLoad = cell.value.toString().includes("Carga");
+          cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: toArgb(isLoad ? "D5E8D4" : "FFE6CC") } };
+          cell.font = { bold: true, size: 10, color: { argb: toArgb(isLoad ? "0D7C31" : "D97700") } };
         }
       }
     }
   }
 
-  // Add worksheet to workbook
-  const sheetName = range === "month" ? format(currentDate, "MMM yyyy", { locale: es }) : range === "current_week" ? "Semana Actual" : "Próxima Semana";
-  XLSX.utils.book_append_sheet(workbook, ws, sheetName);
-
-  // Generate filename
+  // Generate filename and save
   const filename = `logistica-${range}-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
-
-  // Save file with styling support
-  XLSX.writeFile(workbook, filename, {
-    bookSST: true,
-    cellStyles: true
-  });
+  await saveWorkbook(workbook, filename);
 };
 
 export const generateLogisticsCalendarPDF = async (
