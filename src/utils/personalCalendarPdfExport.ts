@@ -16,6 +16,7 @@ import {
   isSameDay,
   parse,
 } from "date-fns";
+import { es } from "date-fns/locale";
 import type { MadridHoliday } from "@/utils/madridCalendar";
 import { getMadridHolidayName, isMadridWorkingDaySync } from "@/utils/madridCalendar";
 
@@ -291,7 +292,6 @@ export const generatePersonalCalendarPDF = async (
     doc.setTextColor(51, 51, 51);
     doc.text(
       `CALENDARIO DE PERSONAL - ${format(monthStart, "MMMM yyyy", { locale: es }).toUpperCase()}`,
-,
       pageWidth / 2,
       monthTitleY,
       { align: "center" }
