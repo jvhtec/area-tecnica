@@ -13,10 +13,10 @@ interface ExportData {
   jobDate?: string;
 }
 
-const TITLE_STYLE = { bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" as const };
-const HEADER_STYLE = { bold: true, bgColor: "34495E", textColor: "FFFFFF" };
-const LABEL_STYLE = { bold: true, bgColor: "ECF0F1" };
-const DATA_STYLE = {};
+const TITLE_STYLE = { bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" as const, borderColor: "2980B9" };
+const HEADER_STYLE = { bold: true, bgColor: "34495E", textColor: "FFFFFF", borderColor: "000000" };
+const LABEL_STYLE = { bold: true, bgColor: "ECF0F1", borderColor: "000000" };
+const DATA_STYLE = { borderColor: "000000" } as const;
 
 function applyHeaderRow(ws: ExcelJS.Worksheet, rowNum: number, cols: number) {
   const row = ws.getRow(rowNum);
@@ -30,7 +30,7 @@ function applyAlternatingRows(ws: ExcelJS.Worksheet, startRow: number, endRow: n
     const bgColor = r % 2 === 0 ? "FFFFFF" : "F8F9FA";
     const row = ws.getRow(r);
     for (let c = 1; c <= cols; c++) {
-      applyStyle(row.getCell(c), { bgColor });
+      applyStyle(row.getCell(c), { bgColor, borderColor: "000000" });
     }
   }
 }
@@ -296,7 +296,7 @@ const createAccommodationSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   let rowIndex = 3;
   data.accommodations?.forEach((accommodation) => {
     // Hotel header
-    applyStyle(ws.getRow(rowIndex).getCell(1), { bold: true, bgColor: "3498DB", textColor: "FFFFFF" });
+    applyStyle(ws.getRow(rowIndex).getCell(1), { bold: true, bgColor: "3498DB", textColor: "FFFFFF", borderColor: "3498DB" });
     ws.mergeCells(rowIndex, 1, rowIndex, 2);
     rowIndex++;
 
@@ -322,7 +322,7 @@ const createAccommodationSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
       const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
       const row = ws.getRow(rowIndex);
       for (let c = 1; c <= 4; c++) {
-        applyStyle(row.getCell(c), { bgColor });
+        applyStyle(row.getCell(c), { bgColor, borderColor: "000000" });
       }
       rowIndex++;
     }
@@ -411,7 +411,7 @@ const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 
   // Logistics details section
   const detailsStartRow = transportEndRow + 2;
-  applyStyle(ws.getRow(detailsStartRow).getCell(1), { bold: true, fontSize: 12, bgColor: "3498DB", textColor: "FFFFFF", alignment: "center" });
+  applyStyle(ws.getRow(detailsStartRow).getCell(1), { bold: true, fontSize: 12, bgColor: "3498DB", textColor: "FFFFFF", alignment: "center" as const, borderColor: "3498DB" });
   ws.mergeCells(detailsStartRow, 1, detailsStartRow, 8);
 
   for (let i = 0; i < 3; i++) {
@@ -486,8 +486,8 @@ const createScheduleSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   if (data.eventData.programScheduleDays && data.eventData.programScheduleDays.length > 0) {
     data.eventData.programScheduleDays.forEach((day) => {
       // Day header
-      applyStyle(ws.getRow(currentRow).getCell(1), { bold: true, bgColor: "3498DB", textColor: "FFFFFF" });
-      applyStyle(ws.getRow(currentRow).getCell(2), { bold: true, bgColor: "3498DB", textColor: "FFFFFF" });
+      applyStyle(ws.getRow(currentRow).getCell(1), { bold: true, bgColor: "3498DB", textColor: "FFFFFF", borderColor: "3498DB" });
+      applyStyle(ws.getRow(currentRow).getCell(2), { bold: true, bgColor: "3498DB", textColor: "FFFFFF", borderColor: "3498DB" });
       ws.mergeCells(currentRow, 1, currentRow, 2);
       currentRow++;
 
@@ -504,7 +504,7 @@ const createScheduleSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
         const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
         const row = ws.getRow(currentRow);
         for (let c = 1; c <= 4; c++) {
-          applyStyle(row.getCell(c), { bgColor });
+          applyStyle(row.getCell(c), { bgColor, borderColor: "000000" });
         }
         currentRow++;
       }
@@ -519,7 +519,7 @@ const createScheduleSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
       const bgColor = i % 2 === 0 ? "FFFFFF" : "F8F9FA";
       const row = ws.getRow(i);
       for (let c = 1; c <= 4; c++) {
-        applyStyle(row.getCell(c), { bgColor });
+        applyStyle(row.getCell(c), { bgColor, borderColor: "000000" });
       }
     }
   }

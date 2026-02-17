@@ -1,6 +1,6 @@
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 import { loadExceljs } from "@/utils/lazyExceljs";
-import { applyStyle, saveWorkbook, toArgb, tintColor } from "@/utils/excelExport";
+import { applyStyle, saveWorkbook, toArgb, tintColor, thinBorder, hexToRgb, getContrastHexColor } from "@/utils/excelExport";
 import {
   format,
   startOfMonth,
@@ -16,8 +16,8 @@ import {
   isSameDay,
   parse,
 } from "date-fns";
-import type { MadridHoliday } from "./madridCalendar";
-import { getMadridHolidayName, isMadridWorkingDaySync } from "./madridCalendar";
+import type { MadridHoliday } from "@/utils/madridCalendar";
+import { getMadridHolidayName, isMadridWorkingDaySync } from "@/utils/madridCalendar";
 
 interface HouseTech {
   id: string;
@@ -57,18 +57,7 @@ const getTechnicianName = (tech: HouseTech): string => {
   return firstName || lastName || "Unknown";
 };
 
-const hexToRgb = (hex: string): [number, number, number] => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return [r, g, b];
-};
-
-const getContrastColor = (hex: string): string => {
-  const [r, g, b] = hexToRgb(hex);
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
-  return luminance > 0.6 ? "#000000" : "#ffffff";
-};
+// hexToRgb and getContrastHexColor imported from @/utils/excelExport
 
 const getStatusColor = (status: string | null): string => {
   switch (status) {
@@ -385,7 +374,7 @@ export const generatePersonalCalendarPDF = async (
             ? assignment.jobs?.color || "#BFDBFE"
             : getStatusColor(availabilityStatus);
           const [r, g, b] = hexToRgb(statusColor);
-          const textColor = getContrastColor(statusColor);
+          const textColor = getContrastHexColor(statusColor);
 
           doc.setFillColor(r, g, b);
           doc.rect(x + 1, yPos, cellWidth - 2, techHeight, "F");
@@ -541,13 +530,6 @@ export const generatePersonalCalendarXLS = async (
     });
   };
 
-  const thinBorder = (color = "D1D5DB") => ({
-    top: { style: "thin" as const, color: { argb: toArgb(color) } },
-    bottom: { style: "thin" as const, color: { argb: toArgb(color) } },
-    left: { style: "thin" as const, color: { argb: toArgb(color) } },
-    right: { style: "thin" as const, color: { argb: toArgb(color) } },
-  });
-
   const buildStyledSheet = (wb: InstanceType<typeof ExcelJS.Workbook>, monthStart: Date, sheetName: string) => {
     const ws = wb.addWorksheet(sheetName);
     const monthEnd = endOfMonth(monthStart);
@@ -689,12 +671,6 @@ export const generatePersonalCalendarXLS = async (
             }
           }
 
-          // Overflow
-          if (dayTechs.length >= rowsPerDay) {
-            const moreCell = ws.getRow(startExcelRow + rowsPerDay - 1).getCell(col);
-            moreCell.value = `+${dayTechs.length - (rowsPerDay - 1)} más...`;
-            moreCell.font = { size: 7, italic: true, color: { argb: toArgb("6B7280") } };
-          }
         }
       }
 

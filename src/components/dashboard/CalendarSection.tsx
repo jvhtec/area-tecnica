@@ -10,7 +10,7 @@ import type { CalendarExportRange, PrintSettings } from "./calendar-section/type
 import { supabase } from "@/lib/supabase";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 import { loadExceljs } from "@/utils/lazyExceljs";
-import { applyStyle, saveWorkbook, toArgb, getContrastTextColor, tintColor } from "@/utils/excelExport";
+import { saveWorkbook, toArgb, tintColor, thinBorder } from "@/utils/excelExport";
 import {
   format,
   startOfMonth,
@@ -25,6 +25,7 @@ import {
   eachMonthOfInterval,
   parseISO,
 } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { useOptimizedDateTypes } from "@/hooks/useOptimizedDateTypes";
 import { useToast } from "@/hooks/use-toast";
 import { isJobOnDate } from "@/utils/timezoneUtils";
@@ -613,18 +614,11 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       });
     };
 
-    const thinBorder = (color = "D1D5DB") => ({
-      top: { style: "thin" as const, color: { argb: toArgb(color) } },
-      bottom: { style: "thin" as const, color: { argb: toArgb(color) } },
-      left: { style: "thin" as const, color: { argb: toArgb(color) } },
-      right: { style: "thin" as const, color: { argb: toArgb(color) } },
-    });
-
     const buildStyledSheet = (wb: InstanceType<typeof ExcelJS.Workbook>, monthStart: Date, sheetName: string) => {
       const ws = wb.addWorksheet(sheetName);
       const monthEnd = endOfMonth(monthStart);
       const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
-      const today = new Date();
+      const today = toZonedTime(new Date(), "Europe/Madrid");
 
       // Column widths - wide enough for job titles
       for (let i = 1; i <= 7; i++) {
@@ -764,12 +758,6 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
               }
             }
 
-            // Overflow indicator
-            if (dayJobs.length >= rowsPerDay) {
-              const moreCell = ws.getRow(startExcelRow + rowsPerDay - 1).getCell(col);
-              moreCell.value = `+${dayJobs.length - (rowsPerDay - 1)} más...`;
-              moreCell.font = { size: 8, italic: true, color: { argb: toArgb("6B7280") } };
-            }
           }
         }
 

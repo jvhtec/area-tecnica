@@ -197,7 +197,7 @@ export const generateLogisticsCalendarXLS = async (
 
       // Title row (row 1)
       if (R === 1) {
-        applyStyle(cell, { bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center" });
+        applyStyle(cell, { bold: true, fontSize: 14, bgColor: "2980B9", textColor: "FFFFFF", alignment: "center", borderColor: "2980B9" });
       }
       // Header row (row 3)
       else if (R === 3) {
