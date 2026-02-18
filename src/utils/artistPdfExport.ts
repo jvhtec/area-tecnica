@@ -81,6 +81,11 @@ export interface ArtistPdfData {
   riderMissing?: boolean;
 }
 
+export interface ArtistPdfOptions {
+  templateMode?: boolean;
+  language?: "es" | "en";
+}
+
 // Helper functions to process wireless and IEM data
 const getWirelessSummary = (systems: WirelessSystem[] = []) => {
   const totalHH = systems.reduce((sum, system) => sum + (system.quantity_hh || 0), 0);
@@ -127,12 +132,21 @@ const loadImageSafely = async (src: string, description: string): Promise<HTMLIm
   });
 };
 
-export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
+export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOptions = {}): Promise<Blob> => {
   const { jsPDF, autoTable } = await loadPdfLibs();
+  const templateMode = options.templateMode === true;
+  const language = options.language === "en" ? "en" : "es";
+  const tx = (es: string, en: string) => (language === "en" ? en : es);
+  const yesNo = (value: boolean) => (value ? tx("Sí", "Yes") : tx("No", "No"));
+  const providerLabel = (value: string) => {
+    if (value === "band") return tx("Banda", "Band");
+    if (value === "mixed") return tx("Mixto", "Mixed");
+    return tx("Festival", "Festival");
+  };
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
-  const createdDate = new Date().toLocaleDateString('en-GB');
+  const createdDate = new Date().toLocaleDateString(language === "en" ? "en-GB" : "es-ES");
 
   // === HEADER SECTION ===
   doc.setFillColor(125, 1, 1);
@@ -183,36 +197,48 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
   // Add title and date
   doc.setFontSize(18);
   doc.setTextColor(255, 255, 255);
-  doc.text(`${data.name} - Stage ${data.stage}`, pageWidth / 2, 15, { align: 'center' });
+  doc.text(`${data.name} - ${tx("Escenario", "Stage")} ${data.stage}`, pageWidth / 2, 15, { align: 'center' });
   doc.setFontSize(12);
-  doc.text(new Date(data.date).toLocaleDateString('en-GB'), pageWidth / 2, 25, { align: 'center' });
+  const headerDate = data.date
+    ? new Date(data.date).toLocaleDateString(language === "en" ? "en-GB" : "es-ES")
+    : '';
+  doc.text(headerDate, pageWidth / 2, 25, { align: 'center' });
 
   let yPosition = 40;
 
   // === SCHEDULE SECTION ===
   doc.setFontSize(12);
   doc.setTextColor(125, 1, 1);
-  doc.text("Schedule", 14, yPosition);
+  doc.text(tx("Horario", "Schedule"), 14, yPosition);
   yPosition += 8;
 
   doc.setFontSize(9);
   doc.setTextColor(51, 51, 51);
-  doc.text(`Show Time: ${data.schedule.show.start} - ${data.schedule.show.end}`, 14, yPosition);
+  const showStart = data.schedule.show.start || (templateMode ? "________" : "");
+  const showEnd = data.schedule.show.end || (templateMode ? "________" : "");
+  doc.text(`${tx("Horario Show", "Show Time")}: ${showStart} - ${showEnd}`, 14, yPosition);
   yPosition += 6;
-  if (data.schedule.soundcheck) {
-    doc.text(`Soundcheck: ${data.schedule.soundcheck.start} - ${data.schedule.soundcheck.end}`, 14, yPosition);
+  if (templateMode || data.schedule.soundcheck) {
+    const soundcheckStart = data.schedule.soundcheck?.start || (templateMode ? "________" : "");
+    const soundcheckEnd = data.schedule.soundcheck?.end || (templateMode ? "________" : "");
+    doc.text(`${tx("Prueba de Sonido", "Soundcheck")}: ${soundcheckStart} - ${soundcheckEnd}`, 14, yPosition);
     yPosition += 6;
   }
   yPosition += 4;
 
   // === TECHNICAL STAFF ===
-  const technicalStaffRows = [
-    ['FOH Tech', data.technical.fohTech ? 'Yes' : 'No'],
-    ['MON Tech', data.technical.monTech ? 'Yes' : 'No']
-  ];
+  const technicalStaffRows = templateMode
+    ? [
+        [tx("Técnico FOH", "FOH Engineer"), ''],
+        [tx("Técnico MON", "MON Engineer"), ''],
+      ]
+    : [
+        [tx("Técnico FOH", "FOH Engineer"), yesNo(data.technical.fohTech)],
+        [tx("Técnico MON", "MON Engineer"), yesNo(data.technical.monTech)],
+      ];
 
   autoTable(doc, {
-    head: [['Position', 'Tech Required']],
+    head: [[tx("Puesto", "Position"), tx("Requiere Técnico", "Tech Required")]],
     body: technicalStaffRows,
     startY: yPosition,
     theme: 'grid',
@@ -233,13 +259,18 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
   yPosition = (doc as any).lastAutoTable.finalY + 8;
 
   // === CONSOLE REQUIREMENTS ===
-  const consoleRows = [
-    ['FOH Console', data.technical.fohConsole.model, data.technical.fohConsole.providedBy],
-    ['MON Console', data.technical.monConsole.model, data.technical.monConsole.providedBy]
-  ];
+  const consoleRows = templateMode
+    ? [
+        [tx("Consola FOH", "FOH Console"), '', ''],
+        [tx("Consola MON", "MON Console"), '', ''],
+      ]
+    : [
+        [tx("Consola FOH", "FOH Console"), data.technical.fohConsole.model, providerLabel(data.technical.fohConsole.providedBy)],
+        [tx("Consola MON", "MON Console"), data.technical.monConsole.model, providerLabel(data.technical.monConsole.providedBy)],
+      ];
 
   autoTable(doc, {
-    head: [['Position', 'Model', 'Provided By']],
+    head: [[tx("Puesto", "Position"), tx("Modelo", "Model"), tx("Proporcionado por", "Provided by")]],
     body: consoleRows,
     startY: yPosition,
     theme: 'grid',
@@ -256,16 +287,23 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
   yPosition = (doc as any).lastAutoTable.finalY + 8;
 
   // === WIRED MICROPHONES ===
-  if (data.wiredMics && data.wiredMics.length > 0) {
-    const wiredMicRows = data.wiredMics.map(mic => [
-      mic.model,
-      mic.quantity.toString(),
-      mic.exclusive_use ? 'Yes' : 'No',
-      mic.notes || '-'
-    ]);
+  if (templateMode || (data.wiredMics && data.wiredMics.length > 0)) {
+    const wiredMicRows = templateMode
+      ? Array.from({ length: 5 }, () => ['', '', '', ''])
+      : (data.wiredMics || []).map(mic => [
+          mic.model,
+          mic.quantity.toString(),
+          yesNo(Boolean(mic.exclusive_use)),
+          mic.notes || '-'
+        ]);
 
     autoTable(doc, {
-      head: [['Microphone Model', 'Quantity', 'Exclusive Use', 'Notes']],
+      head: [[
+        tx("Modelo Micrófono", "Microphone Model"),
+        tx("Cantidad", "Quantity"),
+        tx("Uso Exclusivo", "Exclusive Use"),
+        tx("Notas", "Notes")
+      ]],
       body: wiredMicRows,
       startY: yPosition,
       theme: 'grid',
@@ -291,90 +329,105 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
   // === RF & WIRELESS ===
   const wirelessRows: any[] = [];
   
-  // Process wireless systems with individual provider information
-  if (data.technical.wireless.systems && data.technical.wireless.systems.length > 0) {
-    data.technical.wireless.systems.forEach(system => {
-      const systemProvider = system.provided_by || data.technical.wireless.providedBy;
-      
-      if (system.quantity_hh && system.quantity_hh > 0) {
+  if (templateMode) {
+      wirelessRows.push(
+      [tx('Mano', 'Handheld'), '', '', '', ''],
+      [tx('Petaca', 'Bodypack'), '', '', '', ''],
+      [tx('Canales IEM', 'IEM Channels'), '', '', '', ''],
+      [tx('Petacas IEM', 'IEM Bodypacks'), '', '', '', '']
+    );
+  } else {
+    // Process wireless systems with individual provider information
+    if (data.technical.wireless.systems && data.technical.wireless.systems.length > 0) {
+      data.technical.wireless.systems.forEach(system => {
+        const systemProvider = system.provided_by || data.technical.wireless.providedBy;
+        
+        if (system.quantity_hh && system.quantity_hh > 0) {
+          wirelessRows.push([
+            tx('Mano', 'Handheld'),
+            system.quantity_hh,
+            system.model,
+            system.band || '-',
+            providerLabel(systemProvider || 'festival')
+          ]);
+        }
+        if (system.quantity_bp && system.quantity_bp > 0) {
+          wirelessRows.push([
+            tx('Petaca', 'Bodypack'),
+            system.quantity_bp,
+            system.model,
+            system.band || '-',
+            providerLabel(systemProvider || 'festival')
+          ]);
+        }
+      });
+    } else if (data.technical.wireless.handhelds || data.technical.wireless.bodypacks) {
+      // Handle legacy format
+      if (data.technical.wireless.handhelds) {
         wirelessRows.push([
-          'Handheld',
-          system.quantity_hh,
-          system.model,
-          system.band || '-',
-          systemProvider
+          tx('Mano', 'Handheld'),
+          data.technical.wireless.handhelds,
+          data.technical.wireless.model || '-',
+          data.technical.wireless.band || '-',
+          providerLabel(data.technical.wireless.providedBy)
         ]);
       }
-      if (system.quantity_bp && system.quantity_bp > 0) {
+      if (data.technical.wireless.bodypacks) {
         wirelessRows.push([
-          'Bodypack',
-          system.quantity_bp,
-          system.model,
-          system.band || '-',
-          systemProvider
+          tx('Petaca', 'Bodypack'),
+          data.technical.wireless.bodypacks,
+          data.technical.wireless.model || '-',
+          data.technical.wireless.band || '-',
+          providerLabel(data.technical.wireless.providedBy)
         ]);
       }
-    });
-  } else if (data.technical.wireless.handhelds || data.technical.wireless.bodypacks) {
-    // Handle legacy format
-    if (data.technical.wireless.handhelds) {
-      wirelessRows.push([
-        'Handheld',
-        data.technical.wireless.handhelds,
-        data.technical.wireless.model || '-',
-        data.technical.wireless.band || '-',
-        data.technical.wireless.providedBy
-      ]);
     }
-    if (data.technical.wireless.bodypacks) {
+
+    // Process IEM systems with individual provider information
+    if (data.technical.iem.systems && data.technical.iem.systems.length > 0) {
+      data.technical.iem.systems.forEach(system => {
+        const systemProvider = system.provided_by || data.technical.iem.providedBy;
+        
+        if (system.quantity_hh && system.quantity_hh > 0) {
+          wirelessRows.push([
+            tx('Canales IEM', 'IEM Channels'),
+            system.quantity_hh,
+            system.model,
+            system.band || '-',
+            providerLabel(systemProvider || 'festival')
+          ]);
+        }
+        if (system.quantity_bp && system.quantity_bp > 0) {
+          wirelessRows.push([
+            tx('Petacas IEM', 'IEM Bodypacks'),
+            system.quantity_bp,
+            system.model,
+            system.band || '-',
+            providerLabel(systemProvider || 'festival')
+          ]);
+        }
+      });
+    } else if (data.technical.iem.quantity) {
+      // Handle legacy format
       wirelessRows.push([
-        'Bodypack',
-        data.technical.wireless.bodypacks,
-        data.technical.wireless.model || '-',
-        data.technical.wireless.band || '-',
-        data.technical.wireless.providedBy
+        tx('Sistema IEM', 'IEM System'),
+        data.technical.iem.quantity,
+        data.technical.iem.model || '-',
+        data.technical.iem.band || '-',
+        providerLabel(data.technical.iem.providedBy)
       ]);
     }
   }
 
-  // Process IEM systems with individual provider information
-  if (data.technical.iem.systems && data.technical.iem.systems.length > 0) {
-    data.technical.iem.systems.forEach(system => {
-      const systemProvider = system.provided_by || data.technical.iem.providedBy;
-      
-      if (system.quantity_hh && system.quantity_hh > 0) {
-        wirelessRows.push([
-          'IEM Channels',
-          system.quantity_hh,
-          system.model,
-          system.band || '-',
-          systemProvider
-        ]);
-      }
-      if (system.quantity_bp && system.quantity_bp > 0) {
-        wirelessRows.push([
-          'IEM Bodypacks',
-          system.quantity_bp,
-          system.model,
-          system.band || '-',
-          systemProvider
-        ]);
-      }
-    });
-  } else if (data.technical.iem.quantity) {
-    // Handle legacy format
-    wirelessRows.push([
-      'IEM System',
-      data.technical.iem.quantity,
-      data.technical.iem.model || '-',
-      data.technical.iem.band || '-',
-      data.technical.iem.providedBy
-    ]);
-  }
-
-  if (wirelessRows.length > 0) {
+  if (templateMode || wirelessRows.length > 0) {
     autoTable(doc, {
-      head: [['Type', 'Qty', 'Model', 'Band', 'Provided By']],
+      head: [[
+        tx('Tipo', 'Type'),
+        tx('Cant.', 'Qty'),
+        tx('Modelo', 'Model'),
+        tx('Banda', 'Band'),
+        tx('Proporcionado por', 'Provided by')
+      ]],
       body: wirelessRows,
       startY: yPosition,
       theme: 'grid',
@@ -392,13 +445,13 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
   }
 
   // === MONITORS ===
-  if (data.technical.monitors.enabled) {
-    const monitorRows = [
-      ['Monitors', data.technical.monitors.quantity]
-    ];
+  if (templateMode || data.technical.monitors.enabled) {
+    const monitorRows = templateMode
+      ? [[tx('Monitores', 'Monitors'), '']]
+      : [[tx('Monitores', 'Monitors'), data.technical.monitors.quantity]];
 
     autoTable(doc, {
-      head: [['Type', 'Quantity']],
+      head: [[tx('Tipo', 'Type'), tx('Cantidad', 'Quantity')]],
       body: monitorRows,
       startY: yPosition,
       theme: 'grid',
@@ -416,17 +469,26 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
   }
 
   // === INFRASTRUCTURE ===
-  const infrastructureRows = [
-    data.infrastructure.cat6.enabled && ['CAT6', data.infrastructure.cat6.quantity],
-    data.infrastructure.hma.enabled && ['HMA', data.infrastructure.hma.quantity],
-    data.infrastructure.coax.enabled && ['Coax', data.infrastructure.coax.quantity],
-    data.infrastructure.opticalconDuo.enabled && ['OpticalCon Duo', data.infrastructure.opticalconDuo.quantity],
-    data.infrastructure.analog > 0 && ['Analog Lines', data.infrastructure.analog]
-  ].filter(Boolean);
+  const infrastructureRows = templateMode
+    ? [
+        ['CAT6', ''],
+        ['HMA', ''],
+        ['Coax', ''],
+        ['OpticalCon Duo', ''],
+        [tx('Líneas Analógicas', 'Analog Lines'), ''],
+        [tx('Otros', 'Other'), ''],
+      ]
+    : [
+        data.infrastructure.cat6.enabled && ['CAT6', data.infrastructure.cat6.quantity],
+        data.infrastructure.hma.enabled && ['HMA', data.infrastructure.hma.quantity],
+        data.infrastructure.coax.enabled && ['Coax', data.infrastructure.coax.quantity],
+        data.infrastructure.opticalconDuo.enabled && ['OpticalCon Duo', data.infrastructure.opticalconDuo.quantity],
+        data.infrastructure.analog > 0 && [tx('Líneas Analógicas', 'Analog Lines'), data.infrastructure.analog],
+      ].filter(Boolean);
 
-  if (infrastructureRows.length > 0) {
+  if (templateMode || infrastructureRows.length > 0) {
     autoTable(doc, {
-      head: [['Type', 'Quantity']],
+      head: [[tx('Tipo', 'Type'), tx('Cantidad', 'Quantity')]],
       body: infrastructureRows,
       startY: yPosition,
       theme: 'grid',
@@ -444,16 +506,23 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
   }
 
   // === EXTRAS ===
-  const extraRows = [
-    data.extras.sideFill && ['Side Fill', 'Yes'],
-    data.extras.drumFill && ['Drum Fill', 'Yes'],
-    data.extras.djBooth && ['DJ Booth', 'Yes'],
-    data.extras.wired && ['Additional Wired', data.extras.wired]
-  ].filter(Boolean);
+  const extraRows = templateMode
+    ? [
+        ['Side Fill', ''],
+        ['Drum Fill', ''],
+        ['DJ Booth', ''],
+        [tx('Cableado Adicional', 'Additional Wired'), ''],
+      ]
+    : [
+        data.extras.sideFill && ['Side Fill', yesNo(true)],
+        data.extras.drumFill && ['Drum Fill', yesNo(true)],
+        data.extras.djBooth && ['DJ Booth', yesNo(true)],
+        data.extras.wired && [tx('Cableado Adicional', 'Additional Wired'), data.extras.wired]
+      ].filter(Boolean);
 
-  if (extraRows.length > 0) {
+  if (templateMode || extraRows.length > 0) {
     autoTable(doc, {
-      head: [['Extra Requirements', 'Details']],
+      head: [[tx('Requerimientos Adicionales', 'Extra Requirements'), tx('Detalle', 'Details')]],
       body: extraRows,
       startY: yPosition,
       theme: 'grid',
@@ -471,17 +540,24 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
   }
 
   // === NOTES ===
-  if (data.notes) {
+  if (templateMode || data.notes) {
     doc.setFontSize(12);
     doc.setTextColor(125, 1, 1);
-    doc.text("Notes", 14, yPosition);
+    doc.text(tx("Notas", "Notes"), 14, yPosition);
     yPosition += 8;
 
-    doc.setFontSize(9);
-    doc.setTextColor(51, 51, 51);
-    const splitNotes = doc.splitTextToSize(data.notes, pageWidth - 28);
-    doc.text(splitNotes, 14, yPosition);
-    yPosition += splitNotes.length * 5 + 10;
+    if (templateMode) {
+      const notesBoxHeight = 35;
+      doc.setDrawColor(180, 180, 180);
+      doc.rect(14, yPosition - 4, pageWidth - 28, notesBoxHeight);
+      yPosition += notesBoxHeight + 6;
+    } else {
+      doc.setFontSize(9);
+      doc.setTextColor(51, 51, 51);
+      const splitNotes = doc.splitTextToSize(data.notes, pageWidth - 28);
+      doc.text(splitNotes, 14, yPosition);
+      yPosition += splitNotes.length * 5 + 10;
+    }
   }
 
   // === COMPANY LOGO (CENTERED AT BOTTOM) ===
@@ -534,7 +610,7 @@ export const exportArtistPDF = async (data: ArtistPdfData): Promise<Blob> => {
   // Footer with date (moved to left to avoid overlap with centered logo)
   doc.setFontSize(8);
   doc.setTextColor(51, 51, 51);
-  doc.text(`Generated: ${createdDate}`, 10, pageHeight - 10);
+  doc.text(`${tx("Generado", "Generated")}: ${createdDate}`, 10, pageHeight - 10);
   
   console.log('Individual artist PDF generation completed');
   return doc.output('blob');

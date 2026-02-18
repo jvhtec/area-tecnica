@@ -9,6 +9,7 @@ interface EquipmentSelectProps {
   placeholder?: string;
   fallbackOptions?: readonly string[];
   category?: string;
+  disabled?: boolean;
 }
 
 export const EquipmentSelect = ({
@@ -17,7 +18,8 @@ export const EquipmentSelect = ({
   options,
   placeholder = "Seleccionar equipo",
   fallbackOptions = [],
-  category
+  category,
+  disabled = false,
 }: EquipmentSelectProps) => {
   const { models, isLoading } = useEquipmentModels();
   
@@ -41,7 +43,7 @@ export const EquipmentSelect = ({
   }
 
   return (
-    <Select value={value} onValueChange={onChange} disabled={isLoading}>
+    <Select value={value} onValueChange={onChange} disabled={isLoading || disabled}>
       <SelectTrigger>
         <SelectValue placeholder={isLoading ? "Cargando..." : placeholder} />
       </SelectTrigger>

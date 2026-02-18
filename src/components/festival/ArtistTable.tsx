@@ -10,7 +10,7 @@ import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
@@ -65,6 +65,8 @@ interface Artist {
   infra_analog?: number;
   other_infrastructure?: string;
   infrastructure_provided_by?: 'festival' | 'band' | 'mixed';
+  artist_submitted?: boolean;
+  form_language?: "es" | "en";
 }
 
 interface ArtistTableProps {
@@ -281,6 +283,7 @@ export const ArtistTable = ({
 
   // Apply chronological sorting to filtered artists using imported utility
   const sortedFilteredArtists = sortArtistsChronologically(filteredArtists as any) as Artist[];
+  const hasArtistSubmittedData = sortedFilteredArtists.some((artist) => artist.artist_submitted);
   const handleDeleteClick = async (artist: Artist) => {
     if (window.confirm(`¿Estás seguro de que quieres eliminar ${artist.name}?`)) {
       setDeletingArtistId(artist.id);
@@ -423,7 +426,9 @@ export const ArtistTable = ({
       const pdfData = await transformArtistDataForPdf(artist);
       
       // Remove the gearComparison assignment as it doesn't exist in ArtistPdfData
-      const blob = await exportArtistPDF(pdfData);
+      const blob = await exportArtistPDF(pdfData, {
+        language: artist.form_language === "en" ? "en" : "es",
+      });
 
       // Create download link
       const url = URL.createObjectURL(blob);
@@ -481,6 +486,14 @@ export const ArtistTable = ({
             </Button>
           </div>
 
+          {hasArtistSubmittedData && (
+            <div className="px-2">
+              <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Parte de la información mostrada fue enviada por artistas mediante formulario público.
+              </div>
+            </div>
+          )}
+
           {/* Desktop Table */}
           <div className="hidden md:block w-full overflow-x-auto">
             <Table className="w-full min-w-full">
@@ -516,6 +529,11 @@ export const ArtistTable = ({
                       <TableCell className="min-w-[140px]">
                         <div className="space-y-1">
                           <div className="font-medium">{artist.name}</div>
+                          {artist.artist_submitted && (
+                            <Badge variant="outline" className="text-xs bg-amber-100 text-amber-900 border-amber-300">
+                              Enviado por artista
+                            </Badge>
+                          )}
                           {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">Después de medianoche</Badge>}
                         </div>
                       </TableCell>
@@ -734,6 +752,11 @@ export const ArtistTable = ({
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-base truncate">{artist.name}</h3>
                       <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        {artist.artist_submitted && (
+                          <Badge variant="outline" className="text-xs bg-amber-100 text-amber-900 border-amber-300">
+                            Enviado por artista
+                          </Badge>
+                        )}
                         <Badge variant="outline" className="text-xs">{getStageDisplayName(artist.stage)}</Badge>
                         <Badge variant={artist.rider_missing ? "destructive" : "default"} className="text-xs">
                           {artist.rider_missing ? "Faltante" : "Completo"}
@@ -931,7 +954,14 @@ export const ArtistTable = ({
 
       {selectedArtist && (
         <>
-          <ArtistFormLinkDialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen} artistId={selectedArtist.id} artistName={selectedArtist.name} />
+          <ArtistFormLinkDialog
+            open={linkDialogOpen}
+            onOpenChange={setLinkDialogOpen}
+            artistId={selectedArtist.id}
+            artistName={selectedArtist.name}
+            jobId={jobId}
+            selectedDate={selectedDate}
+          />
           
           <ArtistFileDialog open={fileDialogOpen} onOpenChange={setFileDialogOpen} artistId={selectedArtist.id} />
         </>

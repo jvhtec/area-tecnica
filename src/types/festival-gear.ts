@@ -8,6 +8,9 @@ export interface WirelessConfigProps {
   includeQuantityTypes?: boolean;
   isIEM?: boolean;
   hideProvidedBy?: boolean;
+  festivalAvailableModels?: string[];
+  readOnly?: boolean;
+  language?: 'es' | 'en';
 }
 
 export interface ConsoleConfigProps {

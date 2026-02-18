@@ -14,8 +14,11 @@ export const QuantityInput = ({
   available,
   validate,
   min = 0,
-  className
+  className,
+  disabled = false,
+  language = "es",
 }: QuantityInputProps) => {
+  const tx = (es: string, en: string) => (language === "en" ? en : es);
   const isInvalid = validate ? !validate(value) : false;
 
   return (
@@ -28,18 +31,19 @@ export const QuantityInput = ({
           min={min}
           value={value}
           onChange={(e) => onChange(parseInt(e.target.value) || 0)}
+          disabled={disabled}
           className={cn(className, isInvalid && "border-red-500")}
         />
         {available !== undefined && (
           <Badge variant="secondary">
-            {available} disponibles
+            {available} {tx("disponibles", "available")}
           </Badge>
         )}
       </div>
       {isInvalid && (
         <p className="text-sm text-red-500 flex items-center gap-1 mt-1">
           <AlertCircle className="h-4 w-4" />
-          Excede la cantidad disponible
+          {tx("Excede la cantidad disponible", "Exceeds available quantity")}
         </p>
       )}
     </div>

@@ -52,4 +52,6 @@ export interface ArtistSectionProps {
   };
   onChange: (changes: any) => void;
   gearSetup?: FestivalGearSetup | null;
+  isFieldLocked?: (field: string) => boolean;
+  language?: 'es' | 'en';
 }

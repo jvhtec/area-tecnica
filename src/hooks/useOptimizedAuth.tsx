@@ -536,6 +536,28 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     }
   };
 
+  const getFunctionErrorMessage = async (error: unknown, fallback: string) => {
+    const candidate = error as {
+      message?: string;
+      details?: string;
+      context?: {
+        json?: () => Promise<{ error?: string; message?: string }>;
+      };
+    };
+
+    if (candidate?.context?.json) {
+      try {
+        const payload = await candidate.context.json();
+        const messageFromBody = payload?.error || payload?.message;
+        if (messageFromBody) return messageFromBody;
+      } catch {
+        // Fall back to top-level error message when body parsing fails.
+      }
+    }
+
+    return candidate?.details || candidate?.message || fallback;
+  };
+
   // Admin/management-only create user via Edge Function (service role)
   const createUserAsAdmin = async (userData: Omit<SignUpData, 'password'> & { role?: string } & { flex_resource_id?: string }) => {
     try {
@@ -556,7 +578,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         }
       });
       if (error) {
-        const msg = error.message || 'Failed to create user';
+        const msg = await getFunctionErrorMessage(error, 'Failed to create user');
         setError(msg);
         toast({ title: 'Create user failed', description: msg, variant: 'destructive' });
         return null;
@@ -564,7 +586,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       toast({ title: 'User created', description: `${data?.email || userData.email} has been created.` });
       return data as { id: string; email: string };
     } catch (e: any) {
-      const msg = e?.message || 'Failed to create user';
+      const msg = await getFunctionErrorMessage(e, 'Failed to create user');
       setError(msg);
       toast({ title: 'Create user failed', description: msg, variant: 'destructive' });
       return null;

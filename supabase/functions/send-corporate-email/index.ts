@@ -68,6 +68,7 @@ interface SendCorporateEmailRequest {
   recipients: RecipientCriteria;
   pdfAttachments?: PdfAttachment[];
   inlineImages?: InlineImage[];
+  senderNameOverride?: string;
 }
 
 interface RecipientStatus {
@@ -438,7 +439,7 @@ serve(async (req) => {
     }
 
     // Get sender name based on department
-    const senderName = getSenderName(department);
+    let senderName = getSenderName(department);
     console.log(`[send-corporate-email] Sender name: ${senderName}`);
 
     // Step 3: Validate environment variables
@@ -471,6 +472,27 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
+    }
+
+    if (body.senderNameOverride && body.senderNameOverride.trim()) {
+      const sanitizedSenderName = body.senderNameOverride
+        .trim()
+        // Strip ASCII control chars that can break headers.
+        .split("")
+        .filter((char) => {
+          const code = char.charCodeAt(0);
+          return code >= 32 && code !== 127;
+        })
+        .join("")
+        // Strip zero-width and bidi-control chars that can spoof rendering.
+        .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g, "")
+        .replace(/\s+/g, " ")
+        .slice(0, 100);
+
+      if (sanitizedSenderName) {
+        senderName = sanitizedSenderName;
+      }
+      console.log(`[send-corporate-email] Sender name override applied: ${senderName}`);
     }
 
     // Step 5: Validate attachments

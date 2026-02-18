@@ -1,17 +1,20 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
-import { Loader2, Copy, RefreshCcw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2, Copy, RefreshCcw, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { addDays, format, isAfter } from "date-fns";
+import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
+import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 
 interface ArtistLinkData {
   artistId: string;
   name: string;
   stage: number;
+  form_language?: "es" | "en";
   token?: string;
   expires_at?: string;
   status?: string;
@@ -34,8 +37,9 @@ export const ArtistFormLinksDialog = ({
   const [isLoading, setIsLoading] = useState(true);
   const [artistLinks, setArtistLinks] = useState<ArtistLinkData[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isGeneratingBlankPdf, setIsGeneratingBlankPdf] = useState(false);
 
-  const fetchArtistLinks = async () => {
+  const fetchArtistLinks = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('festival_artists')
@@ -43,6 +47,7 @@ export const ArtistFormLinksDialog = ({
           id,
           name,
           stage,
+          form_language,
           festival_artist_forms (
             token,
             expires_at,
@@ -60,6 +65,7 @@ export const ArtistFormLinksDialog = ({
         artistId: artist.id,
         name: artist.name,
         stage: artist.stage,
+        form_language: artist.form_language === "en" ? "en" : "es",
         token: artist.festival_artist_forms?.[0]?.token,
         expires_at: artist.festival_artist_forms?.[0]?.expires_at,
         status: artist.festival_artist_forms?.[0]?.status,
@@ -76,13 +82,13 @@ export const ArtistFormLinksDialog = ({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [jobId, selectedDate, toast]);
 
   useEffect(() => {
     if (open) {
       fetchArtistLinks();
     }
-  }, [open, jobId, selectedDate]);
+  }, [fetchArtistLinks, open]);
 
   const generateLinks = async () => {
     setIsGenerating(true);
@@ -128,6 +134,11 @@ export const ArtistFormLinksDialog = ({
   };
 
   const copyAllLinks = () => {
+    const buildLink = (artist: ArtistLinkData) =>
+      artist.token
+        ? `${window.location.origin}/festival/artist-form/${artist.token}?lang=${artist.form_language === "en" ? "en" : "es"}`
+        : "Enlace aún no generado";
+
     const groupedByStage = artistLinks.reduce((acc, artist) => {
       const stage = `Stage ${artist.stage}`;
       if (!acc[stage]) acc[stage] = [];
@@ -140,9 +151,7 @@ export const ArtistFormLinksDialog = ({
     Object.entries(groupedByStage).forEach(([stage, artists]) => {
       text += `${stage}:\n`;
       artists.forEach(artist => {
-        const link = artist.token
-          ? `${window.location.origin}/festival/artist-form/${artist.token}`
-          : 'Enlace aún no generado';
+        const link = buildLink(artist);
         text += `${artist.name} - ${link}\n`;
       });
       text += '\n';
@@ -156,13 +165,16 @@ export const ArtistFormLinksDialog = ({
   };
 
   const copyStageLinks = (stage: number) => {
+    const buildLink = (artist: ArtistLinkData) =>
+      artist.token
+        ? `${window.location.origin}/festival/artist-form/${artist.token}?lang=${artist.form_language === "en" ? "en" : "es"}`
+        : "Enlace aún no generado";
+
     const stageArtists = artistLinks.filter(a => a.stage === stage);
     let text = `Stage ${stage} - ${format(new Date(selectedDate), 'dd/MM/yyyy')}\n\n`;
 
     stageArtists.forEach(artist => {
-      const link = artist.token
-        ? `${window.location.origin}/festival/artist-form/${artist.token}`
-        : 'Enlace aún no generado';
+      const link = buildLink(artist);
       text += `${artist.name} - ${link}\n`;
     });
 
@@ -171,6 +183,74 @@ export const ArtistFormLinksDialog = ({
       title: "Copiado",
       description: `Enlaces del Stage ${stage} copiados al portapapeles`,
     });
+  };
+
+  const downloadBlankTemplatePdf = async () => {
+    setIsGeneratingBlankPdf(true);
+    try {
+      let logoUrl: string | undefined;
+      if (jobId) {
+        logoUrl = await fetchJobLogo(jobId);
+      }
+
+      const blankPdfData: ArtistPdfData = {
+        name: "Plantilla Artista",
+        stage: 1,
+        date: selectedDate,
+        schedule: {
+          show: {
+            start: "",
+            end: "",
+          },
+        },
+        technical: {
+          fohTech: false,
+          monTech: false,
+          fohConsole: { model: "", providedBy: "festival" },
+          monConsole: { model: "", providedBy: "festival" },
+          wireless: { systems: [], providedBy: "festival" },
+          iem: { systems: [], providedBy: "festival" },
+          monitors: { enabled: false, quantity: 0 },
+        },
+        infrastructure: {
+          providedBy: "festival",
+          cat6: { enabled: false, quantity: 0 },
+          hma: { enabled: false, quantity: 0 },
+          coax: { enabled: false, quantity: 0 },
+          opticalconDuo: { enabled: false, quantity: 0 },
+          analog: 0,
+          other: "",
+        },
+        extras: {
+          sideFill: false,
+          drumFill: false,
+          djBooth: false,
+          wired: "",
+        },
+        notes: "",
+        wiredMics: [],
+        logoUrl,
+      };
+
+      const blob = await exportArtistPDF(blankPdfData, { templateMode: true });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Plantilla_Blanca_Artista_${selectedDate}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Error generating blank template PDF:", error);
+      toast({
+        title: "Error",
+        description: "No se pudo generar la plantilla PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingBlankPdf(false);
+    }
   };
 
   if (isLoading) {
@@ -186,7 +266,6 @@ export const ArtistFormLinksDialog = ({
   }
 
   const stages = [...new Set(artistLinks.map(a => a.stage))].sort();
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
@@ -200,10 +279,16 @@ export const ArtistFormLinksDialog = ({
               <RefreshCcw className={`h-4 w-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
               Generar Enlaces Faltantes
             </Button>
-            <Button onClick={copyAllLinks}>
-              <Copy className="h-4 w-4 mr-2" />
-              Copiar Todos los Enlaces
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={downloadBlankTemplatePdf} disabled={isGeneratingBlankPdf}>
+                <Printer className="h-4 w-4 mr-2" />
+                {isGeneratingBlankPdf ? "Generando Plantilla..." : "Plantilla PDF en Blanco"}
+              </Button>
+              <Button onClick={copyAllLinks}>
+                <Copy className="h-4 w-4 mr-2" />
+                Copiar Todos los Enlaces
+              </Button>
+            </div>
           </div>
 
           {stages.map(stage => (
@@ -236,7 +321,7 @@ export const ArtistFormLinksDialog = ({
                               variant="ghost"
                               size="sm"
                               onClick={() => {
-                                const link = `${window.location.origin}/festival/artist-form/${artist.token}`;
+                                const link = `${window.location.origin}/festival/artist-form/${artist.token}?lang=${artist.form_language === "en" ? "en" : "es"}`;
                                 navigator.clipboard.writeText(link);
                                 toast({
                                   title: "Copiado",
