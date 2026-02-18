@@ -190,9 +190,10 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
       });
     } catch (error: any) {
       console.error('Error generating day sheet:', error);
+      const errorMessage = error?.message || "No se pudo generar el day sheet";
       toast({
-        title: "Error",
-        description: "No se pudo generar el day sheet",
+        title: "Error al generar el documento",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -211,9 +212,10 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
       });
     } catch (error: any) {
       console.error('Error generating tour book:', error);
+      const errorMessage = error?.message || "No se pudo generar el tour book";
       toast({
-        title: "Error",
-        description: "No se pudo generar el tour book",
+        title: "Error al generar el documento",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -443,8 +445,17 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                                     const travelPlan = tourData?.travel_plan || [];
                                     const segment = travelPlan.find((s: any) => s.toDateId === date.id);
                                     await generateTravelDaySheet(tourData, segment, date, 'to');
-                                  } catch (error) {
+                                    toast({
+                                      title: "Documento generado",
+                                      description: "Hoja de ruta de viaje (ida) generada correctamente",
+                                    });
+                                  } catch (error: any) {
                                     console.error(error);
+                                    toast({
+                                      title: "Error",
+                                      description: error?.message || "No se pudo generar el documento",
+                                      variant: "destructive",
+                                    });
                                   } finally {
                                     setIsGenerating(false);
                                   }
@@ -463,8 +474,17 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                                     const travelPlan = tourData?.travel_plan || [];
                                     const segment = travelPlan.find((s: any) => s.fromDateId === date.id);
                                     await generateTravelDaySheet(tourData, segment, date, 'from');
-                                  } catch (error) {
+                                    toast({
+                                      title: "Documento generado",
+                                      description: "Hoja de ruta de viaje (vuelta) generada correctamente",
+                                    });
+                                  } catch (error: any) {
                                     console.error(error);
+                                    toast({
+                                      title: "Error",
+                                      description: error?.message || "No se pudo generar el documento",
+                                      variant: "destructive",
+                                    });
                                   } finally {
                                     setIsGenerating(false);
                                   }
@@ -504,11 +524,11 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
                                   title: "Sets generados",
                                   description: "Se generaron todos los documentos para esta fecha",
                                 });
-                              } catch (error) {
+                              } catch (error: any) {
                                 console.error(error);
                                 toast({
-                                  title: "Error",
-                                  description: "No se pudieron generar los documentos",
+                                  title: "Error al generar documentos",
+                                  description: error?.message || "No se pudieron generar los documentos",
                                   variant: "destructive",
                                 });
                               } finally {
