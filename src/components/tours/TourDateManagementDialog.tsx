@@ -34,6 +34,22 @@ import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { TECHNICAL_DEPARTMENTS } from "@/types/department";
 import { syncFlexElementsForTourDateChange } from "@/utils/flex-folders/syncDateChange";
 
+interface TourDateObject {
+  id: string;
+  date: string;
+  tour_id: string;
+  location_id: string | null;
+  location?: {
+    id: string;
+    name: string;
+  };
+  notes?: string;
+  tour_date_type: 'show' | 'rehearsal' | 'travel';
+  start_date?: string;
+  end_date?: string;
+  is_tour_pack_only?: boolean;
+}
+
 interface TourDateManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -72,7 +88,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const [editEndDate, setEditEndDate] = useState<string>("");
   const [editTourPackOnly, setEditTourPackOnly] = useState<boolean>(false);
   const [isDeletingDate, setIsDeletingDate] = useState<string | null>(null);
-  
+
   // New date form state
   const [newLocation, setNewLocation] = useState<string>("");
   const [newLocationDetails, setNewLocationDetails] = useState<LocationDetails | null>(null);
@@ -103,7 +119,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   });
 
   const handleAddDate = async (
-    location: string, 
+    location: string,
     tourDateType: 'show' | 'rehearsal' | 'travel' = 'show',
     startDate: string,
     endDate: string,
@@ -115,9 +131,9 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       }
       const finalEndDate = endDate || startDate;
       const rehearsalDays = Math.ceil((new Date(finalEndDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      
+
       console.log("Adding new tour date:", { startDate, finalEndDate, location, tourId, tourDateType, isTourPackOnly });
-      
+
       let locationId: string | null = null;
       if (newLocationDetails && newLocationDetails.name) {
         locationId = await getOrCreateLocationWithDetails(newLocationDetails);
@@ -181,11 +197,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       const { data: newJob, error: jobError } = await supabase
         .from("jobs")
         .insert({
-          title: tourDateType === 'rehearsal' 
-            ? `${tourData.name} - Rehearsal (${location})` 
+          title: tourDateType === 'rehearsal'
+            ? `${tourData.name} - Rehearsal (${location})`
             : tourDateType === 'travel'
-            ? `${tourData.name} - Travel (${location})`
-            : `${tourData.name} (${location || 'No Location'})`,
+              ? `${tourData.name} - Travel (${location})`
+              : `${tourData.name} (${location || 'No Location'})`,
           start_time: `${startDate}T06:00:00`,
           end_time: `${finalEndDate}T21:59:59`,
           location_id: locationId,
@@ -229,7 +245,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           type: tourDateType
         });
       }
-      
+
       const { error: dateTypeError } = await supabase
         .from("job_date_types")
         .insert(jobDateTypes);
@@ -350,11 +366,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       const { data: jobs, error: jobsError } = await supabase
         .from("jobs")
         .update({
-          title: tourDateType === 'rehearsal' 
-            ? `${tourData.name} - Rehearsal (${newLocation})` 
+          title: tourDateType === 'rehearsal'
+            ? `${tourData.name} - Rehearsal (${newLocation})`
             : tourDateType === 'travel'
-            ? `${tourData.name} - Travel (${newLocation})`
-            : `${tourData.name} (${newLocation || 'No Location'})`,
+              ? `${tourData.name} - Travel (${newLocation})`
+              : `${tourData.name} (${newLocation || 'No Location'})`,
           start_time: `${startDate}T06:00:00`,
           end_time: `${finalEndDate}T21:59:59`,
           location_id: locationId,
@@ -387,7 +403,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
               type: tourDateType
             });
           }
-          
+
           if (jobDateTypes.length > 0) {
             const { error: dateTypeError } = await supabase
               .from("job_date_types")
@@ -537,7 +553,6 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           { table: "memoria_tecnica_documents", condition: "job_id" },
           { table: "lights_memoria_tecnica_documents", condition: "job_id" },
           { table: "video_memoria_tecnica_documents", condition: "job_id" },
-          // Use service to delete job date types
           { table: "job_date_types", condition: "job_id", useService: true },
           { table: "job_milestones", condition: "job_id" },
           { table: "power_requirement_tables", condition: "job_id" },
@@ -548,49 +563,76 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           { table: "festival_settings", condition: "job_id" },
           { table: "festival_stages", condition: "job_id" },
           { table: "technician_work_records", condition: "job_id" },
+
+          // Newly identified child tables
+          { table: "timesheets", condition: "job_id" },
+          { table: "job_expenses", condition: "job_id" },
+          { table: "expense_permissions", condition: "job_id" },
+          { table: "job_rehearsal_dates", condition: "job_id" },
+          { table: "staffing_campaigns", condition: "job_id" },
+          { table: "job_technician_payout_overrides", condition: "job_id" },
+          { table: "job_stage_plots", condition: "job_id" },
+          { table: "job_whatsapp_groups", condition: "job_id" },
+          { table: "job_whatsapp_group_requests", condition: "job_id" },
+          { table: "job_required_roles", condition: "job_id" },
+          { table: "presets", condition: "job_id" },
+          { table: "sub_rentals", condition: "job_id" },
+          { table: "job_rate_extras", condition: "job_id" },
+          { table: "transport_requests", condition: "job_id" },
+          { table: "staffing_requests", condition: "job_id" },
+          { table: "assignment_notifications", condition: "job_id" },
+          { table: "job_milestone_definitions", condition: "job_id" },
+          { table: "availability_conflicts", condition: "job_id" },
+          { table: "flex_crew_calls", condition: "job_id" },
+          { table: "flex_work_orders", condition: "job_id" },
         ];
 
         for (const step of deletionSteps) {
+          if (!jobIds || jobIds.length === 0) continue;
+
           console.log(`Deleting from ${step.table}...`);
 
-          if (step.subquery) {
-            // Handle task documents which reference task IDs
-            const { data: taskIds } = await supabase
-              .from(step.subquery)
-              .select("id")
-              .in("job_id", jobIds);
+          try {
+            if (step.subquery) {
+              // Handle task documents which reference task IDs
+              const { data: taskIds } = await supabase
+                .from(step.subquery)
+                .select("id")
+                .in("job_id", jobIds);
 
-            if (taskIds && taskIds.length > 0) {
+              if (taskIds && taskIds.length > 0) {
+                const { error } = await supabase
+                  .from(step.table)
+                  .delete()
+                  .in(step.condition, taskIds.map(t => t.id));
+
+                if (error) {
+                  console.error(`Error deleting from ${step.table}:`, error);
+                }
+              }
+            } else if (step.useService && step.table === "job_date_types") {
+              // Use service for job date types deletion
+              for (const jobId of jobIds) {
+                try {
+                  await deleteJobDateTypes(jobId);
+                } catch (error) {
+                  console.error(`Error deleting job date types for job ${jobId}:`, error);
+                }
+              }
+            } else {
+              // Direct deletion by job_id
               const { error } = await supabase
                 .from(step.table)
                 .delete()
-                .in(step.condition, taskIds.map(t => t.id));
+                .in(step.condition, jobIds);
 
               if (error) {
-                console.error(`Error deleting from ${step.table}:`, error);
-                // Continue with other deletions even if one fails
+                console.warn(`Warning deleting from ${step.table} (likely restricted or empty):`, error);
+                // Continue with other deletions
               }
             }
-          } else if (step.useService && step.table === "job_date_types") {
-            // Use service for job date types deletion
-            for (const jobId of jobIds) {
-              try {
-                await deleteJobDateTypes(jobId);
-              } catch (error) {
-                console.error(`Error deleting job date types for job ${jobId}:`, error);
-              }
-            }
-          } else {
-            // Direct deletion by job_id
-            const { error } = await supabase
-              .from(step.table)
-              .delete()
-              .in(step.condition, jobIds);
-
-            if (error) {
-              console.error(`Error deleting from ${step.table}:`, error);
-              // Continue with other deletions even if one fails
-            }
+          } catch (err) {
+            console.error(`Unexpected error during ${step.table} deletion:`, err);
           }
         }
 
@@ -691,8 +733,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
   const submitEditing = async (dateId: string) => {
     await handleEditDate(
-      dateId, 
-      editLocationValue, 
+      dateId,
+      editLocationValue,
       editTourDateType,
       editStartDate,
       editEndDate,
@@ -703,224 +745,224 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] flex flex-col gap-0 p-0">
-        <DialogHeader className="px-4 pt-4 pb-2 md:px-6 md:pt-6 md:pb-4 border-b">
-          <DialogTitle className="text-base md:text-lg">
-            {readOnly ? 'Tour Dates' : 'Manage Tour Dates'}
-          </DialogTitle>
-        </DialogHeader>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] flex flex-col gap-0 p-0">
+          <DialogHeader className="px-4 pt-4 pb-2 md:px-6 md:pt-6 md:pb-4 border-b">
+            <DialogTitle className="text-base md:text-lg">
+              {readOnly ? 'Tour Dates' : 'Manage Tour Dates'}
+            </DialogTitle>
+          </DialogHeader>
 
-        <ScrollArea className="flex-1 overflow-auto px-4 md:px-6">
-          <div className="space-y-3 md:space-y-4 py-4 pb-6">
-            {/* Bulk folders button removed; availability moved to Team Assignments */}
-            
-            <div className="space-y-4">
-              {tourDates?.map((dateObj) => {
-                const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
-                const isDeleting = isDeletingDate === dateObj.id;
+          <ScrollArea className="flex-1 overflow-auto px-4 md:px-6">
+            <div className="space-y-3 md:space-y-4 py-4 pb-6">
+              {/* Bulk folders button removed; availability moved to Team Assignments */}
 
-                return (
-                  <div key={dateObj.id} className="p-3 md:p-4 border rounded-lg">
-                    {editingTourDate && editingTourDate.id === dateObj.id && !readOnly ? (
-                      <div className="flex flex-col gap-3">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 flex-shrink-0" />
-                          <Input
-                            type="date"
-                            value={editStartDate}
-                            onChange={(e) => {
-                              const newDate = e.target.value;
-                              setEditStartDate(newDate);
-                              if (editTourDateType !== 'rehearsal') {
-                                setEditEndDate(newDate);
-                              }
-                            }}
-                            required
-                            className="text-sm"
-                          />
-                        </div>
-                        {editTourDateType === 'rehearsal' && (
+              <div className="space-y-4">
+                {tourDates?.map((dateObj) => {
+                  const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
+                  const isDeleting = isDeletingDate === dateObj.id;
+
+                  return (
+                    <div key={dateObj.id} className="p-3 md:p-4 border rounded-lg">
+                      {editingTourDate && editingTourDate.id === dateObj.id && !readOnly ? (
+                        <div className="flex flex-col gap-3">
                           <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 flex-shrink-0" />
+                            <Calendar className="h-4 w-4 flex-shrink-0" />
                             <Input
                               type="date"
-                              value={editEndDate}
-                              min={editStartDate}
-                              onChange={(e) => setEditEndDate(e.target.value)}
+                              value={editStartDate}
+                              onChange={(e) => {
+                                const newDate = e.target.value;
+                                setEditStartDate(newDate);
+                                if (editTourDateType !== 'rehearsal') {
+                                  setEditEndDate(newDate);
+                                }
+                              }}
                               required
                               className="text-sm"
                             />
                           </div>
-                        )}
-                        <PlaceAutocomplete
-                          value={editLocationValue}
-                          onInputChange={(value) => {
-                            setEditLocationValue(value);
-                            setEditLocationDetails(null);
-                          }}
-                          onSelect={(result) => {
-                            setEditLocationValue(result.name);
-                            setEditLocationDetails({
-                              name: result.name,
-                              address: result.address,
-                              coordinates: result.coordinates,
-                              place_id: result.place_id,
-                            });
-                          }}
-                          placeholder="Location"
-                          label="Location"
-                          className="w-full"
-                        />
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="tour-pack-only-edit"
-                            checked={editTourPackOnly}
-                            onCheckedChange={(checked) => setEditTourPackOnly(checked as boolean)}
+                          {editTourDateType === 'rehearsal' && (
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 flex-shrink-0" />
+                              <Input
+                                type="date"
+                                value={editEndDate}
+                                min={editStartDate}
+                                onChange={(e) => setEditEndDate(e.target.value)}
+                                required
+                                className="text-sm"
+                              />
+                            </div>
+                          )}
+                          <PlaceAutocomplete
+                            value={editLocationValue}
+                            onInputChange={(value) => {
+                              setEditLocationValue(value);
+                              setEditLocationDetails(null);
+                            }}
+                            onSelect={(result) => {
+                              setEditLocationValue(result.name);
+                              setEditLocationDetails({
+                                name: result.name,
+                                address: result.address,
+                                coordinates: result.coordinates,
+                                place_id: result.place_id,
+                              });
+                            }}
+                            placeholder="Location"
+                            label="Location"
+                            className="w-full"
                           />
-                          <Label htmlFor="tour-pack-only-edit" className="text-xs md:text-sm">
-                            Tour Pack Only (skip PA pullsheet)
-                          </Label>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="tour-pack-only-edit"
+                              checked={editTourPackOnly}
+                              onCheckedChange={(checked) => setEditTourPackOnly(checked as boolean)}
+                            />
+                            <Label htmlFor="tour-pack-only-edit" className="text-xs md:text-sm">
+                              Tour Pack Only (skip PA pullsheet)
+                            </Label>
+                          </div>
+                          <div className="flex flex-col-reverse sm:flex-row gap-2">
+                            <Button variant="outline" onClick={cancelEditing} className="w-full sm:w-auto">
+                              Cancel
+                            </Button>
+                            <Button onClick={() => submitEditing(dateObj.id)} className="w-full sm:w-auto">
+                              Save
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex flex-col-reverse sm:flex-row gap-2">
-                          <Button variant="outline" onClick={cancelEditing} className="w-full sm:w-auto">
-                            Cancel
-                          </Button>
-                          <Button onClick={() => submitEditing(dateObj.id)} className="w-full sm:w-auto">
-                            Save
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                        <div className="space-y-1 flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
-                            <Calendar className="h-4 w-4 flex-shrink-0" />
-                            <span>{format(new Date(dateObj.date), "MMM d, yyyy")}</span>
-                            {dateObj.is_tour_pack_only && (
-                              <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                                <Package className="h-3 w-3" />
-                                <span className="hidden sm:inline">Tour Pack Only</span>
-                                <span className="sm:hidden">TP Only</span>
+                      ) : (
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                          <div className="space-y-1 flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
+                              <Calendar className="h-4 w-4 flex-shrink-0" />
+                              <span>{format(new Date(dateObj.date), "MMM d, yyyy")}</span>
+                              {dateObj.is_tour_pack_only && (
+                                <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
+                                  <Package className="h-3 w-3" />
+                                  <span className="hidden sm:inline">Tour Pack Only</span>
+                                  <span className="sm:hidden">TP Only</span>
+                                </div>
+                              )}
+                            </div>
+                            {dateObj.location?.name && (
+                              <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
+                                <MapPin className="h-4 w-4 flex-shrink-0" />
+                                <span className="truncate">{dateObj.location.name}</span>
+                              </div>
+                            )}
+                            {foldersExist && (
+                              <div className="text-xs text-green-600">
+                                ✓ Flex folders created
                               </div>
                             )}
                           </div>
-                          {dateObj.location?.name && (
-                            <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
-                              <MapPin className="h-4 w-4 flex-shrink-0" />
-                              <span className="truncate">{dateObj.location.name}</span>
-                            </div>
-                          )}
-                          {foldersExist && (
-                            <div className="text-xs text-green-600">
-                              ✓ Flex folders created
-                            </div>
-                          )}
+                          <div className="flex gap-1 md:gap-2 self-end sm:self-auto">
+                            {!readOnly && (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => startEditing(dateObj)}
+                                  title="Edit Date"
+                                  disabled={isDeleting}
+                                  className="h-9 w-9 touch-manipulation"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleDeleteDate(dateObj.id)}
+                                  title="Delete Date"
+                                  disabled={isDeleting}
+                                  className={`h-9 w-9 touch-manipulation ${isDeleting ? "opacity-50 cursor-not-allowed" : ""}`}
+                                >
+                                  {isDeleting ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex gap-1 md:gap-2 self-end sm:self-auto">
-                          {!readOnly && (
-                            <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => startEditing(dateObj)}
-                                title="Edit Date"
-                                disabled={isDeleting}
-                                className="h-9 w-9 touch-manipulation"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDeleteDate(dateObj.id)}
-                                title="Delete Date"
-                                disabled={isDeleting}
-                                className={`h-9 w-9 touch-manipulation ${isDeleting ? "opacity-50 cursor-not-allowed" : ""}`}
-                              >
-                                {isDeleting ? (
-                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            
-            {!readOnly && (
-              <div className="space-y-3 md:space-y-4 border-t pt-4">
-                <h3 className="text-base md:text-lg font-semibold">Add New Date</h3>
-                <TourDateFormFields
-                  location={newLocation}
-                  setLocation={setNewLocation}
-                  setLocationDetails={setNewLocationDetails}
-                  tourDateType={newTourDateType}
-                  setTourDateType={setNewTourDateType}
-                  startDate={newStartDate}
-                  setStartDate={setNewStartDate}
-                  endDate={newEndDate}
-                  setEndDate={setNewEndDate}
-                />
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="tour-pack-only"
-                    checked={newTourPackOnly}
-                    onCheckedChange={(checked) => setNewTourPackOnly(checked as boolean)}
-                  />
-                  <Label htmlFor="tour-pack-only" className="text-xs md:text-sm">
-                    Tour Pack Only (skip PA pullsheet)
-                  </Label>
-                </div>
-                <Button 
-                  onClick={() => {
-                    if (!newStartDate || !newLocation) {
-                      toast({
-                        title: "Error",
-                        description: "Please fill in all required fields",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-                    handleAddDate(
-                      newLocation,
-                      newTourDateType,
-                      newStartDate,
-                      newEndDate || newStartDate,
-                      newTourPackOnly
-                    );
-                    // Reset form
-                    setNewLocation("");
-                    setNewLocationDetails(null);
-                    setNewTourDateType('show');
-                    setNewStartDate("");
-                    setNewEndDate("");
-                    setNewTourPackOnly(false);
-                  }}
-                  className="w-full touch-manipulation"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  <span className="hidden sm:inline">
-                    Add {newTourDateType === 'rehearsal' ? 'Rehearsal Period' : 
-                          newTourDateType === 'travel' ? 'Travel Day' : 'Show Date'}
-                  </span>
-                  <span className="sm:hidden">
-                    Add {newTourDateType === 'rehearsal' ? 'Rehearsal' : 
-                          newTourDateType === 'travel' ? 'Travel' : 'Show'}
-                  </span>
-                </Button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        </ScrollArea>
-      </DialogContent>
-    </Dialog>
+
+              {!readOnly && (
+                <div className="space-y-3 md:space-y-4 border-t pt-4">
+                  <h3 className="text-base md:text-lg font-semibold">Add New Date</h3>
+                  <TourDateFormFields
+                    location={newLocation}
+                    setLocation={setNewLocation}
+                    setLocationDetails={setNewLocationDetails}
+                    tourDateType={newTourDateType}
+                    setTourDateType={setNewTourDateType}
+                    startDate={newStartDate}
+                    setStartDate={setNewStartDate}
+                    endDate={newEndDate}
+                    setEndDate={setNewEndDate}
+                  />
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="tour-pack-only"
+                      checked={newTourPackOnly}
+                      onCheckedChange={(checked) => setNewTourPackOnly(checked as boolean)}
+                    />
+                    <Label htmlFor="tour-pack-only" className="text-xs md:text-sm">
+                      Tour Pack Only (skip PA pullsheet)
+                    </Label>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      if (!newStartDate || !newLocation) {
+                        toast({
+                          title: "Error",
+                          description: "Please fill in all required fields",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      handleAddDate(
+                        newLocation,
+                        newTourDateType,
+                        newStartDate,
+                        newEndDate || newStartDate,
+                        newTourPackOnly
+                      );
+                      // Reset form
+                      setNewLocation("");
+                      setNewLocationDetails(null);
+                      setNewTourDateType('show');
+                      setNewStartDate("");
+                      setNewEndDate("");
+                      setNewTourPackOnly(false);
+                    }}
+                    className="w-full touch-manipulation"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    <span className="hidden sm:inline">
+                      Add {newTourDateType === 'rehearsal' ? 'Rehearsal Period' :
+                        newTourDateType === 'travel' ? 'Travel Day' : 'Show Date'}
+                    </span>
+                    <span className="sm:hidden">
+                      Add {newTourDateType === 'rehearsal' ? 'Rehearsal' :
+                        newTourDateType === 'travel' ? 'Travel' : 'Show'}
+                    </span>
+                  </Button>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
