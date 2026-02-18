@@ -428,6 +428,38 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
 
   yPosition = getLastAutoTableFinalY(yPosition) + 8;
 
+  // === MIC KIT DISCLAIMER ===
+  if (!templateMode && data.micKit && (data.micKit === 'band' || data.micKit === 'mixed')) {
+    const checkPageSpace = (needed: number) => {
+      if (yPosition + needed > pageHeight - 25) {
+        doc.addPage();
+        yPosition = 20;
+      }
+    };
+    checkPageSpace(18);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bolditalic');
+    doc.setTextColor(125, 1, 1);
+    let disclaimerText = '';
+    if (data.micKit === 'band') {
+      disclaimerText = tx(
+        'Nota: Kit de microfonia cableada proporcionado integramente por la banda.',
+        'Note: Wired microphone kit provided entirely by the band.'
+      );
+    } else if (data.micKit === 'mixed') {
+      disclaimerText = tx(
+        'Nota: Setup mixto de microfonia cableada - parte proporcionada por la banda y parte por el festival.',
+        'Note: Mixed wired microphone setup - some provided by the band and some by the festival.'
+      );
+    }
+    const disclaimerLines = doc.splitTextToSize(disclaimerText, pageWidth - 28);
+    doc.text(disclaimerLines, 14, yPosition);
+    yPosition += disclaimerLines.length * 5 + 4;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 51, 51);
+  }
+
   // === WIRED MICROPHONES ===
   if (templateMode || (data.wiredMics && data.wiredMics.length > 0)) {
     const wiredMicRows = templateMode

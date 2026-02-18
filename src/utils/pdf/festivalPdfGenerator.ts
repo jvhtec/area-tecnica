@@ -481,7 +481,9 @@ export const generateAndMergeFestivalPDFs = async (
               wired: String(artist.extras_wired || '')
             },
             notes: artist.notes ? String(artist.notes) : undefined,
-            logoUrl
+            logoUrl,
+            wiredMics: artist.wired_mics || [],
+            micKit: artist.mic_kit || undefined
           };
           
           const pdf = await exportArtistPDF(artistData);
