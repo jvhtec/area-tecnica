@@ -65,7 +65,9 @@ export async function handleBroadcast(
       if (data?.job_id) jobId = data.job_id;
     } catch (_) { /* ignore */ }
   }
-  const jobTitle = await getJobTitle(client, jobId);
+  const bodyJobTitle = typeof body.job_title === 'string' ? body.job_title.trim() : '';
+  const lookedUpJobTitle = await getJobTitle(client, jobId);
+  const jobTitle = bodyJobTitle || lookedUpJobTitle;
   const jobDepartment = await getJobDepartment(client, jobId);
   const jobType = await getJobType(client, jobId);
   const tourId = body.tour_id;
@@ -296,18 +298,19 @@ export async function handleBroadcast(
   } else if (type === EVENT_TYPES.FESTIVAL_PUBLIC_FORM_SUBMITTED) {
     const artistName = ((body as any)?.artist_name as string | undefined)?.trim() || 'Un artista';
     const artistDate = ((body as any)?.artist_date as string | undefined)?.trim() || '';
+    const jobLabel = jobTitle ? ` para "${jobTitle}"` : '';
 
     title = 'Formulario técnico recibido';
     if (artistDate) {
       try {
         const formattedDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' })
           .format(new Date(`${artistDate}T00:00:00Z`));
-        text = `${artistName} envió su formulario técnico (${formattedDate}).`;
+        text = `${artistName} envió su formulario técnico${jobLabel} (${formattedDate}).`;
       } catch (_) {
-        text = `${artistName} envió su formulario técnico.`;
+        text = `${artistName} envió su formulario técnico${jobLabel}.`;
       }
     } else {
-      text = `${artistName} envió su formulario técnico.`;
+      text = `${artistName} envió su formulario técnico${jobLabel}.`;
     }
 
     if (jobId) {
@@ -320,12 +323,13 @@ export async function handleBroadcast(
     const artistName = ((body as any)?.artist_name as string | undefined)?.trim() || 'Un artista';
     const artistDate = ((body as any)?.artist_date as string | undefined)?.trim() || '';
     const riderFileName = (body.file_name || '').trim();
+    const jobLabel = jobTitle ? ` para "${jobTitle}"` : '';
 
     title = 'Rider técnico cargado';
 
     const riderText = riderFileName
-      ? `${artistName} cargó un rider técnico: "${riderFileName}".`
-      : `${artistName} cargó un rider técnico.`;
+      ? `${artistName} cargó un rider técnico${jobLabel}: "${riderFileName}".`
+      : `${artistName} cargó un rider técnico${jobLabel}.`;
 
     if (artistDate) {
       try {
@@ -1213,6 +1217,7 @@ export async function handleBroadcast(
     type,
     meta: {
       jobId: jobId,
+      jobTitle: jobTitle || undefined,
       tourId,
       tourName: tourName ?? undefined,
       actor,

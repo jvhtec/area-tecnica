@@ -27,6 +27,10 @@ type PublicArtistRow = {
   date: string | null;
 };
 
+type JobTitleRow = {
+  title: string | null;
+};
+
 const buildArtistTableUrl = (jobId: string, artistDate?: string | null) => {
   const normalizedDate = typeof artistDate === "string" ? artistDate.trim() : "";
   if (!normalizedDate) {
@@ -98,12 +102,26 @@ serve(async (req) => {
           if (artistError) {
             console.error("[submit-public-artist-form] artist lookup error", artistError);
           } else if (artistRow?.job_id) {
+            let jobTitle: string | null = null;
+            const { data: jobRow, error: jobError } = await supabaseAdmin
+              .from("jobs")
+              .select("title")
+              .eq("id", artistRow.job_id)
+              .maybeSingle<JobTitleRow>();
+
+            if (jobError) {
+              console.error("[submit-public-artist-form] job lookup error", jobError);
+            } else {
+              jobTitle = jobRow?.title ?? null;
+            }
+
             const artistUrl = buildArtistTableUrl(artistRow.job_id, artistRow.date);
             const { error: pushError } = await supabaseAdmin.functions.invoke("push", {
               body: {
                 action: "broadcast",
                 type: "festival.public_form.submitted",
                 job_id: artistRow.job_id,
+                job_title: jobTitle ?? undefined,
                 artist_id: artistRow.id,
                 artist_name: artistRow.name ?? undefined,
                 artist_date: artistRow.date ?? undefined,

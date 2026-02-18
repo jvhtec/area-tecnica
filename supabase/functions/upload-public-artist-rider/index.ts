@@ -31,6 +31,10 @@ type ArtistLookupRow = {
   date: string | null;
 };
 
+type JobTitleRow = {
+  title: string | null;
+};
+
 const sanitizeFileName = (value: string) => {
   const trimmed = value.trim();
   const cleaned = trimmed
@@ -205,12 +209,28 @@ serve(async (req) => {
       return jsonResponse({ ok: false, error: "metadata_insert_failed" }, { status: 500 });
     }
 
+    let jobTitle: string | null = null;
+    if (artistContext?.job_id) {
+      const { data: jobRow, error: jobError } = await supabaseAdmin
+        .from("jobs")
+        .select("title")
+        .eq("id", artistContext.job_id)
+        .maybeSingle<JobTitleRow>();
+
+      if (jobError) {
+        console.error("[upload-public-artist-rider] job lookup error", jobError);
+      } else {
+        jobTitle = jobRow?.title ?? null;
+      }
+    }
+
     const artistUrl = buildArtistTableUrl(artistContext?.job_id, artistContext?.date);
     const { error: pushError } = await supabaseAdmin.functions.invoke("push", {
       body: {
         action: "broadcast",
         type: "festival.public_rider.uploaded",
         job_id: artistContext?.job_id ?? undefined,
+        job_title: jobTitle ?? undefined,
         artist_id: artistContext?.id ?? formRow.artist_id,
         artist_name: artistContext?.name ?? undefined,
         artist_date: artistContext?.date ?? undefined,

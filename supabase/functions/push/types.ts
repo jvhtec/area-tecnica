@@ -44,6 +44,7 @@ export type BroadcastBody = {
   action: "broadcast";
   type: string; // e.g., 'job.created', 'job.updated', 'document.uploaded', 'document.tech_visible.enabled', 'staffing.availability.sent', etc.
   job_id?: string;
+  job_title?: string | null;
   url?: string;
   // Optional targeting hints
   recipient_id?: string; // direct user to notify (e.g., technician)
