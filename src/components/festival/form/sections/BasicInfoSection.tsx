@@ -5,7 +5,20 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArtistSectionProps } from "@/types/artist-form";
 
-export const BasicInfoSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: ArtistSectionProps) => {
+interface BasicInfoSectionProps extends ArtistSectionProps {
+  stageNames?: Record<number, string>;
+  showInternalFlags?: boolean;
+}
+
+export const BasicInfoSection = ({
+  formData,
+  onChange,
+  gearSetup,
+  isFieldLocked,
+  language = "es",
+  stageNames,
+  showInternalFlags = true,
+}: BasicInfoSectionProps) => {
   // Get max stages from gearSetup or default to 3
   const maxStages = gearSetup?.max_stages || 3;
   const locked = (field: string) => isFieldLocked?.(field) ?? false;
@@ -26,7 +39,7 @@ export const BasicInfoSection = ({ formData, onChange, gearSetup, isFieldLocked,
           />
         </div>
         <div>
-          <Label>Stage</Label>
+          <Label>{tx("Escenario", "Stage")}</Label>
           <Select
             value={formData.stage?.toString() || "1"}
             onValueChange={(value) => onChange({ stage: parseInt(value) })}
@@ -38,7 +51,7 @@ export const BasicInfoSection = ({ formData, onChange, gearSetup, isFieldLocked,
             <SelectContent>
               {Array.from({ length: maxStages }, (_, i) => (
                 <SelectItem key={i + 1} value={(i + 1).toString()}>
-                  Stage {i + 1}
+                  {stageNames?.[i + 1] || `${tx("Escenario", "Stage")} ${i + 1}`}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -112,27 +125,29 @@ export const BasicInfoSection = ({ formData, onChange, gearSetup, isFieldLocked,
         )}
       </div>
 
-      <div className="space-y-4">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="after-midnight"
-            checked={formData.isaftermidnight}
-            onCheckedChange={(checked) => onChange({ isaftermidnight: checked })}
-            disabled={locked("isaftermidnight")}
-          />
-          <Label htmlFor="after-midnight">{tx("El show es después de medianoche", "Show is after midnight")}</Label>
-        </div>
+      {showInternalFlags && (
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="after-midnight"
+              checked={formData.isaftermidnight}
+              onCheckedChange={(checked) => onChange({ isaftermidnight: checked })}
+              disabled={locked("isaftermidnight")}
+            />
+            <Label htmlFor="after-midnight">{tx("El show es después de medianoche", "Show is after midnight")}</Label>
+          </div>
 
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="rider-missing"
-            checked={formData.rider_missing}
-            onCheckedChange={(checked) => onChange({ rider_missing: checked })}
-            disabled={locked("rider_missing")}
-          />
-          <Label htmlFor="rider-missing">{tx("El rider está faltando", "Rider is missing")}</Label>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="rider-missing"
+              checked={formData.rider_missing}
+              onCheckedChange={(checked) => onChange({ rider_missing: checked })}
+              disabled={locked("rider_missing")}
+            />
+            <Label htmlFor="rider-missing">{tx("El rider está faltando", "Rider is missing")}</Label>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
