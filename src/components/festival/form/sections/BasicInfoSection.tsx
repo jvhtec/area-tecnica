@@ -8,6 +8,7 @@ import { ArtistSectionProps } from "@/types/artist-form";
 interface BasicInfoSectionProps extends ArtistSectionProps {
   stageNames?: Record<number, string>;
   showInternalFlags?: boolean;
+  showSoundcheckTimes?: boolean;
 }
 
 export const BasicInfoSection = ({
@@ -18,6 +19,7 @@ export const BasicInfoSection = ({
   language = "es",
   stageNames,
   showInternalFlags = true,
+  showSoundcheckTimes = true,
 }: BasicInfoSectionProps) => {
   // Get max stages from gearSetup or default to 3
   const maxStages = gearSetup?.max_stages || 3;
@@ -101,7 +103,7 @@ export const BasicInfoSection = ({
           <Label htmlFor="soundcheck">{tx("Requiere Soundcheck", "Requires Soundcheck")}</Label>
         </div>
 
-        {formData.soundcheck && (
+        {showSoundcheckTimes && formData.soundcheck && (
           <div className="grid grid-cols-2 gap-4 ml-6">
             <div>
               <Label>{tx("Inicio del Soundcheck", "Soundcheck Start")}</Label>

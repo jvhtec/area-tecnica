@@ -38,11 +38,19 @@ export const ArtistFormLinkDialog = ({
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [isGeneratingBlankPdf, setIsGeneratingBlankPdf] = useState(false);
   const [artistLanguage, setArtistLanguage] = useState<"es" | "en">("es");
+  const [formExpiresAt, setFormExpiresAt] = useState<string>("");
 
   const tx = (es: string, en: string) => (artistLanguage === "en" ? en : es);
   const buildFormUrl = (token: string) =>
     `${window.location.origin}/festival/artist-form/${token}?lang=${artistLanguage}`;
   const formLink = formToken ? buildFormUrl(formToken) : "";
+  const formatExpiry = (value: string) =>
+    new Intl.DateTimeFormat(artistLanguage === "en" ? "en-GB" : "es-ES", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Europe/Madrid",
+    }).format(new Date(value));
+  const isExpiringSoon = !!formExpiresAt && new Date(formExpiresAt).getTime() - Date.now() <= 24 * 60 * 60 * 1000;
 
   const getErrorMessage = (error: unknown) =>
     error instanceof Error ? error.message : "Ocurrió un error inesperado";
@@ -109,6 +117,7 @@ export const ArtistFormLinkDialog = ({
       }
 
       setFormToken(data.token);
+      setFormExpiresAt(expiresAt.toISOString());
 
       toast({
         title: tx("Enlace generado", "Link generated"),
@@ -418,7 +427,7 @@ export const ArtistFormLinkDialog = ({
 
           const { data, error } = await supabase
             .from('festival_artist_forms')
-            .select('token')
+            .select('token, expires_at')
             .eq('artist_id', artistId) // Only check THIS artist's forms
             .eq('status', 'pending')
             .gt('expires_at', new Date().toISOString())
@@ -432,12 +441,15 @@ export const ArtistFormLinkDialog = ({
 
           if (data?.token) {
             setFormToken(data.token);
+            setFormExpiresAt(data.expires_at || "");
           } else {
             setFormToken("");
+            setFormExpiresAt("");
           }
         } catch (error) {
           console.error('Error checking existing link:', error);
           setFormToken("");
+          setFormExpiresAt("");
           toast({
             title: "Error",
             description: "No se pudo verificar el enlace de formulario existente.",
@@ -511,6 +523,25 @@ export const ArtistFormLinkDialog = ({
                 <RefreshCcw className="h-4 w-4 mr-2" />
                 Generar Nuevo Enlace
               </Button>
+              {formExpiresAt && (
+                <div
+                  className={`rounded-md border px-3 py-2 text-sm ${
+                    isExpiringSoon
+                      ? "border-amber-300 bg-amber-50 text-amber-900"
+                      : "border-blue-200 bg-blue-50 text-blue-900"
+                  }`}
+                >
+                  <p>
+                    {tx("Este enlace expira:", "This link expires:")} <strong>{formatExpiry(formExpiresAt)}</strong>
+                  </p>
+                  <p className="text-xs mt-1">
+                    {tx(
+                      "Si necesitas rotarlo antes, usa “Generar Nuevo Enlace”.",
+                      "If you need to rotate it before then, use “Generate New Link”."
+                    )}
+                  </p>
+                </div>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -571,6 +602,12 @@ export const ArtistFormLinkDialog = ({
             </>
           ) : (
             <div className="space-y-2">
+              <div className="rounded-md border border-muted px-3 py-2 text-xs text-muted-foreground">
+                {tx(
+                  "Los enlaces públicos expiran en 7 días. Puedes regenerarlos para rotarlos cuando sea necesario.",
+                  "Public links expire in 7 days. You can regenerate them to rotate when needed."
+                )}
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">
                   {tx("Idioma del artista", "Artist language")}

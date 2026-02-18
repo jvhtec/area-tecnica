@@ -274,6 +274,9 @@ export const ArtistFormLinksDialog = ({
         </DialogHeader>
 
         <div className="space-y-6">
+          <div className="rounded-md border border-muted px-3 py-2 text-sm text-muted-foreground">
+            Los enlaces públicos expiran en 7 días. Si necesitas rotarlos antes, usa "Generar Enlaces Faltantes" o regenera el enlace del artista.
+          </div>
           <div className="flex justify-between items-center">
             <Button onClick={generateLinks} disabled={isGenerating}>
               <RefreshCcw className={`h-4 w-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />

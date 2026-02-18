@@ -620,6 +620,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
                   language={formLanguage}
                   stageNames={stageNames}
                   showInternalFlags={false}
+                  showSoundcheckTimes={false}
                 />
 
                 <ConsoleSetupSection
