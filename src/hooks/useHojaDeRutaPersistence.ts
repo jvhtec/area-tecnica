@@ -5,6 +5,30 @@ import { EventData, TravelArrangement, Accommodation } from "@/types/hoja-de-rut
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+
+const PARTIAL_ISO_NO_TZ_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+
+/**
+ * Normalize datetime-local or ISO-ish inputs into explicit UTC ISO timestamps
+ * so PostgreSQL timestamptz columns don't interpret naive values in server local time.
+ */
+const toSafeTimestamptz = (value: string | null | undefined): string | null => {
+  if (!value || !value.trim()) return null;
+
+  const raw = value.trim();
+  const normalizedInput = PARTIAL_ISO_NO_TZ_REGEX.test(raw)
+    ? (raw.length === 16 ? `${raw}:00` : raw)
+    : raw;
+
+  const date = new Date(normalizedInput);
+  if (Number.isNaN(date.getTime())) {
+    console.warn('SAVE: Invalid datetime for timestamptz, storing null:', value);
+    return null;
+  }
+
+  return date.toISOString();
+};
+
 interface SaveCallbacks {
   onSuccess?: () => void;
   onError?: (error: any) => void;
@@ -304,9 +328,9 @@ export const useHojaDeRutaPersistence = (
         driver_phone: transport.driver_phone || '',
         license_plate: transport.license_plate || '',
         company: transport.company || null,
-        date_time: transport.date_time || null,
+        date_time: toSafeTimestamptz(transport.date_time),
         has_return: transport.has_return || false,
-        return_date_time: transport.return_date_time || null,
+        return_date_time: toSafeTimestamptz(transport.return_date_time),
       }));
 
       const validContacts = eventData.contacts?.filter(c =>
@@ -340,6 +364,7 @@ export const useHojaDeRutaPersistence = (
       });
 
       const { error: replaceAllError } = await supabase.rpc(
+        // TODO: Regenerate Supabase types after this migration is deployed to remove this cast.
         'replace_hoja_de_ruta_all' as unknown as keyof Database['public']['Functions'],
         {
           p_hoja_de_ruta_id: hojaDeRutaId,

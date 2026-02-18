@@ -144,13 +144,25 @@ security invoker
 set search_path = public
 as $$
 begin
+  if auth.role() <> 'service_role' then
+    if not exists (
+      select 1
+      from public.hoja_de_ruta h
+      where h.id = p_hoja_de_ruta_id
+        and (h.created_by = auth.uid() or h.approved_by = auth.uid())
+    ) then
+      raise exception 'Not authorized to replace this hoja de ruta''s child data'
+        using errcode = '42501';
+    end if;
+  end if;
+
   perform public.replace_hoja_de_ruta_transport(p_hoja_de_ruta_id, p_transport_rows);
   perform public.replace_hoja_de_ruta_contacts(p_hoja_de_ruta_id, p_contact_rows);
   perform public.replace_hoja_de_ruta_staff(p_hoja_de_ruta_id, p_staff_rows);
 end;
 $$;
 
-grant execute on function public.replace_hoja_de_ruta_transport(uuid, jsonb) to authenticated;
-grant execute on function public.replace_hoja_de_ruta_contacts(uuid, jsonb) to authenticated;
-grant execute on function public.replace_hoja_de_ruta_staff(uuid, jsonb) to authenticated;
+revoke execute on function public.replace_hoja_de_ruta_transport(uuid, jsonb) from public, anon, authenticated;
+revoke execute on function public.replace_hoja_de_ruta_contacts(uuid, jsonb) from public, anon, authenticated;
+revoke execute on function public.replace_hoja_de_ruta_staff(uuid, jsonb) from public, anon, authenticated;
 grant execute on function public.replace_hoja_de_ruta_all(uuid, jsonb, jsonb, jsonb) to authenticated;
