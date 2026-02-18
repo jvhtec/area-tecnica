@@ -200,7 +200,7 @@ const FestivalArtistManagement = () => {
       }
     };
     fetchJobDetails();
-  }, [jobId, routeDate]);
+  }, [jobId]);
 
   useEffect(() => {
     if (!selectedDate) return;
@@ -213,16 +213,6 @@ const FestivalArtistManagement = () => {
       return nextParams;
     }, { replace: true });
   }, [selectedDate, setSearchParams]);
-
-  useEffect(() => {
-    if (!routeDate || !jobDates.length) return;
-    if (selectedDate === routeDate) return;
-
-    const existsInFestival = jobDates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate);
-    if (existsInFestival) {
-      setSelectedDate(routeDate);
-    }
-  }, [jobDates, routeDate, selectedDate]);
 
   const { data: logoData } = useQuery({
     queryKey: ['festival-logo', jobId],
