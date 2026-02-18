@@ -737,31 +737,31 @@ export const generateAndMergeFestivalPDFs = async (
     const tocSections = [];
     
     if (options.includeShiftSchedules && shiftPdfs.length > 0) {
-      tocSections.push({ title: "Staff Shift Schedules", pageCount: shiftPdfs.length });
+      tocSections.push({ title: "Turnos de Personal", pageCount: shiftPdfs.length });
     }
     if (options.includeGearSetup && gearPdfs.length > 0) {
-      tocSections.push({ title: "Stage Equipment Setup", pageCount: gearPdfs.length });
+      tocSections.push({ title: "Equipamiento por Escenario", pageCount: gearPdfs.length });
     }
     if (options.includeArtistTables && artistTablePdfs.length > 0) {
-      tocSections.push({ title: "Artist Schedule Tables", pageCount: artistTablePdfs.length });
+      tocSections.push({ title: "Tablas de Artistas", pageCount: artistTablePdfs.length });
     }
     if (options.includeRfIemTable && rfIemTablePdf) {
-      tocSections.push({ title: "Artist RF & IEM Overview", pageCount: 1 });
+      tocSections.push({ title: "Resumen RF e IEM", pageCount: 1 });
     }
     if (options.includeInfrastructureTable && infrastructureTablePdf) {
-      tocSections.push({ title: "Infrastructure Needs Overview", pageCount: 1 });
+      tocSections.push({ title: "Resumen de Infraestructura", pageCount: 1 });
     }
     if (options.includeWiredMicNeeds && wiredMicMatrixPdf) {
-      tocSections.push({ title: "Wired Microphone Requirements Matrix", pageCount: 1 });
+      tocSections.push({ title: "Matriz de Microfonia Cableada", pageCount: 1 });
     }
     if (options.includeWeatherPrediction && weatherPdf) {
-      tocSections.push({ title: "Weather Forecast", pageCount: 1 });
+      tocSections.push({ title: "Prevision Meteorologica", pageCount: 1 });
     }
     if (options.includeMissingRiderReport && missingRiderReportPdf) {
-      tocSections.push({ title: "Missing Rider Report", pageCount: 1 });
+      tocSections.push({ title: "Reporte de Riders Faltantes", pageCount: 1 });
     }
     if (options.includeArtistRequirements && individualArtistPdfs.length > 0) {
-      tocSections.push({ title: "Individual Artist Requirements", pageCount: individualArtistPdfs.length });
+      tocSections.push({ title: "Requerimientos Individuales por Artista", pageCount: individualArtistPdfs.length });
     }
     
     console.log(`Table of contents sections:`, tocSections);

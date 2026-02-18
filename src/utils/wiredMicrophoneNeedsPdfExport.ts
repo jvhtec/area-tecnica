@@ -72,7 +72,7 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(16);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('Wired Microphone Requirements Matrix', pageWidth / 2, yPosition + 16, { align: 'center' });
+      pdf.text('Matriz de Microfonia Cableada', pageWidth / 2, yPosition + 16, { align: 'center' });
       yPosition += 35;
       
       // Job title
@@ -89,7 +89,7 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       
       pdf.setFontSize(12);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(`${formattedDate} - Stage ${stage}`, pageWidth / 2, yPosition + 8, { align: 'center' });
+      pdf.text(`${formattedDate} - Escenario ${stage}`, pageWidth / 2, yPosition + 8, { align: 'center' });
       yPosition += 30;
       
       // Generate matrix data with simple approach
@@ -111,7 +111,7 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
         pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
         pdf.setFontSize(11);
         pdf.setFont('helvetica', 'normal');
-        pdf.text('No wired microphone requirements for this stage.', margin, yPosition);
+        pdf.text('Sin requerimientos de microfonia cableada para este escenario.', margin, yPosition);
         continue;
       }
       
@@ -119,11 +119,11 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'italic');
       pdf.setTextColor(100, 100, 100);
-      pdf.text('Individual cells show exact quantities per artist. Peak shows maximum concurrent usage.', margin, yPosition);
+      pdf.text('Las celdas individuales muestran cantidades exactas por artista. Pico muestra el uso maximo concurrente.', margin, yPosition);
       yPosition += 20;
       
       // Create table
-      const headers = ['Microphone Model', ...matrixData.artistNames, 'Peak Need'];
+      const headers = ['Modelo Microfono', ...matrixData.artistNames, 'Pico'];
       const tableBody = matrixData.micModels.map(micModel => {
         const row = [micModel];
         
@@ -220,9 +220,9 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
     pdf.setDrawColor(200, 200, 200);
     pdf.line(margin, pageHeight - 20, pageWidth - margin, pageHeight - 20);
     
-    pdf.text(`Generated on ${timestamp}`, margin, pageHeight - 10);
-    pdf.text(`${data.jobTitle} - Wired Microphone Matrix`, pageWidth - margin, pageHeight - 10, { align: 'right' });
-    pdf.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    pdf.text(`Generado: ${timestamp}`, margin, pageHeight - 10);
+    pdf.text(`${data.jobTitle} - Matriz Microfonia Cableada`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+    pdf.text(`Pagina ${i} de ${pageCount}`, pageWidth / 2, pageHeight - 10, { align: 'center' });
   }
   
   return new Blob([pdf.output('blob')], { type: 'application/pdf' });
@@ -237,11 +237,11 @@ const formatDateSimply = (dateString: string): string => {
     const [year, month, day] = dateString.split('-');
     const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
     
-    const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
-                   'July', 'August', 'September', 'October', 'November', 'December'];
+    const weekdays = ['Domingo', 'Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes', 'Sabado'];
+    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     
-    const formatted = `${weekdays[date.getDay()]}, ${months[date.getMonth()]} ${parseInt(day)}, ${year}`;
+    const formatted = `${weekdays[date.getDay()]}, ${parseInt(day)} de ${months[date.getMonth()]} ${year}`;
     console.log(`📅 Formatted: "${dateString}" -> "${formatted}"`);
     return formatted;
   }

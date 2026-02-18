@@ -124,7 +124,7 @@ const formatInfrastructureForPdf = (infrastructure: any) => {
   
   if (!infrastructure) {
     console.log('No infrastructure data provided');
-    return 'None';
+    return 'Ninguno';
   }
 
   const infraItems: string[] = [];
@@ -150,7 +150,7 @@ const formatInfrastructureForPdf = (infrastructure: any) => {
     }
     
     console.log('Infrastructure items found:', infraItems);
-    return infraItems.length > 0 ? infraItems.join(", ") : "None";
+    return infraItems.length > 0 ? infraItems.join(", ") : "Ninguno";
   } catch (error) {
     console.error('Error formatting infrastructure:', error);
     return 'Error formatting infrastructure';
@@ -158,7 +158,7 @@ const formatInfrastructureForPdf = (infrastructure: any) => {
 };
 
 const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }> = [], micKit: string = 'band') => {
-  if (mics.length === 0) return "None";
+  if (mics.length === 0) return "Ninguno";
   
   return mics.map(mic => {
     const exclusiveIndicator = mic.exclusive_use ? " (E)" : "";
@@ -167,7 +167,7 @@ const formatWiredMicsForPdf = (mics: Array<{ model: string; quantity: number; ex
 };
 
 const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "festival", isIEM = false) => {
-  if (systems.length === 0) return "None";
+  if (systems.length === 0) return "Ninguno";
   
   if (providedBy === "mixed") {
     // Show individual system providers when mixed
@@ -214,8 +214,8 @@ const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "
 };
 
 const formatConsolesWithTech = (console: { model: string; providedBy: string }, techRequired: boolean, position: string) => {
-  const techIndicator = techRequired ? " + Tech" : "";
-  const providerDisplay = console.providedBy === "mixed" ? "(Mixed)" : `(${console.providedBy})`;
+  const techIndicator = techRequired ? " + Tec" : "";
+  const providerDisplay = console.providedBy === "mixed" ? "(Mixto)" : `(${console.providedBy})`;
   return `${position}: ${console.model} ${providerDisplay}${techIndicator}`;
 };
 
@@ -228,10 +228,10 @@ const formatGearMismatchesForPdf = (mismatches: GearMismatch[] = []) => {
   
   const parts: string[] = [];
   if (errors.length > 0) {
-    parts.push(`${errors.length} Error${errors.length !== 1 ? 's' : ''}`);
+    parts.push(`${errors.length} Error${errors.length !== 1 ? 'es' : ''}`);
   }
   if (warnings.length > 0) {
-    parts.push(`${warnings.length} Warning${warnings.length !== 1 ? 's' : ''}`);
+    parts.push(`${warnings.length} Aviso${warnings.length !== 1 ? 's' : ''}`);
   }
   
   return parts.join(', ');
@@ -253,7 +253,7 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
   // Header
   doc.setFontSize(14);
   doc.setTextColor(0, 0, 0);
-  doc.text('Additional Equipment Needed to Cover All Riders', 10, currentY);
+  doc.text('Equipamiento Adicional Necesario para Cubrir Todos los Riders', 10, currentY);
   currentY += 10;
 
   let hasAnyNeeds = false;
@@ -267,14 +267,14 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
   // FOH Consoles
   if (needs.consoles.foh.length > 0) {
     needs.consoles.foh.forEach(console => {
-      criticalItems.push(`FOH Console - ${console.model}: ${console.additionalQuantity} additional units (${console.requiredBy.join(', ')})`);
+      criticalItems.push(`Consola FOH - ${console.model}: ${console.additionalQuantity} unidades adicionales (${console.requiredBy.join(', ')})`);
     });
   }
   
   // Monitor Consoles
   if (needs.consoles.monitor.length > 0) {
     needs.consoles.monitor.forEach(console => {
-      criticalItems.push(`Monitor Console - ${console.model}: ${console.additionalQuantity} additional units (${console.requiredBy.join(', ')})`);
+      criticalItems.push(`Consola Monitor - ${console.model}: ${console.additionalQuantity} unidades adicionales (${console.requiredBy.join(', ')})`);
     });
   }
   
@@ -282,10 +282,10 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
   if (needs.wireless.length > 0) {
     needs.wireless.forEach(wireless => {
       const parts: string[] = [];
-      if (wireless.additionalHH > 0) parts.push(`${wireless.additionalHH} handheld`);
-      if (wireless.additionalBP > 0) parts.push(`${wireless.additionalBP} beltpack`);
+      if (wireless.additionalHH > 0) parts.push(`${wireless.additionalHH} manos`);
+      if (wireless.additionalBP > 0) parts.push(`${wireless.additionalBP} petacas`);
       if (parts.length > 0) {
-        criticalItems.push(`Wireless - ${wireless.model}: ${parts.join(', ')} units (${wireless.requiredBy.join(', ')})`);
+        criticalItems.push(`Wireless - ${wireless.model}: ${parts.join(', ')} unidades (${wireless.requiredBy.join(', ')})`);
       }
     });
   }
@@ -294,8 +294,8 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
   if (needs.iem.length > 0) {
     needs.iem.forEach(iem => {
       const parts: string[] = [];
-      if (iem.additionalChannels > 0) parts.push(`${iem.additionalChannels} channels`);
-      if (iem.additionalBP > 0) parts.push(`${iem.additionalBP} beltpack`);
+      if (iem.additionalChannels > 0) parts.push(`${iem.additionalChannels} canales`);
+      if (iem.additionalBP > 0) parts.push(`${iem.additionalBP} petacas`);
       if (parts.length > 0) {
         criticalItems.push(`IEM - ${iem.model}: ${parts.join(', ')} (${iem.requiredBy.join(', ')})`);
       }
@@ -305,7 +305,7 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
   if (criticalItems.length > 0) {
     hasAnyNeeds = true;
     checkPageBreak(15);
-    doc.text('CRITICAL EQUIPMENT:', 10, currentY);
+    doc.text('EQUIPAMIENTO CRITICO:', 10, currentY);
     currentY += 8;
     
     doc.setFontSize(10);
@@ -324,19 +324,19 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
   const infraItems: string[] = [];
   
   if (needs.infrastructure.cat6.additionalQuantity > 0) {
-    infraItems.push(`CAT6 Runs: ${needs.infrastructure.cat6.additionalQuantity} additional (${needs.infrastructure.cat6.requiredBy.join(', ')})`);
+    infraItems.push(`Tiradas CAT6: ${needs.infrastructure.cat6.additionalQuantity} adicionales (${needs.infrastructure.cat6.requiredBy.join(', ')})`);
   }
   if (needs.infrastructure.hma.additionalQuantity > 0) {
-    infraItems.push(`HMA Runs: ${needs.infrastructure.hma.additionalQuantity} additional (${needs.infrastructure.hma.requiredBy.join(', ')})`);
+    infraItems.push(`Tiradas HMA: ${needs.infrastructure.hma.additionalQuantity} adicionales (${needs.infrastructure.hma.requiredBy.join(', ')})`);
   }
   if (needs.infrastructure.coax.additionalQuantity > 0) {
-    infraItems.push(`Coax Runs: ${needs.infrastructure.coax.additionalQuantity} additional (${needs.infrastructure.coax.requiredBy.join(', ')})`);
+    infraItems.push(`Tiradas Coax: ${needs.infrastructure.coax.additionalQuantity} adicionales (${needs.infrastructure.coax.requiredBy.join(', ')})`);
   }
   if (needs.infrastructure.opticalcon_duo.additionalQuantity > 0) {
-    infraItems.push(`OpticalCON DUO Runs: ${needs.infrastructure.opticalcon_duo.additionalQuantity} additional (${needs.infrastructure.opticalcon_duo.requiredBy.join(', ')})`);
+    infraItems.push(`Tiradas OpticalCON DUO: ${needs.infrastructure.opticalcon_duo.additionalQuantity} adicionales (${needs.infrastructure.opticalcon_duo.requiredBy.join(', ')})`);
   }
   if (needs.infrastructure.analog.additionalQuantity > 0) {
-    infraItems.push(`Analog Runs: ${needs.infrastructure.analog.additionalQuantity} additional (${needs.infrastructure.analog.requiredBy.join(', ')})`);
+    infraItems.push(`Tiradas Analogicas: ${needs.infrastructure.analog.additionalQuantity} adicionales (${needs.infrastructure.analog.requiredBy.join(', ')})`);
   }
 
   if (infraItems.length > 0) {
@@ -344,7 +344,7 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
     checkPageBreak(15);
     doc.setFontSize(12);
     doc.setTextColor(255, 165, 0); // Orange for infrastructure
-    doc.text('INFRASTRUCTURE:', 10, currentY);
+    doc.text('INFRAESTRUCTURA:', 10, currentY);
     currentY += 8;
     
     doc.setFontSize(10);
@@ -365,7 +365,7 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
     checkPageBreak(15);
     doc.setFontSize(12);
     doc.setTextColor(0, 100, 200); // Blue for microphones
-    doc.text('MICROPHONES:', 10, currentY);
+    doc.text('MICROFONOS:', 10, currentY);
     currentY += 8;
     
     doc.setFontSize(10);
@@ -373,7 +373,7 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
     
     needs.microphones.forEach(mic => {
       checkPageBreak(6);
-      const wrappedText = doc.splitTextToSize(`• ${mic.model}: ${mic.additionalQuantity} additional units (${mic.requiredBy.join(', ')})`, pageWidth - 25);
+      const wrappedText = doc.splitTextToSize(`• ${mic.model}: ${mic.additionalQuantity} unidades adicionales (${mic.requiredBy.join(', ')})`, pageWidth - 25);
       doc.text(wrappedText, 15, currentY);
       currentY += wrappedText.length * 4 + 2;
     });
@@ -386,12 +386,12 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
     checkPageBreak(10);
     doc.setFontSize(12);
     doc.setTextColor(0, 150, 0); // Green for monitors
-    doc.text('MONITORS:', 10, currentY);
+    doc.text('MONITORES:', 10, currentY);
     currentY += 8;
     
     doc.setFontSize(10);
     doc.setTextColor(0, 0, 0);
-    doc.text(`• Additional Monitors: ${needs.monitors.additionalQuantity} units (${needs.monitors.requiredBy.join(', ')})`, 15, currentY);
+    doc.text(`• Monitores adicionales: ${needs.monitors.additionalQuantity} unidades (${needs.monitors.requiredBy.join(', ')})`, 15, currentY);
     currentY += 10;
   }
 
@@ -399,13 +399,13 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
   const extrasItems: string[] = [];
   
   if (needs.extras.sideFills.additionalStages > 0) {
-    extrasItems.push(`Side Fill Systems: ${needs.extras.sideFills.additionalStages} stages (${needs.extras.sideFills.requiredBy.join(', ')})`);
+    extrasItems.push(`Side Fills: ${needs.extras.sideFills.additionalStages} escenarios (${needs.extras.sideFills.requiredBy.join(', ')})`);
   }
   if (needs.extras.drumFills.additionalStages > 0) {
-    extrasItems.push(`Drum Fill Systems: ${needs.extras.drumFills.additionalStages} stages (${needs.extras.drumFills.requiredBy.join(', ')})`);
+    extrasItems.push(`Drum Fills: ${needs.extras.drumFills.additionalStages} escenarios (${needs.extras.drumFills.requiredBy.join(', ')})`);
   }
   if (needs.extras.djBooths.additionalStages > 0) {
-    extrasItems.push(`DJ Booth Setups: ${needs.extras.djBooths.additionalStages} stages (${needs.extras.djBooths.requiredBy.join(', ')})`);
+    extrasItems.push(`DJ Booths: ${needs.extras.djBooths.additionalStages} escenarios (${needs.extras.djBooths.requiredBy.join(', ')})`);
   }
 
   if (extrasItems.length > 0) {
@@ -433,7 +433,7 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
     checkPageBreak(10);
     doc.setFontSize(12);
     doc.setTextColor(0, 150, 0); // Green
-    doc.text('All rider requirements can be satisfied with current equipment inventory.', 10, currentY);
+    doc.text('Todos los requerimientos pueden satisfacerse con el inventario actual.', 10, currentY);
     currentY += 15;
   }
 
@@ -447,7 +447,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   const doc = new jsPDF('landscape');
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
-  const createdDate = new Date().toLocaleDateString('en-GB');
+  const createdDate = new Date().toLocaleDateString('es-ES');
 
   // === HEADER SECTION ===
   doc.setFillColor(125, 1, 1);
@@ -498,12 +498,12 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   // Add title
   doc.setFontSize(18);
   doc.setTextColor(255, 255, 255);
-  const titleText = `${data.jobTitle} - Artist Schedule`;
-  const stageText = data.stage && data.stage !== 'all' ? ` - ${data.stageNames?.[parseInt(data.stage)] || `Stage ${data.stage}`}` : '';
+  const titleText = `${data.jobTitle} - Tabla de Artistas`;
+  const stageText = data.stage && data.stage !== 'all' ? ` - ${data.stageNames?.[parseInt(data.stage)] || `Escenario ${data.stage}`}` : '';
   doc.text(`${titleText}${stageText}`, pageWidth / 2, 15, { align: 'center' });
   
   doc.setFontSize(12);
-  doc.text(new Date(data.date).toLocaleDateString('en-GB'), pageWidth / 2, 25, { align: 'center' });
+  doc.text(new Date(data.date).toLocaleDateString('es-ES'), pageWidth / 2, 25, { align: 'center' });
 
   // === ARTIST TABLE ===
   const tableData = data.artists.map(artist => {
@@ -519,11 +519,11 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     // Format microphones column with enhanced mixed provider support
     let microphonesDisplay = '';
     if (artist.micKit === 'mixed') {
-      microphonesDisplay = `Kit: Mixed\nFestival: ${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
+      microphonesDisplay = `Kit: Mixto\nFestival: ${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
     } else if (artist.micKit === 'festival') {
       microphonesDisplay = `Kit: Festival\n${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
     } else {
-      microphonesDisplay = `Kit: Band\nBand provides`;
+      microphonesDisplay = `Kit: Banda\nBanda provee`;
     }
 
     return [
@@ -533,15 +533,15 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       `${formatConsolesWithTech(artist.technical.fohConsole, artist.technical.fohTech, 'FOH')}\n${formatConsolesWithTech(artist.technical.monConsole, artist.technical.monTech, 'MON')}`,
       `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, artist.technical.wireless.providedBy)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, artist.technical.iem.providedBy, true)}`,
       microphonesDisplay,
-      artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}x` : 'None',
+      artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}x` : 'Ninguno',
       formatInfrastructureForPdf(artist.infrastructure),
       [
         artist.extras.sideFill ? 'SF' : '',
         artist.extras.drumFill ? 'DF' : '',
         artist.extras.djBooth ? 'DJ' : ''
-      ].filter(Boolean).join(', ') || 'None',
-      artist.notes || 'No notes',
-      artist.riderMissing ? 'Missing' : 'Complete',
+      ].filter(Boolean).join(', ') || 'Ninguno',
+      artist.notes || 'Sin notas',
+      artist.riderMissing ? 'Falta' : 'Completo',
       formatGearMismatchesForPdf(artist.gearMismatches)
     ];
   });
@@ -549,7 +549,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   console.log('Table data prepared:', tableData.length, 'rows');
 
   autoTable(doc, {
-    head: [['Artist', 'Show\nTime', 'Sound\ncheck', 'Consoles', 'Wireless/IEM', 'Microphones', 'Mons', 'Infra', 'Extras', 'Notes', 'Rider', 'Gear\nStatus']],
+    head: [['Artista', 'Show', 'Check', 'Consolas', 'RF/IEM', 'Microfonos', 'Mons', 'Infra', 'Extras', 'Notas', 'Rider', 'Material']],
     body: tableData,
     startY: 40,
     theme: 'grid',
@@ -580,7 +580,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     },
     didParseCell: (data) => {
       // Make "Missing" text red in the Rider Status column (column 10)
-      if (data.column.index === 10 && data.cell.text[0] === 'Missing') {
+      if (data.column.index === 10 && data.cell.text[0] === 'Falta') {
         data.cell.styles.textColor = [255, 0, 0]; // Red color
       }
       
@@ -614,7 +614,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       // Add summary header
       doc.setFontSize(14);
       doc.setTextColor(0, 0, 0);
-      doc.text('Gear Conflicts Summary', 10, currentY);
+      doc.text('Resumen de Conflictos de Material', 10, currentY);
       currentY += 10;
       
       // Add conflicts details with page break handling
@@ -732,7 +732,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   // Footer with date
   doc.setFontSize(8);
   doc.setTextColor(51, 51, 51);
-  doc.text(`Generated: ${createdDate}`, 10, pageHeight - 10);
+  doc.text(`Generado: ${createdDate}`, 10, pageHeight - 10);
   
   console.log('Artist table PDF generation completed');
   return doc.output('blob');

@@ -66,7 +66,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
         // Continue with PDF generation
         doc.setFontSize(14);
         doc.setTextColor(255, 255, 255);  // White
-        doc.text(`${data.jobTitle} - Shifts Schedule`, pageWidth / 2, 12, { align: 'center' });
+        doc.text(`${data.jobTitle} - Turnos de Personal`, pageWidth / 2, 12, { align: 'center' });
         doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
 
         // Group shifts by department
@@ -87,7 +87,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
           // Department header
           doc.setFontSize(12);
           doc.setTextColor(125, 1, 1);
-          doc.text(`${department} Department`, 14, yPosition);
+          doc.text(`Departamento ${department}`, 14, yPosition);
           yPosition += 8;
 
           // Sort shifts by start time
@@ -113,7 +113,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
               }
               // Last resort fallback
               else {
-                technicianName = 'Unnamed Technician';
+                technicianName = 'Sin nombre';
                 console.warn('Missing technician name data for assignment:', a);
               }
               
@@ -122,16 +122,16 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
 
             return [
               shift.name,
-              shift.stage ? `Stage ${shift.stage}` : 'N/A',
+              shift.stage ? `Escenario ${shift.stage}` : 'N/A',
               `${shift.start_time.substring(0, 5)} - ${shift.end_time.substring(0, 5)}`,
-              technicians || 'None'
+              technicians || 'Ninguno'
             ];
           });
 
           // Add table to PDF with consistent corporate red color
           autoTable(doc, {
             startY: yPosition,
-            head: [['Shift Name', 'Stage', 'Time', 'Assigned Technicians']],
+            head: [['Turno', 'Escenario', 'Horario', 'Tecnicos Asignados']],
             body: tableRows,
             theme: 'grid',
             styles: {
@@ -168,7 +168,7 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
         // Add footer with date and try to add sector pro logo
         doc.setFontSize(8);
         doc.setTextColor(51, 51, 51);
-        doc.text(`Generated: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
+        doc.text(`Generado: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
         
         // Try to add Sector Pro logo at the bottom center
         try {
