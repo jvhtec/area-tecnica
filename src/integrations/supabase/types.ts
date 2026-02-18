@@ -1064,6 +1064,7 @@ export type Database = {
             | Database["public"]["Enums"]["provider_type"]
             | null
           foh_tech: boolean | null
+          form_language: string
           id: string
           iem_provided_by: Database["public"]["Enums"]["provider_type"] | null
           iem_systems: Json | null
@@ -1125,6 +1126,7 @@ export type Database = {
             | Database["public"]["Enums"]["provider_type"]
             | null
           foh_tech?: boolean | null
+          form_language?: string
           id?: string
           iem_provided_by?: Database["public"]["Enums"]["provider_type"] | null
           iem_systems?: Json | null
@@ -1186,6 +1188,7 @@ export type Database = {
             | Database["public"]["Enums"]["provider_type"]
             | null
           foh_tech?: boolean | null
+          form_language?: string
           id?: string
           iem_provided_by?: Database["public"]["Enums"]["provider_type"] | null
           iem_systems?: Json | null

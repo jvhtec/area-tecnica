@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
 export const useArtistsQuery = (jobId: string | undefined, selectedDate: string, dayStartTime: string = "07:00") => {
@@ -20,7 +20,13 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
 
       const { data, error } = await supabase
         .from("festival_artists")
-        .select("*")
+        .select(`
+          *,
+          festival_artist_form_submissions!left (
+            id,
+            status
+          )
+        `)
         .eq("job_id", jobId)
         .eq("date", selectedDate)
         .order("show_start", { ascending: true });
@@ -28,19 +34,33 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
       if (error) throw error;
 
       // Process artists for after midnight logic
-      const processedArtists = data?.map(artist => {
+      const processedArtists = data?.map((artist) => {
+        const artistWithSubmissions = artist as typeof artist & {
+          festival_artist_form_submissions?: Array<{ status?: string | null }> | null;
+          artist_submitted?: boolean;
+        };
+        const submissions = artistWithSubmissions.festival_artist_form_submissions;
+        const artistSubmitted = Array.isArray(submissions)
+          ? submissions.some((submission) => submission?.status === "submitted")
+          : false;
+
+        const cleanedArtist = {
+          ...artist,
+          artist_submitted: artistSubmitted,
+        };
+
         if (artist.isaftermidnight !== undefined) {
-          return artist;
+          return cleanedArtist;
         }
         
-        if (!artist.show_start) return artist;
+        if (!artist.show_start) return cleanedArtist;
         
         const [hours] = artist.show_start.split(':').map(Number);
         const [startHour] = dayStartTime.split(':').map(Number);
         const isAfterMidnight = hours < startHour;
         
         return {
-          ...artist,
+          ...cleanedArtist,
           isaftermidnight: isAfterMidnight
         };
       }) || [];

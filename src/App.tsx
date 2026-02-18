@@ -205,6 +205,7 @@ export default function App() {
                           {/* Public Routes */}
                           <Route path="/privacy" element={<Privacy />} />
                           <Route path="festival">
+                            <Route path="artist-form/blank" element={<ArtistRequirementsForm isBlank />} />
                             <Route path="artist-form/:token" element={<ArtistRequirementsForm />} />
                             <Route path="form-submitted" element={<FormSubmitted />} />
                           </Route>

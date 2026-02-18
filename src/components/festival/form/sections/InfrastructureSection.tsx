@@ -6,12 +6,14 @@ import { QuantityInput } from "../shared/QuantityInput";
 import { SectionProps } from "@/types/festival-form";
 import { useEquipmentValidation } from "@/hooks/useEquipmentValidation";
 
-export const InfrastructureSection = ({ formData, onChange, gearSetup }: SectionProps) => {
+export const InfrastructureSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: SectionProps) => {
   const { validateEquipment } = useEquipmentValidation(gearSetup);
+  const locked = (field: string) => isFieldLocked?.(field) ?? false;
+  const tx = (es: string, en: string) => (language === "en" ? en : es);
 
   return (
     <div className="space-y-4 border rounded-lg p-3 md:p-4">
-      <h3 className="text-base md:text-lg font-semibold">Infraestructura</h3>
+      <h3 className="text-base md:text-lg font-semibold">{tx("Infraestructura", "Infrastructure")}</h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* CAT6 */}
@@ -27,6 +29,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                     infra_cat6_quantity: checked ? 1 : 0
                   })
                 }
+                disabled={locked("infra_cat6")}
               />
               <Label htmlFor="infra-cat6" className="text-sm md:text-base">CAT6</Label>
             </div>
@@ -40,6 +43,8 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                 validate={(value) => validateEquipment('cat6', value)}
                 min={1}
                 className="w-full sm:w-24"
+                disabled={locked("infra_cat6_quantity")}
+                language={language}
               />
             )}
           </div>
@@ -58,6 +63,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                     infra_hma_quantity: checked ? 1 : 0
                   })
                 }
+                disabled={locked("infra_hma")}
               />
               <Label htmlFor="infra-hma" className="text-sm md:text-base">HMA</Label>
             </div>
@@ -71,6 +77,8 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                 validate={(value) => validateEquipment('hma', value)}
                 min={1}
                 className="w-full sm:w-24"
+                disabled={locked("infra_hma_quantity")}
+                language={language}
               />
             )}
           </div>
@@ -89,6 +97,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                     infra_coax_quantity: checked ? 1 : 0
                   })
                 }
+                disabled={locked("infra_coax")}
               />
               <Label htmlFor="infra-coax" className="text-sm md:text-base">Coax</Label>
             </div>
@@ -102,6 +111,8 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                 validate={(value) => validateEquipment('coax', value)}
                 min={1}
                 className="w-full sm:w-24"
+                disabled={locked("infra_coax_quantity")}
+                language={language}
               />
             )}
           </div>
@@ -120,6 +131,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                     infra_opticalcon_duo_quantity: checked ? 1 : 0
                   })
                 }
+                disabled={locked("infra_opticalcon_duo")}
               />
               <Label htmlFor="infra-opticalcon" className="text-sm md:text-base">OpticalCon Duo</Label>
             </div>
@@ -133,6 +145,8 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
                 validate={(value) => validateEquipment('opticalcon', value)}
                 min={1}
                 className="w-full sm:w-24"
+                disabled={locked("infra_opticalcon_duo_quantity")}
+                language={language}
               />
             )}
           </div>
@@ -141,7 +155,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
         {/* Analog Lines */}
         <div className="space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <Label htmlFor="infra-analog" className="text-sm md:text-base">Líneas Analógicas</Label>
+            <Label htmlFor="infra-analog" className="text-sm md:text-base">{tx("Líneas Analógicas", "Analog Lines")}</Label>
             <QuantityInput
               id="infra-analog"
               label=""
@@ -151,20 +165,26 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup }: Section
               validate={(value) => validateEquipment('analog', value)}
               min={0}
               className="w-full sm:w-24"
+              disabled={locked("infra_analog")}
+              language={language}
             />
           </div>
         </div>
       </div>
 
       <div>
-        <Label htmlFor="other-infrastructure">Otros Requerimientos de Infraestructura</Label>
+        <Label htmlFor="other-infrastructure">{tx("Otros Requerimientos de Infraestructura", "Other Infrastructure Requirements")}</Label>
         <Input
           id="other-infrastructure"
           value={formData.other_infrastructure || ''}
           onChange={(e) => onChange({
             other_infrastructure: e.target.value
           })}
-          placeholder="Ingrese cualquier requerimiento de infraestructura adicional"
+          placeholder={tx(
+            "Ingrese cualquier requerimiento de infraestructura adicional",
+            "Enter additional infrastructure requirements"
+          )}
+          disabled={locked("other_infrastructure")}
         />
       </div>
     </div>

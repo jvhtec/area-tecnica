@@ -21,19 +21,45 @@ interface CreateUserBody {
   flex_resource_id?: string; // optional Flex contact id
 }
 
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
+const normalizeOptional = (value?: string) => {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+};
+
+const getErrorStatus = (error: unknown) => {
+  const status = Number((error as { status?: number })?.status);
+  return Number.isInteger(status) && status >= 400 && status < 600 ? status : 400;
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const body = await req.json() as CreateUserBody;
+  if (req.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405);
+  }
 
-    if (!body?.email || !body?.firstName || !body?.lastName) {
-      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+  try {
+    let body: CreateUserBody;
+    try {
+      body = await req.json() as CreateUserBody;
+    } catch {
+      return jsonResponse({ error: 'Invalid JSON body' }, 400);
+    }
+
+    const email = body?.email?.trim().toLowerCase();
+    const firstName = body?.firstName?.trim();
+    const lastName = body?.lastName?.trim();
+
+    if (!email || !firstName || !lastName) {
+      return jsonResponse({ error: 'Missing required fields' }, 400);
     }
 
     const supabaseAdmin = createClient(
@@ -42,17 +68,18 @@ serve(async (req) => {
     );
 
     // AuthN of requester
-    const authHeader = req.headers.get('Authorization');
+    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
     if (!authHeader) {
-      throw new Error('No authorization header');
+      return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
+    const token = authHeader.replace('Bearer ', '').trim();
     const { data: { user: requestingUser } } = await supabaseAdmin.auth.getUser(
-      authHeader.replace('Bearer ', '')
+      token
     );
 
     if (!requestingUser) {
-      throw new Error('Not authenticated');
+      return jsonResponse({ error: 'Unauthorized' }, 401);
     }
 
     // AuthZ: require admin or management
@@ -64,36 +91,47 @@ serve(async (req) => {
 
     if (profileErr) throw profileErr;
     if (!requesterProfile || !['admin', 'management'].includes(requesterProfile.role)) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ error: 'Unauthorized' }, 403);
     }
 
     // Create auth user with a standard default password
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: body.email,
+      email,
       password: 'default',
       email_confirm: true,
       user_metadata: {
-        first_name: body.firstName,
-        nickname: body.nickname,
-        last_name: body.lastName,
-        phone: body.phone,
-        department: body.department,
-        dni: body.dni,
-        residencia: body.residencia,
+        first_name: firstName,
+        nickname: normalizeOptional(body.nickname),
+        last_name: lastName,
+        phone: normalizeOptional(body.phone),
+        department: normalizeOptional(body.department),
+        dni: normalizeOptional(body.dni),
+        residencia: normalizeOptional(body.residencia),
         needs_password_change: true,
       },
     });
 
-    if (authError) throw authError;
+    if (authError) {
+      if ((authError as { code?: string }).code === 'email_exists') {
+        return jsonResponse(
+          {
+            error: 'A user with this email address has already been registered',
+            code: 'email_exists',
+          },
+          409,
+        );
+      }
+      throw authError;
+    }
 
     // Optionally set role and flex_resource_id if provided
     const updates: Record<string, any> = {};
-    if (body.role) updates.role = body.role;
-    if (body.nickname) updates.nickname = body.nickname;
-    if (body.flex_resource_id) updates.flex_resource_id = body.flex_resource_id;
+    const role = normalizeOptional(body.role);
+    const nickname = normalizeOptional(body.nickname);
+    const flexResourceId = normalizeOptional(body.flex_resource_id);
+    if (role) updates.role = role;
+    if (nickname) updates.nickname = nickname;
+    if (flexResourceId) updates.flex_resource_id = flexResourceId;
     if (Object.keys(updates).length > 0) {
       const { error: updErr } = await supabaseAdmin
         .from('profiles')
@@ -102,15 +140,12 @@ serve(async (req) => {
       if (updErr) throw updErr;
     }
 
-    return new Response(
-      JSON.stringify({ id: authData.user.id, email: authData.user.email }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return jsonResponse({ id: authData.user.id, email: authData.user.email });
   } catch (error) {
     console.error('create-user error:', error);
-    return new Response(JSON.stringify({ error: (error as any).message ?? 'Unexpected error' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({
+      error: (error as any).message ?? 'Unexpected error',
+      code: (error as any).code,
+    }, getErrorStatus(error));
   }
 });

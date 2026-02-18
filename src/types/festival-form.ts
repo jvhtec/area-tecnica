@@ -7,6 +7,8 @@ export interface SectionProps {
   onChange: (changes: Partial<GearSetupFormData>) => void;
   gearSetup?: FestivalGearSetup | null;
   stageNumber?: number;
+  isFieldLocked?: (field: string) => boolean;
+  language?: 'es' | 'en';
 }
 
 export interface ProviderSelectorProps {
@@ -26,4 +28,6 @@ export interface QuantityInputProps {
   validate?: (value: number) => boolean;
   min?: number;
   className?: string;
+  disabled?: boolean;
+  language?: 'es' | 'en';
 }

@@ -110,6 +110,7 @@ serve(async (req) => {
       return new Intl.DateTimeFormat("es-ES", {
         dateStyle: "full",
         timeStyle: "short",
+        timeZone: "Europe/Madrid",
       }).format(date);
     };
 
@@ -389,20 +390,43 @@ serve(async (req) => {
       console.warn("[send-payout-override-notification] finanzas@sector-pro.com profile not found");
     }
 
-    // Send email via corporate email function to admins and finanzas
-    const { data: sendResult, error: sendError } = await supabase.functions.invoke(
-      "send-corporate-email",
-      {
-        body: {
-          subject: `⚠️ Override de Pago: ${escapeHtml(technicianName)} - ${escapeHtml(jobTitle)}`,
-          bodyHtml: emailHtml,
-          recipients: {
-            roles: ["admin"],
-            profileIds: finanzasProfileId ? [finanzasProfileId] : [],
-            emails: ["finanzas@sector-pro.com"],
-          },
+    // Forward caller auth to preserve actor identity/permissions in nested function call.
+    const authHeader = req.headers.get("Authorization");
+    const corporateEmailInvokeOptions: {
+      body: {
+        subject: string;
+        bodyHtml: string;
+        recipients: {
+          roles: string[];
+          profileIds: string[];
+          emails: string[];
+        };
+      };
+      headers?: Record<string, string>;
+    } = {
+      body: {
+        subject: `⚠️ Override de Pago: ${technicianName} - ${jobTitle}`,
+        bodyHtml: emailHtml,
+        recipients: {
+          roles: ["admin"],
+          profileIds: finanzasProfileId ? [finanzasProfileId] : [],
+          emails: finanzasProfileId ? [] : ["finanzas@sector-pro.com"],
         },
-      }
+      },
+    };
+
+    if (authHeader) {
+      corporateEmailInvokeOptions.headers = {
+        Authorization: authHeader,
+      };
+    } else {
+      console.warn("[send-payout-override-notification] Missing Authorization header for nested corporate email call");
+    }
+
+    // Send email via corporate email function to admins and finanzas
+    const { error: sendError } = await supabase.functions.invoke(
+      "send-corporate-email",
+      corporateEmailInvokeOptions
     );
 
     if (sendError) {

@@ -8,6 +8,7 @@ import { WirelessSetup } from "@/types/festival";
 import { EquipmentSelect } from "../form/shared/EquipmentSelect";
 import { WIRELESS_SYSTEMS, IEM_SYSTEMS } from "@/types/festival-equipment";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useEffect, useMemo } from "react";
 
 export const WirelessConfig = ({ 
   systems, 
@@ -15,10 +16,54 @@ export const WirelessConfig = ({
   label, 
   includeQuantityTypes = false,
   isIEM = false,
-  hideProvidedBy = false
+  hideProvidedBy = false,
+  festivalAvailableModels = [],
+  readOnly = false,
+  language = "es",
 }: WirelessConfigProps) => {
+  const tx = (es: string, en: string) => (language === "en" ? en : es);
+  const festivalModelOptions = useMemo(
+    () => Array.from(new Set(festivalAvailableModels.map((model) => model.trim()).filter(Boolean))),
+    [festivalAvailableModels]
+  );
+
+  useEffect(() => {
+    if (systems.length === 0) return;
+
+    const hasMissingIds = systems.some((system) => !system._id);
+    if (!hasMissingIds) return;
+
+    onChange(
+      systems.map((system) =>
+        system._id ? system : { ...system, _id: crypto.randomUUID() }
+      )
+    );
+  }, [onChange, systems]);
+
+  useEffect(() => {
+    if (festivalModelOptions.length === 0 || systems.length === 0) return;
+
+    const needsNormalization = systems.some((system) => {
+      const isFestivalProvider = (system.provided_by || "festival") === "festival";
+      return isFestivalProvider && !!system.model && !festivalModelOptions.includes(system.model);
+    });
+
+    if (!needsNormalization) return;
+
+    onChange(
+      systems.map((system) => {
+        const isFestivalProvider = (system.provided_by || "festival") === "festival";
+        if (!isFestivalProvider || !system.model || festivalModelOptions.includes(system.model)) {
+          return system;
+        }
+        return { ...system, model: "" };
+      })
+    );
+  }, [festivalModelOptions, onChange, systems]);
+
   const addSystem = () => {
     const newSystem: WirelessSetup = {
+      _id: crypto.randomUUID(),
       model: '',
       quantity: 0,
       quantity_hh: 0,
@@ -34,8 +79,6 @@ export const WirelessConfig = ({
   };
 
   const updateSystem = (index: number, field: keyof WirelessSetup, value: string | number) => {
-    console.log('Updating system:', { index, field, value, currentSystems: systems });
-    
     const updatedSystems = systems.map((system, i) => {
       if (i !== index) return system;
       
@@ -59,9 +102,15 @@ export const WirelessConfig = ({
         // Ensure provided_by is properly validated and typed
         if (value === 'festival' || value === 'band') {
           updatedSystem.provided_by = value;
-          console.log('Updated provided_by to:', value);
+          if (
+            value === "festival" &&
+            festivalModelOptions.length > 0 &&
+            updatedSystem.model &&
+            !festivalModelOptions.includes(updatedSystem.model)
+          ) {
+            updatedSystem.model = "";
+          }
         } else {
-          console.warn('Invalid provided_by value:', value, 'defaulting to festival');
           updatedSystem.provided_by = 'festival';
         }
       } else {
@@ -69,21 +118,19 @@ export const WirelessConfig = ({
         updatedSystem[field as 'model' | 'band'] = value as string;
       }
       
-      console.log('Updated system:', updatedSystem);
       return updatedSystem;
     });
     
-    console.log('Calling onChange with updated systems:', updatedSystems);
     onChange(updatedSystems);
   };
 
   const options = isIEM ? IEM_SYSTEMS : WIRELESS_SYSTEMS;
   const quantityTypeLabels = isIEM ? {
-    hh: "Canales",
-    bp: "Bodypacks"
+    hh: tx("Canales", "Channels"),
+    bp: tx("Petacas", "Bodypacks")
   } : {
-    hh: "De Mano",
-    bp: "Bodypacks"
+    hh: tx("De Mano", "Handheld"),
+    bp: tx("Petacas", "Bodypacks")
   };
 
   const getCategory = () => {
@@ -102,34 +149,57 @@ export const WirelessConfig = ({
           variant="outline"
           size="sm"
           onClick={addSystem}
+          disabled={readOnly}
         >
           <Plus className="h-4 w-4 mr-2" />
-          Añadir Sistema
+          {tx("Añadir Sistema", "Add System")}
         </Button>
       </div>
 
-      {systems.map((system, index) => (
-        <div key={index} className="space-y-4 p-4 border rounded-lg">
+      {systems.map((system, index) => {
+        const systemKey = system._id || `system-${index}`;
+        return (
+        <div key={systemKey} className="space-y-4 p-4 border rounded-lg">
           <div className="flex gap-4 items-start">
-            <div className="flex-1">
-              <EquipmentSelect
-                value={system.model}
-                onChange={(value) => updateSystem(index, 'model', value)}
-                options={[]}
-                fallbackOptions={options}
-                placeholder="Seleccionar sistema"
-                category={getCategory()}
-              />
+          <div className="flex-1">
+              {(() => {
+                const isFestivalProvider = (system.provided_by || "festival") === "festival";
+                const modelOptions = isFestivalProvider ? festivalModelOptions : [];
+                const fallbackOptions = isFestivalProvider ? [] : options;
+                const category = isFestivalProvider ? undefined : getCategory();
+
+                return (
+                  <EquipmentSelect
+                    value={system.model}
+                    onChange={(value) => updateSystem(index, 'model', value)}
+                    options={modelOptions}
+                    fallbackOptions={fallbackOptions}
+                    placeholder={tx("Seleccionar sistema", "Select system")}
+                    category={category}
+                    disabled={readOnly}
+                  />
+                );
+              })()}
             </div>
             <Button
               type="button"
               variant="ghost"
               size="icon"
               onClick={() => removeSystem(index)}
+              disabled={readOnly}
             >
               <Minus className="h-4 w-4" />
             </Button>
           </div>
+
+          {(system.provided_by || "festival") === "festival" && festivalModelOptions.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              {tx(
+                "No hay modelos disponibles en el gear setup del festival para este tipo de sistema.",
+                "No models available in festival gear setup for this system type."
+              )}
+            </p>
+          )}
 
           <div className="flex gap-4">
             <div className="flex-1">
@@ -142,6 +212,7 @@ export const WirelessConfig = ({
                   updateSystem(index, 'quantity_hh', e.target.value);
                 }}
                 placeholder={`${quantityTypeLabels.hh} Qty`}
+                disabled={readOnly}
               />
             </div>
             <div className="flex-1">
@@ -154,43 +225,45 @@ export const WirelessConfig = ({
                   updateSystem(index, 'quantity_bp', e.target.value);
                 }}
                 placeholder={`${quantityTypeLabels.bp} Qty`}
+                disabled={readOnly}
               />
             </div>
           </div>
 
           <div>
-            <Label>Banda de Frecuencia</Label>
+            <Label>{tx("Banda de Frecuencia", "Frequency Band")}</Label>
             <Input
               value={system.band || ''}
               onChange={(e) => updateSystem(index, 'band', e.target.value)}
-              placeholder="ej., G50, H50"
+              placeholder={tx("ej., G50, H50", "e.g., G50, H50")}
+              disabled={readOnly}
             />
           </div>
 
           {!hideProvidedBy && (
             <div>
-              <Label>Proporcionado Por</Label>
+              <Label>{tx("Proporcionado por", "Provided by")}</Label>
               <RadioGroup
                 value={system.provided_by || 'festival'}
                 onValueChange={(value: 'festival' | 'band') => {
-                  console.log('RadioGroup onValueChange called with:', value);
                   updateSystem(index, 'provided_by', value);
                 }}
                 className="flex space-x-4 mt-1"
+                disabled={readOnly}
               >
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="festival" id={`${index}-festival`} />
-                  <Label htmlFor={`${index}-festival`}>Festival</Label>
+                  <RadioGroupItem value="festival" id={`${systemKey}-festival`} disabled={readOnly} />
+                  <Label htmlFor={`${systemKey}-festival`}>{tx("Festival", "Festival")}</Label>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="band" id={`${index}-band`} />
-                  <Label htmlFor={`${index}-band`}>Banda</Label>
+                  <RadioGroupItem value="band" id={`${systemKey}-band`} disabled={readOnly} />
+                  <Label htmlFor={`${systemKey}-band`}>{tx("Banda", "Band")}</Label>
                 </div>
               </RadioGroup>
             </div>
           )}
         </div>
-      ))}
+      )})}
     </div>
   );
 };

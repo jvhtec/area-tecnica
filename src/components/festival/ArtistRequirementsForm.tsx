@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
@@ -11,254 +11,485 @@ import { MonitorSetupSection } from "./form/sections/MonitorSetupSection";
 import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSection";
 import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
-import { FestivalGearSetup } from "@/types/festival";
-import { Loader2 } from "lucide-react";
-import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { FestivalGearSetup, WirelessSetup } from "@/types/festival";
+import { ArtistSectionProps } from "@/types/artist-form";
+import { Loader2, Printer } from "lucide-react";
 
-interface FormData {
-  status: string;
-  [key: string]: any;
+interface ArtistRequirementsFormProps {
+  isBlank?: boolean;
 }
 
-type RealtimeFormPayload = RealtimePostgresChangesPayload<FormData>;
+interface PublicFormContextResponse {
+  ok: boolean;
+  error?: string;
+  status?: string;
+  artist?: Record<string, unknown>;
+  gear_setup?: FestivalGearSetup | null;
+  logo_file_path?: string | null;
+}
 
-export const ArtistRequirementsForm = () => {
+interface PublicSubmitResponse {
+  ok: boolean;
+  error?: string;
+  status?: string;
+}
+
+type ArtistFormState = ArtistSectionProps["formData"];
+
+const makeBlankSystem = () => ({
+  model: "",
+  quantity: 0,
+  quantity_hh: 0,
+  quantity_bp: 0,
+  band: "",
+  provided_by: "festival",
+});
+
+const normalizeTime = (value: string | null | undefined) => {
+  if (!value) return "";
+  return value.length >= 5 ? value.slice(0, 5) : value;
+};
+
+const asString = (value: unknown) => (typeof value === "string" ? value : "");
+const asBoolean = (value: unknown) => (typeof value === "boolean" ? value : false);
+const asNumber = (value: unknown) => (typeof value === "number" ? value : 0);
+const asArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+const hasText = (value: unknown) => asString(value).trim().length > 0;
+const hasPositiveNumber = (value: unknown) => asNumber(value) > 0;
+
+const normalizeFestivalLogoPath = (filePath: string) => {
+  let normalized = filePath.trim();
+  if (!normalized) return "";
+  if (normalized.startsWith("http")) return normalized;
+  if (normalized.startsWith("/")) normalized = normalized.slice(1);
+  if (normalized.startsWith("festival-logos/")) {
+    normalized = normalized.slice("festival-logos/".length);
+  }
+  return normalized;
+};
+
+const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistFormState => ({
+  name: "",
+  stage: 1,
+  date: blankDate,
+  show_start: "",
+  show_end: "",
+  soundcheck: false,
+  soundcheck_start: "",
+  soundcheck_end: "",
+  foh_console: "",
+  foh_console_provided_by: "festival",
+  foh_tech: false,
+  mon_console: "",
+  mon_console_provided_by: "festival",
+  mon_tech: false,
+  wireless_systems: isBlank ? [makeBlankSystem()] : [],
+  iem_systems: isBlank ? [makeBlankSystem()] : [],
+  wireless_provided_by: "festival",
+  iem_provided_by: "festival",
+  monitors_enabled: false,
+  monitors_quantity: 0,
+  extras_sf: false,
+  extras_df: false,
+  extras_djbooth: false,
+  extras_wired: "",
+  infra_cat6: false,
+  infra_cat6_quantity: 0,
+  infra_hma: false,
+  infra_hma_quantity: 0,
+  infra_coax: false,
+  infra_coax_quantity: 0,
+  infra_opticalcon_duo: false,
+  infra_opticalcon_duo_quantity: 0,
+  infra_analog: 0,
+  infrastructure_provided_by: "festival",
+  other_infrastructure: "",
+  notes: "",
+  rider_missing: false,
+  isaftermidnight: false,
+});
+
+export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFormProps) => {
   const { token } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
+
+  const blankJobId = searchParams.get("jobId") || "";
+  const blankDate = searchParams.get("date") || "";
+  const formLanguage = searchParams.get("lang") === "en" ? "en" : "es";
+  const tx = useCallback((es: string, en: string) => (formLanguage === "en" ? en : es), [formLanguage]);
+
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
   const [festivalLogo, setFestivalLogo] = useState<string | null>(null);
-  const [formData, setFormData] = useState<any>({
-    foh_console_provided_by: 'festival',
-    mon_console_provided_by: 'festival',
-    wireless_provided_by: 'festival',
-    iem_provided_by: 'festival',
-    infrastructure_provided_by: 'festival',
-    monitors_enabled: false,
-    monitors_quantity: 0,
-    wireless_quantity_hh: 0,
-    wireless_quantity_bp: 0,
-    iem_quantity: 0,
-    extras_sf: false,
-    extras_df: false,
-    extras_djbooth: false,
-    infra_cat6: false,
-    infra_cat6_quantity: 0,
-    infra_hma: false,
-    infra_hma_quantity: 0,
-    infra_coax: false,
-    infra_coax_quantity: 0,
-    infra_opticalcon_duo: false,
-    infra_opticalcon_duo_quantity: 0,
-    infra_analog: 0
-  });
+  const [companyLogo, setCompanyLogo] = useState("/sector pro logo.png");
+  const [lockedFields, setLockedFields] = useState<Set<string>>(new Set());
+  const [formData, setFormData] = useState<ArtistFormState>(() => createInitialFormData(isBlank, blankDate));
+
+  const resolveFestivalLogoUrl = useCallback(async (rawFilePath: string | null | undefined) => {
+    if (!rawFilePath) {
+      return null;
+    }
+
+    const normalizedPath = normalizeFestivalLogoPath(rawFilePath);
+    if (!normalizedPath) {
+      return null;
+    }
+
+    if (normalizedPath.startsWith("http")) {
+      return normalizedPath;
+    }
+
+    try {
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from("festival-logos")
+        .createSignedUrl(normalizedPath, 60 * 60);
+
+      if (!signedError && signedData?.signedUrl) {
+        return signedData.signedUrl;
+      }
+    } catch (error) {
+      console.warn("Could not create signed logo URL:", error);
+    }
+
+    const { data } = supabase.storage.from("festival-logos").getPublicUrl(normalizedPath);
+    if (data?.publicUrl) {
+      return data.publicUrl;
+    }
+
+    return null;
+  }, []);
 
   useEffect(() => {
-    const fetchFormData = async () => {
+    let cancelled = false;
+
+    const loadBlankContext = async () => {
+      try {
+        setLockedFields(new Set());
+        if (cancelled) return;
+        if (blankDate) {
+          setFormData((prev) => ({ ...prev, date: blankDate }));
+        }
+
+        if (!blankJobId) {
+          return;
+        }
+
+        const { data: gearData } = await supabase
+          .from("festival_gear_setups")
+          .select("*")
+          .eq("job_id", blankJobId)
+          .maybeSingle();
+
+        if (cancelled) return;
+        if (gearData) {
+          setGearSetup(gearData as FestivalGearSetup);
+        }
+
+        const { data: logoData } = await supabase
+          .from("festival_logos")
+          .select("file_path")
+          .eq("job_id", blankJobId)
+          .maybeSingle();
+
+        if (cancelled) return;
+        if (logoData?.file_path) {
+          const resolvedLogo = await resolveFestivalLogoUrl(logoData.file_path);
+          if (!cancelled) {
+            setFestivalLogo(resolvedLogo);
+          }
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.warn("Could not load blank form context:", error);
+      }
+    };
+
+    const loadTokenContext = async () => {
       if (!token) {
+        if (cancelled) return;
         toast({
-          title: "Error",
-          description: "Token de formulario inválido",
-          variant: "destructive"
+          title: tx("Error", "Error"),
+          description: tx("Token de formulario inválido", "Invalid form token"),
+          variant: "destructive",
         });
         return;
       }
-      
-      try {
-        const { data: formInfo, error: formError } = await supabase
-          .from('festival_artist_forms')
-          .select('artist_id, status')
-          .eq('token', token)
-          .maybeSingle();
 
-        if (formError) throw formError;
-        if (!formInfo) {
-          toast({
-            title: "Error",
-            description: "Token de formulario inválido",
-            variant: "destructive"
-          });
+      const { data, error } = await supabase.rpc("get_public_artist_form_context", {
+        p_token: token,
+      });
+
+      if (cancelled) return;
+      if (error) {
+        throw error;
+      }
+
+      const context = data as PublicFormContextResponse;
+      if (!context?.ok) {
+        if (context?.status === "submitted") {
+          if (cancelled) return;
+          navigate(`/festival/form-submitted?lang=${formLanguage}`, { replace: true });
           return;
         }
 
-        if (formInfo.status === 'completed') {
-          toast({
-            title: "Formulario Ya Enviado",
-            description: "Este formulario ya ha sido completado.",
-            variant: "destructive"
-          });
-          return;
-        }
+        if (cancelled) return;
+        const description =
+          context?.status === "expired"
+            ? tx("Este enlace de formulario ha expirado.", "This form link has expired.")
+            : tx("No se pudo abrir este formulario. Verifica que el enlace sea válido.", "Could not open this form. Verify that the link is valid.");
 
-        const { data: artistData, error: artistError } = await supabase
-          .from('festival_artists')
-          .select(`
-            *,
-            jobs:job_id (*)
-          `)
-          .eq('id', formInfo.artist_id)
-          .maybeSingle();
-
-        if (artistError) throw artistError;
-        if (!artistData) {
-          toast({
-            title: "Error",
-            description: "Artista no encontrado",
-            variant: "destructive"
-          });
-          return;
-        }
-
-        const { data: logoData, error: logoError } = await supabase
-          .from('festival_logos')
-          .select('file_path')
-          .eq('job_id', artistData.job_id)
-          .maybeSingle();
-
-        if (logoError) {
-          console.error('Error fetching festival logo:', logoError);
-        } else if (logoData?.file_path) {
-          const { data: { publicUrl } } = supabase
-            .storage
-            .from('festival-logos')
-            .getPublicUrl(logoData.file_path);
-          setFestivalLogo(publicUrl);
-        }
-
-        setFormData(prev => ({
-          ...prev,
-          name: artistData.name,
-          stage: artistData.stage,
-          date: artistData.date,
-          show_start: artistData.show_start,
-          show_end: artistData.show_end,
-          soundcheck: artistData.soundcheck,
-          soundcheck_start: artistData.soundcheck_start,
-          soundcheck_end: artistData.soundcheck_end,
-        }));
-
-        const { data: gearSetupData, error: gearError } = await supabase
-          .from('festival_gear_setups')
-          .select('*')
-          .eq('job_id', artistData.job_id)
-          .eq('date', artistData.date)
-          .maybeSingle();
-
-        if (gearError) throw gearError;
-        if (gearSetupData) {
-          setGearSetup(gearSetupData);
-        } else {
-          console.warn('No gear setup found for this date');
-        }
-      } catch (error: any) {
-        console.error('Error fetching form data:', error);
         toast({
-          title: "Error",
-          description: "No se pudieron cargar los datos del formulario. Por favor intente más tarde.",
-          variant: "destructive"
+          title: tx("Formulario no disponible", "Form unavailable"),
+          description,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const artistData = context.artist || {};
+      const hasSystems = (value: unknown) =>
+        asArray<Record<string, unknown>>(value).some((system) => {
+          return (
+            hasText(system?.model) ||
+            hasPositiveNumber(system?.quantity) ||
+            hasPositiveNumber(system?.quantity_hh) ||
+            hasPositiveNumber(system?.quantity_bp)
+          );
+        });
+
+      const nextLockedFields = new Set<string>(["name", "stage", "date", "show_start", "show_end"]);
+      if (asBoolean(artistData.soundcheck) || hasText(artistData.soundcheck_start) || hasText(artistData.soundcheck_end)) {
+        nextLockedFields.add("soundcheck");
+        nextLockedFields.add("soundcheck_start");
+        nextLockedFields.add("soundcheck_end");
+      }
+      if (hasText(artistData.foh_console)) {
+        nextLockedFields.add("foh_console");
+        nextLockedFields.add("foh_console_provided_by");
+      }
+      if (asBoolean(artistData.foh_tech)) nextLockedFields.add("foh_tech");
+      if (hasText(artistData.mon_console)) {
+        nextLockedFields.add("mon_console");
+        nextLockedFields.add("mon_console_provided_by");
+      }
+      if (asBoolean(artistData.mon_tech)) nextLockedFields.add("mon_tech");
+      if (hasSystems(artistData.wireless_systems)) {
+        nextLockedFields.add("wireless_systems");
+        nextLockedFields.add("wireless_provided_by");
+      }
+      if (hasSystems(artistData.iem_systems)) {
+        nextLockedFields.add("iem_systems");
+        nextLockedFields.add("iem_provided_by");
+      }
+      if (asBoolean(artistData.monitors_enabled) || hasPositiveNumber(artistData.monitors_quantity)) {
+        nextLockedFields.add("monitors_enabled");
+        nextLockedFields.add("monitors_quantity");
+      }
+      if (asBoolean(artistData.extras_sf)) nextLockedFields.add("extras_sf");
+      if (asBoolean(artistData.extras_df)) nextLockedFields.add("extras_df");
+      if (asBoolean(artistData.extras_djbooth)) nextLockedFields.add("extras_djbooth");
+      if (hasText(artistData.extras_wired)) nextLockedFields.add("extras_wired");
+
+      const hasInfrastructure =
+        asBoolean(artistData.infra_cat6) ||
+        hasPositiveNumber(artistData.infra_cat6_quantity) ||
+        asBoolean(artistData.infra_hma) ||
+        hasPositiveNumber(artistData.infra_hma_quantity) ||
+        asBoolean(artistData.infra_coax) ||
+        hasPositiveNumber(artistData.infra_coax_quantity) ||
+        asBoolean(artistData.infra_opticalcon_duo) ||
+        hasPositiveNumber(artistData.infra_opticalcon_duo_quantity) ||
+        hasPositiveNumber(artistData.infra_analog) ||
+        hasText(artistData.other_infrastructure);
+
+      if (asBoolean(artistData.infra_cat6)) nextLockedFields.add("infra_cat6");
+      if (hasPositiveNumber(artistData.infra_cat6_quantity)) nextLockedFields.add("infra_cat6_quantity");
+      if (asBoolean(artistData.infra_hma)) nextLockedFields.add("infra_hma");
+      if (hasPositiveNumber(artistData.infra_hma_quantity)) nextLockedFields.add("infra_hma_quantity");
+      if (asBoolean(artistData.infra_coax)) nextLockedFields.add("infra_coax");
+      if (hasPositiveNumber(artistData.infra_coax_quantity)) nextLockedFields.add("infra_coax_quantity");
+      if (asBoolean(artistData.infra_opticalcon_duo)) nextLockedFields.add("infra_opticalcon_duo");
+      if (hasPositiveNumber(artistData.infra_opticalcon_duo_quantity)) nextLockedFields.add("infra_opticalcon_duo_quantity");
+      if (hasPositiveNumber(artistData.infra_analog)) nextLockedFields.add("infra_analog");
+      if (hasText(artistData.other_infrastructure)) nextLockedFields.add("other_infrastructure");
+      if (hasInfrastructure) nextLockedFields.add("infrastructure_provided_by");
+
+      if (hasText(artistData.notes)) nextLockedFields.add("notes");
+      if (asBoolean(artistData.rider_missing)) nextLockedFields.add("rider_missing");
+      if (asBoolean(artistData.isaftermidnight)) nextLockedFields.add("isaftermidnight");
+
+      setLockedFields(nextLockedFields);
+
+      setFormData((prev) => ({
+        ...prev,
+        name: asString(artistData.name),
+        stage: asNumber(artistData.stage) || 1,
+        date: asString(artistData.date),
+        show_start: normalizeTime(asString(artistData.show_start)),
+        show_end: normalizeTime(asString(artistData.show_end)),
+        soundcheck: asBoolean(artistData.soundcheck),
+        soundcheck_start: normalizeTime(asString(artistData.soundcheck_start)),
+        soundcheck_end: normalizeTime(asString(artistData.soundcheck_end)),
+        foh_console: asString(artistData.foh_console),
+        foh_console_provided_by: asString(artistData.foh_console_provided_by) || "festival",
+        foh_tech: asBoolean(artistData.foh_tech),
+        mon_console: asString(artistData.mon_console),
+        mon_console_provided_by: asString(artistData.mon_console_provided_by) || "festival",
+        mon_tech: asBoolean(artistData.mon_tech),
+        wireless_systems: asArray<WirelessSetup>(artistData.wireless_systems),
+        iem_systems: asArray<WirelessSetup>(artistData.iem_systems),
+        wireless_provided_by: asString(artistData.wireless_provided_by) || "festival",
+        iem_provided_by: asString(artistData.iem_provided_by) || "festival",
+        monitors_enabled: asBoolean(artistData.monitors_enabled),
+        monitors_quantity: asNumber(artistData.monitors_quantity),
+        extras_sf: asBoolean(artistData.extras_sf),
+        extras_df: asBoolean(artistData.extras_df),
+        extras_djbooth: asBoolean(artistData.extras_djbooth),
+        extras_wired: asString(artistData.extras_wired),
+        infra_cat6: asBoolean(artistData.infra_cat6),
+        infra_cat6_quantity: asNumber(artistData.infra_cat6_quantity),
+        infra_hma: asBoolean(artistData.infra_hma),
+        infra_hma_quantity: asNumber(artistData.infra_hma_quantity),
+        infra_coax: asBoolean(artistData.infra_coax),
+        infra_coax_quantity: asNumber(artistData.infra_coax_quantity),
+        infra_opticalcon_duo: asBoolean(artistData.infra_opticalcon_duo),
+        infra_opticalcon_duo_quantity: asNumber(artistData.infra_opticalcon_duo_quantity),
+        infra_analog: asNumber(artistData.infra_analog),
+        infrastructure_provided_by: asString(artistData.infrastructure_provided_by) || "festival",
+        other_infrastructure: asString(artistData.other_infrastructure),
+        notes: asString(artistData.notes),
+        rider_missing: asBoolean(artistData.rider_missing),
+        isaftermidnight: asBoolean(artistData.isaftermidnight),
+      }));
+
+      if (context.gear_setup) {
+        setGearSetup(context.gear_setup);
+      }
+
+      const resolvedLogo = await resolveFestivalLogoUrl(context.logo_file_path);
+      if (cancelled) return;
+      setFestivalLogo(resolvedLogo);
+    };
+
+    const fetchContext = async () => {
+      if (cancelled) return;
+      setIsLoading(true);
+      try {
+        if (isBlank) {
+          await loadBlankContext();
+        } else {
+          await loadTokenContext();
+        }
+      } catch (error) {
+        if (cancelled) return;
+        console.error("Error loading form context:", error);
+        toast({
+          title: tx("Error", "Error"),
+          description: tx("No se pudieron cargar los datos del formulario.", "Could not load form data."),
+          variant: "destructive",
         });
       } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchFormData();
-  }, [token, toast]);
-
-  useEffect(() => {
-    if (!token) return;
-
-    const channel = supabase
-      .channel('form-status-changes')
-      .on<FormData>(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'festival_artist_forms',
-          filter: `token=eq.${token}`,
-        },
-        (payload: RealtimeFormPayload) => {
-          console.log('Form status changed:', payload);
-          const newData = payload.new as FormData;
-          if (newData && newData.status === 'completed') {
-            toast({
-              title: "Estado del Formulario Actualizado",
-              description: "Su formulario ha sido enviado correctamente",
-            });
-            navigate('/festival/form-submitted');
-          }
-        }
-      )
-      .subscribe();
+    void fetchContext();
 
     return () => {
-      supabase.removeChannel(channel);
+      cancelled = true;
     };
-  }, [token, navigate, toast]);
+  }, [blankDate, blankJobId, isBlank, navigate, resolveFestivalLogoUrl, token, toast, tx]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !formData) return;
+    if (isBlank) return;
 
-    setIsLoading(true);
-    try {
-      const { data: formInfo, error: formError } = await supabase
-        .from('festival_artist_forms')
-        .select('id, artist_id, status')
-        .eq('token', token)
-        .maybeSingle();
-
-      if (formError) throw formError;
-      if (!formInfo) {
-        throw new Error('Formulario no encontrado');
-      }
-
-      if (formInfo.status === 'completed') {
-        throw new Error('Este formulario ya ha sido enviado');
-      }
-
-      const { error: submissionError } = await supabase
-        .from('festival_artist_form_submissions')
-        .insert({
-          form_id: formInfo.id,
-          artist_id: formInfo.artist_id,
-          form_data: formData,
-          status: 'submitted',
-          submitted_at: new Date().toISOString(),
-        });
-
-      if (submissionError) throw submissionError;
-
-      const { error: updateError } = await supabase
-        .from('festival_artist_forms')
-        .update({ status: 'submitted' })
-        .eq('id', formInfo.id);
-
-      if (updateError) throw updateError;
-
+    if (!token) {
       toast({
-        title: "Éxito",
-        description: "Sus requerimientos técnicos han sido enviados correctamente.",
+        title: tx("Error", "Error"),
+        description: tx("Token de formulario inválido", "Invalid form token"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase.rpc("submit_public_artist_form", {
+        p_token: token,
+        p_form_data: formData,
       });
 
-      navigate('/festival/form-submitted');
-    } catch (error: any) {
-      console.error('Error submitting form:', error);
+      if (error) {
+        throw error;
+      }
+
+      const result = data as PublicSubmitResponse;
+      if (!result?.ok) {
+        if (result?.status === "submitted") {
+          navigate(`/festival/form-submitted?lang=${formLanguage}`, { replace: true });
+          return;
+        }
+
+        const description =
+          result?.error === "form_expired"
+            ? tx("Este enlace ha expirado.", "This link has expired.")
+            : result?.error === "already_submitted"
+              ? tx("Este artista ya envió el formulario.", "This artist has already submitted the form.")
+              : tx("No se pudo enviar el formulario.", "Could not submit the form.");
+
+        toast({
+          title: tx("Formulario no disponible", "Form unavailable"),
+          description,
+          variant: "destructive",
+        });
+        return;
+      }
+
       toast({
-        title: "Error",
-        description: error.message || "No se pudo enviar el formulario. Por favor intente más tarde.",
-        variant: "destructive"
+        title: tx("Éxito", "Success"),
+        description: tx("Sus requerimientos técnicos han sido enviados correctamente.", "Your technical requirements were submitted successfully."),
+      });
+
+      navigate(`/festival/form-submitted?lang=${formLanguage}`);
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      toast({
+        title: tx("Error", "Error"),
+        description: tx("No se pudo enviar el formulario. Por favor intente más tarde.", "Could not submit the form. Please try again later."),
+        variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleFormChange = (changes: Partial<any>) => {
-    setFormData(prev => ({ ...prev, ...changes }));
+  const handleFormChange = (changes: Partial<ArtistFormState>) => {
+    if (isBlank || lockedFields.size === 0) {
+      setFormData((prev) => ({ ...prev, ...changes }));
+      return;
+    }
+
+    const unlockedChanges = Object.entries(changes).reduce<Partial<ArtistFormState>>((acc, [key, value]) => {
+      if (!lockedFields.has(key)) {
+        (acc as Record<string, unknown>)[key] = value;
+      }
+      return acc;
+    }, {});
+
+    if (Object.keys(unlockedChanges).length === 0) return;
+    setFormData((prev) => ({ ...prev, ...unlockedChanges }));
   };
+
+  const isFieldLocked = useCallback(
+    (field: string) => !isBlank && lockedFields.has(field),
+    [isBlank, lockedFields]
+  );
 
   if (isLoading) {
     return (
@@ -273,81 +504,122 @@ export const ArtistRequirementsForm = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="max-w-4xl mx-auto space-y-8">
-        <div className="flex flex-col items-center space-y-8">
+    <div className="min-h-screen bg-background p-6 print:p-0">
+      <div className="max-w-4xl mx-auto space-y-8 print:space-y-4">
+        <div className="flex flex-col items-center space-y-8 print:space-y-4">
           {festivalLogo && (
-            <img 
-              src={festivalLogo} 
-              alt="Festival Logo" 
+            <img
+              src={festivalLogo}
+              alt="Festival Logo"
               width={192}
               height={64}
               loading="eager"
               decoding="async"
               className="h-16 w-48 object-contain"
+              onError={() => setFestivalLogo(null)}
             />
           )}
-          
-          <Card>
+
+          {isBlank && (
+            <div className="w-full flex justify-end print:hidden">
+              <Button type="button" variant="outline" onClick={() => window.print()}>
+                <Printer className="h-4 w-4 mr-2" />
+                {tx("Imprimir Formulario en Blanco", "Print Blank Form")}
+              </Button>
+            </div>
+          )}
+
+          <Card className="w-full print:shadow-none print:border-none">
             <CardHeader>
-              <CardTitle>Formulario de Requerimientos Técnicos del Artista</CardTitle>
+              <CardTitle>
+                {isBlank
+                  ? tx("Formulario de Requerimientos Técnicos del Artista (En Blanco)", "Artist Technical Requirements Form (Blank)")
+                  : tx("Formulario de Requerimientos Técnicos del Artista", "Artist Technical Requirements Form")}
+              </CardTitle>
+              {!isBlank && lockedFields.size > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {tx(
+                    "Algunos campos fueron pre-cargados por producción y están bloqueados.",
+                    "Some fields were pre-filled by production and are locked."
+                  )}
+                </p>
+              )}
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-8">
                 <BasicInfoSection
                   formData={formData}
                   onChange={handleFormChange}
+                  gearSetup={gearSetup}
+                  isFieldLocked={isFieldLocked}
+                  language={formLanguage}
                 />
 
                 <ConsoleSetupSection
                   formData={formData}
                   onChange={handleFormChange}
                   gearSetup={gearSetup}
+                  isFieldLocked={isFieldLocked}
+                  language={formLanguage}
                 />
 
                 <ArtistWirelessSetupSection
                   formData={formData}
                   onChange={handleFormChange}
+                  gearSetup={gearSetup}
+                  isFieldLocked={isFieldLocked}
+                  language={formLanguage}
                 />
 
                 <MonitorSetupSection
                   formData={formData}
                   onChange={handleFormChange}
                   gearSetup={gearSetup}
+                  isFieldLocked={isFieldLocked}
+                  language={formLanguage}
                 />
 
                 <ExtraRequirementsSection
                   formData={formData}
                   onChange={handleFormChange}
                   gearSetup={gearSetup}
+                  isFieldLocked={isFieldLocked}
+                  language={formLanguage}
                 />
 
                 <InfrastructureSection
                   formData={formData}
                   onChange={handleFormChange}
                   gearSetup={gearSetup}
+                  isFieldLocked={isFieldLocked}
+                  language={formLanguage}
                 />
 
                 <NotesSection
                   formData={formData}
                   onChange={handleFormChange}
+                  isFieldLocked={isFieldLocked}
+                  language={formLanguage}
                 />
 
-                <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? "Enviando..." : "Enviar Requerimientos"}
-                </Button>
+                {!isBlank && (
+                  <Button type="submit" disabled={isSubmitting} className="w-full">
+                    {isSubmitting ? tx("Enviando...", "Sending...") : tx("Enviar Requerimientos", "Submit Requirements")}
+                  </Button>
+                )}
               </form>
             </CardContent>
           </Card>
 
-          <img 
-            src="/sector%20pro%20logo.png" 
-            alt="Company Logo" 
+          <img
+            src={companyLogo}
+            alt="Company Logo"
             width={794}
             height={100}
             loading="lazy"
             decoding="async"
             className="h-16 w-48 object-contain mt-8"
+            onError={() => setCompanyLogo("/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png")}
           />
         </div>
       </div>
