@@ -762,11 +762,15 @@ function JobCardNewFull({
 
       if (mode === 'create') {
         // Double-check folders don't exist (create-only)
-        const { data: existingFolders } = await supabase
+        const existingFoldersQuery = supabase
           .from("flex_folders")
           .select("id")
-          .eq("job_id", job.id)
           .limit(1);
+
+        const { data: existingFolders } =
+          job.job_type === "tourdate" && job.tour_date_id
+            ? await existingFoldersQuery.or(`job_id.eq.${job.id},tour_date_id.eq.${job.tour_date_id}`)
+            : await existingFoldersQuery.eq("job_id", job.id);
 
         if (existingFolders && existingFolders.length > 0) {
           console.log("JobCardNew: Found existing folders in final check:", existingFolders);

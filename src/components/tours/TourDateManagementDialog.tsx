@@ -18,7 +18,6 @@ import {
   MapPin,
   Plus,
   Trash2,
-  FolderPlus,
   Edit,
   Package,
   Clock,
@@ -26,7 +25,6 @@ import {
 } from "lucide-react";
 import { TourDateFormFields } from "./TourDateFormFields";
 import { TourDateListItem } from "./TourDateListItem";
-import { createFoldersForDate } from "./tour-date-management/createFoldersForDate";
 import { useLocationManagement, LocationDetails } from "@/hooks/useLocationManagement";
 import { useTourDateRealtime } from "@/hooks/useTourDateRealtime";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -74,8 +72,6 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const [editEndDate, setEditEndDate] = useState<string>("");
   const [editTourPackOnly, setEditTourPackOnly] = useState<boolean>(false);
   const [isDeletingDate, setIsDeletingDate] = useState<string | null>(null);
-  const [createdTourDateIds, setCreatedTourDateIds] = useState<string[]>([]);
-  const [isCreatingFolders, setIsCreatingFolders] = useState(false);
   
   // New date form state
   const [newLocation, setNewLocation] = useState<string>("");
@@ -86,7 +82,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const [newTourPackOnly, setNewTourPackOnly] = useState<boolean>(false);
   const [editLocationDetails, setEditLocationDetails] = useState<LocationDetails | null>(null);
 
-  const { data: foldersExistenceMap, refetch: refetchFoldersExistence } = useQuery({
+  const { data: foldersExistenceMap } = useQuery({
     queryKey: ["flex-folders-existence", tourDateIds],
     queryFn: async () => {
       if (!tourDates.length) return {};
@@ -105,103 +101,6 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     },
     enabled: tourDates.length > 0,
   });
-
-  const handleCreateFoldersForDate = async (dateObj: TourDateObject) => {
-    if (!tourId) {
-      toast({
-        title: "Missing tour ID",
-        description: "No tour selected. Please refresh and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    if (dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)) return;
-
-    try {
-      const { data: existingFolders } = await supabase
-        .from("flex_folders")
-        .select("id")
-        .eq("tour_date_id", dateObj.id);
-
-      if (existingFolders?.length > 0) {
-        toast({
-          title: "Folders already exist",
-          description: "Flex folders have already been created for this tour date.",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      await createFoldersForDate(dateObj, tourId, true);
-      setCreatedTourDateIds((prev) => [...prev, dateObj.id]);
-
-      queryClient.invalidateQueries({ queryKey: ["flex-folders"] });
-      queryClient.invalidateQueries({ queryKey: ["tours"] });
-
-      toast({
-        title: "Success",
-        description: "Folders created for this tour date."
-      });
-    } catch (error: any) {
-      console.error("Error creating folders for tour date:", error);
-      toast({
-        title: "Error creating folders",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const createAllFolders = async () => {
-    if (isCreatingFolders) return;
-    if (!tourId) {
-      toast({
-        title: "Missing tour ID",
-        description: "No tour selected. Please refresh and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    setIsCreatingFolders(true);
-    try {
-      let successCount = 0;
-      let skipCount = 0;
-      for (const dateObj of tourDates) {
-        if (dateObj.flex_folders_created || createdTourDateIds.includes(dateObj.id)) {
-          skipCount++;
-          continue;
-        }
-        try {
-          const created = await createFoldersForDate(dateObj, tourId, true);
-          if (created) {
-            setCreatedTourDateIds((prev) => [...prev, dateObj.id]);
-            successCount++;
-          } else {
-            skipCount++;
-          }
-        } catch (error) {
-          console.error(
-            `Error creating folders for date ${dateObj.date}:`,
-            error
-          );
-          continue;
-        }
-      }
-      toast({
-        title: "Folders Creation Complete",
-        description: `Folders created for ${successCount} dates. ${skipCount} dates were skipped.`,
-      });
-    } catch (error: any) {
-      console.error("Error creating folders for all dates:", error);
-      toast({
-        title: "Error creating folders",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreatingFolders(false);
-    }
-  };
 
   const handleAddDate = async (
     location: string, 
@@ -820,7 +719,6 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
               {tourDates?.map((dateObj) => {
                 const foldersExist = foldersExistenceMap?.[dateObj.id] || false;
                 const isDeleting = isDeletingDate === dateObj.id;
-                const isCreatingFoldersForDate = createdTourDateIds.includes(dateObj.id);
 
                 return (
                   <div key={dateObj.id} className="p-3 md:p-4 border rounded-lg">
@@ -922,20 +820,6 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                         <div className="flex gap-1 md:gap-2 self-end sm:self-auto">
                           {!readOnly && (
                             <>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleCreateFoldersForDate(dateObj)}
-                                title="Create Flex folders"
-                                disabled={foldersExist || isCreatingFoldersForDate}
-                                className={`h-9 w-9 touch-manipulation ${foldersExist ? "opacity-50 cursor-not-allowed" : ""}`}
-                              >
-                                {isCreatingFoldersForDate ? (
-                                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                                ) : (
-                                  <FolderPlus className="h-4 w-4" />
-                                )}
-                              </Button>
                               <Button
                                 variant="ghost"
                                 size="icon"
