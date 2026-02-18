@@ -306,6 +306,12 @@ const resolveEffectiveTotal = (
 };
 
 const withLpo = (name: string, lpo?: string | null) => (lpo ? `${name}\nLPO: ${lpo}` : name);
+const normalizeVehicleDisclaimerText = (text?: string | null) => {
+  if (!text) return '';
+  return text.includes('Fuel/drive compensation')
+    ? 'Puede aplicarse compensación de combustible/conducción al usar vehículo propio. Coordina con RR. HH. por cada trabajo.'
+    : text;
+};
 
 // Generate PDF for individual rate quote (single job date)
 export async function generateRateQuotePDF(
@@ -410,6 +416,13 @@ export async function generateRateQuotePDF(
       }
     }
 
+    if (quote.vehicle_disclaimer && quote.vehicle_disclaimer_text) {
+      const vehicleNote = normalizeVehicleDisclaimerText(quote.vehicle_disclaimer_text);
+      if (vehicleNote) {
+        nameCellContent += `\n(⚠ ${vehicleNote})`;
+      }
+    }
+
     return [
       nameCellContent,
       quote.is_house_tech ? 'Plantilla' : quote.category || '—',
@@ -481,6 +494,17 @@ export async function generateRateQuotePDF(
 
   // Check if any quotes have manual override
   const anyOverride = quotes.some(quote => quote.has_override);
+  const vehicleDisclaimerNotes = Array.from(
+    new Set(
+      quotesWithComputed
+        .map(({ quote }) =>
+          quote.vehicle_disclaimer && quote.vehicle_disclaimer_text
+            ? normalizeVehicleDisclaimerText(quote.vehicle_disclaimer_text)
+            : null
+        )
+        .filter((note): note is string => typeof note === 'string' && note.length > 0)
+    )
+  );
 
   doc.setFillColor(...SUMMARY_BACKGROUND);
   doc.roundedRect(14, finalY, summaryWidth, 32, 3, 3, 'F');
@@ -517,6 +541,19 @@ export async function generateRateQuotePDF(
     doc.setFontSize(8);
     doc.setTextColor(...CORPORATE_RED);
     doc.text('AVISO: Hay overrides manuales de pago (excepción). Administración debe validar con Dirección.', 14, disclaimerY);
+    disclaimerY += 6;
+  }
+
+  if (vehicleDisclaimerNotes.length > 0) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(...CORPORATE_RED);
+    const maxWidth = pageWidth - 28;
+    vehicleDisclaimerNotes.forEach((note) => {
+      const lines = doc.splitTextToSize(`AVISO VEHÍCULO: ${note}`, maxWidth) as string[];
+      doc.text(lines, 14, disclaimerY);
+      disclaimerY += lines.length * 4 + 2;
+    });
   }
 
   const footerLogo = companyLogo ?? headerLogo;

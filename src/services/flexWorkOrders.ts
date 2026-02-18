@@ -492,6 +492,37 @@ interface ExtraRow {
   status: string;
 }
 
+interface FlexFolderLookupRow {
+  element_id: string;
+  department?: string | null;
+  job_id?: string | null;
+  tour_date_id?: string | null;
+  folder_type?: string | null;
+  created_at?: string | null;
+}
+
+function pickPreferredTourdateFolder<T extends { job_id?: string | null; tour_date_id?: string | null; folder_type?: string | null }>(
+  rows: T[] | null | undefined,
+  jobId: string,
+  tourDateId: string,
+  preferredFolderType?: string
+): T | null {
+  if (!rows?.length) return null;
+
+  const typedRows = preferredFolderType
+    ? rows.filter((row) => row.folder_type === preferredFolderType)
+    : rows;
+  const pool = typedRows.length > 0 ? typedRows : rows;
+
+  return (
+    pool.find((row) => row.job_id === jobId && row.tour_date_id === tourDateId) ??
+    pool.find((row) => row.job_id === jobId) ??
+    pool.find((row) => row.tour_date_id === tourDateId) ??
+    pool[0] ??
+    null
+  );
+}
+
 export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkOrderSyncResult> {
   if (!jobId) {
     throw new Error('Job id is required to sync Flex work orders');
@@ -514,58 +545,73 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
   if (jobError) throw jobError;
   if (!job) throw new Error('Job not found');
 
-  // Determine search criteria based on job type
-  const searchCriteria: any = { folder_type: 'work_orders', department: 'personnel' };
+  const isTourdateJob = job.job_type === 'tourdate';
+  const tourDateId = job.tour_date_id;
 
-  if (job.job_type === 'tourdate') {
-    if (!job.tour_date_id) {
+  if (isTourdateJob && !tourDateId) {
       throw new Error(`Tourdate job ${jobId} is missing tour_date_id`);
-    }
-    searchCriteria.tour_date_id = job.tour_date_id;
-  } else {
-    searchCriteria.job_id = jobId;
   }
 
   // Check if work_orders folder exists
-  const { data: folders, error: foldersError } = await supabase
+  let workOrdersQuery = supabase
     .from('flex_folders')
-    .select('element_id, department')
-    .match(searchCriteria);
+    .select('element_id, department, job_id, tour_date_id, folder_type, created_at')
+    .eq('folder_type', 'work_orders')
+    .eq('department', 'personnel');
+
+  if (isTourdateJob) {
+    workOrdersQuery = workOrdersQuery.or(`job_id.eq.${jobId},tour_date_id.eq.${tourDateId}`);
+  } else {
+    workOrdersQuery = workOrdersQuery.eq('job_id', jobId);
+  }
+
+  const { data: folders, error: foldersError } = await workOrdersQuery.order('created_at', { ascending: false });
 
   if (foldersError) throw foldersError;
 
-  let parentFolder = (folders || []).find((f) => (f as any)?.department === 'personnel') || (folders?.[0] as any);
+  let parentFolder: FlexFolderLookupRow | null = isTourdateJob
+    ? pickPreferredTourdateFolder((folders || []) as FlexFolderLookupRow[], jobId, tourDateId!, 'work_orders')
+    : ((folders?.[0] as FlexFolderLookupRow | undefined) || null);
 
   // Self-healing: Create work_orders folder if missing
   if (!parentFolder?.element_id) {
     console.log(`[FlexWorkOrders] No work_orders folder found for job ${jobId}, creating it now...`);
     
-    // Find the personnel department folder as parent
-    // For tourdate jobs, the personnel folder has folder_type: 'tourdate'
-    // For other jobs, it has folder_type: 'department'
-    const personnelFolderType = job.job_type === 'tourdate' ? 'tourdate' : 'department';
-    
-    const personnelSearchCriteria: any = {
-      folder_type: personnelFolderType,
-      department: 'personnel'
-    };
-    
-    if (job.job_type === 'tourdate') {
-      personnelSearchCriteria.tour_date_id = job.tour_date_id;
+    let personnelFolder: FlexFolderLookupRow | null = null;
+
+    if (isTourdateJob) {
+      // Tour-date folders are stored with mixed keys in legacy/current flows.
+      const { data: personnelFolders, error: personnelError } = await supabase
+        .from('flex_folders')
+        .select('element_id, job_id, tour_date_id, folder_type, created_at')
+        .eq('department', 'personnel')
+        .in('folder_type', ['tourdate', 'department'])
+        .or(`job_id.eq.${jobId},tour_date_id.eq.${tourDateId}`)
+        .order('created_at', { ascending: false });
+
+      if (personnelError) throw personnelError;
+
+      personnelFolder =
+        pickPreferredTourdateFolder(personnelFolders as FlexFolderLookupRow[] | null, jobId, tourDateId!, 'tourdate') ||
+        pickPreferredTourdateFolder(personnelFolders as FlexFolderLookupRow[] | null, jobId, tourDateId!);
     } else {
-      personnelSearchCriteria.job_id = jobId;
+      const { data: personnelFolders, error: personnelError } = await supabase
+        .from('flex_folders')
+        .select('element_id, created_at')
+        .eq('department', 'personnel')
+        .eq('folder_type', 'department')
+        .eq('job_id', jobId)
+        .order('created_at', { ascending: false });
+
+      if (personnelError) throw personnelError;
+      personnelFolder = ((personnelFolders?.[0] as FlexFolderLookupRow | undefined) || null);
     }
     
-    const { data: personnelFolder, error: personnelError } = await supabase
-      .from('flex_folders')
-      .select('element_id')
-      .match(personnelSearchCriteria)
-      .maybeSingle();
-    
-    if (personnelError) throw personnelError;
     if (!personnelFolder?.element_id) {
       throw new Error(
-        `Personnel folder not found for ${job.job_type === 'tourdate' ? 'tour_date_id' : 'job_id'}: ${job.job_type === 'tourdate' ? job.tour_date_id : jobId}. Please create folders first.`
+        isTourdateJob
+          ? `Personnel folder not found for job_id ${jobId} / tour_date_id ${tourDateId}. Please create folders first.`
+          : `Personnel folder not found for job_id ${jobId}. Please create folders first.`
       );
     }
     
@@ -609,12 +655,11 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
       element_id: newElementId,
       department: 'personnel',
       folder_type: 'work_orders',
+      job_id: jobId,
     };
     
-    if (job.job_type === 'tourdate') {
-      insertData.tour_date_id = job.tour_date_id;
-    } else {
-      insertData.job_id = jobId;
+    if (isTourdateJob) {
+      insertData.tour_date_id = tourDateId;
     }
     
     const { data: insertedFolder, error: insertError } = await supabase
