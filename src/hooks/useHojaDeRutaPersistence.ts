@@ -1,8 +1,33 @@
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { EventData, TravelArrangement, Accommodation } from "@/types/hoja-de-ruta";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+
+
+const PARTIAL_ISO_NO_TZ_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+
+/**
+ * Normalize datetime-local or ISO-ish inputs into explicit UTC ISO timestamps
+ * so PostgreSQL timestamptz columns don't interpret naive values in server local time.
+ */
+const toSafeTimestamptz = (value: string | null | undefined): string | null => {
+  if (!value || !value.trim()) return null;
+
+  const raw = value.trim();
+  const normalizedInput = PARTIAL_ISO_NO_TZ_REGEX.test(raw)
+    ? (raw.length === 16 ? `${raw}:00` : raw)
+    : raw;
+
+  const date = new Date(normalizedInput);
+  if (Number.isNaN(date.getTime())) {
+    console.warn('SAVE: Invalid datetime for timestamptz, storing null:', value);
+    return null;
+  }
+
+  return date.toISOString();
+};
 
 interface SaveCallbacks {
   onSuccess?: () => void;
@@ -291,119 +316,67 @@ export const useHojaDeRutaPersistence = (
 
       if (logisticsError) {
         console.error('❌ SAVE: Error saving logistics:', logisticsError);
-        // Do not throw, just log the error
+        throw logisticsError;
       }
 
-      // Save transport data (delete existing and insert new)
-      if (eventData.logistics?.transport && Array.isArray(eventData.logistics.transport)) {
-        const { error: deleteTransportError } = await supabase
-          .from('hoja_de_ruta_transport')
-          .delete()
-          .eq('hoja_de_ruta_id', hojaDeRutaId);
+      const transportRows = (eventData.logistics?.transport && Array.isArray(eventData.logistics.transport)
+        ? eventData.logistics.transport
+        : []
+      ).map(transport => ({
+        transport_type: transport.transport_type,
+        driver_name: transport.driver_name || '',
+        driver_phone: transport.driver_phone || '',
+        license_plate: transport.license_plate || '',
+        company: transport.company || null,
+        date_time: toSafeTimestamptz(transport.date_time),
+        has_return: transport.has_return || false,
+        return_date_time: toSafeTimestamptz(transport.return_date_time),
+      }));
 
-        if (deleteTransportError) {
-          console.error('❌ SAVE: Error deleting old transport:', deleteTransportError);
-          // Do not throw, just log the error
-        }
-
-        if (eventData.logistics.transport.length > 0) {
-          const transportData = eventData.logistics.transport.map(transport => ({
-            hoja_de_ruta_id: hojaDeRutaId,
-            transport_type: transport.transport_type,
-            driver_name: transport.driver_name || '',
-            driver_phone: transport.driver_phone || '',
-            license_plate: transport.license_plate || '',
-            company: transport.company || null,
-            date_time: transport.date_time || null,
-            has_return: transport.has_return || false,
-            return_date_time: transport.return_date_time || null
-          }));
-
-          console.log("🔄 SAVE: Inserting transport data:", transportData);
-
-          const { error: transportError } = await supabase
-            .from('hoja_de_ruta_transport')
-            .insert(transportData);
-
-          if (transportError) {
-            console.error('❌ SAVE: Error saving transport:', transportError);
-            // Do not throw, just log the error
-          }
-        }
-      }
-
-      // Save contacts (delete existing and insert new)
-      const { error: deleteContactsError } = await supabase
-        .from('hoja_de_ruta_contacts')
-        .delete()
-        .eq('hoja_de_ruta_id', hojaDeRutaId);
-
-      if (deleteContactsError) {
-        console.error('❌ SAVE: Error deleting old contacts:', deleteContactsError);
-        // Do not throw, just log the error
-      }
-
-      const validContacts = eventData.contacts?.filter(c => 
+      const validContacts = eventData.contacts?.filter(c =>
         c.name?.trim() || c.role?.trim() || c.phone?.trim()
       ) || [];
 
-      if (validContacts.length > 0) {
-        const contactsData = validContacts.map((contact) => ({
-          hoja_de_ruta_id: hojaDeRutaId,
+      const contactsRows = validContacts.map((contact) => ({
           name: contact.name || '',
           role: contact.role || '',
           phone: contact.phone || '',
           technician_id: contact.technician_id || null,
-        }));
+      }));
 
-        console.log("🔄 SAVE: Inserting contacts data:", contactsData);
-
-        const { error: contactsError } = await supabase
-          .from('hoja_de_ruta_contacts')
-          .insert(contactsData);
-
-        if (contactsError) {
-          console.error('❌ SAVE: Error saving contacts:', contactsError);
-          // Do not throw, just log the error
-        }
-      }
-
-      // Save staff (delete existing and insert new)
-      const { error: deleteStaffError } = await supabase
-        .from('hoja_de_ruta_staff')
-        .delete()
-        .eq('hoja_de_ruta_id', hojaDeRutaId);
-
-      if (deleteStaffError) {
-        console.error('❌ SAVE: Error deleting old staff:', deleteStaffError);
-        // Do not throw, just log the error
-      }
-
-      const validStaff = eventData.staff?.filter(s => 
+      const validStaff = eventData.staff?.filter(s =>
         s.name?.trim() || s.surname1?.trim() || s.surname2?.trim() || s.position?.trim()
       ) || [];
 
-      if (validStaff.length > 0) {
-        const staffData = validStaff.map((staff) => ({
-          hoja_de_ruta_id: hojaDeRutaId,
+      const staffRows = validStaff.map((staff) => ({
           technician_id: staff.technician_id || null,
           name: staff.name || '',
           surname1: staff.surname1 || '',
           surname2: staff.surname2 || '',
           position: staff.position || '',
           dni: staff.dni || '',
-        }));
+      }));
 
-        console.log("🔄 SAVE: Inserting staff data:", staffData);
+      console.log("🔄 SAVE: Replacing transport/contacts/staff data via single RPC", {
+        transportCount: transportRows.length,
+        contactsCount: contactsRows.length,
+        staffCount: staffRows.length,
+      });
 
-        const { error: staffError } = await supabase
-          .from('hoja_de_ruta_staff')
-          .insert(staffData);
-
-        if (staffError) {
-          console.error('❌ SAVE: Error saving staff:', staffError);
-          // Do not throw, just log the error
+      const { error: replaceAllError } = await supabase.rpc(
+        // TODO: Regenerate Supabase types after this migration is deployed to remove this cast.
+        'replace_hoja_de_ruta_all' as unknown as keyof Database['public']['Functions'],
+        {
+          p_hoja_de_ruta_id: hojaDeRutaId,
+          p_transport_rows: transportRows,
+          p_contact_rows: contactsRows,
+          p_staff_rows: staffRows,
         }
+      );
+
+      if (replaceAllError) {
+        console.error('❌ SAVE: Error replacing transport/contacts/staff via RPC:', replaceAllError);
+        throw replaceAllError;
       }
 
       console.log("✅ SAVE: All data saved successfully");
@@ -585,8 +558,8 @@ export const useHojaDeRutaPersistence = (
               accommodation_id: savedAccommodation.id,
               room_type: room.room_type,
               room_number: room.room_number || '',
-              staff_member1_id: room.staff_member1_id || '',
-              staff_member2_id: room.staff_member2_id || ''
+              staff_member1_id: room.staff_member1_id || null,
+              staff_member2_id: room.staff_member2_id || null
             }));
 
             console.log("🔄 SAVE ACCOMMODATION: Inserting rooms:", roomsData);
