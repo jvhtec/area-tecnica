@@ -291,7 +291,7 @@ export const useHojaDeRutaPersistence = (
 
       if (logisticsError) {
         console.error('❌ SAVE: Error saving logistics:', logisticsError);
-        // Do not throw, just log the error
+        throw logisticsError;
       }
 
       // Save transport data (delete existing and insert new)
@@ -303,7 +303,7 @@ export const useHojaDeRutaPersistence = (
 
         if (deleteTransportError) {
           console.error('❌ SAVE: Error deleting old transport:', deleteTransportError);
-          // Do not throw, just log the error
+          throw deleteTransportError;
         }
 
         if (eventData.logistics.transport.length > 0) {
@@ -327,7 +327,7 @@ export const useHojaDeRutaPersistence = (
 
           if (transportError) {
             console.error('❌ SAVE: Error saving transport:', transportError);
-            // Do not throw, just log the error
+            throw transportError;
           }
         }
       }
@@ -340,7 +340,7 @@ export const useHojaDeRutaPersistence = (
 
       if (deleteContactsError) {
         console.error('❌ SAVE: Error deleting old contacts:', deleteContactsError);
-        // Do not throw, just log the error
+        throw deleteContactsError;
       }
 
       const validContacts = eventData.contacts?.filter(c => 
@@ -364,7 +364,7 @@ export const useHojaDeRutaPersistence = (
 
         if (contactsError) {
           console.error('❌ SAVE: Error saving contacts:', contactsError);
-          // Do not throw, just log the error
+          throw contactsError;
         }
       }
 
@@ -376,7 +376,7 @@ export const useHojaDeRutaPersistence = (
 
       if (deleteStaffError) {
         console.error('❌ SAVE: Error deleting old staff:', deleteStaffError);
-        // Do not throw, just log the error
+        throw deleteStaffError;
       }
 
       const validStaff = eventData.staff?.filter(s => 
@@ -402,7 +402,7 @@ export const useHojaDeRutaPersistence = (
 
         if (staffError) {
           console.error('❌ SAVE: Error saving staff:', staffError);
-          // Do not throw, just log the error
+          throw staffError;
         }
       }
 
@@ -585,8 +585,8 @@ export const useHojaDeRutaPersistence = (
               accommodation_id: savedAccommodation.id,
               room_type: room.room_type,
               room_number: room.room_number || '',
-              staff_member1_id: room.staff_member1_id || '',
-              staff_member2_id: room.staff_member2_id || ''
+              staff_member1_id: room.staff_member1_id || null,
+              staff_member2_id: room.staff_member2_id || null
             }));
 
             console.log("🔄 SAVE ACCOMMODATION: Inserting rooms:", roomsData);
