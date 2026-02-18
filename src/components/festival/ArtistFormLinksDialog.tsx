@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { addDays, format, isAfter } from "date-fns";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+import { fetchFestivalGearOptionsForTemplate } from "@/utils/festivalGearOptions";
 
 interface ArtistLinkData {
   artistId: string;
@@ -185,17 +186,20 @@ export const ArtistFormLinksDialog = ({
     });
   };
 
-  const downloadBlankTemplatePdf = async () => {
+  const downloadBlankTemplatePdf = async (stageNumber?: number) => {
     setIsGeneratingBlankPdf(true);
     try {
       let logoUrl: string | undefined;
+      let festivalOptions: ArtistPdfData["festivalOptions"];
+      const templateStage = stageNumber ?? artistLinks[0]?.stage ?? 1;
       if (jobId) {
         logoUrl = await fetchJobLogo(jobId);
+        festivalOptions = await fetchFestivalGearOptionsForTemplate(jobId, templateStage);
       }
 
       const blankPdfData: ArtistPdfData = {
         name: "Plantilla Artista",
-        stage: 1,
+        stage: templateStage,
         date: selectedDate,
         schedule: {
           show: {
@@ -230,6 +234,7 @@ export const ArtistFormLinksDialog = ({
         notes: "",
         wiredMics: [],
         logoUrl,
+        festivalOptions,
       };
 
       const blob = await exportArtistPDF(blankPdfData, { templateMode: true });
@@ -298,10 +303,21 @@ export const ArtistFormLinksDialog = ({
             <div key={stage} className="space-y-2">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-semibold">Stage {stage}</h3>
-                <Button variant="outline" size="sm" onClick={() => copyStageLinks(stage)}>
-                  <Copy className="h-4 w-4 mr-2" />
-                  Copiar Enlaces del Stage
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => downloadBlankTemplatePdf(stage)}
+                    disabled={isGeneratingBlankPdf}
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Plantilla Stage
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => copyStageLinks(stage)}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copiar Enlaces del Stage
+                  </Button>
+                </div>
               </div>
               <div className="border rounded-lg divide-y">
                 {artistLinks

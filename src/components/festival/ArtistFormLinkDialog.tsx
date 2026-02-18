@@ -12,6 +12,7 @@ import { addDays } from "date-fns";
 import { generateQRCode } from "@/utils/qrcode";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+import { fetchFestivalGearOptionsForTemplate } from "@/utils/festivalGearOptions";
 
 interface ArtistFormLinkDialogProps {
   open: boolean;
@@ -317,10 +318,37 @@ export const ArtistFormLinkDialog = ({
       const templateDate = artistData?.date || selectedDate || new Date().toISOString().slice(0, 10);
       const templateName = artistData?.name || artistName || "Artista";
       const templateStage = typeof artistData?.stage === "number" ? artistData.stage : 1;
+      let publicFormUrl = formToken ? buildFormUrl(formToken) : "";
+      let publicFormQrDataUrl = "";
+
+      if (!publicFormUrl) {
+        const { data: existingForm, error: existingFormError } = await supabase
+          .from("festival_artist_forms")
+          .select("token")
+          .eq("artist_id", artistId)
+          .eq("status", "pending")
+          .gt("expires_at", new Date().toISOString())
+          .limit(1)
+          .maybeSingle();
+
+        if (!existingFormError && existingForm?.token) {
+          publicFormUrl = buildFormUrl(existingForm.token);
+        }
+      }
+
+      if (publicFormUrl) {
+        try {
+          publicFormQrDataUrl = await generateQRCode(publicFormUrl);
+        } catch (qrError) {
+          console.error("Error generating QR for blank template PDF:", qrError);
+        }
+      }
 
       let logoUrl: string | undefined;
+      let festivalOptions: ArtistPdfData["festivalOptions"];
       if (jobId) {
         logoUrl = await fetchJobLogo(jobId);
+        festivalOptions = await fetchFestivalGearOptionsForTemplate(jobId, templateStage);
       }
 
       const blankPdfData: ArtistPdfData = {
@@ -371,6 +399,9 @@ export const ArtistFormLinkDialog = ({
         micKit: "festival",
         riderMissing: false,
         logoUrl,
+        festivalOptions,
+        publicFormUrl,
+        publicFormQrDataUrl,
       };
 
       const blob = await exportArtistPDF(blankPdfData, {
