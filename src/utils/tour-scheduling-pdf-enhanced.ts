@@ -441,11 +441,15 @@ export const generateEnhancedEventDaySheet = async (
 
   // Program Schedule
   try {
-    const { data: hojaDeRuta } = await supabase
-      .from('hoja_de_ruta')
+    const { data: hojaDeRuta, error: hojaError } = await supabase
+      .from('hoja_de_ruta' as any)
       .select('*')
       .eq('tour_date_id', tourDate.id)
       .maybeSingle();
+
+    if (hojaError) {
+      console.warn('Error loading hoja de ruta:', hojaError);
+    }
 
     if (hojaDeRuta && hojaDeRuta.program_schedule_json) {
       pdf.setFontSize(14);
@@ -455,10 +459,12 @@ export const generateEnhancedEventDaySheet = async (
       pdf.setTextColor(0, 0, 0);
       currentY += 10;
 
-      const schedule = hojaDeRuta.program_schedule_json;
+      const schedule = Array.isArray(hojaDeRuta.program_schedule_json) 
+        ? hojaDeRuta.program_schedule_json 
+        : [];
 
       for (const day of schedule) {
-        if (day.rows && day.rows.length > 0) {
+        if (day && day.rows && Array.isArray(day.rows) && day.rows.length > 0) {
           if (day.label) {
             pdf.setFontSize(12);
             pdf.setFont(undefined, 'bold');
