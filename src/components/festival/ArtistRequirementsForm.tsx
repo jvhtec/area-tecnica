@@ -15,7 +15,7 @@ import { NotesSection } from "./form/sections/NotesSection";
 import { MicKitSection } from "./form/sections/MicKitSection";
 import { FestivalGearSetup, WirelessSetup } from "@/types/festival";
 import { ArtistSectionProps } from "@/types/artist-form";
-import { Download, Eye, FileText, Loader2, Printer } from "lucide-react";
+import { Download, Eye, FileText, Loader2, Printer, Trash2 } from "lucide-react";
 
 interface ArtistRequirementsFormProps {
   isBlank?: boolean;
@@ -146,6 +146,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
   const [publicArtistId, setPublicArtistId] = useState<string | null>(null);
   const [riderFiles, setRiderFiles] = useState<RiderFileRecord[]>([]);
   const [isUploadingRider, setIsUploadingRider] = useState(false);
+  const [deletingRiderId, setDeletingRiderId] = useState<string | null>(null);
   const [formData, setFormData] = useState<ArtistFormState>(() => createInitialFormData(isBlank, blankDate));
 
   const resolveFestivalLogoUrl = useCallback(async (rawFilePath: string | null | undefined) => {
@@ -671,8 +672,8 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
   const handleRiderUpload = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const input = event.target;
-      const selectedFile = input.files?.[0];
-      if (!selectedFile) return;
+      const selectedFiles = Array.from(input.files || []);
+      if (selectedFiles.length === 0) return;
 
       if (!token || !publicArtistId) {
         toast({
@@ -689,7 +690,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
       try {
         const payload = new FormData();
         payload.append("token", token);
-        payload.append("file", selectedFile);
+        selectedFiles.forEach((file) => payload.append("files", file));
 
         const { data, error } = await supabase.functions.invoke("upload-public-artist-rider", {
           body: payload,
@@ -699,31 +700,51 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
           throw error;
         }
 
-        const response = data as { ok?: boolean; error?: string; file?: Record<string, unknown> } | null;
-        if (!response?.ok || !response.file) {
+        const response = data as {
+          ok?: boolean;
+          error?: string;
+          file?: Record<string, unknown> | null;
+          files?: Array<Record<string, unknown>>;
+        } | null;
+        if (!response?.ok) {
           throw new Error(response?.error || "upload_failed");
         }
 
-        const uploaded: RiderFileRecord = {
-          id: asString(response.file.id),
-          file_name: asString(response.file.file_name),
-          file_path: asString(response.file.file_path),
-          file_type: asString(response.file.file_type) || null,
-          file_size: typeof response.file.file_size === "number" ? response.file.file_size : null,
-          uploaded_at: asString(response.file.uploaded_at) || null,
-          uploaded_by: asString(response.file.uploaded_by) || null,
-          uploaded_by_name: asString(response.file.uploaded_by_name) || null,
-        };
+        const uploadedRaw =
+          Array.isArray(response.files) && response.files.length > 0
+            ? response.files
+            : response.file
+              ? [response.file]
+              : [];
 
-        if (!uploaded.id || !uploaded.file_path) {
+        const uploaded = uploadedRaw
+          .map((file) => ({
+            id: asString(file.id),
+            file_name: asString(file.file_name),
+            file_path: asString(file.file_path),
+            file_type: asString(file.file_type) || null,
+            file_size: typeof file.file_size === "number" ? file.file_size : null,
+            uploaded_at: asString(file.uploaded_at) || null,
+            uploaded_by: asString(file.uploaded_by) || null,
+            uploaded_by_name: asString(file.uploaded_by_name) || null,
+          }))
+          .filter((file) => file.id && file.file_path);
+
+        if (uploaded.length === 0) {
           throw new Error("invalid_upload_response");
         }
 
-        setRiderFiles((prev) => [uploaded, ...prev.filter((file) => file.id !== uploaded.id)]);
+        setRiderFiles((prev) => {
+          const deduped = prev.filter((existing) => !uploaded.some((nextFile) => nextFile.id === existing.id));
+          return [...uploaded, ...deduped];
+        });
 
         toast({
           title: tx("Éxito", "Success"),
-          description: tx("Rider cargado correctamente.", "Rider uploaded successfully."),
+          description:
+            uploaded.length > 1
+              ? tx("Riders cargados correctamente.", "Rider files uploaded successfully.")
+              : tx("Rider cargado correctamente.", "Rider uploaded successfully."),
         });
       } catch (error) {
         console.error("Error uploading rider file:", error);
@@ -743,8 +764,49 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
     [publicArtistId, toast, token, tx]
   );
 
+  const handleDeleteRider = useCallback(
+    async (file: RiderFileRecord) => {
+      if (!token || !file.id) return;
+      setDeletingRiderId(file.id);
+
+      try {
+        const { data, error } = await supabase.functions.invoke("delete-public-artist-rider", {
+          body: {
+            token,
+            fileId: file.id,
+          },
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        const response = data as { ok?: boolean; error?: string } | null;
+        if (!response?.ok) {
+          throw new Error(response?.error || "delete_failed");
+        }
+
+        setRiderFiles((prev) => prev.filter((item) => item.id !== file.id));
+
+        toast({
+          title: tx("Éxito", "Success"),
+          description: tx("Rider eliminado.", "Rider file deleted."),
+        });
+      } catch (error) {
+        console.error("Error deleting rider file:", error);
+        toast({
+          title: tx("Error", "Error"),
+          description: tx("No se pudo eliminar el rider.", "Could not delete rider file."),
+          variant: "destructive",
+        });
+      } finally {
+        setDeletingRiderId(null);
+      }
+    },
+    [toast, token, tx]
+  );
+
   const shouldShowRiderSection = !isBlank && (formData.rider_missing || riderFiles.length > 0);
-  const latestRider = riderFiles[0] || null;
 
   if (isLoading) {
     return (
@@ -826,51 +888,66 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
                       </p>
                     )}
 
-                    {latestRider ? (
+                    {riderFiles.length > 0 ? (
                       <div className="rounded-md border p-3 space-y-3">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2 text-sm font-medium">
-                              <FileText className="h-4 w-4" />
-                              <span>{latestRider.file_name}</span>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              {tx("Subido", "Uploaded")}: {formatUploadedAt(latestRider.uploaded_at)} ·{" "}
-                              {formatFileSize(latestRider.file_size)}
-                            </p>
-                            {latestRider.uploaded_by_name && (
+                        {riderFiles.map((file) => (
+                          <div key={file.id} className="flex flex-col gap-3 border rounded-md p-3 md:flex-row md:items-start md:justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-sm font-medium">
+                                <FileText className="h-4 w-4" />
+                                <span>{file.file_name}</span>
+                              </div>
                               <p className="text-xs text-muted-foreground">
-                                {tx("Subido por", "Uploaded by")}: {latestRider.uploaded_by_name}
+                                {tx("Subido", "Uploaded")}: {formatUploadedAt(file.uploaded_at)} ·{" "}
+                                {formatFileSize(file.file_size)}
                               </p>
-                            )}
-                          </div>
+                              {file.uploaded_by_name && (
+                                <p className="text-xs text-muted-foreground">
+                                  {tx("Subido por", "Uploaded by")}: {file.uploaded_by_name}
+                                </p>
+                              )}
+                            </div>
 
-                          <div className="flex items-center gap-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openRiderFile(latestRider)}
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              {tx("Ver", "View")}
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => downloadRiderFile(latestRider)}
-                            >
-                              <Download className="h-4 w-4 mr-2" />
-                              {tx("Descargar", "Download")}
-                            </Button>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openRiderFile(file)}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                {tx("Ver", "View")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => downloadRiderFile(file)}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                {tx("Descargar", "Download")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletingRiderId === file.id}
+                                onClick={() => handleDeleteRider(file)}
+                              >
+                                {deletingRiderId === file.id ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                )}
+                                {tx("Eliminar", "Delete")}
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-
+                        ))}
                         <p className="text-xs text-muted-foreground">
                           {tx(
-                            "Este es el rider actual que tenemos registrado. Si existe una versión más nueva, súbela usando el campo inferior.",
-                            "This is the current rider we have on file. If there is a newer version, please upload it using the field below."
+                            "Estos son los riders actuales que tenemos registrados. Si existe una versión más nueva, súbela usando el campo inferior y elimina las versiones erróneas.",
+                            "These are the rider files we currently have on file. If there is a newer version, upload it below and delete any incorrect versions."
                           )}
                         </p>
                       </div>
@@ -885,12 +962,13 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
                     <div className="space-y-2">
                       <label htmlFor="public-rider-upload" className="text-sm font-medium">
-                        {tx("Subir rider (PDF, Word o imagen)", "Upload rider (PDF, Word, or image)")}
+                        {tx("Subir rider(s) (PDF, Word o imagen)", "Upload rider file(s) (PDF, Word, or image)")}
                       </label>
                       <Input
                         id="public-rider-upload"
                         type="file"
                         accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.webp"
+                        multiple
                         onChange={handleRiderUpload}
                         disabled={isUploadingRider}
                       />

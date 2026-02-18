@@ -6,6 +6,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_FILES_PER_REQUEST = 10;
 const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "txt", "png", "jpg", "jpeg", "webp"]);
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -52,6 +53,13 @@ const getFileExtension = (fileName: string) => {
   return parts[parts.length - 1].toLowerCase();
 };
 
+const extractFiles = (formData: FormData) => {
+  const filesFromPlural = formData.getAll("files").filter((entry): entry is File => entry instanceof File);
+  if (filesFromPlural.length > 0) return filesFromPlural;
+  const single = formData.get("file");
+  return single instanceof File ? [single] : [];
+};
+
 const buildArtistTableUrl = (jobId?: string | null, artistDate?: string | null) => {
   const normalizedJobId = typeof jobId === "string" ? jobId.trim() : "";
   if (!normalizedJobId) {
@@ -83,34 +91,44 @@ serve(async (req) => {
   try {
     const formData = await req.formData();
     const token = String(formData.get("token") ?? "").trim();
-    const fileEntry = formData.get("file");
+    const fileEntries = extractFiles(formData);
 
     if (!token) {
       return jsonResponse({ ok: false, error: "missing_token" }, { status: 400 });
     }
 
-    if (!(fileEntry instanceof File)) {
+    if (fileEntries.length === 0) {
       return jsonResponse({ ok: false, error: "missing_file" }, { status: 400 });
     }
 
-    if (fileEntry.size <= 0) {
-      return jsonResponse({ ok: false, error: "empty_file" }, { status: 400 });
+    if (fileEntries.length > MAX_FILES_PER_REQUEST) {
+      return jsonResponse({ ok: false, error: "too_many_files" }, { status: 400 });
     }
 
-    if (fileEntry.size > MAX_FILE_SIZE_BYTES) {
-      return jsonResponse({ ok: false, error: "file_too_large" }, { status: 413 });
-    }
+    const validatedFiles = fileEntries.map((entry) => {
+      if (entry.size <= 0) {
+        throw new Error("empty_file");
+      }
 
-    const sanitizedName = sanitizeFileName(fileEntry.name || "rider");
-    const extension = getFileExtension(sanitizedName);
+      if (entry.size > MAX_FILE_SIZE_BYTES) {
+        throw new Error("file_too_large");
+      }
 
-    if (!extension || !ALLOWED_EXTENSIONS.has(extension)) {
-      return jsonResponse({ ok: false, error: "invalid_file_extension" }, { status: 400 });
-    }
+      const sanitizedName = sanitizeFileName(entry.name || "rider");
+      const extension = getFileExtension(sanitizedName);
+      if (!extension || !ALLOWED_EXTENSIONS.has(extension)) {
+        throw new Error("invalid_file_extension");
+      }
 
-    if (fileEntry.type && !ALLOWED_MIME_TYPES.has(fileEntry.type)) {
-      return jsonResponse({ ok: false, error: "invalid_file_type" }, { status: 400 });
-    }
+      if (entry.type && !ALLOWED_MIME_TYPES.has(entry.type)) {
+        throw new Error("invalid_file_type");
+      }
+
+      return {
+        file: entry,
+        sanitizedName,
+      };
+    });
 
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
@@ -176,37 +194,71 @@ serve(async (req) => {
       return jsonResponse({ ok: false, error: "already_submitted", status: "submitted" }, { status: 409 });
     }
 
-    const timestampPrefix = new Date().toISOString().replace(/[:.]/g, "-");
-    const filePath = `${formRow.artist_id}/${timestampPrefix}-${crypto.randomUUID()}-${sanitizedName}`;
+    const insertedFiles: Array<Record<string, unknown>> = [];
+    const uploadedPaths: string[] = [];
 
-    const { error: storageError } = await supabaseAdmin.storage
-      .from("festival_artist_files")
-      .upload(filePath, fileEntry, {
-        upsert: false,
-        contentType: fileEntry.type || "application/octet-stream",
-      });
+    try {
+      for (const entry of validatedFiles) {
+        const timestampPrefix = new Date().toISOString().replace(/[:.]/g, "-");
+        const filePath = `${formRow.artist_id}/${timestampPrefix}-${crypto.randomUUID()}-${entry.sanitizedName}`;
 
-    if (storageError) {
-      console.error("[upload-public-artist-rider] storage upload error", storageError);
-      return jsonResponse({ ok: false, error: "storage_upload_failed" }, { status: 500 });
-    }
+        const { error: storageError } = await supabaseAdmin.storage
+          .from("festival_artist_files")
+          .upload(filePath, entry.file, {
+            upsert: false,
+            contentType: entry.file.type || "application/octet-stream",
+          });
 
-    const { data: insertedFile, error: insertError } = await supabaseAdmin
-      .from("festival_artist_files")
-      .insert({
-        artist_id: formRow.artist_id,
-        file_name: sanitizedName,
-        file_path: filePath,
-        file_type: fileEntry.type || null,
-        file_size: fileEntry.size,
-      })
-      .select("id, file_name, file_path, file_type, file_size, uploaded_at, uploaded_by")
-      .single();
+        if (storageError) {
+          console.error("[upload-public-artist-rider] storage upload error", storageError);
+          throw new Error("storage_upload_failed");
+        }
 
-    if (insertError) {
-      console.error("[upload-public-artist-rider] file metadata insert error", insertError);
-      await supabaseAdmin.storage.from("festival_artist_files").remove([filePath]);
-      return jsonResponse({ ok: false, error: "metadata_insert_failed" }, { status: 500 });
+        uploadedPaths.push(filePath);
+
+        const { data: insertedFile, error: insertError } = await supabaseAdmin
+          .from("festival_artist_files")
+          .insert({
+            artist_id: formRow.artist_id,
+            file_name: entry.sanitizedName,
+            file_path: filePath,
+            file_type: entry.file.type || null,
+            file_size: entry.file.size,
+          })
+          .select("id, file_name, file_path, file_type, file_size, uploaded_at, uploaded_by")
+          .single();
+
+        if (insertError || !insertedFile) {
+          console.error("[upload-public-artist-rider] file metadata insert error", insertError);
+          throw new Error("metadata_insert_failed");
+        }
+
+        insertedFiles.push(insertedFile as Record<string, unknown>);
+      }
+    } catch (uploadError) {
+      if (uploadedPaths.length > 0) {
+        await supabaseAdmin.storage.from("festival_artist_files").remove(uploadedPaths);
+      }
+      if (insertedFiles.length > 0) {
+        const insertedIds = insertedFiles
+          .map((file) => String(file.id ?? ""))
+          .filter((id) => id.length > 0);
+        if (insertedIds.length > 0) {
+          await supabaseAdmin.from("festival_artist_files").delete().in("id", insertedIds);
+        }
+      }
+
+      const errorCode = uploadError instanceof Error ? uploadError.message : "internal_error";
+      const status =
+        errorCode === "file_too_large"
+          ? 413
+          : errorCode === "empty_file" ||
+              errorCode === "invalid_file_extension" ||
+              errorCode === "invalid_file_type"
+            ? 400
+            : 500;
+
+      return jsonResponse({ ok: false, error: errorCode }, { status });
     }
 
     let jobTitle: string | null = null;
@@ -234,7 +286,10 @@ serve(async (req) => {
         artist_id: artistContext?.id ?? formRow.artist_id,
         artist_name: artistContext?.name ?? undefined,
         artist_date: artistContext?.date ?? undefined,
-        file_name: sanitizedName,
+        file_name:
+          insertedFiles.length === 1
+            ? String(insertedFiles[0].file_name ?? "")
+            : `${String(insertedFiles[0].file_name ?? "rider")} (+${insertedFiles.length - 1})`,
         url: artistUrl,
       },
     });
@@ -246,10 +301,12 @@ serve(async (req) => {
     return jsonResponse(
       {
         ok: true,
-        file: {
-          ...insertedFile,
+        file: insertedFiles[0] ? { ...insertedFiles[0], uploaded_by_name: null } : null,
+        files: insertedFiles.map((file) => ({
+          ...file,
           uploaded_by_name: null,
-        },
+        })),
+        count: insertedFiles.length,
       },
       { status: 201 },
     );
