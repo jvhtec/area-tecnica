@@ -784,7 +784,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     if (data.publicFormQrDataUrl) {
       try {
         const qrSize = 28;
-        doc.addImage(data.publicFormQrDataUrl, "PNG", 14, yPosition, qrSize, qrSize);
+        const qrX = 14;
+        const qrY = yPosition;
+        doc.addImage(data.publicFormQrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+        if (data.publicFormUrl && data.publicFormUrl.trim().length > 0) {
+          doc.link(qrX, qrY, qrSize, qrSize, { url: data.publicFormUrl });
+        }
 
         doc.setFontSize(9);
         doc.text(

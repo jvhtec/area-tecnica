@@ -18,6 +18,7 @@ import { compareArtistRequirements, calculateEquipmentNeeds } from "@/utils/gear
 import { supabase } from "@/lib/supabase";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { Checkbox } from "@/components/ui/checkbox";
+import { buildReadableFilename } from "@/utils/fileName";
 
 interface Artist {
   id: string;
@@ -334,8 +335,11 @@ export const ArtistTablePrintDialog = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const stageName = stageFilter && stageFilter !== 'all' ? (stageNames?.[parseInt(stageFilter)] || `stage${stageFilter}`) : '';
-      a.download = `artist_schedule_${selectedDate}${stageName ? `_${stageName.replace(/[^a-zA-Z0-9]/g, '_')}` : ''}.pdf`;
+      const stageName =
+        stageFilter && stageFilter !== 'all'
+          ? (stageNames?.[parseInt(stageFilter)] || `Escenario ${stageFilter}`)
+          : '';
+      a.download = buildReadableFilename(["Cronograma artistas", selectedDate, stageName]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

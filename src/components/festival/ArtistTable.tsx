@@ -16,6 +16,7 @@ import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
 import { GearMismatchIndicator } from "./GearMismatchIndicator";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
+import { buildReadableFilename } from "@/utils/fileName";
 
 interface Artist {
   id: string;
@@ -434,7 +435,7 @@ export const ArtistTable = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${artist.name.replace(/[^a-zA-Z0-9]/g, '_')}_Requirements.pdf`;
+      a.download = buildReadableFilename([artist.name, "Requisitos técnicos"]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

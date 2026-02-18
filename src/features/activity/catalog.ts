@@ -57,6 +57,22 @@ export const activityCatalogDefaults: Record<string, ActivityCatalogEntry> = {
     toast_enabled: true,
     template: '{actor_name} deleted {file_name}',
   },
+  'festival.public_form.submitted': {
+    code: 'festival.public_form.submitted',
+    label: 'Public artist form submitted',
+    default_visibility: 'management',
+    severity: 'success',
+    toast_enabled: true,
+    template: '{artist_name} submitted public artist form',
+  },
+  'festival.public_rider.uploaded': {
+    code: 'festival.public_rider.uploaded',
+    label: 'Public rider uploaded',
+    default_visibility: 'management',
+    severity: 'info',
+    toast_enabled: true,
+    template: '{artist_name} uploaded public rider',
+  },
   'hoja.updated': {
     code: 'hoja.updated',
     label: 'Hoja de ruta updated',

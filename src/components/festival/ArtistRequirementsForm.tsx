@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
@@ -14,7 +15,7 @@ import { NotesSection } from "./form/sections/NotesSection";
 import { MicKitSection } from "./form/sections/MicKitSection";
 import { FestivalGearSetup, WirelessSetup } from "@/types/festival";
 import { ArtistSectionProps } from "@/types/artist-form";
-import { Loader2, Printer } from "lucide-react";
+import { Download, Eye, FileText, Loader2, Printer } from "lucide-react";
 
 interface ArtistRequirementsFormProps {
   isBlank?: boolean;
@@ -28,6 +29,7 @@ interface PublicFormContextResponse {
   gear_setup?: FestivalGearSetup | null;
   logo_file_path?: string | null;
   stage_names?: Array<{ number?: number; name?: string }>;
+  rider_files?: Array<Record<string, unknown>>;
 }
 
 interface PublicSubmitResponse {
@@ -37,6 +39,16 @@ interface PublicSubmitResponse {
 }
 
 type ArtistFormState = ArtistSectionProps["formData"];
+type RiderFileRecord = {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string | null;
+  file_size: number | null;
+  uploaded_at: string | null;
+  uploaded_by: string | null;
+  uploaded_by_name: string | null;
+};
 
 const makeBlankSystem = () => ({
   model: "",
@@ -131,6 +143,9 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
   const [festivalLogo, setFestivalLogo] = useState<string | null>(null);
   const [companyLogo, setCompanyLogo] = useState("/sector pro logo.png");
   const [lockedFields, setLockedFields] = useState<Set<string>>(new Set());
+  const [publicArtistId, setPublicArtistId] = useState<string | null>(null);
+  const [riderFiles, setRiderFiles] = useState<RiderFileRecord[]>([]);
+  const [isUploadingRider, setIsUploadingRider] = useState(false);
   const [formData, setFormData] = useState<ArtistFormState>(() => createInitialFormData(isBlank, blankDate));
 
   const resolveFestivalLogoUrl = useCallback(async (rawFilePath: string | null | undefined) => {
@@ -174,6 +189,8 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
       try {
         setLockedFields(new Set());
         setStageNames({});
+        setPublicArtistId(null);
+        setRiderFiles([]);
         if (cancelled) return;
         if (blankDate) {
           setFormData((prev) => ({ ...prev, date: blankDate }));
@@ -274,7 +291,21 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
       const artistData = context.artist || {};
       const artistJobId = asString(artistData.job_id);
+      const artistId = asString(artistData.id);
       const contextStageNames = Array.isArray(context.stage_names) ? context.stage_names : [];
+      const contextRiderFiles = asArray<Record<string, unknown>>(context.rider_files).map((file) => ({
+        id: asString(file.id),
+        file_name: asString(file.file_name),
+        file_path: asString(file.file_path),
+        file_type: asString(file.file_type) || null,
+        file_size: typeof file.file_size === "number" ? file.file_size : null,
+        uploaded_at: asString(file.uploaded_at) || null,
+        uploaded_by: asString(file.uploaded_by) || null,
+        uploaded_by_name: asString(file.uploaded_by_name) || null,
+      }));
+
+      setPublicArtistId(artistId || null);
+      setRiderFiles(contextRiderFiles.filter((file) => file.id && file.file_path));
       const hasSystems = (value: unknown) =>
         asArray<Record<string, unknown>>(value).some((system) => {
           return (
@@ -485,9 +516,11 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase.rpc("submit_public_artist_form", {
-        p_token: token,
-        p_form_data: formData,
+      const { data, error } = await supabase.functions.invoke("submit-public-artist-form", {
+        body: {
+          token,
+          formData,
+        },
       });
 
       if (error) {
@@ -556,6 +589,163 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
     [isBlank, lockedFields]
   );
 
+  const formatUploadedAt = useCallback(
+    (uploadedAt: string | null) => {
+      if (!uploadedAt) return tx("Fecha desconocida", "Unknown date");
+      const date = new Date(uploadedAt);
+      if (Number.isNaN(date.getTime())) return tx("Fecha desconocida", "Unknown date");
+      return new Intl.DateTimeFormat(formLanguage === "en" ? "en-GB" : "es-ES", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Europe/Madrid",
+      }).format(date);
+    },
+    [formLanguage, tx]
+  );
+
+  const formatFileSize = useCallback(
+    (value: number | null) => {
+      if (!value || value <= 0) return tx("Tamaño desconocido", "Unknown size");
+      if (value < 1024) return `${value} B`;
+      if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+      return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+    },
+    [tx]
+  );
+
+  const openRiderFile = useCallback(
+    async (file: RiderFileRecord) => {
+      try {
+        const { data, error } = await supabase.storage
+          .from("festival_artist_files")
+          .createSignedUrl(file.file_path, 60 * 60);
+
+        if (error || !data?.signedUrl) {
+          throw error ?? new Error("Could not create signed URL");
+        }
+
+        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      } catch (error) {
+        console.error("Error opening rider file:", error);
+        toast({
+          title: tx("Error", "Error"),
+          description: tx("No se pudo abrir el rider.", "Could not open rider file."),
+          variant: "destructive",
+        });
+      }
+    },
+    [toast, tx]
+  );
+
+  const downloadRiderFile = useCallback(
+    async (file: RiderFileRecord) => {
+      try {
+        const { data, error } = await supabase.storage
+          .from("festival_artist_files")
+          .download(file.file_path);
+
+        if (error || !data) {
+          throw error ?? new Error("Could not download file");
+        }
+
+        const url = window.URL.createObjectURL(data);
+        const anchor = window.document.createElement("a");
+        anchor.href = url;
+        anchor.download = file.file_name;
+        window.document.body.appendChild(anchor);
+        anchor.click();
+        window.document.body.removeChild(anchor);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error("Error downloading rider file:", error);
+        toast({
+          title: tx("Error", "Error"),
+          description: tx("No se pudo descargar el rider.", "Could not download rider file."),
+          variant: "destructive",
+        });
+      }
+    },
+    [toast, tx]
+  );
+
+  const handleRiderUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const input = event.target;
+      const selectedFile = input.files?.[0];
+      if (!selectedFile) return;
+
+      if (!token || !publicArtistId) {
+        toast({
+          title: tx("Error", "Error"),
+          description: tx("No se pudo identificar este formulario público.", "Could not identify this public form."),
+          variant: "destructive",
+        });
+        input.value = "";
+        return;
+      }
+
+      setIsUploadingRider(true);
+
+      try {
+        const payload = new FormData();
+        payload.append("token", token);
+        payload.append("file", selectedFile);
+
+        const { data, error } = await supabase.functions.invoke("upload-public-artist-rider", {
+          body: payload,
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        const response = data as { ok?: boolean; error?: string; file?: Record<string, unknown> } | null;
+        if (!response?.ok || !response.file) {
+          throw new Error(response?.error || "upload_failed");
+        }
+
+        const uploaded: RiderFileRecord = {
+          id: asString(response.file.id),
+          file_name: asString(response.file.file_name),
+          file_path: asString(response.file.file_path),
+          file_type: asString(response.file.file_type) || null,
+          file_size: typeof response.file.file_size === "number" ? response.file.file_size : null,
+          uploaded_at: asString(response.file.uploaded_at) || null,
+          uploaded_by: asString(response.file.uploaded_by) || null,
+          uploaded_by_name: asString(response.file.uploaded_by_name) || null,
+        };
+
+        if (!uploaded.id || !uploaded.file_path) {
+          throw new Error("invalid_upload_response");
+        }
+
+        setRiderFiles((prev) => [uploaded, ...prev.filter((file) => file.id !== uploaded.id)]);
+
+        toast({
+          title: tx("Éxito", "Success"),
+          description: tx("Rider cargado correctamente.", "Rider uploaded successfully."),
+        });
+      } catch (error) {
+        console.error("Error uploading rider file:", error);
+        toast({
+          title: tx("Error", "Error"),
+          description: tx(
+            "No se pudo cargar el rider. Inténtalo de nuevo.",
+            "Could not upload rider file. Please try again."
+          ),
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploadingRider(false);
+        input.value = "";
+      }
+    },
+    [publicArtistId, toast, token, tx]
+  );
+
+  const shouldShowRiderSection = !isBlank && (formData.rider_missing || riderFiles.length > 0);
+  const latestRider = riderFiles[0] || null;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-6">
@@ -623,6 +813,97 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
                   showSoundcheckTimes={false}
                 />
 
+                {shouldShowRiderSection && (
+                  <div className="space-y-4 border rounded-lg p-4">
+                    <h3 className="text-lg font-semibold">{tx("Rider Técnico", "Technical Rider")}</h3>
+
+                    {formData.rider_missing && (
+                      <p className="text-sm font-medium text-destructive">
+                        {tx(
+                          "Aún no hemos recibido el rider técnico de este artista. Por favor súbelo en esta sección.",
+                          "We have not received this artist's technical rider yet. Please upload it in this section."
+                        )}
+                      </p>
+                    )}
+
+                    {latestRider ? (
+                      <div className="rounded-md border p-3 space-y-3">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <FileText className="h-4 w-4" />
+                              <span>{latestRider.file_name}</span>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {tx("Subido", "Uploaded")}: {formatUploadedAt(latestRider.uploaded_at)} ·{" "}
+                              {formatFileSize(latestRider.file_size)}
+                            </p>
+                            {latestRider.uploaded_by_name && (
+                              <p className="text-xs text-muted-foreground">
+                                {tx("Subido por", "Uploaded by")}: {latestRider.uploaded_by_name}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openRiderFile(latestRider)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              {tx("Ver", "View")}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => downloadRiderFile(latestRider)}
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              {tx("Descargar", "Download")}
+                            </Button>
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground">
+                          {tx(
+                            "Este es el rider actual que tenemos registrado. Si existe una versión más nueva, súbela usando el campo inferior.",
+                            "This is the current rider we have on file. If there is a newer version, please upload it using the field below."
+                          )}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {tx(
+                          "No hay ningún rider cargado actualmente para este artista.",
+                          "There is currently no rider file uploaded for this artist."
+                        )}
+                      </p>
+                    )}
+
+                    <div className="space-y-2">
+                      <label htmlFor="public-rider-upload" className="text-sm font-medium">
+                        {tx("Subir rider (PDF, Word o imagen)", "Upload rider (PDF, Word, or image)")}
+                      </label>
+                      <Input
+                        id="public-rider-upload"
+                        type="file"
+                        accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.webp"
+                        onChange={handleRiderUpload}
+                        disabled={isUploadingRider}
+                      />
+                      {isUploadingRider && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {tx("Subiendo rider...", "Uploading rider...")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <ConsoleSetupSection
                   formData={formData}
                   onChange={handleFormChange}
@@ -673,6 +954,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
                   gearSetup={gearSetup}
                   isFieldLocked={isFieldLocked}
                   language={formLanguage}
+                  restrictToAvailable={!isBlank}
                 />
 
                 <NotesSection

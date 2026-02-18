@@ -290,6 +290,63 @@ export async function handleBroadcast(
     addNaturalRecipients(Array.from(participants));
 
   // ========================================================================
+  // FESTIVAL PUBLIC ARTIST EVENTS (2 events)
+  // ========================================================================
+
+  } else if (type === EVENT_TYPES.FESTIVAL_PUBLIC_FORM_SUBMITTED) {
+    const artistName = ((body as any)?.artist_name as string | undefined)?.trim() || 'Un artista';
+    const artistDate = ((body as any)?.artist_date as string | undefined)?.trim() || '';
+
+    title = 'Formulario técnico recibido';
+    if (artistDate) {
+      try {
+        const formattedDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' })
+          .format(new Date(`${artistDate}T00:00:00Z`));
+        text = `${artistName} envió su formulario técnico (${formattedDate}).`;
+      } catch (_) {
+        text = `${artistName} envió su formulario técnico.`;
+      }
+    } else {
+      text = `${artistName} envió su formulario técnico.`;
+    }
+
+    if (jobId) {
+      const dateParam = artistDate ? `?date=${encodeURIComponent(artistDate)}` : '';
+      url = body.url || `/festival-management/${jobId}/artists${dateParam}`;
+    }
+
+    addNaturalRecipients(Array.from(mgmt));
+  } else if (type === EVENT_TYPES.FESTIVAL_PUBLIC_RIDER_UPLOADED) {
+    const artistName = ((body as any)?.artist_name as string | undefined)?.trim() || 'Un artista';
+    const artistDate = ((body as any)?.artist_date as string | undefined)?.trim() || '';
+    const riderFileName = (body.file_name || '').trim();
+
+    title = 'Rider técnico cargado';
+
+    const riderText = riderFileName
+      ? `${artistName} cargó un rider técnico: "${riderFileName}".`
+      : `${artistName} cargó un rider técnico.`;
+
+    if (artistDate) {
+      try {
+        const formattedDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' })
+          .format(new Date(`${artistDate}T00:00:00Z`));
+        text = `${riderText} (${formattedDate})`;
+      } catch (_) {
+        text = riderText;
+      }
+    } else {
+      text = riderText;
+    }
+
+    if (jobId) {
+      const dateParam = artistDate ? `?date=${encodeURIComponent(artistDate)}` : '';
+      url = body.url || `/festival-management/${jobId}/artists${dateParam}`;
+    }
+
+    addNaturalRecipients(Array.from(mgmt));
+
+  // ========================================================================
   // INCIDENT REPORTS (1 event - CRITICAL for safety)
   // ========================================================================
 
@@ -1162,6 +1219,9 @@ export async function handleBroadcast(
       recipient: recipName,
       channel: ch,
       ...('file_name' in body ? { fileName: body.file_name } : {}),
+      ...('artist_id' in body ? { artistId: (body as any).artist_id } : {}),
+      ...('artist_name' in body ? { artistName: (body as any).artist_name } : {}),
+      ...('artist_date' in body ? { artistDate: (body as any).artist_date } : {}),
       ...('file_id' in body ? { fileId: body.file_id } : {}),
       ...('venue_id' in body ? { venueId: body.venue_id } : {}),
       ...('venue_name' in body ? { venueName: body.venue_name } : {}),

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, ArrowLeft, Printer, Info, Copy, Menu } from "lucide-react";
@@ -20,13 +20,16 @@ import { useArtistsQuery } from "@/hooks/useArtistsQuery";
 import { CopyArtistsDialog } from "@/components/festival/CopyArtistsDialog";
 import { exportFullFestivalSchedulePDF, FullFestivalSchedulePdfData } from "@/utils/fullFestivalSchedulePdfExport";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
 const FestivalArtistManagement = () => {
   const { jobId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
+  const routeDate = searchParams.get("date") || "";
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<any>(null);
@@ -176,8 +179,11 @@ const FestivalArtistManagement = () => {
         if (isValid(startDate) && isValid(endDate)) {
           const dates = eachDayOfInterval({ start: startDate, end: endDate });
           setJobDates(dates);
-          const formattedDate = format(dates[0], 'yyyy-MM-dd');
-          setSelectedDate(formattedDate);
+          const routeDateExists = routeDate
+            ? dates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate)
+            : false;
+          const initialDate = routeDateExists ? routeDate : format(dates[0], "yyyy-MM-dd");
+          setSelectedDate(initialDate);
         }
       }
 
@@ -194,7 +200,29 @@ const FestivalArtistManagement = () => {
       }
     };
     fetchJobDetails();
-  }, [jobId]);
+  }, [jobId, routeDate]);
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    setSearchParams((previousParams) => {
+      if (previousParams.get("date") === selectedDate) {
+        return previousParams;
+      }
+      const nextParams = new URLSearchParams(previousParams);
+      nextParams.set("date", selectedDate);
+      return nextParams;
+    }, { replace: true });
+  }, [selectedDate, setSearchParams]);
+
+  useEffect(() => {
+    if (!routeDate || !jobDates.length) return;
+    if (selectedDate === routeDate) return;
+
+    const existsInFestival = jobDates.some((festivalDate) => format(festivalDate, "yyyy-MM-dd") === routeDate);
+    if (existsInFestival) {
+      setSelectedDate(routeDate);
+    }
+  }, [jobDates, routeDate, selectedDate]);
 
   const { data: logoData } = useQuery({
     queryKey: ['festival-logo', jobId],
@@ -437,8 +465,13 @@ const FestivalArtistManagement = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const stageName = printStage ? (stageNames[parseInt(printStage)] || `stage${printStage}`) : '';
-      a.download = `artist_schedule_${format(new Date(printDate), 'yyyy-MM-dd')}${stageName ? `_${stageName.replace(/[^a-zA-Z0-9]/g, '_')}` : ''}.pdf`;
+      const stageName = printStage ? (stageNames[parseInt(printStage)] || `Escenario ${printStage}`) : '';
+      a.download = buildReadableFilename([
+        jobTitle || "Festival",
+        "Cronograma artistas",
+        formatDateForFilename(printDate),
+        stageName,
+      ]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -523,7 +556,7 @@ const FestivalArtistManagement = () => {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle.replace(/[^a-zA-Z0-9]/g, '_')}_full_schedule.pdf`;
+      a.download = buildReadableFilename([jobTitle || "Festival", "Cronograma completo"]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

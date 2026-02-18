@@ -70,6 +70,9 @@ export type BroadcastBody = {
   actor_name?: string;
   actor_id?: string;
   recipient_name?: string;
+  artist_id?: string;
+  artist_name?: string;
+  artist_date?: string;
   channel?: 'email' | 'whatsapp';
   status?: string; // confirmed | cancelled | declined
   assignment_status?: string; // confirmed | invited (for direct assignments)

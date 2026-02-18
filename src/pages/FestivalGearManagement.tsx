@@ -16,6 +16,7 @@ import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/PrintOptionsDialog";
 import { Badge } from "@/components/ui/badge";
+import { buildReadableFilename } from "@/utils/fileName";
 
 interface StageInfo {
   id?: string;
@@ -405,7 +406,11 @@ const FestivalGearManagement = () => {
       const url = URL.createObjectURL(pdf);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle}_Stage${selectedStage}_GearSetup.pdf`;
+      a.download = buildReadableFilename([
+        jobTitle || "Festival",
+        getCurrentStageName(selectedStage),
+        "Dotación técnica",
+      ]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

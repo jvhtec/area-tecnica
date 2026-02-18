@@ -6,13 +6,15 @@ import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
 import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingRiderReportPdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
-import { fetchLogoUrl } from './logoUtils';
+import { fetchJobLogo, fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
 import { generateTableOfContents } from './tocGenerator';
 import { mergePDFs } from './pdfMerge';
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from '../wiredMicrophoneNeedsPdfExport';
 import { generateWeatherPDF, WeatherPdfData } from './weatherPdfGenerator';
+import { ensurePublicArtistFormLinks } from '../publicArtistFormLinks';
+import { buildReadableFilename } from '@/utils/fileName';
 
 // Helper function to sort artists chronologically across all dates
 const sortArtistsChronologically = (artists: any[]) => {
@@ -55,7 +57,7 @@ export const generateAndMergeFestivalPDFs = async (
 ): Promise<{ blob: Blob; filename: string }> => {
   console.log("Starting comprehensive PDF generation with options:", options);
 
-  const logoUrl = await fetchLogoUrl(jobId);
+  const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
   console.log("Logo URL for PDFs:", logoUrl);
   
   // Fetch stage names for consistent usage
@@ -644,18 +646,27 @@ export const generateAndMergeFestivalPDFs = async (
         
         // Use chronological sorting for Missing Rider Report as well
         const sortedMissingRiderArtists = sortArtistsChronologically(missingRiderArtists);
+        const publicFormLinksByArtistId = await ensurePublicArtistFormLinks(
+          sortedMissingRiderArtists.map((artist) => ({
+            id: artist.id,
+            form_language: artist.form_language,
+          })),
+        );
         
         const missingRiderData: MissingRiderReportData = {
           jobTitle,
           logoUrl,
           artists: sortedMissingRiderArtists.map(artist => ({
+            id: artist.id,
             name: artist.name || 'Unnamed Artist',
             stage: artist.stage || 1,
+            stageName: getStageNameByNumber(artist.stage || 1),
             date: artist.date || '',
             showTime: {
               start: artist.show_start || '',
               end: artist.show_end || ''
-            }
+            },
+            formUrl: publicFormLinksByArtistId[artist.id],
           }))
         };
         
@@ -810,7 +821,7 @@ export const generateAndMergeFestivalPDFs = async (
     const mergedBlob = await mergePDFs(selectedPdfs);
     
     // Generate filename if not provided
-    const filename = customFilename || `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Complete_Documentation.pdf`;
+    const filename = customFilename || buildReadableFilename([jobTitle || "Festival", "Documentación completa"]);
     
     return { blob: mergedBlob, filename };
   } catch (error) {

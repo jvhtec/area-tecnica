@@ -1,6 +1,6 @@
 
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
@@ -107,6 +107,40 @@ function ShortcutSystemInit() {
   return null;
 }
 
+const isPublicArtistFormRoute = (pathname: string) =>
+  pathname === "/festival/form-submitted" ||
+  pathname === "/festival/artist-form/blank" ||
+  pathname.startsWith("/festival/artist-form/");
+
+function RouteAwareGlobalInitializers() {
+  const { pathname } = useLocation();
+
+  if (isPublicArtistFormRoute(pathname)) {
+    return null;
+  }
+
+  return (
+    <>
+      <ServiceWorkerUpdateInit />
+      <PushSubscriptionRecoveryInit />
+      <ShortcutSystemInit />
+    </>
+  );
+}
+
+function RouteAwareGlobalOverlays() {
+  const { pathname } = useLocation();
+  const isPublicArtistForm = isPublicArtistFormRoute(pathname);
+
+  return (
+    <>
+      {!isPublicArtistForm && <GlobalCreateJobDialog />}
+      <Toaster />
+      {!isPublicArtistForm && <SonnerToaster richColors position="top-right" />}
+    </>
+  );
+}
+
 const SOUND_DEPARTMENT = "sound";
 const LIGHTS_DEPARTMENT = "lights";
 const SOUND_TOOL_ROLES = ["admin", "management", "house_tech"] as const;
@@ -190,9 +224,7 @@ export default function App() {
               <AppBadgeProvider>
                 <Router>
                   <OptimizedAuthProvider>
-                    <ServiceWorkerUpdateInit />
-                    <PushSubscriptionRecoveryInit />
-                    <ShortcutSystemInit />
+                    <RouteAwareGlobalInitializers />
                     <div className="app">
                       <Suspense fallback={<PageLoader />}>
                         <Routes>
@@ -304,11 +336,7 @@ export default function App() {
                           </Route>
                         </Routes>
                       </Suspense>
-                      {/* Global Create Job Dialog - accessible from anywhere via shortcuts */}
-                      <GlobalCreateJobDialog />
-                      {/* Radix-based toaster (legacy) and Sonner toaster for activity + app toasts */}
-                      <Toaster />
-                      <SonnerToaster richColors position="top-right" />
+                      <RouteAwareGlobalOverlays />
                     </div>
                   </OptimizedAuthProvider>
                 </Router>

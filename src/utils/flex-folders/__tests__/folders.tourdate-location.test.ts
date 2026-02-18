@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { createFlexFolderMock } = vi.hoisted(() => ({
+const { createFlexFolderMock, testState } = vi.hoisted(() => ({
   createFlexFolderMock: vi.fn(),
+  testState: {
+    existingTourDateRows: [] as any[],
+    insertedFlexFolders: [] as any[],
+  },
 }));
 
 vi.mock("../api", () => ({
@@ -65,6 +69,10 @@ vi.mock("@/lib/supabase", () => {
     private async execute(): SupabaseResult<any> {
       if (this.action === "select") {
         if (this.table === "flex_folders") {
+          if (this.filters["tour_date_id"] && this.filters["folder_type"] === "tourdate") {
+            return { data: testState.existingTourDateRows, error: null };
+          }
+
           if (this.filters["job_id"]) {
             return { data: [], error: null };
           }
@@ -123,6 +131,13 @@ vi.mock("@/lib/supabase", () => {
       }
 
       if (this.action === "insert") {
+        if (this.table === "flex_folders") {
+          const payload = Array.isArray(this.insertPayload)
+            ? this.insertPayload[0]
+            : this.insertPayload;
+          testState.insertedFlexFolders.push(payload);
+        }
+
         if (this.table === "flex_folders" && this.wantsReturning) {
           const payload = Array.isArray(this.insertPayload)
             ? this.insertPayload[0]
@@ -165,6 +180,9 @@ import { createAllFoldersForJob } from "../folders";
 describe("createAllFoldersForJob tourdate location naming", () => {
   beforeEach(() => {
     createFlexFolderMock.mockReset();
+    testState.existingTourDateRows = [];
+    testState.insertedFlexFolders = [];
+
     let counter = 0;
     createFlexFolderMock.mockImplementation(async () => ({
       elementId: `element-${counter++}`,
@@ -197,5 +215,50 @@ describe("createAllFoldersForJob tourdate location naming", () => {
 
     expect(createdNames.some((name: unknown) => typeof name === "string" && name.includes("Madrid"))).toBe(true);
     expect(createdNames.some((name: unknown) => typeof name === "string" && name.includes("No Location"))).toBe(false);
+  });
+
+  it("reuses existing tourdate department root by tour_date_id and does not create a duplicate", async () => {
+    testState.existingTourDateRows = [
+      {
+        id: "row-existing-production",
+        element_id: "existing-production-root",
+        parent_id: "db-flex-production",
+        folder_type: "tourdate",
+        department: "production",
+      },
+    ];
+
+    const job = {
+      id: "job-2",
+      tour_date_id: "tour-date-1",
+      job_type: "tourdate",
+      tour_id: "tour-1",
+      title: "Tourdate Job",
+      start_time: "2025-01-01T10:00:00.000Z",
+      end_time: "2025-01-01T12:00:00.000Z",
+      location_data: { name: "Madrid", formatted_address: "Madrid, ES" },
+    };
+
+    await createAllFoldersForJob(
+      job,
+      "2025-01-01T10:00:00.000Z",
+      "2025-01-01T12:00:00.000Z",
+      "250101",
+      {
+        production: { subfolders: [] },
+        personnel: { subfolders: [] },
+      }
+    );
+
+    const createdRootParentIds = createFlexFolderMock.mock.calls
+      .map(([payload]) => payload?.parentElementId)
+      .filter((value: unknown): value is string => typeof value === "string");
+
+    expect(createdRootParentIds).not.toContain("flex-production");
+
+    const insertedProductionTourdateRoots = testState.insertedFlexFolders.filter(
+      (row: any) => row?.department === "production" && row?.folder_type === "tourdate"
+    );
+    expect(insertedProductionTourdateRoots).toHaveLength(0);
   });
 });

@@ -48,7 +48,7 @@ export const FestivalDateNavigation = ({
     return startOfWeek(selected, { weekStartsOn: 1 }); // Start week on Monday
   });
   const [showOnlyShowDates, setShowOnlyShowDates] = useState(true);
-  const [viewMode, setViewMode] = useState<'week' | 'all'>('week');
+  const [viewMode, setViewMode] = useState<'week' | 'all'>('all');
 
   // Filter dates based on preferences
   const filteredDates = useMemo(() => {
