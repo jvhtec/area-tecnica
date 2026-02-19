@@ -129,6 +129,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             techTotalDaysMap={data.techTotalDaysMap}
             missingEmailTechIds={actions.missingEmailTechIds}
             sendingByTech={actions.sendingByTech}
+            isClosureLocked={data.isClosureLocked}
             getTechOverride={data.getTechOverride}
             overrideActorMap={data.overrideActorMap}
             editingTechId={actions.editingTechId}

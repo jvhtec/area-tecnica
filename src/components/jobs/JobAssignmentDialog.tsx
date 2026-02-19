@@ -585,7 +585,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                             disabled={isRemoving[assignment.technician_id] || isClosureLocked}
                             className="w-full sm:w-auto"
                           >
-
+                            {isRemoving[assignment.technician_id] ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Eliminando...
@@ -687,7 +687,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                 if (error) throw error;
 
                                 // Sync timesheet categories with the new role
-                                await syncTimesheetCategories(jobId, assignment.technician_id);
+                                if (!disableCategorySync) {
+                                  await syncTimesheetCategories(jobId, assignment.technician_id);
+                                }
 
                                 toast({
                                   title: "Rol actualizado",
@@ -726,6 +728,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                           </Label>
                           <Select
                             value={assignment.video_role || "none"}
+                            disabled={isClosureLocked}
                             onValueChange={async (newRole) => {
                               try {
                                 const { error } = await supabase
@@ -737,7 +740,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                 if (error) throw error;
 
                                 // Sync timesheet categories with the new role
-                                await syncTimesheetCategories(jobId, assignment.technician_id);
+                                if (!disableCategorySync) {
+                                  await syncTimesheetCategories(jobId, assignment.technician_id);
+                                }
 
                                 toast({
                                   title: "Rol actualizado",

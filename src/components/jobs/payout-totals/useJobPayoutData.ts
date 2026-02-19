@@ -7,6 +7,7 @@ import { useJobTechnicianPayoutOverrides } from '@/hooks/useJobPayoutOverride';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
+import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import type { JobPayoutTotals, JobExpenseBreakdownItem } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { FLEX_UI_BASE_URL } from '@/utils/flexUrlResolver';
@@ -30,7 +31,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, start_time, tour_id, rates_approved, job_type, invoicing_company')
+        .select('id, title, start_time, end_time, timezone, tour_id, rates_approved, job_type, invoicing_company')
         .eq('id', jobId)
         .maybeSingle();
       if (error) throw error;
@@ -41,6 +42,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   const jobType = jobMeta?.job_type ?? null;
   const isTourDate = jobType === 'tourdate';
+  const isClosureLocked = isJobPastClosureWindow(jobMeta?.end_time, jobMeta?.timezone ?? 'Europe/Madrid');
   const shouldLoadStandardTotals = !!jobId && !isTourDate && !jobMetaLoading;
   const shouldLoadTourQuotes = !!jobId && isTourDate;
 
@@ -366,6 +368,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     isTourDate,
     isLoading,
     error: error as Error | null,
+    isClosureLocked,
     payoutTotals,
     visibleTourQuotes,
     tourTimesheetDays,

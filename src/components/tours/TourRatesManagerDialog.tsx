@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { generateRateQuotePDF, generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
 import { adjustRehearsalQuotesForMultiDay, sendTourJobEmails } from '@/lib/tour-payout-email';
 import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
+import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 
 type TourRatesManagerDialogProps = {
   open: boolean;
@@ -42,7 +43,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, start_time, end_time, job_type, tour_id')
+        .select('id, title, start_time, end_time, timezone, job_type, tour_id')
         .eq('tour_id', tourId)
         .neq('job_type', 'dryhire')
         .order('start_time', { ascending: true });
@@ -62,6 +63,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
 
   // Manager view: compute quotes for selected job (tourdate -> RPC; single/festival -> payout totals)
   const selectedJob = useMemo(() => tourJobs.find((j: any) => j.id === selectedJobId), [tourJobs, selectedJobId]);
+  const isSelectedJobLocked = isJobPastClosureWindow(selectedJob?.end_time, selectedJob?.timezone ?? 'Europe/Madrid');
   const { data: quotes = [], isLoading: quotesLoading } = useManagerJobQuotes(selectedJobId, selectedJob?.job_type, tourId);
 
   const jobIds = useMemo(() => tourJobs.map((job: any) => job.id).filter(Boolean), [tourJobs]);
@@ -441,8 +443,9 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   </Button>
                   <Button
                     size="sm"
-                    disabled={!selectedJobId || quotes.length === 0 || !selectedJobApproved || isSendingEmails}
+                    disabled={!selectedJobId || quotes.length === 0 || !selectedJobApproved || isSendingEmails || isSelectedJobLocked}
                     onClick={async () => {
+                      if (isSelectedJobLocked) return;
                       if (!selectedJobId) return;
                       setIsSendingEmails(true);
                       try {
@@ -661,8 +664,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                           <Button
                             size="sm"
                             variant={selectedJobApproved ? 'outline' : 'default'}
-                            disabled={toggleJobApproval.isPending || !selectedJobId}
-                            onClick={() => selectedJobId && toggleJobApproval.mutate({ jobId: selectedJobId, approve: !selectedJobApproved })}
+                            disabled={toggleJobApproval.isPending || !selectedJobId || isSelectedJobLocked}
+                            onClick={() => {
+                              if (!selectedJobId || isSelectedJobLocked) return;
+                              toggleJobApproval.mutate({ jobId: selectedJobId, approve: !selectedJobApproved });
+                            }}
                             className="flex items-center gap-1"
                           >
                             {selectedJobApproved ? (
