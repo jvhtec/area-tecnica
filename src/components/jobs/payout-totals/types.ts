@@ -22,6 +22,8 @@ export interface JobMetadata {
   id: string;
   title: string;
   start_time: string;
+  end_time: string | null;
+  timezone: string | null;
   tour_id: string | null;
   rates_approved: boolean | null;
   job_type: string | null;
@@ -34,6 +36,7 @@ export interface JobPayoutData {
   isTourDate: boolean;
   isLoading: boolean;
   error: Error | null;
+  isClosureLocked: boolean;
   payoutTotals: JobPayoutTotals[];
   visibleTourQuotes: TourJobRateQuote[];
   tourTimesheetDays: Map<string, number>;

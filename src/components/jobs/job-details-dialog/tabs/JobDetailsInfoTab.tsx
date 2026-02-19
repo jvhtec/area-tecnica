@@ -19,6 +19,7 @@ import { generateTimesheetPDF } from "@/utils/timesheet-pdf";
 import { generateJobPayoutPDF, generateRateQuotePDF } from "@/utils/rates-pdf-export";
 import { sendJobPayoutEmails } from "@/lib/job-payout-email";
 import { adjustRehearsalQuotesForMultiDay } from "@/lib/tour-payout-email";
+import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import { JobPayoutTotalsPanel } from "@/components/jobs/JobPayoutTotalsPanel";
 import { useJobApprovalStatus } from "@/hooks/useJobApprovalStatus";
 
@@ -51,6 +52,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
     !isDryhire && jobDetails?.job_type === "tourdate" && !isManager && isTechnicianRole && !jobRatesApproved;
 
   const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
+  const isClosureLocked = isJobPastClosureWindow(jobDetails?.end_time, jobDetails?.timezone ?? 'Europe/Madrid');
 
   const [isSendingPayoutEmails, setIsSendingPayoutEmails] = useState(false);
   const triggerPayoutEmails = React.useCallback(
@@ -206,8 +208,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                   <Button
                     size="sm"
                     variant="outline"
+                    disabled={isClosureLocked}
                     onClick={async () => {
-                      if (!resolvedJobId) return;
+                      if (!resolvedJobId || isClosureLocked) return;
                       await supabase
                         .from("jobs")
                         .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
@@ -223,9 +226,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                 ) : (
                   <Button
                     size="sm"
-                    disabled={!approvalStatusLoading && !!approvalStatus && !approvalStatus.canApprove}
+                    disabled={isClosureLocked || (!approvalStatusLoading && !!approvalStatus && !approvalStatus.canApprove)}
                     onClick={async () => {
-                      if (!resolvedJobId) return;
+                      if (!resolvedJobId || isClosureLocked) return;
                       if (approvalStatus && !approvalStatus.canApprove) {
                         const reasons = approvalStatus.blockingReasons.join(", ");
                         toast.error(

@@ -39,6 +39,7 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { formatCurrency } from '@/lib/utils';
+import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { Timesheet, TimesheetFormData } from '@/types/timesheet';
 import SignatureCanvas from 'react-signature-canvas';
 import { Theme } from './types';
@@ -52,6 +53,8 @@ interface TimesheetJobInfo {
   id: string;
   title?: string | null;
   start_time?: string | null;
+  end_time?: string | null;
+  timezone?: string | null;
   location?: TimesheetJobLocation | null;
 }
 
@@ -110,6 +113,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
   const { data: payoutRows = [], isLoading: payoutLoading } = useJobPayoutTotals(job?.id, isTech ? userId : undefined);
   const { data: approvalRow } = useJobRatesApproval(job?.id);
   const isRatesApproved = approvalRow?.rates_approved ?? false;
+  const isClosureLocked = isJobPastClosureWindow(job?.end_time, job?.timezone ?? 'Europe/Madrid');
 
   // Filter to only show current user's timesheets
   const myTimesheets = useMemo(() => {
@@ -341,8 +345,8 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                     const isEditing = editingId === timesheet.id;
                     const statusBadge = getStatusBadge(timesheet.status, isDark);
                     const editableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
-                    const canEdit = editableStatuses.includes(timesheet.status);
-                    const canSubmit = editableStatuses.includes(timesheet.status);
+                    const canEdit = editableStatuses.includes(timesheet.status) && !isClosureLocked;
+                    const canSubmit = editableStatuses.includes(timesheet.status) && !isClosureLocked;
                     // In edit mode, use form defaults; in display mode, only calculate if both times exist
                     const workedHours = isEditing
                       ? calculateHours(

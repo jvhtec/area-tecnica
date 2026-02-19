@@ -20,6 +20,7 @@ import { useJobExtras } from '@/hooks/useJobExtras';
 import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
+import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 
 interface EnhancedJobDetailsModalProps {
     theme: {
@@ -90,6 +91,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     const { data: jobRatesApproval } = useJobRatesApproval(resolvedJobId);
     const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
     const jobRatesApproved = jobRatesApproval?.rates_approved ?? jobDetails?.rates_approved ?? job?.rates_approved ?? false;
+    const isClosureLocked = isJobPastClosureWindow(jobDetails?.end_time ?? job?.end_time, jobDetails?.timezone ?? job?.timezone ?? 'Europe/Madrid');
 
     // Fetch staff assignments
     const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({
@@ -472,8 +474,11 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                     </div>
                                     <Button
                                         size="sm"
-                                        disabled={isApproving || approvalStatusLoading}
-                                        onClick={jobRatesApproved ? handleRevokeRates : handleApproveRates}
+                                        disabled={isApproving || approvalStatusLoading || isClosureLocked}
+                                        onClick={() => {
+                                            if (isClosureLocked) return;
+                                            (jobRatesApproved ? handleRevokeRates : handleApproveRates)();
+                                        }}
                                     >
                                         {isApproving ? (
                                             <Loader2 className="h-4 w-4 animate-spin" />

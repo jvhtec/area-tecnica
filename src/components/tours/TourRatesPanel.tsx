@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { sendTourJobEmails } from "@/lib/tour-payout-email";
 import { getAutonomoBadgeLabel } from "@/utils/autonomo";
+import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import type { TechnicianProfile } from "@/utils/rates-pdf-export";
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
@@ -57,15 +58,16 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('jobs')
-        .select('id, title, start_time, tour_id, rates_approved')
+        .select('id, title, start_time, end_time, timezone, tour_id, rates_approved')
         .eq('id', jobId)
         .maybeSingle();
       if (error) throw error;
-      return data as { id: string; title: string; start_time: string; tour_id: string | null; rates_approved: boolean | null } | null;
+      return data as { id: string; title: string; start_time: string; end_time: string | null; timezone: string | null; tour_id: string | null; rates_approved: boolean | null } | null;
     },
     staleTime: 60_000,
   });
   const jobRatesApproved = Boolean(jobMeta?.rates_approved);
+  const isClosureLocked = isJobPastClosureWindow(jobMeta?.end_time, jobMeta?.timezone ?? 'Europe/Madrid');
   const [isSendingEmails, setIsSendingEmails] = React.useState(false);
   const [sendingByTech, setSendingByTech] = React.useState<Record<string, boolean>>({});
 
@@ -307,13 +309,15 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                             <Switch
                               id={`switch-${quote.job_id}-${quote.technician_id}`}
                               checked={isApproved}
-                              onCheckedChange={(checked) =>
-                                quote.job_id && toggleApprovalMutation.mutate({
+                              onCheckedChange={(checked) => {
+                                if (!quote.job_id || isClosureLocked) return;
+                                toggleApprovalMutation.mutate({
                                   jobId: quote.job_id,
                                   technicianId: quote.technician_id,
                                   approved: checked
-                                })}
-                              disabled={toggleApprovalMutation.isPending}
+                                });
+                              }}
+                              disabled={toggleApprovalMutation.isPending || isClosureLocked}
                             />
                           </div>
                         )}
