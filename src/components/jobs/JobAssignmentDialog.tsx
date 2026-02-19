@@ -47,6 +47,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
+import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 
 interface JobAssignmentDialogProps {
   isOpen: boolean;
@@ -54,6 +55,7 @@ interface JobAssignmentDialogProps {
   onAssignmentChange: () => void;
   jobId: string;
   department?: string;
+  disableCategorySync?: boolean;
 }
 
 interface Assignment {
@@ -151,7 +153,7 @@ const formatDepartmentName = (department: string) => {
   return names[department.toLowerCase()] || department;
 };
 
-export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department }: JobAssignmentDialogProps) => {
+export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId, department, disableCategorySync }: JobAssignmentDialogProps) => {
   const { toast } = useToast();
   const { user, userRole } = useOptimizedAuth();
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
@@ -189,7 +191,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     queryFn: async () => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id, start_time, end_time, title, job_date_types(date, type)")
+        .select("id, start_time, end_time, timezone, title, job_date_types(date, type)")
         .eq("id", jobId)
         .single();
 
@@ -215,6 +217,11 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   // Filter technicians: include technicians, house techs, and flagged admin/management
   const filteredTechnicians = availableTechnicians.filter(tech =>
     tech.role === 'technician' || tech.role === 'house_tech' || tech.role === 'management' || tech.role === 'admin'
+  );
+
+  const isClosureLocked = useMemo(
+    () => isJobPastClosureWindow(jobData?.end_time, jobData?.timezone || 'Europe/Madrid'),
+    [jobData?.end_time, jobData?.timezone]
   );
 
   const jobDates = useMemo(() => {
@@ -310,6 +317,10 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   }, [reqForDept, assignedByRole]);
 
   const handleAddTechnician = async () => {
+    if (isClosureLocked) {
+      return;
+    }
+
     if (!selectedTechnician) {
       toast({
         title: "Warning",
@@ -571,10 +582,10 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                           <Button
                             variant="destructive"
                             size="sm"
-                            disabled={isRemoving[assignment.technician_id]}
+                            disabled={isRemoving[assignment.technician_id] || isClosureLocked}
                             className="w-full sm:w-auto"
                           >
-                            {isRemoving[assignment.technician_id] ? (
+
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Eliminando...
@@ -611,6 +622,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                           </Label>
                           <Select
                             value={assignment.sound_role || "none"}
+                            disabled={isClosureLocked}
                             onValueChange={async (newRole) => {
                               try {
                                 const { error } = await supabase
@@ -622,7 +634,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                 if (error) throw error;
 
                                 // Sync timesheet categories with the new role
-                                await syncTimesheetCategories(jobId, assignment.technician_id);
+                                if (!disableCategorySync) {
+                                  await syncTimesheetCategories(jobId, assignment.technician_id);
+                                }
 
                                 toast({
                                   title: "Rol actualizado",
@@ -661,6 +675,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                           </Label>
                           <Select
                             value={assignment.lights_role || "none"}
+                            disabled={isClosureLocked}
                             onValueChange={async (newRole) => {
                               try {
                                 const { error } = await supabase
