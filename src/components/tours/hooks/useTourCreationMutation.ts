@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { Department } from "@/types/department";
 import { InvoicingCompany } from "@/types/job";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
@@ -235,7 +235,17 @@ export const useTourCreationMutation = () => {
     invoicingCompany,
   }: TourCreationData) => {
     console.log("Starting tour creation process...");
-    
+
+    // Validate user with auth server
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError) {
+      throw new Error("Authentication validation failed");
+    }
+    const currentUserId = user?.id;
+    if (!currentUserId) {
+      throw new Error("Authentication required to create a tour");
+    }
+
     const validDates = dates.filter((date) => date.date);
 
     if (validDates.length === 0) {
@@ -309,6 +319,7 @@ export const useTourCreationMutation = () => {
             tour_id: tour.id,
             color,
             invoicing_company: invoicingCompany,
+            created_by: currentUserId,
           })
           .select()
           .single();

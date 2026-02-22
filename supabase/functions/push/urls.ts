@@ -129,6 +129,11 @@ export function resolveNotificationUrl(
   else if (type === EVENT_TYPES.MESSAGE_RECEIVED) {
     return '/dashboard?showMessages=true';
   }
+  // Festival public artist form/rider events navigate to artist management
+  else if (type === EVENT_TYPES.FESTIVAL_PUBLIC_FORM_SUBMITTED ||
+           type === EVENT_TYPES.FESTIVAL_PUBLIC_RIDER_UPLOADED) {
+    return jobId ? `/festival-management/${jobId}/artists` : '/festival-management';
+  }
   // Default fallback: job, tour, or home
   else {
     if (jobId) {
@@ -140,4 +145,3 @@ export function resolveNotificationUrl(
     return tourId ? `/tours/${tourId}` : '/';
   }
 }
-

@@ -92,13 +92,13 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
     
     // Add title with stage number
     pdf.setFontSize(18);
-    pdf.text(`${data.jobTitle} - Infrastructure Needs - Stage ${stageNum}`, 15, 20);
+    pdf.text(`${data.jobTitle} - Infraestructura - Escenario ${stageNum}`, 15, 20);
     
     // Prepare table data for this stage
     const tableData = stageArtists.map(artist => {
       return [
         artist.name,
-        `Stage ${artist.stage}`,
+        `Escenario ${artist.stage}`,
         artist.providedBy,
         artist.cat6.enabled ? artist.cat6.quantity : '-',
         artist.hma.enabled ? artist.hma.quantity : '-',
@@ -112,15 +112,15 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
     // Add the table with headers
     autoTable(pdf, {
       head: [[
-        'Artist Name', 
-        'Stage',
-        'Provided By',
+        'Artista', 
+        'Escenario',
+        'Proporcionado por',
         'CAT6',
         'HMA', 
         'Coax',
         'OpticalCon Duo',
-        'Analog Lines',
-        'Other'
+        'Lineas Analogicas',
+        'Otros'
       ]],
       body: tableData,
       startY: 30,
@@ -153,11 +153,11 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
     });
     
     // Add footer with date, page numbers, and company logo
-    const date = new Date().toLocaleDateString();
+    const date = new Date().toLocaleDateString('es-ES');
     pdf.setFontSize(8);
     pdf.setTextColor(100);
-    pdf.text(`Generated on ${date}`, 15, pageHeight - bottomMargin + 10);
-    pdf.text(`Stage ${stageNum} Infrastructure Overview`, pageWidth / 2, pageHeight - bottomMargin + 10, { align: 'center' });
+    pdf.text(`Generado: ${date}`, 15, pageHeight - bottomMargin + 10);
+    pdf.text(`Infraestructura Escenario ${stageNum}`, pageWidth / 2, pageHeight - bottomMargin + 10, { align: 'center' });
     
     // Add the logo to the center bottom of the page
     const logo = new Image();
@@ -196,7 +196,7 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
     const pageHeight = pdf.internal.pageSize.getHeight();
     pdf.setFontSize(8);
     pdf.setTextColor(100);
-    pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 25, pageHeight - 10);
+    pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - 30, pageHeight - 10);
   }
   
   return pdf.output('blob');

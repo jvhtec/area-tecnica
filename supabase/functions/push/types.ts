@@ -44,6 +44,7 @@ export type BroadcastBody = {
   action: "broadcast";
   type: string; // e.g., 'job.created', 'job.updated', 'document.uploaded', 'document.tech_visible.enabled', 'staffing.availability.sent', etc.
   job_id?: string;
+  job_title?: string | null;
   url?: string;
   // Optional targeting hints
   recipient_id?: string; // direct user to notify (e.g., technician)
@@ -70,6 +71,9 @@ export type BroadcastBody = {
   actor_name?: string;
   actor_id?: string;
   recipient_name?: string;
+  artist_id?: string;
+  artist_name?: string;
+  artist_date?: string;
   channel?: 'email' | 'whatsapp';
   status?: string; // confirmed | cancelled | declined
   assignment_status?: string; // confirmed | invited (for direct assignments)

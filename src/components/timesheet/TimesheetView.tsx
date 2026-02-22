@@ -1,5 +1,7 @@
 
 import { useState, useMemo, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { createQueryKey } from "@/lib/optimized-react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +21,8 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { sendTimesheetReminder } from "@/lib/timesheet-reminder-email";
+import { supabase } from "@/integrations/supabase/client";
+import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,6 +67,32 @@ export const TimesheetView = ({
 
   // Expense state and queries - must be before any early returns
   const { data: expenses = [] } = useJobExpenses(jobId);
+
+  const { data: jobMeta, isError: jobMetaError } = useQuery({
+    queryKey: createQueryKey.jobs.meta(jobId),
+    enabled: !!jobId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('id, end_time, timezone')
+        .eq('id', jobId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as { id: string; end_time: string | null; timezone: string | null } | null;
+    },
+    staleTime: 60_000,
+  });
+
+  // On error, allow actions (fail-open) rather than permanently locking users out.
+  // When jobMeta is undefined (loading), default to locked=true to prevent
+  // actions until we know the actual closure status.
+  // When jobMeta is null (not found), allow actions (job doesn't exist or has no end_time).
+  const isClosureLocked = (() => {
+    if (jobMetaError) return false; // fail-open on error
+    if (jobMeta === undefined) return true; // locked while loading
+    if (!jobMeta) return false; // job not found, allow actions
+    return isJobPastClosureWindow(jobMeta.end_time, jobMeta.timezone ?? 'Europe/Madrid');
+  })();
 
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);
@@ -150,7 +180,7 @@ export const TimesheetView = ({
   };
 
   const handleUpdateTimesheet = async (timesheet: Timesheet) => {
-    if (!editingTimesheet) return;
+    if (!editingTimesheet || isClosureLocked) return;
 
     await updateTimesheet(editingTimesheet, {
       start_time: formData.start_time,
@@ -165,6 +195,7 @@ export const TimesheetView = ({
   };
 
   const startEditing = (timesheet: Timesheet) => {
+    if (isClosureLocked) return;
     setEditingTimesheet(timesheet.id);
     setFormData({
       date: timesheet.date,
@@ -248,7 +279,7 @@ export const TimesheetView = ({
   };
 
   const handleBulkAction = async (action: 'submit' | 'approve' | 'delete') => {
-    if (selectedTimesheets.size === 0) return;
+    if (selectedTimesheets.size === 0 || isClosureLocked) return;
 
     setIsBulkUpdating(true);
     const timesheetIds = Array.from(selectedTimesheets);
@@ -283,6 +314,7 @@ export const TimesheetView = ({
   };
 
   const handleBulkEdit = async () => {
+    if (isClosureLocked) return;
     console.log('Bulk edit starting with:', {
       selectedTimesheets: Array.from(selectedTimesheets),
       bulkFormData
@@ -432,7 +464,7 @@ export const TimesheetView = ({
                     console.log('Edit Times button clicked, showBulkEditForm:', showBulkEditForm);
                     setShowBulkEditForm(!showBulkEditForm);
                   }}
-                  disabled={isBulkUpdating}
+                  disabled={isBulkUpdating || isClosureLocked}
                 >
                   Editar Tiempos ({selectedTimesheets.size})
                 </Button>
@@ -440,14 +472,14 @@ export const TimesheetView = ({
                   variant="outline"
                   size="sm"
                   onClick={() => handleBulkAction('submit')}
-                  disabled={selectedTimesheets.size === 0 || isBulkUpdating}
+                  disabled={selectedTimesheets.size === 0 || isBulkUpdating || isClosureLocked}
                 >
                   Enviar Seleccionados ({selectedTimesheets.size})
                 </Button>
                 <Button
                   size="sm"
                   onClick={() => handleBulkAction('approve')}
-                  disabled={selectedTimesheets.size === 0 || isBulkUpdating}
+                  disabled={selectedTimesheets.size === 0 || isBulkUpdating || isClosureLocked}
                 >
                   Aprobar Seleccionados ({selectedTimesheets.size})
                 </Button>
@@ -455,7 +487,7 @@ export const TimesheetView = ({
                   variant="destructive"
                   size="sm"
                   onClick={() => handleBulkAction('delete')}
-                  disabled={selectedTimesheets.size === 0 || isBulkUpdating}
+                  disabled={selectedTimesheets.size === 0 || isBulkUpdating || isClosureLocked}
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
                   Eliminar Seleccionados ({selectedTimesheets.size})
@@ -464,7 +496,7 @@ export const TimesheetView = ({
                   variant="outline"
                   size="sm"
                   onClick={clearSelection}
-                  disabled={isBulkUpdating}
+                  disabled={isBulkUpdating || isClosureLocked}
                 >
                   Limpiar
                 </Button>
@@ -474,7 +506,7 @@ export const TimesheetView = ({
               variant="outline"
               size="sm"
               onClick={selectedTimesheets.size > 0 ? clearSelection : selectAllVisibleTimesheets}
-              disabled={isBulkUpdating}
+              disabled={isBulkUpdating || isClosureLocked}
             >
               {selectedTimesheets.size > 0 ? 'Deseleccionar Todo' : 'Seleccionar Todo'}
             </Button>
@@ -499,7 +531,7 @@ export const TimesheetView = ({
                   value={bulkFormData.start_time}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, start_time: e.target.value })}
                   placeholder="Dejar vacío para omitir"
-                  disabled={isBulkUpdating}
+                  disabled={isBulkUpdating || isClosureLocked}
                 />
               </div>
               <div>
@@ -511,7 +543,7 @@ export const TimesheetView = ({
                   value={bulkFormData.end_time}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, end_time: e.target.value })}
                   placeholder="Dejar vacío para omitir"
-                  disabled={isBulkUpdating}
+                  disabled={isBulkUpdating || isClosureLocked}
                 />
               </div>
               <div>
@@ -522,7 +554,7 @@ export const TimesheetView = ({
                   value={bulkFormData.break_minutes || ''}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, break_minutes: e.target.value ? parseInt(e.target.value) : undefined })}
                   placeholder="Dejar vacío para omitir"
-                  disabled={isBulkUpdating}
+                  disabled={isBulkUpdating || isClosureLocked}
                 />
                 <p className="text-[10px] text-muted-foreground mt-1">
                   Solo para descansos por convenio o montajes/desmontajes, no para comidas.
@@ -537,7 +569,7 @@ export const TimesheetView = ({
                   value={bulkFormData.overtime_hours || ''}
                   onChange={(e) => setBulkFormData({ ...bulkFormData, overtime_hours: e.target.value ? parseFloat(e.target.value) : undefined })}
                   placeholder="Dejar vacío para omitir"
-                  disabled={isBulkUpdating}
+                  disabled={isBulkUpdating || isClosureLocked}
                 />
               </div>
               <div className="flex flex-col justify-end gap-2">
@@ -547,7 +579,7 @@ export const TimesheetView = ({
                     type="checkbox"
                     checked={!!bulkFormData.ends_next_day}
                     onChange={(e) => setBulkFormData({ ...bulkFormData, ends_next_day: e.target.checked })}
-                    disabled={isBulkUpdating}
+                    disabled={isBulkUpdating || isClosureLocked}
                   />
                   <Label htmlFor="bulk_ends_next_day">Termina al día siguiente</Label>
                   {bulkFormData.end_time && bulkFormData.start_time && bulkFormData.end_time < bulkFormData.start_time && (
@@ -564,7 +596,7 @@ export const TimesheetView = ({
                     handleBulkEdit();
                   }}
                   className="w-full"
-                  disabled={isBulkUpdating}
+                  disabled={isBulkUpdating || isClosureLocked}
                 >
                   {isBulkUpdating ? 'Actualizando...' : 'Aplicar Cambios'}
                 </Button>
@@ -577,7 +609,7 @@ export const TimesheetView = ({
                 value={bulkFormData.notes}
                 onChange={(e) => setBulkFormData({ ...bulkFormData, notes: e.target.value })}
                 placeholder="Dejar vacío para omitir añadir notas"
-                disabled={isBulkUpdating}
+                disabled={isBulkUpdating || isClosureLocked}
               />
             </div>
           </div>
@@ -658,13 +690,13 @@ export const TimesheetView = ({
             {dayTimesheets.map((timesheet) => {
               const editableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
               const canEditTimesheet = isTechnician
-                ? (timesheet.technician_id === user?.id && editableStatuses.includes(timesheet.status))
-                : (isManagementUser && editableStatuses.includes(timesheet.status));
+                ? (timesheet.technician_id === user?.id && editableStatuses.includes(timesheet.status) && !isClosureLocked)
+                : (isManagementUser && editableStatuses.includes(timesheet.status) && !isClosureLocked);
 
               const submittableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
               const canSubmitTimesheet = isTechnician
-                ? (timesheet.technician_id === user?.id && submittableStatuses.includes(timesheet.status))
-                : (isManagementUser && submittableStatuses.includes(timesheet.status));
+                ? (timesheet.technician_id === user?.id && submittableStatuses.includes(timesheet.status) && !isClosureLocked)
+                : (isManagementUser && submittableStatuses.includes(timesheet.status) && !isClosureLocked);
 
               console.log('Timesheet permission check:', {
                 timesheetId: timesheet.id,
@@ -686,7 +718,7 @@ export const TimesheetView = ({
                           checked={selectedTimesheets.has(timesheet.id)}
                           onChange={() => toggleTimesheetSelection(timesheet.id)}
                           className="h-4 w-4"
-                          disabled={isBulkUpdating}
+                          disabled={isBulkUpdating || isClosureLocked}
                         />
                       )}
                       <div>
@@ -721,7 +753,7 @@ export const TimesheetView = ({
                           variant="outline"
                           size="sm"
                           onClick={() => handleSendReminder(timesheet.id)}
-                          disabled={sendingReminder === timesheet.id || isBulkUpdating}
+                          disabled={sendingReminder === timesheet.id || isBulkUpdating || isClosureLocked}
                           className="border-blue-500 text-blue-600 hover:bg-blue-50"
                         >
                           <Mail className="h-4 w-4 mr-1" />
@@ -748,7 +780,7 @@ export const TimesheetView = ({
                           <Button
                             size="sm"
                             onClick={() => approveTimesheet(timesheet.id)}
-                            disabled={isBulkUpdating}
+                            disabled={isBulkUpdating || isClosureLocked}
                           >
                             Aprobar
                           </Button>
@@ -756,7 +788,7 @@ export const TimesheetView = ({
                             variant="outline"
                             size="sm"
                             onClick={() => openRejectDialog(timesheet)}
-                            disabled={isBulkUpdating}
+                            disabled={isBulkUpdating || isClosureLocked}
                           >
                             Rechazar
                           </Button>
@@ -769,7 +801,7 @@ export const TimesheetView = ({
                           variant="outline"
                           size="sm"
                           onClick={() => revertTimesheet(timesheet.id)}
-                          disabled={isBulkUpdating}
+                          disabled={isBulkUpdating || isClosureLocked}
                           className="border-orange-500 text-orange-600 hover:bg-orange-50"
                         >
                           Revertir Aprobación
@@ -783,7 +815,7 @@ export const TimesheetView = ({
                             <Button
                               variant="destructive"
                               size="sm"
-                              disabled={isBulkUpdating}
+                              disabled={isBulkUpdating || isClosureLocked}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

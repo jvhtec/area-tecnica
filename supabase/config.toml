@@ -48,3 +48,12 @@ verify_jwt = true
 
 [functions.tech-calendar-ics]
 verify_jwt = false
+
+[functions.upload-public-artist-rider]
+verify_jwt = false
+
+[functions.delete-public-artist-rider]
+verify_jwt = false
+
+[functions.submit-public-artist-form]
+verify_jwt = false

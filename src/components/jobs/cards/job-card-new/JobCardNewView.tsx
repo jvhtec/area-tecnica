@@ -21,7 +21,7 @@ import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import type { Department } from "@/types/department";
 
 import { JobCardActions } from "../JobCardActions";
@@ -529,6 +529,7 @@ export function JobCardNewView({
               onAssignmentChange={() => {}}
               jobId={job.id}
               department={department as Department}
+              disableCategorySync={isProjectManagementPage}
             />
           )}
 

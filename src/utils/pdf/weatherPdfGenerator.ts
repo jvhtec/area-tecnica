@@ -42,7 +42,7 @@ export const generateWeatherPDF = async (data: WeatherPdfData): Promise<Blob> =>
   // Title
   pdf.setFontSize(20);
   pdf.setFont('helvetica', 'bold');
-  pdf.text('Weather Forecast', 20, yPosition);
+  pdf.text('Prevision Meteorologica', 20, yPosition);
   yPosition += 10;
   
   pdf.setFontSize(14);
@@ -86,7 +86,7 @@ export const generateWeatherPDF = async (data: WeatherPdfData): Promise<Blob> =>
     
     autoTable(pdf, {
       startY: yPosition,
-      head: [['Date', 'Condition', 'Temperature', 'Rain Chance']],
+      head: [['Fecha', 'Condicion', 'Temperatura', 'Prob. Lluvia']],
       body: tableData,
       theme: 'grid',
       headStyles: {
@@ -111,21 +111,21 @@ export const generateWeatherPDF = async (data: WeatherPdfData): Promise<Blob> =>
     // Add weather source info
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'italic');
-    pdf.text('Weather data provided by Open-Meteo (open-meteo.com)', 20, yPosition);
-    pdf.text(`Generated on: ${new Date().toLocaleString()}`, 20, yPosition + 10);
+    pdf.text('Datos meteorologicos proporcionados por Open-Meteo (open-meteo.com)', 20, yPosition);
+    pdf.text(`Generado: ${new Date().toLocaleString('es-ES')}`, 20, yPosition + 10);
     
   } else {
     // No weather data available
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'normal');
-    pdf.text('Weather data not available for the selected dates and location.', 20, yPosition);
+    pdf.text('Datos meteorologicos no disponibles para las fechas y ubicacion seleccionadas.', 20, yPosition);
     
     if (!data.venue?.address && !data.venue?.coordinates) {
-      pdf.text('Please add venue location information to enable weather forecasts.', 20, yPosition + 15);
+      pdf.text('Por favor, añada la ubicacion del recinto para habilitar la prevision meteorologica.', 20, yPosition + 15);
     }
     
     if (data.jobDates.length === 0) {
-      pdf.text('Please add event dates to enable weather forecasts.', 20, yPosition + 30);
+      pdf.text('Por favor, añada las fechas del evento para habilitar la prevision meteorologica.', 20, yPosition + 30);
     }
   }
   

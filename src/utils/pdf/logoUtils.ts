@@ -21,6 +21,46 @@ const withInflight = (bucket: string, path: string, fn: () => Promise<string | u
   return p;
 };
 
+const parseSupabaseStoragePath = (value: string, bucket: string): string | null => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const decodeSafe = (input: string) => {
+    try {
+      return decodeURIComponent(input);
+    } catch {
+      return input;
+    }
+  };
+
+  const normalize = (input: string) => {
+    let normalized = decodeSafe(input).trim();
+    normalized = normalized.split('?')[0].split('#')[0];
+    normalized = normalized.replace(/^\/+/, '');
+    const bucketPrefix = `${bucket}/`;
+    if (normalized.startsWith(bucketPrefix)) {
+      normalized = normalized.slice(bucketPrefix.length);
+    }
+    return normalized;
+  };
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    try {
+      const url = new URL(trimmed);
+      const segments = decodeSafe(url.pathname).split('/').filter(Boolean);
+      const bucketIndex = segments.indexOf(bucket);
+      if (bucketIndex >= 0 && bucketIndex < segments.length - 1) {
+        return normalize(segments.slice(bucketIndex + 1).join('/'));
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  return normalize(trimmed);
+};
+
 const resolveTourLogoPath = async (tourId: string): Promise<string | null> => {
   try {
     const { data: tourLogo, error: tourLogoError } = await supabase
@@ -88,26 +128,41 @@ export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> =
     
     if (logoData?.file_path) {
       try {
+        const rawPath = logoData.file_path.trim();
+        if (/^https?:\/\//i.test(rawPath)) {
+          const parsedPath = parseSupabaseStoragePath(rawPath, 'festival-logos');
+          if (!parsedPath) {
+            // External URL stored directly in DB
+            return rawPath;
+          }
+        }
+
+        const normalizedPath = parseSupabaseStoragePath(rawPath, 'festival-logos');
+        if (!normalizedPath) {
+          console.warn('Festival logo path could not be normalized:', rawPath);
+          return undefined;
+        }
+
         // Use cache if available
-        const cached = logoUrlCache.get('festival-logos', logoData.file_path);
+        const cached = logoUrlCache.get('festival-logos', normalizedPath);
         if (cached) return cached;
 
-        return await withInflight('festival-logos', logoData.file_path, async () => {
+        return await withInflight('festival-logos', normalizedPath, async () => {
           const { data: signedUrlData, error: signedUrlError } = await supabase.storage
           .from('festival-logos')
-          .createSignedUrl(logoData.file_path, 60 * 60); // 1 hour expiry
+          .createSignedUrl(normalizedPath, 60 * 60); // 1 hour expiry
           
         if (signedUrlError) {
           console.error("Error creating signed URL:", signedUrlError);
           // Try fallback to public URL if signed URL fails
           const { data: publicUrlData } = supabase.storage
             .from('festival-logos')
-            .getPublicUrl(logoData.file_path);
+            .getPublicUrl(normalizedPath);
             
           if (publicUrlData?.publicUrl) {
             console.log("Generated logo public URL (fallback):", publicUrlData.publicUrl);
             // cache for 15 minutes
-            logoUrlCache.set('festival-logos', logoData.file_path, publicUrlData.publicUrl, 15 * 60 * 1000);
+            logoUrlCache.set('festival-logos', normalizedPath, publicUrlData.publicUrl, 15 * 60 * 1000);
             return publicUrlData.publicUrl;
           }
           return undefined;
@@ -116,18 +171,18 @@ export const fetchLogoUrl = async (jobId: string): Promise<string | undefined> =
         if (signedUrlData?.signedUrl) {
           console.log("Generated festival logo signed URL:", signedUrlData.signedUrl);
           // cache for 45 minutes (shorter than 1h expiry)
-          logoUrlCache.set('festival-logos', logoData.file_path, signedUrlData.signedUrl, 45 * 60 * 1000);
+          logoUrlCache.set('festival-logos', normalizedPath, signedUrlData.signedUrl, 45 * 60 * 1000);
           return signedUrlData.signedUrl;
         }
         
         // Fallback to public URL
         const { data: publicUrlData } = supabase.storage
           .from('festival-logos')
-          .getPublicUrl(logoData.file_path);
+          .getPublicUrl(normalizedPath);
           
         if (publicUrlData?.publicUrl) {
           console.log("Generated logo public URL:", publicUrlData.publicUrl);
-          logoUrlCache.set('festival-logos', logoData.file_path, publicUrlData.publicUrl, 15 * 60 * 1000);
+          logoUrlCache.set('festival-logos', normalizedPath, publicUrlData.publicUrl, 15 * 60 * 1000);
           return publicUrlData.publicUrl;
         }
         return undefined;

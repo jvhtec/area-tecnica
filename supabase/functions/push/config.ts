@@ -79,6 +79,10 @@ export const EVENT_TYPES = {
   SOUNDVISION_FILE_UPLOADED: 'soundvision.file.uploaded',
   SOUNDVISION_FILE_DOWNLOADED: 'soundvision.file.downloaded',
 
+  // Festival public artist workflows
+  FESTIVAL_PUBLIC_FORM_SUBMITTED: 'festival.public_form.submitted',
+  FESTIVAL_PUBLIC_RIDER_UPLOADED: 'festival.public_rider.uploaded',
+
   // Hoja de ruta
   HOJA_UPDATED: 'hoja.updated',
 

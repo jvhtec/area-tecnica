@@ -5,11 +5,73 @@ import { Input } from "@/components/ui/input";
 import { QuantityInput } from "../shared/QuantityInput";
 import { SectionProps } from "@/types/festival-form";
 import { useEquipmentValidation } from "@/hooks/useEquipmentValidation";
+import { useEffect } from "react";
 
-export const InfrastructureSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: SectionProps) => {
+interface InfrastructureSectionProps extends SectionProps {
+  restrictToAvailable?: boolean;
+}
+
+export const InfrastructureSection = ({
+  formData,
+  onChange,
+  gearSetup,
+  isFieldLocked,
+  language = "es",
+  restrictToAvailable = false,
+}: InfrastructureSectionProps) => {
   const { validateEquipment } = useEquipmentValidation(gearSetup);
   const locked = (field: string) => isFieldLocked?.(field) ?? false;
   const tx = (es: string, en: string) => (language === "en" ? en : es);
+  const availableCat6 = (gearSetup?.available_cat6_runs ?? 0) > 0;
+  const availableHma = (gearSetup?.available_hma_runs ?? 0) > 0;
+  const availableCoax = (gearSetup?.available_coax_runs ?? 0) > 0;
+  const availableOpticalcon = (gearSetup?.available_opticalcon_duo_runs ?? 0) > 0;
+  const availableAnalog = (gearSetup?.available_analog_runs ?? 0) > 0;
+  const showCat6 = !restrictToAvailable || availableCat6;
+  const showHma = !restrictToAvailable || availableHma;
+  const showCoax = !restrictToAvailable || availableCoax;
+  const showOpticalcon = !restrictToAvailable || availableOpticalcon;
+  const showAnalog = !restrictToAvailable || availableAnalog;
+  const hasAnyInfrastructureOption = showCat6 || showHma || showCoax || showOpticalcon || showAnalog;
+
+  useEffect(() => {
+    if (!restrictToAvailable) return;
+
+    const resetChanges: Partial<typeof formData> = {};
+
+    if (!availableCat6 && (formData.infra_cat6 || (formData.infra_cat6_quantity || 0) > 0)) {
+      resetChanges.infra_cat6 = false;
+      resetChanges.infra_cat6_quantity = 0;
+    }
+    if (!availableHma && (formData.infra_hma || (formData.infra_hma_quantity || 0) > 0)) {
+      resetChanges.infra_hma = false;
+      resetChanges.infra_hma_quantity = 0;
+    }
+    if (!availableCoax && (formData.infra_coax || (formData.infra_coax_quantity || 0) > 0)) {
+      resetChanges.infra_coax = false;
+      resetChanges.infra_coax_quantity = 0;
+    }
+    if (!availableOpticalcon && (formData.infra_opticalcon_duo || (formData.infra_opticalcon_duo_quantity || 0) > 0)) {
+      resetChanges.infra_opticalcon_duo = false;
+      resetChanges.infra_opticalcon_duo_quantity = 0;
+    }
+    if (!availableAnalog && (formData.infra_analog || 0) > 0) {
+      resetChanges.infra_analog = 0;
+    }
+
+    if (Object.keys(resetChanges).length > 0) {
+      onChange(resetChanges);
+    }
+  }, [
+    availableAnalog,
+    availableCat6,
+    availableCoax,
+    availableHma,
+    availableOpticalcon,
+    formData,
+    onChange,
+    restrictToAvailable,
+  ]);
 
   return (
     <div className="space-y-4 border rounded-lg p-3 md:p-4">
@@ -17,6 +79,7 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup, isFieldLo
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* CAT6 */}
+        {showCat6 && (
         <div className="space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center space-x-2">
@@ -49,8 +112,10 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup, isFieldLo
             )}
           </div>
         </div>
+        )}
 
         {/* HMA */}
+        {showHma && (
         <div className="space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center space-x-2">
@@ -83,8 +148,10 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup, isFieldLo
             )}
           </div>
         </div>
+        )}
 
         {/* Coax */}
+        {showCoax && (
         <div className="space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center space-x-2">
@@ -117,8 +184,10 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup, isFieldLo
             )}
           </div>
         </div>
+        )}
 
         {/* OpticalCon Duo */}
+        {showOpticalcon && (
         <div className="space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <div className="flex items-center space-x-2">
@@ -151,8 +220,10 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup, isFieldLo
             )}
           </div>
         </div>
+        )}
 
         {/* Analog Lines */}
+        {showAnalog && (
         <div className="space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <Label htmlFor="infra-analog" className="text-sm md:text-base">{tx("Líneas Analógicas", "Analog Lines")}</Label>
@@ -170,7 +241,17 @@ export const InfrastructureSection = ({ formData, onChange, gearSetup, isFieldLo
             />
           </div>
         </div>
+        )}
       </div>
+
+      {!hasAnyInfrastructureOption && restrictToAvailable && (
+        <p className="text-sm text-muted-foreground">
+          {tx(
+            "No hay opciones de infraestructura disponibles en la dotación de festival para este formulario.",
+            "There are no infrastructure options available in the festival allocation for this form."
+          )}
+        </p>
+      )}
 
       <div>
         <Label htmlFor="other-infrastructure">{tx("Otros Requerimientos de Infraestructura", "Other Infrastructure Requirements")}</Label>

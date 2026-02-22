@@ -94,6 +94,8 @@ export const createQueryKey = {
     list: (filters: Record<string, any>) => [...createQueryKey.jobs.lists(), filters] as const,
     details: () => [...createQueryKey.jobs.all, 'detail'] as const,
     detail: (id: string) => [...createQueryKey.jobs.details(), id] as const,
+    /** Job metadata for timesheet closure window checks (end_time, timezone). */
+    meta: (id: string) => [...createQueryKey.jobs.all, 'meta', id] as const,
   },
   tasks: {
     all: ['tasks'] as const,
@@ -133,6 +135,7 @@ export const optimizedInvalidation = {
   invalidateJobRelated: (queryClient: QueryClient, jobId: string) => {
     const invalidations = [
       createQueryKey.jobs.detail(jobId),
+      createQueryKey.jobs.meta(jobId),
       createQueryKey.tasks.byJob(jobId),
       createQueryKey.assignments.byJob(jobId),
       createQueryKey.folders.existence(jobId)

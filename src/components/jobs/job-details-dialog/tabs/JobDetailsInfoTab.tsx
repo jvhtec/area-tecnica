@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatInTimeZone } from "date-fns-tz";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -10,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { supabase } from "@/integrations/supabase/client";
 import { syncFlexWorkOrdersForJob } from "@/services/flexWorkOrders";
@@ -19,8 +20,10 @@ import { generateTimesheetPDF } from "@/utils/timesheet-pdf";
 import { generateJobPayoutPDF, generateRateQuotePDF } from "@/utils/rates-pdf-export";
 import { sendJobPayoutEmails } from "@/lib/job-payout-email";
 import { adjustRehearsalQuotesForMultiDay } from "@/lib/tour-payout-email";
+import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import { JobPayoutTotalsPanel } from "@/components/jobs/JobPayoutTotalsPanel";
 import { useJobApprovalStatus } from "@/hooks/useJobApprovalStatus";
+import { attachPayoutOverridesToTourQuotes } from "@/services/tourPayoutOverrides";
 
 import { enrichTimesheetsWithProfiles } from "../enrichTimesheetsWithProfiles";
 
@@ -51,6 +54,28 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
     !isDryhire && jobDetails?.job_type === "tourdate" && !isManager && isTechnicianRole && !jobRatesApproved;
 
   const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
+
+  const { data: creatorProfile } = useQuery({
+    queryKey: ["profile-minimal", jobDetails?.created_by],
+    enabled: !!jobDetails?.created_by,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", jobDetails.created_by)
+        .maybeSingle();
+      if (error) {
+        console.error("[JobDetailsInfoTab] Failed to fetch creator profile", error);
+        return null;
+      }
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isClosureLocked = jobDetails
+    ? isJobPastClosureWindow(jobDetails.end_time, jobDetails.timezone ?? 'Europe/Madrid')
+    : false;
 
   const [isSendingPayoutEmails, setIsSendingPayoutEmails] = useState(false);
   const triggerPayoutEmails = React.useCallback(
@@ -105,15 +130,35 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
     queryKey: ["flex-workorders-folder", resolvedJobId, jobDetails?.job_type, jobDetails?.tour_date_id],
     enabled: open && isManager && !!resolvedJobId,
     queryFn: async () => {
-      const criteria: any = { folder_type: "work_orders", department: "personnel" };
-      if ((jobDetails?.job_type || job?.job_type) === "tourdate") {
-        criteria.tour_date_id = jobDetails?.tour_date_id || job?.tour_date_id;
+      const isTourDateJob = (jobDetails?.job_type || job?.job_type) === "tourdate";
+      const tourDateId = jobDetails?.tour_date_id || job?.tour_date_id || null;
+
+      let query = supabase
+        .from("flex_folders")
+        .select("element_id, job_id, tour_date_id, created_at")
+        .eq("folder_type", "work_orders")
+        .eq("department", "personnel");
+
+      if (isTourDateJob) {
+        if (tourDateId) {
+          query = query.or(`job_id.eq.${resolvedJobId},tour_date_id.eq.${tourDateId}`);
+        } else {
+          query = query.eq("job_id", resolvedJobId);
+        }
       } else {
-        criteria.job_id = resolvedJobId;
+        query = query.eq("job_id", resolvedJobId);
       }
-      const { data, error } = await supabase.from("flex_folders").select("element_id").match(criteria).maybeSingle();
-      if (error) return null;
-      return data || null;
+
+      const { data, error } = await query.order("created_at", { ascending: false });
+      if (error || !data?.length) return null;
+
+      const preferred =
+        data.find((row) => row.job_id === resolvedJobId && (!tourDateId || row.tour_date_id === tourDateId)) ||
+        data.find((row) => row.job_id === resolvedJobId) ||
+        (tourDateId ? data.find((row) => row.tour_date_id === tourDateId) : null) ||
+        data[0];
+
+      return preferred ? { element_id: preferred.element_id } : null;
     },
   });
 
@@ -189,6 +234,21 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                 <Badge variant="secondary">{jobDetails.invoicing_company}</Badge>
               </div>
             )}
+            {(creatorProfile || jobDetails?.created_at) && (
+              <div>
+                <p className="text-sm font-medium mb-2">Creado por</p>
+                <span className="text-sm text-muted-foreground">
+                  {creatorProfile
+                    ? `${creatorProfile.first_name} ${creatorProfile.last_name}`.trim()
+                    : "—"}
+                  {jobDetails?.created_at && (
+                    <span className="ml-2 text-xs">
+                      ({formatInTimeZone(new Date(jobDetails.created_at), "Europe/Madrid", "d MMM yyyy, HH:mm", { locale: es })})
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
           </div>
 
           {isManager && !isDryhire && (
@@ -206,8 +266,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                   <Button
                     size="sm"
                     variant="outline"
+                    disabled={isClosureLocked}
                     onClick={async () => {
-                      if (!resolvedJobId) return;
+                      if (!resolvedJobId || isClosureLocked) return;
                       await supabase
                         .from("jobs")
                         .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
@@ -223,9 +284,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                 ) : (
                   <Button
                     size="sm"
-                    disabled={!approvalStatusLoading && !!approvalStatus && !approvalStatus.canApprove}
+                    disabled={isClosureLocked || (!approvalStatusLoading && !!approvalStatus && !approvalStatus.canApprove)}
                     onClick={async () => {
-                      if (!resolvedJobId) return;
+                      if (!resolvedJobId || isClosureLocked) return;
                       if (approvalStatus && !approvalStatus.canApprove) {
                         const reasons = approvalStatus.blockingReasons.join(", ");
                         toast.error(
@@ -308,6 +369,16 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
 
           {approvalStatus && approvalStatus.blockingReasons.length > 0 && (
             <div className="mt-2 text-xs text-foreground/70 dark:text-muted-foreground">Pendiente: {approvalStatus.blockingReasons.join(", ")}</div>
+          )}
+
+          {isClosureLocked && (
+            <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Plazo cerrado</AlertTitle>
+              <AlertDescription>
+                El período para modificar este parte ha finalizado.
+              </AlertDescription>
+            </Alert>
           )}
 
           {jobDetails?.locations && (
@@ -418,12 +489,15 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       created_at: jobDetails?.created_at || new Date().toISOString(),
                     } as any;
 
-                    const tsDoc = await generateTimesheetPDF({
-                      job: jobObj,
-                      timesheets: timesheets as any,
-                      date: "all-dates",
-                    });
-                    const tsBlob = tsDoc.output("blob") as Blob;
+                    let tsBlob: Blob | null = null;
+                    if (!isTourDateJob) {
+                      const tsDoc = await generateTimesheetPDF({
+                        job: jobObj,
+                        timesheets: timesheets as any,
+                        date: "all-dates",
+                      });
+                      tsBlob = tsDoc.output("blob") as Blob;
+                    }
 
                     // 3) Build inputs for payout PDF (tourdate uses rate quotes, others use payout totals)
                     const { data: lpoRows } = await supabase
@@ -535,8 +609,12 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       const daysCounts = new Map<string, number>();
                       techDates.forEach((dates, techId) => daysCounts.set(techId, dates.size));
                       const adjustedQuotes = adjustRehearsalQuotesForMultiDay(quotes as any, daysCounts);
+                      const quotesWithOverrides = await attachPayoutOverridesToTourQuotes(
+                        resolvedJobId,
+                        adjustedQuotes as any
+                      );
                       const quoteBlob = (await generateRateQuotePDF(
-                        adjustedQuotes as any,
+                        quotesWithOverrides as any,
                         {
                           id: jobObj.id,
                           title: jobObj.title,
@@ -591,9 +669,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       )) as Blob;
                     }
 
-                    // 4) Merge into a single pack and download
-                    const merged = await mergePDFs([tsBlob, payoutBlob]);
-                    const url = URL.createObjectURL(merged);
+                    // 4) Build final file (tourdate: payouts only, no timesheet section)
+                    const finalBlob = isTourDateJob || !tsBlob ? payoutBlob : await mergePDFs([tsBlob, payoutBlob]);
+                    const url = URL.createObjectURL(finalBlob);
                     const a = document.createElement("a");
                     a.href = url;
                     a.download = `pack_${(jobObj.title || "job")

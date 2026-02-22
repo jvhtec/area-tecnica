@@ -183,6 +183,8 @@ serve(async (req) => {
     const jobTitle = job?.title || 'trabajo desconocido';
     const subject = `Recordatorio: Parte de horas pendiente - ${jobTitle}`;
 
+    const timesheetUrl = `https://sector-pro.work/timesheets?jobId=${timesheet.job_id}`;
+
     const htmlContent = `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -231,7 +233,20 @@ serve(async (req) => {
             <td style="padding:0 24px 24px 24px;">
               <div style="background:#eef2ff;border-left:4px solid #6366f1;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
                 <div style="color:#374151;font-size:15px;line-height:1.6;">
-                  Te recordamos que tienes partes de horas pendientes de rellenar para el trabajo: <strong>${jobTitle}</strong>, te rogamos completes los partes para su aprobación, una vez aprobados obtendrás un informe de los importes a facturar y la referencia que has de adjuntar a la factura.
+                  Te recordamos que tienes partes de horas pendientes de rellenar para el trabajo: <strong>${jobTitle}</strong>. Te rogamos completes los partes para su aprobación; una vez aprobados obtendrás un informe de los importes a facturar y la referencia que has de adjuntar a la factura.
+                </div>
+              </div>
+
+              <!-- Important deadline warning -->
+              <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
+                <div style="color:#92400e;font-size:14px;line-height:1.6;font-weight:600;margin-bottom:8px;">
+                  ⚠️ Importante: Plazo de rellenado
+                </div>
+                <div style="color:#92400e;font-size:14px;line-height:1.6;">
+                  <strong>Tienes 7 días desde la finalización del trabajo para rellenar tus partes de horas.</strong> Una vez transcurrido este plazo, la ventana de edición se cerrará automáticamente y el sistema establecerá por defecto las horas mínimas correspondientes a tu categoría profesional.
+                </div>
+                <div style="color:#92400e;font-size:14px;line-height:1.6;margin-top:12px;">
+                  <strong>Recomendación:</strong> Para evitar errores y asegurar que se registren correctamente todas tus horas trabajadas, te aconsejamos rellenar los partes inmediatamente después de finalizar cada trabajo.
                 </div>
               </div>
 
@@ -275,10 +290,23 @@ serve(async (req) => {
 
               <!-- CTA Button -->
               <div style="text-align:center;margin:24px 0;">
-                <a href="https://sector-pro.work/timesheets"
-                   style="display:inline-block;background:#6366f1;color:#ffffff;text-decoration:none;padding:12px 32px;border-radius:6px;font-weight:600;font-size:15px;">
-                  Completar Parte de Horas
+                <a href="${timesheetUrl}"
+                   style="display:inline-block;background:#6366f1;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:600;font-size:16px;box-shadow:0 2px 4px rgba(99,102,241,0.3);">
+                  Haz clic aquí para rellenar tu parte de horas ahora
                 </a>
+              </div>
+
+              <!-- Login instructions -->
+              <div style="background:#f9fafb;border:1px solid #e5e7eb;padding:16px;border-radius:6px;margin:20px 0;">
+                <div style="color:#6b7280;font-size:13px;line-height:1.5;">
+                  <strong style="color:#374151;">Instrucciones de acceso:</strong><br/>
+                  Si es la primera vez que accedes a la plataforma, tus credenciales son:
+                  <ul style="margin:8px 0;padding-left:20px;">
+                    <li><strong>Usuario:</strong> ${technician.email}</li>
+                    <li><strong>Contraseña:</strong> default</li>
+                  </ul>
+                  Te recomendamos cambiar tu contraseña tras el primer acceso desde tu perfil.
+                </div>
               </div>
 
               <div style="color:#6b7280;font-size:14px;line-height:1.5;margin-top:20px;">

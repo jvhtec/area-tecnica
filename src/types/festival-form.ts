@@ -17,6 +17,8 @@ export interface ProviderSelectorProps {
   label: string;
   id: string;
   showMixed?: boolean;
+  disabled?: boolean;
+  language?: 'es' | 'en';
 }
 
 export interface QuantityInputProps {

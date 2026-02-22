@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { WiredMic } from "./WiredMicConfig";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from "@/utils/wiredMicrophoneNeedsPdfExport";
+import { buildReadableFilename } from "@/utils/fileName";
 
 interface MicrophoneNeedsCalculatorProps {
   jobId: string;
@@ -97,7 +98,7 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobDetails.title}_Wired_Microphone_Matrix.pdf`;
+      a.download = buildReadableFilename([jobDetails.title || "Festival", "Matriz micrófonos cableados"]);
       a.click();
       URL.revokeObjectURL(url);
     } catch (error) {

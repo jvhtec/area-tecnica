@@ -2,6 +2,7 @@
 import { supabase } from '@/lib/supabase';
 import { generateAndMergeFestivalPDFs } from './festivalPdfGenerator';
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
+import { buildReadableFilename } from "@/utils/fileName";
 
 interface IndividualStagePDFResult {
   blob: Blob;
@@ -33,7 +34,7 @@ export const generateIndividualStagePDFs = async (
   
   const getStageNameByNumber = (stageNumber: number): string => {
     const stage = stageNames?.find(s => s.number === stageNumber);
-    return stage?.name || `Stage_${stageNumber}`;
+    return stage?.name || `Escenario ${stageNumber}`;
   };
 
   // Generate individual PDFs for each stage
@@ -55,7 +56,7 @@ export const generateIndividualStagePDFs = async (
       };
 
       const stageName = getStageNameByNumber(stageNum);
-      const stageFilename = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_${stageName}_Documentation.pdf`;
+      const stageFilename = buildReadableFilename([jobTitle || "Festival", stageName, "Documentación"]);
 
       // Generate the stage-specific PDF
       const result = await generateAndMergeFestivalPDFs(
@@ -79,7 +80,7 @@ export const generateIndividualStagePDFs = async (
   console.log("Generating ZIP file with all stage PDFs");
   const zipBlob = await zip.generateAsync({ type: 'blob' });
   
-  const zipFilename = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Individual_Stage_PDFs.zip`;
+  const zipFilename = buildReadableFilename([jobTitle || "Festival", "Documentación por escenario"], "zip");
 
   return {
     blob: zipBlob,
