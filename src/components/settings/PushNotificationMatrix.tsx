@@ -127,6 +127,10 @@ const FALLBACK_EVENTS: EventInfo[] = [
   { code: 'soundvision.file.uploaded', label: 'SoundVision file uploaded' },
   { code: 'soundvision.file.downloaded', label: 'SoundVision file downloaded' },
 
+  // Festival public artist workflows
+  { code: 'festival.public_form.submitted', label: 'Public artist form submitted' },
+  { code: 'festival.public_rider.uploaded', label: 'Public rider uploaded' },
+
   // App updates
   { code: 'changelog.updated', label: '📝 Changelog updated' },
 ];

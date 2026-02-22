@@ -26,7 +26,7 @@ export const generateStageGearPDF = async (
           console.error("Error fetching stage name:", stageError);
         }
         
-        actualStageName = stageData?.name || `Stage ${stageNumber}`;
+        actualStageName = stageData?.name || `Escenario ${stageNumber}`;
       }
 
       // Fetch job data
@@ -106,7 +106,7 @@ export const generateStageGearPDF = async (
         doc.setFontSize(16);
         doc.setTextColor(255, 255, 255);
         doc.text(`${jobData.title} - ${actualStageName}`, pageWidth / 2, 8, { align: 'center' });
-        doc.text(`Equipment Setup`, pageWidth / 2, 15, { align: 'center' });
+        doc.text(`Equipamiento`, pageWidth / 2, 15, { align: 'center' });
       };
 
       // Initial header
@@ -153,7 +153,7 @@ export const generateStageGearPDF = async (
         yPosition = checkPageBreak(10, yPosition);
         doc.setFontSize(10);
         doc.setTextColor(0, 0, 0);
-        doc.text(`Configuration: Stage-specific setup for ${actualStageName}`, 14, yPosition);
+        doc.text(`Configuracion especifica para ${actualStageName}`, 14, yPosition);
         yPosition += 10;
       }
 
@@ -167,7 +167,7 @@ export const generateStageGearPDF = async (
         
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
-        doc.text('FOH Consoles', 14, yPosition);
+        doc.text('Consolas FOH', 14, yPosition);
         yPosition += 10;
 
         const fohData = setupToUse.foh_consoles.map((console: any) => [
@@ -178,7 +178,7 @@ export const generateStageGearPDF = async (
 
         autoTable(doc, {
           startY: yPosition,
-          head: [['Model', 'Quantity', 'Notes']],
+          head: [['Modelo', 'Cantidad', 'Notas']],
           body: fohData,
           theme: 'grid',
           headStyles: { fillColor: [125, 1, 1] },
@@ -201,7 +201,7 @@ export const generateStageGearPDF = async (
         
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
-        doc.text('Monitor Consoles', 14, yPosition);
+        doc.text('Consolas de Monitor', 14, yPosition);
         yPosition += 10;
 
         const monData = setupToUse.mon_consoles.map((console: any) => [
@@ -212,7 +212,7 @@ export const generateStageGearPDF = async (
 
         autoTable(doc, {
           startY: yPosition,
-          head: [['Model', 'Quantity', 'Notes']],
+          head: [['Modelo', 'Cantidad', 'Notas']],
           body: monData,
           theme: 'grid',
           headStyles: { fillColor: [125, 1, 1] },
@@ -234,13 +234,13 @@ export const generateStageGearPDF = async (
       
       doc.setFontSize(14);
       doc.setTextColor(125, 1, 1);
-      doc.text('Monitors', 14, yPosition);
+      doc.text('Monitores', 14, yPosition);
       yPosition += 10;
 
       doc.setFontSize(12);
       doc.setTextColor(0, 0, 0);
       const monitorQuantity = setupToUse.monitors_quantity || (isStageSpecific ? 0 : setupToUse.available_monitors || 0);
-      doc.text(`Available Monitors: ${monitorQuantity}`, 14, yPosition);
+      doc.text(`Monitores disponibles: ${monitorQuantity}`, 14, yPosition);
       yPosition += 10;
 
       // Wireless
@@ -249,7 +249,7 @@ export const generateStageGearPDF = async (
         
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
-        doc.text('Wireless Systems', 14, yPosition);
+        doc.text('Sistemas Inalambricos', 14, yPosition);
         yPosition += 10;
 
         const wirelessData = setupToUse.wireless_systems.map((system: any) => [
@@ -262,7 +262,7 @@ export const generateStageGearPDF = async (
 
         autoTable(doc, {
           startY: yPosition,
-          head: [['Model', 'HH Quantity', 'BP Quantity', 'Band', 'Notes']],
+          head: [['Modelo', 'Cant. HH', 'Cant. BP', 'Banda', 'Notas']],
           body: wirelessData,
           theme: 'grid',
           headStyles: { fillColor: [125, 1, 1] },
@@ -285,7 +285,7 @@ export const generateStageGearPDF = async (
         
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
-        doc.text('IEM Systems', 14, yPosition);
+        doc.text('Sistemas IEM', 14, yPosition);
         yPosition += 10;
 
         const iemData = setupToUse.iem_systems.map((system: any) => [
@@ -298,7 +298,7 @@ export const generateStageGearPDF = async (
 
         autoTable(doc, {
           startY: yPosition,
-          head: [['Model', 'HH Quantity', 'BP Quantity', 'Band', 'Notes']],
+          head: [['Modelo', 'Cant. HH', 'Cant. BP', 'Banda', 'Notas']],
           body: iemData,
           theme: 'grid',
           headStyles: { fillColor: [125, 1, 1] },
@@ -321,19 +321,19 @@ export const generateStageGearPDF = async (
         
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
-        doc.text('Wired Microphones', 14, yPosition);
+        doc.text('Microfonia Cableada', 14, yPosition);
         yPosition += 10;
 
         const wiredMicData = setupToUse.wired_mics.map((mic: any) => [
           mic.model || 'N/A',
           mic.quantity?.toString() || '1',
-          mic.exclusive_use ? 'Yes' : 'No',
+          mic.exclusive_use ? 'Si' : 'No',
           mic.notes || ''
         ]);
 
         autoTable(doc, {
           startY: yPosition,
-          head: [['Model', 'Quantity', 'Exclusive Use', 'Notes']],
+          head: [['Modelo', 'Cantidad', 'Uso Exclusivo', 'Notas']],
           body: wiredMicData,
           theme: 'grid',
           headStyles: { fillColor: [125, 1, 1] },
@@ -355,7 +355,7 @@ export const generateStageGearPDF = async (
       
       doc.setFontSize(14);
       doc.setTextColor(125, 1, 1);
-      doc.text('Infrastructure', 14, yPosition);
+      doc.text('Infraestructura', 14, yPosition);
       yPosition += 10;
 
       doc.setFontSize(12);
@@ -369,15 +369,15 @@ export const generateStageGearPDF = async (
       const opticalconRuns = setupToUse.infra_opticalcon_duo_quantity !== undefined ? setupToUse.infra_opticalcon_duo_quantity : (setupToUse.available_opticalcon_duo_runs || 0);
       
       yPosition = checkPageBreak(40, yPosition);
-      doc.text(`Available CAT6 Runs: ${cat6Runs}`, 14, yPosition);
+      doc.text(`Tiradas CAT6 disponibles: ${cat6Runs}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`Available HMA Runs: ${hmaRuns}`, 14, yPosition);
+      doc.text(`Tiradas HMA disponibles: ${hmaRuns}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`Available Coax Runs: ${coaxRuns}`, 14, yPosition);
+      doc.text(`Tiradas Coax disponibles: ${coaxRuns}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`Available Analog Runs: ${analogRuns}`, 14, yPosition);
+      doc.text(`Tiradas Analogicas disponibles: ${analogRuns}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`Available Opticalcon Duo Runs: ${opticalconRuns}`, 14, yPosition);
+      doc.text(`Tiradas Opticalcon Duo disponibles: ${opticalconRuns}`, 14, yPosition);
       yPosition += 10;
 
       // Extras
@@ -396,11 +396,11 @@ export const generateStageGearPDF = async (
       const drumFills = setupToUse.extras_df !== undefined ? setupToUse.extras_df : (setupToUse.has_drum_fills || false);
       const djBooths = setupToUse.extras_djbooth !== undefined ? setupToUse.extras_djbooth : (setupToUse.has_dj_booths || false);
       
-      doc.text(`Side Fills: ${sideFills ? 'Yes' : 'No'}`, 14, yPosition);
+      doc.text(`Side Fills: ${sideFills ? 'Si' : 'No'}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`Drum Fills: ${drumFills ? 'Yes' : 'No'}`, 14, yPosition);
+      doc.text(`Drum Fills: ${drumFills ? 'Si' : 'No'}`, 14, yPosition);
       yPosition += 8;
-      doc.text(`DJ Booths: ${djBooths ? 'Yes' : 'No'}`, 14, yPosition);
+      doc.text(`DJ Booths: ${djBooths ? 'Si' : 'No'}`, 14, yPosition);
       yPosition += 10;
 
       // Notes
@@ -409,7 +409,7 @@ export const generateStageGearPDF = async (
         
         doc.setFontSize(14);
         doc.setTextColor(125, 1, 1);
-        doc.text('Notes', 14, yPosition);
+        doc.text('Notas', 14, yPosition);
         yPosition += 10;
 
         doc.setFontSize(12);
@@ -431,8 +431,8 @@ export const generateStageGearPDF = async (
         doc.setFontSize(8);
         doc.setTextColor(100, 100, 100);
         const generatedDate = format(new Date(), 'dd/MM/yyyy HH:mm');
-        doc.text(`Generated: ${generatedDate}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
-        doc.text(`${actualStageName} Equipment Setup`, 14, pageHeight - 10);
+        doc.text(`Generado: ${generatedDate}`, pageWidth - 14, pageHeight - 10, { align: 'right' });
+        doc.text(`${actualStageName} - Equipamiento`, 14, pageHeight - 10);
       }
 
       // Add Sector Pro logo at bottom center of last page

@@ -12,6 +12,8 @@ import { addDays } from "date-fns";
 import { generateQRCode } from "@/utils/qrcode";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+import { fetchFestivalGearOptionsForTemplate } from "@/utils/festivalGearOptions";
+import { buildReadableFilename } from "@/utils/fileName";
 
 interface ArtistFormLinkDialogProps {
   open: boolean;
@@ -38,11 +40,19 @@ export const ArtistFormLinkDialog = ({
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
   const [isGeneratingBlankPdf, setIsGeneratingBlankPdf] = useState(false);
   const [artistLanguage, setArtistLanguage] = useState<"es" | "en">("es");
+  const [formExpiresAt, setFormExpiresAt] = useState<string>("");
 
   const tx = (es: string, en: string) => (artistLanguage === "en" ? en : es);
   const buildFormUrl = (token: string) =>
     `${window.location.origin}/festival/artist-form/${token}?lang=${artistLanguage}`;
   const formLink = formToken ? buildFormUrl(formToken) : "";
+  const formatExpiry = (value: string) =>
+    new Intl.DateTimeFormat(artistLanguage === "en" ? "en-GB" : "es-ES", {
+      dateStyle: "medium",
+      timeStyle: "short",
+      timeZone: "Europe/Madrid",
+    }).format(new Date(value));
+  const isExpiringSoon = !!formExpiresAt && new Date(formExpiresAt).getTime() - Date.now() <= 24 * 60 * 60 * 1000;
 
   const getErrorMessage = (error: unknown) =>
     error instanceof Error ? error.message : "Ocurrió un error inesperado";
@@ -109,6 +119,7 @@ export const ArtistFormLinkDialog = ({
       }
 
       setFormToken(data.token);
+      setFormExpiresAt(expiresAt.toISOString());
 
       toast({
         title: tx("Enlace generado", "Link generated"),
@@ -157,6 +168,138 @@ export const ArtistFormLinkDialog = ({
       ),
     );
 
+  const blobToBase64 = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = String(reader.result || "");
+        const base64 = result.includes(",") ? result.split(",")[1] : result;
+        if (!base64) {
+          reject(new Error("No se pudo convertir la plantilla PDF"));
+          return;
+        }
+        resolve(base64);
+      };
+      reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer la plantilla PDF"));
+      reader.readAsDataURL(blob);
+    });
+
+  const buildBlankTemplatePdf = async (preferredFormUrl?: string) => {
+    if (!artistId) {
+      throw new Error("Se requiere el ID del artista");
+    }
+
+    const { data: artistData, error: artistError } = await supabase
+      .from("festival_artists")
+      .select("name, stage, date, show_start, show_end, soundcheck, soundcheck_start, soundcheck_end")
+      .eq("id", artistId)
+      .maybeSingle();
+
+    if (artistError) throw artistError;
+
+    const templateDate = artistData?.date || selectedDate || new Date().toISOString().slice(0, 10);
+    const templateName = artistData?.name || artistName || "Artista";
+    const templateStage = typeof artistData?.stage === "number" ? artistData.stage : 1;
+    let publicFormUrl = preferredFormUrl || (formToken ? buildFormUrl(formToken) : "");
+    let publicFormQrDataUrl = "";
+
+    if (!publicFormUrl) {
+      const { data: existingForm, error: existingFormError } = await supabase
+        .from("festival_artist_forms")
+        .select("token")
+        .eq("artist_id", artistId)
+        .eq("status", "pending")
+        .gt("expires_at", new Date().toISOString())
+        .limit(1)
+        .maybeSingle();
+
+      if (!existingFormError && existingForm?.token) {
+        publicFormUrl = buildFormUrl(existingForm.token);
+      }
+    }
+
+    if (publicFormUrl) {
+      try {
+        publicFormQrDataUrl = await generateQRCode(publicFormUrl);
+      } catch (qrError) {
+        console.error("Error generating QR for blank template PDF:", qrError);
+      }
+    }
+
+    let logoUrl: string | undefined;
+    let festivalOptions: ArtistPdfData["festivalOptions"];
+    if (jobId) {
+      logoUrl = await fetchJobLogo(jobId);
+      festivalOptions = await fetchFestivalGearOptionsForTemplate(jobId, templateStage);
+    }
+
+    const blankPdfData: ArtistPdfData = {
+      name: templateName,
+      stage: templateStage,
+      date: templateDate,
+      schedule: {
+        show: {
+          start: artistData?.show_start || "",
+          end: artistData?.show_end || "",
+        },
+        soundcheck: artistData?.soundcheck
+          ? {
+              start: artistData?.soundcheck_start || "",
+              end: artistData?.soundcheck_end || "",
+            }
+          : undefined,
+      },
+      technical: {
+        fohTech: false,
+        monTech: false,
+        fohConsole: { model: "", providedBy: "festival" },
+        monConsole: { model: "", providedBy: "festival" },
+        wireless: { systems: [], providedBy: "festival" },
+        iem: { systems: [], providedBy: "festival" },
+        monitors: {
+          enabled: false,
+          quantity: 0,
+        },
+      },
+      infrastructure: {
+        providedBy: "festival",
+        cat6: { enabled: false, quantity: 0 },
+        hma: { enabled: false, quantity: 0 },
+        coax: { enabled: false, quantity: 0 },
+        opticalconDuo: { enabled: false, quantity: 0 },
+        analog: 0,
+        other: "",
+      },
+      extras: {
+        sideFill: false,
+        drumFill: false,
+        djBooth: false,
+        wired: "",
+      },
+      notes: "",
+      wiredMics: [],
+      micKit: "festival",
+      riderMissing: false,
+      logoUrl,
+      festivalOptions,
+      publicFormUrl,
+      publicFormQrDataUrl,
+    };
+
+    const blob = await exportArtistPDF(blankPdfData, {
+      templateMode: true,
+      language: artistLanguage,
+    });
+
+    const fileName = buildReadableFilename([
+      artistLanguage === "en" ? "Template" : "Plantilla",
+      templateName,
+      templateDate,
+    ]);
+
+    return { blob, fileName };
+  };
+
   const saveArtistLanguage = async (nextLanguage: "es" | "en") => {
     setArtistLanguage(nextLanguage);
     const { error } = await supabase
@@ -190,6 +333,9 @@ export const ArtistFormLinkDialog = ({
 
     setIsSendingEmail(true);
     try {
+      const { blob: blankTemplateBlob, fileName: blankTemplateFileName } = await buildBlankTemplatePdf(formLink);
+      const blankTemplateBase64 = await blobToBase64(blankTemplateBlob);
+
       const inlineImages =
         qrCodeDataUrl && qrCodeDataUrl.startsWith("data:")
           ? (() => {
@@ -223,6 +369,7 @@ export const ArtistFormLinkDialog = ({
         </p>
         <p>You can also scan this QR code:</p>
         <p><img src="cid:artist_form_qr" alt="Artist form QR" style="max-width:220px;height:auto;" /></p>
+        <p>We have also attached a printable blank template for this artist.</p>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
         <p style="font-size:12px;color:#6b7280;">
           This is an automated email. Please do not reply. For any issues, contact the festival technical office at
@@ -244,6 +391,7 @@ export const ArtistFormLinkDialog = ({
         </p>
         <p>También puedes escanear este código QR:</p>
         <p><img src="cid:artist_form_qr" alt="QR formulario artista" style="max-width:220px;height:auto;" /></p>
+        <p>Adjuntamos también la plantilla imprimible en blanco para este artista.</p>
         <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
         <p style="font-size:12px;color:#6b7280;">
           Este correo es automático. Por favor, no respondas a este email. Si tienes incidencias, contacta con la oficina técnica del festival en
@@ -262,6 +410,13 @@ export const ArtistFormLinkDialog = ({
             emails: recipients,
           },
           inlineImages,
+          pdfAttachments: [
+            {
+              filename: blankTemplateFileName,
+              content: blankTemplateBase64,
+              size: blankTemplateBlob.size,
+            },
+          ],
           senderNameOverride: "Festivales - Sector Pro",
         },
       });
@@ -297,85 +452,11 @@ export const ArtistFormLinkDialog = ({
 
     setIsGeneratingBlankPdf(true);
     try {
-      const { data: artistData, error: artistError } = await supabase
-        .from("festival_artists")
-        .select("name, stage, date, show_start, show_end, soundcheck, soundcheck_start, soundcheck_end")
-        .eq("id", artistId)
-        .maybeSingle();
-
-      if (artistError) throw artistError;
-
-      const templateDate = artistData?.date || selectedDate || new Date().toISOString().slice(0, 10);
-      const templateName = artistData?.name || artistName || "Artista";
-      const templateStage = typeof artistData?.stage === "number" ? artistData.stage : 1;
-
-      let logoUrl: string | undefined;
-      if (jobId) {
-        logoUrl = await fetchJobLogo(jobId);
-      }
-
-      const blankPdfData: ArtistPdfData = {
-        name: templateName,
-        stage: templateStage,
-        date: templateDate,
-        schedule: {
-          show: {
-            start: artistData?.show_start || "",
-            end: artistData?.show_end || "",
-          },
-          soundcheck: artistData?.soundcheck
-            ? {
-                start: artistData?.soundcheck_start || "",
-                end: artistData?.soundcheck_end || "",
-              }
-            : undefined,
-        },
-        technical: {
-          fohTech: false,
-          monTech: false,
-          fohConsole: { model: "", providedBy: "festival" },
-          monConsole: { model: "", providedBy: "festival" },
-          wireless: { systems: [], providedBy: "festival" },
-          iem: { systems: [], providedBy: "festival" },
-          monitors: {
-            enabled: false,
-            quantity: 0,
-          },
-        },
-        infrastructure: {
-          providedBy: "festival",
-          cat6: { enabled: false, quantity: 0 },
-          hma: { enabled: false, quantity: 0 },
-          coax: { enabled: false, quantity: 0 },
-          opticalconDuo: { enabled: false, quantity: 0 },
-          analog: 0,
-          other: "",
-        },
-        extras: {
-          sideFill: false,
-          drumFill: false,
-          djBooth: false,
-          wired: "",
-        },
-        notes: "",
-        wiredMics: [],
-        micKit: "festival",
-        riderMissing: false,
-        logoUrl,
-      };
-
-      const blob = await exportArtistPDF(blankPdfData, {
-        templateMode: true,
-        language: artistLanguage,
-      });
+      const { blob, fileName } = await buildBlankTemplatePdf();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      const safeName = templateName.replace(/[^a-zA-Z0-9_-]/g, "_") || "Artista";
-      a.download =
-        artistLanguage === "en"
-          ? `Template_${safeName}_${templateDate}.pdf`
-          : `Plantilla_${safeName}_${templateDate}.pdf`;
+      a.download = fileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -418,7 +499,7 @@ export const ArtistFormLinkDialog = ({
 
           const { data, error } = await supabase
             .from('festival_artist_forms')
-            .select('token')
+            .select('token, expires_at')
             .eq('artist_id', artistId) // Only check THIS artist's forms
             .eq('status', 'pending')
             .gt('expires_at', new Date().toISOString())
@@ -432,12 +513,15 @@ export const ArtistFormLinkDialog = ({
 
           if (data?.token) {
             setFormToken(data.token);
+            setFormExpiresAt(data.expires_at || "");
           } else {
             setFormToken("");
+            setFormExpiresAt("");
           }
         } catch (error) {
           console.error('Error checking existing link:', error);
           setFormToken("");
+          setFormExpiresAt("");
           toast({
             title: "Error",
             description: "No se pudo verificar el enlace de formulario existente.",
@@ -511,6 +595,25 @@ export const ArtistFormLinkDialog = ({
                 <RefreshCcw className="h-4 w-4 mr-2" />
                 Generar Nuevo Enlace
               </Button>
+              {formExpiresAt && (
+                <div
+                  className={`rounded-md border px-3 py-2 text-sm ${
+                    isExpiringSoon
+                      ? "border-amber-300 bg-amber-50 text-amber-900"
+                      : "border-blue-200 bg-blue-50 text-blue-900"
+                  }`}
+                >
+                  <p>
+                    {tx("Este enlace expira:", "This link expires:")} <strong>{formatExpiry(formExpiresAt)}</strong>
+                  </p>
+                  <p className="text-xs mt-1">
+                    {tx(
+                      "Si necesitas rotarlo antes, usa “Generar Nuevo Enlace”.",
+                      "If you need to rotate it before then, use “Generate New Link”."
+                    )}
+                  </p>
+                </div>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -571,6 +674,12 @@ export const ArtistFormLinkDialog = ({
             </>
           ) : (
             <div className="space-y-2">
+              <div className="rounded-md border border-muted px-3 py-2 text-xs text-muted-foreground">
+                {tx(
+                  "Los enlaces públicos expiran en 7 días. Puedes regenerarlos para rotarlos cuando sea necesario.",
+                  "Public links expire in 7 days. You can regenerate them to rotate when needed."
+                )}
+              </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">
                   {tx("Idioma del artista", "Artist language")}

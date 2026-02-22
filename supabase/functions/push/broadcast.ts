@@ -65,7 +65,9 @@ export async function handleBroadcast(
       if (data?.job_id) jobId = data.job_id;
     } catch (_) { /* ignore */ }
   }
-  const jobTitle = await getJobTitle(client, jobId);
+  const bodyJobTitle = typeof body.job_title === 'string' ? body.job_title.trim() : '';
+  const lookedUpJobTitle = await getJobTitle(client, jobId);
+  const jobTitle = bodyJobTitle || lookedUpJobTitle;
   const jobDepartment = await getJobDepartment(client, jobId);
   const jobType = await getJobType(client, jobId);
   const tourId = body.tour_id;
@@ -288,6 +290,65 @@ export async function handleBroadcast(
     const fname = body.file_name || 'documento';
     text = `El documento "${fname}" dejó de estar visible en "${jobTitle || 'Trabajo'}".`;
     addNaturalRecipients(Array.from(participants));
+
+  // ========================================================================
+  // FESTIVAL PUBLIC ARTIST EVENTS (2 events)
+  // ========================================================================
+
+  } else if (type === EVENT_TYPES.FESTIVAL_PUBLIC_FORM_SUBMITTED) {
+    const artistName = ((body as any)?.artist_name as string | undefined)?.trim() || 'Un artista';
+    const artistDate = ((body as any)?.artist_date as string | undefined)?.trim() || '';
+    const jobLabel = jobTitle ? ` para "${jobTitle}"` : '';
+
+    title = 'Formulario técnico recibido';
+    if (artistDate) {
+      try {
+        const formattedDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' })
+          .format(new Date(`${artistDate}T00:00:00Z`));
+        text = `${artistName} envió su formulario técnico${jobLabel} (${formattedDate}).`;
+      } catch (_) {
+        text = `${artistName} envió su formulario técnico${jobLabel}.`;
+      }
+    } else {
+      text = `${artistName} envió su formulario técnico${jobLabel}.`;
+    }
+
+    if (jobId) {
+      const dateParam = artistDate ? `?date=${encodeURIComponent(artistDate)}` : '';
+      url = body.url || `/festival-management/${jobId}/artists${dateParam}`;
+    }
+
+    addNaturalRecipients(Array.from(mgmt));
+  } else if (type === EVENT_TYPES.FESTIVAL_PUBLIC_RIDER_UPLOADED) {
+    const artistName = ((body as any)?.artist_name as string | undefined)?.trim() || 'Un artista';
+    const artistDate = ((body as any)?.artist_date as string | undefined)?.trim() || '';
+    const riderFileName = (body.file_name || '').trim();
+    const jobLabel = jobTitle ? ` para "${jobTitle}"` : '';
+
+    title = 'Rider técnico cargado';
+
+    const riderText = riderFileName
+      ? `${artistName} cargó un rider técnico${jobLabel}: "${riderFileName}".`
+      : `${artistName} cargó un rider técnico${jobLabel}.`;
+
+    if (artistDate) {
+      try {
+        const formattedDate = new Intl.DateTimeFormat('es-ES', { dateStyle: 'medium' })
+          .format(new Date(`${artistDate}T00:00:00Z`));
+        text = `${riderText} (${formattedDate})`;
+      } catch (_) {
+        text = riderText;
+      }
+    } else {
+      text = riderText;
+    }
+
+    if (jobId) {
+      const dateParam = artistDate ? `?date=${encodeURIComponent(artistDate)}` : '';
+      url = body.url || `/festival-management/${jobId}/artists${dateParam}`;
+    }
+
+    addNaturalRecipients(Array.from(mgmt));
 
   // ========================================================================
   // INCIDENT REPORTS (1 event - CRITICAL for safety)
@@ -1156,12 +1217,16 @@ export async function handleBroadcast(
     type,
     meta: {
       jobId: jobId,
+      jobTitle: jobTitle || undefined,
       tourId,
       tourName: tourName ?? undefined,
       actor,
       recipient: recipName,
       channel: ch,
       ...('file_name' in body ? { fileName: body.file_name } : {}),
+      ...('artist_id' in body ? { artistId: (body as any).artist_id } : {}),
+      ...('artist_name' in body ? { artistName: (body as any).artist_name } : {}),
+      ...('artist_date' in body ? { artistDate: (body as any).artist_date } : {}),
       ...('file_id' in body ? { fileId: body.file_id } : {}),
       ...('venue_id' in body ? { venueId: body.venue_id } : {}),
       ...('venue_name' in body ? { venueName: body.venue_name } : {}),

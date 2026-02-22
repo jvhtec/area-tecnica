@@ -18,6 +18,7 @@ import { EditShiftDialog } from "./EditShiftDialog";
 import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
 import { CopyShiftsDialog } from "./CopyShiftsDialog";
 import { labelForCode } from '@/utils/roles';
+import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 
 interface ShiftsTableProps {
   shifts: ShiftWithAssignments[];
@@ -165,7 +166,7 @@ export const ShiftsTable = ({
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle.replace(/\s+/g, '_')}_${date}_shifts.pdf`;
+      a.download = buildReadableFilename([jobTitle || "Festival", formatDateForFilename(date), "Turnos"]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

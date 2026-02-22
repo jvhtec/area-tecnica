@@ -38,9 +38,9 @@ export const generateCoverPage = async (
       };
       
       if (startDate.getTime() === endDate.getTime()) {
-        dateRangeText = startDate.toLocaleDateString(undefined, options);
+        dateRangeText = startDate.toLocaleDateString('es-ES', options);
       } else {
-        dateRangeText = `${startDate.toLocaleDateString(undefined, options)} - ${endDate.toLocaleDateString(undefined, options)}`;
+        dateRangeText = `${startDate.toLocaleDateString('es-ES', options)} - ${endDate.toLocaleDateString('es-ES', options)}`;
       }
     }
     
@@ -52,7 +52,7 @@ export const generateCoverPage = async (
       color: rgb(125/255, 1/255, 1/255), // Corporate red
     });
     
-    page.drawText("FESTIVAL DOCUMENTATION", {
+    page.drawText("DOCUMENTACION DEL FESTIVAL", {
       x: leftMargin,
       y: height - 60,
       size: 24,
@@ -165,7 +165,7 @@ export const generateCoverPage = async (
         font: bodyFont,
       });
       // Subtitle below date
-      page.drawText("Complete Technical Documentation", {
+      page.drawText("Documentacion Tecnica Completa", {
         x: leftMargin,
         y: dateY - 30,
         size: 16,

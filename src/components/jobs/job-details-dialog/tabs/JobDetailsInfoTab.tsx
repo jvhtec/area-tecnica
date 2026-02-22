@@ -23,6 +23,7 @@ import { adjustRehearsalQuotesForMultiDay } from "@/lib/tour-payout-email";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import { JobPayoutTotalsPanel } from "@/components/jobs/JobPayoutTotalsPanel";
 import { useJobApprovalStatus } from "@/hooks/useJobApprovalStatus";
+import { attachPayoutOverridesToTourQuotes } from "@/services/tourPayoutOverrides";
 
 import { enrichTimesheetsWithProfiles } from "../enrichTimesheetsWithProfiles";
 
@@ -129,16 +130,35 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
     queryKey: ["flex-workorders-folder", resolvedJobId, jobDetails?.job_type, jobDetails?.tour_date_id],
     enabled: open && isManager && !!resolvedJobId,
     queryFn: async () => {
-      const criteria: any = { folder_type: "work_orders", department: "personnel" };
-      const tourDateId = jobDetails?.tour_date_id || job?.tour_date_id;
-      if ((jobDetails?.job_type || job?.job_type) === "tourdate" && tourDateId) {
-        criteria.tour_date_id = tourDateId;
+      const isTourDateJob = (jobDetails?.job_type || job?.job_type) === "tourdate";
+      const tourDateId = jobDetails?.tour_date_id || job?.tour_date_id || null;
+
+      let query = supabase
+        .from("flex_folders")
+        .select("element_id, job_id, tour_date_id, created_at")
+        .eq("folder_type", "work_orders")
+        .eq("department", "personnel");
+
+      if (isTourDateJob) {
+        if (tourDateId) {
+          query = query.or(`job_id.eq.${resolvedJobId},tour_date_id.eq.${tourDateId}`);
+        } else {
+          query = query.eq("job_id", resolvedJobId);
+        }
       } else {
-        criteria.job_id = resolvedJobId;
+        query = query.eq("job_id", resolvedJobId);
       }
-      const { data, error } = await supabase.from("flex_folders").select("element_id").match(criteria).maybeSingle();
-      if (error) return null;
-      return data || null;
+
+      const { data, error } = await query.order("created_at", { ascending: false });
+      if (error || !data?.length) return null;
+
+      const preferred =
+        data.find((row) => row.job_id === resolvedJobId && (!tourDateId || row.tour_date_id === tourDateId)) ||
+        data.find((row) => row.job_id === resolvedJobId) ||
+        (tourDateId ? data.find((row) => row.tour_date_id === tourDateId) : null) ||
+        data[0];
+
+      return preferred ? { element_id: preferred.element_id } : null;
     },
   });
 
@@ -469,12 +489,15 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       created_at: jobDetails?.created_at || new Date().toISOString(),
                     } as any;
 
-                    const tsDoc = await generateTimesheetPDF({
-                      job: jobObj,
-                      timesheets: timesheets as any,
-                      date: "all-dates",
-                    });
-                    const tsBlob = tsDoc.output("blob") as Blob;
+                    let tsBlob: Blob | null = null;
+                    if (!isTourDateJob) {
+                      const tsDoc = await generateTimesheetPDF({
+                        job: jobObj,
+                        timesheets: timesheets as any,
+                        date: "all-dates",
+                      });
+                      tsBlob = tsDoc.output("blob") as Blob;
+                    }
 
                     // 3) Build inputs for payout PDF (tourdate uses rate quotes, others use payout totals)
                     const { data: lpoRows } = await supabase
@@ -586,8 +609,12 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       const daysCounts = new Map<string, number>();
                       techDates.forEach((dates, techId) => daysCounts.set(techId, dates.size));
                       const adjustedQuotes = adjustRehearsalQuotesForMultiDay(quotes as any, daysCounts);
+                      const quotesWithOverrides = await attachPayoutOverridesToTourQuotes(
+                        resolvedJobId,
+                        adjustedQuotes as any
+                      );
                       const quoteBlob = (await generateRateQuotePDF(
-                        adjustedQuotes as any,
+                        quotesWithOverrides as any,
                         {
                           id: jobObj.id,
                           title: jobObj.title,
@@ -642,9 +669,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       )) as Blob;
                     }
 
-                    // 4) Merge into a single pack and download
-                    const merged = await mergePDFs([tsBlob, payoutBlob]);
-                    const url = URL.createObjectURL(merged);
+                    // 4) Build final file (tourdate: payouts only, no timesheet section)
+                    const finalBlob = isTourDateJob || !tsBlob ? payoutBlob : await mergePDFs([tsBlob, payoutBlob]);
+                    const url = URL.createObjectURL(finalBlob);
                     const a = document.createElement("a");
                     a.href = url;
                     a.download = `pack_${(jobObj.title || "job")

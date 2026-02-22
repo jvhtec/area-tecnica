@@ -20,7 +20,7 @@ export const generateTableOfContents = async (
       color: rgb(125/255, 1/255, 1/255), // Corporate red
     });
     
-    page.drawText("TABLE OF CONTENTS", {
+    page.drawText("INDICE", {
       x: 50,
       y: height - 60,
       size: 24,
@@ -62,14 +62,14 @@ export const generateTableOfContents = async (
     let currentY = height - 150;
     let pageCounter = 3;
     
-    page.drawText("Section", {
+    page.drawText("Seccion", {
       x: 50,
       y: currentY,
       size: 14,
       color: rgb(0, 0, 0),
     });
     
-    page.drawText("Page", {
+    page.drawText("Pagina", {
       x: width - 100,
       y: currentY,
       size: 14,
@@ -117,7 +117,7 @@ export const generateTableOfContents = async (
       currentY -= 30;
     }
     
-    page.drawText("Page 2", {
+    page.drawText("Pagina 2", {
       x: width / 2,
       y: 30,
       size: 10,

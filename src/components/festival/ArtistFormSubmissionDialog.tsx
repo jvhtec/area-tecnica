@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
+import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 
 interface ArtistFormSubmissionDialogProps {
   open: boolean;
@@ -109,7 +110,12 @@ export const ArtistFormSubmissionDialog = ({
       }
 
       // Save the PDF
-      doc.save("envio_formulario.pdf");
+      doc.save(
+        buildReadableFilename([
+          "Envío formulario artista",
+          formatDateForFilename(submission.submitted_at),
+        ]),
+      );
 
       toast({
         title: "Éxito",

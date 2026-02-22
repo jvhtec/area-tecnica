@@ -29,9 +29,9 @@ const getProviderSummary = (systems: RfIemSystemData[]): string => {
   const uniqueProviders = [...new Set(providers)];
   
   if (uniqueProviders.length === 1) {
-    return uniqueProviders[0] === 'festival' ? 'Festival' : 'Band';
+    return uniqueProviders[0] === 'festival' ? 'Festival' : 'Banda';
   } else {
-    return 'Mixed';
+    return 'Mixto';
   }
 };
 
@@ -76,7 +76,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
 
   // Add title
   pdf.setFontSize(18);
-  pdf.text(`${data.jobTitle} - Artist RF & IEM Overview`, 15, 20);
+  pdf.text(`${data.jobTitle} - Resumen RF e IEM`, 15, 20);
   
   // Filter artists to only include those with RF or IEM data
   const filteredArtists = data.artists.filter(artist => 
@@ -114,7 +114,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
 
     return [
       artist.name,
-      `Stage ${artist.stage}`,
+      `Escenario ${artist.stage}`,
       rfProvidedBy,
       rfModels,
       rfBands, 
@@ -131,18 +131,18 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
   // Add the table with headers
   autoTable(pdf, {
     head: [[
-      'Artist Name', 
-      'Stage',
-      'RF Provided By',
-      'RF Models',
-      'RF Bands', 
-      'Handhelds',
-      'Bodypacks',
-      'IEM Provided By',
-      'IEM Models',
-      'IEM Bands', 
-      'IEM Channels',
-      'IEM Bodypacks'
+      'Artista', 
+      'Escenario',
+      'RF Proporcionado por',
+      'Modelos RF',
+      'Bandas RF', 
+      'Manos',
+      'Petacas',
+      'IEM Proporcionado por',
+      'Modelos IEM',
+      'Bandas IEM', 
+      'Canales IEM',
+      'Petacas IEM'
     ]],
     body: tableData,
     startY: 30,
@@ -188,10 +188,10 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
         pdf.setFontSize(8);
         pdf.setTextColor(100);
         
-        const date = new Date().toLocaleDateString();
-        pdf.text(`Generated on ${date}`, 15, pageHeight - 10);
+        const date = new Date().toLocaleDateString('es-ES');
+        pdf.text(`Generado: ${date}`, 15, pageHeight - 10);
         
-        pdf.text(`Page ${i} of ${totalPages}`, pageWidth - 25, pageHeight - 10);
+        pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - 30, pageHeight - 10);
       }
       
       // Now add the logo to the center bottom of all pages

@@ -6,13 +6,15 @@ import { exportRfIemTablePDF, RfIemTablePdfData } from '../rfIemTablePdfExport';
 import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from '../infrastructureTablePdfExport';
 import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingRiderReportPdfExport';
 import { generateStageGearPDF } from '../gearSetupPdfExport';
-import { fetchLogoUrl } from './logoUtils';
+import { fetchJobLogo, fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
 import { generateTableOfContents } from './tocGenerator';
 import { mergePDFs } from './pdfMerge';
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from '../wiredMicrophoneNeedsPdfExport';
 import { generateWeatherPDF, WeatherPdfData } from './weatherPdfGenerator';
+import { ensurePublicArtistFormLinks } from '../publicArtistFormLinks';
+import { buildReadableFilename } from '@/utils/fileName';
 
 // Helper function to sort artists chronologically across all dates
 const sortArtistsChronologically = (artists: any[]) => {
@@ -55,7 +57,7 @@ export const generateAndMergeFestivalPDFs = async (
 ): Promise<{ blob: Blob; filename: string }> => {
   console.log("Starting comprehensive PDF generation with options:", options);
 
-  const logoUrl = await fetchLogoUrl(jobId);
+  const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
   console.log("Logo URL for PDFs:", logoUrl);
   
   // Fetch stage names for consistent usage
@@ -479,7 +481,9 @@ export const generateAndMergeFestivalPDFs = async (
               wired: String(artist.extras_wired || '')
             },
             notes: artist.notes ? String(artist.notes) : undefined,
-            logoUrl
+            logoUrl,
+            wiredMics: artist.wired_mics || [],
+            micKit: artist.mic_kit || undefined
           };
           
           const pdf = await exportArtistPDF(artistData);
@@ -644,18 +648,27 @@ export const generateAndMergeFestivalPDFs = async (
         
         // Use chronological sorting for Missing Rider Report as well
         const sortedMissingRiderArtists = sortArtistsChronologically(missingRiderArtists);
+        const publicFormLinksByArtistId = await ensurePublicArtistFormLinks(
+          sortedMissingRiderArtists.map((artist) => ({
+            id: artist.id,
+            form_language: artist.form_language,
+          })),
+        );
         
         const missingRiderData: MissingRiderReportData = {
           jobTitle,
           logoUrl,
           artists: sortedMissingRiderArtists.map(artist => ({
+            id: artist.id,
             name: artist.name || 'Unnamed Artist',
             stage: artist.stage || 1,
+            stageName: getStageNameByNumber(artist.stage || 1),
             date: artist.date || '',
             showTime: {
               start: artist.show_start || '',
               end: artist.show_end || ''
-            }
+            },
+            formUrl: publicFormLinksByArtistId[artist.id],
           }))
         };
         
@@ -724,31 +737,31 @@ export const generateAndMergeFestivalPDFs = async (
     const tocSections = [];
     
     if (options.includeShiftSchedules && shiftPdfs.length > 0) {
-      tocSections.push({ title: "Staff Shift Schedules", pageCount: shiftPdfs.length });
+      tocSections.push({ title: "Turnos de Personal", pageCount: shiftPdfs.length });
     }
     if (options.includeGearSetup && gearPdfs.length > 0) {
-      tocSections.push({ title: "Stage Equipment Setup", pageCount: gearPdfs.length });
+      tocSections.push({ title: "Equipamiento por Escenario", pageCount: gearPdfs.length });
     }
     if (options.includeArtistTables && artistTablePdfs.length > 0) {
-      tocSections.push({ title: "Artist Schedule Tables", pageCount: artistTablePdfs.length });
+      tocSections.push({ title: "Tablas de Artistas", pageCount: artistTablePdfs.length });
     }
     if (options.includeRfIemTable && rfIemTablePdf) {
-      tocSections.push({ title: "Artist RF & IEM Overview", pageCount: 1 });
+      tocSections.push({ title: "Resumen RF e IEM", pageCount: 1 });
     }
     if (options.includeInfrastructureTable && infrastructureTablePdf) {
-      tocSections.push({ title: "Infrastructure Needs Overview", pageCount: 1 });
+      tocSections.push({ title: "Resumen de Infraestructura", pageCount: 1 });
     }
     if (options.includeWiredMicNeeds && wiredMicMatrixPdf) {
-      tocSections.push({ title: "Wired Microphone Requirements Matrix", pageCount: 1 });
+      tocSections.push({ title: "Matriz de Microfonia Cableada", pageCount: 1 });
     }
     if (options.includeWeatherPrediction && weatherPdf) {
-      tocSections.push({ title: "Weather Forecast", pageCount: 1 });
+      tocSections.push({ title: "Prevision Meteorologica", pageCount: 1 });
     }
     if (options.includeMissingRiderReport && missingRiderReportPdf) {
-      tocSections.push({ title: "Missing Rider Report", pageCount: 1 });
+      tocSections.push({ title: "Reporte de Riders Faltantes", pageCount: 1 });
     }
     if (options.includeArtistRequirements && individualArtistPdfs.length > 0) {
-      tocSections.push({ title: "Individual Artist Requirements", pageCount: individualArtistPdfs.length });
+      tocSections.push({ title: "Requerimientos Individuales por Artista", pageCount: individualArtistPdfs.length });
     }
     
     console.log(`Table of contents sections:`, tocSections);
@@ -810,7 +823,7 @@ export const generateAndMergeFestivalPDFs = async (
     const mergedBlob = await mergePDFs(selectedPdfs);
     
     // Generate filename if not provided
-    const filename = customFilename || `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Complete_Documentation.pdf`;
+    const filename = customFilename || buildReadableFilename([jobTitle || "Festival", "Documentación completa"]);
     
     return { blob: mergedBlob, filename };
   } catch (error) {

@@ -171,8 +171,10 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
     return acc;
   }, {} as Record<string, Timesheet[]>);
 
+  const flattenedTimesheets = Object.values(groupedTimesheets).flat();
+
   // Prepare table data with date grouping
-  const tableData = Object.values(groupedTimesheets).flat().map((timesheet) => {
+  const tableData = flattenedTimesheets.map((timesheet) => {
     const technicianName = `${timesheet.technician?.first_name || ''} ${timesheet.technician?.last_name || ''}`.trim();
     const startTime = formatTime(timesheet.start_time);
     const endTime = formatTime(timesheet.end_time);
@@ -258,7 +260,12 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
     didDrawCell: (data: any) => {
       // Add signature images to the signature column
       if (data.column.index === 6 && data.section === 'body') {
-        const timesheet = Object.values(groupedTimesheets).flat()[data.row.index];
+        const rowIndex = typeof data?.row?.index === 'number' ? data.row.index : -1;
+        if (rowIndex < 0 || rowIndex >= flattenedTimesheets.length) return;
+
+        const timesheet = flattenedTimesheets[rowIndex];
+        if (!timesheet?.id) return;
+
         const signatureImg = signatureMap.get(timesheet.id);
         if (signatureImg) {
           try {

@@ -53,6 +53,23 @@ export interface ArtistInfrastructure {
   other: string;
 }
 
+export interface PdfFestivalGearOptions {
+  fohConsoles?: Array<{ model: string; quantity: number }>;
+  monConsoles?: Array<{ model: string; quantity: number }>;
+  wirelessSystems?: Array<{ model: string; quantity_hh: number; quantity_bp: number; band?: string }>;
+  iemSystems?: Array<{ model: string; quantity_hh: number; quantity_bp: number; band?: string }>;
+  wiredMics?: Array<{ model: string; quantity: number }>;
+  monitorsQuantity?: number;
+  hasSideFill?: boolean;
+  hasDrumFill?: boolean;
+  hasDjBooth?: boolean;
+  availableCat6Runs?: number;
+  availableHmaRuns?: number;
+  availableCoaxRuns?: number;
+  availableOpticalconDuoRuns?: number;
+  availableAnalogRuns?: number;
+}
+
 export interface ArtistPdfData {
   name: string;
   stage: number;
@@ -79,6 +96,9 @@ export interface ArtistPdfData {
   }>;
   micKit?: 'festival' | 'band' | 'mixed';
   riderMissing?: boolean;
+  festivalOptions?: PdfFestivalGearOptions;
+  publicFormUrl?: string;
+  publicFormQrDataUrl?: string;
 }
 
 export interface ArtistPdfOptions {
@@ -136,6 +156,8 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
   const { jsPDF, autoTable } = await loadPdfLibs();
   const templateMode = options.templateMode === true;
   const language = options.language === "en" ? "en" : "es";
+  const checklist = "[ ]";
+  const showHeadMode = templateMode ? "firstPage" : "everyPage";
   const tx = (es: string, en: string) => (language === "en" ? en : es);
   const yesNo = (value: boolean) => (value ? tx("Sí", "Yes") : tx("No", "No"));
   const providerLabel = (value: string) => {
@@ -205,6 +227,10 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
   doc.text(headerDate, pageWidth / 2, 25, { align: 'center' });
 
   let yPosition = 40;
+  const getLastAutoTableFinalY = (fallback: number) => {
+    const docWithTable = doc as unknown as { lastAutoTable?: { finalY?: number } };
+    return docWithTable.lastAutoTable?.finalY ?? fallback;
+  };
 
   // === SCHEDULE SECTION ===
   doc.setFontSize(12);
@@ -226,6 +252,89 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
   }
   yPosition += 4;
 
+  if (templateMode && data.festivalOptions) {
+    const checklistRows: string[][] = [];
+
+    const pushOptionRows = (
+      categoryLabel: string,
+      optionsList: Array<{ label: string; availability: string }>,
+    ) => {
+      if (optionsList.length === 0) {
+        checklistRows.push([categoryLabel, tx("Sin opciones cargadas", "No options loaded"), "-"]);
+        return;
+      }
+
+      optionsList.forEach((option, index) => {
+        checklistRows.push([
+          index === 0 ? categoryLabel : "",
+          `${checklist} ${option.label}`,
+          option.availability,
+        ]);
+      });
+    };
+
+    pushOptionRows(
+      tx("Consolas FOH", "FOH Consoles"),
+      (data.festivalOptions.fohConsoles || []).map((consoleItem) => ({
+        label: consoleItem.model,
+        availability:
+          consoleItem.quantity > 0
+            ? `${tx("Disponibles", "Available")}: ${consoleItem.quantity}`
+            : tx("Sin stock", "Out of stock"),
+      })),
+    );
+
+    pushOptionRows(
+      tx("Consolas MON", "MON Consoles"),
+      (data.festivalOptions.monConsoles || []).map((consoleItem) => ({
+        label: consoleItem.model,
+        availability:
+          consoleItem.quantity > 0
+            ? `${tx("Disponibles", "Available")}: ${consoleItem.quantity}`
+            : tx("Sin stock", "Out of stock"),
+      })),
+    );
+
+    pushOptionRows(
+      tx("Sistemas RF", "Wireless Systems"),
+      (data.festivalOptions.wirelessSystems || []).map((system) => ({
+        label: system.model,
+        availability: `${tx("HH", "HH")} ${system.quantity_hh || 0} / ${tx("BP", "BP")} ${system.quantity_bp || 0}${system.band ? ` | ${system.band}` : ""}`,
+      })),
+    );
+
+    pushOptionRows(
+      tx("Sistemas IEM", "IEM Systems"),
+      (data.festivalOptions.iemSystems || []).map((system) => ({
+        label: system.model,
+        availability: `${tx("Canales", "Channels")} ${system.quantity_hh || 0} / ${tx("Petacas", "Bodypacks")} ${system.quantity_bp || 0}${system.band ? ` | ${system.band}` : ""}`,
+      })),
+    );
+
+    autoTable(doc, {
+      head: [[tx("Categoría", "Category"), tx("Opciones disponibles", "Available options"), tx("Disponibilidad", "Availability")]],
+      body: checklistRows,
+      startY: yPosition,
+      theme: "grid",
+      showHead: showHeadMode,
+      styles: {
+        fontSize: 8,
+        cellPadding: 2.5,
+      },
+      headStyles: {
+        fillColor: [125, 1, 1],
+        textColor: [255, 255, 255],
+      },
+      columnStyles: {
+        0: { cellWidth: 32 },
+        1: { cellWidth: 90 },
+        2: { cellWidth: 58 },
+      },
+    });
+
+    yPosition = getLastAutoTableFinalY(yPosition) + 8;
+  }
+
   // === TECHNICAL STAFF ===
   const technicalStaffRows = templateMode
     ? [
@@ -242,6 +351,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     body: technicalStaffRows,
     startY: yPosition,
     theme: 'grid',
+    showHead: showHeadMode,
     styles: {
       fontSize: 9,
       cellPadding: 3,
@@ -256,24 +366,56 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     },
   });
 
-  yPosition = (doc as any).lastAutoTable.finalY + 8;
+  yPosition = getLastAutoTableFinalY(yPosition) + 8;
 
   // === CONSOLE REQUIREMENTS ===
   const consoleRows = templateMode
-    ? [
-        [tx("Consola FOH", "FOH Console"), '', ''],
-        [tx("Consola MON", "MON Console"), '', ''],
-      ]
+    ? (() => {
+        const rows: string[][] = [];
+        const fohOptions = data.festivalOptions?.fohConsoles || [];
+        const monOptions = data.festivalOptions?.monConsoles || [];
+
+        if (fohOptions.length > 0) {
+          fohOptions.forEach((consoleItem, index) => {
+            rows.push([
+              index === 0 ? tx("Consola FOH", "FOH Console") : "",
+              `${checklist} ${consoleItem.model}`,
+              `${tx("Disponibles", "Available")}: ${consoleItem.quantity || 0}`,
+            ]);
+          });
+        } else {
+          rows.push([tx("Consola FOH", "FOH Console"), "", ""]);
+        }
+
+        if (monOptions.length > 0) {
+          monOptions.forEach((consoleItem, index) => {
+            rows.push([
+              index === 0 ? tx("Consola MON", "MON Console") : "",
+              `${checklist} ${consoleItem.model}`,
+              `${tx("Disponibles", "Available")}: ${consoleItem.quantity || 0}`,
+            ]);
+          });
+        } else {
+          rows.push([tx("Consola MON", "MON Console"), "", ""]);
+        }
+
+        return rows;
+      })()
     : [
         [tx("Consola FOH", "FOH Console"), data.technical.fohConsole.model, providerLabel(data.technical.fohConsole.providedBy)],
         [tx("Consola MON", "MON Console"), data.technical.monConsole.model, providerLabel(data.technical.monConsole.providedBy)],
       ];
 
   autoTable(doc, {
-    head: [[tx("Puesto", "Position"), tx("Modelo", "Model"), tx("Proporcionado por", "Provided by")]],
+    head: [[
+      tx("Puesto", "Position"),
+      tx("Modelo", "Model"),
+      templateMode ? tx("Dotación festival", "Festival inventory") : tx("Proporcionado por", "Provided by"),
+    ]],
     body: consoleRows,
     startY: yPosition,
     theme: 'grid',
+    showHead: showHeadMode,
     styles: {
       fontSize: 9,
       cellPadding: 3,
@@ -284,12 +426,53 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     },
   });
 
-  yPosition = (doc as any).lastAutoTable.finalY + 8;
+  yPosition = getLastAutoTableFinalY(yPosition) + 8;
+
+  // === MIC KIT DISCLAIMER ===
+  if (!templateMode && data.micKit && (data.micKit === 'band' || data.micKit === 'mixed')) {
+    const checkPageSpace = (needed: number) => {
+      if (yPosition + needed > pageHeight - 25) {
+        doc.addPage();
+        yPosition = 20;
+      }
+    };
+    checkPageSpace(18);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bolditalic');
+    doc.setTextColor(125, 1, 1);
+    let disclaimerText = '';
+    if (data.micKit === 'band') {
+      disclaimerText = tx(
+        'Nota: Kit de microfonia cableada proporcionado integramente por la banda.',
+        'Note: Wired microphone kit provided entirely by the band.'
+      );
+    } else if (data.micKit === 'mixed') {
+      disclaimerText = tx(
+        'Nota: Setup mixto de microfonia cableada - parte proporcionada por la banda y parte por el festival.',
+        'Note: Mixed wired microphone setup - some provided by the band and some by the festival.'
+      );
+    }
+    const disclaimerLines = doc.splitTextToSize(disclaimerText, pageWidth - 28);
+    doc.text(disclaimerLines, 14, yPosition);
+    yPosition += disclaimerLines.length * 5 + 4;
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(51, 51, 51);
+  }
 
   // === WIRED MICROPHONES ===
   if (templateMode || (data.wiredMics && data.wiredMics.length > 0)) {
     const wiredMicRows = templateMode
-      ? Array.from({ length: 5 }, () => ['', '', '', ''])
+      ? (() => {
+          const optionsList = data.festivalOptions?.wiredMics || [];
+          if (optionsList.length === 0) return Array.from({ length: 5 }, () => ["", "", "", ""]);
+          return optionsList.map((mic) => [
+            `${checklist} ${mic.model}`,
+            "____",
+            "",
+            `${tx("Disponibles", "Available")}: ${mic.quantity || 0}`,
+          ]);
+        })()
       : (data.wiredMics || []).map(mic => [
           mic.model,
           mic.quantity.toString(),
@@ -307,6 +490,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       body: wiredMicRows,
       startY: yPosition,
       theme: 'grid',
+      showHead: showHeadMode,
       styles: {
         fontSize: 9,
         cellPadding: 3,
@@ -323,19 +507,44 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       }
     });
 
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
+    yPosition = getLastAutoTableFinalY(yPosition) + 8;
   }
 
   // === RF & WIRELESS ===
-  const wirelessRows: any[] = [];
+  const wirelessRows: Array<Array<string | number>> = [];
   
   if (templateMode) {
+    const wirelessOptions = data.festivalOptions?.wirelessSystems || [];
+    const iemOptions = data.festivalOptions?.iemSystems || [];
+
+    if (wirelessOptions.length === 0 && iemOptions.length === 0) {
       wirelessRows.push(
-      [tx('Mano', 'Handheld'), '', '', '', ''],
-      [tx('Petaca', 'Bodypack'), '', '', '', ''],
-      [tx('Canales IEM', 'IEM Channels'), '', '', '', ''],
-      [tx('Petacas IEM', 'IEM Bodypacks'), '', '', '', '']
-    );
+        [tx("Mano", "Handheld"), "____", "", "", ""],
+        [tx("Petaca", "Bodypack"), "____", "", "", ""],
+        [tx("Canales IEM", "IEM Channels"), "____", "", "", ""],
+        [tx("Petacas IEM", "IEM Bodypacks"), "____", "", "", ""],
+      );
+    } else {
+      wirelessOptions.forEach((system, index) => {
+        wirelessRows.push([
+          index === 0 ? tx("Sistemas RF", "Wireless Systems") : "",
+          "____",
+          `${checklist} ${system.model}`,
+          system.band || "-",
+          `${tx("HH", "HH")} ${system.quantity_hh || 0} / ${tx("BP", "BP")} ${system.quantity_bp || 0}`,
+        ]);
+      });
+
+      iemOptions.forEach((system, index) => {
+        wirelessRows.push([
+          index === 0 ? tx("Sistemas IEM", "IEM Systems") : "",
+          "____",
+          `${checklist} ${system.model}`,
+          system.band || "-",
+          `${tx("Canales", "Channels")} ${system.quantity_hh || 0} / ${tx("Petacas", "Bodypacks")} ${system.quantity_bp || 0}`,
+        ]);
+      });
+    }
   } else {
     // Process wireless systems with individual provider information
     if (data.technical.wireless.systems && data.technical.wireless.systems.length > 0) {
@@ -426,11 +635,12 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
         tx('Cant.', 'Qty'),
         tx('Modelo', 'Model'),
         tx('Banda', 'Band'),
-        tx('Proporcionado por', 'Provided by')
+        templateMode ? tx("Dotación festival", "Festival inventory") : tx('Proporcionado por', 'Provided by')
       ]],
       body: wirelessRows,
       startY: yPosition,
       theme: 'grid',
+      showHead: showHeadMode,
       styles: {
         fontSize: 9,
         cellPadding: 3,
@@ -441,13 +651,18 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       },
     });
 
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
+    yPosition = getLastAutoTableFinalY(yPosition) + 8;
   }
 
   // === MONITORS ===
   if (templateMode || data.technical.monitors.enabled) {
     const monitorRows = templateMode
-      ? [[tx('Monitores', 'Monitors'), '']]
+      ? [[
+          tx("Monitores", "Monitors"),
+          data.festivalOptions?.monitorsQuantity
+            ? `${tx("Disponibles", "Available")}: ${data.festivalOptions.monitorsQuantity}`
+            : "",
+        ]]
       : [[tx('Monitores', 'Monitors'), data.technical.monitors.quantity]];
 
     autoTable(doc, {
@@ -455,6 +670,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       body: monitorRows,
       startY: yPosition,
       theme: 'grid',
+      showHead: showHeadMode,
       styles: {
         fontSize: 9,
         cellPadding: 3,
@@ -465,17 +681,17 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       },
     });
 
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
+    yPosition = getLastAutoTableFinalY(yPosition) + 8;
   }
 
   // === INFRASTRUCTURE ===
   const infrastructureRows = templateMode
     ? [
-        ['CAT6', ''],
-        ['HMA', ''],
-        ['Coax', ''],
-        ['OpticalCon Duo', ''],
-        [tx('Líneas Analógicas', 'Analog Lines'), ''],
+        ['CAT6', data.festivalOptions?.availableCat6Runs ? `${tx("Disponibles", "Available")}: ${data.festivalOptions.availableCat6Runs}` : ''],
+        ['HMA', data.festivalOptions?.availableHmaRuns ? `${tx("Disponibles", "Available")}: ${data.festivalOptions.availableHmaRuns}` : ''],
+        ['Coax', data.festivalOptions?.availableCoaxRuns ? `${tx("Disponibles", "Available")}: ${data.festivalOptions.availableCoaxRuns}` : ''],
+        ['OpticalCon Duo', data.festivalOptions?.availableOpticalconDuoRuns ? `${tx("Disponibles", "Available")}: ${data.festivalOptions.availableOpticalconDuoRuns}` : ''],
+        [tx('Líneas Analógicas', 'Analog Lines'), data.festivalOptions?.availableAnalogRuns ? `${tx("Disponibles", "Available")}: ${data.festivalOptions.availableAnalogRuns}` : ''],
         [tx('Otros', 'Other'), ''],
       ]
     : [
@@ -492,6 +708,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       body: infrastructureRows,
       startY: yPosition,
       theme: 'grid',
+      showHead: showHeadMode,
       styles: {
         fontSize: 9,
         cellPadding: 3,
@@ -502,16 +719,16 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       },
     });
 
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
+    yPosition = getLastAutoTableFinalY(yPosition) + 8;
   }
 
   // === EXTRAS ===
   const extraRows = templateMode
     ? [
-        ['Side Fill', ''],
-        ['Drum Fill', ''],
-        ['DJ Booth', ''],
-        [tx('Cableado Adicional', 'Additional Wired'), ''],
+        ['Side Fill', yesNo(Boolean(data.festivalOptions?.hasSideFill)), ''],
+        ['Drum Fill', yesNo(Boolean(data.festivalOptions?.hasDrumFill)), ''],
+        ['DJ Booth', yesNo(Boolean(data.festivalOptions?.hasDjBooth)), ''],
+        [tx('Cableado Adicional', 'Additional Wired'), '', ''],
       ]
     : [
         data.extras.sideFill && ['Side Fill', yesNo(true)],
@@ -522,10 +739,17 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
 
   if (templateMode || extraRows.length > 0) {
     autoTable(doc, {
-      head: [[tx('Requerimientos Adicionales', 'Extra Requirements'), tx('Detalle', 'Details')]],
+      head: templateMode
+        ? [[
+            tx('Requerimientos Adicionales', 'Extra Requirements'),
+            tx('Disponible', 'Available'),
+            tx('Requerido', 'Required'),
+          ]]
+        : [[tx('Requerimientos Adicionales', 'Extra Requirements'), tx('Detalle', 'Details')]],
       body: extraRows,
       startY: yPosition,
       theme: 'grid',
+      showHead: showHeadMode,
       styles: {
         fontSize: 9,
         cellPadding: 3,
@@ -536,7 +760,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       },
     });
 
-    yPosition = (doc as any).lastAutoTable.finalY + 8;
+    yPosition = getLastAutoTableFinalY(yPosition) + 8;
   }
 
   // === NOTES ===
@@ -557,6 +781,72 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       const splitNotes = doc.splitTextToSize(data.notes, pageWidth - 28);
       doc.text(splitNotes, 14, yPosition);
       yPosition += splitNotes.length * 5 + 10;
+    }
+  }
+
+  if (templateMode) {
+    const blockHeight = 42;
+    if (yPosition + blockHeight > pageHeight - 20) {
+      doc.addPage();
+      yPosition = 20;
+    }
+
+    doc.setFontSize(10);
+    doc.setTextColor(125, 1, 1);
+    doc.text(
+      tx(
+        "Recomendado: completar este formulario de forma electrónica",
+        "Recommended: complete this form electronically",
+      ),
+      14,
+      yPosition,
+    );
+    yPosition += 5;
+
+    doc.setFontSize(8);
+    doc.setTextColor(51, 51, 51);
+    const electronicSuggestion = tx(
+      "Sugerencia: usa el enlace público para evitar errores de transcripción en papel.",
+      "Suggestion: use the public link to avoid paper transcription errors.",
+    );
+    const suggestionLines = doc.splitTextToSize(electronicSuggestion, pageWidth - 28);
+    doc.text(suggestionLines, 14, yPosition);
+    yPosition += suggestionLines.length * 4 + 2;
+
+    if (data.publicFormQrDataUrl) {
+      try {
+        const qrSize = 28;
+        const qrX = 14;
+        const qrY = yPosition;
+        doc.addImage(data.publicFormQrDataUrl, "PNG", qrX, qrY, qrSize, qrSize);
+        if (data.publicFormUrl && data.publicFormUrl.trim().length > 0) {
+          doc.link(qrX, qrY, qrSize, qrSize, { url: data.publicFormUrl });
+        }
+
+        doc.setFontSize(9);
+        doc.text(
+          tx("Escanea para completar online", "Scan to complete online"),
+          14 + qrSize + 4,
+          yPosition + 8,
+        );
+        doc.setFontSize(8);
+        doc.text(
+          tx("Solo un envío permitido por enlace", "Only one submission is allowed per link"),
+          14 + qrSize + 4,
+          yPosition + 14,
+        );
+      } catch (qrError) {
+        console.error("Error adding artist form QR to PDF:", qrError);
+      }
+      yPosition += 32;
+    } else {
+      const fallbackText = data.publicFormUrl && data.publicFormUrl.trim().length > 0
+        ? tx("No se pudo incrustar el QR. Usa el enlace en panel de gestión.", "Could not embed QR. Use the link from management panel.")
+        : tx("QR no disponible: genera/copía el enlace desde panel de gestión.", "QR unavailable: generate/copy link from management panel.");
+
+      const fallbackLines = doc.splitTextToSize(fallbackText, pageWidth - 28);
+      doc.text(fallbackLines, 14, yPosition);
+      yPosition += fallbackLines.length * 4 + 2;
     }
   }
 

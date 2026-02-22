@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
@@ -11,9 +12,10 @@ import { MonitorSetupSection } from "./form/sections/MonitorSetupSection";
 import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSection";
 import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
+import { MicKitSection } from "./form/sections/MicKitSection";
 import { FestivalGearSetup, WirelessSetup } from "@/types/festival";
 import { ArtistSectionProps } from "@/types/artist-form";
-import { Loader2, Printer } from "lucide-react";
+import { Download, Eye, FileText, Loader2, Printer, Trash2 } from "lucide-react";
 
 interface ArtistRequirementsFormProps {
   isBlank?: boolean;
@@ -26,6 +28,8 @@ interface PublicFormContextResponse {
   artist?: Record<string, unknown>;
   gear_setup?: FestivalGearSetup | null;
   logo_file_path?: string | null;
+  stage_names?: Array<{ number?: number; name?: string }>;
+  rider_files?: Array<Record<string, unknown>>;
 }
 
 interface PublicSubmitResponse {
@@ -35,6 +39,16 @@ interface PublicSubmitResponse {
 }
 
 type ArtistFormState = ArtistSectionProps["formData"];
+type RiderFileRecord = {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string | null;
+  file_size: number | null;
+  uploaded_at: string | null;
+  uploaded_by: string | null;
+  uploaded_by_name: string | null;
+};
 
 const makeBlankSystem = () => ({
   model: "",
@@ -107,6 +121,8 @@ const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistFormStat
   notes: "",
   rider_missing: false,
   isaftermidnight: false,
+  mic_kit: "band",
+  wired_mics: [],
 });
 
 export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFormProps) => {
@@ -123,9 +139,14 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [gearSetup, setGearSetup] = useState<FestivalGearSetup | null>(null);
+  const [stageNames, setStageNames] = useState<Record<number, string>>({});
   const [festivalLogo, setFestivalLogo] = useState<string | null>(null);
   const [companyLogo, setCompanyLogo] = useState("/sector pro logo.png");
   const [lockedFields, setLockedFields] = useState<Set<string>>(new Set());
+  const [publicArtistId, setPublicArtistId] = useState<string | null>(null);
+  const [riderFiles, setRiderFiles] = useState<RiderFileRecord[]>([]);
+  const [isUploadingRider, setIsUploadingRider] = useState(false);
+  const [deletingRiderId, setDeletingRiderId] = useState<string | null>(null);
   const [formData, setFormData] = useState<ArtistFormState>(() => createInitialFormData(isBlank, blankDate));
 
   const resolveFestivalLogoUrl = useCallback(async (rawFilePath: string | null | undefined) => {
@@ -168,6 +189,9 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
     const loadBlankContext = async () => {
       try {
         setLockedFields(new Set());
+        setStageNames({});
+        setPublicArtistId(null);
+        setRiderFiles([]);
         if (cancelled) return;
         if (blankDate) {
           setFormData((prev) => ({ ...prev, date: blankDate }));
@@ -186,6 +210,21 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         if (cancelled) return;
         if (gearData) {
           setGearSetup(gearData as FestivalGearSetup);
+        }
+
+        const { data: stagesData } = await supabase
+          .from("festival_stages")
+          .select("number, name")
+          .eq("job_id", blankJobId);
+
+        if (!cancelled && stagesData) {
+          const stageMap = stagesData.reduce<Record<number, string>>((acc, stage) => {
+            if (typeof stage.number === "number" && stage.name) {
+              acc[stage.number] = stage.name;
+            }
+            return acc;
+          }, {});
+          setStageNames(stageMap);
         }
 
         const { data: logoData } = await supabase
@@ -217,6 +256,8 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         });
         return;
       }
+
+      setStageNames({});
 
       const { data, error } = await supabase.rpc("get_public_artist_form_context", {
         p_token: token,
@@ -250,6 +291,22 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
       }
 
       const artistData = context.artist || {};
+      const artistJobId = asString(artistData.job_id);
+      const artistId = asString(artistData.id);
+      const contextStageNames = Array.isArray(context.stage_names) ? context.stage_names : [];
+      const contextRiderFiles = asArray<Record<string, unknown>>(context.rider_files).map((file) => ({
+        id: asString(file.id),
+        file_name: asString(file.file_name),
+        file_path: asString(file.file_path),
+        file_type: asString(file.file_type) || null,
+        file_size: typeof file.file_size === "number" ? file.file_size : null,
+        uploaded_at: asString(file.uploaded_at) || null,
+        uploaded_by: asString(file.uploaded_by) || null,
+        uploaded_by_name: asString(file.uploaded_by_name) || null,
+      }));
+
+      setPublicArtistId(artistId || null);
+      setRiderFiles(contextRiderFiles.filter((file) => file.id && file.file_path));
       const hasSystems = (value: unknown) =>
         asArray<Record<string, unknown>>(value).some((system) => {
           return (
@@ -259,13 +316,12 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
             hasPositiveNumber(system?.quantity_bp)
           );
         });
+      const hasWiredMics = (value: unknown) =>
+        asArray<Record<string, unknown>>(value).some((mic) => {
+          return hasText(mic?.model) || hasPositiveNumber(mic?.quantity);
+        });
 
       const nextLockedFields = new Set<string>(["name", "stage", "date", "show_start", "show_end"]);
-      if (asBoolean(artistData.soundcheck) || hasText(artistData.soundcheck_start) || hasText(artistData.soundcheck_end)) {
-        nextLockedFields.add("soundcheck");
-        nextLockedFields.add("soundcheck_start");
-        nextLockedFields.add("soundcheck_end");
-      }
       if (hasText(artistData.foh_console)) {
         nextLockedFields.add("foh_console");
         nextLockedFields.add("foh_console_provided_by");
@@ -320,6 +376,12 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
       if (hasText(artistData.notes)) nextLockedFields.add("notes");
       if (asBoolean(artistData.rider_missing)) nextLockedFields.add("rider_missing");
       if (asBoolean(artistData.isaftermidnight)) nextLockedFields.add("isaftermidnight");
+      if (hasWiredMics(artistData.wired_mics)) {
+        nextLockedFields.add("wired_mics");
+        nextLockedFields.add("mic_kit");
+      } else if (asString(artistData.mic_kit) === "festival" || asString(artistData.mic_kit) === "mixed") {
+        nextLockedFields.add("mic_kit");
+      }
 
       setLockedFields(nextLockedFields);
 
@@ -363,10 +425,45 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         notes: asString(artistData.notes),
         rider_missing: asBoolean(artistData.rider_missing),
         isaftermidnight: asBoolean(artistData.isaftermidnight),
+        mic_kit: (asString(artistData.mic_kit) === "festival" || asString(artistData.mic_kit) === "mixed")
+          ? (asString(artistData.mic_kit) as "festival" | "mixed")
+          : "band",
+        wired_mics: asArray<Record<string, unknown>>(artistData.wired_mics).map((mic) => ({
+          model: asString(mic.model),
+          quantity: asNumber(mic.quantity),
+          exclusive_use: asBoolean(mic.exclusive_use),
+          notes: asString(mic.notes),
+        })),
       }));
 
       if (context.gear_setup) {
         setGearSetup(context.gear_setup);
+      }
+
+      const stageMapFromContext = contextStageNames.reduce<Record<number, string>>((acc, stage) => {
+        if (typeof stage.number === "number" && stage.name) {
+          acc[stage.number] = stage.name;
+        }
+        return acc;
+      }, {});
+
+      if (Object.keys(stageMapFromContext).length > 0) {
+        setStageNames(stageMapFromContext);
+      } else if (artistJobId) {
+        const { data: stagesData } = await supabase
+          .from("festival_stages")
+          .select("number, name")
+          .eq("job_id", artistJobId);
+
+        if (!cancelled && stagesData) {
+          const stageMap = stagesData.reduce<Record<number, string>>((acc, stage) => {
+            if (typeof stage.number === "number" && stage.name) {
+              acc[stage.number] = stage.name;
+            }
+            return acc;
+          }, {});
+          setStageNames(stageMap);
+        }
       }
 
       const resolvedLogo = await resolveFestivalLogoUrl(context.logo_file_path);
@@ -420,9 +517,11 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase.rpc("submit_public_artist_form", {
-        p_token: token,
-        p_form_data: formData,
+      const { data, error } = await supabase.functions.invoke("submit-public-artist-form", {
+        body: {
+          token,
+          formData,
+        },
       });
 
       if (error) {
@@ -491,6 +590,224 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
     [isBlank, lockedFields]
   );
 
+  const formatUploadedAt = useCallback(
+    (uploadedAt: string | null) => {
+      if (!uploadedAt) return tx("Fecha desconocida", "Unknown date");
+      const date = new Date(uploadedAt);
+      if (Number.isNaN(date.getTime())) return tx("Fecha desconocida", "Unknown date");
+      return new Intl.DateTimeFormat(formLanguage === "en" ? "en-GB" : "es-ES", {
+        dateStyle: "medium",
+        timeStyle: "short",
+        timeZone: "Europe/Madrid",
+      }).format(date);
+    },
+    [formLanguage, tx]
+  );
+
+  const formatFileSize = useCallback(
+    (value: number | null) => {
+      if (!value || value <= 0) return tx("Tamaño desconocido", "Unknown size");
+      if (value < 1024) return `${value} B`;
+      if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+      return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+    },
+    [tx]
+  );
+
+  const openRiderFile = useCallback(
+    async (file: RiderFileRecord) => {
+      try {
+        const { data, error } = await supabase.storage
+          .from("festival_artist_files")
+          .createSignedUrl(file.file_path, 60 * 60);
+
+        if (error || !data?.signedUrl) {
+          throw error ?? new Error("Could not create signed URL");
+        }
+
+        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      } catch (error) {
+        console.error("Error opening rider file:", error);
+        toast({
+          title: tx("Error", "Error"),
+          description: tx("No se pudo abrir el rider.", "Could not open rider file."),
+          variant: "destructive",
+        });
+      }
+    },
+    [toast, tx]
+  );
+
+  const downloadRiderFile = useCallback(
+    async (file: RiderFileRecord) => {
+      try {
+        const { data, error } = await supabase.storage
+          .from("festival_artist_files")
+          .download(file.file_path);
+
+        if (error || !data) {
+          throw error ?? new Error("Could not download file");
+        }
+
+        const url = window.URL.createObjectURL(data);
+        const anchor = window.document.createElement("a");
+        anchor.href = url;
+        anchor.download = file.file_name;
+        window.document.body.appendChild(anchor);
+        anchor.click();
+        window.document.body.removeChild(anchor);
+        window.URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error("Error downloading rider file:", error);
+        toast({
+          title: tx("Error", "Error"),
+          description: tx("No se pudo descargar el rider.", "Could not download rider file."),
+          variant: "destructive",
+        });
+      }
+    },
+    [toast, tx]
+  );
+
+  const handleRiderUpload = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const input = event.target;
+      const selectedFiles = Array.from(input.files || []);
+      if (selectedFiles.length === 0) return;
+
+      if (!token || !publicArtistId) {
+        toast({
+          title: tx("Error", "Error"),
+          description: tx("No se pudo identificar este formulario público.", "Could not identify this public form."),
+          variant: "destructive",
+        });
+        input.value = "";
+        return;
+      }
+
+      setIsUploadingRider(true);
+
+      try {
+        const payload = new FormData();
+        payload.append("token", token);
+        selectedFiles.forEach((file) => payload.append("files", file));
+
+        const { data, error } = await supabase.functions.invoke("upload-public-artist-rider", {
+          body: payload,
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        const response = data as {
+          ok?: boolean;
+          error?: string;
+          file?: Record<string, unknown> | null;
+          files?: Array<Record<string, unknown>>;
+        } | null;
+        if (!response?.ok) {
+          throw new Error(response?.error || "upload_failed");
+        }
+
+        const uploadedRaw =
+          Array.isArray(response.files) && response.files.length > 0
+            ? response.files
+            : response.file
+              ? [response.file]
+              : [];
+
+        const uploaded = uploadedRaw
+          .map((file) => ({
+            id: asString(file.id),
+            file_name: asString(file.file_name),
+            file_path: asString(file.file_path),
+            file_type: asString(file.file_type) || null,
+            file_size: typeof file.file_size === "number" ? file.file_size : null,
+            uploaded_at: asString(file.uploaded_at) || null,
+            uploaded_by: asString(file.uploaded_by) || null,
+            uploaded_by_name: asString(file.uploaded_by_name) || null,
+          }))
+          .filter((file) => file.id && file.file_path);
+
+        if (uploaded.length === 0) {
+          throw new Error("invalid_upload_response");
+        }
+
+        setRiderFiles((prev) => {
+          const deduped = prev.filter((existing) => !uploaded.some((nextFile) => nextFile.id === existing.id));
+          return [...uploaded, ...deduped];
+        });
+
+        toast({
+          title: tx("Éxito", "Success"),
+          description:
+            uploaded.length > 1
+              ? tx("Riders cargados correctamente.", "Rider files uploaded successfully.")
+              : tx("Rider cargado correctamente.", "Rider uploaded successfully."),
+        });
+      } catch (error) {
+        console.error("Error uploading rider file:", error);
+        toast({
+          title: tx("Error", "Error"),
+          description: tx(
+            "No se pudo cargar el rider. Inténtalo de nuevo.",
+            "Could not upload rider file. Please try again."
+          ),
+          variant: "destructive",
+        });
+      } finally {
+        setIsUploadingRider(false);
+        input.value = "";
+      }
+    },
+    [publicArtistId, toast, token, tx]
+  );
+
+  const handleDeleteRider = useCallback(
+    async (file: RiderFileRecord) => {
+      if (!token || !file.id) return;
+      setDeletingRiderId(file.id);
+
+      try {
+        const { data, error } = await supabase.functions.invoke("delete-public-artist-rider", {
+          body: {
+            token,
+            fileId: file.id,
+          },
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        const response = data as { ok?: boolean; error?: string } | null;
+        if (!response?.ok) {
+          throw new Error(response?.error || "delete_failed");
+        }
+
+        setRiderFiles((prev) => prev.filter((item) => item.id !== file.id));
+
+        toast({
+          title: tx("Éxito", "Success"),
+          description: tx("Rider eliminado.", "Rider file deleted."),
+        });
+      } catch (error) {
+        console.error("Error deleting rider file:", error);
+        toast({
+          title: tx("Error", "Error"),
+          description: tx("No se pudo eliminar el rider.", "Could not delete rider file."),
+          variant: "destructive",
+        });
+      } finally {
+        setDeletingRiderId(null);
+      }
+    },
+    [toast, token, tx]
+  );
+
+  const shouldShowRiderSection = !isBlank && (formData.rider_missing || riderFiles.length > 0);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-6">
@@ -553,7 +870,117 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
                   gearSetup={gearSetup}
                   isFieldLocked={isFieldLocked}
                   language={formLanguage}
+                  stageNames={stageNames}
+                  showInternalFlags={false}
+                  showSoundcheckTimes={false}
                 />
+
+                {shouldShowRiderSection && (
+                  <div className="space-y-4 border rounded-lg p-4">
+                    <h3 className="text-lg font-semibold">{tx("Rider Técnico", "Technical Rider")}</h3>
+
+                    {formData.rider_missing && (
+                      <p className="text-sm font-medium text-destructive">
+                        {tx(
+                          "Aún no hemos recibido el rider técnico de este artista. Por favor súbelo en esta sección.",
+                          "We have not received this artist's technical rider yet. Please upload it in this section."
+                        )}
+                      </p>
+                    )}
+
+                    {riderFiles.length > 0 ? (
+                      <div className="rounded-md border p-3 space-y-3">
+                        {riderFiles.map((file) => (
+                          <div key={file.id} className="flex flex-col gap-3 border rounded-md p-3 md:flex-row md:items-start md:justify-between">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-sm font-medium">
+                                <FileText className="h-4 w-4" />
+                                <span>{file.file_name}</span>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                {tx("Subido", "Uploaded")}: {formatUploadedAt(file.uploaded_at)} ·{" "}
+                                {formatFileSize(file.file_size)}
+                              </p>
+                              {file.uploaded_by_name && (
+                                <p className="text-xs text-muted-foreground">
+                                  {tx("Subido por", "Uploaded by")}: {file.uploaded_by_name}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openRiderFile(file)}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                {tx("Ver", "View")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => downloadRiderFile(file)}
+                              >
+                                <Download className="h-4 w-4 mr-2" />
+                                {tx("Descargar", "Download")}
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                disabled={deletingRiderId === file.id}
+                                onClick={() => handleDeleteRider(file)}
+                              >
+                                {deletingRiderId === file.id ? (
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                )}
+                                {tx("Eliminar", "Delete")}
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                        <p className="text-xs text-muted-foreground">
+                          {tx(
+                            "Estos son los riders actuales que tenemos registrados. Si existe una versión más nueva, súbela usando el campo inferior y elimina las versiones erróneas.",
+                            "These are the rider files we currently have on file. If there is a newer version, upload it below and delete any incorrect versions."
+                          )}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        {tx(
+                          "No hay ningún rider cargado actualmente para este artista.",
+                          "There is currently no rider file uploaded for this artist."
+                        )}
+                      </p>
+                    )}
+
+                    <div className="space-y-2">
+                      <label htmlFor="public-rider-upload" className="text-sm font-medium">
+                        {tx("Subir rider(s) (PDF, Word o imagen)", "Upload rider file(s) (PDF, Word, or image)")}
+                      </label>
+                      <Input
+                        id="public-rider-upload"
+                        type="file"
+                        accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.webp"
+                        multiple
+                        onChange={handleRiderUpload}
+                        disabled={isUploadingRider}
+                      />
+                      {isUploadingRider && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          {tx("Subiendo rider...", "Uploading rider...")}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <ConsoleSetupSection
                   formData={formData}
@@ -569,6 +996,18 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
                   gearSetup={gearSetup}
                   isFieldLocked={isFieldLocked}
                   language={formLanguage}
+                />
+
+                <MicKitSection
+                  micKit={formData.mic_kit}
+                  wiredMics={formData.wired_mics}
+                  onMicKitChange={(provider) => handleFormChange({ mic_kit: provider })}
+                  onWiredMicsChange={(mics) => handleFormChange({ wired_mics: mics })}
+                  readOnly={isFieldLocked("mic_kit") || isFieldLocked("wired_mics")}
+                  language={formLanguage}
+                  festivalAvailableMics={(gearSetup?.wired_mics || [])
+                    .map((mic) => mic?.model?.trim())
+                    .filter((model): model is string => Boolean(model))}
                 />
 
                 <MonitorSetupSection
@@ -593,6 +1032,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
                   gearSetup={gearSetup}
                   isFieldLocked={isFieldLocked}
                   language={formLanguage}
+                  restrictToAvailable={!isBlank}
                 />
 
                 <NotesSection

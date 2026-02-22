@@ -3,8 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
-import { Download } from "lucide-react";
+import { Download, Mail } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { exportMissingRiderReportPDF, MissingRiderReportData } from "@/utils/missingRiderReportPdfExport";
 import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
@@ -13,7 +14,9 @@ import { exportRfIemTablePDF, RfIemTablePdfData } from "@/utils/rfIemTablePdfExp
 import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from "@/utils/infrastructureTablePdfExport";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from "@/utils/wiredMicrophoneNeedsPdfExport";
 import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
-import { fetchLogoUrl } from "@/utils/pdf/logoUtils";
+import { fetchJobLogo, fetchLogoUrl } from "@/utils/pdf/logoUtils";
+import { ensurePublicArtistFormLinks } from "@/utils/publicArtistFormLinks";
+import { buildReadableFilename } from "@/utils/fileName";
 import { toast } from "sonner";
 
 export interface PrintOptions {
@@ -72,6 +75,46 @@ export const PrintOptionsDialog = ({
     includeWeatherPrediction: true,
     generateIndividualStagePDFs: false
   });
+  const [missingRiderRecipientEmails, setMissingRiderRecipientEmails] = useState("");
+  const [isSendingMissingRiderEmail, setIsSendingMissingRiderEmail] = useState(false);
+
+  const parseRecipientEmails = (value: string) =>
+    Array.from(
+      new Set(
+        value
+          .split(/[,\n;]+/)
+          .map((email) => email.trim())
+          .filter(Boolean),
+      ),
+    );
+
+  const escapeHtml = (value: string) =>
+    value.replace(/[&<>"']/g, (char) => {
+      const escaped: Record<string, string> = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      };
+      return escaped[char] || char;
+    });
+
+  const blobToBase64 = (blob: Blob) =>
+    new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = String(reader.result || "");
+        const base64 = result.includes(",") ? result.split(",")[1] : result;
+        if (!base64) {
+          reject(new Error("No se pudo convertir el PDF a base64"));
+          return;
+        }
+        resolve(base64);
+      };
+      reader.onerror = () => reject(reader.error ?? new Error("No se pudo leer el PDF"));
+      reader.readAsDataURL(blob);
+    });
 
   const handleStageChange = (section: keyof PrintOptions, stageNumber: number, checked: boolean) => {
     if (section === 'gearSetupStages' || section === 'shiftScheduleStages' || 
@@ -115,51 +158,23 @@ export const PrintOptionsDialog = ({
   };
 
   const generateFilename = (): string => {
-    const baseTitle = jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-    
+    const baseTitle = jobTitle || "Festival";
+
     if (options.generateIndividualStagePDFs) {
-      return `${baseTitle}_Individual_Stage_PDFs.zip`;
-    }
-    
-    const selectedSections = [];
-    if (options.includeShiftSchedules) selectedSections.push('Shifts');
-    if (options.includeGearSetup) selectedSections.push('Equipment');
-    if (options.includeArtistTables) selectedSections.push('Artist_Tables');
-    if (options.includeRfIemTable) selectedSections.push('RF_IEM');
-    if (options.includeInfrastructureTable) selectedSections.push('Infrastructure');
-    if (options.includeMissingRiderReport) selectedSections.push('Missing_Riders');
-    if (options.includeArtistRequirements) selectedSections.push('Artist_Requirements');
-    if (options.includeWiredMicNeeds) selectedSections.push('Wired_Mics');
-    if (options.includeWeatherPrediction) selectedSections.push('Weather');
-
-    // If only one section is selected, make it more specific
-    if (selectedSections.length === 1) {
-      const section = selectedSections[0];
-      
-      // Get unique stages across all selected sections
-      const allSelectedStages = new Set([
-        ...(options.includeGearSetup ? options.gearSetupStages : []),
-        ...(options.includeShiftSchedules ? options.shiftScheduleStages : []),
-        ...(options.includeArtistTables ? options.artistTableStages : []),
-        ...(options.includeArtistRequirements ? options.artistRequirementStages : []),
-        ...(options.includeRfIemTable ? options.rfIemTableStages : []),
-        ...(options.includeInfrastructureTable ? options.infrastructureTableStages : []),
-        ...(options.includeWiredMicNeeds ? options.wiredMicNeedsStages : [])
-      ]);
-      
-      const sortedStages = Array.from(allSelectedStages).sort((a, b) => a - b);
-      
-      if (sortedStages.length < maxStages && sortedStages.length > 0) {
-        const stageString = sortedStages.length === 1 
-          ? `Stage${sortedStages[0]}`
-          : `Stages${sortedStages.join('_')}`;
-        return `${baseTitle}_${stageString}_${section}.pdf`;
-      }
-      
-      return `${baseTitle}_${section}.pdf`;
+      return buildReadableFilename([baseTitle, "Documentación por escenario"], "zip");
     }
 
-    // If multiple sections or all sections, check if specific stages are selected
+    const sectionLabels: string[] = [];
+    if (options.includeShiftSchedules) sectionLabels.push("Horarios de turnos");
+    if (options.includeGearSetup) sectionLabels.push("Dotación técnica");
+    if (options.includeArtistTables) sectionLabels.push("Cronograma artistas");
+    if (options.includeRfIemTable) sectionLabels.push("Tabla RF IEM");
+    if (options.includeInfrastructureTable) sectionLabels.push("Tabla infraestructura");
+    if (options.includeMissingRiderReport) sectionLabels.push("Riders faltantes");
+    if (options.includeArtistRequirements) sectionLabels.push("Fichas individuales artistas");
+    if (options.includeWiredMicNeeds) sectionLabels.push("Micrófonos cableados");
+    if (options.includeWeatherPrediction) sectionLabels.push("Predicción meteorológica");
+
     const allSelectedStages = new Set([
       ...(options.includeGearSetup ? options.gearSetupStages : []),
       ...(options.includeShiftSchedules ? options.shiftScheduleStages : []),
@@ -169,17 +184,19 @@ export const PrintOptionsDialog = ({
       ...(options.includeInfrastructureTable ? options.infrastructureTableStages : []),
       ...(options.includeWiredMicNeeds ? options.wiredMicNeedsStages : [])
     ]);
-    
     const sortedStages = Array.from(allSelectedStages).sort((a, b) => a - b);
-    
-    if (sortedStages.length < maxStages && sortedStages.length > 0) {
-      const stageString = sortedStages.length === 1 
-        ? `Stage${sortedStages[0]}`
-        : `Stages${sortedStages.join('_')}`;
-      return `${baseTitle}_${stageString}_Documentation.pdf`;
+    const stageLabel =
+      sortedStages.length > 0 && sortedStages.length < maxStages
+        ? sortedStages.length === 1
+          ? `Escenario ${sortedStages[0]}`
+          : `Escenarios ${sortedStages.join(", ")}`
+        : "";
+
+    if (sectionLabels.length === 1) {
+      return buildReadableFilename([baseTitle, stageLabel, sectionLabels[0]]);
     }
 
-    return `${baseTitle}_Complete_Documentation.pdf`;
+    return buildReadableFilename([baseTitle, stageLabel, "Documentación completa"]);
   };
 
   const renderStageSelections = (section: 'gearSetupStages' | 'shiftScheduleStages' | 'artistTableStages' | 'artistRequirementStages' | 'rfIemTableStages' | 'infrastructureTableStages' | 'wiredMicNeedsStages') => {
@@ -216,76 +233,85 @@ export const PrintOptionsDialog = ({
     onOpenChange(false);
   };
 
-  const handleDownloadMissingRiderReport = async () => {
+  const buildMissingRiderReport = async () => {
     if (!jobId) {
-      toast.error('Se requiere el ID del trabajo para generar el reporte de riders faltantes');
-      return;
+      throw new Error('Se requiere el ID del trabajo para generar el reporte de riders faltantes');
     }
 
+    console.log('Generating Missing Rider Report for job:', jobId);
+    
+    // Fetch festival artists
+    const { data: artists, error } = await supabase
+      .from('festival_artists')
+      .select('*')
+      .eq('job_id', jobId);
+
+    if (error) {
+      console.error('Error fetching artists:', error);
+      throw error;
+    }
+
+    // Filter artists with missing riders
+    const missingRiderArtists = artists?.filter(artist => 
+      Boolean(artist.rider_missing)
+    ) || [];
+
+    const { data: stageRows } = await supabase
+      .from('festival_stages')
+      .select('number, name')
+      .eq('job_id', jobId);
+    const stageNameByNumber = new Map<number, string>(
+      (stageRows || []).map((row) => [Number(row.number), row.name || `Escenario ${row.number}`]),
+    );
+
+    const publicFormLinksByArtistId = await ensurePublicArtistFormLinks(
+      missingRiderArtists.map((artist) => ({
+        id: artist.id,
+        form_language: artist.form_language,
+      })),
+    );
+
+    console.log(`Found ${missingRiderArtists.length} artists with missing riders out of ${artists?.length || 0} total artists`);
+
+    // Fetch logo (festival first, fallback to tour/job resolution)
+    const logoUrl = (await fetchJobLogo(jobId)) || '';
+
+    // Prepare data for PDF
+    const missingRiderData: MissingRiderReportData = {
+      jobTitle,
+      logoUrl,
+      artists: missingRiderArtists.map(artist => ({
+        id: artist.id,
+        name: artist.name || 'Unnamed Artist',
+        stage: artist.stage || 1,
+        stageName: stageNameByNumber.get(Number(artist.stage || 1)) || `Escenario ${artist.stage || 1}`,
+        date: artist.date || '',
+        showTime: {
+          start: artist.show_start || '',
+          end: artist.show_end || ''
+        },
+        formUrl: publicFormLinksByArtistId[artist.id],
+      }))
+    };
+
+    // Generate PDF
+    const pdfBlob = await exportMissingRiderReportPDF(missingRiderData);
+
+    return {
+      pdfBlob,
+      missingCount: missingRiderArtists.length,
+    };
+  };
+
+  const handleDownloadMissingRiderReport = async () => {
     try {
-      console.log('Downloading Missing Rider Report for job:', jobId);
-      
-      // Fetch festival artists
-      const { data: artists, error } = await supabase
-        .from('festival_artists')
-        .select('*')
-        .eq('job_id', jobId);
+      const { pdfBlob } = await buildMissingRiderReport();
 
-      if (error) {
-        console.error('Error fetching artists:', error);
-        throw error;
-      }
-
-      // Filter artists with missing riders
-      const missingRiderArtists = artists?.filter(artist => 
-        Boolean(artist.rider_missing)
-      ) || [];
-
-      console.log(`Found ${missingRiderArtists.length} artists with missing riders out of ${artists?.length || 0} total artists`);
-
-      // Fetch logo
-      let logoUrl = '';
-      try {
-        const { data: logoData } = await supabase
-          .from('festival_logos')
-          .select('file_path')
-          .eq('job_id', jobId)
-          .maybeSingle();
-
-        if (logoData?.file_path) {
-          const { data: { publicUrl } } = supabase
-            .storage
-            .from('festival-logos')
-            .getPublicUrl(logoData.file_path);
-          logoUrl = publicUrl;
-        }
-      } catch (err) {
-        console.warn('Could not fetch logo:', err);
-      }
-
-      // Prepare data for PDF
-      const missingRiderData: MissingRiderReportData = {
-        jobTitle,
-        logoUrl,
-        artists: missingRiderArtists.map(artist => ({
-          name: artist.name || 'Unnamed Artist',
-          stage: artist.stage || 1,
-          date: artist.date || '',
-          showTime: {
-            start: artist.show_start || '',
-            end: artist.show_end || ''
-          }
-        }))
-      };
-
-      // Generate PDF
-      const pdfBlob = await exportMissingRiderReportPDF(missingRiderData);
-      
       // Download file
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Missing_Rider_Report.pdf`;
+      a.download = buildReadableFilename([jobTitle || "Festival", "Reporte riders faltantes"]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -295,6 +321,63 @@ export const PrintOptionsDialog = ({
     } catch (error: any) {
       console.error('Error generating Missing Rider Report:', error);
       toast.error(`Error al generar Reporte de Riders Faltantes: ${error.message}`);
+    }
+  };
+
+  const handleSendMissingRiderReport = async () => {
+    const recipients = parseRecipientEmails(missingRiderRecipientEmails);
+    if (recipients.length === 0) {
+      toast.error("Añade al menos un correo externo para enviar el reporte.");
+      return;
+    }
+
+    setIsSendingMissingRiderEmail(true);
+    try {
+      const { pdfBlob, missingCount } = await buildMissingRiderReport();
+      const pdfBase64 = await blobToBase64(pdfBlob);
+      const pdfFilename = buildReadableFilename([jobTitle || "Festival", "Reporte riders faltantes"]);
+
+      const bodyHtml = `
+        <p>Hola,</p>
+        <p>Adjuntamos el <strong>Reporte de Riders Faltantes</strong> del festival <strong>${escapeHtml(jobTitle)}</strong>.</p>
+        <p>Artistas con rider pendiente: <strong>${missingCount}</strong>.</p>
+        <p>El PDF incluye el QR del formulario público por artista para completar la información técnica cuanto antes.</p>
+        <hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0;" />
+        <p style="font-size:12px;color:#6b7280;">
+          Este correo es automático. Por favor, no respondas a este email. Si tienes incidencias, contacta con la oficina técnica del festival en
+          <a href="mailto:sonido@sector-pro.com">sonido@sector-pro.com</a>.
+        </p>
+      `;
+
+      const { data, error } = await supabase.functions.invoke("send-corporate-email", {
+        body: {
+          subject: `Reporte Riders Faltantes - ${jobTitle}`,
+          bodyHtml,
+          recipients: { emails: recipients },
+          pdfAttachments: [
+            {
+              filename: pdfFilename,
+              content: pdfBase64,
+              size: pdfBlob.size,
+            },
+          ],
+          senderNameOverride: "Festivales - Sector Pro",
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+      if (!data?.success) {
+        throw new Error(data?.error || "No se pudo enviar el correo");
+      }
+
+      toast.success(`Reporte enviado a ${recipients.length} destinatario(s).`);
+    } catch (error: any) {
+      console.error('Error sending Missing Rider Report email:', error);
+      toast.error(`Error al enviar reporte de riders faltantes: ${error.message}`);
+    } finally {
+      setIsSendingMissingRiderEmail(false);
     }
   };
 
@@ -321,7 +404,11 @@ export const PrintOptionsDialog = ({
         const url = URL.createObjectURL(gearBlobs[0]);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Stage${options.gearSetupStages[0]}_Gear_Setup.pdf`;
+        a.download = buildReadableFilename([
+          jobTitle || "Festival",
+          `Escenario ${options.gearSetupStages[0]}`,
+          "Dotación técnica",
+        ]);
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -334,7 +421,7 @@ export const PrintOptionsDialog = ({
         const url = URL.createObjectURL(mergedBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Gear_Setup.pdf`;
+        a.download = buildReadableFilename([jobTitle || "Festival", "Dotación técnica"]);
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -390,7 +477,7 @@ export const PrintOptionsDialog = ({
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Shift_Schedules.pdf`;
+      a.download = buildReadableFilename([jobTitle || "Festival", "Horarios de turnos"]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -438,7 +525,7 @@ export const PrintOptionsDialog = ({
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Artist_Tables.pdf`;
+      a.download = buildReadableFilename([jobTitle || "Festival", "Cronograma artistas"]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -485,7 +572,7 @@ export const PrintOptionsDialog = ({
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_RF_IEM_Table.pdf`;
+      a.download = buildReadableFilename([jobTitle || "Festival", "Tabla RF IEM"]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -532,7 +619,7 @@ export const PrintOptionsDialog = ({
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Infrastructure_Table.pdf`;
+      a.download = buildReadableFilename([jobTitle || "Festival", "Tabla infraestructura"]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -588,7 +675,7 @@ export const PrintOptionsDialog = ({
       const url = URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${jobTitle.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}_Wired_Microphone_Needs.pdf`;
+      a.download = buildReadableFilename([jobTitle || "Festival", "Necesidades micrófonos cableados"]);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -940,6 +1027,30 @@ export const PrintOptionsDialog = ({
               <div className="pl-6 text-sm text-muted-foreground dark:text-gray-300">
                 Resumen de todos los artistas con riders técnicos faltantes
               </div>
+              {jobId && (
+                <div className="pl-6 mt-3 space-y-2">
+                  <Label htmlFor="missing-rider-recipient-emails" className="text-sm font-medium dark:text-gray-200">
+                    Enviar reporte por email (externo)
+                  </Label>
+                  <Textarea
+                    id="missing-rider-recipient-emails"
+                    value={missingRiderRecipientEmails}
+                    onChange={(event) => setMissingRiderRecipientEmails(event.target.value)}
+                    placeholder="correo1@dominio.com, correo2@dominio.com"
+                    rows={3}
+                  />
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleSendMissingRiderReport}
+                    disabled={isSendingMissingRiderEmail}
+                    className="w-full sm:w-auto"
+                  >
+                    <Mail className="h-4 w-4 mr-2" />
+                    {isSendingMissingRiderEmail ? "Enviando reporte..." : "Enviar Reporte por Email"}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
