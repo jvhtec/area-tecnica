@@ -291,7 +291,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange, onCreated]);
+  }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange, onCreated, requirements]);
 
   const selectedDepartments = watch("departments") || [];
 
