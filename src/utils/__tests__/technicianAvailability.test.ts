@@ -55,7 +55,7 @@ describe('datesOverlap', () => {
       )).toBe(true);
     });
 
-    it('returns true when ranges overlap by one minute', () => {
+    it('returns true for adjacent ranges sharing a boundary (end equals start)', () => {
       // First: 10:00-15:00, Second: 15:00-20:00 (edge case - end equals start)
       expect(datesOverlap(
         '2024-05-01T10:00:00Z',

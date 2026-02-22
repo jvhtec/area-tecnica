@@ -12,7 +12,7 @@ describe('getDashboardPath', () => {
     });
 
     it('returns /profile for undefined role', () => {
-      expect(getDashboardPath(undefined as any)).toBe('/profile');
+      expect(getDashboardPath(undefined as unknown as UserRole | null)).toBe('/profile');
     });
   });
 

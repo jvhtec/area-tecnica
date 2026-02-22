@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase-client"; // Updated import path
 import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { trackError } from "@/lib/errorTracking";
+import { filterVisibleJobs } from "@/utils/jobFiltering";
 
 export const useJobs = () => {
   // Set up multi-table subscriptions using our enhanced hooks
@@ -85,18 +86,7 @@ export const useJobs = () => {
           const allJobs = jobs || [];
 
           // Filter out jobs from cancelled/deleted tours and explicitly cancelled jobs
-          const filteredJobs = allJobs.filter((job: any) => {
-            if (job.status === 'Cancelado') return false;
-
-            const tourMeta = job?.tour_date?.tour;
-            if (tourMeta && (tourMeta.status === 'cancelled' || tourMeta.deleted === true)) {
-              return false;
-            }
-
-            return true;
-          });
-
-          return filteredJobs;
+          return filterVisibleJobs(allJobs);
         } catch (error) {
           if (retries > 0) {
             console.log(`Retrying... ${retries} attempts remaining`);

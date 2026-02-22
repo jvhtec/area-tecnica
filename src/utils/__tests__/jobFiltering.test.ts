@@ -2,25 +2,7 @@
  * @vitest-environment node
  */
 import { describe, it, expect } from 'vitest';
-
-/**
- * Job filtering logic extracted from useJobs hook for testability.
- * Filters out cancelled jobs and jobs from cancelled/deleted tours.
- */
-export function filterVisibleJobs(jobs: any[]): any[] {
-  return jobs.filter((job) => {
-    // Explicitly cancelled jobs are always hidden
-    if (job.status === 'Cancelado') return false;
-
-    // Jobs from cancelled or deleted tours are hidden
-    const tourMeta = job?.tour_date?.tour;
-    if (tourMeta && (tourMeta.status === 'cancelled' || tourMeta.deleted === true)) {
-      return false;
-    }
-
-    return true;
-  });
-}
+import { filterVisibleJobs } from '@/utils/jobFiltering';
 
 describe('filterVisibleJobs', () => {
   describe('cancelled jobs', () => {

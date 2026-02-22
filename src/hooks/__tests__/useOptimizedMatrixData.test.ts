@@ -87,7 +87,7 @@ describe('buildAssignmentDateMap', () => {
         { ...createAssignment('tech-2', 'job-2', '2024-05-01'), job: null },
       ];
 
-      const map = buildAssignmentDateMap(assignments as any, []);
+      const map = buildAssignmentDateMap(assignments as unknown as MatrixTimesheetAssignment[], []);
 
       expect(map.size).toBe(1);
       expect(map.has('tech-1-2024-05-01')).toBe(true);
@@ -100,7 +100,7 @@ describe('buildAssignmentDateMap', () => {
         { ...createAssignment('tech-2', 'job-2', '2024-05-01'), date: null },
       ];
 
-      const map = buildAssignmentDateMap(assignments as any, []);
+      const map = buildAssignmentDateMap(assignments as unknown as MatrixTimesheetAssignment[], []);
 
       expect(map.size).toBe(1);
     });
