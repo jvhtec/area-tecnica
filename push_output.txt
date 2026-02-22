@@ -1,0 +1,8 @@
+Initialising login role...
+Connecting to remote database...
+Found local migration files to be inserted before the last migration on remote database.
+
+Rerun the command with --include-all flag to apply these migrations:
+supabase/migrations/20260218193000_fix_replace_hoja_de_ruta_all_execute_permissions.sql
+supabase/migrations/20260218195000_auto_create_public_form_for_missing_rider.sql       
+
