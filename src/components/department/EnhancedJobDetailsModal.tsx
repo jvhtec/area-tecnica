@@ -471,14 +471,16 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                                 Pendiente: {approvalStatus.blockingReasons.join(', ')}
                                             </div>
                                         )}
+                                        {isClosureLocked && (
+                                            <div className={`text-xs ${theme.textMuted}`}>
+                                                Período de cierre finalizado
+                                            </div>
+                                        )}
                                     </div>
                                     <Button
                                         size="sm"
                                         disabled={isApproving || approvalStatusLoading || isClosureLocked}
-                                        onClick={() => {
-                                            if (isClosureLocked) return;
-                                            (jobRatesApproved ? handleRevokeRates : handleApproveRates)();
-                                        }}
+                                        onClick={jobRatesApproved ? handleRevokeRates : handleApproveRates}
                                     >
                                         {isApproving ? (
                                             <Loader2 className="h-4 w-4 animate-spin" />

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatInTimeZone } from "date-fns-tz";
 import { AlertTriangle, ExternalLink } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -10,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 import { supabase } from "@/integrations/supabase/client";
 import { syncFlexWorkOrdersForJob } from "@/services/flexWorkOrders";
@@ -52,7 +53,28 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
     !isDryhire && jobDetails?.job_type === "tourdate" && !isManager && isTechnicianRole && !jobRatesApproved;
 
   const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
-  const isClosureLocked = isJobPastClosureWindow(jobDetails?.end_time, jobDetails?.timezone ?? 'Europe/Madrid');
+
+  const { data: creatorProfile } = useQuery({
+    queryKey: ["profile-minimal", jobDetails?.created_by],
+    enabled: !!jobDetails?.created_by,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("first_name, last_name")
+        .eq("id", jobDetails.created_by)
+        .maybeSingle();
+      if (error) {
+        console.error("[JobDetailsInfoTab] Failed to fetch creator profile", error);
+        return null;
+      }
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const isClosureLocked = jobDetails
+    ? isJobPastClosureWindow(jobDetails.end_time, jobDetails.timezone ?? 'Europe/Madrid')
+    : false;
 
   const [isSendingPayoutEmails, setIsSendingPayoutEmails] = useState(false);
   const triggerPayoutEmails = React.useCallback(
@@ -108,8 +130,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
     enabled: open && isManager && !!resolvedJobId,
     queryFn: async () => {
       const criteria: any = { folder_type: "work_orders", department: "personnel" };
-      if ((jobDetails?.job_type || job?.job_type) === "tourdate") {
-        criteria.tour_date_id = jobDetails?.tour_date_id || job?.tour_date_id;
+      const tourDateId = jobDetails?.tour_date_id || job?.tour_date_id;
+      if ((jobDetails?.job_type || job?.job_type) === "tourdate" && tourDateId) {
+        criteria.tour_date_id = tourDateId;
       } else {
         criteria.job_id = resolvedJobId;
       }
@@ -189,6 +212,21 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
               <div>
                 <p className="text-sm font-medium mb-2">Empresa facturadora</p>
                 <Badge variant="secondary">{jobDetails.invoicing_company}</Badge>
+              </div>
+            )}
+            {(creatorProfile || jobDetails?.created_at) && (
+              <div>
+                <p className="text-sm font-medium mb-2">Creado por</p>
+                <span className="text-sm text-muted-foreground">
+                  {creatorProfile
+                    ? `${creatorProfile.first_name} ${creatorProfile.last_name}`.trim()
+                    : "—"}
+                  {jobDetails?.created_at && (
+                    <span className="ml-2 text-xs">
+                      ({formatInTimeZone(new Date(jobDetails.created_at), "Europe/Madrid", "d MMM yyyy, HH:mm", { locale: es })})
+                    </span>
+                  )}
+                </span>
               </div>
             )}
           </div>
@@ -311,6 +349,16 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
 
           {approvalStatus && approvalStatus.blockingReasons.length > 0 && (
             <div className="mt-2 text-xs text-foreground/70 dark:text-muted-foreground">Pendiente: {approvalStatus.blockingReasons.join(", ")}</div>
+          )}
+
+          {isClosureLocked && (
+            <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Plazo cerrado</AlertTitle>
+              <AlertDescription>
+                El período para modificar este parte ha finalizado.
+              </AlertDescription>
+            </Alert>
           )}
 
           {jobDetails?.locations && (

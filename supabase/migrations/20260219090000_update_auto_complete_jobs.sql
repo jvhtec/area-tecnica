@@ -12,24 +12,33 @@ BEGIN
     RAISE EXCEPTION 'permission denied' USING ERRCODE = '42501';
   END IF;
 
-  SELECT array_agg(id)
-  INTO job_ids
-  FROM public.jobs
-  WHERE end_time < now() - interval '7 days'
-    AND status != 'Cancelado'::job_status
-    AND status != 'Completado'::job_status;
+  -- Use a single atomic UPDATE with RETURNING to avoid TOCTOU race condition.
+  -- Timezone-aware: closure starts at startOfDay(end_time + 7 days) in the job's
+  -- timezone, matching the client-side isJobPastClosureWindow() logic exactly.
+  WITH updated AS (
+    UPDATE public.jobs
+    SET status = 'Completado'::job_status,
+        updated_at = now()
+    WHERE now() >= (
+            date_trunc('day',
+              (end_time AT TIME ZONE COALESCE(timezone, 'Europe/Madrid'))
+              + interval '7 days'
+            ) AT TIME ZONE COALESCE(timezone, 'Europe/Madrid')
+          )
+      AND status != 'Cancelado'::job_status
+      AND status != 'Completado'::job_status
+    RETURNING id
+  )
+  SELECT array_agg(id), count(*)::integer
+  INTO job_ids, updated_count
+  FROM updated;
 
   IF job_ids IS NULL THEN
     RETURN 0;
   END IF;
 
-  UPDATE public.jobs
-  SET status = 'Completado'::job_status,
-      updated_at = now()
-  WHERE id = ANY(job_ids);
-
-  GET DIAGNOSTICS updated_count = ROW_COUNT;
-
+  -- Normalize timesheets: set default values for any NULL fields
+  -- This ensures all timesheets have complete data before computing amounts
   SELECT array_agg(id)
   INTO ts_ids
   FROM (
@@ -40,7 +49,7 @@ BEGIN
         ends_next_day = COALESCE(ends_next_day, false)
     WHERE job_id = ANY(job_ids)
       AND is_active = true
-      AND (start_time IS NULL OR end_time IS NULL)
+      AND (start_time IS NULL OR end_time IS NULL OR break_minutes IS NULL OR ends_next_day IS NULL)
     RETURNING id
   ) updated_timesheets;
 

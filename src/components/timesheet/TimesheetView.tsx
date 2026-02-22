@@ -1,6 +1,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { createQueryKey } from "@/lib/optimized-react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -67,8 +68,8 @@ export const TimesheetView = ({
   // Expense state and queries - must be before any early returns
   const { data: expenses = [] } = useJobExpenses(jobId);
 
-  const { data: jobMeta } = useQuery({
-    queryKey: ['timesheet-job-meta', jobId],
+  const { data: jobMeta, isError: jobMetaError } = useQuery({
+    queryKey: createQueryKey.jobs.meta(jobId),
     enabled: !!jobId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -82,7 +83,16 @@ export const TimesheetView = ({
     staleTime: 60_000,
   });
 
-  const isClosureLocked = isJobPastClosureWindow(jobMeta?.end_time, jobMeta?.timezone ?? 'Europe/Madrid');
+  // On error, allow actions (fail-open) rather than permanently locking users out.
+  // When jobMeta is undefined (loading), default to locked=true to prevent
+  // actions until we know the actual closure status.
+  // When jobMeta is null (not found), allow actions (job doesn't exist or has no end_time).
+  const isClosureLocked = (() => {
+    if (jobMetaError) return false; // fail-open on error
+    if (jobMeta === undefined) return true; // locked while loading
+    if (!jobMeta) return false; // job not found, allow actions
+    return isJobPastClosureWindow(jobMeta.end_time, jobMeta.timezone ?? 'Europe/Madrid');
+  })();
 
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);

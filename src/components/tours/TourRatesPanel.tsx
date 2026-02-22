@@ -318,6 +318,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                                 });
                               }}
                               disabled={toggleApprovalMutation.isPending || isClosureLocked}
+                              title={isClosureLocked ? 'El período de cierre ha pasado' : undefined}
                             />
                           </div>
                         )}

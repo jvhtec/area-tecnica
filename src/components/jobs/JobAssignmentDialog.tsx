@@ -30,12 +30,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { AlertCircle } from "lucide-react";
 import { Job } from "@/types/job";
 import { User } from "@/types/user";
 import { useEffect, useState, useMemo } from "react";
 import { Loader2, RefreshCw, ExternalLink, CalendarIcon } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 import { useAvailableTechnicians } from "@/hooks/useAvailableTechnicians";
@@ -108,7 +110,6 @@ const syncTimesheetCategories = async (jobId: string, technicianId: string) => {
       throw updateError;
     }
 
-    console.log(`Updated timesheet categories to ${newCategory} for technician ${technicianId} on job ${jobId}`);
   } catch (error) {
     console.error('Error in syncTimesheetCategories:', error);
     throw error;
@@ -318,13 +319,18 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   const handleAddTechnician = async () => {
     if (isClosureLocked) {
+      toast({
+        title: "Acción no permitida",
+        description: "El período de modificación para este trabajo ha finalizado",
+        variant: "destructive",
+      });
       return;
     }
 
     if (!selectedTechnician) {
       toast({
-        title: "Warning",
-        description: "Please select a technician",
+        title: "Advertencia",
+        description: "Por favor selecciona un técnico",
       });
       return;
     }
@@ -332,8 +338,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     const singleDayDateKey = selectedJobDate ? format(selectedJobDate, "yyyy-MM-dd") : null;
     if (singleDay && !singleDayDateKey) {
       toast({
-        title: "Select a date",
-        description: "Choose the job date this assignment should cover.",
+        title: "Selecciona una fecha",
+        description: "Elige la fecha del trabajo que debe cubrir esta asignación.",
       });
       return;
     }
@@ -510,6 +516,15 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="w-[95vw] max-w-[625px] max-h-[90vh] flex flex-col overflow-hidden">
+        {isClosureLocked && (
+          <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Plazo cerrado</AlertTitle>
+            <AlertDescription>
+              El período para modificar el personal de este trabajo ha finalizado.
+            </AlertDescription>
+          </Alert>
+        )}
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <span className="text-base md:text-lg">Gestión de Personal - {formatDepartmentName(currentDepartment)}</span>

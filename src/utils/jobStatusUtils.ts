@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 
 export type JobStatus = "Tentativa" | "Confirmado" | "Completado" | "Cancelado";

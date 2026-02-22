@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
+import { createQueryKey } from "@/lib/optimized-react-query";
 import { useState, useCallback, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { Department, TECHNICAL_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
 import { JobType } from "@/types/job";
@@ -25,29 +25,29 @@ import { roleOptionsForDiscipline } from "@/types/roles";
 
 // Simplified schema for better performance
 const formSchema = z.object({
-  title: z.string().min(1, "Title is required"),
+  title: z.string().min(1, "El título es requerido"),
   description: z.string().optional(),
   location: z.object({
-    name: z.string().min(1, "Location is required"),
-    address: z.string().min(1, "Address is required"),
+    name: z.string().min(1, "La ubicación es requerida"),
+    address: z.string().min(1, "La dirección es requerida"),
     coordinates: z.object({
       lat: z.number(),
       lng: z.number(),
     }).optional(),
     place_id: z.string().optional(),
   }),
-  start_time: z.string().min(1, "Start time is required"),
-  end_time: z.string().min(1, "End time is required"),
+  start_time: z.string().min(1, "La hora de inicio es requerida"),
+  end_time: z.string().min(1, "La hora de finalización es requerida"),
   job_type: z.enum(["single", "multi_day", "tour", "festival", "dryhire", "tourdate", "evento"] as const),
-  departments: z.array(z.string()).min(1, "At least one department is required"),
-  color: z.string().min(1, "Color is required"),
-  timezone: z.string().min(1, "Timezone is required"),
+  departments: z.array(z.string()).min(1, "Se requiere al menos un departamento"),
+  color: z.string().min(1, "El color es requerido"),
+  timezone: z.string().min(1, "La zona horaria es requerida"),
 }).refine((data) => {
   const start = new Date(data.start_time);
   const end = new Date(data.end_time);
   return end > start;
 }, {
-  message: "End time must be after start time",
+  message: "La hora de finalización debe ser después de la hora de inicio",
   path: ["end_time"],
 });
 
@@ -67,7 +67,6 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
   const { getOrCreateLocationWithDetails } = useLocationManagement();
   const [locationInput, setLocationInput] = useState("");
   const [requirements, setRequirements] = useState<Record<string, Array<{ role_code: string; quantity: number }>>>({});
-  const navigate = useNavigate();
   const fieldClass = "bg-background border-input text-foreground placeholder:text-muted-foreground";
 
   const formatInput = (d: Date) => {
@@ -180,11 +179,12 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         return;
       }
 
-      // Start location resolution and time conversion in parallel
-      const [locationId, startTimeUTC, endTimeUTC] = await Promise.all([
+      // Start location resolution, time conversion, and session fetch in parallel
+      const [locationId, startTimeUTC, endTimeUTC, { data: { session } }] = await Promise.all([
         getOrCreateLocationWithDetails(values.location as LocationDetails),
         Promise.resolve(localInputToUTC(values.start_time, values.timezone)),
-        Promise.resolve(localInputToUTC(values.end_time, values.timezone))
+        Promise.resolve(localInputToUTC(values.end_time, values.timezone)),
+        supabase.auth.getSession()
       ]);
 
       console.log("CreateJobDialog: Location resolved and times converted");
@@ -203,6 +203,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
             color: values.color,
             timezone: values.timezone,
             status: 'Tentativa',
+            created_by: session?.user?.id ?? null,
           },
         ])
         .select()
@@ -249,8 +250,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
       }
 
       // Refresh job queries (new job may fall into multiple cached ranges)
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      await queryClient.invalidateQueries({ queryKey: createQueryKey.jobs.all });
 
       toast({
         title: "Success",
@@ -291,7 +291,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange, onCreated, navigate]);
+  }, [isSubmitting, getOrCreateLocationWithDetails, queryClient, toast, reset, onOpenChange, onCreated]);
 
   const selectedDepartments = watch("departments") || [];
 
@@ -306,11 +306,11 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Job</DialogTitle>
+          <DialogTitle>Crear Nuevo Trabajo</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
-            <Label>Title</Label>
+            <Label>Título</Label>
             <Input {...register("title")} className={fieldClass} />
             {errors.title && (
               <p className="text-sm text-destructive">{errors.title.message as string}</p>
@@ -318,7 +318,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           </div>
 
           <div className="space-y-2">
-            <Label>Description</Label>
+            <Label>Descripción</Label>
             <Textarea {...register("description")} className={fieldClass} />
           </div>
 
@@ -334,8 +334,8 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                   place_id: undefined, // PlaceAutocomplete doesn't provide place_id
                 });
               }}
-              placeholder="Enter venue location"
-              label="Location"
+              placeholder="Ingrese ubicación del venue"
+              label="Ubicación"
               className=""
             />
             {errors.location && (
@@ -346,22 +346,22 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           </div>
 
           <div className="space-y-2">
-            <Label>Address</Label>
+            <Label>Dirección</Label>
             <Input
-              placeholder="Venue address"
+              placeholder="Dirección del venue"
               {...register("location.address")}
               className={fieldClass}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Timezone</Label>
+            <Label>Zona horaria</Label>
             <Select
               onValueChange={(value) => setValue("timezone", value)}
               defaultValue={watch("timezone")}
             >
               <SelectTrigger className={fieldClass}>
-                <SelectValue placeholder="Select timezone" />
+                <SelectValue placeholder="Seleccionar zona horaria" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Europe/Madrid">Europe/Madrid</SelectItem>
@@ -380,7 +380,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Start Time</Label>
+              <Label>Hora de inicio</Label>
               <Input
                 type="datetime-local"
                 {...register("start_time")}
@@ -393,7 +393,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
               )}
             </div>
             <div>
-              <Label>End Time</Label>
+              <Label>Hora de finalización</Label>
               <Input
                 type="datetime-local"
                 {...register("end_time")}
@@ -408,13 +408,13 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           </div>
 
           <div className="space-y-2">
-            <Label>Job Type</Label>
+            <Label>Tipo de trabajo</Label>
             <Select
               onValueChange={(value) => setValue("job_type", value as any)}
               defaultValue={watch("job_type")}
             >
               <SelectTrigger className={fieldClass}>
-                <SelectValue placeholder="Select job type" />
+                <SelectValue placeholder="Seleccionar tipo de trabajo" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="single">Single</SelectItem>
@@ -471,7 +471,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           {/* Optional crew requirements (skip for dryhire) */}
           {watch("job_type") !== 'dryhire' && selectedDepartments.length > 0 && (
             <div className="space-y-2 border rounded-md p-3">
-              <Label className="font-semibold">Required Crew (optional)</Label>
+              <Label className="font-semibold">Equipo requerido (opcional)</Label>
               <div className="space-y-3">
                 {selectedDepartments.map((dept) => (
                   <div key={dept} className="space-y-2">
@@ -490,7 +490,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                             }}
                           >
                             <SelectTrigger className={fieldClass}>
-                              <SelectValue placeholder="Select role" />
+                              <SelectValue placeholder="Seleccionar rol" />
                             </SelectTrigger>
                             <SelectContent>
                               {roleOptionsForDiscipline(dept).map((opt) => (
@@ -543,7 +543,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                         })}
                         className="border-border"
                       >
-                        Add role
+                        Añadir rol
                       </Button>
                     </div>
                   </div>
@@ -555,7 +555,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           <div className="w-full flex justify-end">
             <Button type="submit" disabled={isSubmitting} className="gap-2 bg-blue-600 hover:bg-blue-500 text-white">
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {isSubmitting ? "Creating..." : "Create Job"}
+              {isSubmitting ? "Creando..." : "Crear Trabajo"}
             </Button>
           </div>
         </form>

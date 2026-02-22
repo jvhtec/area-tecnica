@@ -199,6 +199,7 @@ export function TechnicianPayoutCard({
                   });
                 }}
                 disabled={toggleApprovalMutation.isPending || isClosureLocked}
+                title={isClosureLocked ? 'Periodo de cierre finalizado' : undefined}
               />
             </div>
           )}
