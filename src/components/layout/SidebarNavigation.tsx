@@ -82,6 +82,12 @@ const departmentIconMap: Record<string, LucideIcon> = {
   video: Video,
 }
 
+const normalizeDepartmentKey = (value?: string | null): string =>
+  value
+    ?.toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") ?? ""
+
 const baseNavigationConfig: NavigationItemConfig[] = [
   {
     id: "management-dashboard",
@@ -182,6 +188,21 @@ const baseNavigationConfig: NavigationItemConfig[] = [
      mobileSlot: "secondary",
      getPath: () => "/management/rates",
      isVisible: ({ userRole }) => userRole === "management",
+   },
+   {
+     id: "management-payouts-due",
+     label: "Pagos quincena",
+     mobileLabel: "Pagos",
+     icon: Clock,
+     mobilePriority: 9,
+     mobileSlot: "secondary",
+     getPath: () => "/management/payouts-due",
+     isVisible: ({ userRole, userDepartment }) => {
+       if (userRole === "admin") return true;
+       if (userRole !== "management") return false;
+       const normalized = normalizeDepartmentKey(userDepartment);
+       return normalized === "administrative" || normalized === "administracion";
+     },
    },
    {
      id: "expenses",
@@ -539,11 +560,6 @@ export const SidebarNavigation = ({
   onNavigate,
 }: SidebarNavigationProps) => {
   const location = useLocation()
-
-  if (!userRole) {
-    return <SidebarNavigationSkeleton />
-  }
-
   const navigationItems = useMemo(
     () =>
       buildNavigationItems({
@@ -553,6 +569,10 @@ export const SidebarNavigation = ({
       }),
     [userRole, userDepartment, hasSoundVisionAccess],
   )
+
+  if (!userRole) {
+    return <SidebarNavigationSkeleton />
+  }
 
   if (!navigationItems.length) {
     return null

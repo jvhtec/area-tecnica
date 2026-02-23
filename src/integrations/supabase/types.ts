@@ -2990,6 +2990,8 @@ export type Database = {
           assignment_source: string | null
           external_technician_name: string | null
           id: string
+          invoice_received_at: string | null
+          invoice_received_by: string | null
           job_id: string
           lights_role: string | null
           production_role: string | null
@@ -3008,6 +3010,8 @@ export type Database = {
           assignment_source?: string | null
           external_technician_name?: string | null
           id?: string
+          invoice_received_at?: string | null
+          invoice_received_by?: string | null
           job_id: string
           lights_role?: string | null
           production_role?: string | null
@@ -3026,6 +3030,8 @@ export type Database = {
           assignment_source?: string | null
           external_technician_name?: string | null
           id?: string
+          invoice_received_at?: string | null
+          invoice_received_by?: string | null
           job_id?: string
           lights_role?: string | null
           production_role?: string | null
@@ -3058,6 +3064,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_job_tech_payout_2025"
             referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_assignments_invoice_received_by_fkey"
+            columns: ["invoice_received_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_assignments_invoice_received_by_fkey"
+            columns: ["invoice_received_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "job_assignments_technician_id_fkey"

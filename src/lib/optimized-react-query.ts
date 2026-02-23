@@ -130,6 +130,9 @@ export const createQueryKey = {
   timesheetReminderSettings: {
     all: ['timesheet-reminder-settings'] as const,
   },
+  payoutDueFortnights: {
+    all: ['payout-due-fortnights'] as const,
+  },
 };
 
 // Optimized invalidation strategies

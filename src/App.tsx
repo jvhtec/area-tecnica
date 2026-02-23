@@ -71,6 +71,7 @@ const WallboardPublic = lazy(() => import('@/pages/WallboardPublic'));
 const Announcements = lazy(() => import('@/pages/Announcements'));
 const WallboardPresets = lazy(() => import('@/pages/WallboardPresets'));
 const RatesCenterPage = lazy(() => import('@/pages/RatesCenterPage'));
+const PayoutsDueFortnights = lazy(() => import('@/pages/PayoutsDueFortnights'));
 const ExpensesPage = lazy(() => import('@/pages/Expenses'));
 const Feedback = lazy(() => import('@/pages/Feedback'));
 const SoundVisionFiles = lazy(() => import('@/pages/SoundVisionFiles'));
@@ -143,8 +144,15 @@ function RouteAwareGlobalOverlays() {
 
 const SOUND_DEPARTMENT = "sound";
 const LIGHTS_DEPARTMENT = "lights";
+const ADMINISTRATIVE_DEPARTMENT = "administrative";
 const SOUND_TOOL_ROLES = ["admin", "management", "house_tech"] as const;
 const SOUND_TOOL_ROLES_WITH_TECH = [...SOUND_TOOL_ROLES, "technician"] as const;
+
+const normalizeDepartmentKey = (value?: string | null): string =>
+  value
+    ?.toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "") ?? "";
 
 const FestivalsAccessGuard = () => {
   const { userRole, userDepartment, isLoading } = useOptimizedAuth();
@@ -182,6 +190,29 @@ const DisponibilidadAccessGuard = () => {
   }
 
   return <Disponibilidad />;
+};
+
+const PayoutsDueAccessGuard = () => {
+  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (userRole === "admin") {
+    return <PayoutsDueFortnights />;
+  }
+
+  const normalizedDepartment = normalizeDepartmentKey(userDepartment);
+  const hasAdministrativeManagementAccess =
+    userRole === "management" &&
+    (normalizedDepartment === ADMINISTRATIVE_DEPARTMENT || normalizedDepartment === "administracion");
+
+  if (!hasAdministrativeManagementAccess) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return <PayoutsDueFortnights />;
 };
 
 const TechnicianUnavailabilityAccessGuard = () => {
@@ -285,6 +316,7 @@ export default function App() {
                               <Route path="/announcements" element={<ProtectedRoute allowedRoles={['admin']}><Announcements /></ProtectedRoute>} />
                               <Route path="/management/wallboard-presets" element={<ProtectedRoute allowedRoles={['admin']}><WallboardPresets /></ProtectedRoute>} />
                               <Route path="/management/rates" element={<ProtectedRoute allowedRoles={['admin', 'management']}><RatesCenterPage /></ProtectedRoute>} />
+                              <Route path="/management/payouts-due" element={<ProtectedRoute allowedRoles={['admin', 'management']}><PayoutsDueAccessGuard /></ProtectedRoute>} />
                               <Route path="/gastos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><ExpensesPage /></ProtectedRoute>} />
                               <Route path="/feedback" element={<Feedback />} />
                               <Route path="/soundvision-files" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><SoundVisionFiles /></ProtectedRoute>} />
