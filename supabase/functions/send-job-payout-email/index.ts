@@ -122,6 +122,46 @@ function formatWorkedDates(dates?: string[]): string {
   }
 }
 
+interface PayoutEstimate {
+  fromDate: Date;
+  toDate: Date;
+}
+
+function getEstimatedPayoutFromDate(serviceDate: Date): Date {
+  const year = serviceDate.getFullYear();
+  const month = serviceDate.getMonth();
+  const day = serviceDate.getDate();
+
+  const periodClosingDate = day <= 15
+    ? new Date(year, month, 15)
+    : new Date(year, month + 1, 0);
+
+  const estimatedPayoutDate = new Date(periodClosingDate);
+  estimatedPayoutDate.setDate(estimatedPayoutDate.getDate() + 30);
+  return estimatedPayoutDate;
+}
+
+function calculateEstimatedPayoutRange(workedDates?: string[], referenceDate = new Date()): PayoutEstimate {
+  const validServiceDates = (workedDates ?? [])
+    .map((isoDate) => new Date(isoDate))
+    .filter((d) => !Number.isNaN(d.getTime()));
+
+  const sourceDates = validServiceDates.length > 0 ? validServiceDates : [referenceDate];
+  const payoutFromDates = sourceDates.map(getEstimatedPayoutFromDate);
+
+  const earliestTs = Math.min(...payoutFromDates.map((d) => d.getTime()));
+  const latestTs = Math.max(...payoutFromDates.map((d) => d.getTime()));
+
+  return {
+    fromDate: new Date(earliestTs),
+    toDate: new Date(latestTs),
+  };
+}
+
+function formatLongDate(date: Date): string {
+  return new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(date);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -290,6 +330,14 @@ serve(async (req) => {
       const deductionFormatted = formatCurrency(deductionAmount);
       const hasDeduction = deductionAmount > 0;
 
+      const payoutEstimate = calculateEstimatedPayoutRange(tech.worked_dates);
+      const payoutEstimateText = payoutEstimate.fromDate.getTime() === payoutEstimate.toDate.getTime()
+        ? `a partir del ${formatLongDate(payoutEstimate.fromDate)}`
+        : `entre el ${formatLongDate(payoutEstimate.fromDate)} y el ${formatLongDate(payoutEstimate.toDate)}`;
+
+      const todayEstimate = calculateEstimatedPayoutRange(undefined, new Date());
+      const todayEstimateText = `a partir del ${formatLongDate(todayEstimate.fromDate)}`;
+
       // Prefer DB overrides when present (PDF already reflects override; email body must match)
       const overrideAmount = overrideMap.get(tech.technician_id);
       const totalFromPayload = Number(tech.totals?.total_eur ?? 0);
@@ -374,6 +422,21 @@ serve(async (req) => {
                     <p style="margin:0;color:#374151;line-height:1.55;">
                       Si detectas alguna incidencia no respondas a este mensaje y contacta con administración.
                     </p>
+                    <div style="margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;color:#1e3a8a;font-size:14px;line-height:1.55;">
+                      <b>5. FORMA DE PAGO</b>
+                      <p style="margin:8px 0 0 0;">
+                        El pago de los servicios se realizará de forma quincenal conforme al siguiente calendario:
+                      </p>
+                      <ul style="margin:8px 0 0 18px;padding:0;line-height:1.55;">
+                        <li>Los servicios prestados entre el día 1 y el día 15 de cada mes serán abonados en un plazo no inferior a 30 días naturales contados a partir del día 15 del mismo mes.</li>
+                        <li>Los servicios prestados entre el día 16 y el último día del mes serán abonados en un plazo no inferior a 30 días naturales contados a partir del último día del mes correspondiente.</li>
+                      </ul>
+                      <p style="margin:8px 0 0 0;">
+                        El pago quedará supeditado a la correcta cumplimentación y validación de los partes de trabajo y/o hojas de horas correspondientes, dentro de los términos establecidos.
+                      </p>
+                      <p style="margin:10px 0 0 0;"><b>Estimación para este trabajo:</b> ${payoutEstimateText}.</p>
+                      <p style="margin:6px 0 0 0;"><b>Si emites la factura hoy:</b> puedes esperar el pago ${todayEstimateText}.</p>
+                    </div>
                   </td>
                 </tr>
                 <tr>
