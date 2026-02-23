@@ -37,7 +37,6 @@ interface ProfileLite {
   id: string;
   first_name: string | null;
   last_name: string | null;
-  nickname: string | null;
   department: string | null;
   role: string | null;
   autonomo: boolean | null;
@@ -206,8 +205,6 @@ function getFortnightFromDate(date: Date): Omit<DueGroup, "items" | "totalEur"> 
 
 function buildTechnicianName(profile: ProfileLite | undefined, fallbackId: string): string {
   if (!profile) return fallbackId;
-  const nickname = profile.nickname?.trim();
-  if (nickname) return nickname;
   const fullName = `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim();
   return fullName || fallbackId;
 }
@@ -413,7 +410,7 @@ async function fetchFortnightPayoutsDue(): Promise<DueData> {
   for (const techIdChunk of chunkArray(technicianIds, FILTER_CHUNK_SIZE)) {
     const { data: profilesData, error: profilesError } = await supabase
       .from("profiles")
-      .select("id, first_name, last_name, nickname, department, role, autonomo")
+      .select("id, first_name, last_name, department, role, autonomo")
       .in("id", techIdChunk);
 
     if (profilesError) throw profilesError;
