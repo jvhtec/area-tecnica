@@ -4,7 +4,8 @@ import { createQueryKey } from '@/lib/optimized-react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Download, X } from 'lucide-react';
-import { formatInTimeZone } from 'date-fns-tz';
+import { addDays, getDaysInMonth } from 'date-fns';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { JobPayoutEmailContextResult } from '@/lib/job-payout-email';
@@ -12,6 +13,18 @@ import { effectiveTotal } from '@/lib/job-payout-email';
 import { supabase } from '@/integrations/supabase/client';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 import { HOUSE_TECH_LABEL } from '@/utils/autonomo';
+
+const MADRID_TIMEZONE = 'Europe/Madrid';
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 interface PayoutEmailPreviewProps {
   open: boolean;
@@ -59,12 +72,49 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
     if (!value) return null;
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return null;
-    return formatInTimeZone(date, 'Europe/Madrid', "d 'de' MMMM 'de' yyyy", { locale: es });
+    return formatInTimeZone(date, MADRID_TIMEZONE, "d 'de' MMMM 'de' yyyy", { locale: es });
   };
 
   const formatFallbackJobDateText = () => {
     const formatted = formatDateLong(context.job.start_time);
-    return formatted ? `el ${formatted}` : 'en fecha desconocida';
+    return formatted ? `el ${formatted}` : 'fecha desconocida';
+  };
+
+  const parseServiceDate = (dateValue?: string | null): Date | null => {
+    if (!dateValue) return null;
+    if (DATE_ONLY_RE.test(dateValue)) {
+      return fromZonedTime(`${dateValue}T12:00:00`, MADRID_TIMEZONE);
+    }
+    const parsed = new Date(dateValue);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return parsed;
+  };
+
+  const getEstimatedPayoutFromDate = (serviceDate: Date): Date => {
+    const madridDateStr = formatInTimeZone(serviceDate, MADRID_TIMEZONE, 'yyyy-MM-dd');
+    const [yearStr, monthStr, dayStr] = madridDateStr.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const day = Number(dayStr);
+    // month is 1-indexed from yyyy-MM-dd; JS Date expects 0-indexed month.
+    const lastDayOfMonth = getDaysInMonth(new Date(year, month - 1, 1));
+    const closingDay = day <= 15 ? 15 : lastDayOfMonth;
+    const closingDateStr = `${yearStr}-${monthStr}-${String(closingDay).padStart(2, '0')}T12:00:00`;
+    const periodClosingDate = fromZonedTime(closingDateStr, MADRID_TIMEZONE);
+    return addDays(periodClosingDate, 30);
+  };
+
+  const calculateEstimatedPayoutRange = (serviceDates: Date[]) => {
+    if (serviceDates.length === 0) {
+      throw new Error('calculateEstimatedPayoutRange requires at least one service date');
+    }
+    const payoutFromDates = serviceDates.map(getEstimatedPayoutFromDate);
+    const earliestTs = Math.min(...payoutFromDates.map((d) => d.getTime()));
+    const latestTs = Math.max(...payoutFromDates.map((d) => d.getTime()));
+    return {
+      fromDate: new Date(earliestTs),
+      toDate: new Date(latestTs),
+    };
   };
 
   const handleDownloadPDF = () => {
@@ -106,16 +156,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
     const formatDateLongOrUnknown = (value?: string | Date | null) =>
       formatDateLong(value) ?? 'fecha desconocida';
 
-    const formatWorkedDates = (dates: string[]) => {
-      if (!dates || dates.length === 0) {
-        return formatFallbackJobDateText();
-      }
-
-      const parsed = dates
-        .map((d) => new Date(d))
-        .filter((d) => !Number.isNaN(d.getTime()))
-        .sort((a, b) => a.getTime() - b.getTime());
-
+    const formatWorkedDates = (parsed: Date[]) => {
       if (parsed.length === 0) {
         return formatFallbackJobDateText();
       }
@@ -133,9 +174,43 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
       return `los días ${firstDate} - ${lastDate} (${parsed.length} días)`;
     };
 
+    const buildEventDateClause = (dateText: string) => {
+      const normalized = dateText.trim().toLowerCase();
+      if (normalized.startsWith('los días')) {
+        return `en <b>${escapeHtml(dateText)}</b>`;
+      }
+      if (normalized === 'fecha desconocida') {
+        return 'en fecha desconocida';
+      }
+      if (normalized.startsWith('el ')) {
+        return `<b>${escapeHtml(dateText)}</b>`;
+      }
+      return `de fecha <b>${escapeHtml(dateText)}</b>`;
+    };
+
     const timesheetLines = context.timesheetMap.get(selectedAttachment.technician_id) || [];
     const workedDates = Array.from(new Set(timesheetLines.map(l => l.date).filter((d): d is string => d != null))).sort();
-    const dateText = formatWorkedDates(workedDates);
+    const workedServiceDates = workedDates
+      .map((d) => parseServiceDate(d))
+      .filter((d): d is Date => d !== null)
+      .sort((a, b) => a.getTime() - b.getTime());
+    const dateText = formatWorkedDates(workedServiceDates);
+    const eventDateClause = buildEventDateClause(dateText);
+    const fallbackServiceDate = parseServiceDate(context.job.start_time);
+    const estimateSourceDates = workedServiceDates.length > 0
+      ? workedServiceDates
+      : (fallbackServiceDate ? [fallbackServiceDate] : []);
+    const payoutEstimate = estimateSourceDates.length > 0
+      ? calculateEstimatedPayoutRange(estimateSourceDates)
+      : null;
+    const rawPayoutEstimateText = payoutEstimate
+      ? (payoutEstimate.fromDate.getTime() === payoutEstimate.toDate.getTime()
+        ? `a partir del ${formatDateLongOrUnknown(payoutEstimate.fromDate)}`
+        : `entre el ${formatDateLongOrUnknown(payoutEstimate.fromDate)} y el ${formatDateLongOrUnknown(payoutEstimate.toDate)}`)
+      : null;
+    const payoutEstimateText = rawPayoutEstimateText ? escapeHtml(rawPayoutEstimateText) : null;
+    const todayEstimate = calculateEstimatedPayoutRange([new Date()]);
+    const todayEstimateText = escapeHtml(`a partir del ${formatDateLongOrUnknown(todayEstimate.fromDate)}`);
 
     const parts = formatCurrency(selectedAttachment.payout.timesheets_total_eur);
     const extras = formatCurrency(selectedAttachment.payout.extras_total_eur);
@@ -155,13 +230,23 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
     const lpoNumber = selectedAttachment.lpo_number;
     const invoicingCompany = context.job.invoicing_company;
     const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
+    const safeJobTitle = escapeHtml(context.job.title || '');
+    const safeName = escapeHtml(selectedAttachment.full_name || 'equipo');
+    const safeLpoNumber = lpoNumber ? escapeHtml(lpoNumber) : '';
+    const safeCompanyDetails = companyDetails
+      ? {
+          legalName: escapeHtml(companyDetails.legalName),
+          cif: escapeHtml(companyDetails.cif),
+          address: escapeHtml(companyDetails.address),
+        }
+      : null;
 
     return `<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Resumen de pagos · ${context.job.title}</title>
+  <title>Resumen de pagos · ${safeJobTitle}</title>
 </head>
 <body style="margin:0;padding:0;background:#f5f7fb;font-family:Arial,Helvetica,sans-serif;color:#111827;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f5f7fb;padding:24px;">
@@ -175,9 +260,9 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
           </tr>
           <tr>
             <td style="padding:24px 24px 8px 24px;">
-              <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${selectedAttachment.full_name || 'equipo'},</h2>
+              <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeName},</h2>
               <p style="margin:0;color:#374151;line-height:1.55;">
-                Adjuntamos tu resumen de pagos correspondiente al trabajo <b>${context.job.title}</b>, realizado <b>${dateText}</b>.
+                El detalle económico de los trabajos realizados en el evento <b>${safeJobTitle}</b> ${eventDateClause}, según acuerdo previo, es el siguiente:
               </p>
             </td>
           </tr>
@@ -202,7 +287,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
               <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:14px;">
                 <b>Nota de facturación:</b>
                 <p style="margin:8px 0 0 0;line-height:1.55;">
-                  ${companyDetails ? `Te rogamos emitas tu factura a: <b>${companyDetails.legalName}</b> (CIF: ${companyDetails.cif}, ${companyDetails.address})` : ''}${companyDetails && lpoNumber ? ' e incluyas el siguiente número de referencia: ' : ''}${lpoNumber ? `<b>${lpoNumber}</b>` : ''}.
+                  ${safeCompanyDetails ? `Te rogamos emitas tu factura a: <b>${safeCompanyDetails.legalName}</b> (CIF: ${safeCompanyDetails.cif}, ${safeCompanyDetails.address})` : ''}${safeCompanyDetails && safeLpoNumber ? ' e incluyas el siguiente número de referencia: ' : ''}${safeLpoNumber ? `<b>${safeLpoNumber}</b>` : ''}.
                 </p>
               </div>
             </td>
@@ -213,6 +298,21 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
               <p style="margin:0;color:#374151;line-height:1.55;">
                 Si detectas alguna incidencia no respondas a este mensaje y contacta con administración.
               </p>
+              <div style="margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;color:#1e3a8a;font-size:14px;line-height:1.55;">
+                <b>FORMA DE PAGO</b>
+                <p style="margin:8px 0 0 0;">
+                  El pago de los servicios se realizará de forma quincenal conforme al siguiente calendario:
+                </p>
+                <ul style="margin:8px 0 0 18px;padding:0;line-height:1.55;">
+                  <li>Los servicios prestados entre el día 1 y el día 15 de cada mes serán abonados en un plazo no inferior a 30 días naturales contados a partir del día 15 del mismo mes.</li>
+                  <li>Los servicios prestados entre el día 16 y el último día del mes serán abonados en un plazo no inferior a 30 días naturales contados a partir del último día del mes correspondiente.</li>
+                </ul>
+                <p style="margin:8px 0 0 0;">
+                  El pago quedará supeditado a la correcta cumplimentación y validación de los partes de trabajo y/o hojas de horas correspondientes, dentro de los términos establecidos.
+                </p>
+                ${payoutEstimateText ? `<p style="margin:10px 0 0 0;"><b>Estimación para este trabajo:</b> ${payoutEstimateText}.</p>` : ''}
+                <p style="margin:6px 0 0 0;"><b>Si emites la factura hoy:</b> puedes esperar el pago ${todayEstimateText}.</p>
+              </div>
             </td>
           </tr>
           <tr>

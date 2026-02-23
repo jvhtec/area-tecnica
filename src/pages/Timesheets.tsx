@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, Download, FileText } from "lucide-react";
 import { TimesheetView } from "@/components/timesheet/TimesheetView";
+import { TimesheetReminderSettings } from "@/components/timesheet/TimesheetReminderSettings";
 import { downloadTimesheetPDF } from "@/utils/timesheet-pdf";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTimesheets } from "@/hooks/useTimesheets";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { es } from 'date-fns/locale';
 import { useSearchParams } from "react-router-dom";
@@ -17,7 +18,7 @@ export default function Timesheets() {
   const [searchParams, setSearchParams] = useSearchParams();
   const jobIdFromUrl = searchParams.get('jobId');
   const [selectedJobId, setSelectedJobId] = useState<string>(jobIdFromUrl || "");
-  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const { toast } = useToast();
   const { user, userRole } = useOptimizedAuth();
   const { data: jobs = [], isLoading: jobsLoading } = useOptimizedJobs();
   const { timesheets } = useTimesheets(selectedJobId || "", { userRole });
@@ -32,13 +33,7 @@ export default function Timesheets() {
 
   useEffect(() => {
     if (user?.department && canManage) {
-      // Normalize department casing if needed, or assume exact match
       const userDept = user.department;
-      // We'll set it, validity will be checked by the Select options later or it just shows 'all' if not found
-      // Actually, we should probably wait until departments are computed? 
-      // But user.department is usually stable. Let me set it.
-      // Wait, if I set it here, "all" select item might be tricky?
-      // No, "all" is always an option.
       setFilterDepartment(userDept);
     }
   }, [user?.department, canManage]);
@@ -58,7 +53,9 @@ export default function Timesheets() {
         const isTourDate = type === 'tourdate';
         if (isDryHire || isTourDate) return false;
         if (Array.isArray(job.job_date_types) && job.job_date_types.length > 0) {
-          return job.job_date_types.some((dt: any) => dt?.type !== 'off' && dt?.type !== 'travel');
+          return job.job_date_types.some(
+            (dt: { type?: string } | null | undefined) => dt?.type !== 'off' && dt?.type !== 'travel'
+          );
         }
         return true;
       })
@@ -130,7 +127,11 @@ export default function Timesheets() {
 
     // Use all timesheets for the job, not filtered by date
     if (timesheets.length === 0) {
-      alert('No se encontraron partes de horas para este trabajo');
+      toast({
+        title: 'Sin partes de horas',
+        description: 'No se encontraron partes de horas para este trabajo.',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -142,7 +143,11 @@ export default function Timesheets() {
       });
     } catch (error) {
       console.error('Error generando PDF:', error);
-      alert('No se pudo generar el PDF');
+      toast({
+        title: 'Error',
+        description: 'No se pudo generar el PDF.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -169,33 +174,21 @@ export default function Timesheets() {
             Gestiona partes de horas de los técnicos para los trabajos
           </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="min-w-[240px]">
-            <Select value={selectedJobId} onValueChange={handleJobSelect}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecciona un trabajo" />
-              </SelectTrigger>
-              <SelectContent>
-                {relevantJobs.map(job => (
-                  <SelectItem key={job.id} value={job.id}>{job.title}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {selectedJobId && canDownloadPDF && !timesheetsDisabled && (
-            <>
-              <Button
-                onClick={handleDownloadPDF}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Descargar PDF
-              </Button>
-            </>
-          )}
-        </div>
+        {selectedJobId && canDownloadPDF && !timesheetsDisabled && (
+          <Button
+            onClick={handleDownloadPDF}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Descargar PDF
+          </Button>
+        )}
       </div>
+
+      {canManage && (
+        <TimesheetReminderSettings />
+      )}
 
       {!selectedJobId && !jobsLoading && (
         <Card>
@@ -319,7 +312,6 @@ export default function Timesheets() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Fecha</label>
                 <label className="text-sm font-medium">Fecha</label>
                 <Select value={filterDate} onValueChange={setFilterDate}>
                   <SelectTrigger>

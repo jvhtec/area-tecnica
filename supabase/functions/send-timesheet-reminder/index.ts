@@ -374,6 +374,15 @@ serve(async (req) => {
     const brevoResponse = await sendRes.json();
     console.log('Email sent successfully:', brevoResponse.messageId);
 
+    // Stamp reminder_sent_at so the auto-reminder system knows a reminder was recently sent
+    const { error: updateError } = await supabaseAdmin
+      .from('timesheets')
+      .update({ reminder_sent_at: new Date().toISOString() })
+      .eq('id', timesheetId);
+    if (updateError) {
+      console.warn('Could not update reminder_sent_at:', updateError.message);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,

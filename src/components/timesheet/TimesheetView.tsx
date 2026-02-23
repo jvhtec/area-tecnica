@@ -15,7 +15,6 @@ import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Timesheet, TimesheetFormData } from "@/types/timesheet";
 import { TimesheetSignature } from "./TimesheetSignature";
-import { JobTotalAmounts } from "./JobTotalAmounts";
 import { MyJobTotal } from "./MyJobTotal";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -418,9 +417,6 @@ export const TimesheetView = ({
 
   return (
     <div className="space-y-6">
-      {/* Job cost summary (overall) */}
-      <JobTotalAmounts jobId={jobId} jobTitle={jobTitle} />
-
       {/* Technician's total for this job */}
       <MyJobTotal
         jobId={jobId}
@@ -925,7 +921,14 @@ export const TimesheetView = ({
                           <p className="font-medium">Cálculo de Tarifa</p>
                           {isManagementUser && (
                             <div className="flex gap-2">
-                              <Button size="sm" variant="outline" onClick={() => recalcTimesheet(timesheet.id)}>Recalcular</Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => recalcTimesheet(timesheet.id)}
+                                disabled={isBulkUpdating || isClosureLocked}
+                              >
+                                Recalcular
+                              </Button>
                               {!timesheet.category && (
                                 <Badge variant="destructive">Establecer categoría para calcular</Badge>
                               )}

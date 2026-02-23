@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { addDays, getDaysInMonth } from "npm:date-fns@3.6.0";
+import { formatInTimeZone, fromZonedTime } from "npm:date-fns-tz@3.2.0";
 import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -21,6 +23,8 @@ const corsHeaders: Record<string, string> = {
 const BREVO_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
 const BREVO_FROM = Deno.env.get("BREVO_FROM") ?? "";
 const ADMIN_BCC = Deno.env.get("PAYOUT_EMAIL_BCC") ?? "";
+const MADRID_TIMEZONE = "Europe/Madrid";
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 interface JobMetadata {
   id: string;
@@ -80,46 +84,113 @@ function formatCurrency(amount?: number) {
 }
 
 function formatJobDate(dateIso?: string) {
-  if (!dateIso) return 'sin fecha';
+  if (!dateIso) return 'fecha desconocida';
   const parsed = new Date(dateIso);
-  if (Number.isNaN(parsed.getTime())) return 'sin fecha';
-  return new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(parsed);
+  if (Number.isNaN(parsed.getTime())) return 'fecha desconocida';
+  return formatLongDate(parsed);
 }
 
-function formatWorkedDates(dates?: string[]): string {
-  if (!dates || dates.length === 0) return '';
+function parseServiceDate(dateValue: string): Date | null {
+  if (!dateValue) return null;
 
-  const parsed = dates
-    .map(d => new Date(d))
-    .filter(d => !Number.isNaN(d.getTime()))
+  if (DATE_ONLY_RE.test(dateValue)) {
+    return fromZonedTime(`${dateValue}T12:00:00`, MADRID_TIMEZONE);
+  }
+
+  const parsed = new Date(dateValue);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed;
+}
+
+function parseWorkedDates(dates?: string[]): Date[] {
+  if (!dates?.length) return [];
+  return dates
+    .map((d) => parseServiceDate(d))
+    .filter((d): d is Date => d !== null)
     .sort((a, b) => a.getTime() - b.getTime());
+}
 
+function formatWorkedDatesFromParsed(parsed: Date[]): string {
   if (parsed.length === 0) return '';
   if (parsed.length === 1) {
-    return 'el ' + new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(parsed[0]);
+    return `el ${formatLongDate(parsed[0])}`;
   }
 
   // Multiple dates - format as "los días X, Y y Z de mes de año"
-  const formatter = new Intl.DateTimeFormat('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
-  const dayFormatter = new Intl.DateTimeFormat('es-ES', { day: 'numeric' });
+  const dayFormatter = new Intl.DateTimeFormat('es-ES', { day: 'numeric', timeZone: MADRID_TIMEZONE });
 
   // Check if all dates are in the same month/year
   const firstDate = parsed[0];
-  const sameMonth = parsed.every(d =>
-    d.getMonth() === firstDate.getMonth() && d.getFullYear() === firstDate.getFullYear()
-  );
+  const firstMonthKey = formatInTimeZone(firstDate, MADRID_TIMEZONE, 'yyyy-MM');
+  const sameMonth = parsed.every((d) => formatInTimeZone(d, MADRID_TIMEZONE, 'yyyy-MM') === firstMonthKey);
 
   if (sameMonth) {
     const days = parsed.map(d => dayFormatter.format(d));
     const lastDay = days.pop();
-    const monthYear = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric' }).format(firstDate);
+    const monthYear = new Intl.DateTimeFormat('es-ES', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: MADRID_TIMEZONE,
+    }).format(firstDate);
     return `los días ${days.join(', ')} y ${lastDay} de ${monthYear}`;
   } else {
     // Different months - list all dates
-    const formatted = parsed.map(d => formatter.format(d));
+    const formatted = parsed.map((d) => formatLongDate(d));
     const lastDate = formatted.pop();
     return `los días ${formatted.join(', ')} y ${lastDate}`;
   }
+}
+
+function buildEventDateClause(dateText: string): string {
+  const normalized = dateText.trim().toLowerCase();
+  if (normalized.startsWith('los días')) {
+    return `en <b>${escapeHtml(dateText)}</b>`;
+  }
+  if (normalized === 'fecha desconocida') {
+    return 'en fecha desconocida';
+  }
+  if (normalized.startsWith('el ')) {
+    return `<b>${escapeHtml(dateText)}</b>`;
+  }
+  return `de fecha <b>${escapeHtml(dateText)}</b>`;
+}
+
+interface PayoutEstimate {
+  fromDate: Date;
+  toDate: Date;
+}
+
+function getEstimatedPayoutFromDate(serviceDate: Date): Date {
+  const madridDateStr = formatInTimeZone(serviceDate, MADRID_TIMEZONE, "yyyy-MM-dd");
+  const [yearStr, monthStr, dayStr] = madridDateStr.split("-");
+  const year = Number(yearStr);
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  // month is 1-indexed from yyyy-MM-dd; JS Date expects 0-indexed month.
+  const lastDayOfMonth = getDaysInMonth(new Date(year, month - 1, 1));
+  const closingDay = day <= 15 ? 15 : lastDayOfMonth;
+  const closingDateStr = `${yearStr}-${monthStr}-${String(closingDay).padStart(2, "0")}T12:00:00`;
+  const periodClosingDate = fromZonedTime(closingDateStr, MADRID_TIMEZONE);
+  return addDays(periodClosingDate, 30);
+}
+
+function calculateEstimatedPayoutRange(serviceDates: Date[]): PayoutEstimate {
+  if (serviceDates.length === 0) {
+    throw new Error("calculateEstimatedPayoutRange requires at least one service date");
+  }
+  const payoutFromDates = serviceDates.map(getEstimatedPayoutFromDate);
+
+  const earliestTs = Math.min(...payoutFromDates.map((d) => d.getTime()));
+  const latestTs = Math.max(...payoutFromDates.map((d) => d.getTime()));
+
+  return {
+    fromDate: new Date(earliestTs),
+    toDate: new Date(latestTs),
+  };
+}
+
+function formatLongDate(date: Date): string {
+  return new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: MADRID_TIMEZONE }).format(date);
 }
 
 serve(async (req) => {
@@ -252,6 +323,8 @@ serve(async (req) => {
     // Corporate assets (logos)
     const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || `${SUPABASE_URL}/storage/v1/object/public/company-assets/sectorlogow.png`;
     const AT_LOGO_URL = Deno.env.get('AT_LOGO_URL') || `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
+    const todayEstimate = calculateEstimatedPayoutRange([new Date()]);
+    const todayEstimateText = escapeHtml(`a partir del ${formatLongDate(todayEstimate.fromDate)}`);
 
     for (const tech of body.technicians) {
       const trimmedEmail = (tech.email || '').trim();
@@ -277,9 +350,13 @@ serve(async (req) => {
 
       // Corporate-styled HTML, aligned with other emails
       const safeName = escapeHtml(tech.full_name || '');
-      const workedDatesText = formatWorkedDates(tech.worked_dates);
+      const workedServiceDates = parseWorkedDates(tech.worked_dates);
+      const workedDatesText = formatWorkedDatesFromParsed(workedServiceDates);
       const fallbackJobDate = formatJobDate(body.job.start_time);
-      const dateText = workedDatesText || `el ${fallbackJobDate}`;
+      const dateText =
+        workedDatesText ||
+        (fallbackJobDate === 'fecha desconocida' ? 'fecha desconocida' : `el ${fallbackJobDate}`);
+      const eventDateClause = buildEventDateClause(dateText);
       const parts = formatCurrency(tech.totals?.timesheets_total_eur);
       const extras = formatCurrency(tech.totals?.extras_total_eur);
       const expensesAmount = tech.totals?.expenses_total_eur ?? 0;
@@ -289,6 +366,20 @@ serve(async (req) => {
       const deductionAmount = tech.totals?.deduction_eur ?? 0;
       const deductionFormatted = formatCurrency(deductionAmount);
       const hasDeduction = deductionAmount > 0;
+
+      const jobFallbackServiceDate = body.job.start_time ? parseServiceDate(body.job.start_time) : null;
+      const estimateSourceDates = workedServiceDates.length > 0
+        ? workedServiceDates
+        : (jobFallbackServiceDate ? [jobFallbackServiceDate] : []);
+      const payoutEstimate = estimateSourceDates.length > 0
+        ? calculateEstimatedPayoutRange(estimateSourceDates)
+        : null;
+      const rawPayoutEstimateText = payoutEstimate
+        ? (payoutEstimate.fromDate.getTime() === payoutEstimate.toDate.getTime()
+          ? `a partir del ${formatLongDate(payoutEstimate.fromDate)}`
+          : `entre el ${formatLongDate(payoutEstimate.fromDate)} y el ${formatLongDate(payoutEstimate.toDate)}`)
+        : null;
+      const payoutEstimateText = rawPayoutEstimateText ? escapeHtml(rawPayoutEstimateText) : null;
 
       // Prefer DB overrides when present (PDF already reflects override; email body must match)
       const overrideAmount = overrideMap.get(tech.technician_id);
@@ -332,7 +423,7 @@ serve(async (req) => {
                   <td style="padding:24px 24px 8px 24px;">
                     <h2 style="margin:0 0 8px 0;font-size:20px;color:#111827;">Hola ${safeName || 'equipo'},</h2>
                       <p style="margin:0;color:#374151;line-height:1.55;">
-                        Adjuntamos tu resumen de pagos correspondiente al trabajo <b>${escapedJobTitle}</b>, realizado <b>${dateText}</b>.
+                        El detalle económico de los trabajos realizados en el evento <b>${escapedJobTitle}</b> ${eventDateClause}, según acuerdo previo, es el siguiente:
                       </p>
                   </td>
                 </tr>
@@ -374,6 +465,21 @@ serve(async (req) => {
                     <p style="margin:0;color:#374151;line-height:1.55;">
                       Si detectas alguna incidencia no respondas a este mensaje y contacta con administración.
                     </p>
+                    <div style="margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 14px;color:#1e3a8a;font-size:14px;line-height:1.55;">
+                      <b>FORMA DE PAGO</b>
+                      <p style="margin:8px 0 0 0;">
+                        El pago de los servicios se realizará de forma quincenal conforme al siguiente calendario:
+                      </p>
+                      <ul style="margin:8px 0 0 18px;padding:0;line-height:1.55;">
+                        <li>Los servicios prestados entre el día 1 y el día 15 de cada mes serán abonados en un plazo no inferior a 30 días naturales contados a partir del día 15 del mismo mes.</li>
+                        <li>Los servicios prestados entre el día 16 y el último día del mes serán abonados en un plazo no inferior a 30 días naturales contados a partir del último día del mes correspondiente.</li>
+                      </ul>
+                      <p style="margin:8px 0 0 0;">
+                        El pago quedará supeditado a la correcta cumplimentación y validación de los partes de trabajo y/o hojas de horas correspondientes, dentro de los términos establecidos.
+                      </p>
+                      ${payoutEstimateText ? `<p style="margin:10px 0 0 0;"><b>Estimación para este trabajo:</b> ${payoutEstimateText}.</p>` : ''}
+                      <p style="margin:6px 0 0 0;"><b>Si emites la factura hoy:</b> puedes esperar el pago ${todayEstimateText}.</p>
+                    </div>
                   </td>
                 </tr>
                 <tr>
