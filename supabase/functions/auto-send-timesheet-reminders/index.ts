@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
-import { createClient } from 'npm:@supabase/supabase-js@2.7.1'
+import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -101,7 +101,7 @@ serve(async (req) => {
     const DEFAULT_SETTINGS: DeptSettings = { auto_reminders_enabled: false, reminder_frequency_days: 1 }
 
     // Check if ALL departments are disabled (quick-exit optimisation)
-    const anyEnabled = settingsRows?.some((r) => r.auto_reminders_enabled) ?? true
+    const anyEnabled = settingsRows?.some((r) => r.auto_reminders_enabled) ?? false
     if (!anyEnabled) {
       console.log('All department reminders disabled – nothing to do.')
       return new Response(
@@ -425,9 +425,11 @@ serve(async (req) => {
         `Reminder sent: ${groupIds.length} timesheet(s) dept=${techDept} to=${technician.email} msgId=${brevoRes.messageId}`
       )
 
-      // Update reminder_sent_at and auto_reminder_count on all rows in the group
-      // in parallel (one request per row so each gets its own incremented count).
-      await Promise.all(
+      // Stamp reminder_sent_at and increment auto_reminder_count on all rows in
+      // the group in parallel. Check every result: if any update fails the
+      // reminder_sent_at won't be stored, meaning the next cron run would send
+      // a duplicate email. Count the group as failed in that case.
+      const updateResults = await Promise.allSettled(
         groupTimesheets.map((t) =>
           supabaseAdmin
             .from('timesheets')
@@ -439,7 +441,24 @@ serve(async (req) => {
         )
       )
 
-      sentCount++
+      let groupUpdateOk = true
+      for (let i = 0; i < updateResults.length; i++) {
+        const result = updateResults[i]
+        const t = groupTimesheets[i]
+        if (result.status === 'rejected') {
+          console.error(`Failed to update timesheet ${t.id} (rejected):`, result.reason)
+          groupUpdateOk = false
+        } else if (result.value.error) {
+          console.error(`Failed to update timesheet ${t.id}:`, result.value.error)
+          groupUpdateOk = false
+        }
+      }
+
+      if (groupUpdateOk) {
+        sentCount++
+      } else {
+        failCount++
+      }
     }
 
     console.log(
@@ -450,10 +469,13 @@ serve(async (req) => {
       JSON.stringify({ success: true, sent: sentCount, failed: failCount, skipped_dept: skippedDept }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message
+      : typeof error === 'string' ? error
+      : JSON.stringify(error) || 'Internal server error'
     console.error('Unhandled error in auto-send-timesheet-reminders:', error)
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({ error: msg }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

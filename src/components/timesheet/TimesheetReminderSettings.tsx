@@ -39,10 +39,11 @@ async function fetchSettings(): Promise<DeptSetting[]> {
 }
 
 async function updateDeptSetting(patch: Partial<DeptSetting> & { department: DepartmentKey }): Promise<void> {
+  // Use upsert so the call is idempotent: inserts when the row is missing
+  // (e.g. a new department added after the seed) and updates otherwise.
   const { error } = await supabase
     .from("timesheet_reminder_settings")
-    .update({ ...patch, updated_at: new Date().toISOString() })
-    .eq("department", patch.department);
+    .upsert({ ...patch, updated_at: new Date().toISOString() }, { onConflict: "department" });
   if (error) throw error;
 }
 
@@ -72,12 +73,11 @@ export function TimesheetReminderSettings({ className }: { className?: string })
     staleTime: 30_000,
   });
 
+  // onSuccess invalidates after each individual mutation; no global onError so
+  // callers can own their own toasts without risk of double-firing.
   const mutation = useMutation({
     mutationFn: updateDeptSetting,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: QUERY_KEY }),
-    onError: (err: Error) => {
-      toast({ title: "Error al guardar", description: err.message, variant: "destructive" });
-    },
   });
 
   // Build a quick lookup from the fetched rows
@@ -91,12 +91,22 @@ export function TimesheetReminderSettings({ className }: { className?: string })
       reminder_frequency_days: 1,
     };
 
-  const handleToggle = (department: DepartmentKey, checked: boolean) => {
-    mutation.mutate({ department, auto_reminders_enabled: checked });
+  const handleToggle = async (department: DepartmentKey, checked: boolean) => {
+    try {
+      await mutation.mutateAsync({ department, auto_reminders_enabled: checked });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: "Error al guardar", description: msg, variant: "destructive" });
+    }
   };
 
-  const handleFrequency = (department: DepartmentKey, value: string) => {
-    mutation.mutate({ department, reminder_frequency_days: parseInt(value, 10) });
+  const handleFrequency = async (department: DepartmentKey, value: string) => {
+    try {
+      await mutation.mutateAsync({ department, reminder_frequency_days: parseInt(value, 10) });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: "Error al guardar", description: msg, variant: "destructive" });
+    }
   };
 
   const handleEnableAll = async (enabled: boolean) => {
@@ -106,7 +116,6 @@ export function TimesheetReminderSettings({ className }: { className?: string })
           mutation.mutateAsync({ department: key, auto_reminders_enabled: enabled })
         )
       );
-      await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
       toast({
         title: enabled ? "Todos los departamentos activados" : "Todos los departamentos desactivados",
       });

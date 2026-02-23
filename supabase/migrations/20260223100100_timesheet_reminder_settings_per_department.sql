@@ -61,7 +61,7 @@ DROP TABLE IF EXISTS "public"."timesheet_reminder_settings";
 CREATE TABLE "public"."timesheet_reminder_settings" (
     "id"                       uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
     "department"               text        NOT NULL,
-    "auto_reminders_enabled"   boolean     DEFAULT true  NOT NULL,
+    "auto_reminders_enabled"   boolean     DEFAULT false NOT NULL,
     "reminder_frequency_days"  integer     DEFAULT 1     NOT NULL,
     "updated_at"               timestamp with time zone DEFAULT now(),
     CONSTRAINT "unique_department" UNIQUE ("department")
