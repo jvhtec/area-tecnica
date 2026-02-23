@@ -76,16 +76,11 @@ COMMENT ON COLUMN "public"."timesheet_reminder_settings"."auto_reminders_enabled
 COMMENT ON COLUMN "public"."timesheet_reminder_settings"."reminder_frequency_days" IS
   'Minimum number of days between consecutive auto-reminders for the same timesheet (per department).';
 
--- Seed one row per department.
--- Only sound and lights are enabled by default; other departments start disabled.
+-- Seed rows for the two departments that use auto-reminders.
 INSERT INTO "public"."timesheet_reminder_settings" ("department", "auto_reminders_enabled", "reminder_frequency_days")
 VALUES
-    ('sound',          true,  1),
-    ('lights',         true,  1),
-    ('video',          false, 1),
-    ('logistics',      false, 1),
-    ('production',     false, 1),
-    ('administrative', false, 1)
+    ('sound',  true, 1),
+    ('lights', true, 1)
 ON CONFLICT ("department") DO NOTHING;
 
 -- RLS
