@@ -183,15 +183,26 @@ serve(async (req) => {
     let skippedDept = 0
     const nowIso = now.toISOString()
 
+    // ─── Group timesheets by (technician_id, job_id) ─────────────────────────
+    // A technician can have multiple draft timesheet rows for the same job
+    // (one per day). We send at most ONE reminder email per (tech, job) pair.
+    type GroupKey = string
+    const groups = new Map<GroupKey, typeof timesheets>()
     for (const ts of timesheets) {
-      // Only process timesheets for completed jobs
       if (!completedJobIds.has(ts.job_id)) continue
+      const key: GroupKey = `${ts.technician_id}::${ts.job_id}`
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(ts)
+    }
 
+    for (const [, groupTimesheets] of groups) {
+      // All rows in a group share the same technician and job
+      const ts = groupTimesheets[0]
       const technician = techMap.get(ts.technician_id)
       const job = jobMap.get(ts.job_id)
 
       if (!technician?.email || !job) {
-        console.warn(`Skipping timesheet ${ts.id}: missing tech email or job.`)
+        console.warn(`Skipping group tech=${ts.technician_id} job=${ts.job_id}: missing tech email or job.`)
         failCount++
         continue
       }
@@ -205,9 +216,16 @@ serve(async (req) => {
         continue
       }
 
-      // ── Frequency check ───────────────────────────────────────────────────
-      if (ts.reminder_sent_at) {
-        const lastSent = new Date(ts.reminder_sent_at)
+      // ── Frequency check – use the most-recent reminder_sent_at in the group
+      // so a manual reminder on any row in the group resets the cooldown.
+      const latestReminderSentAt = groupTimesheets
+        .map((t) => t.reminder_sent_at)
+        .filter(Boolean)
+        .sort()
+        .at(-1) ?? null
+
+      if (latestReminderSentAt) {
+        const lastSent = new Date(latestReminderSentAt)
         const daysSince = (now.getTime() - lastSent.getTime()) / (1000 * 60 * 60 * 24)
         if (daysSince < deptSettings.reminder_frequency_days) {
           continue // Too soon for this department's frequency
@@ -377,21 +395,28 @@ serve(async (req) => {
       }
 
       const brevoRes = await sendRes.json()
+      const groupIds = groupTimesheets.map((t) => t.id)
       console.log(
-        `Reminder sent: timesheet=${ts.id} dept=${techDept} to=${technician.email} msgId=${brevoRes.messageId}`
+        `Reminder sent: ${groupIds.length} timesheet(s) dept=${techDept} to=${technician.email} msgId=${brevoRes.messageId}`
       )
 
-      // Update reminder tracking
+      // Stamp reminder_sent_at and increment auto_reminder_count on ALL timesheets
+      // in the group so the frequency check works correctly across the whole group.
       const { error: updateError } = await supabaseAdmin
         .from('timesheets')
-        .update({
-          reminder_sent_at: nowIso,
-          auto_reminder_count: (ts.auto_reminder_count ?? 0) + 1,
-        })
-        .eq('id', ts.id)
+        .update({ reminder_sent_at: nowIso })
+        .in('id', groupIds)
 
       if (updateError) {
-        console.error(`Failed to update reminder tracking for timesheet ${ts.id}:`, updateError)
+        console.error(`Failed to update reminder_sent_at for group (${groupIds.join(',')}):`, updateError)
+      }
+
+      // Increment auto_reminder_count individually (each row may have a different current value)
+      for (const t of groupTimesheets) {
+        await supabaseAdmin
+          .from('timesheets')
+          .update({ auto_reminder_count: (t.auto_reminder_count ?? 0) + 1 })
+          .eq('id', t.id)
       }
 
       sentCount++
