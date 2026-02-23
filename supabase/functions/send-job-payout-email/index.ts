@@ -122,6 +122,35 @@ function formatWorkedDates(dates?: string[]): string {
   }
 }
 
+/**
+ * Calculates the earliest expected payment date based on the quincenal payment terms:
+ * - Services rendered 1st–15th: paid ≥ 30 days after the 15th of that month.
+ * - Services rendered 16th–last day: paid ≥ 30 days after the last day of that month.
+ * By default uses today's date (the day the invoice is issued).
+ */
+function calculateEstimatedPaymentDate(fromDate: Date = new Date()): Date {
+  const day = fromDate.getDate();
+  const month = fromDate.getMonth();
+  const year = fromDate.getFullYear();
+
+  let baseDate: Date;
+  if (day <= 15) {
+    baseDate = new Date(year, month, 15);
+  } else {
+    // Last day of the current month
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    baseDate = new Date(year, month, lastDay);
+  }
+
+  const paymentDate = new Date(baseDate);
+  paymentDate.setDate(paymentDate.getDate() + 30);
+  return paymentDate;
+}
+
+function formatPaymentDate(date: Date): string {
+  return new Intl.DateTimeFormat('es-ES', { dateStyle: 'long' }).format(date);
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -296,6 +325,7 @@ serve(async (req) => {
       const effectiveTotal = overrideAmount != null ? overrideAmount - deductionAmount : totalFromPayload;
       const grand = formatCurrency(effectiveTotal);
       const invoicingCompany = body.job.invoicing_company;
+      const estimatedPaymentDate = formatPaymentDate(calculateEstimatedPaymentDate(new Date()));
 
       const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
       if (DEBUG) {
@@ -369,6 +399,22 @@ serve(async (req) => {
                 </tr>
                 `;
                 })()}
+                <tr>
+                  <td style="padding:12px 24px 0 24px;">
+                    <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 14px;color:#166534;font-size:14px;">
+                      <b>Forma de pago</b>
+                      <p style="margin:8px 0 0 0;line-height:1.55;">
+                        El pago se realiza de forma quincenal: los servicios prestados entre el día 1 y el 15 se abonan en un plazo no inferior a 30 días naturales desde el día 15 del mismo mes; los prestados entre el día 16 y el último día del mes, en un plazo no inferior a 30 días naturales desde el último día del mes.
+                      </p>
+                      <p style="margin:10px 0 0 0;line-height:1.55;">
+                        Si emites tu factura hoy, puedes esperar el pago a partir del <b>${estimatedPaymentDate}</b>.
+                      </p>
+                      <p style="margin:8px 0 0 0;font-size:12px;color:#166534;opacity:0.8;">
+                        * El pago queda supeditado a la correcta cumplimentación y validación de los partes de trabajo y/o hojas de horas correspondientes.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
                 <tr>
                   <td style="padding:16px 24px 8px 24px;">
                     <p style="margin:0;color:#374151;line-height:1.55;">
