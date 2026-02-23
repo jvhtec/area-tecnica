@@ -12,12 +12,8 @@ import { createQueryKey } from "@/lib/optimized-react-query";
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 const DEPARTMENTS = [
-  { key: "sound",          label: "Sonido" },
-  { key: "lights",         label: "Iluminación" },
-  { key: "video",          label: "Vídeo" },
-  { key: "logistics",      label: "Logística" },
-  { key: "production",     label: "Producción" },
-  { key: "administrative", label: "Administración" },
+  { key: "sound",  label: "Sonido" },
+  { key: "lights", label: "Iluminación" },
 ] as const;
 
 type DepartmentKey = (typeof DEPARTMENTS)[number]["key"];
