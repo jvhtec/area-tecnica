@@ -83,13 +83,8 @@ export function TimesheetReminderSettings({ className }: { className?: string })
   // Build a quick lookup from the fetched rows
   const settingsMap = new Map(rows.map((r) => [r.department, r]));
 
-  const ENABLED_BY_DEFAULT = new Set<DepartmentKey>(["sound", "lights"]);
   const getDept = (key: DepartmentKey): DeptSetting =>
-    settingsMap.get(key) ?? {
-      department: key,
-      auto_reminders_enabled: ENABLED_BY_DEFAULT.has(key),
-      reminder_frequency_days: 1,
-    };
+    settingsMap.get(key) ?? { department: key, auto_reminders_enabled: false, reminder_frequency_days: 1 };
 
   const handleToggle = async (department: DepartmentKey, checked: boolean) => {
     try {

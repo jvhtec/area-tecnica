@@ -94,11 +94,14 @@ ALTER TABLE "public"."timesheet_reminder_settings" ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "trs_select_management" ON "public"."timesheet_reminder_settings"
     FOR SELECT USING (public.is_admin_or_management());
 
+CREATE POLICY "trs_insert_management" ON "public"."timesheet_reminder_settings"
+    FOR INSERT WITH CHECK (public.is_admin_or_management());
+
 CREATE POLICY "trs_update_management" ON "public"."timesheet_reminder_settings"
     FOR UPDATE USING (public.is_admin_or_management())
     WITH CHECK (public.is_admin_or_management());
 
-GRANT SELECT, UPDATE ON TABLE "public"."timesheet_reminder_settings" TO "authenticated";
+GRANT SELECT, INSERT, UPDATE ON TABLE "public"."timesheet_reminder_settings" TO "authenticated";
 GRANT ALL ON TABLE "public"."timesheet_reminder_settings" TO "service_role";
 
 -- invoke_auto_timesheet_reminders() was updated at the top of this migration.

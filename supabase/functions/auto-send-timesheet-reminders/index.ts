@@ -159,43 +159,57 @@ serve(async (req) => {
       )
     }
 
-    // ─── Fetch jobs to find completed ones ───────────────────────────────────
+    // ─── Fetch jobs to find completed ones (chunked to avoid PostgREST cap) ──
+    const CHUNK = 500
     const jobIds = [...new Set(timesheets.map((t) => t.job_id))]
-    const { data: jobs, error: jobsError } = await supabaseAdmin
-      .from('jobs')
-      .select('id, title, end_time')
-      .in('id', jobIds)
-
-    if (jobsError) {
-      console.error('Failed to query jobs:', jobsError)
-      return new Response(JSON.stringify({ error: 'Failed to query jobs' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const allJobs: Array<{ id: string; title: string; end_time: string | null }> = []
+    for (let i = 0; i < jobIds.length; i += CHUNK) {
+      const chunk = jobIds.slice(i, i + CHUNK)
+      const { data: chunkData, error: chunkErr } = await supabaseAdmin
+        .from('jobs')
+        .select('id, title, end_time')
+        .in('id', chunk)
+      if (chunkErr) {
+        console.error('Failed to query jobs chunk:', chunkErr)
+        return new Response(JSON.stringify({ error: 'Failed to query jobs' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      if (chunkData) allJobs.push(...chunkData)
+      if (chunk.length === CHUNK) console.warn(`Jobs chunk ${i / CHUNK} returned ${chunkData?.length} rows`)
     }
 
     const now = new Date()
     const completedJobIds = new Set(
-      (jobs ?? []).filter((j) => j.end_time && new Date(j.end_time) < now).map((j) => j.id)
+      allJobs.filter((j) => j.end_time && new Date(j.end_time) < now).map((j) => j.id)
     )
-    const jobMap = new Map((jobs ?? []).map((j) => [j.id, j]))
+    const jobMap = new Map(allJobs.map((j) => [j.id, j]))
 
-    // ─── Fetch technician profiles (include department) ──────────────────────
+    // ─── Fetch technician profiles (chunked) ─────────────────────────────────
     const techIds = [...new Set(timesheets.map((t) => t.technician_id))]
-    const { data: technicians, error: techError } = await supabaseAdmin
-      .from('profiles')
-      .select('id, first_name, last_name, nickname, email, department')
-      .in('id', techIds)
-
-    if (techError) {
-      console.error('Failed to query technicians:', techError)
-      return new Response(JSON.stringify({ error: 'Failed to query technicians' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    const allTechs: Array<{
+      id: string; first_name: string | null; last_name: string | null
+      nickname: string | null; email: string; department: string | null
+    }> = []
+    for (let i = 0; i < techIds.length; i += CHUNK) {
+      const chunk = techIds.slice(i, i + CHUNK)
+      const { data: chunkData, error: chunkErr } = await supabaseAdmin
+        .from('profiles')
+        .select('id, first_name, last_name, nickname, email, department')
+        .in('id', chunk)
+      if (chunkErr) {
+        console.error('Failed to query technicians chunk:', chunkErr)
+        return new Response(JSON.stringify({ error: 'Failed to query technicians' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      if (chunkData) allTechs.push(...chunkData)
+      if (chunk.length === CHUNK) console.warn(`Techs chunk ${i / CHUNK} returned ${chunkData?.length} rows`)
     }
 
-    const techMap = new Map((technicians ?? []).map((t) => [t.id, t]))
+    const techMap = new Map(allTechs.map((t) => [t.id, t]))
 
     const BREVO_KEY = Deno.env.get('BREVO_API_KEY') ?? ''
     const BREVO_FROM = Deno.env.get('BREVO_FROM') ?? ''
@@ -261,10 +275,23 @@ serve(async (req) => {
       }
 
       // ── Build and send email ──────────────────────────────────────────────
+      const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://sector-pro.work'
       const techName = technician.nickname || technician.first_name || 'Técnico'
       const jobTitle = job.title || 'trabajo desconocido'
       const subject = `Recordatorio: Parte de horas pendiente - ${jobTitle}`
-      const timesheetUrl = `https://sector-pro.work/timesheets?jobId=${ts.job_id}`
+      const timesheetUrl = `${SITE_URL}/timesheets?jobId=${ts.job_id}`
+
+      // Collect all pending dates for this (tech, job) group, sorted ascending
+      const pendingDates = [...new Set(groupTimesheets.map((t) => t.date))]
+        .sort()
+        .map((d) =>
+          new Date(d).toLocaleDateString('es-ES', {
+            weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+          })
+        )
+      const pendingDatesDisplay = pendingDates.length === 1
+        ? pendingDates[0]
+        : `${pendingDates[0]} – ${pendingDates[pendingDates.length - 1]} (${pendingDates.length} días)`
 
       const htmlContent = `<!DOCTYPE html>
 <html lang="es">
@@ -342,12 +369,7 @@ serve(async (req) => {
                   </tr>
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
-                      <strong>Fecha:</strong> ${new Date(ts.date).toLocaleDateString('es-ES', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
+                      <strong>Fecha(s):</strong> ${pendingDatesDisplay}
                     </td>
                   </tr>
                   <tr>
@@ -401,7 +423,7 @@ serve(async (req) => {
 
       const emailPayload = {
         sender: { email: BREVO_FROM, name: 'Área Técnica - Sector Pro' },
-        to: [{ email: technician.email, name: `${technician.first_name} ${technician.last_name}` }],
+        to: [{ email: technician.email, name: `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim() || technician.email }],
         subject,
         htmlContent,
       }
