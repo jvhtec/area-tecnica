@@ -325,7 +325,6 @@ export default function Timesheets() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Fecha</label>
-                <label className="text-sm font-medium">Fecha</label>
                 <Select value={filterDate} onValueChange={setFilterDate}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todas las fechas" />

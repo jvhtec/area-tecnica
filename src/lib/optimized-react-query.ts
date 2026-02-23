@@ -127,6 +127,9 @@ export const createQueryKey = {
     byJobAndTechnician: (jobId?: string | null, technicianId?: string | null) =>
       [...createQueryKey.payoutOverrides.all, jobId ?? null, technicianId ?? null] as const,
   },
+  timesheetReminderSettings: {
+    all: ['timesheet-reminder-settings'] as const,
+  },
 };
 
 // Optimized invalidation strategies

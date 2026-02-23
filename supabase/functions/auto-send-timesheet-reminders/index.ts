@@ -21,22 +21,25 @@ serve(async (req) => {
   console.log('=== auto-send-timesheet-reminders invoked ===', startedAt)
 
   try {
-    // Called by pg_cron with service_role key, or manually by admin/management.
-    // verify_jwt=false in config.toml – we validate the caller here.
+    // verify_jwt=true in config.toml – the Supabase gateway has already
+    // verified the JWT signature before this code runs. We still decode the
+    // payload once to distinguish service_role (pg_cron) from user callers and
+    // to extract the user-id for the profile role-check.
     const authHeader = req.headers.get('Authorization') ?? ''
     const jwt = authHeader.replace('Bearer ', '')
 
-    let callerRole = 'unknown'
+    let jwtPayload: Record<string, unknown> = {}
     try {
-      const payload = JSON.parse(atob(jwt.split('.')[1]))
-      callerRole = payload.role ?? 'unknown'
+      jwtPayload = JSON.parse(atob(jwt.split('.')[1]))
     } catch {
-      console.error('Failed to decode JWT')
+      console.error('Failed to decode JWT payload')
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+
+    const callerRole = (jwtPayload.role as string) ?? 'unknown'
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
     const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -47,10 +50,9 @@ serve(async (req) => {
       callerAuthorized = true
       console.log('Caller: pg_cron (service_role)')
     } else {
-      try {
-        const payload = JSON.parse(atob(jwt.split('.')[1]))
-        const userId = payload.sub
-        if (userId) {
+      const userId = jwtPayload.sub as string | undefined
+      if (userId) {
+        try {
           const { data: profile } = await supabaseAdmin
             .from('profiles')
             .select('role')
@@ -60,8 +62,8 @@ serve(async (req) => {
             callerAuthorized = true
             console.log('Caller: management user', userId)
           }
-        }
-      } catch { /* ignore */ }
+        } catch { /* ignore */ }
+      }
     }
 
     if (!callerAuthorized) {
@@ -94,8 +96,9 @@ serve(async (req) => {
       })
     }
 
-    // Default for departments not in the settings table (fallback: enabled, 1 day)
-    const DEFAULT_SETTINGS: DeptSettings = { auto_reminders_enabled: true, reminder_frequency_days: 1 }
+    // Default for departments not in the settings table: opt-out (disabled).
+    // Unconfigured or null departments must not receive reminders.
+    const DEFAULT_SETTINGS: DeptSettings = { auto_reminders_enabled: false, reminder_frequency_days: 1 }
 
     // Check if ALL departments are disabled (quick-exit optimisation)
     const anyEnabled = settingsRows?.some((r) => r.auto_reminders_enabled) ?? true
@@ -107,23 +110,48 @@ serve(async (req) => {
       )
     }
 
-    // ─── Find candidate timesheets ────────────────────────────────────────────
-    // Fetch all draft timesheets – we filter by department frequency in-memory
-    // because each department can have a different frequency value.
-    const { data: timesheets, error: tsError } = await supabaseAdmin
-      .from('timesheets')
-      .select('id, technician_id, job_id, date, status, reminder_sent_at, auto_reminder_count')
-      .eq('status', 'draft')
+    // ─── Find candidate timesheets (paginated) ───────────────────────────────
+    // Supabase PostgREST caps responses at 1000 rows by default. Paginate to
+    // ensure we never silently miss rows.
+    const PAGE_SIZE = 1000
+    const allTimesheets: Array<{
+      id: string
+      technician_id: string
+      job_id: string
+      date: string
+      status: string
+      reminder_sent_at: string | null
+      auto_reminder_count: number
+    }> = []
 
-    if (tsError) {
-      console.error('Failed to query timesheets:', tsError)
-      return new Response(JSON.stringify({ error: 'Failed to query timesheets' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    for (let page = 0; ; page++) {
+      const { data: pageData, error: tsError } = await supabaseAdmin
+        .from('timesheets')
+        .select('id, technician_id, job_id, date, status, reminder_sent_at, auto_reminder_count')
+        .eq('status', 'draft')
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
+
+      if (tsError) {
+        console.error('Failed to query timesheets (page %d):', page, tsError)
+        return new Response(JSON.stringify({ error: 'Failed to query timesheets' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+
+      if (!pageData || pageData.length === 0) break
+      allTimesheets.push(...pageData)
+
+      if (pageData.length === PAGE_SIZE) {
+        console.warn(`Timesheets page ${page} returned exactly ${PAGE_SIZE} rows – fetching next page.`)
+      } else {
+        break // last page
+      }
     }
 
-    if (!timesheets || timesheets.length === 0) {
+    const timesheets = allTimesheets
+
+    if (timesheets.length === 0) {
       console.log('No draft timesheets found.')
       return new Response(
         JSON.stringify({ success: true, sent: 0 }),
@@ -340,12 +368,9 @@ serve(async (req) => {
               <div style="background:#f9fafb;border:1px solid #e5e7eb;padding:16px;border-radius:6px;margin:20px 0;">
                 <div style="color:#6b7280;font-size:13px;line-height:1.5;">
                   <strong style="color:#374151;">Instrucciones de acceso:</strong><br/>
-                  Si es la primera vez que accedes a la plataforma, tus credenciales son:
-                  <ul style="margin:8px 0;padding-left:20px;">
-                    <li><strong>Usuario:</strong> ${technician.email}</li>
-                    <li><strong>Contraseña:</strong> default</li>
-                  </ul>
-                  Te recomendamos cambiar tu contraseña tras el primer acceso desde tu perfil.
+                  Accede con tu email: <strong>${technician.email}</strong>.<br/>
+                  Si no recuerdas tu contraseña, utiliza el enlace <em>"¿Olvidaste tu contraseña?"</em>
+                  en la pantalla de inicio de sesión para restablecerla.
                 </div>
               </div>
 
@@ -400,24 +425,19 @@ serve(async (req) => {
         `Reminder sent: ${groupIds.length} timesheet(s) dept=${techDept} to=${technician.email} msgId=${brevoRes.messageId}`
       )
 
-      // Stamp reminder_sent_at and increment auto_reminder_count on ALL timesheets
-      // in the group so the frequency check works correctly across the whole group.
-      const { error: updateError } = await supabaseAdmin
-        .from('timesheets')
-        .update({ reminder_sent_at: nowIso })
-        .in('id', groupIds)
-
-      if (updateError) {
-        console.error(`Failed to update reminder_sent_at for group (${groupIds.join(',')}):`, updateError)
-      }
-
-      // Increment auto_reminder_count individually (each row may have a different current value)
-      for (const t of groupTimesheets) {
-        await supabaseAdmin
-          .from('timesheets')
-          .update({ auto_reminder_count: (t.auto_reminder_count ?? 0) + 1 })
-          .eq('id', t.id)
-      }
+      // Update reminder_sent_at and auto_reminder_count on all rows in the group
+      // in parallel (one request per row so each gets its own incremented count).
+      await Promise.all(
+        groupTimesheets.map((t) =>
+          supabaseAdmin
+            .from('timesheets')
+            .update({
+              reminder_sent_at: nowIso,
+              auto_reminder_count: (t.auto_reminder_count ?? 0) + 1,
+            })
+            .eq('id', t.id)
+        )
+      )
 
       sentCount++
     }

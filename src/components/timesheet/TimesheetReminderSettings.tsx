@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Bell, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { createQueryKey } from "@/lib/optimized-react-query";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,8 +27,6 @@ interface DeptSetting {
   auto_reminders_enabled: boolean;
   reminder_frequency_days: number;
 }
-
-const QUERY_KEY = ["timesheet-reminder-settings"];
 
 // ─── Data helpers ─────────────────────────────────────────────────────────────
 
@@ -65,6 +64,8 @@ export function TimesheetReminderSettings({ className }: { className?: string })
   const queryClient = useQueryClient();
   const [isTriggeringManual, setIsTriggeringManual] = useState(false);
 
+  const QUERY_KEY = createQueryKey.timesheetReminderSettings.all;
+
   const { data: rows = [], isLoading } = useQuery({
     queryKey: QUERY_KEY,
     queryFn: fetchSettings,
@@ -98,13 +99,21 @@ export function TimesheetReminderSettings({ className }: { className?: string })
     mutation.mutate({ department, reminder_frequency_days: parseInt(value, 10) });
   };
 
-  const handleEnableAll = (enabled: boolean) => {
-    for (const { key } of DEPARTMENTS) {
-      mutation.mutate({ department: key, auto_reminders_enabled: enabled });
+  const handleEnableAll = async (enabled: boolean) => {
+    try {
+      await Promise.all(
+        DEPARTMENTS.map(({ key }) =>
+          mutation.mutateAsync({ department: key, auto_reminders_enabled: enabled })
+        )
+      );
+      await queryClient.invalidateQueries({ queryKey: QUERY_KEY });
+      toast({
+        title: enabled ? "Todos los departamentos activados" : "Todos los departamentos desactivados",
+      });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: "Error al actualizar departamentos", description: msg, variant: "destructive" });
     }
-    toast({
-      title: enabled ? "Todos los departamentos activados" : "Todos los departamentos desactivados",
-    });
   };
 
   const handleManualTrigger = async () => {
@@ -115,8 +124,9 @@ export function TimesheetReminderSettings({ className }: { className?: string })
         title: "Envío completado",
         description: `${sent} recordatorio(s) enviado(s)${failed > 0 ? `, ${failed} fallo(s)` : ""}.`,
       });
-    } catch (err: any) {
-      toast({ title: "Error al enviar recordatorios", description: err.message, variant: "destructive" });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast({ title: "Error al enviar recordatorios", description: msg, variant: "destructive" });
     } finally {
       setIsTriggeringManual(false);
     }

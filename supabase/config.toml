@@ -41,7 +41,7 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.auto-send-timesheet-reminders]
-verify_jwt = false
+verify_jwt = true
 
 [functions.cleanup-corporate-email-images]
 verify_jwt = false

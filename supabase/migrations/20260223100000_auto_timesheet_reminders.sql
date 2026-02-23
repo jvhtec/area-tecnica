@@ -96,10 +96,17 @@ COMMENT ON FUNCTION "public"."invoke_auto_timesheet_reminders"() IS
 GRANT EXECUTE ON FUNCTION "public"."invoke_auto_timesheet_reminders"() TO "service_role";
 
 -- 4. Schedule daily at 10:00 UTC (11:00 Madrid CET / 12:00 CEST)
--- Unschedule existing job first to avoid duplicates on re-runs
-SELECT cron.unschedule('auto-timesheet-reminders') WHERE EXISTS (
-    SELECT 1 FROM cron.job WHERE jobname = 'auto-timesheet-reminders'
-);
+-- Unschedule any existing job first to avoid duplicates on re-runs.
+-- Use a DO block so cron.unschedule() is guaranteed to execute when the job
+-- exists – a bare "SELECT fn() WHERE EXISTS ..." can be silently skipped by
+-- the planner if it treats the SELECT as returning no rows.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'auto-timesheet-reminders') THEN
+        PERFORM cron.unschedule('auto-timesheet-reminders');
+    END IF;
+END;
+$$;
 
 SELECT cron.schedule(
     'auto-timesheet-reminders',
