@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -119,10 +120,10 @@ export function TimesheetReminderSettings({ className }: { className?: string })
   const handleManualTrigger = async () => {
     setIsTriggeringManual(true);
     try {
-      const { sent, failed } = await triggerManualBatch();
+      const { sent, failed, skipped_dept } = await triggerManualBatch();
       toast({
         title: "Envío completado",
-        description: `${sent} recordatorio(s) enviado(s)${failed > 0 ? `, ${failed} fallo(s)` : ""}.`,
+        description: `${sent} recordatorio(s) enviado(s)${failed > 0 ? `, ${failed} fallo(s)` : ""}${skipped_dept > 0 ? `, ${skipped_dept} omitido(s)` : ""}.`,
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -132,7 +133,19 @@ export function TimesheetReminderSettings({ className }: { className?: string })
     }
   };
 
-  if (isLoading) return null;
+  if (isLoading) {
+    return (
+      <Card className={className}>
+        <CardHeader className="pb-3">
+          <Skeleton className="h-5 w-48" />
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-9 w-full" />
+          <Skeleton className="h-9 w-full" />
+        </CardContent>
+      </Card>
+    );
+  }
 
   const allEnabled = DEPARTMENTS.every((d) => getDept(d.key).auto_reminders_enabled);
   const anyEnabled = DEPARTMENTS.some((d) => getDept(d.key).auto_reminders_enabled);
