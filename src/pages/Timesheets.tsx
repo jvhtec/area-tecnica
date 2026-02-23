@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, Download, FileText } from "lucide-react";
 import { TimesheetView } from "@/components/timesheet/TimesheetView";
+import { TimesheetReminderSettings } from "@/components/timesheet/TimesheetReminderSettings";
 import { downloadTimesheetPDF } from "@/utils/timesheet-pdf";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { useTimesheets } from "@/hooks/useTimesheets";
@@ -197,6 +198,10 @@ export default function Timesheets() {
         </div>
       </div>
 
+      {canManage && (
+        <TimesheetReminderSettings />
+      )}
+
       {!selectedJobId && !jobsLoading && (
         <Card>
           <CardHeader>
@@ -319,7 +324,6 @@ export default function Timesheets() {
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium">Fecha</label>
                 <label className="text-sm font-medium">Fecha</label>
                 <Select value={filterDate} onValueChange={setFilterDate}>
                   <SelectTrigger>
