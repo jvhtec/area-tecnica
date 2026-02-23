@@ -40,6 +40,9 @@ verify_jwt = true
 [functions.send-timesheet-reminder]
 verify_jwt = true
 
+[functions.auto-send-timesheet-reminders]
+verify_jwt = false
+
 [functions.cleanup-corporate-email-images]
 verify_jwt = false
 
