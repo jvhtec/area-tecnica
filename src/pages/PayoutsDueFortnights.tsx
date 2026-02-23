@@ -101,7 +101,14 @@ interface PayoutEstimate {
   toDate: Date;
 }
 
-type SortColumn = "technicianName" | "department" | "jobDate" | "jobTitle" | "estimate" | "totalEur";
+type SortColumn =
+  | "technicianName"
+  | "department"
+  | "jobDate"
+  | "jobTitle"
+  | "estimate"
+  | "autonomo"
+  | "totalEur";
 type SortDirection = "asc" | "desc";
 
 function chunkArray<T>(items: T[], size: number): T[][] {
@@ -253,6 +260,12 @@ function compareDueItems(
       if (result === 0) {
         result = left.toDate.getTime() - right.toDate.getTime();
       }
+      break;
+    case "autonomo":
+      result = compareText(
+        formatAutonomoCellValue(left.isHouseTech, left.isAutonomo),
+        formatAutonomoCellValue(right.isHouseTech, right.isAutonomo)
+      );
       break;
     case "totalEur":
       result = left.totalEur - right.totalEur;
@@ -1092,7 +1105,17 @@ export default function PayoutsDueFortnights() {
                           Estimación {getSortIndicator("estimate")}
                         </Button>
                       </TableHead>
-                      <TableHead>Autónomo</TableHead>
+                      <TableHead>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="-ml-2 h-8 px-2"
+                          onClick={() => handleSort("autonomo")}
+                        >
+                          Autónomo {getSortIndicator("autonomo")}
+                        </Button>
+                      </TableHead>
                       <TableHead>Factura recibida</TableHead>
                       <TableHead className="text-right">
                         <Button
@@ -1126,7 +1149,7 @@ export default function PayoutsDueFortnights() {
                           <TableCell>{formatAutonomoCellValue(item.isHouseTech, item.isAutonomo)}</TableCell>
                           <TableCell>
                             {!invoiceApplicable ? (
-                              "No aplica"
+                              null
                             ) : canManageInvoice ? (
                               <div className="flex items-center gap-2">
                                 <Checkbox
