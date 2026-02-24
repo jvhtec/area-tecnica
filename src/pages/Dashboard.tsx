@@ -13,7 +13,6 @@ import { isJobOnDate } from "@/utils/timezoneUtils";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
-import { useOptimizedMessagesSubscriptions } from "@/hooks/useOptimizedSubscriptions";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 const DashboardMobileHub = lazy(() =>
@@ -96,8 +95,6 @@ const Dashboard = () => {
   const { data: jobs = [], isLoading } = useOptimizedJobs(undefined, jobsRangeStart, jobsRangeEnd);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  // Ensure realtime updates for messages are wired
-  useOptimizedMessagesSubscriptions(userId);
 
   const { data: pendingExpensesSummary, isLoading: isLoadingPendingExpenses } = useQuery({
     queryKey: ['dashboard-expenses-summary'],

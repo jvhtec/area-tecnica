@@ -2,10 +2,20 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { verify } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+function readPositiveIntEnv(name: string, fallback: number) {
+  const raw = Deno.env.get(name);
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "";
 const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? "";
+const DEFAULT_FEED_CACHE_TTL_MS = readPositiveIntEnv("WALLBOARD_FEED_CACHE_TTL_MS", 15000);
+const PRESET_CONFIG_CACHE_TTL_MS = readPositiveIntEnv("WALLBOARD_PRESET_CONFIG_CACHE_TTL_MS", 120000);
+const MAX_CACHE_ENTRIES = readPositiveIntEnv("WALLBOARD_FEED_CACHE_MAX_ENTRIES", 500);
 
 type AuthResult = {
   method: "jwt" | "shared";
@@ -14,6 +24,19 @@ type AuthResult = {
 
 type Dept = "sound" | "lights" | "video";
 
+type CacheEntry = {
+  expiresAt: number;
+  body: string;
+};
+
+type InFlightResponse = {
+  status: number;
+  body: string;
+};
+
+const feedResponseCache = new Map<string, CacheEntry>();
+const inFlightResponseCache = new Map<string, Promise<InFlightResponse>>();
+
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
@@ -21,6 +44,35 @@ function corsHeaders() {
     "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Max-Age": "86400",
   } as Record<string, string>;
+}
+
+function buildJsonResponse(body: string, status = 200) {
+  return new Response(body, {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders() },
+  });
+}
+
+function readCache(cacheKey: string): Response | null {
+  const cached = feedResponseCache.get(cacheKey);
+  if (!cached) return null;
+  if (cached.expiresAt <= Date.now()) {
+    feedResponseCache.delete(cacheKey);
+    return null;
+  }
+  return buildJsonResponse(cached.body, 200);
+}
+
+function writeCache(cacheKey: string, body: string, ttlMs: number) {
+  if (ttlMs <= 0) return;
+  if (feedResponseCache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = feedResponseCache.keys().next().value;
+    if (oldestKey) feedResponseCache.delete(oldestKey);
+  }
+  feedResponseCache.set(cacheKey, {
+    expiresAt: Date.now() + ttlMs,
+    body,
+  });
 }
 
 class HttpError extends Error {
@@ -166,6 +218,36 @@ serve(async (req) => {
     const presetSlug = auth.presetSlug?.trim().toLowerCase() ?? undefined;
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
 
+    const isCacheablePath =
+      path.endsWith("/jobs-overview") ||
+      path.endsWith("/calendar") ||
+      path.endsWith("/crew-assignments") ||
+      path.endsWith("/doc-progress") ||
+      path.endsWith("/pending-actions") ||
+      path.endsWith("/logistics") ||
+      path.endsWith("/announcements") ||
+      path.endsWith("/preset-config");
+    const cacheTtlMs = path.endsWith("/preset-config")
+      ? PRESET_CONFIG_CACHE_TTL_MS
+      : DEFAULT_FEED_CACHE_TTL_MS;
+    const cacheKey = isCacheablePath
+      ? `${auth.method}|${path}|preset:${presetSlug ?? "none"}`
+      : null;
+
+    if (cacheKey) {
+      const cached = readCache(cacheKey);
+      if (cached) return cached;
+    }
+
+    const respondJson = (payload: unknown, status = 200) => {
+      const body = JSON.stringify(payload);
+      if (status === 200 && cacheKey) {
+        writeCache(cacheKey, body, cacheTtlMs);
+      }
+      return buildJsonResponse(body, status);
+    };
+
+    const handlePathRequest = async (): Promise<Response> => {
     if (path.endsWith("/jobs-overview")) {
       // Next 7 days window (inclusive of the 7th day)
       const now = new Date();
@@ -242,9 +324,7 @@ serve(async (req) => {
         }),
       } as any;
 
-      return new Response(JSON.stringify({ ...result, presetSlug }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders() },
-      });
+      return respondJson({ ...result, presetSlug });
     }
 
     if (path.endsWith("/calendar")) {
@@ -323,9 +403,7 @@ serve(async (req) => {
         }),
       } as any;
 
-      return new Response(JSON.stringify({ ...result, presetSlug }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders() },
-      });
+      return respondJson({ ...result, presetSlug });
     }
 
     if (path.endsWith("/crew-assignments")) {
@@ -406,9 +484,7 @@ serve(async (req) => {
         })),
       } as any;
 
-      return new Response(JSON.stringify({ ...result, presetSlug }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders() },
-      });
+      return respondJson({ ...result, presetSlug });
     }
 
     if (path.endsWith("/doc-progress")) {
@@ -449,9 +525,7 @@ serve(async (req) => {
         })),
       };
 
-      return new Response(JSON.stringify({ ...payload, presetSlug }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders() },
-      });
+      return respondJson({ ...payload, presetSlug });
     }
 
     if (path.endsWith("/pending-actions")) {
@@ -528,9 +602,7 @@ serve(async (req) => {
         });
       }
 
-      return new Response(JSON.stringify({ items, presetSlug }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders() },
-      });
+      return respondJson({ items, presetSlug });
     }
 
     if (path.endsWith("/logistics")) {
@@ -587,98 +659,11 @@ serve(async (req) => {
         };
       });
 
-      // Fetch confirmed dry-hire jobs for client pickups/returns
-      const { data: dryHireJobs } = await sb
-        .from("jobs")
-        .select("id, title, start_time, end_time, job_type, status, timezone")
-        .eq("job_type", "dryhire")
-        .eq("status", "Confirmado")
-        .gte("start_time", startDate)
-        .lte("start_time", weekEnd.toISOString());
-
-      const toTZParts = (iso: string, tz?: string): { date: string; time: string } => {
-        try {
-          const d = new Date(iso);
-          const zone = tz || "Europe/Madrid";
-          const dateFmt = new Intl.DateTimeFormat("en-CA", {
-            timeZone: zone,
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
-          });
-          const timeFmt = new Intl.DateTimeFormat("en-GB", {
-            timeZone: zone,
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: false,
-          });
-          const date = dateFmt.format(d);
-          const time = timeFmt.format(d);
-          return { date, time };
-        } catch {
-          return { date: (iso || "").slice(0, 10), time: (iso || "").slice(11, 16) };
-        }
-      };
-
-      const dryHireItems = (dryHireJobs ?? []).flatMap((j: any) => {
-        const nowParts = toTZParts(new Date().toISOString(), j.timezone);
-        const pickupParts = toTZParts(j.start_time, j.timezone);
-        const returnParts = j.end_time ? toTZParts(j.end_time, j.timezone) : null;
-        const nowKey = `${nowParts.date}${nowParts.time}`;
-        const pickupKey = `${pickupParts.date}${pickupParts.time}`;
-        const weekWindowParts = toTZParts(weekEnd.toISOString(), j.timezone);
-        const weekWindowKey = `${weekWindowParts.date}${weekWindowParts.time}`;
-        const items: any[] = [];
-
-        if (pickupKey >= nowKey && pickupKey <= weekWindowKey) {
-          items.push({
-            id: `dryhire-${j.id}`,
-            date: pickupParts.date,
-            time: pickupParts.time,
-            title: j.title || "Dry Hire",
-            transport_type: "recogida cliente",
-            transport_provider: null,
-            plate: null,
-            job_title: j.title || null,
-            procedure: "load",
-            loadingBay: null,
-            departments: [],
-            color: null,
-            notes: null,
-          });
-        }
-
-        if (returnParts) {
-          const returnKey = `${returnParts.date}${returnParts.time}`;
-          if (returnKey >= nowKey && returnKey <= weekWindowKey) {
-            items.push({
-              id: `dryhire-return-${j.id}`,
-              date: returnParts.date,
-              time: returnParts.time,
-              title: j.title || "Dry Hire",
-              transport_type: "devolución cliente",
-              transport_provider: null,
-              plate: null,
-              job_title: j.title || null,
-              procedure: "unload",
-              loadingBay: null,
-              departments: [],
-              color: null,
-              notes: null,
-            });
-          }
-        }
-
-        return items;
-      });
-
-      const logisticsItems = [...logisticsItemsBase, ...dryHireItems].sort((a, b) =>
+      const logisticsItems = logisticsItemsBase.sort((a, b) =>
         (a.date + a.time).localeCompare(b.date + b.time)
       );
 
-      return new Response(JSON.stringify({ items: logisticsItems, presetSlug }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders() },
-      });
+      return respondJson({ items: logisticsItems, presetSlug });
     }
 
     if (path.endsWith("/announcements")) {
@@ -689,9 +674,7 @@ serve(async (req) => {
         .order("created_at", { ascending: false })
         .limit(20);
       if (error) throw error;
-      return new Response(JSON.stringify({ announcements: data ?? [], presetSlug }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders() },
-      });
+      return respondJson({ announcements: data ?? [], presetSlug });
     }
 
     if (path.endsWith("/preset-config")) {
@@ -700,10 +683,7 @@ serve(async (req) => {
       
       if (!presetSlug) {
         console.error("❌ [preset-config] No preset slug provided");
-        return new Response(JSON.stringify({ error: "No preset slug provided" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json", ...corsHeaders() },
-        });
+        return respondJson({ error: "No preset slug provided" }, 400);
       }
 
       console.log("🔍 [preset-config] Querying database for slug:", presetSlug);
@@ -715,35 +695,48 @@ serve(async (req) => {
 
       if (error) {
         console.error("❌ [preset-config] Database error:", error);
-        return new Response(JSON.stringify({ error: error.message }), {
-          status: 500,
-          headers: { "Content-Type": "application/json", ...corsHeaders() },
-        });
+        return respondJson({ error: error.message }, 500);
       }
 
       if (!data) {
         console.error("❌ [preset-config] Preset not found in database:", presetSlug);
-        return new Response(JSON.stringify({ error: "Preset not found", slug: presetSlug }), {
-          status: 404,
-          headers: { "Content-Type": "application/json", ...corsHeaders() },
-        });
+        return respondJson({ error: "Preset not found", slug: presetSlug }, 404);
       }
 
       console.log("✅ [preset-config] Preset found and returning:", { slug: presetSlug, panelOrder: data.panel_order });
-      return new Response(JSON.stringify({ config: data, slug: presetSlug }), {
-        headers: { "Content-Type": "application/json", ...corsHeaders() },
-      });
+      return respondJson({ config: data, slug: presetSlug });
     }
 
-    return new Response(JSON.stringify({ error: "Not Found" }), {
-      status: 404,
-      headers: { "Content-Type": "application/json", ...corsHeaders() },
-    });
+    return respondJson({ error: "Not Found" }, 404);
+    };
+
+    if (!cacheKey) {
+      return await handlePathRequest();
+    }
+
+    const existingInFlight = inFlightResponseCache.get(cacheKey);
+    if (existingInFlight) {
+      const pending = await existingInFlight;
+      return buildJsonResponse(pending.body, pending.status);
+    }
+
+    const pendingResponse = (async (): Promise<InFlightResponse> => {
+      const response = await handlePathRequest();
+      return {
+        status: response.status,
+        body: await response.text(),
+      };
+    })();
+
+    inFlightResponseCache.set(cacheKey, pendingResponse);
+    try {
+      const resolved = await pendingResponse;
+      return buildJsonResponse(resolved.body, resolved.status);
+    } finally {
+      inFlightResponseCache.delete(cacheKey);
+    }
   } catch (e: any) {
     const status = e instanceof HttpError ? e.status : 500;
-    return new Response(JSON.stringify({ error: e?.message ?? String(e) }), {
-      status,
-      headers: { "Content-Type": "application/json", ...corsHeaders() },
-    });
+    return buildJsonResponse(JSON.stringify({ error: e?.message ?? String(e) }), status);
   }
 });

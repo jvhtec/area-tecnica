@@ -91,6 +91,9 @@ export const NotificationBadge = ({
     const timeoutId = window.setTimeout(() => {
       fetchUnreadMessages()
     }, 500)
+    const intervalId = window.setInterval(() => {
+      fetchUnreadMessages()
+    }, 30000)
 
     const handleInvalidate = () => {
       if (debounceTimerRef.current) {
@@ -104,49 +107,13 @@ export const NotificationBadge = ({
     window.addEventListener("messages_invalidated", handleInvalidate)
     window.addEventListener("direct_messages_invalidated", handleInvalidate)
 
-    const channel = supabase
-      .channel("realtime-notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "messages",
-        },
-        () => {
-          if (debounceTimerRef.current) {
-            window.clearTimeout(debounceTimerRef.current)
-          }
-          debounceTimerRef.current = window.setTimeout(() => {
-            fetchUnreadMessages()
-          }, 200)
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "direct_messages",
-        },
-        () => {
-          if (debounceTimerRef.current) {
-            window.clearTimeout(debounceTimerRef.current)
-          }
-          debounceTimerRef.current = window.setTimeout(() => {
-            fetchUnreadMessages()
-          }, 200)
-        },
-      )
-      .subscribe()
-
     return () => {
       window.clearTimeout(timeoutId)
+      window.clearInterval(intervalId)
       if (debounceTimerRef.current) {
         window.clearTimeout(debounceTimerRef.current)
         debounceTimerRef.current = null
       }
-      supabase.removeChannel(channel)
       window.removeEventListener("messages_invalidated", handleInvalidate)
       window.removeEventListener("direct_messages_invalidated", handleInvalidate)
     }

@@ -1,12 +1,6 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import {
-  checkNetworkConnection,
-  ensureRealtimeConnection,
-  monitorConnectionHealth,
-  supabase,
-} from '@/integrations/supabase/client';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { createQueryKey } from '@/lib/optimized-react-query';
 import { normalizeDept } from '@/utils/tasks';
 
@@ -58,126 +52,18 @@ export interface GroupedPendingTask {
   }>;
 }
 
-const TASK_TABLES = [
-  'sound_job_tasks',
-  'lights_job_tasks',
-  'video_job_tasks',
-  'production_job_tasks',
-  'administrative_job_tasks',
-] as const;
-
-type TaskRow = Record<string, unknown> & { assigned_to?: string | null };
-
 /**
  * Hook to fetch pending tasks for the current user.
  * Includes both individually-assigned tasks and department-shared tasks.
  * Only runs when a logged-in task-coordinator role is detected.
+ *
+ * Note: Realtime listeners were intentionally removed because multiple UI
+ * consumers of this hook were creating duplicate subscriptions and causing
+ * significant database load. We refresh on a short interval instead.
  */
 export function usePendingTasks(userId: string | null, userRole: string | null, userDepartment?: string | null) {
   const isEligibleRole = !!userRole && ['management', 'admin', 'logistics', 'oscar'].includes(userRole);
   const normalizedDepartment = useMemo(() => normalizeDept(userDepartment) ?? null, [userDepartment]);
-  const queryClient = useQueryClient();
-  const healthCleanupRef = useRef<null | (() => void)>(null);
-
-  useEffect(() => {
-    if (!userId || !isEligibleRole) {
-      return;
-    }
-
-    let isMounted = true;
-    let channelRef: ReturnType<typeof supabase.channel> | undefined;
-
-    const invalidatePendingTasks = () => {
-      queryClient.invalidateQueries({
-        queryKey: createQueryKey.pendingTasks.byUser(userId, normalizedDepartment),
-      });
-    };
-
-    (async () => {
-      const isOnline = await checkNetworkConnection();
-      if (!isOnline || !isMounted) return;
-
-      await ensureRealtimeConnection();
-      if (!isMounted) return;
-
-      const channel = supabase.channel(
-        `pending-tasks-${userId}-${Math.random().toString(36).slice(2, 10)}`
-      );
-
-      TASK_TABLES.forEach((table) => {
-        // Listen for changes to tasks assigned to this user
-        channel.on(
-          'postgres_changes',
-          { event: '*', schema: 'public', table, filter: `assigned_to=eq.${userId}` },
-          invalidatePendingTasks
-        );
-
-        // Listen for changes to department-shared tasks
-        if (normalizedDepartment) {
-          channel.on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table,
-              filter: `assigned_department=eq.${normalizedDepartment}`,
-            },
-            invalidatePendingTasks
-          );
-
-          channel.on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table,
-              filter: `assigned_department=eq.${normalizedDepartment}_warehouse`,
-            },
-            invalidatePendingTasks
-          );
-        }
-
-        channel.on(
-          'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table },
-          (payload: RealtimePostgresChangesPayload<TaskRow>) => {
-            const previousAssignee = (payload.old as TaskRow)?.assigned_to ?? null;
-            const nextAssignee = (payload.new as TaskRow)?.assigned_to ?? null;
-
-            if (previousAssignee === userId && nextAssignee !== userId) {
-              invalidatePendingTasks();
-            }
-          }
-        );
-      });
-
-      channel.subscribe();
-
-      // If unmount happened while awaiting, clean up immediately
-      if (!isMounted) {
-        void supabase.removeChannel(channel);
-        return;
-      }
-
-      channelRef = channel;
-
-      // Monitor connection health and refetch on reconnection
-      healthCleanupRef.current = monitorConnectionHealth((isConnected) => {
-        if (isConnected && isMounted) {
-          invalidatePendingTasks();
-        }
-      });
-    })();
-
-    return () => {
-      isMounted = false;
-      if (channelRef) {
-        void supabase.removeChannel(channelRef);
-      }
-      healthCleanupRef.current?.();
-      healthCleanupRef.current = null;
-    };
-  }, [userId, isEligibleRole, normalizedDepartment, queryClient]);
 
   return useQuery({
     queryKey: createQueryKey.pendingTasks.byUser(userId, normalizedDepartment),
@@ -265,9 +151,10 @@ export function usePendingTasks(userId: string | null, userRole: string | null, 
 
       return Array.from(grouped.values());
     },
-    // Refetch on window focus to catch new assignments
+    // Keep task badges and task modal reasonably fresh without realtime fanout.
     refetchOnWindowFocus: true,
-    // Keep data fresh
-    staleTime: 30000, // 30 seconds
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
+    staleTime: 15000,
   });
 }

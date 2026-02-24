@@ -201,7 +201,13 @@ export function WallboardDisplay({
     if (isApiMode) {
       return;
     }
+    const MIN_REFRESH_INTERVAL_MS = 30000;
+    const REALTIME_DEBOUNCE_MS = 1000;
+    const POLL_INTERVAL_MS = 30000;
     let cancelled = false;
+    let inFlight = false;
+    let pending = false;
+    let lastFetchStartedAt = 0;
     let isFirstLoad = true;
     const fetchAll = async () => {
       const now = new Date();
@@ -584,43 +590,56 @@ export function WallboardDisplay({
         }
       }
     };
+
     let refreshTimer: number | null = null;
-    const scheduleRefresh = () => {
-      if (cancelled || refreshTimer) return;
+    const scheduleRefresh = (delayMs: number = REALTIME_DEBOUNCE_MS) => {
+      if (cancelled) return;
+      if (refreshTimer) return;
       refreshTimer = window.setTimeout(() => {
         refreshTimer = null;
-        fetchAll();
-      }, 300);
+        void runFetch();
+      }, delayMs);
     };
 
-    const channel = supabase
-      .channel('wallboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tours' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_departments' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_documents' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_required_roles' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'timesheets' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_events' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_event_departments' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, scheduleRefresh)
-      .subscribe((status) => {
-        if (import.meta.env.DEV) {
-          console.log('📡 [Wallboard] Realtime status (direct):', status);
-        }
-      });
+    const runFetch = async () => {
+      if (cancelled) return;
 
-    fetchAll();
+      const now = Date.now();
+      const elapsed = now - lastFetchStartedAt;
+      if (elapsed < MIN_REFRESH_INTERVAL_MS) {
+        scheduleRefresh(MIN_REFRESH_INTERVAL_MS - elapsed);
+        return;
+      }
+
+      if (inFlight) {
+        pending = true;
+        return;
+      }
+
+      inFlight = true;
+      lastFetchStartedAt = now;
+      try {
+        await fetchAll();
+      } finally {
+        inFlight = false;
+        if (pending && !cancelled) {
+          pending = false;
+          scheduleRefresh();
+        }
+      }
+    };
+
+    void runFetch();
+    const pollId = window.setInterval(() => {
+      scheduleRefresh(0);
+    }, POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
       if (refreshTimer) {
         window.clearTimeout(refreshTimer);
       }
-      supabase.removeChannel(channel);
+      window.clearInterval(pollId);
     };
   }, [isApiMode]);
 
@@ -628,7 +647,13 @@ export function WallboardDisplay({
     if (!wallboardApiToken) {
       return;
     }
+    const MIN_REFRESH_INTERVAL_MS = 30000;
+    const REALTIME_DEBOUNCE_MS = 1500;
+    const POLL_INTERVAL_MS = 30000;
     let cancelled = false;
+    let inFlight = false;
+    let pending = false;
+    let lastFetchStartedAt = 0;
     const api = new WallboardApi(wallboardApiToken);
 
     const fetchAll = async () => {
@@ -658,42 +683,55 @@ export function WallboardDisplay({
       }
     };
 
-    fetchAll();
     let refreshTimer: number | null = null;
-    const scheduleRefresh = () => {
-      if (cancelled || refreshTimer) return;
+    const scheduleRefresh = (delayMs: number = REALTIME_DEBOUNCE_MS) => {
+      if (cancelled) return;
+      if (refreshTimer) return;
       refreshTimer = window.setTimeout(() => {
         refreshTimer = null;
-        fetchAll();
-      }, 300);
+        void runFetch();
+      }, delayMs);
     };
 
-    const channel = supabase
-      .channel('wallboard-realtime-api')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'jobs' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'tours' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_assignments' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_departments' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_documents' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'job_required_roles' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'timesheets' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'announcements' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_events' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'logistics_event_departments' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, scheduleRefresh)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'locations' }, scheduleRefresh)
-      .subscribe((status) => {
-        if (import.meta.env.DEV) {
-          console.log('📡 [Wallboard] Realtime status (public/API):', status);
+    const runFetch = async () => {
+      if (cancelled) return;
+
+      const now = Date.now();
+      const elapsed = now - lastFetchStartedAt;
+      if (elapsed < MIN_REFRESH_INTERVAL_MS) {
+        scheduleRefresh(MIN_REFRESH_INTERVAL_MS - elapsed);
+        return;
+      }
+
+      if (inFlight) {
+        pending = true;
+        return;
+      }
+
+      inFlight = true;
+      lastFetchStartedAt = now;
+      try {
+        await fetchAll();
+      } finally {
+        inFlight = false;
+        if (pending && !cancelled) {
+          pending = false;
+          scheduleRefresh();
         }
-      });
+      }
+    };
+
+    void runFetch();
+    const pollId = window.setInterval(() => {
+      scheduleRefresh(0);
+    }, POLL_INTERVAL_MS);
 
     return () => {
       cancelled = true;
       if (refreshTimer) {
         window.clearTimeout(refreshTimer);
       }
-      supabase.removeChannel(channel);
+      window.clearInterval(pollId);
     };
   }, [wallboardApiToken, onFatalError]);
 

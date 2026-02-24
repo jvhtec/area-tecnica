@@ -7,7 +7,9 @@ export const queryClient = createOptimizedQueryClient();
 
 // Setup function to initialize React Query with optimizations
 export const setupReactQuery = () => {
-  console.log('Setting up optimized React Query configuration');
+  if (import.meta.env.DEV) {
+    console.log('Setting up optimized React Query configuration');
+  }
   return { queryClient };
 };
 

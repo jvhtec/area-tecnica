@@ -12,6 +12,14 @@ interface DeptSettings {
   reminder_frequency_days: number
 }
 
+const DEFAULT_MAX_JOB_AGE_DAYS = 7
+
+const parsePositiveInt = (raw: string | undefined, fallback: number): number => {
+  const parsed = Number(raw)
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback
+  return Math.floor(parsed)
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -181,9 +189,28 @@ serve(async (req) => {
     }
 
     const now = new Date()
-    const completedJobIds = new Set(
-      allJobs.filter((j) => j.end_time && new Date(j.end_time) < now).map((j) => j.id)
+    // Guardrail: automatic reminders should never target long-expired jobs.
+    // Override via env only if business rules change.
+    const maxJobAgeDays = parsePositiveInt(
+      Deno.env.get('AUTO_REMINDER_MAX_JOB_AGE_DAYS'),
+      DEFAULT_MAX_JOB_AGE_DAYS,
     )
+    const maxJobAgeMs = maxJobAgeDays * 24 * 60 * 60 * 1000
+    const completedRecentJobIds = new Set<string>()
+    const completedExpiredJobIds = new Set<string>()
+    for (const job of allJobs) {
+      if (!job.end_time) continue
+      const endTime = new Date(job.end_time)
+      if (Number.isNaN(endTime.getTime())) continue
+      if (endTime >= now) continue
+
+      const ageMs = now.getTime() - endTime.getTime()
+      if (ageMs <= maxJobAgeMs) {
+        completedRecentJobIds.add(job.id)
+      } else {
+        completedExpiredJobIds.add(job.id)
+      }
+    }
     const jobMap = new Map(allJobs.map((j) => [j.id, j]))
 
     // ─── Fetch technician profiles (chunked) ─────────────────────────────────
@@ -224,6 +251,8 @@ serve(async (req) => {
     let sentCount = 0
     let failCount = 0
     let skippedDept = 0
+    let skippedExpiredJob = 0
+    let skippedNotCompletedJob = 0
     const nowIso = now.toISOString()
 
     // ─── Group timesheets by (technician_id, job_id) ─────────────────────────
@@ -232,10 +261,18 @@ serve(async (req) => {
     type GroupKey = string
     const groups = new Map<GroupKey, typeof timesheets>()
     for (const ts of timesheets) {
-      if (!completedJobIds.has(ts.job_id)) continue
-      const key: GroupKey = `${ts.technician_id}::${ts.job_id}`
-      if (!groups.has(key)) groups.set(key, [])
-      groups.get(key)!.push(ts)
+      if (completedRecentJobIds.has(ts.job_id)) {
+        const key: GroupKey = `${ts.technician_id}::${ts.job_id}`
+        if (!groups.has(key)) groups.set(key, [])
+        groups.get(key)!.push(ts)
+        continue
+      }
+
+      if (completedExpiredJobIds.has(ts.job_id)) {
+        skippedExpiredJob++
+      } else {
+        skippedNotCompletedJob++
+      }
     }
 
     for (const [, groupTimesheets] of groups) {
@@ -483,11 +520,19 @@ serve(async (req) => {
     }
 
     console.log(
-      `Done. sent=${sentCount} failed=${failCount} skipped_dept=${skippedDept}`
+      `Done. sent=${sentCount} failed=${failCount} skipped_dept=${skippedDept} skipped_expired_job=${skippedExpiredJob} skipped_not_completed_job=${skippedNotCompletedJob} max_job_age_days=${maxJobAgeDays}`
     )
 
     return new Response(
-      JSON.stringify({ success: true, sent: sentCount, failed: failCount, skipped_dept: skippedDept }),
+      JSON.stringify({
+        success: true,
+        sent: sentCount,
+        failed: failCount,
+        skipped_dept: skippedDept,
+        skipped_expired_job: skippedExpiredJob,
+        skipped_not_completed_job: skippedNotCompletedJob,
+        max_job_age_days: maxJobAgeDays,
+      }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   } catch (error: unknown) {

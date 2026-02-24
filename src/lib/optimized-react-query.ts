@@ -14,7 +14,9 @@ const createOptimizedQueryOptions = (isLeader: boolean = true): DefaultOptions =
     },
     retryDelay: (attemptIndex) => Math.min(1000 * 1.5 ** attemptIndex, 10000), // Faster backoff
     refetchOnWindowFocus: isLeader, // Only leader refetches on focus
-    refetchOnMount: 'always', // Always refetch on mount for fresh data
+    // Avoid full app-wide refetch storms when navigating between routes.
+    // Leader refetches stale data on mount; follower tabs rely on BroadcastChannel sync.
+    refetchOnMount: isLeader,
     refetchOnReconnect: isLeader, // Only leader refetches on reconnect
     gcTime: 5 * 60 * 1000, // 5 minutes - reduced from 10 minutes
     networkMode: 'online', // Only make requests when online
@@ -49,7 +51,9 @@ export const createOptimizedQueryClient = (isLeader: boolean = true) => {
     
     // Check if this query is already pending
     if (pendingQueries.has(queryKey)) {
-      console.log(`Deduplicating query: ${queryKey}`);
+      if (import.meta.env.DEV) {
+        console.log(`Deduplicating query: ${queryKey}`);
+      }
       return pendingQueries.get(queryKey)!;
     }
 

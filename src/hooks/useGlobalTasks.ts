@@ -1,11 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import {
-  checkNetworkConnection,
-  ensureRealtimeConnection,
-  monitorConnectionHealth,
-} from '@/lib/enhanced-supabase-client';
 
 type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 
@@ -88,8 +82,6 @@ export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTas
   const dept: Dept = department && TASK_TABLE[department] ? department : 'sound';
   const table = TASK_TABLE[dept];
   const docFk = DOC_FK[dept];
-  const queryClient = useQueryClient();
-  const healthCleanupRef = useRef<(() => void) | null>(null);
 
   const query = useQuery({
     queryKey: ['global-tasks', dept, filters],
@@ -125,58 +117,11 @@ export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTas
       if (error) throw error;
       return (data || []) as GlobalTask[];
     },
+    refetchOnWindowFocus: true,
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
+    staleTime: 15000,
   });
-
-  // Invalidate by query-key prefix so the *current* filter combination is
-  // always refreshed, regardless of which filters were active when the
-  // subscription was created.
-  // Also monitors connection health and ensures reconnection.
-  useEffect(() => {
-    let isMounted = true;
-    let channelRef: ReturnType<typeof supabase.channel> | undefined;
-
-    // Check network and ensure realtime connection before subscribing
-    (async () => {
-      const isOnline = await checkNetworkConnection();
-      if (!isOnline || !isMounted) return;
-
-      await ensureRealtimeConnection();
-      if (!isMounted) return;
-
-      const channel = supabase
-        .channel(`rtm-global-${table}`)
-        .on('postgres_changes', { event: '*', schema: 'public', table }, () => {
-          queryClient.invalidateQueries({ queryKey: ['global-tasks', dept] });
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'task_documents' }, () => {
-          queryClient.invalidateQueries({ queryKey: ['global-tasks', dept] });
-        })
-        .subscribe();
-
-      // If unmount happened while awaiting, clean up immediately
-      if (!isMounted) {
-        void supabase.removeChannel(channel);
-        return;
-      }
-
-      channelRef = channel;
-
-      // Monitor connection health and refetch on reconnection
-      healthCleanupRef.current = monitorConnectionHealth((isConnected) => {
-        if (isConnected && isMounted) {
-          queryClient.invalidateQueries({ queryKey: ['global-tasks', dept] });
-        }
-      });
-    })();
-
-    return () => {
-      isMounted = false;
-      if (channelRef) {
-        void supabase.removeChannel(channelRef);
-      }
-      healthCleanupRef.current?.();
-    };
-  }, [table, dept, queryClient]);
 
   return {
     tasks: query.data || [],

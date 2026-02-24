@@ -18,9 +18,7 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
   '/dashboard': [
     { table: 'jobs', priority: 'high' }, 
     { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_date_types', priority: 'medium' }, 
-    { table: 'messages', priority: 'medium' }, 
-    { table: 'direct_messages', priority: 'medium' }
+    { table: 'job_date_types', priority: 'medium' }
   ],
   
   // Department-specific routes
