@@ -64,7 +64,7 @@ export const useOptimizedJobs = (
           assignment_date,
           status,
           assigned_at,
-          profiles!inner(
+          profiles!job_assignments_technician_id_fkey!inner(
             id,
             first_name,
             nickname,
