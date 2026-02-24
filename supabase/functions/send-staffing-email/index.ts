@@ -974,10 +974,20 @@ serve(async (req) => {
         }
         const chatId = norm.value.replace(/^\+/, '').replace(/\D/g, '') + '@c.us';
         const basePayload = { chatId, text, linkPreview: false } as const;
-        const attempts = [
+        // WAHA deployments can differ by version/proxy. Try multiple compatible variants.
+        const attemptCandidates = [
           { url: `${base}/api/${encodeURIComponent(session)}/sendText`, body: { ...basePayload } },
           { url: `${base}/api/sendText`, body: { ...basePayload, session } },
+          { url: `${base}/api/sendText?session=${encodeURIComponent(session)}`, body: { ...basePayload } },
+          { url: `${base}/api/sendText`, body: { ...basePayload } },
         ] as const;
+        const seenAttempts = new Set<string>();
+        const attempts = attemptCandidates.filter((candidate) => {
+          const key = `${candidate.url}|${JSON.stringify(candidate.body)}`;
+          if (seenAttempts.has(key)) return false;
+          seenAttempts.add(key);
+          return true;
+        });
 
         // Timeouts and helpers
         const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
