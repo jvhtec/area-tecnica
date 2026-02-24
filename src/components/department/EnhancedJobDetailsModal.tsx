@@ -104,7 +104,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
           sound_role,
           lights_role,
           video_role,
-          technician:profiles(id, first_name, last_name, email)
+          technician:profiles!job_assignments_technician_id_fkey(id, first_name, last_name, email)
         `)
                 .eq('job_id', job.id)
                 .eq('status', 'confirmed');

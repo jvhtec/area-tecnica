@@ -147,7 +147,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
               assignment_date,
               assigned_at,
               assigned_by,
-              profiles (
+              profiles!job_assignments_technician_id_fkey (
                 first_name,
                 last_name,
                 email,

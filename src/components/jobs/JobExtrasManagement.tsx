@@ -37,7 +37,7 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
         .from('job_assignments')
         .select(`
           technician_id,
-          profiles:technician_id (
+          profiles!job_assignments_technician_id_fkey (
             first_name,
             last_name,
             role,

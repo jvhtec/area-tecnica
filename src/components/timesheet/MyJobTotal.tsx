@@ -28,7 +28,7 @@ export function MyJobTotal({ jobId, filterTechnicianId }: MyJobTotalProps) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_assignments')
-        .select(`technician_id, profiles:technician_id ( first_name, last_name )`)
+        .select(`technician_id, profiles!job_assignments_technician_id_fkey ( first_name, last_name )`)
         .eq('job_id', jobId);
       if (error) throw error;
       return data || [];

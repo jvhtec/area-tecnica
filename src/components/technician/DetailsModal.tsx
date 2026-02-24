@@ -76,7 +76,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
           sound_role,
           lights_role,
           video_role,
-          technician:profiles(id, first_name, last_name, email, profile_picture_url)
+          technician:profiles!job_assignments_technician_id_fkey(id, first_name, last_name, email, profile_picture_url)
         `)
                 .eq('job_id', job.id)
                 .eq('status', 'confirmed');

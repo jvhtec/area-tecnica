@@ -31,7 +31,7 @@ export const useOptimisticJobManagement = (
           sound_role,
           lights_role,
           video_role,
-          profiles(
+          profiles!job_assignments_technician_id_fkey(
             first_name,
             last_name
           )
