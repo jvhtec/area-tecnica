@@ -529,7 +529,6 @@ export function JobCardNewView({
               onAssignmentChange={() => {}}
               jobId={job.id}
               department={department as Department}
-              disableCategorySync={isProjectManagementPage}
             />
           )}
 

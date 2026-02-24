@@ -45,6 +45,7 @@ import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignmen
 import { checkTimeConflictEnhanced, ConflictCheckResult } from '@/utils/technicianAvailability';
 import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment';
+import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 
 interface AssignJobDialogProps {
   open: boolean;
@@ -556,6 +557,19 @@ export const AssignJobDialog = ({
       if (verifyErr) throw verifyErr;
       if (!verifyData || verifyData.length === 0) {
         throw new Error('La asignación no se guardó');
+      }
+
+      try {
+        await syncTimesheetCategoriesForAssignment({
+          jobId: selectedJobId,
+          technicianId,
+          soundRole: basePayload.sound_role,
+          lightsRole: basePayload.lights_role,
+          videoRole: basePayload.video_role,
+        });
+      } catch (syncError) {
+        console.error('Error syncing timesheet category after assignment update:', syncError);
+        toast.error('La asignación se guardó, pero no se pudo sincronizar la categoría de partes');
       }
 
       console.log('Assignment created successfully, now handling Flex crew assignments...');

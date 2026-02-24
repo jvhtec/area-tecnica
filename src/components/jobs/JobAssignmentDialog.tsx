@@ -48,8 +48,8 @@ import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
-import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
+import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 
 interface JobAssignmentDialogProps {
   isOpen: boolean;
@@ -89,26 +89,13 @@ const syncTimesheetCategories = async (jobId: string, technicianId: string) => {
       return;
     }
 
-    // Calculate the new category based on all roles
-    const newCategory = getCategoryFromAssignment(assignment);
-
-    if (!newCategory) {
-      console.warn('Could not determine category from assignment roles');
-      return;
-    }
-
-    // Update all timesheets for this job/technician with the new category
-    const { error: updateError } = await supabase
-      .from('timesheets')
-      .update({ category: newCategory })
-      .eq('job_id', jobId)
-      .eq('technician_id', technicianId)
-      .eq('is_active', true);
-
-    if (updateError) {
-      console.error('Error updating timesheet categories:', updateError);
-      throw updateError;
-    }
+    await syncTimesheetCategoriesForAssignment({
+      jobId,
+      technicianId,
+      soundRole: assignment.sound_role,
+      lightsRole: assignment.lights_role,
+      videoRole: assignment.video_role,
+    });
 
   } catch (error) {
     console.error('Error in syncTimesheetCategories:', error);

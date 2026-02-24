@@ -18,14 +18,16 @@ import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { createQueryKey } from "@/lib/optimized-react-query";
-import { downloadPayoutDueGroupPdf } from "@/utils/payout-due-pdf";
 
 const MADRID_TIMEZONE = "Europe/Madrid";
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
-const LOOKBACK_DAYS = 365;
 const LOOKAHEAD_DAYS = 120;
+const PAYOUT_TO_SERVICE_LOOKBACK_DAYS = 90;
+const PAYOUT_TO_SERVICE_LOOKAHEAD_DAYS = 45;
 // Keep URL length safely below PostgREST/proxy limits when using `.in(...)` filters.
-const FILTER_CHUNK_SIZE = 25;
+const FILTER_CHUNK_SIZE = 60;
+const MAX_PARALLEL_CHUNKS = 6;
+const MAX_TECH_IDS_IN_QUERY_FILTER = 100;
 
 interface JobLite {
   id: string;
@@ -100,6 +102,11 @@ interface PayoutEstimate {
   toDate: Date;
 }
 
+interface FetchFortnightPayoutsDueParams {
+  payoutFromInput: string;
+  payoutToInput: string;
+}
+
 type SortColumn =
   | "technicianName"
   | "department"
@@ -117,6 +124,24 @@ function chunkArray<T>(items: T[], size: number): T[][] {
     chunks.push(items.slice(index, index + size));
   }
   return chunks;
+}
+
+async function fetchInChunks<T>(
+  ids: string[],
+  fetchChunk: (chunk: string[]) => Promise<T[]>
+): Promise<T[]> {
+  if (ids.length === 0) return [];
+
+  const chunks = chunkArray(ids, FILTER_CHUNK_SIZE);
+  const results: T[][] = [];
+
+  for (let index = 0; index < chunks.length; index += MAX_PARALLEL_CHUNKS) {
+    const batch = chunks.slice(index, index + MAX_PARALLEL_CHUNKS);
+    const batchResults = await Promise.all(batch.map((chunk) => fetchChunk(chunk)));
+    results.push(...batchResults);
+  }
+
+  return results.flat();
 }
 
 function formatCurrency(amount: number): string {
@@ -344,10 +369,18 @@ function isInvoiceApplicable(isHouseTech: boolean, isAutonomo: boolean | null): 
   return !isHouseTech && isAutonomo === true;
 }
 
-async function fetchFortnightPayoutsDue(): Promise<DueData> {
+async function fetchFortnightPayoutsDue({
+  payoutFromInput,
+  payoutToInput,
+}: FetchFortnightPayoutsDueParams): Promise<DueData> {
   const generatedAt = new Date();
-  const windowFrom = subDays(generatedAt, LOOKBACK_DAYS);
-  const windowTo = addDays(generatedAt, LOOKAHEAD_DAYS);
+  const payoutFrom = parseDateInputValue(payoutFromInput, false);
+  const payoutTo = parseDateInputValue(payoutToInput, true);
+
+  const safePayoutFrom = payoutFrom ?? generatedAt;
+  const safePayoutTo = payoutTo ?? addDays(generatedAt, LOOKAHEAD_DAYS);
+  const windowFrom = subDays(safePayoutFrom, PAYOUT_TO_SERVICE_LOOKBACK_DAYS);
+  const windowTo = addDays(safePayoutTo, PAYOUT_TO_SERVICE_LOOKAHEAD_DAYS);
 
   const { data: jobsData, error: jobsError } = await supabase
     .from("jobs")
@@ -363,8 +396,7 @@ async function fetchFortnightPayoutsDue(): Promise<DueData> {
   }
 
   const jobIds = jobs.map((job) => job.id);
-  const payouts: PayoutLite[] = [];
-  for (const jobIdChunk of chunkArray(jobIds, FILTER_CHUNK_SIZE)) {
+  const payouts = await fetchInChunks<PayoutLite>(jobIds, async (jobIdChunk) => {
     const { data: payoutsData, error: payoutsError } = await supabase
       .from("v_job_tech_payout_2025")
       .select("job_id, technician_id, total_eur")
@@ -372,8 +404,8 @@ async function fetchFortnightPayoutsDue(): Promise<DueData> {
       .gt("total_eur", 0);
 
     if (payoutsError) throw payoutsError;
-    payouts.push(...((payoutsData ?? []) as PayoutLite[]));
-  }
+    return (payoutsData ?? []) as PayoutLite[];
+  });
 
   const validPayouts = payouts.filter(
     (row) => !!row.job_id && !!row.technician_id && Number(row.total_eur ?? 0) > 0
@@ -386,47 +418,60 @@ async function fetchFortnightPayoutsDue(): Promise<DueData> {
   const technicianIds = Array.from(
     new Set(validPayouts.map((row) => row.technician_id).filter((value): value is string => !!value))
   );
+  const relevantJobIds = Array.from(
+    new Set(validPayouts.map((row) => row.job_id).filter((value): value is string => !!value))
+  );
   const technicianSet = new Set(technicianIds);
   const payoutPairSet = new Set(
     validPayouts.map((row) => `${row.job_id as string}:${row.technician_id as string}`)
   );
+  const shouldFilterTechniciansInQuery =
+    technicianIds.length > 0 && technicianIds.length <= MAX_TECH_IDS_IN_QUERY_FILTER;
 
-  const timesheetsRaw: TimesheetLite[] = [];
-  for (const jobIdChunk of chunkArray(jobIds, FILTER_CHUNK_SIZE)) {
-    const { data: timesheetsData, error: timesheetsError } = await supabase
-      .from("timesheets")
-      .select("job_id, technician_id, date")
-      .in("job_id", jobIdChunk)
-      .eq("approved_by_manager", true);
+  const [timesheetsRaw, profiles, assignmentsRaw] = await Promise.all([
+    fetchInChunks<TimesheetLite>(relevantJobIds, async (jobIdChunk) => {
+      let query = supabase
+        .from("timesheets")
+        .select("job_id, technician_id, date")
+        .in("job_id", jobIdChunk)
+        .eq("approved_by_manager", true);
+      if (shouldFilterTechniciansInQuery) {
+        query = query.in("technician_id", technicianIds);
+      }
 
-    if (timesheetsError) throw timesheetsError;
-    timesheetsRaw.push(...((timesheetsData ?? []) as TimesheetLite[]));
-  }
+      const { data: timesheetsData, error: timesheetsError } = await query;
+
+      if (timesheetsError) throw timesheetsError;
+      return (timesheetsData ?? []) as TimesheetLite[];
+    }),
+    fetchInChunks<ProfileLite>(technicianIds, async (techIdChunk) => {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, department, role, autonomo")
+        .in("id", techIdChunk);
+
+      if (profilesError) throw profilesError;
+      return (profilesData ?? []) as ProfileLite[];
+    }),
+    fetchInChunks<JobAssignmentInvoiceLite>(relevantJobIds, async (jobIdChunk) => {
+      let query = supabase
+        .from("job_assignments")
+        .select("job_id, technician_id, invoice_received_at, invoice_received_by")
+        .in("job_id", jobIdChunk);
+      if (shouldFilterTechniciansInQuery) {
+        query = query.in("technician_id", technicianIds);
+      }
+
+      const { data: assignmentsData, error: assignmentsError } = await query;
+
+      if (assignmentsError) throw assignmentsError;
+      return (assignmentsData ?? []) as JobAssignmentInvoiceLite[];
+    }),
+  ]);
+
   const timesheets = timesheetsRaw.filter(
     (row) => !!row.technician_id && technicianSet.has(row.technician_id)
   );
-
-  const profiles: ProfileLite[] = [];
-  for (const techIdChunk of chunkArray(technicianIds, FILTER_CHUNK_SIZE)) {
-    const { data: profilesData, error: profilesError } = await supabase
-      .from("profiles")
-      .select("id, first_name, last_name, department, role, autonomo")
-      .in("id", techIdChunk);
-
-    if (profilesError) throw profilesError;
-    profiles.push(...((profilesData ?? []) as ProfileLite[]));
-  }
-
-  const assignmentsRaw: JobAssignmentInvoiceLite[] = [];
-  for (const jobIdChunk of chunkArray(jobIds, FILTER_CHUNK_SIZE)) {
-    const { data: assignmentsData, error: assignmentsError } = await supabase
-      .from("job_assignments")
-      .select("job_id, technician_id, invoice_received_at, invoice_received_by")
-      .in("job_id", jobIdChunk);
-
-    if (assignmentsError) throw assignmentsError;
-    assignmentsRaw.push(...((assignmentsData ?? []) as JobAssignmentInvoiceLite[]));
-  }
 
   const jobsById = new Map(jobs.map((job) => [job.id, job]));
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile]));
@@ -451,6 +496,11 @@ async function fetchFortnightPayoutsDue(): Promise<DueData> {
     serviceDatesByKey.set(key, existing);
   }
 
+  for (const [key, dates] of serviceDatesByKey.entries()) {
+    dates.sort((a, b) => a.getTime() - b.getTime());
+    serviceDatesByKey.set(key, dates);
+  }
+
   const groupsByKey = new Map<string, DueGroup>();
 
   for (const row of validPayouts) {
@@ -461,9 +511,7 @@ async function fetchFortnightPayoutsDue(): Promise<DueData> {
 
     const job = jobsById.get(jobId);
     const serviceKey = `${jobId}:${technicianId}`;
-    const serviceDates = [...(serviceDatesByKey.get(serviceKey) ?? [])].sort(
-      (a, b) => a.getTime() - b.getTime()
-    );
+    const serviceDates = serviceDatesByKey.get(serviceKey) ?? [];
     const fallbackDate = parseServiceDate(job?.start_time ?? null);
     const estimateSourceDates = serviceDates.length > 0 ? serviceDates : fallbackDate ? [fallbackDate] : [];
     if (estimateSourceDates.length === 0) continue;
@@ -525,6 +573,10 @@ export default function PayoutsDueFortnights() {
   const queryClient = useQueryClient();
   const { user, userRole, userDepartment } = useOptimizedAuth();
   const todayInput = formatDateInputValue(new Date());
+  const defaultToInput = useMemo(
+    () => formatDateInputValue(addDays(new Date(), LOOKAHEAD_DAYS)),
+    []
+  );
   const [searchText, setSearchText] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
   const [fromDateFilter, setFromDateFilter] = useState(todayInput);
@@ -535,6 +587,8 @@ export default function PayoutsDueFortnights() {
   const [updatingInvoiceKeys, setUpdatingInvoiceKeys] = useState<Record<string, boolean>>({});
 
   const normalizedDepartment = normalizeDepartmentKey(userDepartment);
+  const queryFromInput = fromDateFilter || todayInput;
+  const queryToInput = toDateFilter || defaultToInput;
   const canManageInvoice =
     userRole === "admin" ||
     (userRole === "management" &&
@@ -547,9 +601,14 @@ export default function PayoutsDueFortnights() {
     error,
     refetch,
   } = useQuery({
-    queryKey: createQueryKey.payoutDueFortnights.all,
-    queryFn: fetchFortnightPayoutsDue,
+    queryKey: [...createQueryKey.payoutDueFortnights.all, queryFromInput, queryToInput],
+    queryFn: () =>
+      fetchFortnightPayoutsDue({
+        payoutFromInput: queryFromInput,
+        payoutToInput: queryToInput,
+      }),
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const invoiceMutation = useMutation({
@@ -704,6 +763,7 @@ export default function PayoutsDueFortnights() {
     const paymentWindow = getSuggestedPaymentWindow(group.startDate);
     setPrintingGroupKey(group.key);
     try {
+      const { downloadPayoutDueGroupPdf } = await import("@/utils/payout-due-pdf");
       await downloadPayoutDueGroupPdf({
         paymentFrom: paymentWindow.fromDate,
         paymentTo: paymentWindow.toDate,
