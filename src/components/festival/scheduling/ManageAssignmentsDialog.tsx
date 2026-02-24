@@ -79,12 +79,12 @@ export const ManageAssignmentsDialog = ({
         .from("job_assignments")
         .select(`
           technician_id,
-          profiles (
-            id, 
-            first_name, 
-            last_name, 
-            email, 
-            department, 
+          profiles!job_assignments_technician_id_fkey (
+            id,
+            first_name,
+            last_name,
+            email,
+            department,
             role
           )
         `)

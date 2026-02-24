@@ -75,7 +75,7 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
         .from('job_assignments')
         .select(`
           *,
-          profiles (
+          profiles!job_assignments_technician_id_fkey (
             first_name,
             nickname,
             last_name,
