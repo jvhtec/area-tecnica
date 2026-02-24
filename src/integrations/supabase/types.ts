@@ -3066,20 +3066,6 @@ export type Database = {
             referencedColumns: ["job_id"]
           },
           {
-            foreignKeyName: "job_assignments_invoice_received_by_fkey"
-            columns: ["invoice_received_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "job_assignments_invoice_received_by_fkey"
-            columns: ["invoice_received_by"]
-            isOneToOne: false
-            referencedRelation: "wallboard_profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "job_assignments_technician_id_fkey"
             columns: ["technician_id"]
             isOneToOne: false
