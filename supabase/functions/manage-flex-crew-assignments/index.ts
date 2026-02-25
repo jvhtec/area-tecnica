@@ -175,6 +175,14 @@ serve(async (req) => {
 
     const { job_id, technician_id, department, action } = await req.json() as RequestBody;
     const actorId = await resolveActorId(supabase, req);
+    
+    // Require authenticated actor for write operations
+    if (!actorId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log(`Managing Flex crew assignment: ${action} technician ${technician_id} for job ${job_id} in department ${department}`);
 
