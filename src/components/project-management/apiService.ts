@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { onFlexTokenInvalidate } from "@/utils/flexTokenCache";
 
 export interface CreateLaborPORequest {
   name: string;
@@ -100,6 +101,7 @@ interface ProjectHeaderResponse {
 }
 
 let cachedToken: string | null = null;
+onFlexTokenInvalidate(() => { cachedToken = null; });
 
 const getAuthToken = async () => {
   if (cachedToken) return cachedToken;

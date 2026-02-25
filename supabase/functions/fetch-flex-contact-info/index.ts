@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveFlexAuthToken } from "../_shared/flexAuthToken.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,17 +40,8 @@ serve(async (req: Request) => {
     const cid = body.contact_id || (body.url ? extractUuid(body.url) : null);
     if (!cid) return new Response(JSON.stringify({ error: 'Missing contact_id or url' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    // Resolve Flex auth token
-    let flexAuthToken = Deno.env.get("X_AUTH_TOKEN") || "";
-    if (!flexAuthToken) {
-      try {
-        const { data: secretData } = await supabase.functions.invoke('get-secret', {
-          body: { secretName: 'X_AUTH_TOKEN' },
-          headers: { Authorization: authHeader }
-        });
-        if (secretData?.X_AUTH_TOKEN) flexAuthToken = secretData.X_AUTH_TOKEN as string;
-      } catch (_) {}
-    }
+    // Resolve Flex auth token (per-user key with global fallback)
+    const flexAuthToken = await resolveFlexAuthToken(supabase, user.id);
     if (!flexAuthToken) return new Response(JSON.stringify({ error: 'Flex auth not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     // Call Flex key-info

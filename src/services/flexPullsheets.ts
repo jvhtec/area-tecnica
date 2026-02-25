@@ -1,8 +1,10 @@
 import { supabase } from '@/integrations/supabase/client';
 import { FLEX_API_BASE_URL } from '@/lib/api-config';
 import type { PresetSubsystem } from '@/types/equipment';
+import { onFlexTokenInvalidate } from '@/utils/flexTokenCache';
 
 let cachedFlexToken: string | null = null;
+onFlexTokenInvalidate(() => { cachedFlexToken = null; });
 
 // Material de sonido is a root-only grouping in Flex and intentionally omitted here.
 export const FLEX_CATEGORY_MAP = new Map<string, string>([

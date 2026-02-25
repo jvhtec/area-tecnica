@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { FlexFolderPayload, FlexFolderResponse } from "./types";
 import { getFlexApiBaseUrl } from "./config";
+import { onFlexTokenInvalidate } from "@/utils/flexTokenCache";
 
 /**
  * Error response from Flex API
@@ -10,6 +11,7 @@ interface FlexApiError {
 }
 
 let cachedFlexToken: string | null = null;
+onFlexTokenInvalidate(() => { cachedFlexToken = null; });
 
 /**
  * Gets the Flex authentication token from Supabase secrets

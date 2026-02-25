@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { onFlexTokenInvalidate } from "@/utils/flexTokenCache";
 
 /**
  * Types for Flex element tree structure
@@ -28,6 +29,7 @@ export interface FlatElementNode {
 }
 
 let cachedFlexToken: string | null = null;
+onFlexTokenInvalidate(() => { cachedFlexToken = null; });
 
 /**
  * Gets the Flex authentication token from Supabase secrets

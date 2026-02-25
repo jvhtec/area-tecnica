@@ -4957,7 +4957,7 @@ export type Database = {
           dni: string | null
           email: string
           first_name: string | null
-          flex_id: string | null
+          flex_api_key: string | null
           flex_resource_id: string | null
           flex_user_id: string | null
           id: string
@@ -4990,7 +4990,7 @@ export type Database = {
           dni?: string | null
           email: string
           first_name?: string | null
-          flex_id?: string | null
+          flex_api_key?: string | null
           flex_resource_id?: string | null
           flex_user_id?: string | null
           id: string
@@ -5023,7 +5023,7 @@ export type Database = {
           dni?: string | null
           email?: string
           first_name?: string | null
-          flex_id?: string | null
+          flex_api_key?: string | null
           flex_resource_id?: string | null
           flex_user_id?: string | null
           id?: string

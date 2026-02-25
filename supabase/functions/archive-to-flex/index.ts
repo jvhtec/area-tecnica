@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveFlexAuthToken } from "../_shared/flexAuthToken.ts";
 
 type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comercial" | "logistics" | "administrative";
 
@@ -35,7 +36,8 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 // Flex API config
 const FLEX_API_BASE_URL = Deno.env.get("FLEX_API_BASE_URL") || "https://sectorpro.flexrentalsolutions.com/f5/api";
-const FLEX_AUTH_TOKEN = Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
+// Resolved per-request via resolveFlexAuthToken (per-user key with global fallback)
+let FLEX_AUTH_TOKEN = Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -349,6 +351,17 @@ serve(async (req) => {
   const explicitDepts = (body.departments || []) as Dept[];
 
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+  // Resolve per-user Flex API token
+  let actorId: string | null = null;
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const { data } = await sb.auth.getUser(authHeader.replace("Bearer ", ""));
+      actorId = data.user?.id ?? null;
+    }
+  } catch (_) { /* ignore */ }
+  FLEX_AUTH_TOKEN = await resolveFlexAuthToken(sb, actorId);
 
   // Load selected departments for the job (used for better defaults)
   async function getJobSelectedDepartments(): Promise<Dept[]> {

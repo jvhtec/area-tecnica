@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { resolveFlexAuthToken } from '../_shared/flexAuthToken.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,9 +22,7 @@ serve(async (req) => {
     // Initialize Supabase client for authentication
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const authToken = Deno.env.get('X_AUTH_TOKEN')
-    
-    if (!supabaseUrl || !supabaseKey || !authToken) {
+    if (!supabaseUrl || !supabaseKey) {
       throw new Error('Missing required environment variables')
     }
 
@@ -41,6 +40,12 @@ serve(async (req) => {
 
     if (authError || !user) {
       throw new Error('Invalid authentication')
+    }
+
+    // Resolve Flex API token (per-user key with global fallback)
+    const authToken = await resolveFlexAuthToken(supabase, user.id)
+    if (!authToken) {
+      throw new Error('No Flex API token available')
     }
 
     // Parse request body

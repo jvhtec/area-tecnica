@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { FLEX_API_BASE_URL } from '@/lib/api-config';
 import { FLEX_FOLDER_IDS } from './flex-folders/constants';
+import { onFlexTokenInvalidate } from '@/utils/flexTokenCache';
 
 export const FLEX_UI_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
 
@@ -124,6 +125,7 @@ interface SchemaResolution {
 
 let cachedFlexToken: string | null = null;
 let pendingTokenPromise: Promise<string> | null = null;
+onFlexTokenInvalidate(() => { cachedFlexToken = null; pendingTokenPromise = null; });
 
 function coerceString(value: unknown): string | undefined {
   if (typeof value === 'string') {

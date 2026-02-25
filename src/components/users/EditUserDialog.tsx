@@ -37,6 +37,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const [residencia, setResidencia] = useState<string>(user?.residencia || "");
   const [homeLatitude, setHomeLatitude] = useState<number | null>(user?.home_latitude ?? null);
   const [homeLongitude, setHomeLongitude] = useState<number | null>(user?.home_longitude ?? null);
+  const [flexApiKey, setFlexApiKey] = useState<string>(user?.flex_api_key || "");
   const [bgColor, setBgColor] = useState<string>(user?.bg_color || "");
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(user?.profile_picture_url || null);
 
@@ -45,6 +46,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     const forceSoundvisionForHouseTech = user?.department === 'sound' && user?.role === 'house_tech';
     setSoundvisionAccessEnabled(forceSoundvisionForHouseTech ? true : !!user?.soundvision_access_enabled);
     setFlexResourceId(user?.flex_resource_id || "");
+    setFlexApiKey(user?.flex_api_key || "");
     setFlexUrl("");
     setIsAutonomo(user?.autonomo !== false);
     setResidencia(user?.residencia || "");
@@ -99,6 +101,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       role: formData.get('role') as string,
       assignable_as_tech: assignableAsTech,
       flex_resource_id: (formData.get('flex_resource_id') as string || flexResourceId || '').trim() || null,
+      flex_api_key: flexApiKey.trim() || null,
       soundvision_access_enabled: forceSoundvisionAccess ? true : soundvisionAccessEnabled,
       autonomo: isAutonomo,
     };
@@ -271,6 +274,23 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                     Example URL: https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop#contact/4b0d98e0-e700-11ea-97d0-2a0a4490a7fb/phone
                   </p>
                 </div>
+              </div>
+            )}
+            {/* Flex API Key - only for admin/management users */}
+            {isManagementUser && ['admin', 'management'].includes(user?.role || '') && (
+              <div className="space-y-2">
+                <Label htmlFor="flex_api_key">Flex API Key (X-Auth-Token)</Label>
+                <Input
+                  id="flex_api_key"
+                  type="password"
+                  placeholder="Clave API personal de Flex (opcional)"
+                  value={flexApiKey}
+                  onChange={(e) => setFlexApiKey(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Si se configura, las operaciones de Flex de este usuario usarán esta clave en vez de la global.
+                  Esto ayuda a distribuir las llamadas API y evitar el límite de 2000/hora.
+                </p>
               </div>
             )}
             <div className="space-y-2">

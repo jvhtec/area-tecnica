@@ -46,10 +46,10 @@ serve(async (req) => {
       throw new Error('Invalid authentication')
     }
 
-    // Check if user has admin or management role
+    // Check if user has admin or management role (also fetch flex_api_key for per-user Flex token)
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, flex_api_key')
       .eq('id', user.id)
       .single()
 
@@ -70,6 +70,18 @@ serve(async (req) => {
         JSON.stringify({ error: `Secret ${secretName} not allowed` }),
         {
           status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // For X_AUTH_TOKEN (Flex API key), check if the user has a personal key first
+    if (secretName === 'X_AUTH_TOKEN' && profile.flex_api_key) {
+      console.log(`Using per-user Flex API key for user ${user.id}`);
+      return new Response(
+        JSON.stringify({ [secretName]: profile.flex_api_key }),
+        {
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
