@@ -106,7 +106,10 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       autonomo: isAutonomo,
     };
 
-    console.log("Submitting user update with data:", updatedData);
+    console.log("Submitting user update with data:", {
+      ...updatedData,
+      flex_api_key: updatedData.flex_api_key ? '[REDACTED]' : null,
+    });
     onSave(updatedData);
   };
 
@@ -279,7 +282,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
             {/* Flex API Key - only for admin/management users */}
             {isManagementUser && ['admin', 'management'].includes(user?.role || '') && (
               <div className="space-y-2">
-                <Label htmlFor="flex_api_key">Flex API Key (X-Auth-Token)</Label>
+                <Label htmlFor="flex_api_key">Clave API de Flex (X-Auth-Token)</Label>
                 <Input
                   id="flex_api_key"
                   type="password"

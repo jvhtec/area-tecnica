@@ -14,7 +14,11 @@ export function FlexApiKeySettings() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId) {
+      setApiKey("");
+      setIsLoading(false);
+      return;
+    }
     let cancelled = false;
 
     (async () => {

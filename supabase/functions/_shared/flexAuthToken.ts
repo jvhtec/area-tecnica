@@ -7,8 +7,19 @@
  * This distributes Flex API calls across multiple keys so a single key
  * doesn't hit the 2000-calls/hour rate limit under heavy load.
  */
+
+type SupabaseFrom = {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: unknown) => {
+        single: () => Promise<{ data: { flex_api_key?: string } | null; error: unknown }>;
+      };
+    };
+  };
+};
+
 export async function resolveFlexAuthToken(
-  supabase: { from: (table: string) => any },
+  supabase: SupabaseFrom,
   userId: string | null
 ): Promise<string> {
   // Try per-user key first
