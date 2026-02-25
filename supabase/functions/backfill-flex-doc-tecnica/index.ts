@@ -7,8 +7,6 @@ type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comerci
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const FLEX_API_BASE_URL = Deno.env.get("FLEX_API_BASE_URL") || "https://sectorpro.flexrentalsolutions.com/f5/api";
-// Resolved per-request via resolveFlexAuthToken (per-user key with global fallback)
-let FLEX_AUTH_TOKEN = Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -35,14 +33,14 @@ function normalize(str: string): string {
 
 const DEF_ID_DOCUMENTACION_TECNICA = "3787806c-af2d-11df-b8d5-00e08175e43e";
 
-async function fetchElementTree(elementId: string): Promise<any[]> {
-  if (!FLEX_AUTH_TOKEN) throw new Error('Missing FLEX auth token');
+async function fetchElementTree(elementId: string, flexAuthToken: string): Promise<any[]> {
+  if (!flexAuthToken) throw new Error('Missing FLEX auth token');
   const r = await fetch(`${FLEX_API_BASE_URL}/element/${encodeURIComponent(elementId)}/tree`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
-      'X-Auth-Token': FLEX_AUTH_TOKEN,
-      'apikey': FLEX_AUTH_TOKEN,
+      'X-Auth-Token': flexAuthToken,
+      'apikey': flexAuthToken,
       'accept': '*/*',
     }
   });
@@ -169,7 +167,7 @@ serve(async (req) => {
       actorId = data.user?.id ?? null;
     }
   } catch (_) { /* ignore */ }
-  FLEX_AUTH_TOKEN = await resolveFlexAuthToken(sb, actorId);
+  const flexAuthToken = await resolveFlexAuthToken(sb, actorId);
 
   // 1) Candidate roots: department folders, tour-level folders per dept, and main job element
   const { data: deptRows } = await sb
@@ -244,7 +242,7 @@ serve(async (req) => {
 
   for (const row of candidates) {
     try {
-      const tree = await fetchElementTree(row.elementId as string);
+      const tree = await fetchElementTree(row.elementId as string, flexAuthToken);
       let docIds: string[] = [];
       if (row.dept) {
         // Prefer department-targeted discovery
