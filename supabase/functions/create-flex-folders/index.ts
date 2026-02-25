@@ -154,6 +154,15 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey)
     const actorId = await resolveActorId(supabase, req)
+    
+    // Require authenticated actor for folder creation
+    if (!actorId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - authentication required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
+    
     const authToken = await resolveFlexAuthToken(supabase, actorId)
     if (!authToken) {
       throw new Error('No Flex API token available')
