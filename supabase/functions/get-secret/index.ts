@@ -77,7 +77,7 @@ serve(async (req) => {
 
     // For X_AUTH_TOKEN (Flex API key), check if the user has a personal key first
     if (secretName === 'X_AUTH_TOKEN' && profile.flex_api_key) {
-      console.log(`Using per-user Flex API key for user ${user.id}`);
+      console.log('Using per-user Flex API key');
       return new Response(
         JSON.stringify({ [secretName]: profile.flex_api_key }),
         {

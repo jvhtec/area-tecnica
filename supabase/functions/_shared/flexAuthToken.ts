@@ -42,8 +42,11 @@ export async function resolveFlexAuthToken(
   // Fallback to global environment variable
   const globalToken =
     Deno.env.get('X_AUTH_TOKEN') ||
-    Deno.env.get('FLEX_X_AUTH_TOKEN') ||
-    '';
+    Deno.env.get('FLEX_X_AUTH_TOKEN');
+
+  if (!globalToken) {
+    throw new Error('No Flex API token configured. Set X_AUTH_TOKEN or FLEX_X_AUTH_TOKEN environment variable.');
+  }
 
   return globalToken;
 }

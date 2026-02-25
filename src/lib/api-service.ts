@@ -29,8 +29,7 @@ export class ApiService {
     if (this.pendingTokenPromise) return this.pendingTokenPromise;
     
     const requestVersion = this.tokenVersion;
-    
-    this.pendingTokenPromise = (async () => {
+    const localPromise = (async () => {
       const { data, error } = await supabase.functions.invoke('get-secret', {
         body: { secretName: 'X_AUTH_TOKEN' }
       });
@@ -48,10 +47,15 @@ export class ApiService {
       return token;
     })();
     
+    this.pendingTokenPromise = localPromise;
+    
     try {
-      return await this.pendingTokenPromise;
+      return await localPromise;
     } finally {
-      this.pendingTokenPromise = null;
+      // Only clear if our promise is still the current one
+      if (this.pendingTokenPromise === localPromise) {
+        this.pendingTokenPromise = null;
+      }
     }
   }
   

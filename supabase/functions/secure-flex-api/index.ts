@@ -12,6 +12,13 @@ const corsHeaders = {
 
 const FLEX_API_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/api';
 
+class ServiceUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ServiceUnavailableError';
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -45,7 +52,7 @@ serve(async (req) => {
     // Resolve Flex API token (per-user key with global fallback)
     const authToken = await resolveFlexAuthToken(supabase, user.id)
     if (!authToken) {
-      throw new Error('No Flex API token available')
+      throw new ServiceUnavailableError('No Flex API token available')
     }
 
     // Parse request body
@@ -97,6 +104,14 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error("Error in secure-flex-api:", error)
+    
+    let status = 400;
+    if (error instanceof ServiceUnavailableError) {
+      status = 503;
+    } else if (error.message?.includes('authentication')) {
+      status = 401;
+    }
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
@@ -104,7 +119,7 @@ serve(async (req) => {
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: error.message?.includes('authentication') ? 401 : 400,
+        status,
       },
     )
   }
