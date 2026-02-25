@@ -50,9 +50,13 @@ serve(async (req) => {
     }
 
     // Resolve Flex API token (per-user key with global fallback)
-    const authToken = await resolveFlexAuthToken(supabase, user.id)
-    if (!authToken) {
-      throw new ServiceUnavailableError('No Flex API token available')
+    let authToken: string;
+    try {
+      authToken = await resolveFlexAuthToken(supabase, user.id);
+    } catch (tokenErr) {
+      throw new ServiceUnavailableError(
+        tokenErr instanceof Error ? tokenErr.message : 'No Flex API token available'
+      );
     }
 
     // Parse request body
@@ -105,17 +109,18 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in secure-flex-api:", error)
     
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     let status = 400;
     if (error instanceof ServiceUnavailableError) {
       status = 503;
-    } else if (error.message?.includes('authentication')) {
+    } else if (errorMessage.includes('authentication')) {
       status = 401;
     }
     
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || 'Internal server error' 
+        error: errorMessage,
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
