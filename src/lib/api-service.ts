@@ -1,5 +1,6 @@
 
 import { supabase } from "@/lib/supabase";
+import { onFlexTokenInvalidate } from "@/utils/flexTokenCache";
 
 // Singleton API Service class
 export class ApiService {
@@ -11,6 +12,7 @@ export class ApiService {
   static getInstance(): ApiService {
     if (!ApiService.instance) {
       ApiService.instance = new ApiService();
+      onFlexTokenInvalidate(() => { ApiService.instance.token = null; });
     }
     return ApiService.instance;
   }
