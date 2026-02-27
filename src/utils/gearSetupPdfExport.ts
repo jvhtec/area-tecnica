@@ -195,6 +195,14 @@ export const generateStageGearPDF = async (
         yPosition = (doc as any).lastAutoTable.finalY + 15;
       }
 
+      if (setupToUse.foh_waves_outboard && String(setupToUse.foh_waves_outboard).trim().length > 0) {
+        yPosition = checkPageBreak(14, yPosition);
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`FOH Waves/Outboard: ${String(setupToUse.foh_waves_outboard).trim()}`, 14, yPosition);
+        yPosition += 10;
+      }
+
       // Monitor Consoles
       if (setupToUse.mon_consoles && setupToUse.mon_consoles.length > 0) {
         yPosition = checkPageBreak(60, yPosition);
@@ -227,6 +235,14 @@ export const generateStageGearPDF = async (
         });
 
         yPosition = (doc as any).lastAutoTable.finalY + 15;
+      }
+
+      if (setupToUse.mon_waves_outboard && String(setupToUse.mon_waves_outboard).trim().length > 0) {
+        yPosition = checkPageBreak(14, yPosition);
+        doc.setFontSize(10);
+        doc.setTextColor(0, 0, 0);
+        doc.text(`MON Waves/Outboard: ${String(setupToUse.mon_waves_outboard).trim()}`, 14, yPosition);
+        yPosition += 10;
       }
 
       // Monitors

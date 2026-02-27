@@ -96,6 +96,9 @@ const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistFormStat
   foh_tech: false,
   mon_console: "",
   mon_console_provided_by: "festival",
+  monitors_from_foh: false,
+  foh_waves_outboard: "",
+  mon_waves_outboard: "",
   mon_tech: false,
   wireless_systems: isBlank ? [makeBlankSystem()] : [],
   iem_systems: isBlank ? [makeBlankSystem()] : [],
@@ -326,11 +329,14 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         nextLockedFields.add("foh_console");
         nextLockedFields.add("foh_console_provided_by");
       }
+      if (hasText(artistData.foh_waves_outboard)) nextLockedFields.add("foh_waves_outboard");
       if (asBoolean(artistData.foh_tech)) nextLockedFields.add("foh_tech");
       if (hasText(artistData.mon_console)) {
         nextLockedFields.add("mon_console");
         nextLockedFields.add("mon_console_provided_by");
       }
+      if (asBoolean(artistData.monitors_from_foh)) nextLockedFields.add("monitors_from_foh");
+      if (hasText(artistData.mon_waves_outboard)) nextLockedFields.add("mon_waves_outboard");
       if (asBoolean(artistData.mon_tech)) nextLockedFields.add("mon_tech");
       if (hasSystems(artistData.wireless_systems)) {
         nextLockedFields.add("wireless_systems");
@@ -398,8 +404,11 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         foh_console: asString(artistData.foh_console),
         foh_console_provided_by: asString(artistData.foh_console_provided_by) || "festival",
         foh_tech: asBoolean(artistData.foh_tech),
+        foh_waves_outboard: asString(artistData.foh_waves_outboard),
         mon_console: asString(artistData.mon_console),
         mon_console_provided_by: asString(artistData.mon_console_provided_by) || "festival",
+        monitors_from_foh: asBoolean(artistData.monitors_from_foh),
+        mon_waves_outboard: asString(artistData.mon_waves_outboard),
         mon_tech: asBoolean(artistData.mon_tech),
         wireless_systems: asArray<WirelessSetup>(artistData.wireless_systems),
         iem_systems: asArray<WirelessSetup>(artistData.iem_systems),

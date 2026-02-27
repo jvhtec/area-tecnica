@@ -400,6 +400,9 @@ const FestivalArtistManagement = () => {
               model: artist.mon_console,
               providedBy: artist.mon_console_provided_by
             },
+            monitorsFromFoh: artist.monitors_from_foh || false,
+            fohWavesOutboard: artist.foh_waves_outboard || "",
+            monWavesOutboard: artist.mon_waves_outboard || "",
             wireless: {
               systems: wirelessSystems,
               providedBy: artist.wireless_provided_by
@@ -749,6 +752,7 @@ const FestivalArtistManagement = () => {
                     dayStartTime={dayStartTime} 
                     jobId={jobId}
                     selectedDate={selectedDate}
+                    onArtistStagePlotUpdated={invalidateArtists}
                   />
                 </div>
               ) : (

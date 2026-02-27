@@ -43,6 +43,7 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [editingModel, setEditingModel] = useState<string | null>(null);
+  const [customModel, setCustomModel] = useState('');
 
   // Filter available mics based on search
   const filteredMics = useMemo(() => {
@@ -101,6 +102,14 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
     } else {
       onChange([...value, { model, quantity: 1 }]);
     }
+  };
+
+  const addCustomMicrophone = () => {
+    if (readOnly) return;
+    const normalizedModel = customModel.trim();
+    if (!normalizedModel) return;
+    addMicrophone(normalizedModel);
+    setCustomModel('');
   };
 
   // Remove one unit of a microphone
@@ -180,6 +189,39 @@ export const MicrophoneListBuilder: React.FC<MicrophoneListBuilderProps> = ({
         <span id="mic-search-description" className="sr-only">
           Escriba para filtrar la lista de micrófonos disponibles. Total actual: {totalCount} micrófonos.
         </span>
+      </div>
+
+      {/* Custom model input */}
+      <div className="space-y-2">
+        <Label htmlFor="custom-mic-model" className="text-sm font-semibold">
+          Modelo personalizado
+        </Label>
+        <div className="flex gap-2">
+          <Input
+            id="custom-mic-model"
+            type="text"
+            placeholder="Agregar micrófono no listado..."
+            value={customModel}
+            onChange={(e) => setCustomModel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addCustomMicrophone();
+              }
+            }}
+            disabled={readOnly}
+            aria-label="Agregar modelo de micrófono personalizado"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={addCustomMicrophone}
+            disabled={readOnly || customModel.trim().length === 0}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Agregar
+          </Button>
+        </div>
       </div>
 
       {/* Tally Grid */}

@@ -40,27 +40,6 @@ export const WirelessConfig = ({
     );
   }, [onChange, systems]);
 
-  useEffect(() => {
-    if (festivalModelOptions.length === 0 || systems.length === 0) return;
-
-    const needsNormalization = systems.some((system) => {
-      const isFestivalProvider = (system.provided_by || "festival") === "festival";
-      return isFestivalProvider && !!system.model && !festivalModelOptions.includes(system.model);
-    });
-
-    if (!needsNormalization) return;
-
-    onChange(
-      systems.map((system) => {
-        const isFestivalProvider = (system.provided_by || "festival") === "festival";
-        if (!isFestivalProvider || !system.model || festivalModelOptions.includes(system.model)) {
-          return system;
-        }
-        return { ...system, model: "" };
-      })
-    );
-  }, [festivalModelOptions, onChange, systems]);
-
   const addSystem = () => {
     const newSystem: WirelessSetup = {
       _id: crypto.randomUUID(),
@@ -102,14 +81,6 @@ export const WirelessConfig = ({
         // Ensure provided_by is properly validated and typed
         if (value === 'festival' || value === 'band') {
           updatedSystem.provided_by = value;
-          if (
-            value === "festival" &&
-            festivalModelOptions.length > 0 &&
-            updatedSystem.model &&
-            !festivalModelOptions.includes(updatedSystem.model)
-          ) {
-            updatedSystem.model = "";
-          }
         } else {
           updatedSystem.provided_by = 'festival';
         }
@@ -165,8 +136,8 @@ export const WirelessConfig = ({
               {(() => {
                 const isFestivalProvider = (system.provided_by || "festival") === "festival";
                 const modelOptions = isFestivalProvider ? festivalModelOptions : [];
-                const fallbackOptions = isFestivalProvider ? [] : options;
-                const category = isFestivalProvider ? undefined : getCategory();
+                const fallbackOptions = options;
+                const category = getCategory();
 
                 return (
                   <EquipmentSelect

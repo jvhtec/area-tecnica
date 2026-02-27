@@ -35,7 +35,7 @@ export const MicKitSection = ({
   ) as string[];
   const availableMics =
     micKit === "festival" || micKit === "mixed"
-      ? normalizedFestivalMics
+      ? Array.from(new Set([...allAvailableMics, ...normalizedFestivalMics]))
       : allAvailableMics;
 
   return (

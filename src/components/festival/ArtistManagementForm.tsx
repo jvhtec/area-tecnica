@@ -37,6 +37,9 @@ interface ArtistManagementFormData {
   foh_console_provided_by: string;
   mon_console: string;
   mon_console_provided_by: string;
+  monitors_from_foh: boolean;
+  foh_waves_outboard: string;
+  mon_waves_outboard: string;
   wireless_systems: any[];
   iem_systems: any[];
   wireless_provided_by: string;
@@ -101,6 +104,9 @@ export const ArtistManagementForm = ({
       foh_console_provided_by: artistData?.foh_console_provided_by || "festival",
       mon_console: artistData?.mon_console || "",
       mon_console_provided_by: artistData?.mon_console_provided_by || "festival",
+      monitors_from_foh: artistData?.monitors_from_foh || false,
+      foh_waves_outboard: artistData?.foh_waves_outboard || "",
+      mon_waves_outboard: artistData?.mon_waves_outboard || "",
       wireless_systems: artistData?.wireless_systems || [],
       iem_systems: artistData?.iem_systems || [],
       wireless_provided_by: artistData?.wireless_provided_by || "festival",

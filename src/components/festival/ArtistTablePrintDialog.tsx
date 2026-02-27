@@ -34,6 +34,9 @@ interface Artist {
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
+  monitors_from_foh?: boolean;
+  foh_waves_outboard?: string;
+  mon_waves_outboard?: string;
   wireless_systems: any[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: any[];
@@ -220,6 +223,9 @@ export const ArtistTablePrintDialog = ({
           foh_console_provided_by: (artist.foh_console_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
           mon_console: artist.mon_console,
           mon_console_provided_by: (artist.mon_console_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
+          monitors_from_foh: artist.monitors_from_foh || false,
+          foh_waves_outboard: artist.foh_waves_outboard || "",
+          mon_waves_outboard: artist.mon_waves_outboard || "",
           wireless_systems: artist.wireless_systems || [],
           wireless_provided_by: (artist.wireless_provided_by as 'festival' | 'band' | 'mixed') || 'festival',
           iem_systems: artist.iem_systems || [],
@@ -267,6 +273,9 @@ export const ArtistTablePrintDialog = ({
               model: artist.mon_console,
               providedBy: artist.mon_console_provided_by || 'festival'
             },
+            monitorsFromFoh: artist.monitors_from_foh || false,
+            fohWavesOutboard: artist.foh_waves_outboard || "",
+            monWavesOutboard: artist.mon_waves_outboard || "",
             wireless: {
               systems: artist.wireless_systems || [],
               providedBy: artist.wireless_provided_by || 'festival'

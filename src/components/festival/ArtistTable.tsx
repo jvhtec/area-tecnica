@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, type ChangeEvent, type ClipboardEvent as ReactClipboardEvent } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, FileText, Loader2, Mic, Link, ExternalLink, Upload, Printer } from "lucide-react";
+import { Pencil, Trash2, FileText, Loader2, Mic, Link, ExternalLink, Printer, ImagePlus, ImageOff } from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
@@ -12,6 +12,7 @@ import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
 import { GearMismatchIndicator } from "./GearMismatchIndicator";
@@ -32,6 +33,9 @@ interface Artist {
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
+  monitors_from_foh?: boolean;
+  foh_waves_outboard?: string;
+  mon_waves_outboard?: string;
   wireless_systems: any[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: any[];
@@ -68,6 +72,10 @@ interface Artist {
   infrastructure_provided_by?: 'festival' | 'band' | 'mixed';
   artist_submitted?: boolean;
   form_language?: "es" | "en";
+  stage_plot_file_path?: string | null;
+  stage_plot_file_name?: string | null;
+  stage_plot_file_type?: string | null;
+  stage_plot_uploaded_at?: string | null;
 }
 
 interface ArtistTableProps {
@@ -82,6 +90,7 @@ interface ArtistTableProps {
   dayStartTime: string;
   jobId?: string;
   selectedDate?: string;
+  onArtistStagePlotUpdated?: () => void;
 }
 
 export const ArtistTable = ({
@@ -95,7 +104,8 @@ export const ArtistTable = ({
   riderFilter,
   dayStartTime,
   jobId,
-  selectedDate
+  selectedDate,
+  onArtistStagePlotUpdated
 }: ArtistTableProps) => {
   const [deletingArtistId, setDeletingArtistId] = useState<string | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -107,6 +117,13 @@ export const ArtistTable = ({
   const [gearComparisons, setGearComparisons] = useState<Record<string, ArtistGearComparison>>({});
   const [festivalGearSetup, setFestivalGearSetup] = useState<FestivalGearSetup | null>(null);
   const [stageGearSetups, setStageGearSetups] = useState<Record<number, StageGearSetup>>({});
+  const [stagePlotUrls, setStagePlotUrls] = useState<Record<string, string>>({});
+  const [selectedStagePlotArtist, setSelectedStagePlotArtist] = useState<Artist | null>(null);
+  const [stagePlotDialogOpen, setStagePlotDialogOpen] = useState(false);
+  const [uploadingStagePlotArtistId, setUploadingStagePlotArtistId] = useState<string | null>(null);
+  const [deletingStagePlotArtistId, setDeletingStagePlotArtistId] = useState<string | null>(null);
+  const [isClipboardReading, setIsClipboardReading] = useState(false);
+  const stagePlotInputRef = useRef<HTMLInputElement | null>(null);
 
   // Fetch custom stage names
   useEffect(() => {
@@ -198,6 +215,9 @@ export const ArtistTable = ({
         foh_console_provided_by: artist.foh_console_provided_by,
         mon_console: artist.mon_console,
         mon_console_provided_by: artist.mon_console_provided_by,
+        monitors_from_foh: artist.monitors_from_foh || false,
+        foh_waves_outboard: artist.foh_waves_outboard || "",
+        mon_waves_outboard: artist.mon_waves_outboard || "",
         wireless_systems: artist.wireless_systems || [],
         wireless_provided_by: artist.wireless_provided_by,
         iem_systems: artist.iem_systems || [],
@@ -231,6 +251,213 @@ export const ArtistTable = ({
   // Helper function to get stage display name
   const getStageDisplayName = (stageNumber: number) => {
     return stageNames[stageNumber] || `Stage ${stageNumber}`;
+  };
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    const loadStagePlotUrls = async () => {
+      const artistsWithPlot = artists.filter((artist) => Boolean(artist.stage_plot_file_path));
+
+      if (artistsWithPlot.length === 0) {
+        if (!isCancelled) {
+          setStagePlotUrls({});
+        }
+        return;
+      }
+
+      const nextUrls: Record<string, string> = {};
+
+      await Promise.all(
+        artistsWithPlot.map(async (artist) => {
+          if (!artist.stage_plot_file_path) return;
+          const { data, error } = await supabase.storage
+            .from("festival_artist_files")
+            .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
+
+          if (!error && data?.signedUrl) {
+            nextUrls[artist.id] = data.signedUrl;
+          }
+        })
+      );
+
+      if (!isCancelled) {
+        setStagePlotUrls(nextUrls);
+      }
+    };
+
+    loadStagePlotUrls();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [artists]);
+
+  const handleOpenStagePlotCapture = (artist: Artist) => {
+    setSelectedStagePlotArtist(artist);
+    setStagePlotDialogOpen(true);
+  };
+
+  const uploadStagePlotFile = async (artist: Artist, file: File) => {
+    if (!file.type.startsWith("image/")) {
+      toast.error("El stage plot debe ser una imagen.");
+      return;
+    }
+
+    setUploadingStagePlotArtistId(artist.id);
+
+    try {
+      const fileExtension = file.name.split(".").pop() || "jpg";
+      const nextFilePath = `${artist.id}/stage-plots/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("festival_artist_files")
+        .upload(nextFilePath, file, {
+          contentType: file.type,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { error: updateError } = await supabase
+        .from("festival_artists")
+        .update({
+          stage_plot_file_path: nextFilePath,
+          stage_plot_file_name: file.name,
+          stage_plot_file_type: file.type,
+          stage_plot_uploaded_at: new Date().toISOString(),
+        })
+        .eq("id", artist.id);
+
+      if (updateError) {
+        await supabase.storage.from("festival_artist_files").remove([nextFilePath]);
+        throw updateError;
+      }
+
+      if (
+        artist.stage_plot_file_path &&
+        artist.stage_plot_file_path !== nextFilePath
+      ) {
+        await supabase.storage
+          .from("festival_artist_files")
+          .remove([artist.stage_plot_file_path]);
+      }
+
+      onArtistStagePlotUpdated?.();
+      toast.success(`Stage plot actualizado para ${artist.name}.`);
+      setStagePlotDialogOpen(false);
+      setSelectedStagePlotArtist(null);
+    } catch (error) {
+      console.error("Error uploading stage plot:", error);
+      toast.error("No se pudo cargar el stage plot.");
+    } finally {
+      setUploadingStagePlotArtistId(null);
+    }
+  };
+
+  const handleStagePlotUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !selectedStagePlotArtist) return;
+    await uploadStagePlotFile(selectedStagePlotArtist, file);
+  };
+
+  const handleStagePlotPaste = async (event: ReactClipboardEvent<HTMLDivElement>) => {
+    if (!selectedStagePlotArtist) return;
+    const imageItem = Array.from(event.clipboardData.items).find((item) =>
+      item.type.startsWith("image/")
+    );
+    if (!imageItem) {
+      toast.error("No se detectó ninguna imagen en el portapapeles.");
+      return;
+    }
+
+    const imageFile = imageItem.getAsFile();
+    if (!imageFile) {
+      toast.error("No se pudo leer la imagen del portapapeles.");
+      return;
+    }
+
+    event.preventDefault();
+    await uploadStagePlotFile(selectedStagePlotArtist, imageFile);
+  };
+
+  const handleReadClipboardImage = async () => {
+    if (!selectedStagePlotArtist) return;
+
+    if (!navigator.clipboard?.read) {
+      toast.error("Tu navegador no permite leer imágenes del portapapeles en este contexto.");
+      return;
+    }
+
+    setIsClipboardReading(true);
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        const imageType = item.types.find((type) => type.startsWith("image/"));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        const clipboardFile = new File([blob], `stage-plot-${Date.now()}.png`, { type: blob.type });
+        await uploadStagePlotFile(selectedStagePlotArtist, clipboardFile);
+        return;
+      }
+
+      toast.error("No se encontró ninguna imagen en el portapapeles.");
+    } catch (error) {
+      console.error("Error reading image from clipboard:", error);
+      toast.error("No se pudo leer la imagen del portapapeles.");
+    } finally {
+      setIsClipboardReading(false);
+    }
+  };
+
+  const handleDeleteStagePlot = async (artist: Artist) => {
+    if (!artist.stage_plot_file_path) return;
+
+    if (!window.confirm(`¿Eliminar el stage plot de ${artist.name}?`)) {
+      return;
+    }
+
+    setDeletingStagePlotArtistId(artist.id);
+    try {
+      const currentPath = artist.stage_plot_file_path;
+
+      const { error: updateError } = await supabase
+        .from("festival_artists")
+        .update({
+          stage_plot_file_path: null,
+          stage_plot_file_name: null,
+          stage_plot_file_type: null,
+          stage_plot_uploaded_at: null,
+        })
+        .eq("id", artist.id);
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      await supabase.storage.from("festival_artist_files").remove([currentPath]);
+
+      setStagePlotUrls((previous) => {
+        const updated = { ...previous };
+        delete updated[artist.id];
+        return updated;
+      });
+
+      onArtistStagePlotUpdated?.();
+      if (selectedStagePlotArtist?.id === artist.id) {
+        setStagePlotDialogOpen(false);
+        setSelectedStagePlotArtist(null);
+      }
+      toast.success(`Stage plot eliminado para ${artist.name}.`);
+    } catch (error) {
+      console.error("Error deleting stage plot:", error);
+      toast.error("No se pudo eliminar el stage plot.");
+    } finally {
+      setDeletingStagePlotArtistId(null);
+    }
   };
 
 
@@ -277,7 +504,13 @@ export const ArtistTable = ({
   const filteredArtists = artists.filter(artist => {
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStage = stageFilter === "all" || artist.stage?.toString() === stageFilter;
-    const matchesEquipment = !equipmentFilter || artist.foh_console.toLowerCase().includes(equipmentFilter.toLowerCase()) || artist.mon_console.toLowerCase().includes(equipmentFilter.toLowerCase()) || artist.wired_mics && artist.wired_mics.some(mic => mic.model.toLowerCase().includes(equipmentFilter.toLowerCase()));
+    const filterText = equipmentFilter.toLowerCase();
+    const matchesEquipment = !equipmentFilter ||
+      artist.foh_console.toLowerCase().includes(filterText) ||
+      artist.mon_console.toLowerCase().includes(filterText) ||
+      (artist.foh_waves_outboard || "").toLowerCase().includes(filterText) ||
+      (artist.mon_waves_outboard || "").toLowerCase().includes(filterText) ||
+      (artist.wired_mics && artist.wired_mics.some(mic => mic.model.toLowerCase().includes(filterText)));
     const matchesRider = riderFilter === "all" || riderFilter === "missing" && artist.rider_missing || riderFilter === "complete" && !artist.rider_missing;
     return matchesSearch && matchesStage && matchesEquipment && matchesRider;
   });
@@ -338,6 +571,7 @@ export const ArtistTable = ({
   // Helper function to transform artist data for PDF with logo URL
   const transformArtistDataForPdf = async (artist: Artist): Promise<ArtistPdfData> => {
     let logoUrl: string | undefined;
+    let stagePlotUrl: string | undefined;
     
     if (jobId) {
       try {
@@ -345,6 +579,22 @@ export const ArtistTable = ({
         console.log('Fetched logo URL for PDF:', logoUrl);
       } catch (error) {
         console.error('Error fetching logo for PDF:', error);
+      }
+    }
+
+    if (artist.stage_plot_file_path) {
+      try {
+        const { data: stagePlotData, error: stagePlotError } = await supabase.storage
+          .from("festival_artist_files")
+          .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
+
+        if (stagePlotError) {
+          console.error("Error creating signed URL for stage plot:", stagePlotError);
+        } else if (stagePlotData?.signedUrl) {
+          stagePlotUrl = stagePlotData.signedUrl;
+        }
+      } catch (error) {
+        console.error("Error loading stage plot for PDF:", error);
       }
     }
 
@@ -373,6 +623,9 @@ export const ArtistTable = ({
           model: artist.mon_console,
           providedBy: artist.mon_console_provided_by || 'festival'
         },
+        monitorsFromFoh: artist.monitors_from_foh || false,
+        fohWavesOutboard: artist.foh_waves_outboard || "",
+        monWavesOutboard: artist.mon_waves_outboard || "",
         wireless: {
           systems: artist.wireless_systems || [],
           providedBy: artist.wireless_provided_by || 'festival'
@@ -417,7 +670,9 @@ export const ArtistTable = ({
       wiredMics: artist.wired_mics || [],
       logoUrl: logoUrl,
       micKit: artist.mic_kit || 'band',
-      riderMissing: artist.rider_missing || false
+      riderMissing: artist.rider_missing || false,
+      stagePlotUrl,
+      stagePlotFileType: artist.stage_plot_file_type || undefined,
     };
   };
 
@@ -501,6 +756,7 @@ export const ArtistTable = ({
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-[140px]">Artista</TableHead>
+                  <TableHead className="min-w-[120px]">Stage Plot</TableHead>
                   <TableHead className="min-w-[80px]">Stage</TableHead>
                   <TableHead className="min-w-[100px]">Hora del show</TableHead>
                   <TableHead className="min-w-[100px]">Soundcheck</TableHead>
@@ -538,6 +794,37 @@ export const ArtistTable = ({
                           {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">Después de medianoche</Badge>}
                         </div>
                       </TableCell>
+                      <TableCell className="min-w-[120px]">
+                        <div className="space-y-2">
+                          {stagePlotUrls[artist.id] ? (
+                            <button
+                              type="button"
+                              className="group relative h-16 w-24 overflow-hidden rounded border"
+                              onClick={() => window.open(stagePlotUrls[artist.id], "_blank", "noopener,noreferrer")}
+                              title="Ver stage plot"
+                            >
+                              <img
+                                src={stagePlotUrls[artist.id]}
+                                alt={`Stage plot de ${artist.name}`}
+                                className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                              />
+                            </button>
+                          ) : (
+                            <div className="flex h-16 w-24 items-center justify-center rounded border border-dashed text-xs text-muted-foreground">
+                              Sin plot
+                            </div>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-xs"
+                            onClick={() => handleOpenStagePlotCapture(artist)}
+                            disabled={uploadingStagePlotArtistId === artist.id}
+                          >
+                            {uploadingStagePlotArtistId === artist.id ? "Cargando..." : "Pegar/Cargar"}
+                          </Button>
+                        </div>
+                      </TableCell>
                       <TableCell className="min-w-[80px]">
                         <Badge variant="outline">{getStageDisplayName(artist.stage)}</Badge>
                       </TableCell>
@@ -570,15 +857,31 @@ export const ArtistTable = ({
                             )}
                             {artist.foh_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                           </div>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <span>MON: {artist.mon_console || "No especificado"}</span>
-                            {artist.mon_console_provided_by && (
-                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
-                                {artist.mon_console_provided_by}
-                              </Badge>
-                            )}
-                            {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
-                          </div>
+                          {artist.foh_waves_outboard && (
+                            <div className="text-xs text-muted-foreground">
+                              FOH Waves/Outboard: {artist.foh_waves_outboard}
+                            </div>
+                          )}
+                          {artist.monitors_from_foh ? (
+                            <div className="text-xs text-muted-foreground">Monitores desde FOH</div>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <span>MON: {artist.mon_console || "No especificado"}</span>
+                                {artist.mon_console_provided_by && (
+                                  <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
+                                    {artist.mon_console_provided_by}
+                                  </Badge>
+                                )}
+                                {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
+                              </div>
+                              {artist.mon_waves_outboard && (
+                                <div className="text-xs text-muted-foreground">
+                                  MON Waves/Outboard: {artist.mon_waves_outboard}
+                                </div>
+                              )}
+                            </>
+                          )}
                         </div>
                       </TableCell>
                       
@@ -726,6 +1029,26 @@ export const ArtistTable = ({
                           <Button variant="ghost" size="icon" onClick={() => handlePrintArtist(artist)} disabled={printingArtistId === artist.id} title="Print artist details">
                             {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenStagePlotCapture(artist)}
+                            disabled={uploadingStagePlotArtistId === artist.id}
+                            title="Capture/upload stage plot"
+                          >
+                            {uploadingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+                          </Button>
+                          {artist.stage_plot_file_path && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleDeleteStagePlot(artist)}
+                              disabled={deletingStagePlotArtistId === artist.id}
+                              title="Delete stage plot"
+                            >
+                              {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
+                            </Button>
+                          )}
                           <Button variant="ghost" size="icon" onClick={() => onEditArtist(artist)} title="Edit artist">
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -767,6 +1090,36 @@ export const ArtistTable = ({
                     </div>
                   </div>
 
+                  <div className="space-y-1">
+                    <div className="text-sm font-medium">Stage Plot</div>
+                    {stagePlotUrls[artist.id] ? (
+                      <button
+                        type="button"
+                        className="h-20 w-full overflow-hidden rounded border"
+                        onClick={() => window.open(stagePlotUrls[artist.id], "_blank", "noopener,noreferrer")}
+                      >
+                        <img
+                          src={stagePlotUrls[artist.id]}
+                          alt={`Stage plot de ${artist.name}`}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                    ) : (
+                      <div className="rounded border border-dashed p-2 text-xs text-muted-foreground">
+                        Sin stage plot cargado
+                      </div>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenStagePlotCapture(artist)}
+                      disabled={uploadingStagePlotArtistId === artist.id}
+                    >
+                      {uploadingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ImagePlus className="h-4 w-4 mr-1" />}
+                      <span className="text-xs">Pegar/Cargar stage plot</span>
+                    </Button>
+                  </div>
+
                   {/* Show Time */}
                   <div className="space-y-1">
                     <div className="text-sm font-medium">Hora del show</div>
@@ -795,16 +1148,32 @@ export const ArtistTable = ({
                         )}
                         {artist.foh_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
                       </div>
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <span className="text-xs text-muted-foreground">MON:</span>
-                        <span>{artist.mon_console || "No especificado"}</span>
-                        {artist.mon_console_provided_by && (
-                          <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
-                            {artist.mon_console_provided_by}
-                          </Badge>
-                        )}
-                        {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
-                      </div>
+                      {artist.foh_waves_outboard && (
+                        <div className="text-xs text-muted-foreground">
+                          FOH Waves/Outboard: {artist.foh_waves_outboard}
+                        </div>
+                      )}
+                      {artist.monitors_from_foh ? (
+                        <div className="text-xs text-muted-foreground">Monitores desde FOH</div>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className="text-xs text-muted-foreground">MON:</span>
+                            <span>{artist.mon_console || "No especificado"}</span>
+                            {artist.mon_console_provided_by && (
+                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
+                                {artist.mon_console_provided_by}
+                              </Badge>
+                            )}
+                            {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
+                          </div>
+                          {artist.mon_waves_outboard && (
+                            <div className="text-xs text-muted-foreground">
+                              MON Waves/Outboard: {artist.mon_waves_outboard}
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -931,6 +1300,16 @@ export const ArtistTable = ({
                       {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4 mr-1" />}
                       <span className="text-xs">Imprimir</span>
                     </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleOpenStagePlotCapture(artist)} disabled={uploadingStagePlotArtistId === artist.id}>
+                      {uploadingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4 mr-1" />}
+                      <span className="text-xs">Plot</span>
+                    </Button>
+                    {artist.stage_plot_file_path && (
+                      <Button variant="ghost" size="sm" onClick={() => handleDeleteStagePlot(artist)} disabled={deletingStagePlotArtistId === artist.id}>
+                        {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4 mr-1" />}
+                        <span className="text-xs">Quitar</span>
+                      </Button>
+                    )}
                     <Button variant="ghost" size="sm" onClick={() => onEditArtist(artist)}>
                       <Pencil className="h-4 w-4 mr-1" />
                       <span className="text-xs">Editar</span>
@@ -952,6 +1331,91 @@ export const ArtistTable = ({
           )}
         </div>
       </TooltipProvider>
+
+      <input
+        ref={stagePlotInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handleStagePlotUpload}
+      />
+
+      <Dialog
+        open={stagePlotDialogOpen}
+        onOpenChange={(open) => {
+          setStagePlotDialogOpen(open);
+          if (!open) {
+            setSelectedStagePlotArtist(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Stage Plot {selectedStagePlotArtist ? `- ${selectedStagePlotArtist.name}` : ""}
+            </DialogTitle>
+            <DialogDescription>
+              Pega una captura con `Ctrl+V` / `Cmd+V`, o carga una imagen desde archivo/cámara.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {selectedStagePlotArtist && stagePlotUrls[selectedStagePlotArtist.id] ? (
+              <div className="overflow-hidden rounded border">
+                <img
+                  src={stagePlotUrls[selectedStagePlotArtist.id]}
+                  alt={`Stage plot de ${selectedStagePlotArtist.name}`}
+                  className="max-h-64 w-full object-contain bg-muted/30"
+                />
+              </div>
+            ) : (
+              <div className="rounded border border-dashed p-4 text-sm text-muted-foreground">
+                Este artista todavía no tiene stage plot.
+              </div>
+            )}
+
+            <div
+              className="rounded-lg border border-dashed p-4 text-sm"
+              tabIndex={0}
+              onPaste={handleStagePlotPaste}
+            >
+              Pega aquí la imagen del portapapeles.
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="default"
+                onClick={handleReadClipboardImage}
+                disabled={!selectedStagePlotArtist || isClipboardReading || uploadingStagePlotArtistId === selectedStagePlotArtist?.id}
+              >
+                {isClipboardReading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImagePlus className="h-4 w-4 mr-2" />}
+                Pegar desde portapapeles
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => stagePlotInputRef.current?.click()}
+                disabled={!selectedStagePlotArtist || uploadingStagePlotArtistId === selectedStagePlotArtist?.id}
+              >
+                Seleccionar archivo
+              </Button>
+              {selectedStagePlotArtist?.stage_plot_file_path && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => handleDeleteStagePlot(selectedStagePlotArtist)}
+                  disabled={deletingStagePlotArtistId === selectedStagePlotArtist.id}
+                >
+                  {deletingStagePlotArtistId === selectedStagePlotArtist.id ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ImageOff className="h-4 w-4 mr-2" />}
+                  Eliminar stage plot
+                </Button>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {selectedArtist && (
         <>

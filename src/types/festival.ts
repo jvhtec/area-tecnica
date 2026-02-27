@@ -29,6 +29,8 @@ export interface FestivalGearSetup {
   max_stages: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
+  foh_waves_outboard?: string | null;
+  mon_waves_outboard?: string | null;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
   wired_mics: WiredMicSetup[];
@@ -61,6 +63,9 @@ export interface ArtistFormData {
   foh_console_provided_by: ProviderType;
   mon_console: string;
   mon_console_provided_by: ProviderType;
+  monitors_from_foh: boolean;
+  foh_waves_outboard: string;
+  mon_waves_outboard: string;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
   wireless_provided_by: ProviderType;
@@ -103,6 +108,8 @@ export interface StageGearSetup {
   stage_number: number;
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
+  foh_waves_outboard?: string | null;
+  mon_waves_outboard?: string | null;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
   wired_mics: WiredMicSetup[];

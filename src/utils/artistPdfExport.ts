@@ -6,6 +6,9 @@ export interface ArtistTechnicalInfo {
   monTech: boolean;
   fohConsole: { model: string; providedBy: string };
   monConsole: { model: string; providedBy: string };
+  monitorsFromFoh?: boolean;
+  fohWavesOutboard?: string;
+  monWavesOutboard?: string;
   wireless: {
     systems?: WirelessSystem[];
     model?: string;
@@ -56,6 +59,8 @@ export interface ArtistInfrastructure {
 export interface PdfFestivalGearOptions {
   fohConsoles?: Array<{ model: string; quantity: number }>;
   monConsoles?: Array<{ model: string; quantity: number }>;
+  fohWavesOutboard?: string;
+  monWavesOutboard?: string;
   wirelessSystems?: Array<{ model: string; quantity_hh: number; quantity_bp: number; band?: string }>;
   iemSystems?: Array<{ model: string; quantity_hh: number; quantity_bp: number; band?: string }>;
   wiredMics?: Array<{ model: string; quantity: number }>;
@@ -99,6 +104,8 @@ export interface ArtistPdfData {
   festivalOptions?: PdfFestivalGearOptions;
   publicFormUrl?: string;
   publicFormQrDataUrl?: string;
+  stagePlotUrl?: string;
+  stagePlotFileType?: string;
 }
 
 export interface ArtistPdfOptions {
@@ -150,6 +157,18 @@ const loadImageSafely = async (src: string, description: string): Promise<HTMLIm
     
     img.src = src;
   });
+};
+
+const imageToJpegDataUrl = (image: HTMLImageElement): string => {
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth || image.width;
+  canvas.height = image.naturalHeight || image.height;
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Could not create canvas context for stage plot conversion");
+  }
+  context.drawImage(image, 0, 0);
+  return canvas.toDataURL("image/jpeg", 0.92);
 };
 
 export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOptions = {}): Promise<Blob> => {
@@ -399,12 +418,32 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
           rows.push([tx("Consola MON", "MON Console"), "", ""]);
         }
 
+        rows.push([tx("Waves/Outboard FOH", "FOH Waves/Outboard"), data.festivalOptions?.fohWavesOutboard || "", ""]);
+        rows.push([tx("Monitores desde FOH", "Monitors from FOH"), "", ""]);
+        rows.push([tx("Waves/Outboard MON", "MON Waves/Outboard"), data.festivalOptions?.monWavesOutboard || "", ""]);
+
         return rows;
       })()
-    : [
-        [tx("Consola FOH", "FOH Console"), data.technical.fohConsole.model, providerLabel(data.technical.fohConsole.providedBy)],
-        [tx("Consola MON", "MON Console"), data.technical.monConsole.model, providerLabel(data.technical.monConsole.providedBy)],
-      ];
+    : (() => {
+        const rows: string[][] = [
+          [tx("Consola FOH", "FOH Console"), data.technical.fohConsole.model, providerLabel(data.technical.fohConsole.providedBy)],
+        ];
+
+        if (data.technical.fohWavesOutboard && data.technical.fohWavesOutboard.trim().length > 0) {
+          rows.push([tx("Waves/Outboard FOH", "FOH Waves/Outboard"), data.technical.fohWavesOutboard, "-"]);
+        }
+
+        if (data.technical.monitorsFromFoh) {
+          rows.push([tx("Monitores desde FOH", "Monitors from FOH"), yesNo(true), "-"]);
+        } else {
+          rows.push([tx("Consola MON", "MON Console"), data.technical.monConsole.model, providerLabel(data.technical.monConsole.providedBy)]);
+          if (data.technical.monWavesOutboard && data.technical.monWavesOutboard.trim().length > 0) {
+            rows.push([tx("Waves/Outboard MON", "MON Waves/Outboard"), data.technical.monWavesOutboard, "-"]);
+          }
+        }
+
+        return rows;
+      })();
 
   autoTable(doc, {
     head: [[
@@ -850,57 +889,76 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     }
   }
 
-  // === COMPANY LOGO (CENTERED AT BOTTOM) ===
+  // === COMPANY LOGO + FOOTER ===
   console.log("Attempting to load Sector Pro logo");
-  const sectorImg = await loadImageSafely('/sector pro logo.png', 'Sector Pro logo');
-  if (sectorImg) {
-    try {
-      const logoWidth = 20;
-      const ratio = sectorImg.width / sectorImg.height;
-      const logoHeight = logoWidth / ratio;
-      
-      // Center horizontally at bottom of page
-      doc.addImage(
-        sectorImg, 
-        'PNG', 
-        pageWidth / 2 - logoWidth / 2,  // Center horizontally
-        pageHeight - logoHeight - 10,
-        logoWidth,
-        logoHeight
-      );
-      console.log("Sector Pro logo added successfully at bottom center");
-    } catch (error) {
-      console.error('Error adding Sector Pro logo to PDF:', error);
-    }
-  } else {
-    // Try alternative Sector Pro logo
-    const altSectorImg = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'alternative Sector Pro logo');
-    if (altSectorImg) {
+  let footerLogoImage = await loadImageSafely('/sector pro logo.png', 'Sector Pro logo');
+  if (!footerLogoImage) {
+    footerLogoImage = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'alternative Sector Pro logo');
+  }
+
+  const drawPageFooter = (targetPageWidth: number, targetPageHeight: number, includeArtistInfo = false) => {
+    if (footerLogoImage) {
       try {
         const logoWidth = 20;
-        const ratio = altSectorImg.width / altSectorImg.height;
+        const ratio = footerLogoImage.width / footerLogoImage.height;
         const logoHeight = logoWidth / ratio;
-        
-        // Center horizontally at bottom of page
         doc.addImage(
-          altSectorImg, 
-          'PNG', 
-          pageWidth / 2 - logoWidth / 2,  // Center horizontally
-          pageHeight - logoHeight - 10, 
-          logoWidth, 
+          footerLogoImage,
+          'PNG',
+          targetPageWidth / 2 - logoWidth / 2,
+          targetPageHeight - logoHeight - 6,
+          logoWidth,
           logoHeight
         );
-        console.log("Alternative Sector Pro logo added successfully at bottom center");
       } catch (error) {
-        console.error('Error adding alternative Sector Pro logo to PDF:', error);
+        console.error('Error adding footer logo to PDF:', error);
+      }
+    }
+
+    doc.setFontSize(8);
+    doc.setTextColor(51, 51, 51);
+    doc.text(`${tx("Generado", "Generated")}: ${createdDate}`, 10, targetPageHeight - 10);
+    if (includeArtistInfo) {
+      doc.text(`${tx("Artista", "Artist")}: ${data.name}`, targetPageWidth - 10, targetPageHeight - 10, { align: 'right' });
+    }
+  };
+
+  drawPageFooter(pageWidth, pageHeight);
+
+  if (!templateMode && data.stagePlotUrl) {
+    const stagePlotImage = await loadImageSafely(data.stagePlotUrl, "stage plot");
+    if (stagePlotImage) {
+      try {
+        const stagePlotDataUrl = imageToJpegDataUrl(stagePlotImage);
+        doc.addPage("a4", "landscape");
+
+        const stagePlotPageWidth = doc.internal.pageSize.getWidth();
+        const stagePlotPageHeight = doc.internal.pageSize.getHeight();
+        const margin = 8;
+        const footerReserve = 14;
+        const availableWidth = stagePlotPageWidth - margin * 2;
+        const availableHeight = stagePlotPageHeight - margin * 2 - footerReserve;
+        const imageRatio = stagePlotImage.width / stagePlotImage.height;
+        const pageRatio = availableWidth / availableHeight;
+
+        let renderWidth = availableWidth;
+        let renderHeight = availableHeight;
+        if (imageRatio > pageRatio) {
+          renderHeight = renderWidth / imageRatio;
+        } else {
+          renderWidth = renderHeight * imageRatio;
+        }
+
+        const x = (stagePlotPageWidth - renderWidth) / 2;
+        const y = Math.max(margin, (stagePlotPageHeight - footerReserve - renderHeight) / 2);
+
+        doc.addImage(stagePlotDataUrl, "JPEG", x, y, renderWidth, renderHeight);
+        drawPageFooter(stagePlotPageWidth, stagePlotPageHeight, true);
+      } catch (stagePlotError) {
+        console.error("Error adding stage plot page to PDF:", stagePlotError);
       }
     }
   }
-
-  // Footer with date (moved to left to avoid overlap with centered logo)
-  doc.setFontSize(8);
-  doc.setTextColor(51, 51, 51);
-  doc.text(`${tx("Generado", "Generated")}: ${createdDate}`, 10, pageHeight - 10);
   
   console.log('Individual artist PDF generation completed');
   return doc.output('blob');

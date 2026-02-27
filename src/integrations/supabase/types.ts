@@ -1063,6 +1063,7 @@ export type Database = {
           foh_console_provided_by:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          foh_waves_outboard: string | null
           foh_tech: boolean | null
           form_language: string
           id: string
@@ -1088,7 +1089,9 @@ export type Database = {
           mon_console_provided_by:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          mon_waves_outboard: string | null
           mon_tech: boolean | null
+          monitors_from_foh: boolean | null
           monitors_enabled: boolean | null
           monitors_quantity: number | null
           name: string
@@ -1098,6 +1101,10 @@ export type Database = {
           rf_festival_url: string | null
           rf_festival_wireless: number | null
           rider_missing: boolean | null
+          stage_plot_file_name: string | null
+          stage_plot_file_path: string | null
+          stage_plot_file_type: string | null
+          stage_plot_uploaded_at: string | null
           show_end: string | null
           show_start: string | null
           soundcheck: boolean | null
@@ -1125,6 +1132,7 @@ export type Database = {
           foh_console_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          foh_waves_outboard?: string | null
           foh_tech?: boolean | null
           form_language?: string
           id?: string
@@ -1150,7 +1158,9 @@ export type Database = {
           mon_console_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          mon_waves_outboard?: string | null
           mon_tech?: boolean | null
+          monitors_from_foh?: boolean | null
           monitors_enabled?: boolean | null
           monitors_quantity?: number | null
           name: string
@@ -1160,6 +1170,10 @@ export type Database = {
           rf_festival_url?: string | null
           rf_festival_wireless?: number | null
           rider_missing?: boolean | null
+          stage_plot_file_name?: string | null
+          stage_plot_file_path?: string | null
+          stage_plot_file_type?: string | null
+          stage_plot_uploaded_at?: string | null
           show_end?: string | null
           show_start?: string | null
           soundcheck?: boolean | null
@@ -1187,6 +1201,7 @@ export type Database = {
           foh_console_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          foh_waves_outboard?: string | null
           foh_tech?: boolean | null
           form_language?: string
           id?: string
@@ -1212,7 +1227,9 @@ export type Database = {
           mon_console_provided_by?:
             | Database["public"]["Enums"]["provider_type"]
             | null
+          mon_waves_outboard?: string | null
           mon_tech?: boolean | null
+          monitors_from_foh?: boolean | null
           monitors_enabled?: boolean | null
           monitors_quantity?: number | null
           name?: string
@@ -1222,6 +1239,10 @@ export type Database = {
           rf_festival_url?: string | null
           rf_festival_wireless?: number | null
           rider_missing?: boolean | null
+          stage_plot_file_name?: string | null
+          stage_plot_file_path?: string | null
+          stage_plot_file_type?: string | null
+          stage_plot_uploaded_at?: string | null
           show_end?: string | null
           show_start?: string | null
           soundcheck?: boolean | null
@@ -1272,6 +1293,7 @@ export type Database = {
           created_at: string | null
           extras_wired: string | null
           foh_consoles: Json | null
+          foh_waves_outboard: string | null
           has_dj_booths: boolean | null
           has_drum_fills: boolean | null
           has_side_fills: boolean | null
@@ -1280,6 +1302,7 @@ export type Database = {
           job_id: string | null
           max_stages: number | null
           mon_consoles: Json | null
+          mon_waves_outboard: string | null
           notes: string | null
           other_infrastructure: string | null
           updated_at: string | null
@@ -1296,6 +1319,7 @@ export type Database = {
           created_at?: string | null
           extras_wired?: string | null
           foh_consoles?: Json | null
+          foh_waves_outboard?: string | null
           has_dj_booths?: boolean | null
           has_drum_fills?: boolean | null
           has_side_fills?: boolean | null
@@ -1304,6 +1328,7 @@ export type Database = {
           job_id?: string | null
           max_stages?: number | null
           mon_consoles?: Json | null
+          mon_waves_outboard?: string | null
           notes?: string | null
           other_infrastructure?: string | null
           updated_at?: string | null
@@ -1320,6 +1345,7 @@ export type Database = {
           created_at?: string | null
           extras_wired?: string | null
           foh_consoles?: Json | null
+          foh_waves_outboard?: string | null
           has_dj_booths?: boolean | null
           has_drum_fills?: boolean | null
           has_side_fills?: boolean | null
@@ -1328,6 +1354,7 @@ export type Database = {
           job_id?: string | null
           max_stages?: number | null
           mon_consoles?: Json | null
+          mon_waves_outboard?: string | null
           notes?: string | null
           other_infrastructure?: string | null
           updated_at?: string | null
@@ -1566,6 +1593,7 @@ export type Database = {
           extras_sf: boolean | null
           extras_wired: string | null
           foh_consoles: Json | null
+          foh_waves_outboard: string | null
           gear_setup_id: string
           id: string
           iem_systems: Json | null
@@ -1579,6 +1607,7 @@ export type Database = {
           infra_opticalcon_duo: boolean | null
           infra_opticalcon_duo_quantity: number | null
           mon_consoles: Json | null
+          mon_waves_outboard: string | null
           monitors_enabled: boolean | null
           monitors_quantity: number | null
           notes: string | null
@@ -1595,6 +1624,7 @@ export type Database = {
           extras_sf?: boolean | null
           extras_wired?: string | null
           foh_consoles?: Json | null
+          foh_waves_outboard?: string | null
           gear_setup_id: string
           id?: string
           iem_systems?: Json | null
@@ -1608,6 +1638,7 @@ export type Database = {
           infra_opticalcon_duo?: boolean | null
           infra_opticalcon_duo_quantity?: number | null
           mon_consoles?: Json | null
+          mon_waves_outboard?: string | null
           monitors_enabled?: boolean | null
           monitors_quantity?: number | null
           notes?: string | null
@@ -1624,6 +1655,7 @@ export type Database = {
           extras_sf?: boolean | null
           extras_wired?: string | null
           foh_consoles?: Json | null
+          foh_waves_outboard?: string | null
           gear_setup_id?: string
           id?: string
           iem_systems?: Json | null
@@ -1637,6 +1669,7 @@ export type Database = {
           infra_opticalcon_duo?: boolean | null
           infra_opticalcon_duo_quantity?: number | null
           mon_consoles?: Json | null
+          mon_waves_outboard?: string | null
           monitors_enabled?: boolean | null
           monitors_quantity?: number | null
           notes?: string | null

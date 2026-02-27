@@ -93,6 +93,27 @@ export const generateAndMergeFestivalPDFs = async (
       .eq("job_id", jobId);
     
     if (artistError) throw artistError;
+
+    const stagePlotUrlsByArtistId: Record<string, string> = {};
+    const artistsWithStagePlot = (artists || []).filter((artist) => Boolean(artist.stage_plot_file_path));
+
+    if (artistsWithStagePlot.length > 0) {
+      await Promise.all(
+        artistsWithStagePlot.map(async (artist) => {
+          try {
+            const { data: signedData, error: signedError } = await supabase.storage
+              .from("festival_artist_files")
+              .createSignedUrl(String(artist.stage_plot_file_path), 60 * 60);
+
+            if (!signedError && signedData?.signedUrl) {
+              stagePlotUrlsByArtistId[String(artist.id)] = signedData.signedUrl;
+            }
+          } catch (stagePlotError) {
+            console.error(`Error signing stage plot for artist ${artist.id}:`, stagePlotError);
+          }
+        })
+      );
+    }
     
     if (options.includeGearSetup && options.gearSetupStages.length > 0) {
       console.log("Starting gear setup PDF generation for stages:", options.gearSetupStages);
@@ -337,6 +358,9 @@ export const generateAndMergeFestivalPDFs = async (
                       model: String(artist.mon_console || ''), 
                       providedBy: String(artist.mon_console_provided_by || 'festival') 
                     },
+                    monitorsFromFoh: Boolean(artist.monitors_from_foh || false),
+                    fohWavesOutboard: String(artist.foh_waves_outboard || ""),
+                    monWavesOutboard: String(artist.mon_waves_outboard || ""),
                     wireless: {
                       systems: wirelessSystems,
                       providedBy: String(artist.wireless_provided_by || 'festival')
@@ -433,6 +457,9 @@ export const generateAndMergeFestivalPDFs = async (
                 model: String(artist.mon_console || ''), 
                 providedBy: String(artist.mon_console_provided_by || 'festival') 
               },
+              monitorsFromFoh: Boolean(artist.monitors_from_foh || false),
+              fohWavesOutboard: String(artist.foh_waves_outboard || ""),
+              monWavesOutboard: String(artist.mon_waves_outboard || ""),
               wireless: {
                 systems: artist.wireless_systems || [],
                 providedBy: String(artist.wireless_provided_by || 'festival'),
@@ -483,7 +510,9 @@ export const generateAndMergeFestivalPDFs = async (
             notes: artist.notes ? String(artist.notes) : undefined,
             logoUrl,
             wiredMics: artist.wired_mics || [],
-            micKit: artist.mic_kit || undefined
+            micKit: artist.mic_kit || undefined,
+            stagePlotUrl: stagePlotUrlsByArtistId[String(artist.id)],
+            stagePlotFileType: artist.stage_plot_file_type ? String(artist.stage_plot_file_type) : undefined,
           };
           
           const pdf = await exportArtistPDF(artistData);

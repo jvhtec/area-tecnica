@@ -44,6 +44,9 @@ interface ArtistRequirements {
   foh_console_provided_by?: 'festival' | 'band' | 'mixed';
   mon_console: string;
   mon_console_provided_by?: 'festival' | 'band' | 'mixed';
+  monitors_from_foh?: boolean;
+  foh_waves_outboard?: string;
+  mon_waves_outboard?: string;
   wireless_systems: WirelessSetup[];
   wireless_provided_by?: 'festival' | 'band' | 'mixed';
   iem_systems: WirelessSetup[];
@@ -75,6 +78,8 @@ interface ArtistRequirements {
 interface AvailableGear {
   foh_consoles: ConsoleSetup[];
   mon_consoles: ConsoleSetup[];
+  foh_waves_outboard?: string | null;
+  mon_waves_outboard?: string | null;
   wireless_systems: WirelessSetup[];
   iem_systems: WirelessSetup[];
   wired_mics: WiredMicSetup[];
@@ -107,6 +112,8 @@ export const compareArtistRequirements = (
   const availableGear: AvailableGear = stageSetup ? {
     foh_consoles: stageSetup.foh_consoles,
     mon_consoles: stageSetup.mon_consoles,
+    foh_waves_outboard: stageSetup.foh_waves_outboard || "",
+    mon_waves_outboard: stageSetup.mon_waves_outboard || "",
     wireless_systems: stageSetup.wireless_systems,
     iem_systems: stageSetup.iem_systems,
     wired_mics: stageSetup.wired_mics || [], // Use stage mics only, even if empty
@@ -122,6 +129,8 @@ export const compareArtistRequirements = (
   } : globalSetup ? {
     foh_consoles: globalSetup.foh_consoles,
     mon_consoles: globalSetup.mon_consoles,
+    foh_waves_outboard: globalSetup.foh_waves_outboard || "",
+    mon_waves_outboard: globalSetup.mon_waves_outboard || "",
     wireless_systems: globalSetup.wireless_systems,
     iem_systems: globalSetup.iem_systems,
     wired_mics: globalSetup.wired_mics || [],
@@ -137,6 +146,8 @@ export const compareArtistRequirements = (
   } : {
     foh_consoles: [],
     mon_consoles: [],
+    foh_waves_outboard: "",
+    mon_waves_outboard: "",
     wireless_systems: [],
     iem_systems: [],
     wired_mics: [],
@@ -187,8 +198,44 @@ export const compareArtistRequirements = (
     }
   }
 
+  const normalizeText = (value: string | null | undefined) => (value || "").trim().toLowerCase();
+  const artistFohWavesOutboard = (artist.foh_waves_outboard || "").trim();
+  const availableFohWavesOutboard = (availableGear.foh_waves_outboard || "").trim();
+  if (artistFohWavesOutboard.length > 0) {
+    const fohProvidedBy = artist.foh_console_provided_by || 'festival';
+    if (fohProvidedBy === 'band') {
+      mismatches.push({
+        type: 'console',
+        severity: 'warning',
+        message: `Band handling FOH Waves/Outboard (${artistFohWavesOutboard})`
+      });
+    } else if (!availableFohWavesOutboard) {
+      mismatches.push({
+        type: 'console',
+        severity: 'error',
+        message: `FOH Waves/Outboard requested but not configured in gear setup`,
+      });
+    } else {
+      const normalizedNeed = normalizeText(artistFohWavesOutboard);
+      const normalizedAvailable = normalizeText(availableFohWavesOutboard);
+      if (
+        normalizedNeed &&
+        normalizedAvailable &&
+        !normalizedAvailable.includes(normalizedNeed) &&
+        !normalizedNeed.includes(normalizedAvailable)
+      ) {
+        mismatches.push({
+          type: 'console',
+          severity: 'warning',
+          message: `FOH Waves/Outboard request differs from configured setup`,
+          details: `Requested: ${artistFohWavesOutboard}. Configured: ${availableFohWavesOutboard}`
+        });
+      }
+    }
+  }
+
   // Check Monitor Console availability
-  if (artist.mon_console && artist.mon_console.trim() !== '') {
+  if (!artist.monitors_from_foh && artist.mon_console && artist.mon_console.trim() !== '') {
     const providedBy = artist.mon_console_provided_by || 'festival';
     
     if (providedBy === 'band') {
@@ -215,6 +262,41 @@ export const compareArtistRequirements = (
           severity: 'error',
           message: `Monitor Console "${artist.mon_console}" out of stock`,
           details: `Available quantity: ${availableMonConsole.quantity}`
+        });
+      }
+    }
+  }
+
+  const artistMonWavesOutboard = (artist.mon_waves_outboard || "").trim();
+  const availableMonWavesOutboard = (availableGear.mon_waves_outboard || "").trim();
+  if (!artist.monitors_from_foh && artistMonWavesOutboard.length > 0) {
+    const monProvidedBy = artist.mon_console_provided_by || 'festival';
+    if (monProvidedBy === 'band') {
+      mismatches.push({
+        type: 'console',
+        severity: 'warning',
+        message: `Band handling MON Waves/Outboard (${artistMonWavesOutboard})`
+      });
+    } else if (!availableMonWavesOutboard) {
+      mismatches.push({
+        type: 'console',
+        severity: 'error',
+        message: `MON Waves/Outboard requested but not configured in gear setup`,
+      });
+    } else {
+      const normalizedNeed = normalizeText(artistMonWavesOutboard);
+      const normalizedAvailable = normalizeText(availableMonWavesOutboard);
+      if (
+        normalizedNeed &&
+        normalizedAvailable &&
+        !normalizedAvailable.includes(normalizedNeed) &&
+        !normalizedNeed.includes(normalizedAvailable)
+      ) {
+        mismatches.push({
+          type: 'console',
+          severity: 'warning',
+          message: `MON Waves/Outboard request differs from configured setup`,
+          details: `Requested: ${artistMonWavesOutboard}. Configured: ${availableMonWavesOutboard}`
         });
       }
     }
@@ -731,7 +813,7 @@ export const calculateEquipmentNeeds = (
     }
 
     // Monitor Console
-    if (artist.mon_console && artist.mon_console_provided_by !== 'band') {
+    if (!artist.monitors_from_foh && artist.mon_console && artist.mon_console_provided_by !== 'band') {
       stageReq.monConsoles[artist.mon_console] = (stageReq.monConsoles[artist.mon_console] || 0) + 1;
     }
 

@@ -42,6 +42,9 @@ export interface ArtistTablePdfData {
         model: string;
         providedBy: string;
       };
+      monitorsFromFoh?: boolean;
+      fohWavesOutboard?: string;
+      monWavesOutboard?: string;
       wireless: {
         systems: any[];
         providedBy: string;
@@ -217,6 +220,26 @@ const formatConsolesWithTech = (console: { model: string; providedBy: string }, 
   const techIndicator = techRequired ? " + Tec" : "";
   const providerDisplay = console.providedBy === "mixed" ? "(Mixto)" : `(${console.providedBy})`;
   return `${position}: ${console.model} ${providerDisplay}${techIndicator}`;
+};
+
+const formatConsoleSectionForPdf = (technical: ArtistTablePdfData["artists"][number]["technical"]) => {
+  const lines: string[] = [];
+  lines.push(formatConsolesWithTech(technical.fohConsole, technical.fohTech, "FOH"));
+
+  if (technical.fohWavesOutboard && technical.fohWavesOutboard.trim().length > 0) {
+    lines.push(`FOH W/O: ${technical.fohWavesOutboard.trim()}`);
+  }
+
+  if (technical.monitorsFromFoh) {
+    lines.push("MON: Desde FOH");
+  } else {
+    lines.push(formatConsolesWithTech(technical.monConsole, technical.monTech, "MON"));
+    if (technical.monWavesOutboard && technical.monWavesOutboard.trim().length > 0) {
+      lines.push(`MON W/O: ${technical.monWavesOutboard.trim()}`);
+    }
+  }
+
+  return lines.join("\n");
 };
 
 // Simplified gear mismatch formatting without emoji icons
@@ -530,7 +553,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       artist.name,
       `${artist.showTime.start} - ${artist.showTime.end}`,
       artist.soundcheck ? `${artist.soundcheck.start} - ${artist.soundcheck.end}` : 'No',
-      `${formatConsolesWithTech(artist.technical.fohConsole, artist.technical.fohTech, 'FOH')}\n${formatConsolesWithTech(artist.technical.monConsole, artist.technical.monTech, 'MON')}`,
+      formatConsoleSectionForPdf(artist.technical),
       `Wireless: ${formatWirelessSystemsForPdf(artist.technical.wireless.systems, artist.technical.wireless.providedBy)}\nIEM: ${formatWirelessSystemsForPdf(artist.technical.iem.systems, artist.technical.iem.providedBy, true)}`,
       microphonesDisplay,
       artist.technical.monitors.enabled ? `${artist.technical.monitors.quantity}x` : 'Ninguno',

@@ -26,6 +26,9 @@ export const ArtistForm = () => {
     wired_mics: WiredMic[];
     foh_tech: boolean;
     mon_tech: boolean;
+    monitors_from_foh: boolean;
+    foh_waves_outboard: string;
+    mon_waves_outboard: string;
     isaftermidnight: boolean;
     rider_missing: boolean;
   }>({
@@ -40,8 +43,11 @@ export const ArtistForm = () => {
     foh_console: "",
     foh_console_provided_by: "festival",
     foh_tech: false,
+    foh_waves_outboard: "",
     mon_console: "",
     mon_console_provided_by: "festival",
+    monitors_from_foh: false,
+    mon_waves_outboard: "",
     mon_tech: false,
     wireless_systems: [],
     iem_systems: [],
@@ -158,8 +164,11 @@ export const ArtistForm = () => {
           foh_console: formData.foh_console,
           foh_console_provided_by: formData.foh_console_provided_by,
           foh_tech: formData.foh_tech,
+          foh_waves_outboard: formData.foh_waves_outboard,
           mon_console: formData.mon_console,
           mon_console_provided_by: formData.mon_console_provided_by,
+          monitors_from_foh: formData.monitors_from_foh,
+          mon_waves_outboard: formData.mon_waves_outboard,
           mon_tech: formData.mon_tech,
           wireless_systems: formData.wireless_systems,
           wireless_provided_by: formData.wireless_provided_by,
@@ -358,46 +367,84 @@ export const ArtistForm = () => {
                 />
                 <Label htmlFor="foh-tech">Requiere Técnico FOH</Label>
               </div>
+              <div className="space-y-2">
+                <Label>Waves / Outboard FOH</Label>
+                <Input
+                  type="text"
+                  value={formData.foh_waves_outboard || ""}
+                  onChange={(e) => setFormData(prev => ({ ...prev, foh_waves_outboard: e.target.value }))}
+                  placeholder="Ej: Waves + outboard analógico"
+                />
+              </div>
             </div>
 
             {/* Monitor Console Section */}
             <div className="space-y-4">
               <h2 className="text-xl font-semibold">Console de Monitor</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Modelo de Console</Label>
-                  <Select
-                    value={formData.mon_console || ""}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar console" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {monOptions.map((option) => (
-                        <SelectItem key={option} value={option}>
-                          {option}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Proporcionado Por</Label>
-                  <Select
-                    value={formData.mon_console_provided_by || "festival"}
-                    onValueChange={(value: "festival" | "band") => setFormData(prev => ({ ...prev, mon_console_provided_by: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="festival">Festival</SelectItem>
-                      <SelectItem value="band">Banda</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="monitors-from-foh"
+                  checked={formData.monitors_from_foh}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      monitors_from_foh: !!checked,
+                      mon_console: !!checked ? "" : prev.mon_console,
+                      mon_console_provided_by: !!checked ? "festival" : prev.mon_console_provided_by,
+                      mon_waves_outboard: !!checked ? "" : prev.mon_waves_outboard,
+                    }))
+                  }
+                />
+                <Label htmlFor="monitors-from-foh">Monitores desde FOH</Label>
               </div>
+              {!formData.monitors_from_foh && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Modelo de Console</Label>
+                      <Select
+                        value={formData.mon_console || ""}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, mon_console: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Seleccionar console" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {monOptions.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Proporcionado Por</Label>
+                      <Select
+                        value={formData.mon_console_provided_by || "festival"}
+                        onValueChange={(value: "festival" | "band") => setFormData(prev => ({ ...prev, mon_console_provided_by: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="festival">Festival</SelectItem>
+                          <SelectItem value="band">Banda</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Waves / Outboard MON</Label>
+                    <Input
+                      type="text"
+                      value={formData.mon_waves_outboard || ""}
+                      onChange={(e) => setFormData(prev => ({ ...prev, mon_waves_outboard: e.target.value }))}
+                      placeholder="Ej: Plugins/FX para monitores"
+                    />
+                  </div>
+                </>
+              )}
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="mon-tech"
