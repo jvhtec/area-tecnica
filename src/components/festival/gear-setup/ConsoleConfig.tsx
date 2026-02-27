@@ -5,17 +5,12 @@ import { Plus, Minus } from "lucide-react";
 import { ConsoleConfigProps } from "@/types/festival-gear";
 import { ConsoleSetup } from "@/types/festival";
 import { EquipmentSelect } from "../form/shared/EquipmentSelect";
-
-const consoleOptions = [
-  'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
-  'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
-  'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Midas HD96',
-  'Midas PRO2', 'Midas M32','Behringer X32','Behringer Wing', 'Avid S6L',
-  'A&H C1500', 'A&H C2500', 'A&H S3000', 'A&H S5000', 'A&H S7000',
-  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Other'
-];
+import { useEquipmentModels } from "@/hooks/useEquipmentModels";
+import { FESTIVAL_CONSOLE_OPTIONS } from "@/constants/festivalConsoleOptions";
 
 export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps) => {
+  const { models } = useEquipmentModels();
+
   const addConsole = () => {
     onChange([...consoles, { model: '', quantity: 1 }]);
   };
@@ -32,12 +27,18 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
     );
   };
 
-  // Determine category based on label
   const getCategory = () => {
     if (label.toLowerCase().includes('foh')) return 'foh_console';
     if (label.toLowerCase().includes('monitor')) return 'mon_console';
     return undefined;
   };
+  const category = getCategory();
+  const categoryOptions = category
+    ? models.filter((model) => model.category === category).map((model) => model.name)
+    : [];
+  const mergedConsoleOptions = Array.from(
+    new Set([...categoryOptions, ...FESTIVAL_CONSOLE_OPTIONS])
+  );
 
   return (
     <div className="space-y-4">
@@ -60,10 +61,9 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
             <EquipmentSelect
               value={console.model}
               onChange={(value) => updateConsole(index, 'model', value)}
-              options={[]}
-              fallbackOptions={consoleOptions}
+              options={mergedConsoleOptions}
+              fallbackOptions={FESTIVAL_CONSOLE_OPTIONS}
               placeholder="Seleccionar console"
-              category={getCategory()}
             />
           </div>
           <div className="w-24">

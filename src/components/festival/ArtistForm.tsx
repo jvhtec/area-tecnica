@@ -12,14 +12,7 @@ import { MicKitSection } from "./form/sections/MicKitSection";
 import { ArtistFormData } from "@/types/festival";
 import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 import { WiredMic } from "./gear-setup/WiredMicConfig";
-
-const consoleOptions = [
-  'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
-  'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
-  'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Avid S6L',
-  'A&H C1500', 'A&H C2500', 'A&H S3000', 'A&H S5000', 'A&H S7000',
-  'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Midas HD96', 'Other'
-];
+import { FESTIVAL_CONSOLE_OPTIONS } from "@/constants/festivalConsoleOptions";
 
 export const ArtistForm = () => {
   const { token } = useParams();
@@ -86,8 +79,8 @@ export const ArtistForm = () => {
     .filter(model => model.category === 'mon_console')
     .map(model => model.name);
     
-  const fohOptions = fohConsoleOptions.length > 0 ? fohConsoleOptions : consoleOptions;
-  const monOptions = monConsoleOptions.length > 0 ? monConsoleOptions : consoleOptions;
+  const fohOptions = Array.from(new Set([...fohConsoleOptions, ...FESTIVAL_CONSOLE_OPTIONS]));
+  const monOptions = Array.from(new Set([...monConsoleOptions, ...FESTIVAL_CONSOLE_OPTIONS]));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
