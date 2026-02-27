@@ -9,7 +9,8 @@ import { EquipmentSelect } from "../form/shared/EquipmentSelect";
 const consoleOptions = [
   'Yamaha CL5', 'Yamaha PMx', 'Yamaha DM7','Yamaha DM3', 'DiGiCo SD5', 'DiGiCo SD7', 'DiGiCo SD8', 
   'DiGiCo SD10', 'DiGiCo SD11', 'DiGiCo SD12', 'DiGiCo SD5Q', 'DiGiCo SD7Q',
-  'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Avid S6L',
+  'DiGiCo Q225', 'DiGiCo Q326', 'DiGiCo Q338', 'DiGiCo Q852', 'Midas HD96',
+  'Midas PRO2', 'Midas M32','Behringer X32','Behringer Wing', 'Avid S6L',
   'A&H C1500', 'A&H C2500', 'A&H S3000', 'A&H S5000', 'A&H S7000',
   'Waves LV1 (homemade)', 'Waves LV1 Classic', 'SSL', 'Other'
 ];
