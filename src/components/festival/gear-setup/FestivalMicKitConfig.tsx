@@ -166,6 +166,7 @@ export const FestivalMicKitConfig = ({ jobId, stageNumber, wiredMics, onChange }
           peakRequirements={analysisData?.peakRequirements || []}
           analysisDetails={analysisData?.analysisDetails || {
             totalArtists: 0,
+            totalDates: 0,
             microphoneModels: [],
             peakCalculationMethod: '',
             stageNumber

@@ -11,6 +11,7 @@ interface ArtistMicRequirement {
   show_start: string;
   show_end: string;
   wired_mics: WiredMic[];
+  mic_kit?: 'festival' | 'band' | 'mixed' | null;
 }
 
 interface MicrophoneAnalysisResult {
@@ -18,6 +19,7 @@ interface MicrophoneAnalysisResult {
   peakRequirements: WiredMic[];
   analysisDetails: {
     totalArtists: number;
+    totalDates: number;
     microphoneModels: string[];
     peakCalculationMethod: string;
     stageNumber: number;
@@ -33,12 +35,12 @@ export const useMicrophoneAnalysis = (jobId: string, stageNumber: number) => {
         .select('id, name, stage, date, show_start, show_end, wired_mics, mic_kit')
         .eq('job_id', jobId)
         .eq('stage', stageNumber)
-        .eq('mic_kit', 'festival')
         .not('wired_mics', 'is', null);
       
       if (error) throw error;
 
       const validArtists = artists?.filter(artist => 
+        artist.mic_kit !== 'band' &&
         artist.wired_mics && 
         Array.isArray(artist.wired_mics) && 
         artist.wired_mics.length > 0
@@ -52,6 +54,7 @@ export const useMicrophoneAnalysis = (jobId: string, stageNumber: number) => {
         peakRequirements,
         analysisDetails: {
           totalArtists: validArtists.length,
+          totalDates: new Set(validArtists.map(artist => artist.date)).size,
           microphoneModels: Array.from(new Set(
             validArtists.flatMap(artist => 
               artist.wired_mics?.map((mic: WiredMic) => mic.model) || []
@@ -107,7 +110,7 @@ const calculatePeakMicrophoneRequirements = (artists: ArtistMicRequirement[]): W
           model,
           quantity,
           exclusive_use: false,
-          notes: `Peak requirement for stage (${dateArtists.length} artists)`
+          notes: `Pico por escenario (${dateArtists.length} artistas)`
         });
       } else {
         // Take the maximum quantity needed across all dates
@@ -115,7 +118,7 @@ const calculatePeakMicrophoneRequirements = (artists: ArtistMicRequirement[]): W
           micRequirements.set(model, {
             ...existing,
             quantity,
-            notes: `Peak requirement for stage (${dateArtists.length} artists)`
+            notes: `Pico por escenario (${dateArtists.length} artistas)`
           });
         }
       }

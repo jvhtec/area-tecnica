@@ -13,6 +13,7 @@ interface MicrophoneAnalysisPreviewProps {
   peakRequirements: WiredMic[];
   analysisDetails: {
     totalArtists: number;
+    totalDates: number;
     microphoneModels: string[];
     peakCalculationMethod: string;
     stageNumber: number;
@@ -43,7 +44,7 @@ export const MicrophoneAnalysisPreview = ({
           <Alert>
             <CheckCircle className="h-4 w-4" />
             <AlertDescription>
-              Análisis completado para {analysisDetails.totalArtists} artistas en Stage {analysisDetails.stageNumber} usando micrófonos del festival.
+              Análisis completado para {analysisDetails.totalArtists} artistas en {analysisDetails.totalDates} fecha{analysisDetails.totalDates !== 1 ? "s" : ""} de Stage {analysisDetails.stageNumber} usando micrófonos de festival/mixto.
               Requisitos máximos calculados considerando horarios de shows y restricciones de uso exclusivo.
             </AlertDescription>
           </Alert>
@@ -56,6 +57,10 @@ export const MicrophoneAnalysisPreview = ({
             <div className="bg-green-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-green-700">{analysisDetails.totalArtists}</div>
               <div className="text-sm text-green-600">Artistas Analizados</div>
+            </div>
+            <div className="bg-amber-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-amber-700">{analysisDetails.totalDates}</div>
+              <div className="text-sm text-amber-600">Fechas Analizadas</div>
             </div>
             <div className="bg-purple-50 p-4 rounded-lg">
               <div className="text-2xl font-bold text-purple-700">{peakRequirements.length}</div>
@@ -92,7 +97,7 @@ export const MicrophoneAnalysisPreview = ({
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No se encontraron requisitos de micrófonos para Stage {analysisDetails.stageNumber}.
-              Asegúrese de que los artistas en este stage tengan micrófonos cableados configurados con kit de festival seleccionado.
+              Asegúrese de que los artistas en este stage tengan micrófonos cableados configurados con kit festival o mixto.
             </div>
           )}
 

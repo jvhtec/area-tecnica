@@ -551,6 +551,15 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
 
   // === RF & WIRELESS ===
   const wirelessRows: Array<Array<string | number>> = [];
+  const resolveRowProvider = (systemProvider: unknown, globalProvider: string) => {
+    if (systemProvider === "festival" || systemProvider === "band" || systemProvider === "mixed") {
+      return providerLabel(systemProvider);
+    }
+    if (globalProvider === "mixed") {
+      return tx("Mixto (sin detalle)", "Mixed (unspecified)");
+    }
+    return providerLabel(globalProvider || "festival");
+  };
   
   if (templateMode) {
     const wirelessOptions = data.festivalOptions?.wirelessSystems || [];
@@ -588,24 +597,37 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     // Process wireless systems with individual provider information
     if (data.technical.wireless.systems && data.technical.wireless.systems.length > 0) {
       data.technical.wireless.systems.forEach(system => {
-        const systemProvider = system.provided_by || data.technical.wireless.providedBy;
+        const rowProvider = resolveRowProvider(system.provided_by, data.technical.wireless.providedBy || "festival");
+        const handhelds = Number(system.quantity_hh || 0);
+        const bodypacks = Number(system.quantity_bp || 0);
+        const hasModel = typeof system.model === "string" && system.model.trim().length > 0;
         
-        if (system.quantity_hh && system.quantity_hh > 0) {
+        if (handhelds > 0) {
           wirelessRows.push([
             tx('Mano', 'Handheld'),
-            system.quantity_hh,
+            handhelds,
             system.model,
             system.band || '-',
-            providerLabel(systemProvider || 'festival')
+            rowProvider
           ]);
         }
-        if (system.quantity_bp && system.quantity_bp > 0) {
+        if (bodypacks > 0) {
           wirelessRows.push([
             tx('Petaca', 'Bodypack'),
-            system.quantity_bp,
+            bodypacks,
             system.model,
             system.band || '-',
-            providerLabel(systemProvider || 'festival')
+            rowProvider
+          ]);
+        }
+
+        if (handhelds <= 0 && bodypacks <= 0 && hasModel) {
+          wirelessRows.push([
+            tx('Sistema RF', 'Wireless System'),
+            0,
+            system.model,
+            system.band || '-',
+            rowProvider
           ]);
         }
       });
@@ -634,24 +656,37 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     // Process IEM systems with individual provider information
     if (data.technical.iem.systems && data.technical.iem.systems.length > 0) {
       data.technical.iem.systems.forEach(system => {
-        const systemProvider = system.provided_by || data.technical.iem.providedBy;
+        const rowProvider = resolveRowProvider(system.provided_by, data.technical.iem.providedBy || "festival");
+        const channels = Number(system.quantity_hh ?? system.quantity ?? 0);
+        const bodypacks = Number(system.quantity_bp || 0);
+        const hasModel = typeof system.model === "string" && system.model.trim().length > 0;
         
-        if (system.quantity_hh && system.quantity_hh > 0) {
+        if (channels > 0) {
           wirelessRows.push([
             tx('Canales IEM', 'IEM Channels'),
-            system.quantity_hh,
+            channels,
             system.model,
             system.band || '-',
-            providerLabel(systemProvider || 'festival')
+            rowProvider
           ]);
         }
-        if (system.quantity_bp && system.quantity_bp > 0) {
+        if (bodypacks > 0) {
           wirelessRows.push([
             tx('Petacas IEM', 'IEM Bodypacks'),
-            system.quantity_bp,
+            bodypacks,
             system.model,
             system.band || '-',
-            providerLabel(systemProvider || 'festival')
+            rowProvider
+          ]);
+        }
+
+        if (channels <= 0 && bodypacks <= 0 && hasModel) {
+          wirelessRows.push([
+            tx('Sistema IEM', 'IEM System'),
+            0,
+            system.model,
+            system.band || '-',
+            rowProvider
           ]);
         }
       });
