@@ -173,7 +173,7 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'console',
         severity: 'warning',
-        message: `Band bringing FOH Console "${artist.foh_console}"`
+        message: `La banda aporta consola FOH "${artist.foh_console}"`
       });
     } else {
       const availableFohConsole = availableGear.foh_consoles.find(
@@ -184,15 +184,15 @@ export const compareArtistRequirements = (
         mismatches.push({
           type: 'console',
           severity: 'error',
-          message: `FOH Console "${artist.foh_console}" not available`,
-          details: `Available: ${availableGear.foh_consoles.map(c => c.model).join(', ') || 'None'}`
+          message: `Consola FOH "${artist.foh_console}" no disponible`,
+          details: `Disponible: ${availableGear.foh_consoles.map(c => c.model).join(', ') || 'Ninguna'}`
         });
       } else if (availableFohConsole.quantity < 1) {
         mismatches.push({
           type: 'console',
           severity: 'error',
-          message: `FOH Console "${artist.foh_console}" out of stock`,
-          details: `Available quantity: ${availableFohConsole.quantity}`
+          message: `Consola FOH "${artist.foh_console}" sin stock`,
+          details: `Cantidad disponible: ${availableFohConsole.quantity}`
         });
       }
     }
@@ -207,13 +207,13 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'console',
         severity: 'warning',
-        message: `Band handling FOH Waves/Outboard (${artistFohWavesOutboard})`
+        message: `La banda aporta Waves/Outboard FOH (${artistFohWavesOutboard})`
       });
     } else if (!availableFohWavesOutboard) {
       mismatches.push({
         type: 'console',
         severity: 'error',
-        message: `FOH Waves/Outboard requested but not configured in gear setup`,
+        message: `Se solicita Waves/Outboard FOH pero no está configurado en el setup de equipo`,
       });
     } else {
       const normalizedNeed = normalizeText(artistFohWavesOutboard);
@@ -227,8 +227,8 @@ export const compareArtistRequirements = (
         mismatches.push({
           type: 'console',
           severity: 'warning',
-          message: `FOH Waves/Outboard request differs from configured setup`,
-          details: `Requested: ${artistFohWavesOutboard}. Configured: ${availableFohWavesOutboard}`
+          message: `La solicitud de Waves/Outboard FOH difiere del setup configurado`,
+          details: `Solicitado: ${artistFohWavesOutboard}. Configurado: ${availableFohWavesOutboard}`
         });
       }
     }
@@ -242,7 +242,7 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'console',
         severity: 'warning',
-        message: `Band bringing Monitor Console "${artist.mon_console}"`
+        message: `La banda aporta consola de monitores "${artist.mon_console}"`
       });
     } else {
       const availableMonConsole = availableGear.mon_consoles.find(
@@ -253,15 +253,15 @@ export const compareArtistRequirements = (
         mismatches.push({
           type: 'console',
           severity: 'error',
-          message: `Monitor Console "${artist.mon_console}" not available`,
-          details: `Available: ${availableGear.mon_consoles.map(c => c.model).join(', ') || 'None'}`
+          message: `Consola de monitores "${artist.mon_console}" no disponible`,
+          details: `Disponible: ${availableGear.mon_consoles.map(c => c.model).join(', ') || 'Ninguna'}`
         });
       } else if (availableMonConsole.quantity < 1) {
         mismatches.push({
           type: 'console',
           severity: 'error',
-          message: `Monitor Console "${artist.mon_console}" out of stock`,
-          details: `Available quantity: ${availableMonConsole.quantity}`
+          message: `Consola de monitores "${artist.mon_console}" sin stock`,
+          details: `Cantidad disponible: ${availableMonConsole.quantity}`
         });
       }
     }
@@ -275,13 +275,13 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'console',
         severity: 'warning',
-        message: `Band handling MON Waves/Outboard (${artistMonWavesOutboard})`
+        message: `La banda aporta Waves/Outboard MON (${artistMonWavesOutboard})`
       });
     } else if (!availableMonWavesOutboard) {
       mismatches.push({
         type: 'console',
         severity: 'error',
-        message: `MON Waves/Outboard requested but not configured in gear setup`,
+        message: `Se solicita Waves/Outboard MON pero no está configurado en el setup de equipo`,
       });
     } else {
       const normalizedNeed = normalizeText(artistMonWavesOutboard);
@@ -295,8 +295,8 @@ export const compareArtistRequirements = (
         mismatches.push({
           type: 'console',
           severity: 'warning',
-          message: `MON Waves/Outboard request differs from configured setup`,
-          details: `Requested: ${artistMonWavesOutboard}. Configured: ${availableMonWavesOutboard}`
+          message: `La solicitud de Waves/Outboard MON difiere del setup configurado`,
+          details: `Solicitado: ${artistMonWavesOutboard}. Configurado: ${availableMonWavesOutboard}`
         });
       }
     }
@@ -310,7 +310,7 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'wireless',
         severity: 'warning',
-        message: `Band bringing wireless systems`
+        message: `La banda aporta sistemas inalámbricos`
       });
     } else if (providedBy === 'mixed') {
       // Handle mixed setups: check each system individually
@@ -334,8 +334,8 @@ export const compareArtistRequirements = (
             mismatches.push({
               type: 'wireless',
               severity: 'error',
-              message: `Wireless system "${artistWireless.model}" not available`,
-              details: `Available: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'None'}`
+              message: `Sistema inalámbrico "${artistWireless.model}" no disponible`,
+              details: `Disponible: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'Ninguno'}`
             });
           } else {
             const requiredHH = artistWireless.quantity_hh || 0;
@@ -347,8 +347,8 @@ export const compareArtistRequirements = (
               mismatches.push({
                 type: 'wireless',
                 severity: 'error',
-                message: `Insufficient wireless handheld units for "${artistWireless.model}"`,
-                details: `Required: ${requiredHH}, Available: ${availableHH}`
+                message: `Unidades inalámbricas de mano insuficientes para "${artistWireless.model}"`,
+                details: `Requiere: ${requiredHH}, Disponible: ${availableHH}`
               });
             }
             
@@ -356,8 +356,8 @@ export const compareArtistRequirements = (
               mismatches.push({
                 type: 'wireless',
                 severity: 'error',
-                message: `Insufficient wireless beltpack units for "${artistWireless.model}"`,
-                details: `Required: ${requiredBP}, Available: ${availableBP}`
+                message: `Petacas inalámbricas insuficientes para "${artistWireless.model}"`,
+                details: `Requiere: ${requiredBP}, Disponible: ${availableBP}`
               });
             }
           }
@@ -369,7 +369,7 @@ export const compareArtistRequirements = (
         mismatches.push({
           type: 'wireless',
           severity: 'warning',
-          message: `Mixed wireless setup - band providing some systems`
+          message: `Configuración inalámbrica mixta: la banda aporta parte de los sistemas`
         });
       }
     } else {
@@ -383,8 +383,8 @@ export const compareArtistRequirements = (
           mismatches.push({
             type: 'wireless',
             severity: 'error',
-            message: `Wireless system "${artistWireless.model}" not available`,
-            details: `Available: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'None'}`
+            message: `Sistema inalámbrico "${artistWireless.model}" no disponible`,
+            details: `Disponible: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'Ninguno'}`
           });
         } else {
           const requiredHH = artistWireless.quantity_hh || 0;
@@ -396,8 +396,8 @@ export const compareArtistRequirements = (
             mismatches.push({
               type: 'wireless',
               severity: 'error',
-              message: `Insufficient wireless handheld units for "${artistWireless.model}"`,
-              details: `Required: ${requiredHH}, Available: ${availableHH}`
+              message: `Unidades inalámbricas de mano insuficientes para "${artistWireless.model}"`,
+              details: `Requiere: ${requiredHH}, Disponible: ${availableHH}`
             });
           }
           
@@ -405,8 +405,8 @@ export const compareArtistRequirements = (
             mismatches.push({
               type: 'wireless',
               severity: 'error',
-              message: `Insufficient wireless beltpack units for "${artistWireless.model}"`,
-              details: `Required: ${requiredBP}, Available: ${availableBP}`
+              message: `Petacas inalámbricas insuficientes para "${artistWireless.model}"`,
+              details: `Requiere: ${requiredBP}, Disponible: ${availableBP}`
             });
           }
         }
@@ -422,7 +422,7 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'iem',
         severity: 'warning',
-        message: `Band bringing IEM systems`
+        message: `La banda aporta sistemas IEM`
       });
     } else if (providedBy === 'mixed') {
       // Handle mixed setups: check each system individually
@@ -446,8 +446,8 @@ export const compareArtistRequirements = (
             mismatches.push({
               type: 'iem',
               severity: 'error',
-              message: `IEM system "${artistIEM.model}" not available`,
-              details: `Available: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'None'}`
+              message: `Sistema IEM "${artistIEM.model}" no disponible`,
+              details: `Disponible: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'Ninguno'}`
             });
           } else {
             const requiredChannels = artistIEM.quantity_hh || artistIEM.quantity || 0;
@@ -459,8 +459,8 @@ export const compareArtistRequirements = (
               mismatches.push({
                 type: 'iem',
                 severity: 'error',
-                message: `Insufficient IEM channels for "${artistIEM.model}"`,
-                details: `Required: ${requiredChannels}, Available: ${availableChannels}`
+                message: `Canales IEM insuficientes para "${artistIEM.model}"`,
+                details: `Requiere: ${requiredChannels}, Disponible: ${availableChannels}`
               });
             }
             
@@ -468,8 +468,8 @@ export const compareArtistRequirements = (
               mismatches.push({
                 type: 'iem',
                 severity: 'error',
-                message: `Insufficient IEM beltpacks for "${artistIEM.model}"`,
-                details: `Required: ${requiredBP}, Available: ${availableBP}`
+                message: `Petacas IEM insuficientes para "${artistIEM.model}"`,
+                details: `Requiere: ${requiredBP}, Disponible: ${availableBP}`
               });
             }
           }
@@ -481,7 +481,7 @@ export const compareArtistRequirements = (
         mismatches.push({
           type: 'iem',
           severity: 'warning',
-          message: `Mixed IEM setup - band providing some systems`
+          message: `Configuración IEM mixta: la banda aporta parte de los sistemas`
         });
       }
     } else {
@@ -495,8 +495,8 @@ export const compareArtistRequirements = (
           mismatches.push({
             type: 'iem',
             severity: 'error',
-            message: `IEM system "${artistIEM.model}" not available`,
-            details: `Available: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'None'}`
+            message: `Sistema IEM "${artistIEM.model}" no disponible`,
+            details: `Disponible: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'Ninguno'}`
           });
         } else {
           const requiredChannels = artistIEM.quantity_hh || artistIEM.quantity || 0;
@@ -508,8 +508,8 @@ export const compareArtistRequirements = (
             mismatches.push({
               type: 'iem',
               severity: 'error',
-              message: `Insufficient IEM channels for "${artistIEM.model}"`,
-              details: `Required: ${requiredChannels}, Available: ${availableChannels}`
+              message: `Canales IEM insuficientes para "${artistIEM.model}"`,
+              details: `Requiere: ${requiredChannels}, Disponible: ${availableChannels}`
             });
           }
           
@@ -517,8 +517,8 @@ export const compareArtistRequirements = (
             mismatches.push({
               type: 'iem',
               severity: 'error',
-              message: `Insufficient IEM beltpacks for "${artistIEM.model}"`,
-              details: `Required: ${requiredBP}, Available: ${availableBP}`
+              message: `Petacas IEM insuficientes para "${artistIEM.model}"`,
+              details: `Requiere: ${requiredBP}, Disponible: ${availableBP}`
             });
           }
         }
@@ -550,13 +550,13 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'microphones',
         severity: 'warning',
-        message: `Band bringing microphone kit (${artist.wired_mics?.length || 0} mic types)`
+        message: `La banda aporta kit de micrófonos (${artist.wired_mics?.length || 0} tipos de micro)`
       });
     } else {
       mismatches.push({
         type: 'microphones',
         severity: 'warning',
-        message: `Band bringing microphone kit`
+        message: `La banda aporta kit de micrófonos`
       });
     }
   } else if (micKitProvider === 'festival' || micKitProvider === 'mixed') {
@@ -574,8 +574,8 @@ export const compareArtistRequirements = (
         mismatches.push({
           type: 'microphones',
           severity: 'error',
-          message: `Festival microphones required but none configured`,
-          details: `Artist needs ${artist.wired_mics?.length || 0} microphone types but festival has no mics available`
+          message: `Se requieren micrófonos de festival pero no hay ninguno configurado`,
+          details: `El artista necesita ${artist.wired_mics?.length || 0} tipos de micro, pero el festival no tiene micros disponibles`
         });
       } else {
         console.log('Festival has mics, checking individual requirements...');
@@ -595,16 +595,16 @@ export const compareArtistRequirements = (
             mismatches.push({
               type: 'microphones',
               severity: 'error',
-              message: `Wired microphone "${artistMic.model}" not available`,
-              details: `Available: ${availableGear.wired_mics.map(m => m.model).join(', ') || 'None'}`
+              message: `Micrófono cableado "${artistMic.model}" no disponible`,
+              details: `Disponible: ${availableGear.wired_mics.map(m => m.model).join(', ') || 'Ninguno'}`
             });
           } else if (availableMic.quantity < artistMic.quantity) {
             console.log(`ERROR: Insufficient quantity for "${artistMic.model}"`);
             mismatches.push({
               type: 'microphones',
               severity: 'error',
-              message: `Insufficient "${artistMic.model}" microphones`,
-              details: `Required: ${artistMic.quantity}, Available: ${availableMic.quantity}`
+              message: `Micrófonos "${artistMic.model}" insuficientes`,
+              details: `Requiere: ${artistMic.quantity}, Disponible: ${availableMic.quantity}`
             });
           } else {
             console.log(`OK: Mic "${artistMic.model}" available with sufficient quantity`);
@@ -616,7 +616,7 @@ export const compareArtistRequirements = (
         mismatches.push({
           type: 'microphones',
           severity: 'warning',
-          message: `Mixed microphone setup - band providing additional mics`
+          message: `Configuración de micrófonos mixta: la banda aporta micros adicionales`
         });
       }
     } else if (micKitProvider === 'festival') {
@@ -625,7 +625,7 @@ export const compareArtistRequirements = (
         mismatches.push({
           type: 'microphones',
           severity: 'warning',
-          message: `Festival microphone kit expected but none configured`
+          message: `Se espera kit de micrófonos de festival, pero no hay ninguno configurado`
         });
       }
     }
@@ -642,8 +642,8 @@ export const compareArtistRequirements = (
     mismatches.push({
       type: 'monitors',
       severity: 'error',
-      message: `Insufficient monitors`,
-      details: `Required: ${artist.monitors_quantity}, Available: ${availableGear.available_monitors}`
+      message: `Monitores insuficientes`,
+      details: `Requiere: ${artist.monitors_quantity}, Disponible: ${availableGear.available_monitors}`
     });
   }
 
@@ -652,7 +652,7 @@ export const compareArtistRequirements = (
     mismatches.push({
       type: 'extras',
       severity: 'warning',
-      message: `Side fills requested but not available`
+      message: `Se solicitan side fills, pero no están disponibles`
     });
   }
 
@@ -660,7 +660,7 @@ export const compareArtistRequirements = (
     mismatches.push({
       type: 'extras',
       severity: 'warning',
-      message: `Drum fills requested but not available`
+      message: `Se solicitan drum fills, pero no están disponibles`
     });
   }
 
@@ -668,7 +668,7 @@ export const compareArtistRequirements = (
     mismatches.push({
       type: 'extras',
       severity: 'warning',
-      message: `DJ booth requested but not available`
+      message: `Se solicita cabina DJ, pero no está disponible`
     });
   }
 
@@ -679,15 +679,15 @@ export const compareArtistRequirements = (
     mismatches.push({
       type: 'infrastructure',
       severity: 'warning',
-      message: `Band bringing infrastructure`
+      message: `La banda aporta infraestructura`
     });
   } else {
     if (artist.infra_cat6 && (artist.infra_cat6_quantity || 0) > availableGear.available_cat6_runs) {
       mismatches.push({
         type: 'infrastructure',
         severity: 'error',
-        message: `Insufficient CAT6 runs`,
-        details: `Required: ${artist.infra_cat6_quantity || 0}, Available: ${availableGear.available_cat6_runs}`
+        message: `Tiradas CAT6 insuficientes`,
+        details: `Requiere: ${artist.infra_cat6_quantity || 0}, Disponible: ${availableGear.available_cat6_runs}`
       });
     }
 
@@ -695,8 +695,8 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'infrastructure',
         severity: 'error',
-        message: `Insufficient HMA runs`,
-        details: `Required: ${artist.infra_hma_quantity || 0}, Available: ${availableGear.available_hma_runs}`
+        message: `Tiradas HMA insuficientes`,
+        details: `Requiere: ${artist.infra_hma_quantity || 0}, Disponible: ${availableGear.available_hma_runs}`
       });
     }
 
@@ -704,8 +704,8 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'infrastructure',
         severity: 'error',
-        message: `Insufficient Coax runs`,
-        details: `Required: ${artist.infra_coax_quantity || 0}, Available: ${availableGear.available_coax_runs}`
+        message: `Tiradas coaxiales insuficientes`,
+        details: `Requiere: ${artist.infra_coax_quantity || 0}, Disponible: ${availableGear.available_coax_runs}`
       });
     }
 
@@ -713,8 +713,8 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'infrastructure',
         severity: 'error',
-        message: `Insufficient OpticalCON DUO runs`,
-        details: `Required: ${artist.infra_opticalcon_duo_quantity || 0}, Available: ${availableGear.available_opticalcon_duo_runs}`
+        message: `Tiradas OpticalCON DUO insuficientes`,
+        details: `Requiere: ${artist.infra_opticalcon_duo_quantity || 0}, Disponible: ${availableGear.available_opticalcon_duo_runs}`
       });
     }
 
@@ -722,8 +722,8 @@ export const compareArtistRequirements = (
       mismatches.push({
         type: 'infrastructure',
         severity: 'error',
-        message: `Insufficient analog runs`,
-        details: `Required: ${artist.infra_analog || 0}, Available: ${availableGear.available_analog_runs}`
+        message: `Tiradas analógicas insuficientes`,
+        details: `Requiere: ${artist.infra_analog || 0}, Disponible: ${availableGear.available_analog_runs}`
       });
     }
   }
