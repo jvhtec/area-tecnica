@@ -113,7 +113,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   });
 
   const { data: waGroup, refetch: refetchWaGroup } = useQuery({
-    queryKey: ['job-whatsapp-group', resolvedJobId, waDepartment],
+    queryKey: ['job-whatsapp-group', resolvedJobId, waDepartment, 0],
     enabled: !!resolvedJobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
     queryFn: async () => {
       if (!resolvedJobId) return null;
@@ -122,6 +122,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         .select('id, wa_group_id')
         .eq('job_id', resolvedJobId)
         .eq('department', waDepartment)
+        .eq('stage_number', 0)
         .maybeSingle();
       if (error) return null;
       return data;
@@ -129,7 +130,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   });
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
-    queryKey: ['job-whatsapp-group-request', resolvedJobId, waDepartment],
+    queryKey: ['job-whatsapp-group-request', resolvedJobId, waDepartment, 0],
     enabled: !!resolvedJobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
     queryFn: async () => {
       if (!resolvedJobId) return null;
@@ -138,6 +139,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         .select('id, created_at')
         .eq('job_id', resolvedJobId)
         .eq('department', waDepartment)
+        .eq('stage_number', 0)
         .maybeSingle();
       if (error) return null;
       return data;
@@ -240,7 +242,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
 
       // Invoke the existing edge function
       const { data: fnRes, error: fnErr } = await supabase.functions.invoke('create-whatsapp-group', {
-        body: { job_id: jobRow.id, department: waDepartment }
+        body: { job_id: jobRow.id, department: waDepartment, stage_number: 0 }
       });
       if (fnErr) {
         toast({ title: 'Error al crear grupo', description: fnErr.message, variant: 'destructive' });
@@ -287,7 +289,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       // Clear the failed request using RPC function with correct job_id
       const { data: clearResult, error: clearError } = await supabase.rpc(
         'clear_whatsapp_group_request',
-        { p_job_id: jobId, p_department: waDepartment }
+        { p_job_id: jobId, p_department: waDepartment, p_stage_number: 0 }
       );
 
       if (clearError) {

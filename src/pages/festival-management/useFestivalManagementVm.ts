@@ -17,6 +17,11 @@ import { format, isValid } from "date-fns";
 
 import type { ArtistRiderFile, FestivalJob, JobDocumentEntry } from "./types";
 
+type FestivalStageOption = {
+  number: number;
+  name: string;
+};
+
 export type FestivalManagementVmResult =
   | { status: "missing_job_id" }
   | { status: "loading" }
@@ -44,6 +49,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
   const { userRole } = useOptimizedAuth();
   const [maxStages, setMaxStages] = useState(1);
+  const [festivalStageOptions, setFestivalStageOptions] = useState<FestivalStageOption[]>([]);
   const { flexUuid, isLoading: isFlexLoading, error: flexError, folderExists, refetch: refetchFlexUuid } = useFlexUuid(jobId || "");
   const [jobDocuments, setJobDocuments] = useState<JobDocumentEntry[]>([]);
   const [artistRiderFiles, setArtistRiderFiles] = useState<ArtistRiderFile[]>([]);
@@ -83,6 +89,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [uuidProduction, setUuidProduction] = useState("");
   const [isWhatsappDialogOpen, setIsWhatsappDialogOpen] = useState(false);
   const [waDepartment, setWaDepartment] = useState<'sound' | 'lights' | 'video'>('sound');
+  const [waStageNumber, setWaStageNumber] = useState<number>(0);
   const [isAlmacenDialogOpen, setIsAlmacenDialogOpen] = useState(false);
   const [waMessage, setWaMessage] = useState<string>("");
   const [isSendingWa, setIsSendingWa] = useState(false);
@@ -91,7 +98,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
 
   // Check if WhatsApp group already exists for this job/department
   const { data: waGroup, refetch: refetchWaGroup } = useQuery({
-    queryKey: ['job-whatsapp-group', jobId, waDepartment],
+    queryKey: ['job-whatsapp-group', jobId, waDepartment, waStageNumber],
     enabled: !!jobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
     queryFn: async () => {
       if (!jobId) return null;
@@ -100,6 +107,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         .select('id, wa_group_id')
         .eq('job_id', jobId)
         .eq('department', waDepartment)
+        .eq('stage_number', waStageNumber)
         .maybeSingle();
       if (error) return null;
       return data;
@@ -107,7 +115,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   });
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
-    queryKey: ['job-whatsapp-group-request', jobId, waDepartment],
+    queryKey: ['job-whatsapp-group-request', jobId, waDepartment, waStageNumber],
     enabled: !!jobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
     queryFn: async () => {
       if (!jobId) return null;
@@ -116,11 +124,29 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         .select('id, created_at')
         .eq('job_id', jobId)
         .eq('department', waDepartment)
+        .eq('stage_number', waStageNumber)
         .maybeSingle();
       if (error) return null;
       return data;
     }
   });
+
+  useEffect(() => {
+    const total = Math.max(maxStages, 1);
+    const usesStageScopedWhatsapp = waDepartment !== "lights";
+
+    if (!usesStageScopedWhatsapp) {
+      setWaStageNumber(0);
+      return;
+    }
+
+    if (total > 1) {
+      setWaStageNumber((prev) => (prev >= 1 && prev <= total ? prev : 1));
+      return;
+    }
+
+    setWaStageNumber(0);
+  }, [maxStages, waDepartment]);
 
   const resolveJobDocumentLocation = useCallback((path: string) => resolveJobDocLocation(path), []);
 
@@ -175,11 +201,53 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
           .order("created_at", { ascending: false })
           .limit(1);
 
+        let resolvedMaxStages = 1;
         if (gearError) {
           console.error("Error fetching gear setup:", gearError);
         } else if (gearSetups && gearSetups.length > 0) {
-          setMaxStages(gearSetups[0].max_stages || 1);
+          resolvedMaxStages = Math.max(gearSetups[0].max_stages || 1, 1);
         }
+
+        const { data: stageRows, error: stageError } = await supabase
+          .from("festival_stages")
+          .select("number, name")
+          .eq("job_id", jobId)
+          .order("number", { ascending: true });
+
+        if (stageError) {
+          console.error("Error fetching festival stages:", stageError);
+          setFestivalStageOptions(
+            Array.from({ length: resolvedMaxStages }, (_, idx) => ({
+              number: idx + 1,
+              name: `Stage ${idx + 1}`,
+            })),
+          );
+        } else {
+          const configuredHighestStage = Math.max(
+            0,
+            ...(stageRows || [])
+              .map((row) => Number(row.number))
+              .filter((value) => Number.isFinite(value) && value > 0),
+          );
+          const totalStages = Math.max(resolvedMaxStages, configuredHighestStage, 1);
+          const stageNameMap = new Map<number, string>(
+            (stageRows || [])
+              .filter((row) => typeof row.number === "number")
+              .map((row) => [row.number, row.name || `Stage ${row.number}`]),
+          );
+
+          setFestivalStageOptions(
+            Array.from({ length: totalStages }, (_, idx) => {
+              const stageNumber = idx + 1;
+              return {
+                number: stageNumber,
+                name: stageNameMap.get(stageNumber) || `Stage ${stageNumber}`,
+              };
+            }),
+          );
+          resolvedMaxStages = totalStages;
+        }
+        setMaxStages(resolvedMaxStages);
 
         if (jobData.location_id) {
           const { data: loc, error: locError } = await supabase
@@ -971,7 +1039,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
       try {
         setIsSendingWa(true);
         const { error } = await supabase.functions.invoke("create-whatsapp-group", {
-          body: { job_id: jobId, department: waDepartment },
+          body: { job_id: jobId, department: waDepartment, stage_number: waStageNumber },
         });
         if (error) throw error;
         toast({
@@ -992,7 +1060,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         setIsSendingWa(false);
       }
     },
-    [jobId, waDepartment, refetchWaGroup, refetchWaRequest, toast],
+    [jobId, waDepartment, waStageNumber, refetchWaGroup, refetchWaRequest, toast],
   );
 
   const handleRetryWhatsappGroup = useCallback(
@@ -1007,7 +1075,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         // Clear the failed request using RPC function
         const { data: clearResult, error: clearError } = await supabase.rpc(
           'clear_whatsapp_group_request',
-          { p_job_id: jobId, p_department: waDepartment }
+          { p_job_id: jobId, p_department: waDepartment, p_stage_number: waStageNumber }
         );
 
         if (clearError) {
@@ -1054,7 +1122,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         setIsSendingWa(false);
       }
     },
-    [jobId, waDepartment, refetchWaGroup, refetchWaRequest, handleCreateWhatsappGroup, toast],
+    [jobId, waDepartment, waStageNumber, refetchWaGroup, refetchWaRequest, handleCreateWhatsappGroup, toast],
   );
 
   const handleSendToAlmacen = useCallback(
@@ -1249,6 +1317,9 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
     setIsWhatsappDialogOpen,
     waDepartment,
     setWaDepartment,
+    waStageNumber,
+    setWaStageNumber,
+    festivalStageOptions,
     waGroup,
     waRequest,
     isSendingWa,
@@ -1277,4 +1348,3 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
 
   return { status: "ready", vm };
 };
-

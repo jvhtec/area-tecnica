@@ -370,7 +370,7 @@ function JobCardNewFull({
 
   // WhatsApp group existence for this job + department (for management only)
   const { data: waGroup, refetch: refetchWaGroup } = useQuery({
-    queryKey: ['job-whatsapp-group', job.id, department],
+    queryKey: ['job-whatsapp-group', job.id, department, 0],
     enabled: !!job?.id && !!department && (userRole === 'management' || userRole === 'admin'),
     queryFn: async () => {
       const { data, error } = await supabase
@@ -378,6 +378,7 @@ function JobCardNewFull({
         .select('id, wa_group_id')
         .eq('job_id', job.id)
         .eq('department', department)
+        .eq('stage_number', 0)
         .maybeSingle();
       if (error) return null;
       return data;
@@ -385,7 +386,7 @@ function JobCardNewFull({
   });
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
-    queryKey: ['job-whatsapp-group-request', job.id, department],
+    queryKey: ['job-whatsapp-group-request', job.id, department, 0],
     enabled: !!job?.id && !!department && (userRole === 'management' || userRole === 'admin'),
     queryFn: async () => {
       const { data, error } = await supabase
@@ -393,6 +394,7 @@ function JobCardNewFull({
         .select('id, created_at')
         .eq('job_id', job.id)
         .eq('department', department)
+        .eq('stage_number', 0)
         .maybeSingle();
       if (error) return null;
       return data;
@@ -467,7 +469,7 @@ function JobCardNewFull({
       }
 
       const { data, error } = await supabase.functions.invoke('create-whatsapp-group', {
-        body: { job_id: job.id as string, department: department as any }
+        body: { job_id: job.id as string, department: department as any, stage_number: 0 }
       });
       if (error) {
         // Even on error, lock may have been recorded. We'll refetch lock and inform user.
@@ -502,7 +504,7 @@ function JobCardNewFull({
       // Clear the failed request using RPC function
       const { data: clearResult, error: clearError } = await supabase.rpc(
         'clear_whatsapp_group_request',
-        { p_job_id: job.id, p_department: department }
+        { p_job_id: job.id, p_department: department, p_stage_number: 0 }
       );
 
       if (clearError) {

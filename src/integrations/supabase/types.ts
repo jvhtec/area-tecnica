@@ -3867,18 +3867,21 @@ export type Database = {
           department: string
           id: string
           job_id: string
+          stage_number: number
         }
         Insert: {
           created_at?: string
           department: string
           id?: string
           job_id: string
+          stage_number?: number
         }
         Update: {
           created_at?: string
           department?: string
           id?: string
           job_id?: string
+          stage_number?: number
         }
         Relationships: [
           {
@@ -3910,6 +3913,7 @@ export type Database = {
           department: string
           id: string
           job_id: string
+          stage_number: number
           wa_group_id: string
         }
         Insert: {
@@ -3917,6 +3921,7 @@ export type Database = {
           department: string
           id?: string
           job_id: string
+          stage_number?: number
           wa_group_id: string
         }
         Update: {
@@ -3924,6 +3929,7 @@ export type Database = {
           department?: string
           id?: string
           job_id?: string
+          stage_number?: number
           wa_group_id?: string
         }
         Relationships: [

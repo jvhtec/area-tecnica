@@ -13,6 +13,7 @@ const corsHeaders = {
 interface CreateRequest {
   job_id: string;
   department: Dept;
+  stage_number?: number | string;
 }
 
 function normalizePhone(raw: string, defaultCountry: string): { ok: true; value: string } | { ok: false; reason: string } {
@@ -47,8 +48,35 @@ serve(async (req: Request) => {
   try {
     const url = new URL(req.url);
     const finalizeOnly = url.searchParams.get('finalize') === '1';
-    const { job_id, department } = await req.json() as CreateRequest;
-    if (!job_id || !department || !['sound','lights','video'].includes(department)) {
+    const { job_id, department, stage_number } = await req.json() as CreateRequest;
+    let parsedStageNumber: number | null = null;
+    if (stage_number !== undefined) {
+      if (typeof stage_number === 'string') {
+        const trimmed = stage_number.trim();
+        if (!/^\d+$/.test(trimmed)) {
+          return new Response(
+            JSON.stringify({ error: 'Invalid stage_number: must be a non-negative integer' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+        parsedStageNumber = Number.parseInt(trimmed, 10);
+      } else if (typeof stage_number === 'number' && Number.isInteger(stage_number) && stage_number >= 0) {
+        parsedStageNumber = stage_number;
+      } else {
+        return new Response(
+          JSON.stringify({ error: 'Invalid stage_number: must be a non-negative integer' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+    }
+    const stageNumber = parsedStageNumber ?? 0;
+    const effectiveStageNumber = department === 'lights' ? 0 : stageNumber;
+
+    if (
+      !job_id ||
+      !department ||
+      !['sound','lights','video'].includes(department)
+    ) {
       return new Response(JSON.stringify({ error: 'Missing or invalid parameters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -94,6 +122,7 @@ serve(async (req: Request) => {
       .select('id, wa_group_id')
       .eq('job_id', job_id)
       .eq('department', department)
+      .eq('stage_number', effectiveStageNumber)
       .maybeSingle();
     if (existingErr && existingErr.message) {
       console.warn('job_whatsapp_groups lookup error', existingErr);
@@ -108,6 +137,7 @@ serve(async (req: Request) => {
       .select('id')
       .eq('job_id', job_id)
       .eq('department', department)
+      .eq('stage_number', effectiveStageNumber)
       .maybeSingle();
     if (priorReq && !finalizeOnly) {
       return new Response(JSON.stringify({ success: true, wa_group_id: null, note: 'Group request already recorded (locked)' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -117,7 +147,7 @@ serve(async (req: Request) => {
     if (!priorReq) {
       const { error: lockErr } = await supabaseAdmin
         .from('job_whatsapp_group_requests')
-        .insert({ job_id, department });
+        .insert({ job_id, department, stage_number: effectiveStageNumber });
       if (lockErr && !(lockErr as any)?.code?.includes?.('23505')) {
         // Not a unique violation; fail explicitly
         return new Response(JSON.stringify({ error: 'Failed to record group request', details: lockErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -127,46 +157,127 @@ serve(async (req: Request) => {
     // Fetch job details
     const { data: job, error: jobErr } = await supabaseAdmin
       .from('jobs')
-      .select('id, title, start_time, timezone, tour_id')
+      .select('id, title, tour_id')
       .eq('id', job_id)
       .maybeSingle();
     if (!job || jobErr) return new Response(JSON.stringify({ error: 'Job not found', details: jobErr?.message }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    // Fetch assignments + profiles
-    const { data: assigns, error: assignsErr } = await supabaseAdmin
-      .from('job_assignments')
-      .select(`
-        technician_id,
-        sound_role, lights_role, video_role,
-        profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
-      `)
-      .eq('job_id', job_id);
-    if (assignsErr) {
-      console.warn('job_assignments fetch error', assignsErr);
+    let stageDisplayName: string | null = null;
+    if (effectiveStageNumber > 0) {
+      try {
+        const { data: stageRow, error: stageErr } = await supabaseAdmin
+          .from('festival_stages')
+          .select('name')
+          .eq('job_id', job_id)
+          .eq('number', effectiveStageNumber)
+          .maybeSingle();
+        if (stageErr) {
+          console.warn('festival_stages fetch error', stageErr);
+        }
+        stageDisplayName = (stageRow?.name || '').trim() || `Stage ${effectiveStageNumber}`;
+      } catch (e) {
+        console.warn('festival_stages lookup failed', e);
+        stageDisplayName = `Stage ${effectiveStageNumber}`;
+      }
     }
 
     const defaultCC = Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34';
     const participants: string[] = [];
     const missing: string[] = [];
     const invalid: string[] = [];
+    if (effectiveStageNumber > 0) {
+      const { data: stageAssignments, error: stageAssignmentsErr } = await supabaseAdmin
+        .from('festival_shift_assignments')
+        .select(`
+          technician_id,
+          festival_shifts!inner (
+            job_id,
+            department,
+            stage
+          )
+        `)
+        .eq('festival_shifts.job_id', job_id)
+        .eq('festival_shifts.department', department)
+        .eq('festival_shifts.stage', effectiveStageNumber)
+        .not('technician_id', 'is', null);
 
-    const rows = (assigns ?? []).filter((r: any) => {
-      if (department === 'sound') return !!r.sound_role;
-      if (department === 'lights') return !!r.lights_role;
-      if (department === 'video') return !!r.video_role;
-      return false;
-    });
-
-    for (const r of rows) {
-      const fullName = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Tecnico';
-      const rawPhone = (r.profiles?.phone || '').trim();
-      if (!rawPhone) {
-        missing.push(fullName);
-        continue;
+      if (stageAssignmentsErr) {
+        console.warn('festival_shift_assignments fetch error', stageAssignmentsErr);
       }
-      const norm = normalizePhone(rawPhone, defaultCC);
-      if (norm.ok) participants.push(norm.value);
-      else invalid.push(`${fullName} (${rawPhone})`);
+
+      const technicianIds = Array.from(
+        new Set(
+          (stageAssignments || [])
+            .map((row: any) => row.technician_id)
+            .filter((id: string | null) => !!id)
+        )
+      );
+
+      if (technicianIds.length === 0) {
+        return new Response(
+          JSON.stringify({
+            error: 'No technicians assigned to selected stage',
+            stage_number: effectiveStageNumber,
+            department,
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const { data: stageProfiles, error: stageProfilesErr } = await supabaseAdmin
+        .from('profiles')
+        .select('id, first_name, last_name, phone')
+        .in('id', technicianIds);
+
+      if (stageProfilesErr) {
+        console.warn('profiles fetch error for stage participants', stageProfilesErr);
+      }
+
+      const profileById = new Map((stageProfiles || []).map((p: any) => [p.id, p]));
+      for (const technicianId of technicianIds) {
+        const profile = profileById.get(technicianId);
+        const fullName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Tecnico';
+        const rawPhone = (profile?.phone || '').trim();
+        if (!rawPhone) {
+          missing.push(fullName);
+          continue;
+        }
+        const norm = normalizePhone(rawPhone, defaultCC);
+        if (norm.ok) participants.push(norm.value);
+        else invalid.push(`${fullName} (${rawPhone})`);
+      }
+    } else {
+      // Default behavior: recipients come from job assignments by department.
+      const { data: assigns, error: assignsErr } = await supabaseAdmin
+        .from('job_assignments')
+        .select(`
+          technician_id,
+          sound_role, lights_role, video_role,
+          profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
+        `)
+        .eq('job_id', job_id);
+      if (assignsErr) {
+        console.warn('job_assignments fetch error', assignsErr);
+      }
+
+      const rows = (assigns ?? []).filter((r: any) => {
+        if (department === 'sound') return !!r.sound_role;
+        if (department === 'lights') return !!r.lights_role;
+        if (department === 'video') return !!r.video_role;
+        return false;
+      });
+
+      for (const r of rows) {
+        const fullName = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Tecnico';
+        const rawPhone = (r.profiles?.phone || '').trim();
+        if (!rawPhone) {
+          missing.push(fullName);
+          continue;
+        }
+        const norm = normalizePhone(rawPhone, defaultCC);
+        if (norm.ok) participants.push(norm.value);
+        else invalid.push(`${fullName} (${rawPhone})`);
+      }
     }
 
     // Always include management user for the department (if phone exists and matches department)
@@ -216,7 +327,8 @@ serve(async (req: Request) => {
     if (apiKey) headers['X-API-Key'] = apiKey;
 
     const deptNameEs = department === 'sound' ? 'Sonido' : department === 'lights' ? 'Luces' : 'Video';
-    const subject = `${job.title} - ${deptNameEs}`;
+    const stageSuffix = effectiveStageNumber > 0 ? ` - ${stageDisplayName || `Stage ${effectiveStageNumber}`}` : '';
+    const subject = `${job.title} - ${deptNameEs}${stageSuffix}`;
 
     // WAHA expects JIDs like 34900111222@c.us and an object list
     const session = (cfg?.[0] as any)?.session || Deno.env.get('WAHA_SESSION') || 'default';
@@ -350,7 +462,7 @@ serve(async (req: Request) => {
     // Persist
     const { error: insErr } = await supabaseAdmin
       .from('job_whatsapp_groups')
-      .insert({ job_id, department, wa_group_id });
+      .insert({ job_id, department, stage_number: effectiveStageNumber, wa_group_id });
     if (insErr) {
       // Best effort to not leave group untracked, still respond with success but include warning
       console.warn('Failed to persist job_whatsapp_groups:', insErr);
@@ -475,15 +587,7 @@ serve(async (req: Request) => {
     }
 
     // Send welcome message (best effort) using WAHA /api/sendText
-    const startStr = (() => {
-      try {
-        const dt = job.start_time ? new Date(job.start_time) : null;
-        if (!dt) return '';
-        return `\nFecha: ${dt.toLocaleDateString('es-ES')} ${dt.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}`;
-      } catch { return ''; }
-    })();
-
-    const message = `👋 Bienvenidos al grupo de ${job.title} - ${deptNameEs}.\nUsad este chat para la coordinación.${startStr}`;
+    const message = `👋 Bienvenidos al grupo de ${job.title} - ${deptNameEs}${stageSuffix}.\nUsad este chat para la coordinación.`;
     try {
       const msgBody = { chatId: wa_group_id, text: message, session } as const;
       const sendUrl = `${base}/api/sendText`;
@@ -506,7 +610,13 @@ serve(async (req: Request) => {
       }
     } catch (_) { /* ignore */ }
 
-    const resp: any = { success: true, wa_group_id, warnings: { missing, invalid }, participants: uniqueParticipants };
+    const resp: any = {
+      success: true,
+      wa_group_id,
+      stage_number: effectiveStageNumber,
+      warnings: { missing, invalid },
+      participants: uniqueParticipants
+    };
     if (usedFallback) resp.note = 'Grupo creado con 1 participante por fallback; añadiremos el resto en una futura sincronización.';
     return new Response(JSON.stringify(resp), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err) {

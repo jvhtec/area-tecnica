@@ -88,6 +88,9 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
     setIsWhatsappDialogOpen,
     waDepartment,
     setWaDepartment,
+    waStageNumber,
+    setWaStageNumber,
+    festivalStageOptions,
     waGroup,
     waRequest,
     isSendingWa,
@@ -105,6 +108,14 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
     isDeleting,
     handleDeleteJob,
   } = vm;
+  const festivalWhatsappStageOptions =
+    festivalStageOptions.length > 0
+      ? festivalStageOptions
+      : Array.from({ length: maxStages }, (_, idx) => ({
+          number: idx + 1,
+          name: `Stage ${idx + 1}`,
+        }));
+  const requiresStageScopedWhatsapp = maxStages > 1 && waDepartment !== "lights";
 
   return (
     <>
@@ -366,11 +377,27 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
                 </label>
               </div>
             </div>
+            {requiresStageScopedWhatsapp && (
+              <div>
+                <label className="block text-sm font-medium mb-2">Stage</label>
+                <select
+                  className="w-full h-9 rounded-md border bg-background px-3 text-sm"
+                  value={waStageNumber > 0 ? String(waStageNumber) : ""}
+                  onChange={(e) => setWaStageNumber(Number.parseInt(e.target.value, 10))}
+                >
+                  {festivalWhatsappStageOptions.map((stage) => (
+                    <option key={stage.number} value={stage.number}>
+                      {stage.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             {/* Show status if group exists or request pending */}
             {waGroup && (
               <div className="rounded-md bg-green-50 border border-green-200 p-3">
                 <p className="text-sm text-green-800 font-medium">
-                  ✓ Grupo ya creado para este departamento
+                  ✓ Grupo ya creado para este departamento{requiresStageScopedWhatsapp && waStageNumber > 0 ? ` (Stage ${waStageNumber})` : ""}
                 </p>
               </div>
             )}
@@ -389,7 +416,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
             {waRequest && !waGroup ? (
               <Button
                 onClick={handleRetryWhatsappGroup}
-                disabled={isSendingWa}
+                disabled={isSendingWa || (requiresStageScopedWhatsapp && waStageNumber < 1)}
                 className="bg-orange-500 hover:bg-orange-600"
               >
                 {isSendingWa ? "Reintentando..." : "Reintentar Crear Grupo"}
@@ -397,7 +424,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
             ) : (
               <Button
                 onClick={handleCreateWhatsappGroup}
-                disabled={isSendingWa || !!waGroup}
+                disabled={isSendingWa || !!waGroup || (requiresStageScopedWhatsapp && waStageNumber < 1)}
               >
                 {isSendingWa ? "Creando..." : waGroup ? "Grupo Creado" : "Crear Grupo"}
               </Button>
@@ -465,4 +492,3 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
     </>
   );
 };
-
