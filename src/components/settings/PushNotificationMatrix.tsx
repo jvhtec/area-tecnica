@@ -114,6 +114,7 @@ const FALLBACK_EVENTS: EventInfo[] = [
   { code: 'tourdate.type.changed.rehearsal', label: 'Tour date changed to Rehearsal' },
   { code: 'tourdate.type.changed.travel', label: 'Tour date changed to Travel' },
   { code: 'tourdate.type.changed.setup', label: 'Tour date changed to Setup' },
+  { code: 'tourdate.type.changed.rigging', label: 'Tour date changed to Rigging' },
   { code: 'tourdate.type.changed.off', label: 'Tour date changed to Day Off' },
 
   // Job date events
@@ -122,6 +123,7 @@ const FALLBACK_EVENTS: EventInfo[] = [
   { code: 'jobdate.type.changed.rehearsal', label: 'Job date changed to Rehearsal' },
   { code: 'jobdate.type.changed.travel', label: 'Job date changed to Travel' },
   { code: 'jobdate.type.changed.setup', label: 'Job date changed to Setup' },
+  { code: 'jobdate.type.changed.rigging', label: 'Job date changed to Rigging' },
   { code: 'jobdate.type.changed.off', label: 'Job date changed to Day Off' },
 
   // SoundVision

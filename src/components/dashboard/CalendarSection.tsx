@@ -29,6 +29,7 @@ import { toZonedTime } from "date-fns-tz";
 import { useOptimizedDateTypes } from "@/hooks/useOptimizedDateTypes";
 import { useToast } from "@/hooks/use-toast";
 import { isJobOnDate } from "@/utils/timezoneUtils";
+import { DateType, DATE_TYPE_META, DATE_TYPE_ORDER, getDateTypeMeta } from "@/constants/dateTypes";
 
 interface CalendarSectionProps {
   date: Date | undefined;
@@ -297,13 +298,10 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
     const cellPadding = 2;
 
     const daysOfWeek = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-    const dateTypeLabels: Record<string, string> = {
-      travel: "V",
-      setup: "M",
-      show: "S",
-      off: "O",
-      rehearsal: "E",
-    };
+    const dateTypeLabels: Record<DateType, string> = DATE_TYPE_ORDER.reduce((acc, type) => {
+      acc[type] = DATE_TYPE_META[type].shortLabel;
+      return acc;
+    }, {} as Record<DateType, string>);
 
     // Helper function to calculate events for a day
     const getEventsForDayPdf = (day: Date) => { // Renamed to avoid conflict with memoized one
@@ -462,7 +460,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
           for (const [index, job] of dayJobs.slice(0, maxEventsToShow).entries()) {
             const key = `${job.id}-${format(day, "yyyy-MM-dd")}`;
             const dateType = dateTypes[key]?.type;
-            const typeLabel = dateType ? dateTypeLabels[dateType] : "";
+            const typeLabel = getDateTypeMeta(dateType)?.shortLabel || "";
             const baseColor = job.color || "#cccccc";
             const [r, g, b] = hexToRgb(baseColor);
             const textColor = getContrastHexColor(baseColor);
@@ -544,13 +542,16 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 
   // --- XLS Generation Logic ---
   // Date type colors matching the UI icons
-  const DATE_TYPE_COLORS: Record<string, { bg: string; text: string; label: string }> = {
-    travel:    { bg: "DBEAFE", text: "2563EB", label: "V" },   // Blue
-    setup:     { bg: "FEF9C3", text: "A16207", label: "M" },   // Yellow
-    show:      { bg: "DCFCE7", text: "16A34A", label: "S" },   // Green
-    off:       { bg: "F3F4F6", text: "6B7280", label: "O" },   // Gray
-    rehearsal: { bg: "EDE9FE", text: "7C3AED", label: "E" },   // Violet
-  };
+  const DATE_TYPE_COLORS: Record<DateType, { bg: string; text: string; label: string; labelEs: string }> = DATE_TYPE_ORDER.reduce((acc, type) => {
+    const meta = DATE_TYPE_META[type];
+    acc[type] = {
+      bg: meta.xlsBg,
+      text: meta.xlsText,
+      label: meta.shortLabel,
+      labelEs: meta.labelEs,
+    };
+    return acc;
+  }, {} as Record<DateType, { bg: string; text: string; label: string; labelEs: string }>);
 
   const WEEKEND_BG = "F1F5F9"; // slate-100
   const TODAY_BORDER = "2563EB"; // primary blue
@@ -719,7 +720,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
               const job = dayJobs[i];
               const key = `${job.id}-${format(day, "yyyy-MM-dd")}`;
               const dateType = dateTypes[key]?.type;
-              const dtInfo = dateType ? DATE_TYPE_COLORS[dateType] : null;
+              const dtInfo = getDateTypeMeta(dateType)
+                ? DATE_TYPE_COLORS[dateType as DateType]
+                : null;
               const jobColor = (job.color || `#${DEFAULT_JOB_COLOR}`).replace(/^#/, "");
 
               const cell = ws.getRow(startExcelRow + i + 1).getCell(col);
@@ -761,13 +764,10 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
       const legendHeaderRow = ws.addRow(["Leyenda:"]);
       legendHeaderRow.getCell(1).font = { bold: true, size: 9, color: { argb: toArgb("374151") } };
 
-      const legendItems = [
-        { label: "V = Viaje", color: DATE_TYPE_COLORS.travel },
-        { label: "M = Montaje", color: DATE_TYPE_COLORS.setup },
-        { label: "S = Show", color: DATE_TYPE_COLORS.show },
-        { label: "O = Libre", color: DATE_TYPE_COLORS.off },
-        { label: "E = Ensayo", color: DATE_TYPE_COLORS.rehearsal },
-      ];
+      const legendItems = DATE_TYPE_ORDER.map((type) => {
+        const item = DATE_TYPE_COLORS[type];
+        return { label: `${item.label} = ${item.labelEs}`, color: item };
+      });
       const legendDataRow = ws.addRow(legendItems.map((l) => l.label).concat(["", ""]));
       for (let i = 0; i < legendItems.length; i++) {
         const cell = legendDataRow.getCell(i + 1);

@@ -2,16 +2,16 @@ import React from 'react';
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Clock, MapPin } from "lucide-react";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { LocationDetails } from "@/hooks/useLocationManagement";
+import { DateType, isSingleDayDateType, TOUR_DATE_TYPE_OPTIONS } from "@/constants/dateTypes";
 
 interface TourDateFormFieldsProps {
   location: string;
   setLocation: (value: string) => void;
   setLocationDetails?: (value: LocationDetails | null) => void;
-  tourDateType: 'show' | 'rehearsal' | 'travel';
-  setTourDateType: (value: 'show' | 'rehearsal' | 'travel') => void;
+  tourDateType: DateType;
+  setTourDateType: (value: DateType) => void;
   startDate: string;
   setStartDate: (value: string) => void;
   endDate: string;
@@ -32,16 +32,8 @@ export const TourDateFormFields: React.FC<TourDateFormFieldsProps> = ({
   const handleStartDateChange = (value: string) => {
     setStartDate(value);
     // Auto-set end date for single-day events
-    if (tourDateType === 'show' || tourDateType === 'travel') {
+    if (isSingleDayDateType(tourDateType)) {
       setEndDate(value);
-    }
-  };
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'rehearsal': return <Clock className="h-4 w-4" />;
-      case 'travel': return <MapPin className="h-4 w-4" />;
-      default: return <Calendar className="h-4 w-4" />;
     }
   };
 
@@ -54,24 +46,18 @@ export const TourDateFormFields: React.FC<TourDateFormFieldsProps> = ({
             <SelectValue placeholder="Select date type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="show">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Show
-              </div>
-            </SelectItem>
-            <SelectItem value="rehearsal">
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Rehearsal
-              </div>
-            </SelectItem>
-            <SelectItem value="travel">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" />
-                Travel Day
-              </div>
-            </SelectItem>
+            {TOUR_DATE_TYPE_OPTIONS.map((option) => {
+              const Icon = option.icon;
+
+              return (
+                <SelectItem key={option.value} value={option.value}>
+                  <div className="flex items-center gap-2">
+                    <Icon className={`h-4 w-4 ${option.iconClassName}`} />
+                    {option.label}
+                  </div>
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
       </div>
@@ -110,7 +96,7 @@ export const TourDateFormFields: React.FC<TourDateFormFieldsProps> = ({
           />
         </div>
 
-        {tourDateType === 'rehearsal' && (
+        {!isSingleDayDateType(tourDateType) && (
           <div>
             <Label htmlFor="endDate">End Date</Label>
             <Input
@@ -124,7 +110,7 @@ export const TourDateFormFields: React.FC<TourDateFormFieldsProps> = ({
         )}
       </div>
 
-      {tourDateType === 'rehearsal' && startDate && endDate && (
+      {!isSingleDayDateType(tourDateType) && startDate && endDate && (
         <div className="text-sm text-muted-foreground">
           Duration: {Math.ceil((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1} days
         </div>

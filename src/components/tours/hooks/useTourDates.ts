@@ -1,13 +1,14 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
+import { DateType, isSingleDayDateType } from "@/constants/dateTypes";
 
 export const useTourDates = (tourId?: string) => {
   const [dates, setDates] = useState<{ 
     date: string; 
     location: string; 
-    tourDateType: 'show' | 'rehearsal' | 'travel';
+    tourDateType: DateType;
     startDate: string;
     endDate: string;
   }[]>([
@@ -91,9 +92,13 @@ export const useTourDates = (tourId?: string) => {
     // Auto-populate single date fields for backward compatibility
     if (field === "startDate") {
       newDates[index].date = value;
-      if (!newDates[index].endDate || newDates[index].tourDateType === 'show') {
+      if (!newDates[index].endDate || isSingleDayDateType(newDates[index].tourDateType)) {
         newDates[index].endDate = value;
       }
+    }
+
+    if (field === "tourDateType" && isSingleDayDateType(value as DateType)) {
+      newDates[index].endDate = newDates[index].startDate || newDates[index].date || "";
     }
     
     // Sort by start date

@@ -1,5 +1,5 @@
-import { Plane, Wrench, Star, Moon, Mic } from 'lucide-react';
 import type { JobDateType, LogisticsEventType, LogisticsTransportType, TimesheetStatus } from './types';
+import { getDateTypeMeta } from '@/constants/dateTypes';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -89,20 +89,10 @@ export function getDateTypeForJobOnDay(
 
 export function getDateTypeIcon(type: JobDateType | null): JSX.Element | null {
   if (!type) return null;
-  switch (type) {
-    case 'travel':
-      return <Plane className="w-4 h-4" />;
-    case 'setup':
-      return <Wrench className="w-4 h-4" />;
-    case 'show':
-      return <Star className="w-4 h-4" />;
-    case 'off':
-      return <Moon className="w-4 h-4" />;
-    case 'rehearsal':
-      return <Mic className="w-4 h-4" />;
-    default:
-      return null;
-  }
+  const meta = getDateTypeMeta(type);
+  if (!meta) return null;
+  const Icon = meta.icon;
+  return <Icon className="w-4 h-4" />;
 }
 
 export function getTransportIcon(

@@ -10,6 +10,12 @@ import { Truck, Plus, Trash2, Download } from "lucide-react";
 import { Transport } from "@/types/hoja-de-ruta";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import {
+  LOGISTICS_HOJA_CATEGORY_LABELS,
+  LOGISTICS_HOJA_CATEGORY_MAX_SELECTION,
+  LOGISTICS_HOJA_CATEGORY_OPTIONS,
+  type LogisticsHojaCategory,
+} from "@/constants/logisticsHojaCategories";
 
 interface ModernTransportSectionProps {
   transport: Transport[];
@@ -39,6 +45,38 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
 
   const isValidTransportType = (type: any): type is Transport['transport_type'] => {
     return VALID_TRANSPORT_TYPES.includes(type);
+  };
+
+  const normalizeCategories = (categories: unknown): LogisticsHojaCategory[] => {
+    if (!Array.isArray(categories)) return [];
+    return categories.filter((category): category is LogisticsHojaCategory =>
+      LOGISTICS_HOJA_CATEGORY_OPTIONS.includes(category as LogisticsHojaCategory)
+    );
+  };
+
+  const toggleCategory = (index: number, category: LogisticsHojaCategory) => {
+    const currentCategories = normalizeCategories(validTransport[index]?.logistics_categories);
+    const hasCategory = currentCategories.includes(category);
+
+    if (hasCategory) {
+      onUpdateTransport(
+        index,
+        "logistics_categories",
+        currentCategories.filter((item) => item !== category)
+      );
+      return;
+    }
+
+    if (currentCategories.length >= LOGISTICS_HOJA_CATEGORY_MAX_SELECTION) {
+      toast({
+        title: "Límite alcanzado",
+        description: `Puedes seleccionar hasta ${LOGISTICS_HOJA_CATEGORY_MAX_SELECTION} categorías.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    onUpdateTransport(index, "logistics_categories", [...currentCategories, category]);
   };
 
   // Map transport_provider enum to company values (1:1 mapping)
@@ -76,6 +114,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
         .from('logistics_events')
         .select('*')
         .eq('job_id', jobId)
+        .eq('is_hoja_relevant', true)
         .order('event_date', { ascending: true })
         .order('event_time', { ascending: true });
 
@@ -111,6 +150,9 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
           driver_phone: undefined,
           has_return: false,
           return_date_time: undefined,
+          source_logistics_event_id: event.id,
+          is_hoja_relevant: event.is_hoja_relevant ?? true,
+          logistics_categories: normalizeCategories((event as any).hoja_categories),
         };
       });
 
@@ -119,7 +161,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
 
       toast({
         title: "Importación exitosa",
-        description: `Se importaron ${importedTransports.length} evento(s) logístico(s)`,
+        description: `Se importaron ${importedTransports.length} evento(s) logístico(s) relevante(s) para hoja de ruta`,
       });
 
     } catch (error) {
@@ -135,11 +177,11 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
   };
 
   return (
-    <Card className="border-2">
+    <Card className="border">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="flex items-center gap-2">
-            <Truck className="w-5 h-5 text-indigo-600" />
+            <Truck className="w-5 h-5 text-primary" />
             Transporte
           </CardTitle>
           <div className="flex gap-2">
@@ -176,15 +218,15 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: 20 }}
-                className="p-6 border-2 border-gray-200 rounded-lg bg-gradient-to-r from-indigo-50 to-transparent"
+                className="p-6 rounded-lg border border-border bg-card/70 backdrop-blur-sm"
               >
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-semibold">Transporte {index + 1}</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Transporte {index + 1}</h3>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => onRemoveTransport(index)}
-                    className="text-red-600 hover:text-red-700"
+                    className="text-destructive hover:text-destructive"
                   >
                     <Trash2 className="w-4 h-4" />
                   </Button>
@@ -270,6 +312,44 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
                       onCheckedChange={(checked) => onUpdateTransport(index, 'has_return', checked)}
                     />
                     <Label htmlFor={`has_return_${item.id}`}>Mismo camión para la vuelta</Label>
+                  </div>
+                  <div className="flex items-center space-x-2 pt-6">
+                    <Checkbox
+                      id={`is_hoja_relevant_${item.id}`}
+                      checked={item.is_hoja_relevant ?? true}
+                      onCheckedChange={(checked) => onUpdateTransport(index, 'is_hoja_relevant', checked === true)}
+                    />
+                    <Label htmlFor={`is_hoja_relevant_${item.id}`}>Relevante Hoja de Ruta</Label>
+                  </div>
+                  <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label>Categorías Hoja de Ruta</Label>
+                      <span className="text-xs text-muted-foreground">
+                        {normalizeCategories(item.logistics_categories).length}/{LOGISTICS_HOJA_CATEGORY_MAX_SELECTION}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {LOGISTICS_HOJA_CATEGORY_OPTIONS.map((category) => {
+                        const selected = normalizeCategories(item.logistics_categories).includes(category);
+                        return (
+                          <Button
+                            key={`${item.id}_${category}`}
+                            type="button"
+                            size="sm"
+                            variant={selected ? "default" : "outline"}
+                            disabled={item.is_hoja_relevant === false}
+                            onClick={() => toggleCategory(index, category)}
+                          >
+                            {LOGISTICS_HOJA_CATEGORY_LABELS[category]}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    {item.is_hoja_relevant === false && (
+                      <p className="text-xs text-muted-foreground">
+                        Activa "Relevante Hoja de Ruta" para usar categorías.
+                      </p>
+                    )}
                   </div>
                   {item.has_return && (
                     <div className="space-y-2">

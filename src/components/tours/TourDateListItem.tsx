@@ -3,20 +3,21 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, MapPin, Clock, Edit2, Trash2, FolderPlus, Folder, CheckCircle, Loader2 } from "lucide-react";
+import { MapPin, Edit2, Trash2, FolderPlus, Folder, CheckCircle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { DateType, getDateTypeMeta, TOUR_DATE_TYPE_OPTIONS } from "@/constants/dateTypes";
 
 interface TourDateListItemProps {
   dateObj: any;
   isEditing: boolean;
   editingDate: string;
   editingLocation: string;
-  editingTourDateType: 'show' | 'rehearsal' | 'travel';
+  editingTourDateType: DateType;
   editingStartDate: string;
   editingEndDate: string;
   setEditingDate: (value: string) => void;
   setEditingLocation: (value: string) => void;
-  setEditingTourDateType: (value: 'show' | 'rehearsal' | 'travel') => void;
+  setEditingTourDateType: (value: DateType) => void;
   setEditingStartDate: (value: string) => void;
   setEditingEndDate: (value: string) => void;
   onEdit: () => void;
@@ -52,19 +53,14 @@ export const TourDateListItem: React.FC<TourDateListItemProps> = ({
   readOnly = false,
 }) => {
   const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'rehearsal': return <Clock className="h-4 w-4" />;
-      case 'travel': return <MapPin className="h-4 w-4" />;
-      default: return <Calendar className="h-4 w-4" />;
-    }
+    const meta = getDateTypeMeta(type);
+    const Icon = meta?.icon;
+    if (!Icon) return null;
+    return <Icon className={`h-4 w-4 ${meta?.iconClassName ?? ""}`} />;
   };
 
   const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'rehearsal': return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'travel': return 'bg-blue-100 text-blue-800 border-blue-200';
-      default: return 'bg-green-100 text-green-800 border-green-200';
-    }
+    return getDateTypeMeta(type)?.badgeClassName ?? getDateTypeMeta("show")!.badgeClassName;
   };
 
   const formatDateRange = (startDate: string, endDate: string, type: string) => {
@@ -105,9 +101,11 @@ export const TourDateListItem: React.FC<TourDateListItemProps> = ({
               <SelectValue placeholder="Select date type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="show">Show</SelectItem>
-              <SelectItem value="rehearsal">Rehearsal</SelectItem>
-              <SelectItem value="travel">Travel</SelectItem>
+              {TOUR_DATE_TYPE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Input
@@ -146,7 +144,7 @@ export const TourDateListItem: React.FC<TourDateListItemProps> = ({
                   {formatDateRange(dateObj.start_date || dateObj.date, dateObj.end_date || dateObj.date, dateObj.tour_date_type)}
                 </span>
                 <Badge className={getTypeColor(dateObj.tour_date_type)}>
-                  {dateObj.tour_date_type || 'show'}
+                  {getDateTypeMeta(dateObj.tour_date_type)?.labelEs || "Concierto"}
                 </Badge>
                 {getDuration(dateObj.start_date || dateObj.date, dateObj.end_date || dateObj.date) && (
                   <span className="text-sm text-muted-foreground">

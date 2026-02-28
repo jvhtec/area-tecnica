@@ -946,7 +946,7 @@ export async function handleBroadcast(
     addNaturalRecipients(Array.from(mgmt));
 
   // ========================================================================
-  // TOUR DATE TYPE CHANGE EVENTS (6 events)
+  // TOUR DATE TYPE CHANGE EVENTS (7 events)
   // ========================================================================
 
   } else if (type.startsWith('tourdate.type.changed')) {
@@ -962,6 +962,7 @@ export async function handleBroadcast(
       'rehearsal': 'Ensayo',
       'travel': 'Viaje',
       'setup': 'Montaje',
+      'rigging': 'Rigging',
       'off': 'Día libre'
     };
 
@@ -988,6 +989,11 @@ export async function handleBroadcast(
       text = tourName
         ? `${actor} cambió "${locationName}" a Montaje en "${tourName}".`
         : `${actor} cambió "${locationName}" a Montaje.`;
+    } else if (type === 'tourdate.type.changed.rigging') {
+      title = 'Fecha cambiada a Rigging';
+      text = tourName
+        ? `${actor} cambió "${locationName}" a Rigging en "${tourName}".`
+        : `${actor} cambió "${locationName}" a Rigging.`;
     } else if (type === 'tourdate.type.changed.off') {
       title = 'Fecha cambiada a Día libre';
       text = tourName
@@ -1011,7 +1017,7 @@ export async function handleBroadcast(
     addNaturalRecipients(Array.from(mgmt));
 
   // ========================================================================
-  // JOB DATE TYPE CHANGE EVENTS (6 events)
+  // JOB DATE TYPE CHANGE EVENTS (7 events)
   // ========================================================================
 
   } else if (type.startsWith('jobdate.type.changed')) {
@@ -1025,6 +1031,7 @@ export async function handleBroadcast(
       'rehearsal': 'Ensayo',
       'travel': 'Viaje',
       'setup': 'Montaje',
+      'rigging': 'Rigging',
       'off': 'Día libre',
     };
 
@@ -1038,6 +1045,8 @@ export async function handleBroadcast(
       title = 'Fecha del trabajo: Viaje';
     } else if (type === 'jobdate.type.changed.setup') {
       title = 'Fecha del trabajo: Montaje';
+    } else if (type === 'jobdate.type.changed.rigging') {
+      title = 'Fecha del trabajo: Rigging';
     } else if (type === 'jobdate.type.changed.off') {
       title = 'Fecha del trabajo: Día libre';
     } else {

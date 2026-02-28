@@ -1,4 +1,5 @@
 import type { AnnouncementLevel } from '@/constants/announcementLevels';
+import type { DateType } from '@/constants/dateTypes';
 
 export type Dept = 'sound' | 'lights' | 'video';
 
@@ -78,11 +79,10 @@ export interface LogisticsItem {
   notes?: string | null;
 }
 
-export type JobDateType = 'travel' | 'setup' | 'show' | 'off' | 'rehearsal';
+export type JobDateType = DateType;
 export type LogisticsTransportType = 'trailer' | '9m' | '8m' | '6m' | '4m' | 'furgoneta' | 'rv' | string;
 export type LogisticsEventType = 'load' | 'unload' | string;
 
 export type TickerMessage = { message: string; level: AnnouncementLevel };
 
 export type PanelKey = 'overview' | 'crew' | 'logistics' | 'pending' | 'calendar';
-

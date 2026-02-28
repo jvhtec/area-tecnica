@@ -1,7 +1,6 @@
-
-import { useEffect, useState } from "react";
+import { DateType, DATE_TYPE_OPTIONS, getDateTypeMeta, isNonWorkingDateType } from "@/constants/dateTypes";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { Plane, Wrench, Star, Moon, Mic, ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfDay } from "date-fns";
@@ -9,9 +8,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTableSubscription } from "@/hooks/useTableSubscription";
 import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { openFlexElement } from "@/utils/flex-folders";
+import type { ReactNode } from "react";
 
 interface DateTypeContextMenuProps {
-  children: React.ReactNode;
+  children: ReactNode;
   jobId: string;
   date: Date;
   onTypeChange: () => void;
@@ -24,7 +24,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
   // Use the improved subscription hook with correct parameters
   useTableSubscription('job_date_types', ['job-date-types', jobId]);
 
-  const handleSetDateType = async (type: 'travel' | 'setup' | 'show' | 'off' | 'rehearsal') => {
+  const handleSetDateType = async (type: DateType) => {
     try {
       const localDate = startOfDay(date);
       const formattedDate = format(localDate, 'yyyy-MM-dd');
@@ -57,7 +57,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
       // Void timesheets when marking date as 'off' or 'travel'
       // This hides them from all users while the date type is set
-      if (type === 'off' || type === 'travel') {
+      if (isNonWorkingDateType(type)) {
         const { error: voidError } = await supabase
           .from('timesheets')
           .update({ is_active: false })
@@ -105,7 +105,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
       toast({
         title: "Success",
-        description: `Date type set to ${type}`,
+        description: `Date type set to ${getDateTypeMeta(type)?.label || type}`,
       });
       onTypeChange();
     } catch (error: any) {
@@ -195,21 +195,15 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         alignOffset={-10}
         avoidCollisions={true}
       >
-        <ContextMenuItem onClick={() => handleSetDateType('travel')} className="flex items-center gap-2">
-          <Plane className="h-4 w-4" /> Travel
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => handleSetDateType('setup')} className="flex items-center gap-2">
-          <Wrench className="h-4 w-4" /> Setup
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => handleSetDateType('show')} className="flex items-center gap-2">
-          <Star className="h-4 w-4" /> Show
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => handleSetDateType('rehearsal')} className="flex items-center gap-2">
-          <Mic className="h-4 w-4" /> Rehearsal
-        </ContextMenuItem>
-        <ContextMenuItem onClick={() => handleSetDateType('off')} className="flex items-center gap-2">
-          <Moon className="h-4 w-4" /> Off
-        </ContextMenuItem>
+        {DATE_TYPE_OPTIONS.map((option) => {
+          const Icon = option.icon;
+
+          return (
+            <ContextMenuItem key={option.value} onClick={() => handleSetDateType(option.value)} className="flex items-center gap-2">
+              <Icon className={`h-4 w-4 ${option.iconClassName}`} /> {option.label}
+            </ContextMenuItem>
+          );
+        })}
         {jobId && (
           <ContextMenuItem 
             onClick={handleFlexClick} 

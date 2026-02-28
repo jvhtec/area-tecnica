@@ -14,6 +14,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { getDateTypeMeta, isKeyFestivalDateType } from "@/constants/dateTypes";
 
 interface FestivalDateNavigationProps {
   jobDates: Date[];
@@ -58,7 +59,7 @@ export const FestivalDateNavigation = ({
       const formattedDate = format(date, 'yyyy-MM-dd');
       const key = `${jobId}-${formattedDate}`;
       const dateType = dateTypes[key];
-      return dateType === 'show' || dateType === 'setup' || dateType === 'rehearsal';
+      return isKeyFestivalDateType(dateType);
     });
   }, [jobDates, showOnlyShowDates, dateTypes, jobId]);
 
@@ -93,45 +94,20 @@ export const FestivalDateNavigation = ({
   const getDateTypeColor = (date: Date) => {
     const formattedDate = format(date, 'yyyy-MM-dd');
     const key = `${jobId}-${formattedDate}`;
-    const dateType = dateTypes[key];
-    
-    switch (dateType) {
-      case 'travel':
-        return 'border-blue-500 bg-blue-50';
-      case 'setup':
-        return 'border-amber-500 bg-amber-50';
-      case 'show':
-        return 'border-green-500 bg-green-50';
-      case 'off':
-        return 'border-gray-500 bg-gray-50';
-      case 'rehearsal':
-        return 'border-purple-500 bg-purple-50';
-      default:
-        return 'border-gray-300';
-    }
+    const meta = getDateTypeMeta(dateTypes[key]);
+    if (!meta) return "border-gray-300";
+    return `${meta.festivalBorderClassName} ${meta.festivalBackgroundClassName}`;
   };
 
   const getDateTypeBadge = (date: Date) => {
     const formattedDate = format(date, 'yyyy-MM-dd');
     const key = `${jobId}-${formattedDate}`;
-    const dateType = dateTypes[key];
-    
-    if (!dateType) return null;
-    
-    const badges = {
-      travel: { text: 'T', color: 'bg-blue-500' },
-      setup: { text: 'S', color: 'bg-amber-500' },
-      show: { text: '●', color: 'bg-green-500' },
-      off: { text: 'O', color: 'bg-gray-500' },
-      rehearsal: { text: 'R', color: 'bg-purple-500' }
-    };
-    
-    const badge = badges[dateType as keyof typeof badges];
-    if (!badge) return null;
+    const meta = getDateTypeMeta(dateTypes[key]);
+    if (!meta) return null;
     
     return (
-      <span className={`absolute -top-1 -right-1 w-4 h-4 ${badge.color} text-white text-xs rounded-full flex items-center justify-center font-bold`}>
-        {badge.text}
+      <span className={`absolute -top-1 -right-1 w-4 h-4 ${meta.festivalBadgeColorClassName} text-white text-xs rounded-full flex items-center justify-center font-bold`}>
+        {meta.shortLabel}
       </span>
     );
   };

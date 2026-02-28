@@ -4,6 +4,7 @@ import type { EventData, TravelArrangement, Accommodation, Transport } from "@/t
 import { loadExceljs } from "@/utils/lazyExceljs";
 import { applyStyle, populateSheet, saveWorkbook, toArgb } from "@/utils/excelExport";
 import type ExcelJS from "exceljs";
+import { formatLogisticsHojaCategories } from "@/constants/logisticsHojaCategories";
 
 interface ExportData {
   eventData: EventData;
@@ -345,7 +346,7 @@ const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   const sheetData: SheetRow[] = [
     ["LOGÍSTICA Y TRANSPORTE"],
     [],
-    ["Tipo de Transporte", "Conductor", "Teléfono", "Matrícula", "Compañía", "Fecha/Hora", "¿Retorno?", "Fecha/Hora Retorno"],
+    ["Tipo de Transporte", "Conductor", "Teléfono", "Matrícula", "Compañía", "Fecha/Hora", "¿Retorno?", "Fecha/Hora Retorno", "Relevante Hoja de Ruta", "Categorías Hoja de Ruta"],
   ];
 
   if (transports.length > 0) {
@@ -383,10 +384,12 @@ const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
         transport.date_time || "",
         transport.has_return ? "Sí" : "No",
         transport.return_date_time || "",
+        transport.is_hoja_relevant === false ? "No" : "Sí",
+        formatLogisticsHojaCategories(transport.logistics_categories),
       ]);
     });
   } else {
-    sheetData.push(["No hay transporte registrado", "", "", "", "", "", "", ""]);
+    sheetData.push(["No hay transporte registrado", "", "", "", "", "", "", "", "", ""]);
   }
 
   // Add logistics notes
@@ -402,25 +405,25 @@ const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
 
   // Title style
   applyStyle(ws.getRow(1).getCell(1), TITLE_STYLE);
-  ws.mergeCells("A1:H1");
+  ws.mergeCells("A1:J1");
 
   // Header row
-  applyHeaderRow(ws, 3, 8);
+  applyHeaderRow(ws, 3, 10);
 
   // Data rows for transport
   const transportEndRow = Math.max(4, 4 + transports.length - 1);
-  applyAlternatingRows(ws, 4, transportEndRow, 8);
+  applyAlternatingRows(ws, 4, transportEndRow, 10);
 
   // Logistics details section
   const detailsStartRow = transportEndRow + 2;
   applyStyle(ws.getRow(detailsStartRow).getCell(1), { bold: true, fontSize: 12, bgColor: "3498DB", textColor: "FFFFFF", alignment: "center" as const, borderColor: "3498DB" });
-  ws.mergeCells(detailsStartRow, 1, detailsStartRow, 8);
+  ws.mergeCells(detailsStartRow, 1, detailsStartRow, 10);
 
   for (let i = 0; i < 3; i++) {
     const row = detailsStartRow + 2 + i;
     applyStyle(ws.getRow(row).getCell(1), LABEL_STYLE);
     applyStyle(ws.getRow(row).getCell(2), DATA_STYLE);
-    ws.mergeCells(row, 2, row, 8);
+    ws.mergeCells(row, 2, row, 10);
   }
 
   ws.getColumn(1).width = 18;
@@ -431,6 +434,8 @@ const createLogisticsSheet = (wb: ExcelJS.Workbook, data: ExportData) => {
   ws.getColumn(6).width = 18;
   ws.getColumn(7).width = 10;
   ws.getColumn(8).width = 18;
+  ws.getColumn(9).width = 24;
+  ws.getColumn(10).width = 28;
 };
 
 // Schedule Sheet

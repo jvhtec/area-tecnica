@@ -32,6 +32,12 @@ import { format } from "date-fns";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
 import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
+import {
+  LOGISTICS_HOJA_CATEGORY_LABELS,
+  LOGISTICS_HOJA_CATEGORY_MAX_SELECTION,
+  LOGISTICS_HOJA_CATEGORY_OPTIONS,
+  type LogisticsHojaCategory,
+} from "@/constants/logisticsHojaCategories";
 
 // Available departments
 const departments: Department[] = [
@@ -55,6 +61,8 @@ interface LogisticsEventDialogProps {
     license_plate: string | null;
     title?: string;
     color?: string;
+    is_hoja_relevant?: boolean;
+    hoja_categories?: LogisticsHojaCategory[];
     departments: { department: Department }[];
   };
   // Optional initial values when creating a new event
@@ -90,9 +98,37 @@ export const LogisticsEventDialog = ({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [color, setColor] = useState("#7E69AB");
   const [alsoCreateUnload, setAlsoCreateUnload] = useState(false);
+  const [isHojaRelevant, setIsHojaRelevant] = useState(true);
+  const [hojaCategories, setHojaCategories] = useState<LogisticsHojaCategory[]>([]);
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const normalizeCategories = (categories: unknown): LogisticsHojaCategory[] => {
+    if (!Array.isArray(categories)) return [];
+    return categories.filter((category): category is LogisticsHojaCategory =>
+      LOGISTICS_HOJA_CATEGORY_OPTIONS.includes(category as LogisticsHojaCategory)
+    );
+  };
+
+  const toggleHojaCategory = (category: LogisticsHojaCategory) => {
+    setHojaCategories((prev) => {
+      if (prev.includes(category)) {
+        return prev.filter((item) => item !== category);
+      }
+
+      if (prev.length >= LOGISTICS_HOJA_CATEGORY_MAX_SELECTION) {
+        toast({
+          title: "Límite alcanzado",
+          description: `Puedes seleccionar hasta ${LOGISTICS_HOJA_CATEGORY_MAX_SELECTION} categorías.`,
+          variant: "destructive",
+        });
+        return prev;
+      }
+
+      return [...prev, category];
+    });
+  };
 
   // Initialize form state when dialog opens or when switching to a different event
   useEffect(() => {
@@ -115,6 +151,8 @@ export const LogisticsEventDialog = ({
       setNotes((selectedEvent as any).notes || "");
       setSelectedDepartments((selectedEvent.departments || []).map((d) => d.department));
       setColor(selectedEvent.color || "#7E69AB");
+      setIsHojaRelevant((selectedEvent as any).is_hoja_relevant ?? true);
+      setHojaCategories(normalizeCategories((selectedEvent as any).hoja_categories));
     } else {
       setEventType(initialEventType || "load");
       setTransportType(initialTransportType || "trailer");
@@ -129,6 +167,8 @@ export const LogisticsEventDialog = ({
       setSelectedDepartments(initialDepartments || []);
       setColor("#7E69AB");
       setAlsoCreateUnload(false);
+      setIsHojaRelevant(true);
+      setHojaCategories([]);
       // Ensure job selection is cleared if no initial job is provided
       if (!initialJobId) {
         setSelectedJob(null);
@@ -281,6 +321,8 @@ export const LogisticsEventDialog = ({
         title: customTitle || null,
         license_plate: licensePlate || null,
         color: color,
+        is_hoja_relevant: isHojaRelevant,
+        hoja_categories: hojaCategories,
       };
 
       if (selectedEvent) {
@@ -336,6 +378,15 @@ export const LogisticsEventDialog = ({
         }
         if ((selectedEvent.license_plate || "") !== (eventData.license_plate || "")) {
           changes.license_plate = { from: selectedEvent.license_plate, to: eventData.license_plate };
+        }
+        const previousHojaRelevant = (selectedEvent as any).is_hoja_relevant ?? true;
+        if (previousHojaRelevant !== eventData.is_hoja_relevant) {
+          changes.is_hoja_relevant = { from: previousHojaRelevant, to: eventData.is_hoja_relevant };
+        }
+        const previousCategories = normalizeCategories((selectedEvent as any).hoja_categories).slice().sort();
+        const nextCategories = normalizeCategories(eventData.hoja_categories).slice().sort();
+        if (JSON.stringify(previousCategories) !== JSON.stringify(nextCategories)) {
+          changes.hoja_categories = { from: previousCategories, to: nextCategories };
         }
         const nextDepartments = [...selectedDepartments].sort();
         if (JSON.stringify(previousDepartments) !== JSON.stringify(nextDepartments)) {
@@ -620,6 +671,51 @@ export const LogisticsEventDialog = ({
                 onChange={(e) => setLoadingBay(e.target.value)}
                 placeholder="Opcional"
               />
+            </div>
+
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="isHojaRelevant"
+                  checked={isHojaRelevant}
+                  disabled={!selectedJob}
+                  onCheckedChange={(value) => setIsHojaRelevant(value === true)}
+                />
+                <Label htmlFor="isHojaRelevant">Relevante para Hoja de Ruta</Label>
+              </div>
+              {!selectedJob && (
+                <p className="text-xs text-muted-foreground">
+                  Selecciona un trabajo para configurar la relevancia en Hoja de Ruta.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label>Categorías para Hoja de Ruta</Label>
+                <span className="text-xs text-muted-foreground">
+                  {hojaCategories.length}/{LOGISTICS_HOJA_CATEGORY_MAX_SELECTION}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {LOGISTICS_HOJA_CATEGORY_OPTIONS.map((category) => (
+                  <Button
+                    key={category}
+                    type="button"
+                    size="sm"
+                    variant={hojaCategories.includes(category) ? "default" : "outline"}
+                    disabled={!selectedJob || !isHojaRelevant}
+                    onClick={() => toggleHojaCategory(category)}
+                  >
+                    {LOGISTICS_HOJA_CATEGORY_LABELS[category]}
+                  </Button>
+                ))}
+              </div>
+              {(!selectedJob || !isHojaRelevant) && (
+                <p className="text-xs text-muted-foreground">
+                  Selecciona un trabajo y marca el evento como relevante para asignar categorías.
+                </p>
+              )}
             </div>
 
             {/* Notes */}

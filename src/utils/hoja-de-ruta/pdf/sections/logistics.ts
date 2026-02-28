@@ -2,6 +2,7 @@ import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 import { Formatters } from '../utils/formatters';
+import { formatLogisticsHojaCategories } from "@/constants/logisticsHojaCategories";
 
 export class LogisticsSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -24,12 +25,14 @@ export class LogisticsSection {
         Formatters.translateCompany(transport.company || ''),
         Formatters.formatDateTime(transport.date_time || ''),
         transport.has_return ? 'Sí' : 'No',
-        Formatters.formatDateTime(transport.return_date_time || '')
+        Formatters.formatDateTime(transport.return_date_time || ''),
+        transport.is_hoja_relevant === false ? 'No' : 'Sí',
+        formatLogisticsHojaCategories(transport.logistics_categories)
       ]);
 
       this.pdfDoc.addTable({
         startY: yPosition,
-        head: [["Tipo", "Conductor", "Teléfono", "Matrícula", "Empresa", "Salida", "Retorno", "Vuelta"]],
+        head: [["Tipo", "Conductor", "Teléfono", "Matrícula", "Empresa", "Salida", "Retorno", "Vuelta", "Hoja", "Categorías"]],
         body: transportData,
         theme: "grid",
         styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' },

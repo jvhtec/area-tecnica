@@ -1,3 +1,5 @@
+import type { LogisticsHojaCategory } from "@/constants/logisticsHojaCategories";
+
 // Core interfaces - most comprehensive version first
 export interface WeatherData {
   date: string;
@@ -46,6 +48,9 @@ export interface Transport {
   date_time?: string;
   has_return?: boolean;
   return_date_time?: string;
+  source_logistics_event_id?: string;
+  is_hoja_relevant?: boolean;
+  logistics_categories?: LogisticsHojaCategory[];
 }
 
 export interface RoomAssignment {

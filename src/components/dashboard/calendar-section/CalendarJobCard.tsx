@@ -2,21 +2,18 @@ import React from "react";
 import { format } from "date-fns";
 import {
   Clock,
+  type LucideIcon,
   Lightbulb,
   MapPin,
-  Mic,
-  Moon,
   Music2,
-  Plane,
-  Star,
   Users,
   Video,
-  Wrench,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
+import { getDateTypeMeta } from "@/constants/dateTypes";
 
 import { DateTypeContextMenu } from "../DateTypeContextMenu";
 
@@ -29,34 +26,27 @@ export interface CalendarJobCardProps {
 export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dateTypes }) => {
   const getDateTypeIcon = (jobId: string, date: Date) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
-    const dateType = dateTypes[key]?.type;
-    switch (dateType) {
-      case "travel":
-        return <Plane className="h-3 w-3 text-blue-500" />;
-      case "setup":
-        return <Wrench className="h-3 w-3 text-yellow-500" />;
-      case "show":
-        return <Star className="h-3 w-3 text-green-500" />;
-      case "off":
-        return <Moon className="h-3 w-3 text-gray-500" />;
-      case "rehearsal":
-        return <Mic className="h-3 w-3 text-violet-500" />;
-      default:
-        return null;
-    }
+    const meta = getDateTypeMeta(dateTypes[key]?.type);
+    if (!meta) return null;
+    const Icon = meta.icon;
+    return <Icon className={`h-3 w-3 ${meta.iconClassName}`} />;
   };
 
   const getDepartmentIcon = (dept: string) => {
+    let Icon: LucideIcon | null = null;
     switch (dept) {
       case "sound":
-        return <Music2 className="h-3 w-3" />;
+        Icon = Music2;
+        break;
       case "lights":
-        return <Lightbulb className="h-3 w-3" />;
+        Icon = Lightbulb;
+        break;
       case "video":
-        return <Video className="h-3 w-3" />;
-      default:
-        return null;
+        Icon = Video;
+        break;
     }
+    if (!Icon) return null;
+    return <Icon className="h-3 w-3" />;
   };
 
   const getTotalRequiredPersonnel = (job: any) => {
@@ -155,4 +145,3 @@ export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dat
     </DateTypeContextMenu>
   );
 };
-

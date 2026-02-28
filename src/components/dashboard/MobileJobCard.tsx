@@ -41,6 +41,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useQueryClient } from "@tanstack/react-query";
 import { openFlexElement } from "@/utils/flex-folders";
 import { isFestivalLikeJobType } from "@/utils/jobType";
+import { DateType, DATE_TYPE_OPTIONS, getDateTypeMeta } from "@/constants/dateTypes";
 
 interface MobileJobCardProps {
   job: any;
@@ -52,14 +53,6 @@ interface MobileJobCardProps {
   onDeleteClick?: (jobId: string) => void;
   onJobClick?: (jobId: string) => void;
 }
-
-const DATE_TYPE_OPTIONS = [
-  { value: 'travel', label: 'Travel', emoji: '✈️' },
-  { value: 'setup', label: 'Setup', emoji: '🔧' },
-  { value: 'show', label: 'Show', emoji: '🎭' },
-  { value: 'off', label: 'Off', emoji: '😴' },
-  { value: 'rehearsal', label: 'Rehearsal', emoji: '🎵' }
-];
 
 export function MobileJobCard({
   job,
@@ -76,7 +69,7 @@ export function MobileJobCard({
   const queryClient = useQueryClient();
   const { userRole } = useOptimizedAuth();
   const [dateTypeDialogOpen, setDateTypeDialogOpen] = useState(false);
-  const [selectedDateType, setSelectedDateType] = useState<string>('show');
+  const [selectedDateType, setSelectedDateType] = useState<DateType>('show');
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
   const isMobile = useIsMobile();
   const { uuid: flexUuid, isLoading: isLoadingFlexUuid, error: flexError, hasChecked, fetchFlexUuid } = useFlexUuidLazy();
@@ -130,9 +123,7 @@ export function MobileJobCard({
 
   const currentTypeValue = currentDateType ? (currentDateType.type || currentDateType.date_type) : undefined;
 
-  const currentDateTypeEmoji = DATE_TYPE_OPTIONS.find(option => 
-    option.value === currentTypeValue
-  )?.emoji || '🎭';
+  const currentDateTypeEmoji = getDateTypeMeta(currentTypeValue)?.emoji || '🎭';
 
   const jobTitle = (job.title || job.job_name || 'Untitled Job').length > 26 
     ? (job.title || job.job_name || 'Untitled Job').substring(0, 26) + '...'
@@ -168,7 +159,7 @@ export function MobileJobCard({
     navigate(`/festival-management/${job.id}`);
   };
 
-  const handleDateTypeChange = async (newType: string) => {
+  const handleDateTypeChange = async (newType: DateType) => {
     try {
       const dateStr = format(currentDate, 'yyyy-MM-dd');
       
@@ -210,7 +201,7 @@ export function MobileJobCard({
 
   const handleDateTypeBadgeClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setSelectedDateType(currentDateType?.type || 'show');
+    setSelectedDateType((currentDateType?.type || 'show') as DateType);
     setDateTypeDialogOpen(true);
   };
 

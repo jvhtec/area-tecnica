@@ -328,9 +328,12 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
         transport: [...prev.logistics.transport, {
           id: crypto.randomUUID(),
           transport_type: 'trailer',
-          driver: '',
-          plate_number: '',
-          notes: ''
+          driver_name: '',
+          driver_phone: '',
+          license_plate: '',
+          has_return: false,
+          is_hoja_relevant: true,
+          logistics_categories: [],
         }]
       }
     }));
@@ -351,7 +354,40 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
       ...prev,
       logistics: {
         ...prev.logistics,
-        transport: [...prev.logistics.transport, ...transports]
+        transport: (() => {
+          const current = Array.isArray(prev.logistics.transport) ? [...prev.logistics.transport] : [];
+
+          transports.forEach((incoming) => {
+            const sourceId = incoming.source_logistics_event_id || null;
+            if (sourceId) {
+              const existingIndex = current.findIndex(
+                (transport) => transport.source_logistics_event_id === sourceId
+              );
+
+              if (existingIndex >= 0) {
+                const existing = current[existingIndex];
+                current[existingIndex] = {
+                  ...existing,
+                  transport_type: incoming.transport_type,
+                  license_plate: incoming.license_plate,
+                  company: incoming.company,
+                  date_time: incoming.date_time,
+                  source_logistics_event_id: sourceId,
+                  is_hoja_relevant: incoming.is_hoja_relevant ?? true,
+                  logistics_categories: incoming.logistics_categories || [],
+                  driver_name: incoming.driver_name ?? existing.driver_name,
+                  driver_phone: incoming.driver_phone ?? existing.driver_phone,
+                  has_return: incoming.has_return ?? existing.has_return,
+                };
+                return;
+              }
+            }
+
+            current.push(incoming);
+          });
+
+          return current;
+        })()
       }
     }));
   }, [setEventData]);

@@ -170,7 +170,10 @@ export const useHojaDeRutaPersistence = (
             company: t.company,
             date_time: t.date_time ? String(t.date_time).replace(' ', 'T').slice(0, 16) : '',
             has_return: t.has_return,
-            return_date_time: t.return_date_time ? String(t.return_date_time).replace(' ', 'T').slice(0, 16) : ''
+            return_date_time: t.return_date_time ? String(t.return_date_time).replace(' ', 'T').slice(0, 16) : '',
+            source_logistics_event_id: t.source_logistics_event_id || undefined,
+            is_hoja_relevant: t.is_hoja_relevant ?? true,
+            logistics_categories: t.logistics_categories || [],
           })) : [],
           loadingDetails: logistics?.loading_details || '',
           unloadingDetails: logistics?.unloading_details || '',
@@ -331,6 +334,9 @@ export const useHojaDeRutaPersistence = (
         date_time: toSafeTimestamptz(transport.date_time),
         has_return: transport.has_return || false,
         return_date_time: toSafeTimestamptz(transport.return_date_time),
+        source_logistics_event_id: transport.source_logistics_event_id || null,
+        is_hoja_relevant: transport.is_hoja_relevant ?? true,
+        logistics_categories: transport.logistics_categories || [],
       }));
 
       const validContacts = eventData.contacts?.filter(c =>

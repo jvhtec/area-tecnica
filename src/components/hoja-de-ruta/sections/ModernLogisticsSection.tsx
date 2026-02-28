@@ -40,10 +40,10 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
         onImportTransports={onImportTransports}
         jobId={jobId}
       />
-      <Card className="border-2">
+      <Card className="border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-indigo-600" />
+            <Building2 className="w-5 h-5 text-primary" />
             Logística del Evento
           </CardTitle>
         </CardHeader>
@@ -52,7 +52,7 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
             {/* Equipment Logistics */}
             <div className="space-y-3">
               <Label className="text-sm font-medium flex items-center gap-2">
-                <Package className="w-4 h-4 text-indigo-600" />
+                <Package className="w-4 h-4 text-primary" />
                 Logística de Equipos
               </Label>
               <Textarea
@@ -66,7 +66,7 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
                   return { ...prev, logistics: updatedLogistics };
                 })}
                 placeholder="Instrucciones especiales para equipos..."
-                className="border-2 focus:border-indigo-300 min-h-[100px]"
+                className="min-h-[100px]"
               />
             </div>
           </div>
@@ -89,7 +89,7 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
                   return { ...prev, logistics: updatedLogistics };
                 })}
                 placeholder="Horarios, ubicación, personal necesario para la descarga..."
-                className="border-2 focus:border-red-300 min-h-[120px]"
+                className="min-h-[120px]"
               />
             </div>
 
@@ -110,7 +110,7 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
                   return { ...prev, logistics: updatedLogistics };
                 })}
                 placeholder="Horarios, ubicación, personal necesario para la carga..."
-                className="border-2 focus:border-green-300 min-h-[120px]"
+                className="min-h-[120px]"
               />
             </div>
           </div>

@@ -4,11 +4,12 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Clock, MapPin, Plane, Wrench, Star, Moon, Mic } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, MapPin } from "lucide-react";
 import { Department } from "@/types/department";
 import { JobStatusSelector } from "@/components/jobs/JobStatusSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJobDistance } from "@/hooks/useJobDistance";
+import { getDateTypeMeta } from "@/constants/dateTypes";
 
 interface JobCardHeaderProps {
   job: any;
@@ -38,21 +39,10 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
 
   const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
-    const dateType = dateTypes[key]?.type;
-    switch (dateType) {
-      case "travel":
-        return <Plane className="h-3 w-3 text-blue-500" />;
-      case "setup":
-        return <Wrench className="h-3 w-3 text-yellow-500" />;
-      case "show":
-        return <Star className="h-3 w-3 text-green-500" />;
-      case "off":
-        return <Moon className="h-3 w-3 text-gray-500" />;
-      case "rehearsal":
-        return <Mic className="h-3 w-3 text-violet-500" />;
-      default:
-        return null;
-    }
+    const meta = getDateTypeMeta(dateTypes[key]?.type);
+    if (!meta) return null;
+    const Icon = meta.icon;
+    return <Icon className={`h-3 w-3 ${meta.iconClassName}`} />;
   };
 
   const getBadgeForJobType = (jobType: string) => {

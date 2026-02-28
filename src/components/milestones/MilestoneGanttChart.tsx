@@ -6,9 +6,10 @@ import { cn } from "@/lib/utils";
 import { Department } from "@/types/department";
 import { useEffect, useRef, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
-import { Check, Star, Plane, Wrench, Moon } from "lucide-react";
+import { Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { DateType, getDateTypeMeta } from "@/constants/dateTypes";
 
 interface Milestone {
   id: string;
@@ -24,9 +25,9 @@ interface Milestone {
   } | null;
 }
 
-interface DateType {
+interface JobDateTypeRow {
   date: string;
-  type: 'travel' | 'setup' | 'show' | 'off';
+  type: DateType;
 }
 
 interface MilestoneGanttChartProps {
@@ -40,7 +41,7 @@ export function MilestoneGanttChart({ milestones, startDate, jobId }: MilestoneG
   
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
-  const [dateTypes, setDateTypes] = useState<DateType[]>([]);
+  const [dateTypes, setDateTypes] = useState<JobDateTypeRow[]>([]);
   
   const lastMilestoneDate = milestones.reduce((latest, milestone) => {
     const date = new Date(milestone.due_date);
@@ -75,19 +76,10 @@ export function MilestoneGanttChart({ milestones, startDate, jobId }: MilestoneG
   const getDateTypeIcon = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const dateType = dateTypes.find(dt => dt.date === dateStr);
-
-    switch (dateType?.type) {
-      case 'travel':
-        return <Plane className="h-3 w-3 text-blue-500" />;
-      case 'setup':
-        return <Wrench className="h-3 w-3 text-yellow-500" />;
-      case 'show':
-        return <Star className="h-3 w-3 text-green-500" />;
-      case 'off':
-        return <Moon className="h-3 w-3 text-gray-500" />;
-      default:
-        return null;
-    }
+    const meta = getDateTypeMeta(dateType?.type);
+    if (!meta) return null;
+    const Icon = meta.icon;
+    return <Icon className={`h-3 w-3 ${meta.iconClassName}`} />;
   };
 
   const getPriorityColor = (priority: number) => {

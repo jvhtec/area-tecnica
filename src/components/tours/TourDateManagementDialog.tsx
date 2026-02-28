@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -33,6 +33,7 @@ import { deleteJobDateTypes } from "@/services/deleteJobDateTypes";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { TECHNICAL_DEPARTMENTS } from "@/types/department";
 import { syncFlexElementsForTourDateChange } from "@/utils/flex-folders/syncDateChange";
+import { DateType, getDateTypeMeta, isSingleDayDateType } from "@/constants/dateTypes";
 
 interface TourDateObject {
   id: string;
@@ -44,7 +45,7 @@ interface TourDateObject {
     name: string;
   };
   notes?: string;
-  tour_date_type: 'show' | 'rehearsal' | 'travel';
+  tour_date_type: DateType;
   start_date?: string;
   end_date?: string;
   is_tour_pack_only?: boolean;
@@ -57,6 +58,14 @@ interface TourDateManagementDialogProps {
   tourDates: TourDateObject[];
   readOnly?: boolean;
 }
+
+const buildTourDateJobTitle = (tourName: string, location: string, tourDateType: DateType): string => {
+  const safeLocation = location || "Sin ubicación";
+  if (tourDateType === "show") {
+    return `${tourName} (${safeLocation})`;
+  }
+  return `${tourName} - ${getDateTypeMeta(tourDateType)?.labelEs || tourDateType} (${safeLocation})`;
+};
 
 export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> = ({
   open,
@@ -83,7 +92,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
   const [editingTourDate, setEditingTourDate] = useState<any>(null);
   const [editLocationValue, setEditLocationValue] = useState<string>("");
-  const [editTourDateType, setEditTourDateType] = useState<'show' | 'rehearsal' | 'travel'>('show');
+  const [editTourDateType, setEditTourDateType] = useState<DateType>("show");
   const [editStartDate, setEditStartDate] = useState<string>("");
   const [editEndDate, setEditEndDate] = useState<string>("");
   const [editTourPackOnly, setEditTourPackOnly] = useState<boolean>(false);
@@ -92,7 +101,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   // New date form state
   const [newLocation, setNewLocation] = useState<string>("");
   const [newLocationDetails, setNewLocationDetails] = useState<LocationDetails | null>(null);
-  const [newTourDateType, setNewTourDateType] = useState<'show' | 'rehearsal' | 'travel'>('show');
+  const [newTourDateType, setNewTourDateType] = useState<DateType>("show");
   const [newStartDate, setNewStartDate] = useState<string>("");
   const [newEndDate, setNewEndDate] = useState<string>("");
   const [newTourPackOnly, setNewTourPackOnly] = useState<boolean>(false);
@@ -120,7 +129,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
   const handleAddDate = async (
     location: string,
-    tourDateType: 'show' | 'rehearsal' | 'travel' = 'show',
+    tourDateType: DateType = "show",
     startDate: string,
     endDate: string,
     isTourPackOnly: boolean = false
@@ -129,7 +138,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       if (!tourId) {
         throw new Error("Tour ID is required");
       }
-      const finalEndDate = endDate || startDate;
+      const finalEndDate = isSingleDayDateType(tourDateType) ? startDate : (endDate || startDate);
       const rehearsalDays = Math.ceil((new Date(finalEndDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
       console.log("Adding new tour date:", { startDate, finalEndDate, location, tourId, tourDateType, isTourPackOnly });
@@ -197,11 +206,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       const { data: newJob, error: jobError } = await supabase
         .from("jobs")
         .insert({
-          title: tourDateType === 'rehearsal'
-            ? `${tourData.name} - Rehearsal (${location})`
-            : tourDateType === 'travel'
-              ? `${tourData.name} - Travel (${location})`
-              : `${tourData.name} (${location || 'No Location'})`,
+          title: buildTourDateJobTitle(tourData.name, location, tourDateType),
           start_time: `${startDate}T06:00:00`,
           end_time: `${finalEndDate}T21:59:59`,
           location_id: locationId,
@@ -281,7 +286,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const handleEditDate = async (
     dateId: string,
     newLocation: string,
-    tourDateType: 'show' | 'rehearsal' | 'travel',
+    tourDateType: DateType,
     startDate: string,
     endDate: string,
     isTourPackOnly: boolean
@@ -290,7 +295,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       if (!tourId) {
         throw new Error("Tour ID is required");
       }
-      const finalEndDate = endDate || startDate;
+      const finalEndDate = isSingleDayDateType(tourDateType) ? startDate : (endDate || startDate);
       const rehearsalDays = Math.ceil((new Date(finalEndDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       console.log("Editing tour date:", { dateId, startDate, finalEndDate, newLocation, tourDateType, isTourPackOnly });
       let locationId: string | null = null;
@@ -366,11 +371,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       const { data: jobs, error: jobsError } = await supabase
         .from("jobs")
         .update({
-          title: tourDateType === 'rehearsal'
-            ? `${tourData.name} - Rehearsal (${newLocation})`
-            : tourDateType === 'travel'
-              ? `${tourData.name} - Travel (${newLocation})`
-              : `${tourData.name} (${newLocation || 'No Location'})`,
+          title: buildTourDateJobTitle(tourData.name, newLocation, tourDateType),
           start_time: `${startDate}T06:00:00`,
           end_time: `${finalEndDate}T21:59:59`,
           location_id: locationId,
@@ -774,7 +775,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                               onChange={(e) => {
                                 const newDate = e.target.value;
                                 setEditStartDate(newDate);
-                                if (editTourDateType !== 'rehearsal') {
+                                if (isSingleDayDateType(editTourDateType)) {
                                   setEditEndDate(newDate);
                                 }
                               }}
@@ -782,7 +783,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                               className="text-sm"
                             />
                           </div>
-                          {editTourDateType === 'rehearsal' && (
+                          {!isSingleDayDateType(editTourDateType) && (
                             <div className="flex items-center gap-2">
                               <Clock className="h-4 w-4 flex-shrink-0" />
                               <Input
@@ -898,7 +899,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
               {!readOnly && (
                 <div className="space-y-3 md:space-y-4 border-t pt-4">
-                  <h3 className="text-base md:text-lg font-semibold">Add New Date</h3>
+                  <h3 className="text-base md:text-lg font-semibold">Añadir nueva fecha</h3>
                   <TourDateFormFields
                     location={newLocation}
                     setLocation={setNewLocation}
@@ -949,12 +950,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline">
-                      Add {newTourDateType === 'rehearsal' ? 'Rehearsal Period' :
-                        newTourDateType === 'travel' ? 'Travel Day' : 'Show Date'}
+                      Añadir {newTourDateType === "rehearsal"
+                        ? "Período de ensayo"
+                        : `Fecha de ${getDateTypeMeta(newTourDateType)?.labelEs || "Concierto"}`}
                     </span>
                     <span className="sm:hidden">
-                      Add {newTourDateType === 'rehearsal' ? 'Rehearsal' :
-                        newTourDateType === 'travel' ? 'Travel' : 'Show'}
+                      Añadir {getDateTypeMeta(newTourDateType)?.labelEs || "Concierto"}
                     </span>
                   </Button>
                 </div>

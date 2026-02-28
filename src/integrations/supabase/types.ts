@@ -2799,8 +2799,11 @@ export type Database = {
           has_return: boolean | null
           hoja_de_ruta_id: string | null
           id: string
+          is_hoja_relevant: boolean
+          logistics_categories: Database["public"]["Enums"]["logistics_transport_category"][]
           license_plate: string | null
           return_date_time: string | null
+          source_logistics_event_id: string | null
           transport_type: string
           updated_at: string | null
         }
@@ -2813,8 +2816,11 @@ export type Database = {
           has_return?: boolean | null
           hoja_de_ruta_id?: string | null
           id?: string
+          is_hoja_relevant?: boolean
+          logistics_categories?: Database["public"]["Enums"]["logistics_transport_category"][]
           license_plate?: string | null
           return_date_time?: string | null
+          source_logistics_event_id?: string | null
           transport_type: string
           updated_at?: string | null
         }
@@ -2827,8 +2833,11 @@ export type Database = {
           has_return?: boolean | null
           hoja_de_ruta_id?: string | null
           id?: string
+          is_hoja_relevant?: boolean
+          logistics_categories?: Database["public"]["Enums"]["logistics_transport_category"][]
           license_plate?: string | null
           return_date_time?: string | null
+          source_logistics_event_id?: string | null
           transport_type?: string
           updated_at?: string | null
         }
@@ -2838,6 +2847,13 @@ export type Database = {
             columns: ["hoja_de_ruta_id"]
             isOneToOne: false
             referencedRelation: "hoja_de_ruta"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hoja_de_ruta_transport_source_logistics_event_id_fkey"
+            columns: ["source_logistics_event_id"]
+            isOneToOne: false
+            referencedRelation: "logistics_events"
             referencedColumns: ["id"]
           },
         ]
@@ -4383,7 +4399,9 @@ export type Database = {
           event_date: string
           event_time: string
           event_type: Database["public"]["Enums"]["logistics_event_type"]
+          hoja_categories: Database["public"]["Enums"]["logistics_transport_category"][]
           id: string
+          is_hoja_relevant: boolean
           job_id: string | null
           license_plate: string | null
           loading_bay: string | null
@@ -4400,7 +4418,9 @@ export type Database = {
           event_date: string
           event_time: string
           event_type: Database["public"]["Enums"]["logistics_event_type"]
+          hoja_categories?: Database["public"]["Enums"]["logistics_transport_category"][]
           id?: string
+          is_hoja_relevant?: boolean
           job_id?: string | null
           license_plate?: string | null
           loading_bay?: string | null
@@ -4417,7 +4437,9 @@ export type Database = {
           event_date?: string
           event_time?: string
           event_type?: Database["public"]["Enums"]["logistics_event_type"]
+          hoja_categories?: Database["public"]["Enums"]["logistics_transport_category"][]
           id?: string
+          is_hoja_relevant?: boolean
           job_id?: string | null
           license_plate?: string | null
           loading_bay?: string | null
@@ -8742,12 +8764,19 @@ export type Database = {
       flex_work_order_item_source: "role" | "extra"
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
-      job_date_type: "travel" | "setup" | "show" | "off" | "rehearsal"
+      job_date_type: "travel" | "setup" | "rigging" | "show" | "off" | "rehearsal"
       job_extra_type: "travel_half" | "travel_full" | "day_off"
       job_rate_extras_status: "pending" | "approved" | "rejected"
       job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
       job_type: "single" | "tour" | "festival" | "ciclo" | "dryhire" | "tourdate" | "evento"
       logistics_event_type: "load" | "unload"
+      logistics_transport_category:
+        | "sonido_madera"
+        | "sonido_escenario"
+        | "iluminacion_hierro"
+        | "iluminacion_aparatos"
+        | "video"
+        | "rigging_motores"
       message_status: "unread" | "read"
       milestone_category:
         | "planning"
@@ -8772,7 +8801,7 @@ export type Database = {
       room_type: "single" | "double"
       task_status: "not_started" | "in_progress" | "completed"
       timesheet_status: "draft" | "submitted" | "approved"
-      tour_date_type: "show" | "rehearsal" | "travel"
+      tour_date_type: "show" | "rehearsal" | "travel" | "setup" | "off" | "rigging"
       transport_provider_enum: "camionaje" | "transluminaria" | "the_wild_tour" | "pantoja" | "crespo" | "montabi_dorado" | "grupo_sese" | "nacex" | "sector_pro" | "recogida_cliente"
       transport_type: "trailer" | "9m" | "8m" | "6m" | "4m" | "furgoneta" | "rv"
       transportation_type: "van" | "sleeper_bus" | "train" | "plane" | "rv"
@@ -9064,12 +9093,20 @@ export const Constants = {
       flex_work_order_item_source: ["role", "extra"],
       form_status: ["pending", "submitted", "expired"],
       global_preset_status: ["available", "unavailable", "tentative"],
-      job_date_type: ["travel", "setup", "show", "off", "rehearsal"],
+      job_date_type: ["travel", "setup", "rigging", "show", "off", "rehearsal"],
       job_extra_type: ["travel_half", "travel_full", "day_off"],
       job_rate_extras_status: ["pending", "approved", "rejected"],
       job_status: ["Tentativa", "Confirmado", "Completado", "Cancelado"],
       job_type: ["single", "tour", "festival", "ciclo", "dryhire", "tourdate", "evento"],
       logistics_event_type: ["load", "unload"],
+      logistics_transport_category: [
+        "sonido_madera",
+        "sonido_escenario",
+        "iluminacion_hierro",
+        "iluminacion_aparatos",
+        "video",
+        "rigging_motores",
+      ],
       message_status: ["unread", "read"],
       milestone_category: [
         "planning",
@@ -9097,7 +9134,7 @@ export const Constants = {
       room_type: ["single", "double"],
       task_status: ["not_started", "in_progress", "completed"],
       timesheet_status: ["draft", "submitted", "approved"],
-      tour_date_type: ["show", "rehearsal", "travel"],
+      tour_date_type: ["show", "rehearsal", "travel", "setup", "off", "rigging"],
       transport_provider_enum: ["camionaje", "transluminaria", "the_wild_tour", "pantoja", "crespo", "montabi_dorado", "grupo_sese", "nacex", "sector_pro", "recogida_cliente"],
       transport_type: ["trailer", "9m", "8m", "6m", "4m", "furgoneta", "rv"],
       transportation_type: ["van", "sleeper_bus", "train", "plane", "rv"],
