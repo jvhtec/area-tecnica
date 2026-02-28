@@ -13,6 +13,7 @@ import type { JobPayoutTotalsPanelProps } from './types';
 
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
   const data = useJobPayoutData(jobId, technicianId);
+  const isCicloJob = data.jobMeta?.job_type === 'ciclo';
   const actions = usePayoutActions({
     jobId,
     technicianId,
@@ -118,6 +119,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             payout={payout}
             jobId={jobId}
             isTourDate={data.isTourDate}
+            isCicloJob={isCicloJob}
             isManager={data.isManager}
             profileMap={data.profileMap}
             autonomoMap={data.autonomoMap}
@@ -150,6 +152,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           payoutTotals={data.payoutTotals}
           calculatedGrandTotal={data.calculatedGrandTotal}
           payoutOverrides={data.payoutOverrides}
+          isCicloJob={isCicloJob}
         />
       </CardContent>
 

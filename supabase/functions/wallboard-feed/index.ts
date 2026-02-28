@@ -268,7 +268,7 @@ serve(async (req) => {
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
+        .in("job_type", ["single", "festival", "ciclo", "tourdate"])
         .in("status", ["Confirmado", "Tentativa", "Completado"])
         .lt("start_time", weekEnd.toISOString()) // Job starts before window ends
         .gte("end_time", todayStart.toISOString()) // Job ends after window starts (ongoing or future)
@@ -349,7 +349,7 @@ serve(async (req) => {
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
+        .in("job_type", ["single", "festival", "ciclo", "tourdate"])
         .in("status", ["Confirmado", "Tentativa", "Completado"])
         .lt("start_time", gridEnd.toISOString()) // Job starts before calendar ends
         .gte("end_time", gridStart.toISOString()) // Job ends after calendar starts (ongoing)
@@ -429,7 +429,7 @@ serve(async (req) => {
             profiles(id, first_name, last_name)
           )
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
+        .in("job_type", ["single", "festival", "ciclo", "tourdate"])
         .in("status", ["Confirmado", "Tentativa", "Completado"])
         .lt("start_time", weekEnd.toISOString()) // Job starts before window ends
         .gte("end_time", todayStart.toISOString()) // Job ends after window starts (ongoing)
@@ -501,7 +501,7 @@ serve(async (req) => {
           tour_id,
           job_departments(department)
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
+        .in("job_type", ["single", "festival", "ciclo", "tourdate"])
         .in("status", ["Confirmado", "Tentativa", "Completado"])
         .lt("start_time", tomorrowEnd.toISOString()) // Job starts before tomorrow ends
         .gte("end_time", todayStart.toISOString()) // Job ends after today starts (ongoing)
@@ -544,7 +544,7 @@ serve(async (req) => {
           job_departments(department),
           job_assignments(technician_id, sound_role, lights_role, video_role)
         `)
-        .in("job_type", ["single", "festival", "tourdate"])
+        .in("job_type", ["single", "festival", "ciclo", "tourdate"])
         .in("status", ["Confirmado", "Tentativa", "Completado"])
         .lt("start_time", tomorrowEnd.toISOString()) // Job starts before tomorrow ends
         .gte("end_time", todayStart.toISOString()); // Job ends after today starts (ongoing)

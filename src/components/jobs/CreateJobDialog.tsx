@@ -38,7 +38,7 @@ const formSchema = z.object({
   }),
   start_time: z.string().min(1, "La hora de inicio es requerida"),
   end_time: z.string().min(1, "La hora de finalización es requerida"),
-  job_type: z.enum(["single", "multi_day", "tour", "festival", "dryhire", "tourdate", "evento"] as const),
+  job_type: z.enum(["single", "multi_day", "tour", "festival", "ciclo", "dryhire", "tourdate", "evento"] as const),
   departments: z.array(z.string()).min(1, "Se requiere al menos un departamento"),
   color: z.string().min(1, "El color es requerido"),
   timezone: z.string().min(1, "La zona horaria es requerida"),
@@ -420,6 +420,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                 <SelectItem value="single">Single</SelectItem>
                 <SelectItem value="tour">Tour</SelectItem>
                 <SelectItem value="festival">Festival</SelectItem>
+                <SelectItem value="ciclo">Ciclo</SelectItem>
                 <SelectItem value="dryhire">Dry Hire</SelectItem>
                 <SelectItem value="tourdate">Tour Date</SelectItem>
                 <SelectItem value="evento">Evento</SelectItem>

@@ -21,6 +21,7 @@ interface TechnicianPayoutOverrideResult {
   job_id: string;
   job_title: string;
   job_start_time: string;
+  job_type?: string | null;
   technician_id: string;
   technician_name: string;
   technician_department: string;
@@ -50,7 +51,7 @@ export function useSetTechnicianPayoutOverride() {
       const result = data as TechnicianPayoutOverrideResult;
 
       // Send notification email if successful (silently, no user notifications)
-      if (result.success) {
+      if (result.success && result.job_type !== 'ciclo') {
         try {
           const { error: emailError } = await supabase.functions.invoke(
             'send-payout-override-notification',
@@ -66,6 +67,7 @@ export function useSetTechnicianPayoutOverride() {
                 oldOverrideAmountEur: result.old_override_amount_eur,
                 newOverrideAmountEur: result.new_override_amount_eur,
                 calculatedTotal: result.calculated_total_eur,
+                jobType: result.job_type ?? undefined,
               },
             }
           );
@@ -87,8 +89,12 @@ export function useSetTechnicianPayoutOverride() {
       queryClient.invalidateQueries({ queryKey: ['job-tech-payout', data.job_id] });
       queryClient.invalidateQueries({ queryKey: ['job-tech-payout-overrides', data.job_id] });
 
-      const changeType = data.old_override_amount_eur === null ? 'activado' : 'modificado';
-      toast.success(`Override de pago ${changeType} para ${data.technician_name}`);
+      if (data.job_type === 'ciclo') {
+        toast.success(`Pago fijo guardado para ${data.technician_name}`);
+      } else {
+        const changeType = data.old_override_amount_eur === null ? 'activado' : 'modificado';
+        toast.success(`Override de pago ${changeType} para ${data.technician_name}`);
+      }
     },
     onError: (error: Error) => {
       console.error('[useSetTechnicianPayoutOverride] Error:', error);
@@ -123,7 +129,7 @@ export function useRemoveTechnicianPayoutOverride() {
       const result = data as TechnicianPayoutOverrideResult;
 
       // Send notification email if successful (silently, no user notifications)
-      if (result.success) {
+      if (result.success && result.job_type !== 'ciclo') {
         try {
           const { error: emailError } = await supabase.functions.invoke('send-payout-override-notification', {
             body: {
@@ -137,6 +143,7 @@ export function useRemoveTechnicianPayoutOverride() {
               oldOverrideAmountEur: result.old_override_amount_eur,
               newOverrideAmountEur: null,
               calculatedTotal: result.calculated_total_eur,
+              jobType: result.job_type ?? undefined,
             },
           });
 
@@ -155,7 +162,9 @@ export function useRemoveTechnicianPayoutOverride() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['job-tech-payout', data.job_id] });
       queryClient.invalidateQueries({ queryKey: ['job-tech-payout-overrides', data.job_id] });
-      toast.success(`Override removido para ${data.technician_name}`);
+      toast.success(data.job_type === 'ciclo'
+        ? `Pago fijo removido para ${data.technician_name}`
+        : `Override removido para ${data.technician_name}`);
     },
     onError: (error: Error) => {
       console.error('[useRemoveTechnicianPayoutOverride] Error:', error);

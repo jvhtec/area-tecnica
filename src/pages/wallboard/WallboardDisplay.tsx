@@ -242,7 +242,7 @@ export function WallboardDisplay({
       const { data: jobs, error: jobsError } = await supabase
         .from('jobs')
         .select('id,title,start_time,end_time,status,location_id,job_type,tour_id,timezone,color')
-        .in('job_type', ['single', 'festival', 'tourdate', 'dryhire', 'evento'])
+        .in('job_type', ['single', 'festival', 'ciclo', 'tourdate', 'dryhire', 'evento'])
         .in('status', ['Confirmado', 'Tentativa', 'Completado'])
         .filter('time_range', 'ov', calendarRange)
         .order('start_time', { ascending: true });

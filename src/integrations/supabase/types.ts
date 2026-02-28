@@ -8746,7 +8746,7 @@ export type Database = {
       job_extra_type: "travel_half" | "travel_full" | "day_off"
       job_rate_extras_status: "pending" | "approved" | "rejected"
       job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
-      job_type: "single" | "tour" | "festival" | "dryhire" | "tourdate" | "evento"
+      job_type: "single" | "tour" | "festival" | "ciclo" | "dryhire" | "tourdate" | "evento"
       logistics_event_type: "load" | "unload"
       message_status: "unread" | "read"
       milestone_category:
@@ -9068,7 +9068,7 @@ export const Constants = {
       job_extra_type: ["travel_half", "travel_full", "day_off"],
       job_rate_extras_status: ["pending", "approved", "rejected"],
       job_status: ["Tentativa", "Confirmado", "Completado", "Cancelado"],
-      job_type: ["single", "tour", "festival", "dryhire", "tourdate", "evento"],
+      job_type: ["single", "tour", "festival", "ciclo", "dryhire", "tourdate", "evento"],
       logistics_event_type: ["load", "unload"],
       message_status: ["unread", "read"],
       milestone_category: [

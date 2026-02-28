@@ -55,7 +55,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
             job_departments!inner(department)
           `
         )
-        .in('job_type', ['single', 'festival', 'tourdate', 'evento'])
+        .in('job_type', ['single', 'festival', 'ciclo', 'tourdate', 'evento'])
         .eq('job_departments.department', department)
         // Include jobs overlapping this day (handle end_time NULL)
         .or(

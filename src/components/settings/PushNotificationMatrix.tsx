@@ -60,6 +60,7 @@ const FALLBACK_EVENTS: EventInfo[] = [
   { code: 'job.type.changed.single', label: 'Job changed to Single' },
   { code: 'job.type.changed.tour', label: 'Job changed to Tour' },
   { code: 'job.type.changed.festival', label: 'Job changed to Festival' },
+  { code: 'job.type.changed.ciclo', label: 'Job changed to Ciclo' },
   { code: 'job.type.changed.dryhire', label: 'Job changed to Dry Hire' },
   { code: 'job.type.changed.tourdate', label: 'Job changed to Tour Date' },
 

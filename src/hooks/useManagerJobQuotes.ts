@@ -88,7 +88,7 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
         return attachPayoutOverridesToTourQuotes(jobId, results as TourJobRateQuote[]);
       }
 
-      // Single/festival jobs within a tour: use payout totals view
+      // Non-tourdate jobs within a tour (single/festival/ciclo): use payout totals view
       const { data: payouts, error } = await supabase
         .from('v_job_tech_payout_2025')
         .select('job_id, technician_id, timesheets_total_eur, extras_total_eur, total_eur')
@@ -122,4 +122,3 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
     staleTime: 30 * 1000,
   });
 }
-

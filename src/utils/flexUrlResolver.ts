@@ -95,7 +95,7 @@ export interface FlexTreeNode {
 }
 
 export interface FlexUrlResolverContext {
-  jobType?: 'single' | 'festival' | 'dryhire' | 'tourdate' | 'evento';
+  jobType?: 'single' | 'festival' | 'ciclo' | 'dryhire' | 'tourdate' | 'evento';
   viewHint?: string | null;
   fallbackDefinitionId?: string | null;
   fallbackDomainId?: string | null;

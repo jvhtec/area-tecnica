@@ -23,6 +23,7 @@ interface TechnicianPayoutCardProps {
   payout: JobPayoutTotals;
   jobId: string;
   isTourDate: boolean;
+  isCicloJob?: boolean;
   isManager: boolean;
   profileMap: Map<string, TechnicianProfileWithEmail>;
   autonomoMap: Map<string, boolean | null>;
@@ -57,6 +58,7 @@ export function TechnicianPayoutCard({
   payout,
   jobId,
   isTourDate,
+  isCicloJob = false,
   isManager,
   profileMap,
   autonomoMap,
@@ -339,6 +341,7 @@ export function TechnicianPayoutCard({
       {isManager && (
         <JobPayoutOverrideSection
           override={override}
+          isCicloJob={isCicloJob}
           isEditing={isEditing}
           techName={techName}
           calculatedTotalEur={payout.total_eur}

@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
+import { isFestivalLikeJobType } from "@/utils/jobType";
 
 interface TodayScheduleProps {
   jobs: any[];
@@ -87,7 +88,7 @@ export const TodaySchedule = ({
 
           let isFestivalJob = false;
           if (typeof jobData === 'object' && 'job_type' in jobData) {
-            isFestivalJob = jobData.job_type === 'festival';
+            isFestivalJob = isFestivalLikeJobType(jobData.job_type);
           }
 
           return (
@@ -135,7 +136,7 @@ export const TodaySchedule = ({
 
             if (typeof jobData === 'object') {
               if ('job_type' in jobData) {
-                isFestivalJob = jobData.job_type === 'festival';
+                isFestivalJob = isFestivalLikeJobType(jobData.job_type);
               }
             }
 

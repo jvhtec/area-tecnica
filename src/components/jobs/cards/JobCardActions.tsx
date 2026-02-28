@@ -33,6 +33,7 @@ import {
   openFlexElement,
   type FlatElementNode,
 } from "@/utils/flex-folders";
+import { isFestivalLikeJobType } from "@/utils/jobType";
 
 interface JobCardActionsProps {
   job: any;
@@ -503,7 +504,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
   const canViewCalculators = isProjectManagementPage && (userRole === 'management' || userRole === 'admin');
 
-  const allowedJobType = ['single', 'festival', 'tourdate'].includes(job?.job_type);
+  const isFestivalLike = isFestivalLikeJobType(job?.job_type);
+  const allowedJobType = ['single', 'festival', 'ciclo', 'tourdate'].includes(job?.job_type);
 
   const navigateToCalculator = (e: React.MouseEvent, type: 'pesos' | 'consumos') => {
     e.stopPropagation();
@@ -1028,7 +1030,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         </Button>
       )}
 
-      {job.job_type === "festival" && isProjectManagementPage && canManageArtists && (
+      {isFestivalLike && isProjectManagementPage && canManageArtists && (
         <Button
           variant="outline"
           size="sm"
@@ -1040,7 +1042,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           <span className="hidden sm:inline">{userRole === 'technician' || userRole === 'house_tech' ? 'Ver Festival' : 'Gestionar Festival'}</span>
         </Button>
       )}
-      {job.job_type !== "festival" && job.job_type !== "dryhire" && isProjectManagementPage && canManageArtists && (
+      {!isFestivalLike && job.job_type !== "dryhire" && isProjectManagementPage && canManageArtists && (
         <Button
           variant="outline"
           size="sm"

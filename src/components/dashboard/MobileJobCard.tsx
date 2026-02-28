@@ -40,6 +40,7 @@ import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQueryClient } from "@tanstack/react-query";
 import { openFlexElement } from "@/utils/flex-folders";
+import { isFestivalLikeJobType } from "@/utils/jobType";
 
 interface MobileJobCardProps {
   job: any;
@@ -143,7 +144,7 @@ export function MobileJobCard({
   const endTime = job.end_time ? format(new Date(job.end_time), 'HH:mm') : '';
   const timeRange = startTime && endTime ? `${startTime} - ${endTime}` : startTime;
 
-  const isFestival = job.job_type === 'festival';
+  const isFestival = isFestivalLikeJobType(job.job_type);
 
   const handleJobCardClick = () => {
     if (isHouseTech || isJobBeingDeleted) {

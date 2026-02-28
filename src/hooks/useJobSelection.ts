@@ -48,7 +48,7 @@ export const useJobSelection = () => {
           )
         `)
         .gte('start_time', today.toISOString()) // Filter to present/future jobs only
-        .in('job_type', ['single', 'festival', 'tourdate']) // Only include relevant job types
+        .in('job_type', ['single', 'festival', 'ciclo', 'tourdate']) // Only include relevant job types
         .neq('status', 'Completado') // Exclude completed/deleted jobs
         .order("start_time", { ascending: true });
 

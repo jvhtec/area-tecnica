@@ -47,7 +47,7 @@ export interface IntentDetectionContext {
   /**
    * Job type - helps determine if this is a dryhire or tourdate subfolder
    */
-  jobType?: 'single' | 'festival' | 'dryhire' | 'tourdate' | 'evento';
+  jobType?: 'single' | 'festival' | 'ciclo' | 'dryhire' | 'tourdate' | 'evento';
   /**
    * Folder type from the database - indicates the element type
    */

@@ -1074,6 +1074,7 @@ export async function handleBroadcast(
       'single': 'Trabajo individual',
       'tour': 'Gira',
       'festival': 'Festival',
+      'ciclo': 'Ciclo',
       'dryhire': 'Alquiler seco',
       'tourdate': 'Fecha de gira',
       'evento': 'Evento'
@@ -1091,6 +1092,9 @@ export async function handleBroadcast(
     } else if (type === 'job.type.changed.festival') {
       title = 'Trabajo cambiado a Festival';
       text = `${actor} cambió "${jobName}" a Festival.`;
+    } else if (type === 'job.type.changed.ciclo') {
+      title = 'Trabajo cambiado a Ciclo';
+      text = `${actor} cambió "${jobName}" a Ciclo.`;
     } else if (type === 'job.type.changed.dryhire') {
       title = 'Trabajo cambiado a Alquiler seco';
       text = `${actor} cambió "${jobName}" a Alquiler seco.`;

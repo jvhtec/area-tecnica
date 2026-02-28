@@ -16,6 +16,7 @@ import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/Prin
 import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { FestivalsPagination } from "@/components/ui/festivals-pagination";
 import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils";
+import { isFestivalLikeJobType } from "@/utils/jobType";
 
 const ITEMS_PER_PAGE = 9; // 3x3 grid
 
@@ -50,7 +51,7 @@ const Festivals = () => {
   useEffect(() => {
     if (jobs) {
       let festivals = jobs.filter(job => 
-        job.job_type === 'festival' && 
+        isFestivalLikeJobType(job.job_type) &&
         job.status !== 'Cancelado'
       );
       

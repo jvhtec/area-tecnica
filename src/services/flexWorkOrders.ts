@@ -749,7 +749,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
       for (const r of roleEntries) {
         const laborResourceId = resourceIdForRole(r.dept, r.role);
         if (!laborResourceId) continue;
-        const roleQty = (job.job_type && (job.job_type === 'single' || job.job_type === 'festival')) ? 3 : 1;
+        const roleQty = (job.job_type && (job.job_type === 'single' || job.job_type === 'festival' || job.job_type === 'ciclo')) ? 3 : 1;
         const pricingModelId = (job.job_type && (job.job_type === 'tour' || job.job_type === 'tourdate'))
           ? PRICING_MODEL_DIA_TOUR_ID
           : PRICING_MODEL_BASE_2025_ID;
@@ -774,7 +774,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
           await setLineItemTimeQtyBulk({ documentId, lineItemId, timeQty: roleQty, token });
         }
         // For single/festival jobs with overtime, add child lines under SOUND and LIGHTS roles
-        if (lineItemId && job.job_type && (job.job_type === 'single' || job.job_type === 'festival') && (r.dept === 'sound' || r.dept === 'lights')) {
+        if (lineItemId && job.job_type && (job.job_type === 'single' || job.job_type === 'festival' || job.job_type === 'ciclo') && (r.dept === 'sound' || r.dept === 'lights')) {
           // Horas 11-12
           const child1 = await addResourceLineItem({
             documentId,

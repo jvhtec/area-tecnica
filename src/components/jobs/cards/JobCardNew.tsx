@@ -25,6 +25,7 @@ import { JobCardNewView } from "./job-card-new/JobCardNewView";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreateFoldersOptions } from "@/utils/flex-folders";
+import { isFestivalLikeJobType } from "@/utils/jobType";
 
 export interface JobCardNewProps {
   job: any;
@@ -111,6 +112,7 @@ function JobCardNewFull({
   // Collapsible sections (collapsed by default)
   const [docsCollapsed, setDocsCollapsed] = useState(true);
   const [ridersCollapsed, setRidersCollapsed] = useState(true);
+  const isFestivalLike = isFestivalLikeJobType(job?.job_type);
 
   // Track if we've already opened the modal from URL param to prevent race condition
   const openedFromParamRef = useRef(false);
@@ -133,7 +135,7 @@ function JobCardNewFull({
   // Load artists then rider files (2-step RLS-friendly)
   const { data: cardArtists = [] } = useQuery({
     queryKey: ['jobcard-artists', job.id],
-    enabled: !!job?.id && job.job_type === 'festival',
+    enabled: !!job?.id && isFestivalLike,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('festival_artists')

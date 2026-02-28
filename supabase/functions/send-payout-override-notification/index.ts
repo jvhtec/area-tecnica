@@ -33,6 +33,7 @@ interface PayoutOverrideNotificationRequest {
   jobId: string;
   jobTitle: string;
   jobStartTime: string;
+  jobType?: string | null;
   technicianId: string;
   technicianName: string;
   technicianDepartment: string;
@@ -66,6 +67,7 @@ serve(async (req) => {
       jobId,
       jobTitle,
       jobStartTime,
+      jobType,
       technicianId,
       technicianName,
       technicianDepartment,
@@ -74,6 +76,33 @@ serve(async (req) => {
       newOverrideAmountEur,
       calculatedTotal,
     } = payload;
+
+    let resolvedJobType = jobType?.toLowerCase()?.trim() || null;
+    if (!resolvedJobType && jobId) {
+      const { data: jobRow, error: jobTypeError } = await supabase
+        .from("jobs")
+        .select("job_type")
+        .eq("id", jobId)
+        .maybeSingle();
+
+      if (jobTypeError) {
+        console.warn("[send-payout-override-notification] Failed to resolve job_type:", jobTypeError);
+      } else {
+        resolvedJobType = jobRow?.job_type?.toLowerCase()?.trim() || null;
+      }
+    }
+
+    if (resolvedJobType === "ciclo") {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: "Notification skipped for ciclo job type",
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     // Get actor information
     const { data: actorProfile, error: actorError } = await supabase

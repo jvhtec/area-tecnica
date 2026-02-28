@@ -37,6 +37,8 @@ export function resolveNotificationUrl(
   tourId: string | undefined,
   jobType: string | null | undefined,
 ): string {
+  const isFestivalLike = jobType === 'festival' || jobType === 'ciclo';
+
   // Assignment notifications navigate to job assignment matrix
   if (type === EVENT_TYPES.JOB_ASSIGNMENT_CONFIRMED ||
       type === EVENT_TYPES.JOB_ASSIGNMENT_DIRECT ||
@@ -50,7 +52,7 @@ export function resolveNotificationUrl(
            type === EVENT_TYPES.DOCUMENT_TECH_VISIBLE_DISABLED) {
     if (!jobId) return '/project-management';
     // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true
-    return jobType === 'festival'
+    return isFestivalLike
       ? `/festival-management/${jobId}`
       : `/festival-management/${jobId}?singleJob=true`;
   }
@@ -93,7 +95,7 @@ export function resolveNotificationUrl(
            type?.startsWith('job.type.changed')) {
     if (!jobId) return '/project-management';
     // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true
-    return jobType === 'festival'
+    return isFestivalLike
       ? `/festival-management/${jobId}`
       : `/festival-management/${jobId}?singleJob=true`;
   }
@@ -119,7 +121,7 @@ export function resolveNotificationUrl(
            type === EVENT_TYPES.TASK_COMPLETED) {
     if (jobId) {
       // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true
-      return jobType === 'festival'
+      return isFestivalLike
         ? `/festival-management/${jobId}`
         : `/festival-management/${jobId}?singleJob=true`;
     }
@@ -138,7 +140,7 @@ export function resolveNotificationUrl(
   else {
     if (jobId) {
       // Festival jobs go to /festival-management/{jobId}, others add ?singleJob=true
-      return jobType === 'festival'
+      return isFestivalLike
         ? `/festival-management/${jobId}`
         : `/festival-management/${jobId}?singleJob=true`;
     }

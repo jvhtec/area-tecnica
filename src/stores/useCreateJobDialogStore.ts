@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+export type CreateJobDialogJobType = 'single' | 'tour' | 'festival' | 'ciclo' | 'dryhire' | 'tourdate';
+
 /**
  * Global store for managing the Create Job Dialog
  * Allows opening the dialog from anywhere in the app via shortcuts
@@ -9,14 +11,14 @@ interface CreateJobDialogState {
   isOpen: boolean;
   initialDepartment?: string;
   initialDate?: Date;
-  initialJobType?: 'single' | 'tour' | 'festival' | 'dryhire' | 'tourdate';
+  initialJobType?: CreateJobDialogJobType;
 }
 
 interface CreateJobDialogStore extends CreateJobDialogState {
   openDialog: (options?: {
     department?: string;
     date?: Date;
-    jobType?: 'single' | 'tour' | 'festival' | 'dryhire' | 'tourdate';
+    jobType?: CreateJobDialogJobType;
   }) => void;
   closeDialog: () => void;
 }

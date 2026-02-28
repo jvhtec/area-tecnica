@@ -28,7 +28,7 @@ serve(async (req) => {
     const { data: allJobs, error: allError } = await sb
       .from("jobs")
       .select("id, title, status, job_type, start_time")
-      .in("job_type", ["single", "festival", "tourdate"])
+      .in("job_type", ["single", "festival", "ciclo", "tourdate"])
       .gte("start_time", todayStart.toISOString())
       .lte("start_time", weekEnd.toISOString())
       .order("start_time", { ascending: true });
@@ -48,7 +48,7 @@ serve(async (req) => {
     const { data: filteredJobs, error: filteredError } = await sb
       .from("jobs")
       .select("id, title, status, job_type, start_time")
-      .in("job_type", ["single", "festival", "tourdate"])
+      .in("job_type", ["single", "festival", "ciclo", "tourdate"])
       .in("status", ["Confirmado", "Tentativa", "Completado"])
       .gte("start_time", todayStart.toISOString())
       .lte("start_time", weekEnd.toISOString())

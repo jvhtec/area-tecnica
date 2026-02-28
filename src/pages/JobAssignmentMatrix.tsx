@@ -305,7 +305,7 @@ export default function JobAssignmentMatrix() {
           job_assignments!job_id(technician_id)
         `)
         .filter('time_range', 'ov', windowRange)
-        .in('job_type', ['single', 'festival', 'tourdate', 'evento'])
+        .in('job_type', ['single', 'festival', 'ciclo', 'tourdate', 'evento'])
         .limit(500); // Limit for performance
 
       // Add department filter if selected

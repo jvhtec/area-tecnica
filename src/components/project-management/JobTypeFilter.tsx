@@ -21,6 +21,7 @@ interface JobTypeFilterProps {
 const TYPE_LABELS: Record<string, string> = {
   single: "Single",
   festival: "Festival",
+  ciclo: "Ciclo",
   tour: "Tour",
   tourdate: "Tour Date",
   dryhire: "Dry Hire",
@@ -100,4 +101,3 @@ export const JobTypeFilter = ({
     </DropdownMenu>
   );
 };
-

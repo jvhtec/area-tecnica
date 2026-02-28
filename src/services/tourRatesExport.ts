@@ -9,7 +9,7 @@ export interface TourRatesExportJob {
   title: string;
   start_time: string;
   end_time?: string | null;
-  job_type?: 'single' | 'tour' | 'tourdate' | 'festival' | 'dryhire' | string | null;
+  job_type?: 'single' | 'tour' | 'tourdate' | 'festival' | 'ciclo' | 'dryhire' | string | null;
 }
 
 export interface TourRatesExportProfile {
@@ -317,7 +317,7 @@ export async function buildTourRatesExportPayload(
         },
       }));
     } else {
-      // Single/festival job within a tour: use payout totals (timesheets + extras)
+      // Non-tourdate job within a tour (single/festival/ciclo): use payout totals (timesheets + extras)
       const { data: payouts, error: payoutError } = await supabase
         .from('v_job_tech_payout_2025')
         .select('technician_id, timesheets_total_eur, extras_total_eur, total_eur, vehicle_disclaimer, vehicle_disclaimer_text')

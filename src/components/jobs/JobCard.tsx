@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { JobExtrasDialog } from "./JobExtrasDialog";
+import { isFestivalLikeJobType } from "@/utils/jobType";
 
 interface JobCardProps {
   job: Job;
@@ -43,6 +44,7 @@ export const JobCard = ({
   const canManageFestival = ['admin', 'management', 'logistics', 'technician'].includes(userRole || '');
   // Define who can edit and delete jobs
   const canEditJobs = ['admin', 'management'].includes(userRole || '');
+  const isFestivalLike = isFestivalLikeJobType(job.job_type);
 
   return (
     <Card 
@@ -56,7 +58,7 @@ export const JobCard = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-2">
           <CardTitle className="text-base md:text-lg font-semibold flex items-center gap-2">
             <span className="break-words">{job.title}</span>
-            {job.job_type === 'festival' && (
+            {isFestivalLike && (
               <Music className="inline-block h-4 w-4 text-primary flex-shrink-0" />
             )}
           </CardTitle>
@@ -75,7 +77,7 @@ export const JobCard = ({
                 <span className="hidden sm:inline">Extras</span>
               </Button>
             )}
-            {job.job_type === 'festival' && canManageFestival && (
+            {isFestivalLike && canManageFestival && (
               <Button 
                 variant="outline"
                 size="sm"

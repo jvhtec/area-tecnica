@@ -1,5 +1,17 @@
-import { format } from "date-fns";
+import { addDays } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { supabase } from "@/lib/supabase";
+
+const MADRID_TIMEZONE = "Europe/Madrid";
+
+function toMadridDateKey(date: Date): string {
+  return formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd");
+}
+
+function nextMadridDateKey(dateKey: string): string {
+  const madridNoonUtc = fromZonedTime(`${dateKey}T12:00:00`, MADRID_TIMEZONE);
+  return formatInTimeZone(addDays(madridNoonUtc, 1), MADRID_TIMEZONE, "yyyy-MM-dd");
+}
 
 export type MatrixJob = {
   id: string;
@@ -24,7 +36,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
     `
     )
     .filter("time_range", "ov", windowRange)
-    .in("job_type", ["single", "festival", "tourdate", "evento"])
+    .in("job_type", ["single", "festival", "ciclo", "tourdate", "evento"])
     .limit(500);
 
   if (department) {
@@ -131,18 +143,16 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
   }
 
   const perDay = new Map<string, { user_id: string; date: string; status: string; notes?: string }>();
-  const startDay = new Date(start);
-  startDay.setHours(0, 0, 0, 0);
-  const endDay = new Date(end);
-  endDay.setHours(0, 0, 0, 0);
+  const startDateKey = toMadridDateKey(start);
+  const endDateKey = toMadridDateKey(end);
 
   for (const batch of techBatches) {
     const { data: schedRows, error: schedErr } = await supabase
       .from("availability_schedules")
       .select("user_id, date, status, notes, source")
       .in("user_id", batch)
-      .gte("date", format(start, "yyyy-MM-dd"))
-      .lte("date", format(end, "yyyy-MM-dd"))
+      .gte("date", startDateKey)
+      .lte("date", endDateKey)
       .or("status.eq.unavailable,source.eq.vacation");
     if (schedErr) throw schedErr;
     (schedRows || []).forEach((row: any) => {
@@ -163,8 +173,8 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
       .from("technician_availability")
       .select("technician_id, date, status")
       .in("technician_id", technicianIds)
-      .gte("date", format(start, "yyyy-MM-dd"))
-      .lte("date", format(end, "yyyy-MM-dd"))
+      .gte("date", startDateKey)
+      .lte("date", endDateKey)
       .in("status", ["vacation", "travel", "sick", "day_off"]);
     if (legacyErr) {
       if (legacyErr.code !== "42P01") throw legacyErr;
@@ -191,21 +201,29 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
         .select("technician_id, start_date, end_date, status")
         .eq("status", "approved")
         .in("technician_id", batch)
-        .lte("start_date", format(end, "yyyy-MM-dd"))
-        .gte("end_date", format(start, "yyyy-MM-dd"));
+        .lte("start_date", endDateKey)
+        .gte("end_date", startDateKey);
       if (vacErr) {
         if (vacErr.code !== "42P01") throw vacErr;
       }
       (vacs || []).forEach((vac: any) => {
-        const s = new Date(vac.start_date);
-        const e = new Date(vac.end_date);
-        const clampStart = new Date(Math.max(startDay.getTime(), new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()));
-        const clampEnd = new Date(Math.min(endDay.getTime(), new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime()));
-        for (let d = new Date(clampStart); d.getTime() <= clampEnd.getTime(); d.setDate(d.getDate() + 1)) {
-          const key = `${vac.technician_id}-${format(d, "yyyy-MM-dd")}`;
+        const vacationStart = String(vac.start_date ?? "");
+        const vacationEnd = String(vac.end_date ?? "");
+        if (!vacationStart || !vacationEnd) return;
+
+        const clampStart = vacationStart > startDateKey ? vacationStart : startDateKey;
+        const clampEnd = vacationEnd < endDateKey ? vacationEnd : endDateKey;
+        if (clampStart > clampEnd) return;
+
+        let dateKey = clampStart;
+        while (dateKey <= clampEnd) {
+          const key = `${vac.technician_id}-${dateKey}`;
           if (!perDay.has(key)) {
-            perDay.set(key, { user_id: vac.technician_id, date: format(d, "yyyy-MM-dd"), status: "unavailable" });
+            perDay.set(key, { user_id: vac.technician_id, date: dateKey, status: "unavailable" });
           }
+          const nextDateKey = nextMadridDateKey(dateKey);
+          if (nextDateKey === dateKey) break;
+          dateKey = nextDateKey;
         }
       });
     }
@@ -298,4 +316,3 @@ export function parseSummaryRow(row: any): StaffingSummaryRow | null {
     roles,
   };
 }
-

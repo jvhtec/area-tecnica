@@ -31,6 +31,8 @@ export function formatJobTypeLabel(jobType?: string | null): string | null {
       return 'Fecha de gira';
     case 'festival':
       return 'Festival';
+    case 'ciclo':
+      return 'Ciclo';
     case 'dryhire':
       return 'Dry hire';
     default:
@@ -127,4 +129,3 @@ export function getTransportIcon(
     </span>
   );
 }
-

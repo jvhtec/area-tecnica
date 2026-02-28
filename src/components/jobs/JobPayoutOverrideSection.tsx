@@ -27,6 +27,7 @@ const formatOverrideTimestamp = (value?: string) => {
 
 export const JobPayoutOverrideSection: React.FC<{
   override?: JobPayoutOverride;
+  isCicloJob?: boolean;
   isEditing: boolean;
   techName: string;
   calculatedTotalEur: number;
@@ -40,6 +41,7 @@ export const JobPayoutOverrideSection: React.FC<{
   isRemoving: boolean;
 }> = ({
   override,
+  isCicloJob = false,
   isEditing,
   techName,
   calculatedTotalEur,
@@ -54,16 +56,26 @@ export const JobPayoutOverrideSection: React.FC<{
 }) => (
     <div className="space-y-2">
       {override && !isEditing && (
-        <div className="text-xs bg-amber-500/10 p-2 rounded border border-amber-500/30 text-amber-700 dark:text-amber-200">
+        <div
+          className={
+            isCicloJob
+              ? "text-xs bg-blue-500/10 p-2 rounded border border-blue-500/30 text-blue-700 dark:text-blue-200"
+              : "text-xs bg-amber-500/10 p-2 rounded border border-amber-500/30 text-amber-700 dark:text-amber-200"
+          }
+        >
           <div className="flex justify-between items-center">
-            <span className="font-medium">Override activo:</span>
+            <span className="font-medium">{isCicloJob ? "Pago fijo (ciclo):" : "Override activo:"}</span>
             <div className="flex items-center gap-2">
               <span className="font-bold">{formatCurrency(override.override_amount_eur)}</span>
               <Button
                 size="sm"
                 variant="ghost"
                 onClick={onStartEdit}
-                className="h-6 px-2 text-amber-700 dark:text-amber-200 hover:text-amber-800 dark:hover:text-amber-100 hover:bg-amber-500/20"
+                className={
+                  isCicloJob
+                    ? "h-6 px-2 text-blue-700 dark:text-blue-200 hover:text-blue-800 dark:hover:text-blue-100 hover:bg-blue-500/20"
+                    : "h-6 px-2 text-amber-700 dark:text-amber-200 hover:text-amber-800 dark:hover:text-amber-100 hover:bg-amber-500/20"
+                }
               >
                 <Edit2 className="h-3 w-3" />
               </Button>
@@ -81,20 +93,34 @@ export const JobPayoutOverrideSection: React.FC<{
           <div className="text-xs mt-1 opacity-75">Calculado: {formatCurrency(calculatedTotalEur)}</div>
           {(override.actor_name || override.actor_email || override.set_at) && (
             <div className="text-[11px] mt-1 opacity-80">
-              {`Override por ${override.actor_name || '—'}${override.actor_email ? ` (${override.actor_email})` : ''}${override.set_at ? ` · ${formatOverrideTimestamp(override.set_at)}` : ''}`}
+              {`${isCicloJob ? 'Pago fijo por' : 'Override por'} ${override.actor_name || '—'}${override.actor_email ? ` (${override.actor_email})` : ''}${override.set_at ? ` · ${formatOverrideTimestamp(override.set_at)}` : ''}`}
             </div>
           )}
-          <div className="text-[11px] mt-1 opacity-80">
-            ⚠️ Excepción: Administración debe validar este override con Dirección.
-          </div>
+          {!isCicloJob && (
+            <div className="text-[11px] mt-1 opacity-80">
+              ⚠️ Excepción: Administración debe validar este override con Dirección.
+            </div>
+          )}
         </div>
       )}
 
       {isEditing && (
-        <div className="bg-amber-500/10 p-3 rounded border border-amber-500/30 space-y-2">
-          <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-200">
+        <div
+          className={
+            isCicloJob
+              ? "bg-blue-500/10 p-3 rounded border border-blue-500/30 space-y-2"
+              : "bg-amber-500/10 p-3 rounded border border-amber-500/30 space-y-2"
+          }
+        >
+          <div
+            className={
+              isCicloJob
+                ? "flex items-center gap-2 text-xs text-blue-700 dark:text-blue-200"
+                : "flex items-center gap-2 text-xs text-amber-700 dark:text-amber-200"
+            }
+          >
             <Edit2 className="h-3.5 w-3.5" />
-            <span className="font-medium">Override de pago para {techName}</span>
+            <span className="font-medium">{isCicloJob ? `Pago fijo (ciclo) para ${techName}` : `Override de pago para ${techName}`}</span>
           </div>
           <div className="flex items-center gap-2">
             <Input
@@ -107,22 +133,31 @@ export const JobPayoutOverrideSection: React.FC<{
               className="flex-1 bg-background border-input text-foreground placeholder:text-muted-foreground h-8"
               autoFocus
             />
-            <Button size="sm" onClick={onSave} disabled={isSaving} className="bg-amber-600 hover:bg-amber-500 text-white h-8">
+            <Button
+              size="sm"
+              onClick={onSave}
+              disabled={isSaving}
+              className={isCicloJob ? "bg-blue-600 hover:bg-blue-500 text-white h-8" : "bg-amber-600 hover:bg-amber-500 text-white h-8"}
+            >
               {isSaving ? 'Guardando...' : 'Guardar'}
             </Button>
             <Button size="sm" variant="ghost" onClick={onCancel} className="text-foreground hover:bg-muted h-8">
               Cancelar
             </Button>
           </div>
-          <div className="text-xs text-amber-700 dark:text-amber-200">Calculado: {formatCurrency(calculatedTotalEur)}</div>
+          <div className={isCicloJob ? "text-xs text-blue-700 dark:text-blue-200" : "text-xs text-amber-700 dark:text-amber-200"}>
+            Calculado: {formatCurrency(calculatedTotalEur)}
+          </div>
           {(override?.actor_name || override?.actor_email || override?.set_at) && (
-            <div className="text-[11px] text-amber-700 dark:text-amber-200 opacity-90">
-              {`Override por ${override?.actor_name || '—'}${override?.actor_email ? ` (${override.actor_email})` : ''}${override?.set_at ? ` · ${formatOverrideTimestamp(override.set_at)}` : ''}`}
+            <div className={isCicloJob ? "text-[11px] text-blue-700 dark:text-blue-200 opacity-90" : "text-[11px] text-amber-700 dark:text-amber-200 opacity-90"}>
+              {`${isCicloJob ? 'Pago fijo por' : 'Override por'} ${override?.actor_name || '—'}${override?.actor_email ? ` (${override.actor_email})` : ''}${override?.set_at ? ` · ${formatOverrideTimestamp(override.set_at)}` : ''}`}
             </div>
           )}
-          <div className="text-[11px] text-amber-700 dark:text-amber-200 opacity-90">
-            ⚠️ Excepción: Administración debe validar este override con Dirección.
-          </div>
+          {!isCicloJob && (
+            <div className="text-[11px] text-amber-700 dark:text-amber-200 opacity-90">
+              ⚠️ Excepción: Administración debe validar este override con Dirección.
+            </div>
+          )}
         </div>
       )}
 
@@ -131,12 +166,15 @@ export const JobPayoutOverrideSection: React.FC<{
           size="sm"
           variant="outline"
           onClick={onStartEdit}
-          className="w-full border-amber-500/30 text-amber-700 dark:text-amber-200 hover:bg-amber-500/10 hover:text-amber-800 dark:hover:text-amber-100"
+          className={
+            isCicloJob
+              ? "w-full border-blue-500/30 text-blue-700 dark:text-blue-200 hover:bg-blue-500/10 hover:text-blue-800 dark:hover:text-blue-100"
+              : "w-full border-amber-500/30 text-amber-700 dark:text-amber-200 hover:bg-amber-500/10 hover:text-amber-800 dark:hover:text-amber-100"
+          }
         >
           <Edit2 className="h-3 w-3 mr-1" />
-          Establecer override de pago
+          {isCicloJob ? "Establecer pago fijo (ciclo)" : "Establecer override de pago"}
         </Button>
       )}
     </div>
   );
-

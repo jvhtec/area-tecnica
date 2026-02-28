@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { Department } from "@/types/department";
 import { sanitizeLogData } from "@/lib/enhanced-security-config";
+import { OPS_JOB_TYPES_NO_DRYHIRE, OPS_JOB_TYPES_WITH_DRYHIRE } from "@/utils/jobType";
 
 /**
  * Optimized jobs hook that consolidates multiple queries and subscriptions
@@ -91,7 +92,7 @@ export const useOptimizedJobs = (
         )
       `)
       // Include relevant job types; optionally include dryhire
-      .in('job_type', includeDryhire ? ['single', 'festival', 'tourdate', 'dryhire', 'evento'] : ['single', 'festival', 'tourdate', 'evento'])
+      .in('job_type', includeDryhire ? [...OPS_JOB_TYPES_WITH_DRYHIRE] : [...OPS_JOB_TYPES_NO_DRYHIRE])
       .order('start_time', { ascending: true });
 
     // Apply filters efficiently using indexes

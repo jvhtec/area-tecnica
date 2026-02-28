@@ -76,7 +76,7 @@ export const CopyArtistsDialog = ({
       const { data, error } = await supabase
         .from("jobs")
         .select("id, title, start_time, end_time")
-        .eq("job_type", "festival")
+        .in("job_type", ["festival", "ciclo"])
         .neq("id", currentJobId)
         .order("start_time", { ascending: false });
 
