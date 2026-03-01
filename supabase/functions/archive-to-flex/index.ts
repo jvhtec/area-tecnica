@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveFlexAuthToken } from "../_shared/flexAuthToken.ts";
 
 type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comercial" | "logistics" | "administrative";
 
@@ -35,8 +36,14 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 // Flex API config
 const FLEX_API_BASE_URL = Deno.env.get("FLEX_API_BASE_URL") || "https://sectorpro.flexrentalsolutions.com/f5/api";
-const FLEX_AUTH_TOKEN = Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
 
+/**
+ * Create an HTTP Response with a JSON-serialized body and standard CORS headers.
+ *
+ * @param body - The value to serialize as the JSON response body
+ * @param status - HTTP status code to send (defaults to 200)
+ * @returns A Response whose body is the JSON serialization of `body`, with Content-Type `application/json`, CORS headers, and the given status code
+ */
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -88,8 +95,16 @@ type FlexAddLinePayload = {
   notes?: string;
 };
 
-async function addRemoteFileLine(remoteFileListId: string, payload: FlexAddLinePayload): Promise<{ ok: true; data: any } | { ok: false; status: number; error?: any }> {
-  if (!FLEX_AUTH_TOKEN) {
+/**
+ * Adds a new entry (line) to a Flex remote file list for a given remoteFileListId.
+ *
+ * @param remoteFileListId - Identifier of the remote file list to which the line will be added
+ * @param payload - Payload describing the file line (filename, mimetype, filesize, optional url/content/notes)
+ * @param flexAuthToken - Flex API authentication token required for the request
+ * @returns An object with `ok: true` and the Flex response `data` on success; otherwise an object with `ok: false`, an HTTP `status`, and optional `error` details
+ */
+async function addRemoteFileLine(remoteFileListId: string, payload: FlexAddLinePayload, flexAuthToken: string): Promise<{ ok: true; data: any } | { ok: false; status: number; error?: any }> {
+  if (!flexAuthToken) {
     return { ok: false, status: 500, error: "Missing FLEX auth token" };
   }
   try {
@@ -98,8 +113,8 @@ async function addRemoteFileLine(remoteFileListId: string, payload: FlexAddLineP
       headers: {
         "accept": "*/*",
         "Content-Type": "application/json",
-        "X-Auth-Token": FLEX_AUTH_TOKEN,
-        "apikey": FLEX_AUTH_TOKEN,
+        "X-Auth-Token": flexAuthToken,
+        "apikey": flexAuthToken,
       },
       body: JSON.stringify(payload),
     });
@@ -152,7 +167,15 @@ async function getDocTecnicaTargets(
 
 // Simple cache helpers
 const deptFolderCache = new Map<string, string | null>(); // key `${jobId}:${dept}` -> element_id
-const docTecCache = new Map<string, string | null>(); // key deptFolderElementId -> doc_tecnica element id
+const docTecCache = new Map<string, string | null>(); /**
+ * Retrieve the element ID of a department folder for a given job, using a per-request cache when available.
+ *
+ * The lookup is cached by `${jobId}:${dept}` so subsequent calls for the same job and department return the cached value.
+ *
+ * @param jobId - The job identifier to query folders for
+ * @param dept - The department whose folder element ID is being requested
+ * @returns The `element_id` of the department folder, or `null` if no matching folder is found
+ */
 
 async function getDepartmentFolderElementId(
   sb: ReturnType<typeof createClient>,
@@ -173,14 +196,24 @@ async function getDepartmentFolderElementId(
   return val;
 }
 
-async function fetchElementTree(elementId: string): Promise<any[]> {
-  if (!FLEX_AUTH_TOKEN) throw new Error("Missing FLEX auth token");
+/**
+ * Retrieve and normalize the element tree for a Flex element.
+ *
+ * Fetches the element tree for `elementId` from the Flex API and returns an array of node objects.
+ *
+ * @param elementId - The Flex element identifier whose tree should be fetched
+ * @param flexAuthToken - Auth token used to authorize the Flex API request
+ * @returns An array of element tree nodes; if the API returns a single node the result will be an array containing that node
+ * @throws Error if `flexAuthToken` is missing or if the Flex API responds with a non-OK status (error message included when available)
+ */
+async function fetchElementTree(elementId: string, flexAuthToken: string): Promise<any[]> {
+  if (!flexAuthToken) throw new Error("Missing FLEX auth token");
   const res = await fetch(`${FLEX_API_BASE_URL}/element/${encodeURIComponent(elementId)}/tree`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
-      "X-Auth-Token": FLEX_AUTH_TOKEN,
-      "apikey": FLEX_AUTH_TOKEN,
+      "X-Auth-Token": flexAuthToken,
+      "apikey": flexAuthToken,
       "accept": "*/*",
     },
   });
@@ -226,13 +259,24 @@ function findDocTecnicaInTree(nodes: any[]): string | null {
   return null;
 }
 
+/**
+ * Resolve the "Documentación Técnica" element ID within a department folder by fetching and searching its element tree.
+ *
+ * Fetches the folder's element tree from the Flex API and searches for a node representing Documentación Técnica;
+ * the resolved element ID is cached for subsequent calls.
+ *
+ * @param deptFolderElementId - The Flex element ID of the department folder to search.
+ * @param flexAuthToken - Per-request Flex API authentication token used to fetch the element tree.
+ * @returns The element ID of the Documentación Técnica node if found, `null` otherwise.
+ */
 async function resolveDocTecnicaByTree(
   deptFolderElementId: string,
+  flexAuthToken: string,
 ): Promise<string | null> {
   if (!deptFolderElementId) return null;
   if (docTecCache.has(deptFolderElementId)) return docTecCache.get(deptFolderElementId)!;
   try {
-    const tree = await fetchElementTree(deptFolderElementId);
+    const tree = await fetchElementTree(deptFolderElementId, flexAuthToken);
     const docId = findDocTecnicaInTree(tree);
     docTecCache.set(deptFolderElementId, docId);
     return docId;
@@ -350,7 +394,24 @@ serve(async (req) => {
 
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
-  // Load selected departments for the job (used for better defaults)
+  // Resolve per-user Flex API token
+  let actorId: string | null = null;
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const { data } = await sb.auth.getUser(authHeader.replace("Bearer ", ""));
+      actorId = data.user?.id ?? null;
+    }
+  } catch (_) { /* ignore */ }
+  const flexAuthToken = await resolveFlexAuthToken(sb, actorId);
+
+  /**
+   * Load the departments explicitly selected for the current job from the job_departments table.
+   *
+   * Filters the returned values to the set of valid department identifiers and returns an empty array if none are found or on error.
+   *
+   * @returns An array of department identifiers present for the job (e.g., "sound", "lights"); empty array if no valid selections or on failure.
+   */
   async function getJobSelectedDepartments(): Promise<Dept[]> {
     try {
       const { data, error } = await sb
@@ -444,7 +505,7 @@ serve(async (req) => {
         try {
           const deptFolderElementId = await getDepartmentFolderElementId(sb, jobId, dept);
           if (deptFolderElementId) {
-            const docTecId = await resolveDocTecnicaByTree(deptFolderElementId);
+            const docTecId = await resolveDocTecnicaByTree(deptFolderElementId, flexAuthToken);
             if (docTecId) {
               targets.set(dept, docTecId);
               rfl = docTecId;
@@ -457,7 +518,7 @@ serve(async (req) => {
           try {
             const tourDeptFolderId = await getTourDeptFolderElementId(sb, jobId, dept);
             if (tourDeptFolderId) {
-              const docTecId = await resolveDocTecnicaByTree(tourDeptFolderId);
+              const docTecId = await resolveDocTecnicaByTree(tourDeptFolderId, flexAuthToken);
               if (docTecId) {
                 targets.set(dept, docTecId);
                 rfl = docTecId;
@@ -477,7 +538,7 @@ serve(async (req) => {
           try {
             const mainEl = await getMainElementId(sb, jobId);
             if (mainEl) {
-              const tree = await fetchElementTree(mainEl);
+              const tree = await fetchElementTree(mainEl, flexAuthToken);
               const docTecId = findDocTecByDeptInTree(tree, dept);
               if (docTecId) {
                 targets.set(dept, docTecId);
@@ -565,7 +626,7 @@ serve(async (req) => {
             content: contentBytes,
             notes: `Imported from Sector Pro (job ${jobId})`,
           };
-          res = await addRemoteFileLine(rflIds[i], payloadContent);
+          res = await addRemoteFileLine(rflIds[i], payloadContent, flexAuthToken);
           if (res) flexResponses.push({ rflId: rflIds[i], mode: 'content', status: (res as any).status ?? (res.ok ? 200 : 500), data: (res as any).data, error: (res as any).error });
         } catch (e) {
           console.error('[archive-to-flex] content-first exception', e);
@@ -580,7 +641,7 @@ serve(async (req) => {
           url: signed.signedUrl,
           notes: `Imported from Sector Pro (job ${jobId})`,
         };
-        const res2 = await addRemoteFileLine(rflIds[i], payloadUrl);
+        const res2 = await addRemoteFileLine(rflIds[i], payloadUrl, flexAuthToken);
         flexResponses.push({ rflId: rflIds[i], mode: 'url', status: (res2 as any).status ?? (res2.ok ? 200 : 500), data: (res2 as any).data, error: (res2 as any).error });
         if (!res2.ok) {
           allOk = false;
