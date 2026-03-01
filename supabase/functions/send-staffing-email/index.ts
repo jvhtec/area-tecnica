@@ -745,8 +745,57 @@ serve(async (req) => {
 
       // Step 5: Build content (email or whatsapp)
       console.log('📧 BUILDING EMAIL CONTENT...');
+
+      // For WhatsApp, generate short tokens for clean URLs
+      let waConfirmUrl: string | null = null;
+      let waDeclineUrl: string | null = null;
+      const SHORT_URL_BASE = Deno.env.get('SHORT_URL_BASE') || 'https://www.sector-pro.work/a';
+
+      if (desiredChannel === 'whatsapp') {
+        try {
+          // Generate short tokens (22 chars each, URL-safe)
+          const genShortToken = () => {
+            const bytes = new Uint8Array(16);
+            crypto.getRandomValues(bytes);
+            return btoa(String.fromCharCode(...bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+          };
+
+          const confirmShortToken = genShortToken();
+          const declineShortToken = genShortToken();
+
+          // Store tokens directly on the staffing_requests row
+          const { error: tokenUpdateErr } = await supabase
+            .from('staffing_requests')
+            .update({
+              wa_confirm_token: confirmShortToken,
+              wa_decline_token: declineShortToken,
+              hmac_token_raw: token,
+            })
+            .eq('id', insertedId);
+
+          if (tokenUpdateErr) {
+            console.warn('[send-staffing-email] Failed to store short tokens, using long URLs:', tokenUpdateErr);
+          } else {
+            waConfirmUrl = `${SHORT_URL_BASE}/${confirmShortToken}`;
+            waDeclineUrl = `${SHORT_URL_BASE}/${declineShortToken}`;
+            console.log('📱 Short tokens stored on staffing_request:', {
+              rid: insertedId,
+              confirm: confirmShortToken.substring(0, 8) + '...',
+              decline: declineShortToken.substring(0, 8) + '...'
+            });
+          }
+        } catch (tokenErr) {
+          console.warn('[send-staffing-email] Error generating short tokens:', tokenErr);
+        }
+      }
+
+      // Long URLs (used for email, or as fallback for WhatsApp)
       const confirmUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${token}&c=${encodeURIComponent(desiredChannel)}`;
       const declineUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=decline&exp=${encodeURIComponent(exp)}&t=${token}&c=${encodeURIComponent(desiredChannel)}`;
+
+      // For WhatsApp, use short URLs if available
+      const waConfirmLink = waConfirmUrl || confirmUrl;
+      const waDeclineLink = waDeclineUrl || declineUrl;
 
       const roleLabel = labelForRoleCode(role) || null;
       const subject = phase === "availability"
@@ -919,8 +968,8 @@ serve(async (req) => {
           lines.push(`Calendario del tour (PDF): ${tourPdfSignedUrl}`);
           lines.push('');
         }
-        lines.push(`Confirmar: ${confirmUrl}`);
-        lines.push(`No estoy disponible: ${declineUrl}`);
+        lines.push(`Confirmar: ${waConfirmLink}`);
+        lines.push(`No estoy disponible: ${waDeclineLink}`);
         const text = lines.join('\n');
 
         // WAHA config - use actor's endpoint
