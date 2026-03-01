@@ -328,5 +328,34 @@ export const downloadTimesheetPDF = async (options: GenerateTimesheetPDFOptions)
     ? `timesheet-${options.job.title.replace(/[^a-zA-Z0-9]/g, '_')}-all-dates.pdf`
     : `timesheet-${options.job.title.replace(/[^a-zA-Z0-9]/g, '_')}-${options.date}.pdf`;
     
-  doc.save(fileName);
+  // Use enhanced download method
+  await downloadPDFWithFallback(doc, fileName);
+};
+
+// Enhanced PDF download function with fallback
+const downloadPDFWithFallback = async (doc: any, filename: string) => {
+  try {
+    // Try the blob method first
+    const blob = doc.output('blob');
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    
+    document.body.appendChild(link);
+    link.click();
+    
+    setTimeout(() => {
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    }, 100);
+    
+    console.log('✅ Timesheet PDF downloaded successfully');
+  } catch (error) {
+    console.warn('Blob download failed, falling back to direct save:', error);
+    // Fallback to direct save
+    doc.save(filename);
+  }
 };
