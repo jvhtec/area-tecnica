@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveFlexAuthToken } from "../_shared/flexAuthToken.ts";
 
 type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comercial" | "logistics" | "administrative";
 
@@ -35,7 +36,6 @@ const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 // Flex API config
 const FLEX_API_BASE_URL = Deno.env.get("FLEX_API_BASE_URL") || "https://sectorpro.flexrentalsolutions.com/f5/api";
-const FLEX_AUTH_TOKEN = Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -88,8 +88,8 @@ type FlexAddLinePayload = {
   notes?: string;
 };
 
-async function addRemoteFileLine(remoteFileListId: string, payload: FlexAddLinePayload): Promise<{ ok: true; data: any } | { ok: false; status: number; error?: any }> {
-  if (!FLEX_AUTH_TOKEN) {
+async function addRemoteFileLine(remoteFileListId: string, payload: FlexAddLinePayload, flexAuthToken: string): Promise<{ ok: true; data: any } | { ok: false; status: number; error?: any }> {
+  if (!flexAuthToken) {
     return { ok: false, status: 500, error: "Missing FLEX auth token" };
   }
   try {
@@ -98,8 +98,8 @@ async function addRemoteFileLine(remoteFileListId: string, payload: FlexAddLineP
       headers: {
         "accept": "*/*",
         "Content-Type": "application/json",
-        "X-Auth-Token": FLEX_AUTH_TOKEN,
-        "apikey": FLEX_AUTH_TOKEN,
+        "X-Auth-Token": flexAuthToken,
+        "apikey": flexAuthToken,
       },
       body: JSON.stringify(payload),
     });
@@ -173,14 +173,14 @@ async function getDepartmentFolderElementId(
   return val;
 }
 
-async function fetchElementTree(elementId: string): Promise<any[]> {
-  if (!FLEX_AUTH_TOKEN) throw new Error("Missing FLEX auth token");
+async function fetchElementTree(elementId: string, flexAuthToken: string): Promise<any[]> {
+  if (!flexAuthToken) throw new Error("Missing FLEX auth token");
   const res = await fetch(`${FLEX_API_BASE_URL}/element/${encodeURIComponent(elementId)}/tree`, {
     method: "GET",
     headers: {
       "Content-Type": "application/json",
-      "X-Auth-Token": FLEX_AUTH_TOKEN,
-      "apikey": FLEX_AUTH_TOKEN,
+      "X-Auth-Token": flexAuthToken,
+      "apikey": flexAuthToken,
       "accept": "*/*",
     },
   });
@@ -228,11 +228,12 @@ function findDocTecnicaInTree(nodes: any[]): string | null {
 
 async function resolveDocTecnicaByTree(
   deptFolderElementId: string,
+  flexAuthToken: string,
 ): Promise<string | null> {
   if (!deptFolderElementId) return null;
   if (docTecCache.has(deptFolderElementId)) return docTecCache.get(deptFolderElementId)!;
   try {
-    const tree = await fetchElementTree(deptFolderElementId);
+    const tree = await fetchElementTree(deptFolderElementId, flexAuthToken);
     const docId = findDocTecnicaInTree(tree);
     docTecCache.set(deptFolderElementId, docId);
     return docId;
@@ -350,6 +351,17 @@ serve(async (req) => {
 
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+  // Resolve per-user Flex API token
+  let actorId: string | null = null;
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const { data } = await sb.auth.getUser(authHeader.replace("Bearer ", ""));
+      actorId = data.user?.id ?? null;
+    }
+  } catch (_) { /* ignore */ }
+  const flexAuthToken = await resolveFlexAuthToken(sb, actorId);
+
   // Load selected departments for the job (used for better defaults)
   async function getJobSelectedDepartments(): Promise<Dept[]> {
     try {
@@ -444,7 +456,7 @@ serve(async (req) => {
         try {
           const deptFolderElementId = await getDepartmentFolderElementId(sb, jobId, dept);
           if (deptFolderElementId) {
-            const docTecId = await resolveDocTecnicaByTree(deptFolderElementId);
+            const docTecId = await resolveDocTecnicaByTree(deptFolderElementId, flexAuthToken);
             if (docTecId) {
               targets.set(dept, docTecId);
               rfl = docTecId;
@@ -457,7 +469,7 @@ serve(async (req) => {
           try {
             const tourDeptFolderId = await getTourDeptFolderElementId(sb, jobId, dept);
             if (tourDeptFolderId) {
-              const docTecId = await resolveDocTecnicaByTree(tourDeptFolderId);
+              const docTecId = await resolveDocTecnicaByTree(tourDeptFolderId, flexAuthToken);
               if (docTecId) {
                 targets.set(dept, docTecId);
                 rfl = docTecId;
@@ -477,7 +489,7 @@ serve(async (req) => {
           try {
             const mainEl = await getMainElementId(sb, jobId);
             if (mainEl) {
-              const tree = await fetchElementTree(mainEl);
+              const tree = await fetchElementTree(mainEl, flexAuthToken);
               const docTecId = findDocTecByDeptInTree(tree, dept);
               if (docTecId) {
                 targets.set(dept, docTecId);
@@ -565,7 +577,7 @@ serve(async (req) => {
             content: contentBytes,
             notes: `Imported from Sector Pro (job ${jobId})`,
           };
-          res = await addRemoteFileLine(rflIds[i], payloadContent);
+          res = await addRemoteFileLine(rflIds[i], payloadContent, flexAuthToken);
           if (res) flexResponses.push({ rflId: rflIds[i], mode: 'content', status: (res as any).status ?? (res.ok ? 200 : 500), data: (res as any).data, error: (res as any).error });
         } catch (e) {
           console.error('[archive-to-flex] content-first exception', e);
@@ -580,7 +592,7 @@ serve(async (req) => {
           url: signed.signedUrl,
           notes: `Imported from Sector Pro (job ${jobId})`,
         };
-        const res2 = await addRemoteFileLine(rflIds[i], payloadUrl);
+        const res2 = await addRemoteFileLine(rflIds[i], payloadUrl, flexAuthToken);
         flexResponses.push({ rflId: rflIds[i], mode: 'url', status: (res2 as any).status ?? (res2.ok ? 200 : 500), data: (res2 as any).data, error: (res2 as any).error });
         if (!res2.ok) {
           allOk = false;

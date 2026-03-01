@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { FLEX_API_BASE_URL } from '@/lib/api-config';
 import { FLEX_FOLDER_IDS, RESPONSIBLE_PERSON_IDS, DEPARTMENT_SUFFIXES } from '@/utils/flex-folders/constants';
 import { resourceIdForRole, EXTRA_RESOURCE_IDS } from '@/utils/flex-labor-resources';
+import { onFlexTokenInvalidate } from '@/utils/flexTokenCache';
 
 const WORK_ORDER_DEFINITION_ID = FLEX_FOLDER_IDS.ordenTrabajo;
 const DEFAULT_LOCATION_ID = FLEX_FOLDER_IDS.location;
@@ -11,9 +12,16 @@ const PRICING_MODEL_BASE_2025_ID = 'a4307bf9-cd39-4df1-9d6d-48932120c4bd';
 const PRICING_MODEL_DIA_TOUR_ID = '04c62780-c51d-11ea-a087-2a0a4490a7fb';
 
 let cachedFlexToken: string | null = null;
+let tokenVersion = 0;
+onFlexTokenInvalidate(() => {
+  tokenVersion += 1;
+  cachedFlexToken = null;
+});
 
 async function getFlexAuthToken(): Promise<string> {
   if (cachedFlexToken) return cachedFlexToken;
+  
+  const requestVersion = tokenVersion;
 
   const { data, error } = await supabase.functions.invoke('get-secret', {
     body: { secretName: 'X_AUTH_TOKEN' },
@@ -28,7 +36,10 @@ async function getFlexAuthToken(): Promise<string> {
     throw new Error('Flex auth token response missing X_AUTH_TOKEN');
   }
 
-  cachedFlexToken = token;
+  // Only cache if version hasn't changed (no invalidation during fetch)
+  if (requestVersion === tokenVersion) {
+    cachedFlexToken = token;
+  }
   return token;
 }
 

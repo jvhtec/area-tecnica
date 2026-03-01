@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { businessRoleIdFor, inferTierFromRoleCode } from "./flexBusinessRoles.ts";
+import { resolveFlexAuthToken } from "../_shared/flexAuthToken.ts";
 
 type Dept = "sound" | "lights" | "video";
 
@@ -30,23 +31,18 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Auth token
-    let flexAuthToken = Deno.env.get("X_AUTH_TOKEN") || "";
-    if (!flexAuthToken) {
+    // Resolve calling user for per-user API key lookup
+    let actorId: string | null = null;
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
       try {
-        const res = await fetch(new URL(req.url).origin + "/functions/v1/get-secret", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "X_AUTH_TOKEN" })
-        });
-        if (res.ok) {
-          const j = await res.json();
-          flexAuthToken = (j as any)?.X_AUTH_TOKEN || flexAuthToken;
-        }
-      } catch (_) {
-        // ignore
-      }
+        const { data } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
+        actorId = data.user?.id ?? null;
+      } catch (_) { /* ignore */ }
     }
+
+    // Auth token (per-user key with global fallback)
+    const flexAuthToken = await resolveFlexAuthToken(supabase, actorId);
 
     if (!flexAuthToken) {
       return new Response(JSON.stringify({ error: "X_AUTH_TOKEN not configured" }), {

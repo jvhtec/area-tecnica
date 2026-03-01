@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { FLEX_API_BASE_URL } from '@/lib/api-config';
 import { FLEX_FOLDER_IDS } from './flex-folders/constants';
+import { onFlexTokenInvalidate } from '@/utils/flexTokenCache';
 
 export const FLEX_UI_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
 
@@ -124,6 +125,12 @@ interface SchemaResolution {
 
 let cachedFlexToken: string | null = null;
 let pendingTokenPromise: Promise<string> | null = null;
+let tokenVersion = 0;
+onFlexTokenInvalidate(() => {
+  tokenVersion += 1;
+  cachedFlexToken = null;
+  pendingTokenPromise = null;
+});
 
 function coerceString(value: unknown): string | undefined {
   if (typeof value === 'string') {
@@ -171,6 +178,8 @@ async function getFlexAuthToken(): Promise<string> {
     return pendingTokenPromise;
   }
 
+  const requestVersion = tokenVersion;
+  
   pendingTokenPromise = (async () => {
     console.log('[flexUrlResolver] Fetching Flex auth token');
     const { data, error } = await supabase.functions.invoke('get-secret', {
@@ -188,7 +197,10 @@ async function getFlexAuthToken(): Promise<string> {
       throw new Error('Flex auth token response missing X_AUTH_TOKEN');
     }
 
-    cachedFlexToken = token;
+    // Only cache if version hasn't changed (no invalidation during fetch)
+    if (requestVersion === tokenVersion) {
+      cachedFlexToken = token;
+    }
     pendingTokenPromise = null;
     return token;
   })();

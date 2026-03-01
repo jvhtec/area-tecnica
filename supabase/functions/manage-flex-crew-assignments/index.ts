@@ -2,6 +2,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { businessRoleIdFor, inferTierFromRoleCode } from './flexBusinessRoles.ts'
+import { resolveFlexAuthToken } from '../_shared/flexAuthToken.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -174,6 +175,14 @@ serve(async (req) => {
 
     const { job_id, technician_id, department, action } = await req.json() as RequestBody;
     const actorId = await resolveActorId(supabase, req);
+    
+    // Require authenticated actor for write operations
+    if (!actorId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     console.log(`Managing Flex crew assignment: ${action} technician ${technician_id} for job ${job_id} in department ${department}`);
 
@@ -216,9 +225,9 @@ serve(async (req) => {
       );
     }
 
-    const flexAuthToken = Deno.env.get('X_AUTH_TOKEN');
+    const flexAuthToken = await resolveFlexAuthToken(supabase, actorId);
     if (!flexAuthToken) {
-      console.error('X_AUTH_TOKEN not configured');
+      console.error('No Flex API token available');
       return new Response(
         JSON.stringify({ error: 'Flex authentication not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
