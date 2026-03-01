@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS achievements (
   title text NOT NULL,
   description text NOT NULL,
   hint text,
-  category text NOT NULL CHECK (category IN ('volume', 'house', 'reliability', 'endurance', 'diversity', 'hidden')),
+  category text NOT NULL CHECK (category IN ('volume', 'house', 'reliability', 'endurance', 'diversity', 'community', 'management', 'hidden')),
   evaluation_type text NOT NULL,
   metric_key text NOT NULL,
   threshold integer NOT NULL,
@@ -127,7 +127,108 @@ INSERT INTO achievements (code, title, description, hint, category, evaluation_t
 ('venues_15',         'Viajero',                   '15 venues diferentes. Conoces media ciudad.',                  NULL,                            'diversity', 'venue_count',        'venue_count',        15, NULL, false, '✈️', 270),
 ('festival_day',      'Día de Festival',           'Tu primer festival completado.',                               'Completa un trabajo de festival','diversity', 'festival_job_count', 'festival_job_count', 1,  NULL, false, '🎪', 280),
 ('festival_regular',  'Festivalero',               '10 días de festival. Ya tienes botas de barro propias.',       NULL,                            'diversity', 'festival_job_count', 'festival_job_count', 10, NULL, false, '🎶', 290),
-('festival_veteran',  'Veterano de Festivales',    '25 días de festival. Tu tienda de campaña tiene wifi.',        NULL,                            'diversity', 'festival_job_count', 'festival_job_count', 25, NULL, false, '⛺', 300);
+('festival_veteran',  'Veterano de Festivales',    '25 días de festival. Tu tienda de campaña tiene wifi.',        NULL,                            'diversity', 'festival_job_count', 'festival_job_count', 25, NULL, false, '⛺', 300),
+
+-- Community (1)
+('bug_hunter',        'Cazador de Bugs',           'Has reportado 5 o más bugs para ayudar a mejorar la plataforma.', 'Reporta bugs desde la página de Soporte', 'community', 'threshold', 'bug_reports_submitted', 5, NULL, false, '🐛', 310),
+
+-- Management Only - Job Operations (8)
+('first_job_created',      'Primer Trabajo Creado',     'Has creado tu primer trabajo en el sistema.',                    'Crea un trabajo desde el calendario',     'management', 'threshold', 'jobs_created',        1,   NULL, false, '📝', 320),
+('job_machine',            'Máquina de Bolos',          '10 trabajos creados. Ya dominas el sistema.',                    NULL,                                      'management', 'threshold', 'jobs_created',        10,  NULL, false, '⚙️', 330),
+('booking_boss',           'Jefe de Booking',           '50 trabajos creados. Eres el motor de la productora.',           NULL,                                      'management', 'threshold', 'jobs_created',        50,  NULL, false, '👔', 340),
+('production_powerhouse',  'Potencia de Producción',    '100 trabajos creados. La agenda gira alrededor tuyo.',           NULL,                                      'management', 'threshold', 'jobs_created',        100, NULL, false, '🏭', 350),
+('unstoppable_booker',     'Booker Imparable',          '250 trabajos creados. Tienes el calendario en la sangre.',       NULL,                                      'management', 'threshold', 'jobs_created',        250, NULL, false, '🚀', 360),
+('first_confirmation',     'Primera Confirmación',      'Has confirmado tu primer trabajo.',                              'Confirma un trabajo pendiente',           'management', 'threshold', 'jobs_confirmed',      1,   NULL, false, '✓', 370),
+('confirmation_king',      'Rey de Confirmaciones',     '50 confirmaciones. La producción avanza gracias a ti.',          NULL,                                      'management', 'threshold', 'jobs_confirmed',      50,  NULL, false, '👑', 380),
+('master_coordinator',     'Coordinador Maestro',       '100 confirmaciones. Nada se mueve sin tu aprobación.',           NULL,                                      'management', 'threshold', 'jobs_confirmed',      100, NULL, false, '🎯', 390),
+
+-- Management Only - Documentation (6)
+('first_document',         'Primer Documento',          'Has subido tu primer documento al sistema.',                     'Sube un documento a un trabajo',          'management', 'threshold', 'documents_uploaded',  1,   NULL, false, '📄', 400),
+('paperwork_pro',          'Pro del Papeleo',           '25 documentos subidos. Organizas la información como nadie.',    NULL,                                      'management', 'threshold', 'documents_uploaded',  25,  NULL, false, '📋', 410),
+('document_master',        'Maestro de Archivos',       '100 documentos. Eres la biblioteca de la productora.',           NULL,                                      'management', 'threshold', 'documents_uploaded',  100, NULL, false, '📚', 420),
+('first_pdf_export',       'Primer PDF Generado',       'Has exportado tu primer PDF del sistema.',                       'Genera un PDF de riders o itinerarios',   'management', 'threshold', 'pdfs_generated',      1,   NULL, false, '📑', 430),
+('pdf_wizard',             'Mago de PDFs',              '50 PDFs generados. Los informes salen de tu varita mágica.',     NULL,                                      'management', 'threshold', 'pdfs_generated',      50,  NULL, false, '🪄', 440),
+('archive_architect',      'Arquitecto del Archivo',    '200 PDFs generados. Documentas la historia de cada evento.',     NULL,                                      'management', 'threshold', 'pdfs_generated',      200, NULL, false, '🏗️', 450),
+
+-- Management Only - Crew Management (8)
+('first_assignment',       'Primera Asignación',        'Has asignado a tu primer técnico.',                              'Asigna un técnico a un trabajo',          'management', 'threshold', 'assignments_created', 1,   NULL, false, '👤', 460),
+('crew_builder',           'Constructor de Crew',       '25 asignaciones. Ya montas equipos con soltura.',                NULL,                                      'management', 'threshold', 'assignments_created', 25,  NULL, false, '👥', 470),
+('staffing_expert',        'Experto en Staffing',       '100 asignaciones. Conoces a cada técnico y su especialidad.',    NULL,                                      'management', 'threshold', 'assignments_created', 100, NULL, false, '🎓', 480),
+('workforce_commander',    'Comandante de Personal',    '500 asignaciones. Orquestas equipos como un director.',          NULL,                                      'management', 'threshold', 'assignments_created', 500, NULL, false, '🎼', 490),
+('first_timesheet_ok',     'Primer Timesheet Aprobado', 'Has aprobado tu primer timesheet.',                              'Aprueba un timesheet pendiente',          'management', 'threshold', 'timesheets_approved', 1,   NULL, false, '⏰', 500),
+('payroll_manager',        'Gestor de Nóminas',         '50 timesheets aprobados. El equipo cobra gracias a ti.',         NULL,                                      'management', 'threshold', 'timesheets_approved', 50,  NULL, false, '💰', 510),
+('timesheet_guardian',     'Guardián de Timesheets',    '200 timesheets aprobados. Nadie escapa a tu revisión.',          NULL,                                      'management', 'threshold', 'timesheets_approved', 200, NULL, false, '🛡️', 520),
+('staffing_request_pro',   'Pro de Solicitudes',        'Has gestionado 25 solicitudes de staffing.',                     'Gestiona solicitudes de personal',        'management', 'threshold', 'staffing_handled',    25,  NULL, false, '📞', 530),
+
+-- Management Only - Communication (4)
+('first_announcement',     'Primer Anuncio',            'Has publicado tu primer anuncio para el equipo.',                'Publica un anuncio desde la app',         'management', 'threshold', 'announcements_sent',  1,   NULL, false, '📢', 540),
+('town_crier',             'Pregonero',                 '10 anuncios publicados. Mantienes informado al equipo.',         NULL,                                      'management', 'threshold', 'announcements_sent',  10,  NULL, false, '🔔', 550),
+('first_task',             'Primera Tarea Creada',      'Has creado tu primera tarea en el sistema.',                     'Crea una tarea para el equipo',           'management', 'threshold', 'tasks_created',       1,   NULL, false, '✔️', 560),
+('task_master',            'Maestro de Tareas',         '50 tareas creadas. Organizas el trabajo del equipo.',            NULL,                                      'management', 'threshold', 'tasks_created',       50,  NULL, false, '📝', 570),
+
+-- Management Only - Operations (4)
+('equipment_guru',         'Gurú del Equipamiento',     'Has gestionado 25 elementos de equipamiento.',                   'Gestiona el inventario de equipos',       'management', 'threshold', 'equipment_managed',   25,  NULL, false, '🎚️', 580),
+('subrental_specialist',   'Especialista en Subrental', '10 subrentals gestionados. Sabes cuándo pedir refuerzos.',       NULL,                                      'management', 'threshold', 'subrentals_managed',  10,  NULL, false, '📦', 590),
+('preset_creator',         'Creador de Presets',        '5 presets de equipamiento creados. Eficientas el sistema.',      'Crea presets de equipos reutilizables',   'management', 'threshold', 'presets_created',     5,   NULL, false, '⚡', 600),
+('operations_mastermind',  'Cerebro de Operaciones',    '1000 acciones totales de gestión. Eres el corazón del sistema.', NULL,                                      'management', 'threshold', 'total_mgmt_actions',  1000,NULL, false, '🧠', 610),
+
+-- Management Only - Production Documents (5)
+('first_hoja_ruta',        'Primera Hoja de Ruta',      'Has creado tu primera hoja de ruta para una gira.',              'Genera una hoja de ruta desde Tours',    'management', 'threshold', 'hojas_ruta_created',  1,   NULL, false, '🗺️', 620),
+('route_master',           'Maestro de Rutas',          '10 hojas de ruta. Planificas giras como un pro.',               NULL,                                      'management', 'threshold', 'hojas_ruta_created',  10,  NULL, false, '🧭', 630),
+('first_rider',            'Primer Rider',              'Has creado tu primer rider técnico de artista.',                 'Crea un rider desde Festivales',         'management', 'threshold', 'riders_created',      1,   NULL, false, '🎸', 640),
+('rider_specialist',       'Especialista en Riders',    '25 riders creados. Conoces cada detalle técnico.',               NULL,                                      'management', 'threshold', 'riders_created',      25,  NULL, false, '🎛️', 650),
+('incident_handler',       'Gestor de Incidencias',     '5 informes de incidencias documentados.',                        'Documenta incidencias desde la app',     'management', 'threshold', 'incidents_reported',  5,   NULL, false, '⚠️', 660),
+
+-- Management Only - Technical Specs (5)
+('first_consumo',          'Primer Consumo',            'Has calculado tu primer consumo de potencia.',                   'Calcula consumos de luces o sonido',     'management', 'threshold', 'consumos_created',    1,   NULL, false, '⚡', 670),
+('power_calculator',       'Calculador de Potencia',    '10 consumos calculados. Dominas los amperios.',                  NULL,                                      'management', 'threshold', 'consumos_created',    10,  NULL, false, '🔌', 680),
+('first_peso',             'Primer Cálculo de Peso',    'Has calculado pesos para logística por primera vez.',            'Calcula pesos para transporte',          'management', 'threshold', 'pesos_calculated',    1,   NULL, false, '⚖️', 690),
+('logistics_engineer',     'Ingeniero Logístico',       '15 cálculos de peso. Optimizas cada camión.',                    NULL,                                      'management', 'threshold', 'pesos_calculated',    15,  NULL, false, '🚛', 700),
+('stage_plotter',          'Diseñador de Escenario',    'Has creado 5 stage plots para montajes.',                        'Diseña stage plots desde la app',        'management', 'threshold', 'stage_plots_created', 5,   NULL, false, '🎭', 710),
+
+-- Management Only - Warehouse & Logistics (3)
+('warehouse_warrior',      'Guerrero del Almacén',      '20 operaciones de load-in/load-out gestionadas.',                'Gestiona entradas/salidas de almacén',   'management', 'threshold', 'warehouse_ops',       20,  NULL, false, '📦', 720),
+('transport_coordinator',  'Coordinador de Transporte', 'Has coordinado transporte para 10 eventos.',                     NULL,                                      'management', 'threshold', 'transport_coordinated',10, NULL, false, '🚚', 730),
+('flex_integrator',        'Integrador Flex',           'Has sincronizado 15 elementos con Flex Rental.',                 'Integra trabajos con Flex',              'management', 'threshold', 'flex_syncs',          15,  NULL, false, '🔗', 740),
+
+-- Management Only - Festival & Tour Operations (5)
+('festival_scheduler',     'Programador de Festivales', 'Has programado tu primer festival multi-día.',                   'Programa un festival en la app',         'management', 'threshold', 'festivals_scheduled', 1,   NULL, false, '🎪', 750),
+('festival_maestro',       'Maestro de Festivales',     '5 festivales programados. Organizas eventos épicos.',            NULL,                                      'management', 'threshold', 'festivals_scheduled', 5,   NULL, false, '🎉', 760),
+('artist_coordinator',     'Coordinador de Artistas',   'Has gestionado 30 artistas en festivales.',                      'Gestiona artistas y requisitos',         'management', 'threshold', 'artists_managed',     30,  NULL, false, '🎤', 770),
+('tour_architect',         'Arquitecto de Giras',       'Has creado 10 giras completas con fechas e itinerarios.',        NULL,                                      'management', 'threshold', 'tours_created',       10,  NULL, false, '🗓️', 780),
+('presupuesto_pro',        'Pro de Presupuestos',       '20 presupuestos/quotes generados. Cierras deals.',               'Genera presupuestos para clientes',      'management', 'threshold', 'quotes_generated',    20,  NULL, false, '💼', 790),
+
+-- Management Only - Communication & Messaging (4)
+('first_group_message',    'Primer Mensaje Grupal',     'Has enviado tu primer mensaje a un grupo de trabajo.',           'Envía mensajes grupales al equipo',      'management', 'threshold', 'group_messages_sent', 1,   NULL, false, '💬', 800),
+('team_communicator',      'Comunicador del Equipo',    '50 mensajes grupales enviados. Mantienes al equipo conectado.',  NULL,                                      'management', 'threshold', 'group_messages_sent', 50,  NULL, false, '📱', 810),
+('whatsapp_master',        'Maestro de WhatsApp',       'Has gestionado 10 grupos de WhatsApp para proyectos.',           'Gestiona grupos de comunicación',        'management', 'threshold', 'whatsapp_groups',     10,  NULL, false, '📲', 820),
+('broadcast_champion',     'Campeón de Difusión',       '100 comunicaciones enviadas. Tu voz llega a todos.',             NULL,                                      'management', 'threshold', 'broadcasts_sent',     100, NULL, false, '📻', 830),
+
+-- Management Only - Client Relations (4)
+('first_client_meeting',   'Primera Reunión Cliente',   'Has registrado tu primera reunión con cliente.',                 'Registra reuniones de clientes',         'management', 'threshold', 'client_meetings',     1,   NULL, false, '🤝', 840),
+('relationship_builder',   'Constructor de Relaciones', '20 reuniones de cliente. Construyes relaciones sólidas.',        NULL,                                      'management', 'threshold', 'client_meetings',     20,  NULL, false, '🏗️', 850),
+('feedback_collector',     'Recolector de Feedback',    'Has recopilado feedback de 15 clientes.',                        'Solicita feedback post-evento',          'management', 'threshold', 'client_feedback',     15,  NULL, false, '📝', 860),
+('client_champion',        'Campeón del Cliente',       '50 interacciones de cliente. La satisfacción es tu prioridad.',  NULL,                                      'management', 'threshold', 'client_interactions', 50,  NULL, false, '⭐', 870),
+
+-- Management Only - Financial Operations (3)
+('expense_tracker',        'Rastreador de Gastos',      'Has registrado 30 gastos de producción.',                        'Registra gastos de eventos',             'management', 'threshold', 'expenses_tracked',    30,  NULL, false, '💵', 880),
+('budget_guardian',        'Guardián del Presupuesto',  'Has revisado presupuestos para 15 proyectos.',                   'Revisa y ajusta presupuestos',           'management', 'threshold', 'budgets_reviewed',    15,  NULL, false, '💰', 890),
+('rate_negotiator',        'Negociador de Tarifas',     'Has negociado tarifas para 25 técnicos.',                        'Gestiona tarifas personalizadas',        'management', 'threshold', 'rates_negotiated',    25,  NULL, false, '💼', 900),
+
+-- Management Only - Venue & Location Management (3)
+('venue_mapper',           'Mapeador de Venues',        'Has añadido 10 nuevos venues al sistema.',                       'Añade venues nuevos',                    'management', 'threshold', 'venues_added',        10,  NULL, false, '📍', 910),
+('location_expert',        'Experto en Localizaciones', 'Has actualizado información de 25 venues.',                      'Mantén datos de venues actualizados',    'management', 'threshold', 'venues_updated',      25,  NULL, false, '🗺️', 920),
+('venue_scout',            'Scout de Venues',           '5 scouting reports de localizaciones completados.',              'Realiza scouting de nuevos espacios',    'management', 'threshold', 'venue_scouts',        5,   NULL, false, '🔍', 930),
+
+-- Management Only - Safety & Quality (3)
+('safety_first',           'Seguridad Primero',         'Has completado 10 checklists de seguridad.',                     'Completa checklists de seguridad',       'management', 'threshold', 'safety_checks',       10,  NULL, false, '🦺', 940),
+('quality_auditor',        'Auditor de Calidad',        '15 auditorías de calidad realizadas.',                           'Audita calidad de eventos',              'management', 'threshold', 'quality_audits',      15,  NULL, false, '✅', 950),
+('incident_investigator',  'Investigador de Incidentes','Has investigado y documentado 10 incidentes.',                    'Investiga y previene incidentes',        'management', 'threshold', 'incidents_investigated', 10, NULL, false, '🔎', 960),
+
+-- Management Only - System Administration (3)
+('user_manager',           'Gestor de Usuarios',        'Has gestionado accesos de 20 usuarios.',                         'Gestiona usuarios del sistema',          'management', 'threshold', 'users_managed',       20,  NULL, false, '👤', 970),
+('permissions_master',     'Maestro de Permisos',       'Has configurado permisos para 10 departamentos o roles.',        'Configura permisos y roles',             'management', 'threshold', 'permissions_set',     10,  NULL, false, '🔐', 980),
+('system_architect',       'Arquitecto del Sistema',    '50 configuraciones del sistema realizadas. Moldeas la plataforma.', 'Personaliza configuración del sistema', 'management', 'threshold', 'system_configs',      50,  NULL, false, '⚙️', 990);
 
 -- ============================================================================
 -- Evaluation Function: evaluate one user's achievements
@@ -310,6 +411,418 @@ BEGIN
   VALUES (p_user_id, 'no_cancel_streak', v_metric_value, now())
   ON CONFLICT (user_id, metric_key)
   DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+  -- ---- Metric: bug_reports_submitted ----
+  SELECT COUNT(*) INTO v_metric_value
+  FROM bug_reports
+  WHERE created_by = p_user_id;
+
+  INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+  VALUES (p_user_id, 'bug_reports_submitted', v_metric_value, now())
+  ON CONFLICT (user_id, metric_key)
+  DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+  -- ============================================================================
+  -- Management Metrics (only calculated for admin/management roles)
+  -- ============================================================================
+  IF EXISTS (SELECT 1 FROM profiles WHERE id = p_user_id AND role IN ('admin', 'management')) THEN
+
+    -- ---- Metric: jobs_created ----
+    SELECT COUNT(*) INTO v_metric_value
+    FROM jobs
+    WHERE created_by = p_user_id;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'jobs_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: jobs_confirmed ----
+    -- Count jobs where status is 'confirmado' (created by this user)
+    SELECT COUNT(*) INTO v_metric_value
+    FROM jobs
+    WHERE created_by = p_user_id AND status = 'confirmado';
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'jobs_confirmed', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: assignments_created ----
+    SELECT COUNT(*) INTO v_metric_value
+    FROM job_assignments
+    WHERE created_by = p_user_id;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'assignments_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: timesheets_approved ----
+    -- Count approved timesheets (if approved_by column exists, otherwise count by created_by)
+    SELECT COUNT(*) INTO v_metric_value
+    FROM timesheets
+    WHERE created_by = p_user_id AND status = 'aprobado';
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'timesheets_approved', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: staffing_handled ----
+    SELECT COUNT(*) INTO v_metric_value
+    FROM staffing_requests
+    WHERE created_by = p_user_id;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'staffing_handled', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: announcements_sent ----
+    SELECT COUNT(*) INTO v_metric_value
+    FROM announcements
+    WHERE created_by = p_user_id;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'announcements_sent', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: tasks_created ----
+    SELECT COUNT(*) INTO v_metric_value
+    FROM global_tasks
+    WHERE created_by = p_user_id;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'tasks_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: equipment_managed ----
+    SELECT COUNT(*) INTO v_metric_value
+    FROM stock_movements
+    WHERE created_by = p_user_id;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'equipment_managed', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: subrentals_managed ----
+    SELECT COUNT(*) INTO v_metric_value
+    FROM subrental_requests
+    WHERE created_by = p_user_id;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'subrentals_managed', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: presets_created ----
+    SELECT COUNT(*) INTO v_metric_value
+    FROM equipment_presets
+    WHERE created_by = p_user_id;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'presets_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: documents_uploaded ----
+    -- Placeholder: might need adjustment based on actual document storage
+    SELECT 0 INTO v_metric_value;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'documents_uploaded', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: pdfs_generated ----
+    -- Placeholder: might need adjustment based on actual PDF tracking
+    SELECT 0 INTO v_metric_value;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'pdfs_generated', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Production Document Metrics ----
+    -- Note: These use placeholder counts - adjust based on actual table schemas
+
+    -- hojas_ruta_created: Tour route sheets/day sheets created
+    SELECT 0 INTO v_metric_value;  -- Placeholder
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'hojas_ruta_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- riders_created: Technical riders for artists
+    SELECT COUNT(*) INTO v_metric_value
+    FROM artist_requirements
+    WHERE created_by = p_user_id;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'riders_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- incidents_reported: Incident reports filed
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need incident_reports table
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'incidents_reported', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Technical Spec Metrics ----
+
+    -- consumos_created: Power consumption sheets
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need consumos tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'consumos_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- pesos_calculated: Weight calculations for logistics
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need weight calc tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'pesos_calculated', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- stage_plots_created: Stage plot designs
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need stage plot tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'stage_plots_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Warehouse & Logistics Metrics ----
+
+    -- warehouse_ops: Load-in/load-out operations
+    SELECT COUNT(*) INTO v_metric_value
+    FROM load_in_load_out
+    WHERE created_by = p_user_id;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'warehouse_ops', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- transport_coordinated: Transport coordination
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need transport tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'transport_coordinated', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- flex_syncs: Flex Rental integrations
+    SELECT COUNT(*) INTO v_metric_value
+    FROM flex_folders
+    WHERE created_by = p_user_id;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'flex_syncs', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Festival & Tour Operations Metrics ----
+
+    -- festivals_scheduled: Festivals created
+    SELECT COUNT(*) INTO v_metric_value
+    FROM tours
+    WHERE created_by = p_user_id AND tour_type = 'festival';
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'festivals_scheduled', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- artists_managed: Artists in festivals
+    SELECT COUNT(*) INTO v_metric_value
+    FROM festival_artists
+    WHERE created_by = p_user_id;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'artists_managed', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- tours_created: Tours created
+    SELECT COUNT(*) INTO v_metric_value
+    FROM tours
+    WHERE created_by = p_user_id AND tour_type = 'tour';
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'tours_created', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- quotes_generated: Quotes/presupuestos generated
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need quotes tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'quotes_generated', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Communication & Messaging Metrics ----
+
+    -- group_messages_sent: Group messages sent to teams
+    SELECT COUNT(*) INTO v_metric_value
+    FROM messages
+    WHERE created_by = p_user_id AND is_group_message = true;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'group_messages_sent', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- whatsapp_groups: WhatsApp groups managed
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need whatsapp_groups tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'whatsapp_groups', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- broadcasts_sent: Total broadcasts/announcements + messages
+    SELECT COUNT(*) INTO v_metric_value
+    FROM (
+      SELECT created_at FROM announcements WHERE created_by = p_user_id
+      UNION ALL
+      SELECT created_at FROM messages WHERE created_by = p_user_id
+    ) combined;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'broadcasts_sent', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Client Relations Metrics ----
+
+    -- client_meetings: Client meetings tracked
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need client_meetings table
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'client_meetings', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- client_feedback: Client feedback collected
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need client_feedback table
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'client_feedback', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- client_interactions: Total client interactions (meetings + feedback + follow-ups)
+    SELECT 0 INTO v_metric_value;  -- Placeholder: sum of client-related activities
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'client_interactions', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Financial Operations Metrics ----
+
+    -- expenses_tracked: Expenses tracked for events
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need expenses table
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'expenses_tracked', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- budgets_reviewed: Budgets reviewed/approved
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need budget_reviews tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'budgets_reviewed', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- rates_negotiated: Custom tech rates negotiated
+    SELECT COUNT(*) INTO v_metric_value
+    FROM custom_tech_rates
+    WHERE created_by = p_user_id;
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'rates_negotiated', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Venue & Location Management Metrics ----
+
+    -- venues_added: New venues added to system
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need created_by on locations table
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'venues_added', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- venues_updated: Venue information updated
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need venue update tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'venues_updated', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- venue_scouts: Scouting reports completed
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need venue_scouting table
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'venue_scouts', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Safety & Quality Metrics ----
+
+    -- safety_checks: Safety checklists completed
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need safety_checklists table
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'safety_checks', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- quality_audits: Quality audits performed
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need quality_audits table
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'quality_audits', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- incidents_investigated: Incidents investigated and resolved
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need incident_investigations table
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'incidents_investigated', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- System Administration Metrics ----
+
+    -- users_managed: User accounts managed (created or modified)
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need user management tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'users_managed', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- permissions_set: Permission configurations set
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need permissions tracking
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'permissions_set', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- system_configs: System configurations changed
+    SELECT 0 INTO v_metric_value;  -- Placeholder: need system_settings audit log
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'system_configs', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+    -- ---- Metric: total_mgmt_actions ----
+    -- Sum of all management actions
+    SELECT COALESCE(
+      (SELECT current_value FROM achievement_progress WHERE user_id = p_user_id AND metric_key = 'jobs_created'), 0) +
+      COALESCE((SELECT current_value FROM achievement_progress WHERE user_id = p_user_id AND metric_key = 'jobs_confirmed'), 0) +
+      COALESCE((SELECT current_value FROM achievement_progress WHERE user_id = p_user_id AND metric_key = 'assignments_created'), 0) +
+      COALESCE((SELECT current_value FROM achievement_progress WHERE user_id = p_user_id AND metric_key = 'staffing_handled'), 0) +
+      COALESCE((SELECT current_value FROM achievement_progress WHERE user_id = p_user_id AND metric_key = 'announcements_sent'), 0) +
+      COALESCE((SELECT current_value FROM achievement_progress WHERE user_id = p_user_id AND metric_key = 'tasks_created'), 0)
+    INTO v_metric_value;
+
+    INSERT INTO achievement_progress (user_id, metric_key, current_value, last_evaluated_at)
+    VALUES (p_user_id, 'total_mgmt_actions', v_metric_value, now())
+    ON CONFLICT (user_id, metric_key)
+    DO UPDATE SET current_value = EXCLUDED.current_value, last_evaluated_at = now();
+
+  END IF;
 
   -- ============================================================================
   -- Check all active achievements and unlock newly qualified ones

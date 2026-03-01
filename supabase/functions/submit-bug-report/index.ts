@@ -307,6 +307,9 @@ serve(async (req) => {
       );
     }
 
+    // Note: Achievement evaluation is handled automatically by database trigger
+    // on_bug_report_submitted_evaluate_achievements (see migration 20260213000000)
+
     // Send confirmation email (optional - can be implemented later)
     // TODO: Send confirmation email to reporter
 

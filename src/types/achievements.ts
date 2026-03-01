@@ -1,4 +1,4 @@
-export type AchievementCategory = 'volume' | 'house' | 'reliability' | 'endurance' | 'diversity' | 'hidden';
+export type AchievementCategory = 'volume' | 'house' | 'reliability' | 'endurance' | 'diversity' | 'community' | 'management' | 'hidden';
 
 export interface Achievement {
   id: string;
@@ -49,6 +49,8 @@ export const CATEGORY_LABELS: Record<AchievementCategory, string> = {
   reliability: 'Fiabilidad',
   endurance: 'Resistencia',
   diversity: 'Experiencia',
+  community: 'Comunidad',
+  management: 'Gestión',
   hidden: 'Ocultos',
 };
 
@@ -58,5 +60,7 @@ export const CATEGORY_ORDER: AchievementCategory[] = [
   'reliability',
   'endurance',
   'diversity',
+  'community',
+  'management',
   'hidden',
 ];
