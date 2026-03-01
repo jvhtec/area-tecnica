@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeSlug from "rehype-slug";
@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Search, BookOpen, Printer } from "lucide-react";
-import manualContent from "@/assets/UserManual.md?raw";
+import manualEs from "@/assets/UserManual.es.md?raw";
+import manualEn from "@/assets/UserManual.en.md?raw";
 
 interface TOCItem {
   id: string;
@@ -15,28 +16,63 @@ interface TOCItem {
   level: number;
 }
 
+type ManualLang = "es" | "en";
+
+const STORAGE_KEY = "area-tecnica:user-manual:lang";
+
+const slugify = (title: string) => {
+  // Normalize accents (áéíóúñ etc.) so ids are stable.
+  const normalized = title
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+  return normalized
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+};
+
 export const UserManual = () => {
+  const [lang, setLang] = useState<ManualLang>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved === "en" || saved === "es" ? saved : "es";
+    } catch {
+      return "es";
+    }
+  });
+
+  const manualContent = useMemo(() => (lang === "en" ? manualEn : manualEs), [lang]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredContent, setFilteredContent] = useState(manualContent);
   const [tocItems, setTocItems] = useState<TOCItem[]>([]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+    } catch {
+      // ignore
+    }
+  }, [lang]);
+
   // Extract table of contents from markdown
   useEffect(() => {
-    const lines = manualContent.split('\n');
+    const lines = manualContent.split("\n");
     const toc: TOCItem[] = [];
-    
-    lines.forEach(line => {
+
+    lines.forEach((line) => {
       const match = line.match(/^(#{2,4})\s+(.+)/);
       if (match) {
         const level = match[1].length;
         const title = match[2];
-        const id = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const id = slugify(title);
         toc.push({ id, title, level });
       }
     });
-    
+
     setTocItems(toc);
-  }, []);
+  }, [manualContent]);
 
   // Filter content based on search
   useEffect(() => {
@@ -45,22 +81,29 @@ export const UserManual = () => {
       return;
     }
 
-    const lines = manualContent.split('\n');
+    const lowerTerm = searchTerm.toLowerCase();
+    const lines = manualContent.split("\n");
     const filteredLines: string[] = [];
     let includeSection = false;
     let currentSection = "";
 
-    lines.forEach((line, index) => {
+    lines.forEach((line) => {
       // Check if this is a header
       if (line.match(/^#{2,4}\s+/)) {
         currentSection = line;
-        includeSection = line.toLowerCase().includes(searchTerm.toLowerCase());
+        includeSection = line.toLowerCase().includes(lowerTerm);
         if (includeSection) {
           filteredLines.push(line);
         }
-      } else if (includeSection) {
+        return;
+      }
+
+      if (includeSection) {
         filteredLines.push(line);
-      } else if (line.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return;
+      }
+
+      if (line.toLowerCase().includes(lowerTerm)) {
         // Include context around matching lines
         if (currentSection && !filteredLines.includes(currentSection)) {
           filteredLines.push(currentSection);
@@ -70,8 +113,8 @@ export const UserManual = () => {
       }
     });
 
-    setFilteredContent(filteredLines.join('\n'));
-  }, [searchTerm]);
+    setFilteredContent(filteredLines.join("\n"));
+  }, [searchTerm, manualContent]);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -84,6 +127,14 @@ export const UserManual = () => {
     window.print();
   };
 
+  const ui = {
+    title: lang === "en" ? "User Manual" : "Manual de usuario",
+    searchPlaceholder: lang === "en" ? "Search manual..." : "Buscar en el manual...",
+    print: lang === "en" ? "Print manual" : "Imprimir manual",
+    toc: lang === "en" ? "Table of contents" : "Índice",
+    language: lang === "en" ? "Language" : "Idioma",
+  };
+
   return (
     <div className="container mx-auto py-8 px-4 max-w-7xl">
       <div className="flex flex-col lg:flex-row gap-8">
@@ -91,9 +142,29 @@ export const UserManual = () => {
         <div className="lg:w-80 space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5" />
-                User Manual
+              <CardTitle className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-2">
+                  <BookOpen className="w-5 h-5" />
+                  {ui.title}
+                </span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant={lang === "es" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setLang("es")}
+                  >
+                    ES
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={lang === "en" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setLang("en")}
+                  >
+                    EN
+                  </Button>
+                </div>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -101,7 +172,7 @@ export const UserManual = () => {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search manual..."
+                  placeholder={ui.searchPlaceholder}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -111,13 +182,13 @@ export const UserManual = () => {
               {/* Print Button */}
               <Button onClick={handlePrint} variant="outline" className="w-full">
                 <Printer className="w-4 h-4 mr-2" />
-                Print Manual
+                {ui.print}
               </Button>
 
               {/* Table of Contents */}
               <div className="space-y-2">
                 <h3 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
-                  Table of Contents
+                  {ui.toc}
                 </h3>
                 <nav className="space-y-1 max-h-96 overflow-y-auto">
                   {tocItems.map((item) => (
@@ -197,7 +268,15 @@ export const UserManual = () => {
                       <code className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono text-sm" {...props}>
                         {children}
                       </code>
-                    )
+                    ),
+                    img: ({ ...props }) => (
+                      // Ensure screenshots are readable and don’t overflow.
+                      // eslint-disable-next-line jsx-a11y/alt-text
+                      <img
+                        {...props}
+                        className={`rounded-lg border border-border my-4 max-w-full ${props.className ?? ""}`}
+                      />
+                    ),
                   }}
                 >
                   {filteredContent}
