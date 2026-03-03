@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_VAPID_PUBLIC_KEY?: string;
   readonly VITE_FLEX_BASE_URL?: string;
   readonly VITE_ENABLE_NATIVE_HAPTICS?: string;
+  readonly VITE_WEB_HAPTICS_DEBUG?: string;
 }
 
 interface ImportMeta {

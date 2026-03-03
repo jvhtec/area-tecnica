@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core'
 import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics'
+import { WebHaptics } from 'web-haptics'
 
 import { useHapticsPreferencesStore, type HapticsIntensity } from '@/stores/useHapticsPreferencesStore'
 
@@ -17,12 +18,6 @@ export const HAPTIC_PATTERNS: Record<HapticEvent, number | number[]> = {
   [HapticEvent.Warning]: [30, 40, 30],
   [HapticEvent.Error]: [45, 30, 45],
   [HapticEvent.SelectionChanged]: 8,
-}
-
-const INTENSITY_MULTIPLIER: Record<HapticsIntensity, number> = {
-  light: 0.65,
-  medium: 1,
-  strong: 1.25,
 }
 
 type HapticRateClass = 'interaction' | 'confirmation'
@@ -102,14 +97,6 @@ const isHapticsAllowed = (): boolean => {
   return true
 }
 
-export const WEB_HAPTIC_STRATEGY: Record<HapticEvent, number | number[]> = {
-  [HapticEvent.Tap]: HAPTIC_PATTERNS[HapticEvent.Tap],
-  [HapticEvent.Success]: HAPTIC_PATTERNS[HapticEvent.Success],
-  [HapticEvent.Warning]: HAPTIC_PATTERNS[HapticEvent.Warning],
-  [HapticEvent.Error]: HAPTIC_PATTERNS[HapticEvent.Error],
-  [HapticEvent.SelectionChanged]: HAPTIC_PATTERNS[HapticEvent.SelectionChanged],
-}
-
 type HapticAdapter = {
   canUse: () => boolean
   trigger: (event: HapticEvent) => Promise<boolean>
@@ -121,14 +108,27 @@ const isNativeHapticsEnabled = (): boolean => {
   return import.meta.env.VITE_ENABLE_NATIVE_HAPTICS === 'true'
 }
 
-const applyIntensity = (pattern: number | number[], intensity: HapticsIntensity): number | number[] => {
-  const multiplier = INTENSITY_MULTIPLIER[intensity]
+const isWebHapticsDebugEnabled = (): boolean => {
+  return import.meta.env.VITE_WEB_HAPTICS_DEBUG === 'true'
+}
 
-  if (Array.isArray(pattern)) {
-    return pattern.map((value) => Math.max(1, Math.round(value * multiplier)))
+let webHapticsClient: WebHaptics | null | undefined
+
+const getWebHapticsClient = (): WebHaptics | null => {
+  if (typeof window === 'undefined') {
+    return null
   }
 
-  return Math.max(1, Math.round(pattern * multiplier))
+  if (webHapticsClient !== undefined) {
+    return webHapticsClient
+  }
+
+  webHapticsClient = new WebHaptics({
+    debug: isWebHapticsDebugEnabled(),
+    showSwitch: false,
+  })
+
+  return webHapticsClient
 }
 
 const nativeAdapter: HapticAdapter = {
@@ -187,16 +187,37 @@ const nativeAdapter: HapticAdapter = {
 
 const webAdapter: HapticAdapter = {
   canUse: () => {
-    return typeof navigator !== 'undefined' && 'vibrate' in navigator && typeof navigator.vibrate === 'function'
+    const client = getWebHapticsClient()
+    if (!client) {
+      return false
+    }
+
+    return WebHaptics.isSupported || isWebHapticsDebugEnabled()
   },
   trigger: async (event: HapticEvent) => {
     if (!webAdapter.canUse()) {
       return false
     }
 
+    const client = getWebHapticsClient()
+    if (!client) {
+      return false
+    }
+
+    const eventMap: Record<HapticEvent, 'light' | 'selection' | 'success' | 'warning' | 'error'> = {
+      [HapticEvent.Tap]: 'light',
+      [HapticEvent.SelectionChanged]: 'selection',
+      [HapticEvent.Success]: 'success',
+      [HapticEvent.Warning]: 'warning',
+      [HapticEvent.Error]: 'error',
+    }
+    const intensityMap: Record<HapticsIntensity, number> = {
+      light: 0.4,
+      medium: 0.7,
+      strong: 1,
+    }
     const { hapticsIntensity } = getHapticsPreferences()
-    const pattern = applyIntensity(WEB_HAPTIC_STRATEGY[event], hapticsIntensity)
-    navigator.vibrate(pattern)
+    await client.trigger(eventMap[event], { intensity: intensityMap[hapticsIntensity] })
     return true
   },
 }

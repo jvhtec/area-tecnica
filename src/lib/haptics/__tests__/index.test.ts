@@ -15,6 +15,26 @@ const mockStoreState = vi.hoisted(() => ({
   hapticsIntensity: 'light' as const,
 }))
 
+const mockWebHaptics = vi.hoisted(() => {
+  const trigger = vi.fn().mockResolvedValue(undefined)
+  const constructor = vi.fn()
+
+  class MockWebHaptics {
+    static isSupported = true
+    trigger = trigger
+
+    constructor(...args: unknown[]) {
+      constructor(...args)
+    }
+  }
+
+  return {
+    MockWebHaptics,
+    trigger,
+    constructor,
+  }
+})
+
 vi.mock('@capacitor/core', () => ({
   Capacitor: mockCapacitor,
 }))
@@ -33,18 +53,15 @@ vi.mock('@capacitor/haptics', () => ({
   },
 }))
 
+vi.mock('web-haptics', () => ({
+  WebHaptics: mockWebHaptics.MockWebHaptics,
+}))
+
 vi.mock('@/stores/useHapticsPreferencesStore', () => ({
   useHapticsPreferencesStore: {
     getState: () => mockStoreState,
   },
 }))
-
-const setNavigator = (value?: Navigator) => {
-  Object.defineProperty(globalThis, 'navigator', {
-    configurable: true,
-    value,
-  })
-}
 
 const setMatchMedia = (matches: boolean) => {
   Object.defineProperty(globalThis, 'window', {
@@ -61,6 +78,7 @@ describe('haptics adapter selection', () => {
     vi.unstubAllEnvs()
     mockStoreState.hapticsEnabled = true
     mockStoreState.hapticsIntensity = 'light'
+    mockWebHaptics.MockWebHaptics.isSupported = true
     setMatchMedia(false)
   })
 
@@ -69,25 +87,24 @@ describe('haptics adapter selection', () => {
     vi.restoreAllMocks()
     vi.unstubAllEnvs()
     mockCapacitor.isNativePlatform.mockReturnValue(false)
-    setNavigator(undefined)
+    mockWebHaptics.MockWebHaptics.isSupported = true
   })
 
-  it('prefers web vibration when available even on native platform with native flag disabled', async () => {
+  it('prefers web-haptics on native platform when native flag is disabled', async () => {
     vi.stubEnv('VITE_ENABLE_NATIVE_HAPTICS', 'false')
     mockCapacitor.isNativePlatform.mockReturnValue(true)
-    const vibrate = vi.fn().mockReturnValue(true)
-    setNavigator({ vibrate } as unknown as Navigator)
 
     const { haptics } = await import('@/lib/haptics')
 
     await expect(haptics.success()).resolves.toBe(true)
-    expect(vibrate).toHaveBeenCalledWith(expect.any(Array))
+    expect(mockWebHaptics.trigger).toHaveBeenCalledWith('success', { intensity: 0.4 })
     expect(mockHaptics.notification).not.toHaveBeenCalled()
   })
 
-  it('uses native haptics when flag is enabled and web vibration is unavailable', async () => {
+  it('uses native haptics when flag is enabled and web-haptics is unsupported', async () => {
     vi.stubEnv('VITE_ENABLE_NATIVE_HAPTICS', 'true')
     mockCapacitor.isNativePlatform.mockReturnValue(true)
+    mockWebHaptics.MockWebHaptics.isSupported = false
 
     const { haptics } = await import('@/lib/haptics')
 
@@ -95,19 +112,15 @@ describe('haptics adapter selection', () => {
     expect(mockHaptics.notification).toHaveBeenCalledWith({ type: 'SUCCESS' })
   })
 
-  it('uses web vibration fallback when native is unavailable', async () => {
-    const vibrate = vi.fn().mockReturnValue(true)
-    setNavigator({ vibrate } as unknown as Navigator)
-
-    const { haptics, HAPTIC_PATTERNS, HapticEvent } = await import('@/lib/haptics')
+  it('uses web-haptics fallback when native is unavailable', async () => {
+    const { haptics } = await import('@/lib/haptics')
 
     await expect(haptics.warning()).resolves.toBe(true)
-    expect(vibrate).toHaveBeenCalledWith(expect.any(Array))
-    const expectedBase = HAPTIC_PATTERNS[HapticEvent.Warning] as number[]
-    expect((vibrate.mock.calls[0]?.[0] as number[])[0]).toBeLessThanOrEqual(expectedBase[0])
+    expect(mockWebHaptics.trigger).toHaveBeenCalledWith('warning', { intensity: 0.4 })
   })
 
   it('returns false safely when haptics are unsupported', async () => {
+    mockWebHaptics.MockWebHaptics.isSupported = false
     const { haptics } = await import('@/lib/haptics')
 
     await expect(haptics.tap()).resolves.toBe(false)
@@ -115,31 +128,24 @@ describe('haptics adapter selection', () => {
   })
 
   it('short-circuits when user has disabled haptics', async () => {
-    const vibrate = vi.fn().mockReturnValue(true)
-    setNavigator({ vibrate } as unknown as Navigator)
     mockStoreState.hapticsEnabled = false
 
     const { haptics } = await import('@/lib/haptics')
 
     await expect(haptics.tap()).resolves.toBe(false)
-    expect(vibrate).not.toHaveBeenCalled()
+    expect(mockWebHaptics.trigger).not.toHaveBeenCalled()
   })
 
   it('respects reduced motion preference', async () => {
-    const vibrate = vi.fn().mockReturnValue(true)
-    setNavigator({ vibrate } as unknown as Navigator)
     setMatchMedia(true)
 
     const { haptics } = await import('@/lib/haptics')
 
     await expect(haptics.tap()).resolves.toBe(false)
-    expect(vibrate).not.toHaveBeenCalled()
+    expect(mockWebHaptics.trigger).not.toHaveBeenCalled()
   })
 
   it('rate-limits rapid interaction events and dedupes same event bursts', async () => {
-    const vibrate = vi.fn().mockReturnValue(true)
-    setNavigator({ vibrate } as unknown as Navigator)
-
     const nowSpy = vi.spyOn(Date, 'now')
     nowSpy
       .mockReturnValueOnce(1000)
@@ -152,13 +158,10 @@ describe('haptics adapter selection', () => {
     await expect(haptics.tap()).resolves.toBe(false)
     await expect(haptics.tap()).resolves.toBe(true)
 
-    expect(vibrate).toHaveBeenCalledTimes(2)
+    expect(mockWebHaptics.trigger).toHaveBeenCalledTimes(2)
   })
 
   it('applies stricter throttling to interaction events than confirmation events', async () => {
-    const vibrate = vi.fn().mockReturnValue(true)
-    setNavigator({ vibrate } as unknown as Navigator)
-
     const nowSpy = vi.spyOn(Date, 'now')
     nowSpy
       .mockReturnValueOnce(2000)
@@ -174,12 +177,13 @@ describe('haptics adapter selection', () => {
     await expect(haptics.success()).resolves.toBe(true)
     await expect(haptics.error()).resolves.toBe(true)
 
-    expect(vibrate).toHaveBeenCalledTimes(3)
+    expect(mockWebHaptics.trigger).toHaveBeenCalledTimes(3)
   })
 
   it('swallows plugin errors so UI interactions never throw', async () => {
     vi.stubEnv('VITE_ENABLE_NATIVE_HAPTICS', 'true')
     mockCapacitor.isNativePlatform.mockReturnValue(true)
+    mockWebHaptics.MockWebHaptics.isSupported = false
     mockHaptics.impact.mockRejectedValueOnce(new Error('native failure'))
 
     const { triggerHaptic, HapticEvent } = await import('@/lib/haptics')

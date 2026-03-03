@@ -1,12 +1,13 @@
 # Haptics Guidelines
 
-This project uses semantic haptic events from `src/lib/haptics` so product behavior stays consistent across native and web.
+This project uses semantic haptic events from `src/lib/haptics` and the `web-haptics` package so product behavior stays consistent across native and web.
 
 ## Runtime strategy
 
-- **Web-first default**: when `navigator.vibrate` is available, web vibration is used.
+- **Web-first default**: the web adapter uses `web-haptics` presets for semantic events.
 - **Native path is feature-flagged**: native haptics only run when `VITE_ENABLE_NATIVE_HAPTICS` is set to `"true"`.
 - **Unsupported platforms**: if neither web nor native adapter is available, haptics safely no-op.
+- **Optional debug fallback**: set `VITE_WEB_HAPTICS_DEBUG="true"` to enable `web-haptics` debug audio feedback on unsupported browsers during testing.
 
 **Browser support limitations**:
 - Web vibration is not supported in Safari (iOS/macOS).
