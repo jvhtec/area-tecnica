@@ -2974,7 +2974,9 @@ export type Database = {
           base_day_especialista_eur: number | null
           base_day_responsable_eur: number | null
           currency: string
+          overtime_hour_especialista_eur: number | null
           overtime_hour_eur: number | null
+          overtime_hour_responsable_eur: number | null
           plus_10_12_eur: number | null
           profile_id: string
           rehearsal_day_eur: number | null
@@ -2989,7 +2991,9 @@ export type Database = {
           base_day_especialista_eur?: number | null
           base_day_responsable_eur?: number | null
           currency?: string
+          overtime_hour_especialista_eur?: number | null
           overtime_hour_eur?: number | null
+          overtime_hour_responsable_eur?: number | null
           plus_10_12_eur?: number | null
           profile_id: string
           rehearsal_day_eur?: number | null
@@ -3004,7 +3008,9 @@ export type Database = {
           base_day_especialista_eur?: number | null
           base_day_responsable_eur?: number | null
           currency?: string
+          overtime_hour_especialista_eur?: number | null
           overtime_hour_eur?: number | null
+          overtime_hour_responsable_eur?: number | null
           plus_10_12_eur?: number | null
           profile_id?: string
           rehearsal_day_eur?: number | null

@@ -13,6 +13,8 @@ export interface HouseTechRate {
   tour_base_especialista_eur?: number | null;
   plus_10_12_eur?: number;
   overtime_hour_eur?: number;
+  overtime_hour_especialista_eur?: number | null;
+  overtime_hour_responsable_eur?: number | null;
   currency: string;
   updated_by?: string;
   updated_at: string;
@@ -28,6 +30,8 @@ export interface HouseTechRateInput {
   tour_base_especialista_eur?: number | null;
   plus_10_12_eur?: number | null;
   overtime_hour_eur?: number | null;
+  overtime_hour_especialista_eur?: number | null;
+  overtime_hour_responsable_eur?: number | null;
 }
 
 export function useHouseTechRate(profileId: string) {

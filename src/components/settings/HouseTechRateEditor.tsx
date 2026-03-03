@@ -35,7 +35,9 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
   const [tourBaseEspecialistaEur, setTourBaseEspecialistaEur] = useState<string>('');
   const [tourBaseTecnicoEur, setTourBaseTecnicoEur] = useState<string>('');
   const [plus1012Eur, setPlus1012Eur] = useState<string>('30');
-  const [overtimeHourEur, setOvertimeHourEur] = useState<string>('');
+  const [overtimeHourTecnicoEur, setOvertimeHourTecnicoEur] = useState<string>('');
+  const [overtimeHourEspecialistaEur, setOvertimeHourEspecialistaEur] = useState<string>('');
+  const [overtimeHourResponsableEur, setOvertimeHourResponsableEur] = useState<string>('');
 
   const RATE_CATEGORIES = ['tecnico', 'especialista', 'responsable'] as const;
   type RateCategory = (typeof RATE_CATEGORIES)[number];
@@ -81,7 +83,9 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
       setTourBaseEspecialistaEur(currentRate.tour_base_especialista_eur?.toString() || '');
       setTourBaseTecnicoEur(currentRate.tour_base_other_eur?.toString() || '');
       setPlus1012Eur(currentRate.plus_10_12_eur?.toString() || '30');
-      setOvertimeHourEur(currentRate.overtime_hour_eur?.toString() || '');
+      setOvertimeHourTecnicoEur(currentRate.overtime_hour_eur?.toString() || '');
+      setOvertimeHourEspecialistaEur(currentRate.overtime_hour_especialista_eur?.toString() || '');
+      setOvertimeHourResponsableEur(currentRate.overtime_hour_responsable_eur?.toString() || '');
     }
   }, [currentRate]);
 
@@ -99,7 +103,9 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
       tour_base_especialista_eur: tourBaseEspecialistaEur ? parseFloat(tourBaseEspecialistaEur) : null,
       tour_base_other_eur: tourBaseTecnicoEur ? parseFloat(tourBaseTecnicoEur) : null,
       plus_10_12_eur: plus1012Eur ? parseFloat(plus1012Eur) : null,
-      overtime_hour_eur: overtimeHourEur ? parseFloat(overtimeHourEur) : null,
+      overtime_hour_eur: overtimeHourTecnicoEur ? parseFloat(overtimeHourTecnicoEur) : null,
+      overtime_hour_especialista_eur: overtimeHourEspecialistaEur ? parseFloat(overtimeHourEspecialistaEur) : null,
+      overtime_hour_responsable_eur: overtimeHourResponsableEur ? parseFloat(overtimeHourResponsableEur) : null,
     });
 
     // Log the activity
@@ -290,18 +296,50 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="overtime">Tarifa horas extra (€/hora)</Label>
+            <Label htmlFor="overtime-tecnico">Tarifa horas extra - Técnico (€/hora)</Label>
             <Input
-              id="overtime"
+              id="overtime-tecnico"
               type="number"
               step="0.01"
               min="0"
-              value={overtimeHourEur}
-              onChange={(e) => setOvertimeHourEur(e.target.value)}
-              placeholder={`Por defecto: €${categoryDefaultsMap?.[category as RateCategory]?.overtime_hour_eur || '20'}/h`}
+              value={overtimeHourTecnicoEur}
+              onChange={(e) => setOvertimeHourTecnicoEur(e.target.value)}
+              placeholder={`Por defecto: €${categoryDefaultsMap?.tecnico?.overtime_hour_eur || '20'}/h`}
             />
             <p className="text-xs text-muted-foreground">
-              Precio por hora por encima de 12 (dejar vacío para usar el valor por defecto de la categoría)
+              Tarifa regular de horas extra (técnico). Si está vacía, se usa el valor por defecto de la categoría técnico.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="overtime-especialista">Tarifa horas extra - Especialista (€/hora)</Label>
+            <Input
+              id="overtime-especialista"
+              type="number"
+              step="0.01"
+              min="0"
+              value={overtimeHourEspecialistaEur}
+              onChange={(e) => setOvertimeHourEspecialistaEur(e.target.value)}
+              placeholder={`Por defecto/fallback: €${categoryDefaultsMap?.especialista?.overtime_hour_eur || '20'}/h`}
+            />
+            <p className="text-xs text-muted-foreground">
+              Si está vacía, para house tech se usa la tarifa OT de técnico.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="overtime-responsable">Tarifa horas extra - Responsable (€/hora)</Label>
+            <Input
+              id="overtime-responsable"
+              type="number"
+              step="0.01"
+              min="0"
+              value={overtimeHourResponsableEur}
+              onChange={(e) => setOvertimeHourResponsableEur(e.target.value)}
+              placeholder={`Por defecto/fallback: €${categoryDefaultsMap?.responsable?.overtime_hour_eur || '25'}/h`}
+            />
+            <p className="text-xs text-muted-foreground">
+              Si está vacía, para house tech se aplica: OT responsable → (si OT técnico = 15, usar 20) → OT técnico.
             </p>
           </div>
         </div>
