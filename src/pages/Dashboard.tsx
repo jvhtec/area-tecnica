@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Mail, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isJobOnDate } from "@/utils/timezoneUtils";
-import { useToast } from "@/hooks/use-toast";
+import { useHapticToast } from "@/hooks/useHapticToast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -93,7 +93,7 @@ const Dashboard = () => {
   const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
   const { data: jobs = [], isLoading } = useOptimizedJobs(undefined, jobsRangeStart, jobsRangeEnd);
-  const { toast } = useToast();
+  const hapticToast = useHapticToast();
   const queryClient = useQueryClient();
 
   const { data: pendingExpensesSummary, isLoading: isLoadingPendingExpenses } = useQuery({
@@ -157,24 +157,23 @@ const Dashboard = () => {
   const handleDeleteClick = useCallback(async (jobId: string) => {
     // Check permissions
     if (!["admin", "management"].includes(userRole || "")) {
-      toast({
-        title: "Permission denied",
-        description: "Only admin and management users can delete jobs",
-        variant: "destructive"
+      hapticToast.error("Permiso denegado", {
+        description: "Solo los usuarios admin y de gestión pueden eliminar trabajos",
       });
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this job? This action cannot be undone and will remove all related data.")) return;
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.")) return;
+
+    hapticToast.destructiveConfirm();
 
     try {
       // Call optimistic deletion service
       const result = await deleteJobOptimistically(jobId);
 
       if (result.success) {
-        toast({
-          title: "Job deleted",
-          description: result.details || "The job has been removed and cleanup is running in background."
+        hapticToast.success("Trabajo eliminado", {
+          description: result.details || "El trabajo ha sido eliminado y la limpieza se está ejecutando en segundo plano."
         });
 
         // Invalidate queries to refresh the list
@@ -184,13 +183,11 @@ const Dashboard = () => {
       }
     } catch (error: any) {
       console.error("Dashboard: Error in optimistic job deletion:", error);
-      toast({
-        title: "Error deleting job",
+      hapticToast.error("Error al eliminar trabajo", {
         description: error.message,
-        variant: "destructive"
       });
     }
-  }, [queryClient, toast, userRole]);
+  }, [hapticToast, queryClient, userRole]);
 
   const handleDateTypeChange = useCallback(() => {}, []);
 
