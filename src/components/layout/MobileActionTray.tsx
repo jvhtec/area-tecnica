@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { cn } from "@/lib/utils"
+import { useHaptics } from "@/hooks/useHaptics"
 
 import { NavigationItem } from "./SidebarNavigation"
 import { ThemeToggle } from "./ThemeToggle"
@@ -38,12 +39,15 @@ export const MobileActionTray = ({
 }: MobileActionTrayProps) => {
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
+  const { trigger } = useHaptics()
 
   const handleNavigate = () => {
+    trigger("light")
     setOpen(false)
   }
 
   const handleSignOut = async () => {
+    trigger("heavy")
     await onSignOut()
     setOpen(false)
   }

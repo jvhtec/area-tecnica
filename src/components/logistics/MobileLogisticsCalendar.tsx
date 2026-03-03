@@ -10,6 +10,7 @@ import { LogisticsEventDialog } from "./LogisticsEventDialog";
 import { LogisticsEventCard } from "./LogisticsEventCard";
 import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
 import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
+import { useHaptics } from "@/hooks/useHaptics";
 
 interface MobileLogisticsCalendarProps {
   date: Date;
@@ -28,6 +29,7 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [visibleEventsCount, setVisibleEventsCount] = useState(DEFAULT_VISIBLE_EVENTS);
   const { toast } = useToast();
+  const { trigger: haptic } = useHaptics();
 
   useEffect(() => {
     setCurrentDate(date);
@@ -100,18 +102,21 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   };
 
   const navigateToPrevious = () => {
+    haptic("light");
     const newDate = subDays(currentDate, 1);
     setCurrentDate(newDate);
     onDateSelect(newDate);
   };
 
   const navigateToNext = () => {
+    haptic("light");
     const newDate = addDays(currentDate, 1);
     setCurrentDate(newDate);
     onDateSelect(newDate);
   };
 
   const navigateToToday = () => {
+    haptic("medium");
     const today = new Date();
     setCurrentDate(today);
     onDateSelect(today);

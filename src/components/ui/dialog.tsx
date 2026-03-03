@@ -3,8 +3,26 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { useHaptics } from "@/hooks/useHaptics"
 
-const Dialog = DialogPrimitive.Root
+const DialogHaptic = React.forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Root>
+>(({ onOpenChange, ...props }, _ref) => {
+  const { trigger } = useHaptics()
+  return (
+    <DialogPrimitive.Root
+      onOpenChange={(open) => {
+        trigger(open ? "medium" : "light")
+        onOpenChange?.(open)
+      }}
+      {...props}
+    />
+  )
+})
+DialogHaptic.displayName = "Dialog"
+
+const Dialog = DialogHaptic as typeof DialogPrimitive.Root
 
 const DialogTrigger = DialogPrimitive.Trigger
 

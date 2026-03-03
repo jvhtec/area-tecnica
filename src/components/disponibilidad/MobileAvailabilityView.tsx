@@ -12,6 +12,7 @@ import { SubRentalDialog } from '@/components/equipment/SubRentalDialog';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
+import { useHaptics } from '@/hooks/useHaptics';
 
 type DisponibilidadDepartment = 'sound' | 'lights';
 
@@ -43,6 +44,7 @@ export function MobileAvailabilityView({
 }: MobileAvailabilityViewProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const { theme, isDark } = useTechnicianTheme();
+    const { trigger: haptic } = useHaptics();
     const [showActionsMenu, setShowActionsMenu] = useState(false);
     const [showPresetDialog, setShowPresetDialog] = useState(false);
     const [showWeeklySummary, setShowWeeklySummary] = useState(false);
@@ -54,10 +56,12 @@ export function MobileAvailabilityView({
     });
 
     const handlePrevDay = () => {
+        haptic("light");
         onDateSelect(subDays(selectedDate, 1));
     };
 
     const handleNextDay = () => {
+        haptic("light");
         onDateSelect(addDays(selectedDate, 1));
     };
 
@@ -99,6 +103,7 @@ export function MobileAvailabilityView({
                                                     variant={department === value ? 'default' : 'outline'}
                                                     size="sm"
                                                     onClick={() => {
+                                                        haptic("selection");
                                                         onDepartmentChange(value as DisponibilidadDepartment);
                                                         setShowActionsMenu(false);
                                                     }}
@@ -163,7 +168,7 @@ export function MobileAvailabilityView({
                         return (
                             <button
                                 key={date.toISOString()}
-                                onClick={() => onDateSelect(date)}
+                                onClick={() => { haptic("selection"); onDateSelect(date); }}
                                 className={cn(
                                     "flex flex-col items-center justify-center min-w-[50px] h-[70px] rounded-xl transition-all snap-center border",
                                     isSelected

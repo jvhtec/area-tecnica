@@ -51,6 +51,7 @@ import {
 import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
 import { useMobileDayCalendarSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useHaptics } from "@/hooks/useHaptics";
 
 interface MobileDayCalendarProps {
   date: Date | undefined;
@@ -100,6 +101,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
   const queryClient = useQueryClient();
+  const { trigger: haptic } = useHaptics();
   
   // Set up realtime subscriptions for all mobile calendar data
   useMobileDayCalendarSubscriptions();
@@ -194,18 +196,21 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
   };
 
   const navigateToPrevious = () => {
+    haptic("light");
     const previousDay = subDays(currentDate, 1);
     setCurrentDate(previousDay);
     onDateSelect(previousDay);
   };
 
   const navigateToNext = () => {
+    haptic("light");
     const nextDay = addDays(currentDate, 1);
     setCurrentDate(nextDay);
     onDateSelect(nextDay);
   };
 
   const navigateToToday = () => {
+    haptic("medium");
     const today = new Date();
     setCurrentDate(today);
     onDateSelect(today);
