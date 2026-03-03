@@ -43,18 +43,15 @@ export const useHapticsPreferencesStore = create<HapticsPreferencesState>()(
         hapticsEnabled: state.hapticsEnabled,
         hapticsIntensity: state.hapticsIntensity,
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true)
+      onRehydrateStorage: (state) => {
+        state.setHasHydrated(true)
       },
     },
   ),
 )
 
-export const initializeHapticsPreferences = () => {
-  try {
-    useHapticsPreferencesStore.persist.rehydrate()
-  } catch {
-    // Ignore storage hydration failures and continue with defaults.
-    useHapticsPreferencesStore.getState().setHasHydrated(true)
-  }
+export const initializeHapticsPreferences = async () => {
+  await useHapticsPreferencesStore.persist
+    .rehydrate()
+    .catch(() => useHapticsPreferencesStore.getState().setHasHydrated(true))
 }

@@ -1,4 +1,5 @@
 import { Capacitor } from '@capacitor/core'
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics'
 
 import { useHapticsPreferencesStore, type HapticsIntensity } from '@/stores/useHapticsPreferencesStore'
 
@@ -35,9 +36,7 @@ const HAPTIC_RATE_CLASS_BY_EVENT: Record<HapticEvent, HapticRateClass> = {
 }
 
 export const HAPTIC_RATE_LIMIT_MS: Record<HapticRateClass, number> = {
-  // Stricter throttling for high-frequency events.
   interaction: 160,
-  // Looser throttling for user-visible success/error confirmations.
   confirmation: 80,
 }
 
@@ -111,18 +110,12 @@ export const WEB_HAPTIC_STRATEGY: Record<HapticEvent, number | number[]> = {
   [HapticEvent.SelectionChanged]: HAPTIC_PATTERNS[HapticEvent.SelectionChanged],
 }
 
-type NativeHapticsPlugin = {
-  impact?: (options?: { style?: 'LIGHT' | 'MEDIUM' | 'HEAVY' }) => Promise<void>
-  notification?: (options: { type: 'SUCCESS' | 'WARNING' | 'ERROR' }) => Promise<void>
-  selectionStart?: () => Promise<void>
-  selectionChanged?: () => Promise<void>
-  vibrate?: (options?: { duration?: number }) => Promise<void>
-}
-
 type HapticAdapter = {
   canUse: () => boolean
   trigger: (event: HapticEvent) => Promise<boolean>
 }
+
+type HapticStyle = 'LIGHT' | 'MEDIUM' | 'HEAVY'
 
 const applyIntensity = (pattern: number | number[], intensity: HapticsIntensity): number | number[] => {
   const multiplier = INTENSITY_MULTIPLIER[intensity]
@@ -134,80 +127,53 @@ const applyIntensity = (pattern: number | number[], intensity: HapticsIntensity)
   return Math.max(1, Math.round(pattern * multiplier))
 }
 
-const getNativeHapticsPlugin = (): NativeHapticsPlugin | null => {
-  const plugins = (Capacitor as unknown as { Plugins?: Record<string, unknown> })?.Plugins
-  if (!plugins?.Haptics) {
-    return null
-  }
-
-  return plugins.Haptics as NativeHapticsPlugin
-}
-
 const nativeAdapter: HapticAdapter = {
   canUse: () => {
     const isNativePlatform = Capacitor?.isNativePlatform?.() ?? false
-    const pluginAvailable = Capacitor?.isPluginAvailable?.('Haptics') ?? false
 
-    return isNativePlatform && pluginAvailable && !!getNativeHapticsPlugin()
+    return isNativePlatform && Boolean(Haptics)
   },
   trigger: async (event: HapticEvent) => {
     const { hapticsIntensity } = getHapticsPreferences()
-    const plugin = getNativeHapticsPlugin()
-    if (!plugin) {
-      return false
-    }
 
     if (event === HapticEvent.SelectionChanged) {
-      if (plugin.selectionChanged) {
-        await plugin.selectionChanged()
-        return true
-      }
-      if (plugin.selectionStart) {
-        await plugin.selectionStart()
-        return true
-      }
+      await Haptics.selectionChanged()
+      return true
     }
 
     if (event === HapticEvent.Success || event === HapticEvent.Warning || event === HapticEvent.Error) {
-      if (plugin.notification) {
-        const typeMap = {
-          [HapticEvent.Success]: 'SUCCESS',
-          [HapticEvent.Warning]: 'WARNING',
-          [HapticEvent.Error]: 'ERROR',
-        } as const
-
-        await plugin.notification({ type: typeMap[event] })
-        return true
-      }
-    }
-
-    if (plugin.impact) {
-      const styleMap: Record<HapticsIntensity, { light: 'LIGHT'; medium: 'MEDIUM'; heavy: 'HEAVY' }> = {
-        light: { light: 'LIGHT', medium: 'LIGHT', heavy: 'MEDIUM' },
-        medium: { light: 'LIGHT', medium: 'MEDIUM', heavy: 'HEAVY' },
-        strong: { light: 'MEDIUM', medium: 'HEAVY', heavy: 'HEAVY' },
-      }
-
-      const semanticStyle = {
-        [HapticEvent.Tap]: 'light',
-        [HapticEvent.Success]: 'medium',
-        [HapticEvent.Warning]: 'heavy',
-        [HapticEvent.Error]: 'heavy',
-        [HapticEvent.SelectionChanged]: 'light',
+      const typeMap = {
+        [HapticEvent.Success]: NotificationType.Success,
+        [HapticEvent.Warning]: NotificationType.Warning,
+        [HapticEvent.Error]: NotificationType.Error,
       } as const
 
-      await plugin.impact({ style: styleMap[hapticsIntensity][semanticStyle[event]] })
+      await Haptics.notification({ type: typeMap[event] })
       return true
     }
 
-    if (plugin.vibrate) {
-      const duration = applyIntensity(HAPTIC_PATTERNS[event], hapticsIntensity)
-      const ms = Array.isArray(duration) ? duration[0] : duration
-      await plugin.vibrate({ duration: ms })
-      return true
+    const styleMap: Record<HapticsIntensity, { light: HapticStyle; medium: HapticStyle; heavy: HapticStyle }> = {
+      light: { light: 'LIGHT', medium: 'LIGHT', heavy: 'MEDIUM' },
+      medium: { light: 'LIGHT', medium: 'MEDIUM', heavy: 'HEAVY' },
+      strong: { light: 'MEDIUM', medium: 'HEAVY', heavy: 'HEAVY' },
     }
 
-    return false
+    const semanticStyle = {
+      [HapticEvent.Tap]: 'light',
+      [HapticEvent.Success]: 'medium',
+      [HapticEvent.Warning]: 'heavy',
+      [HapticEvent.Error]: 'heavy',
+      [HapticEvent.SelectionChanged]: 'light',
+    } as const
+
+    const impactStyleMap: Record<HapticStyle, ImpactStyle> = {
+      LIGHT: ImpactStyle.Light,
+      MEDIUM: ImpactStyle.Medium,
+      HEAVY: ImpactStyle.Heavy,
+    }
+
+    await Haptics.impact({ style: impactStyleMap[styleMap[hapticsIntensity][semanticStyle[event]]] })
+    return true
   },
 }
 

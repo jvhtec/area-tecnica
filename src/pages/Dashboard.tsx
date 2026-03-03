@@ -157,13 +157,13 @@ const Dashboard = () => {
   const handleDeleteClick = useCallback(async (jobId: string) => {
     // Check permissions
     if (!["admin", "management"].includes(userRole || "")) {
-      hapticToast.error("Permission denied", {
-        description: "Only admin and management users can delete jobs",
+      hapticToast.error("Permiso denegado", {
+        description: "Solo los usuarios admin y de gestión pueden eliminar trabajos",
       });
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this job? This action cannot be undone and will remove all related data.")) return;
+    if (!window.confirm("¿Estás seguro de que deseas eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.")) return;
 
     hapticToast.destructiveConfirm();
 
@@ -172,8 +172,8 @@ const Dashboard = () => {
       const result = await deleteJobOptimistically(jobId);
 
       if (result.success) {
-        hapticToast.success("Job deleted", {
-          description: result.details || "The job has been removed and cleanup is running in background."
+        hapticToast.success("Trabajo eliminado", {
+          description: result.details || "El trabajo ha sido eliminado y la limpieza se está ejecutando en segundo plano."
         });
 
         // Invalidate queries to refresh the list
@@ -183,7 +183,7 @@ const Dashboard = () => {
       }
     } catch (error: any) {
       console.error("Dashboard: Error in optimistic job deletion:", error);
-      hapticToast.error("Error deleting job", {
+      hapticToast.error("Error al eliminar trabajo", {
         description: error.message,
       });
     }

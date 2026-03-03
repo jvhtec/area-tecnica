@@ -61,7 +61,7 @@ window.addEventListener('error', (event) => {
   }
 });
 
-initializeHapticsPreferences()
+void initializeHapticsPreferences()
 
 const rootElement = document.getElementById('root')
 

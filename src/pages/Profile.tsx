@@ -564,7 +564,7 @@ export const Profile = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Haptic feedback</CardTitle>
+              <CardTitle>Retroalimentación háptica</CardTitle>
               <CardDescription>
                 Ajusta el feedback táctil para interacciones clave. Se respetará “reducir movimiento” del sistema.
               </CardDescription>

@@ -28,7 +28,7 @@ describe('hapticToast', () => {
   })
 
   it('triggers success haptic and success toast', async () => {
-    const { hapticToast } = await import('../useHapticToast')
+    const { hapticToast } = await import('@/hooks/useHapticToast')
 
     hapticToast.success('Saved', { description: 'ok' })
 
@@ -37,7 +37,7 @@ describe('hapticToast', () => {
   })
 
   it('can disable haptic per call', async () => {
-    const { hapticToast } = await import('../useHapticToast')
+    const { hapticToast } = await import('@/hooks/useHapticToast')
 
     hapticToast.error('Failed', { haptic: false })
 
@@ -46,7 +46,7 @@ describe('hapticToast', () => {
   })
 
   it('emits warning haptic for destructive confirmation helper', async () => {
-    const { hapticToast } = await import('../useHapticToast')
+    const { hapticToast } = await import('@/hooks/useHapticToast')
 
     hapticToast.destructiveConfirm()
 
