@@ -2,6 +2,7 @@ import { Link, useLocation } from "react-router-dom"
 import { MoreHorizontal } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { useHaptics } from "@/hooks/useHaptics"
 
 import { NavigationItem } from "./SidebarNavigation"
 import { MobileActionTray } from "./MobileActionTray"
@@ -30,6 +31,7 @@ export const MobileNavBar = ({
   userEmail,
 }: MobileNavBarProps) => {
   const { pathname } = useLocation()
+  const { trigger } = useHaptics()
   const hasNavigation = primaryItems.length > 0 || trayItems.length > 0
   // Always render the tray trigger so persistent actions like Sign Out and About
   // remain accessible for all roles, even when there are no additional tray items.
@@ -58,6 +60,7 @@ export const MobileNavBar = ({
               to={item.to}
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
+              onClick={() => trigger("light")}
               className={cn(
                 "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 isActive

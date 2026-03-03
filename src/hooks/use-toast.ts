@@ -1,6 +1,14 @@
 
 import { toast as toastPrimitive } from "sonner";
 import * as React from "react";
+import { triggerHaptic } from "@/hooks/useHaptics";
+
+// Fire-and-forget haptic for toast notifications (outside React lifecycle)
+function toastHaptic(pattern: string) {
+  try {
+    triggerHaptic(pattern);
+  } catch { /* non-critical */ }
+}
 
 type ToasterToast = any;
 
@@ -160,24 +168,28 @@ function toast(options: string | React.ReactNode | Omit<ToastData, "id"> | {
   if (variant) {
     switch (variant) {
       case "destructive":
+        toastHaptic("error");
         return toastPrimitive.error(rest.title, {
           description: rest.description,
           id,
           ...rest
         });
       case "success":
+        toastHaptic("success");
         return toastPrimitive.success(rest.title, {
           description: rest.description,
           id,
           ...rest
         });
       case "warning":
+        toastHaptic("warning");
         return toastPrimitive.warning(rest.title, {
           description: rest.description,
           id,
           ...rest
         });
       case "info":
+        toastHaptic("nudge");
         return toastPrimitive.info(rest.title, {
           description: rest.description,
           id,
@@ -203,21 +215,25 @@ function toast(options: string | React.ReactNode | Omit<ToastData, "id"> | {
 
 // Add API-compatible methods for backward compatibility
 toast.success = (title: string, options?: any) => {
+  toastHaptic("success");
   const { description, ...rest } = options || {};
   return toastPrimitive.success(title, { description, ...rest });
 };
 
 toast.error = (title: string, options?: any) => {
+  toastHaptic("error");
   const { description, ...rest } = options || {};
   return toastPrimitive.error(title, { description, ...rest });
 };
 
 toast.warning = (title: string, options?: any) => {
+  toastHaptic("warning");
   const { description, ...rest } = options || {};
   return toastPrimitive.warning(title, { description, ...rest });
 };
 
 toast.info = (title: string, options?: any) => {
+  toastHaptic("nudge");
   const { description, ...rest } = options || {};
   return toastPrimitive.info(title, { description, ...rest });
 };

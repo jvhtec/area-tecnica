@@ -3,8 +3,26 @@ import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { useHaptics } from "@/hooks/useHaptics"
 
-const Select = SelectPrimitive.Root
+const SelectHaptic = React.forwardRef<
+  React.ElementRef<typeof SelectPrimitive.Root>,
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root>
+>(({ onValueChange, ...props }, _ref) => {
+  const { trigger } = useHaptics()
+  return (
+    <SelectPrimitive.Root
+      onValueChange={(value) => {
+        trigger("selection")
+        onValueChange?.(value)
+      }}
+      {...props}
+    />
+  )
+})
+SelectHaptic.displayName = "Select"
+
+const Select = SelectHaptic as typeof SelectPrimitive.Root
 
 const SelectGroup = SelectPrimitive.Group
 

@@ -5,6 +5,7 @@ import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { useUserPreferences } from "@/hooks/useUserPreferences"
+import { useHaptics } from "@/hooks/useHaptics"
 
 interface ThemeToggleProps {
   display?: "sidebar" | "icon"
@@ -19,6 +20,7 @@ export const ThemeToggle = ({
 }: ThemeToggleProps = {}) => {
   const { resolvedTheme, setTheme } = useTheme()
   const { preferences, updatePreferences } = useUserPreferences()
+  const { trigger } = useHaptics()
   const [mounted, setMounted] = useState(false)
   const hasManuallyToggled = useRef(false)
 
@@ -39,6 +41,7 @@ export const ThemeToggle = ({
 
   const toggleDarkMode = useCallback(() => {
     hasManuallyToggled.current = true
+    trigger("medium")
     const newTheme = isDarkMode ? 'light' : 'dark'
     setTheme(newTheme)
 

@@ -42,6 +42,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { openFlexElement } from "@/utils/flex-folders";
 import { isFestivalLikeJobType } from "@/utils/jobType";
 import { DateType, DATE_TYPE_OPTIONS, getDateTypeMeta } from "@/constants/dateTypes";
+import { useHaptics } from "@/hooks/useHaptics";
 
 interface MobileJobCardProps {
   job: any;
@@ -68,6 +69,7 @@ export function MobileJobCard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { userRole } = useOptimizedAuth();
+  const { trigger: haptic } = useHaptics();
   const [dateTypeDialogOpen, setDateTypeDialogOpen] = useState(false);
   const [selectedDateType, setSelectedDateType] = useState<DateType>('show');
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
@@ -141,8 +143,9 @@ export function MobileJobCard({
     if (isHouseTech || isJobBeingDeleted) {
       return;
     }
-    
+
     if (userRole !== "logistics" && onJobClick) {
+      haptic("light");
       onJobClick(job.id);
     }
   };
@@ -175,6 +178,7 @@ export function MobileJobCard({
 
       if (error) throw error;
 
+      haptic("success");
       toast({
         title: "Date type updated",
         description: `Set to ${DATE_TYPE_OPTIONS.find(opt => opt.value === newType)?.label}`
@@ -191,6 +195,7 @@ export function MobileJobCard({
       }
     } catch (error: any) {
       console.error('Error updating date type:', error);
+      haptic("error");
       toast({
         title: "Error",
         description: "Failed to update date type",

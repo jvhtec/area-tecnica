@@ -28,6 +28,7 @@ import { Theme } from "@/components/technician/types";
 import { PersonalCalendarPrintDialog } from "./PersonalCalendarPrintDialog";
 import { generatePersonalCalendarPDF, generatePersonalCalendarXLS } from "@/utils/personalCalendarPdfExport";
 import { useMadridHolidays } from "@/hooks/useMadridHolidays";
+import { useHaptics } from "@/hooks/useHaptics";
 
 interface MobilePersonalCalendarProps {
   date: Date;
@@ -45,6 +46,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   isDark
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
+  const { trigger: haptic } = useHaptics();
   const [selectedDepartment, setSelectedDepartment] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'warehouse' | 'job' | 'off'>('all');
   const [showPrintDialog, setShowPrintDialog] = useState(false);
@@ -99,18 +101,21 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   ).sort();
 
   const navigateToPrevious = () => {
+    haptic("light");
     const newDate = subDays(currentDate, 1);
     setCurrentDate(newDate);
     onDateSelect(newDate);
   };
 
   const navigateToNext = () => {
+    haptic("light");
     const newDate = addDays(currentDate, 1);
     setCurrentDate(newDate);
     onDateSelect(newDate);
   };
 
   const navigateToToday = () => {
+    haptic("medium");
     const today = new Date();
     setCurrentDate(today);
     onDateSelect(today);
