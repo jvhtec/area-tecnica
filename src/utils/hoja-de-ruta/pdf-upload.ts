@@ -1,8 +1,27 @@
 
 import { supabase } from "@/lib/supabase";
 
-export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: string): Promise<void> => {
+type HojaPdfDocumentKind = 'hoja_de_ruta' | 'certificado_entrega';
+
+const HOJA_PDF_FOLDER_BY_KIND: Record<HojaPdfDocumentKind, string> = {
+  hoja_de_ruta: 'hojas-de-ruta',
+  certificado_entrega: 'certificados-entrega',
+};
+
+interface UploadPdfToJobOptions {
+  kind?: HojaPdfDocumentKind;
+}
+
+export const uploadPdfToJob = async (
+  jobId: string,
+  pdfBlob: Blob,
+  fileName: string,
+  options: UploadPdfToJobOptions = {}
+): Promise<void> => {
   try {
+    const kind = options.kind || 'hoja_de_ruta';
+    const folderBase = HOJA_PDF_FOLDER_BY_KIND[kind];
+
     // Sanitize filename for storage while preserving human-readable spaces.
     const sanitizedFileName = fileName
       .replace(/_/g, ' ')
@@ -11,7 +30,7 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
       .replace(/\s+\./g, '.')
       .trim();
 
-    const folderPath = `hojas-de-ruta/${jobId}`;
+    const folderPath = `${folderBase}/${jobId}`;
     const filePath = `${folderPath}/${sanitizedFileName}`;
 
     const { data: authData, error: authError } = await supabase.auth.getUser();
@@ -20,9 +39,15 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
     }
     const userId = authData.user?.id || null;
 
-    console.log('Uploading Hoja de Ruta PDF:', sanitizedFileName, 'to job:', jobId, 'user:', userId);
+    console.log('Uploading job PDF:', {
+      kind,
+      fileName: sanitizedFileName,
+      jobId,
+      userId,
+    });
 
-    // Snapshot existing Hoja PDFs so we can clean up *after* a successful upload+insert.
+    // Snapshot existing PDFs in the same scoped folder so we can clean up
+    // *after* a successful upload+insert.
     // This avoids a window where the DB row exists but the file has already been deleted.
     let previousDocs: Array<{ id: string; file_path: string }> = [];
     try {
@@ -102,7 +127,7 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
           if (removeError) {
             console.warn('Storage remove warning (hoja de ruta cleanup):', removeError);
           } else {
-            console.log(`Removed ${previousPaths.length} previous Hoja de Ruta file(s) from storage.`);
+            console.log(`Removed ${previousPaths.length} previous PDF file(s) from storage for kind "${kind}".`);
           }
         }
       } catch (cleanupErr) {

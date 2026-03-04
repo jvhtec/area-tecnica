@@ -1,6 +1,8 @@
 export { PDFEngine } from './pdf-engine';
-export type { PDFGenerationOptions } from './core/pdf-types';
+export type { DriverCertificatePDFGenerationOptions, PDFGenerationOptions } from './core/pdf-types';
 import { PDFEngine } from './pdf-engine';
+import { DriverCertificatePDFEngine } from './driver-certificate-pdf-engine';
+import type { DriverCertificatePDFGenerationOptions } from './core/pdf-types';
 
 // Main export function for backward compatibility
 export const generatePDF = async (
@@ -29,5 +31,12 @@ export const generatePDF = async (
     accommodations
   });
   
+  return engine.generate();
+};
+
+export const generateDriverCertificatePDF = async (
+  options: DriverCertificatePDFGenerationOptions
+): Promise<void> => {
+  const engine = new DriverCertificatePDFEngine(options);
   return engine.generate();
 };

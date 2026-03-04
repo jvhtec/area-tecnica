@@ -12,6 +12,7 @@ interface HojaDeRutaPrintDialogProps {
   showDialog: boolean;
   setShowDialog: (open: boolean) => void;
   onGeneratePDF: () => void;
+  onGenerateDriverCertificatePDF: () => void;
   onGenerateXLS: () => void;
   isGenerating?: boolean;
 }
@@ -20,6 +21,7 @@ export const HojaDeRutaPrintDialog: React.FC<HojaDeRutaPrintDialogProps> = ({
   showDialog,
   setShowDialog,
   onGeneratePDF,
+  onGenerateDriverCertificatePDF,
   onGenerateXLS,
   isGenerating = false,
 }) => {
@@ -35,6 +37,10 @@ export const HojaDeRutaPrintDialog: React.FC<HojaDeRutaPrintDialogProps> = ({
             <Button onClick={() => { void onGeneratePDF(); }} disabled={isGenerating}>
               <Printer className="h-4 w-4 mr-2" />
               Documento Completo PDF
+            </Button>
+            <Button onClick={() => { void onGenerateDriverCertificatePDF(); }} disabled={isGenerating} variant="outline">
+              <Printer className="h-4 w-4 mr-2" />
+              Certificado Conductores PDF
             </Button>
           </div>
           <div className="flex flex-col gap-2">

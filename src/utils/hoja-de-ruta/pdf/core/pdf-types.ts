@@ -36,3 +36,12 @@ export interface PDFGenerationOptions {
   includeLogisticsTransport?: boolean;
   dedupeTransportAcrossSections?: boolean;
 }
+
+export interface DriverCertificatePDFGenerationOptions {
+  eventData: EventData;
+  selectedJobId: string;
+  jobTitle: string;
+  jobDate?: string;
+  venueMapPreview?: string | null;
+  toast?: any;
+}

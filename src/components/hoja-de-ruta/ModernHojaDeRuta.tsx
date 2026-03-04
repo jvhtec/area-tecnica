@@ -254,6 +254,46 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     }
   };
 
+  const handleGenerateDriverCertificatePDF = async () => {
+    if (!selectedJobId) {
+      toast({
+        title: "Error",
+        description: "Por favor, seleccione un trabajo antes de generar el certificado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      if (isDirty || hasSavedData) {
+        await handleSaveAll();
+      }
+
+      const { generateDriverCertificatePDF } = await import("@/utils/hoja-de-ruta/pdf");
+
+      const jobDetails = jobs?.find(job => job.id === selectedJobId);
+
+      await generateDriverCertificatePDF({
+        eventData,
+        selectedJobId,
+        jobTitle: jobDetails?.title || "",
+        jobDate: jobDetails?.start_time || undefined,
+        venueMapPreview,
+        toast,
+      });
+    } catch (error) {
+      console.error("Error generating driver certificate PDF:", error);
+      toast({
+        title: "❌ Error",
+        description: "Hubo un problema al generar el certificado de conductores.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // Excel export handler
   const handleGenerateXLS = async () => {
     if (!selectedJobId) {
@@ -728,6 +768,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
         showDialog={showPrintDialog}
         setShowDialog={setShowPrintDialog}
         onGeneratePDF={handleGeneratePDF}
+        onGenerateDriverCertificatePDF={handleGenerateDriverCertificatePDF}
         onGenerateXLS={handleGenerateXLS}
         isGenerating={isGenerating}
       />

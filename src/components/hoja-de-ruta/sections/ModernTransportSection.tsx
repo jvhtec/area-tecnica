@@ -298,12 +298,15 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Fecha y Hora</Label>
+                    <Label>Fecha y Hora (en recinto)</Label>
                     <Input
                       type="datetime-local"
                       value={item.date_time || ''}
                       onChange={(e) => onUpdateTransport(index, 'date_time', e.target.value)}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Este horario corresponde al recinto del evento.
+                    </p>
                   </div>
                   <div className="flex items-center space-x-2 pt-6">
                     <Checkbox

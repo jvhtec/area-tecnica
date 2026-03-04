@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
-import { format } from "date-fns";
+import { endOfMonth, format, startOfMonth } from "date-fns";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
 import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
@@ -178,10 +178,25 @@ export const LogisticsEventDialog = ({
   }, [open, selectedEvent?.id]);
 
   // Fetch available Jobs (used for read-only job label and select)
+  const monthAnchor = selectedDate || new Date();
+  const monthStart = startOfMonth(monthAnchor);
+  const monthEnd = endOfMonth(monthAnchor);
+
   const { data: jobs } = useQuery({
-    queryKey: ["jobs"],
+    queryKey: [
+      "logistics-dialog-jobs",
+      monthStart.toISOString(),
+      monthEnd.toISOString(),
+    ],
     queryFn: async () => {
-      const { data, error } = await supabase.from("jobs").select("id, title");
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("id, title, start_time, status, job_type")
+        .in("status", ["Tentativa", "Confirmado"])
+        .neq("job_type", "dryhire")
+        .gte("start_time", monthStart.toISOString())
+        .lte("start_time", monthEnd.toISOString())
+        .order("start_time", { ascending: true });
       if (error) throw error;
       return data;
     },
@@ -498,7 +513,7 @@ export const LogisticsEventDialog = ({
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Job Selection or locked job display */}
-            {(!selectedEvent && !initialJobId) ? (
+            {!initialJobId ? (
               <div className="space-y-2">
                 <Label>Trabajo</Label>
                 <Select
@@ -514,7 +529,9 @@ export const LogisticsEventDialog = ({
                     <SelectItem value="no-job">Sin trabajo</SelectItem>
                     {jobs?.map((job) => (
                       <SelectItem key={job.id} value={job.id}>
-                        {job.title}
+                        {job.start_time
+                          ? `${job.title} · ${format(new Date(job.start_time), "dd/MM HH:mm")}`
+                          : job.title}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -526,7 +543,7 @@ export const LogisticsEventDialog = ({
                 <div className="px-3 py-2 border rounded bg-muted text-sm">
                   {(() => {
                     const jt = jobs?.find(j => j.id === (selectedEvent?.job_id || initialJobId))?.title;
-                    return jt || 'Trabajo seleccionado';
+                    return jt || 'Trabajo asignado';
                   })()}
                 </div>
               </div>

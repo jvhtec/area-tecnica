@@ -6,8 +6,6 @@ import { HeaderSection } from './sections/header-section';
 import { CoverSection } from './sections/cover-section';
 import { ContentSections } from './sections/content-sections';
 import { FooterService } from './services/footer-service';
-import { StampService } from './services/stamp-service';
-import { supabase } from '@/lib/supabase';
 
 export class PDFEngine {
   private pdfDoc: PDFDocument;
@@ -195,20 +193,6 @@ export class PDFEngine {
         await this.contentSections.addRestaurantsSection(this.options.eventData, currentY);
       }
 
-      // 14. Certificado de entrega (siempre al final)
-      if (includeLogisticsTransport && this.contentSections.hasDeliveryCertificateData(this.options.eventData)) {
-        const [certificateJobContext, sectorProStamp] = await Promise.all([
-          this.fetchDeliveryCertificateJobContext(selectedJobId),
-          StampService.loadExactSectorProStamp(),
-        ]);
-        const currentY = this.headerSection.addSectionHeader("Certificado de Entrega");
-        this.contentSections.addDeliveryCertificateSection(this.options.eventData, currentY, {
-          ...certificateJobContext,
-          issueDate: new Date(),
-          stamp: sectorProStamp,
-        });
-      }
-
       // Add Sector-Pro footer to all pages with page numbers and job name
       await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle);
 
@@ -228,32 +212,6 @@ export class PDFEngine {
         variant: "destructive",
       });
       throw error;
-    }
-  }
-
-  private async fetchDeliveryCertificateJobContext(jobId: string): Promise<{ invoicingCompany?: string | null; jobLocation?: string | null }> {
-    try {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select(`
-          invoicing_company,
-          location:locations(name, formatted_address)
-        `)
-        .eq('id', jobId)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      const location = (data as any)?.location;
-      const jobLocation = (location?.formatted_address || location?.name || null) as string | null;
-
-      return {
-        invoicingCompany: (data as any)?.invoicing_company || null,
-        jobLocation,
-      };
-    } catch (error) {
-      console.warn('Unable to fetch delivery certificate job context:', error);
-      return { invoicingCompany: null, jobLocation: null };
     }
   }
 
