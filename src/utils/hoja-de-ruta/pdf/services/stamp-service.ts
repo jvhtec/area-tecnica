@@ -3,9 +3,8 @@ export class StampService {
   private static cachedFallbackSectorProStamp: StampImage | null = null;
 
   static async loadExactSectorProStamp(): Promise<StampImage | null> {
-    if (this.cachedExactSectorProStamp !== undefined) return this.cachedExactSectorProStamp;
+    if (this.cachedExactSectorProStamp) return this.cachedExactSectorProStamp;
     if (typeof window === 'undefined') {
-      this.cachedExactSectorProStamp = null;
       return null;
     }
 
@@ -17,7 +16,7 @@ export class StampService {
 
     for (const path of possiblePaths) {
       try {
-        const response = await fetch(path);
+        const response = await fetch(path, { cache: 'no-store' });
         if (!response.ok) continue;
         const blob = await response.blob();
         const dataUrl = await this.blobToDataURL(blob);
@@ -29,7 +28,6 @@ export class StampService {
       }
     }
 
-    this.cachedExactSectorProStamp = null;
     return null;
   }
 
