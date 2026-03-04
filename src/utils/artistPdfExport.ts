@@ -1,5 +1,6 @@
 import { WirelessSystem, IEMSystem } from '@/types/festival-equipment';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
 
 export interface ArtistTechnicalInfo {
   fohTech: boolean;
@@ -15,7 +16,8 @@ export interface ArtistTechnicalInfo {
     providedBy: string;
     handhelds?: number;
     bodypacks?: number;
-    band?: string;
+    band?: FrequencyBandSelection | string;
+    channels?: number;
     hh?: number;
     bp?: number;
   };
@@ -24,7 +26,7 @@ export interface ArtistTechnicalInfo {
     model?: string;
     providedBy: string;
     quantity?: number;
-    band?: string;
+    band?: FrequencyBandSelection | string;
   };
   monitors: {
     enabled: boolean;
@@ -36,14 +38,15 @@ export interface ArtistTechnicalInfo {
 interface WirelessSystemDetail {
   quantity_hh?: number;
   quantity_bp?: number;
+  quantity_ch?: number;
   model: string;
-  band?: string;
+  band?: FrequencyBandSelection | string;
 }
 
 interface IEMSystemDetail {
   quantity: number;
   model: string;
-  band?: string;
+  band?: FrequencyBandSelection | string;
 }
 
 export interface ArtistInfrastructure {
@@ -61,8 +64,8 @@ export interface PdfFestivalGearOptions {
   monConsoles?: Array<{ model: string; quantity: number }>;
   fohWavesOutboard?: string;
   monWavesOutboard?: string;
-  wirelessSystems?: Array<{ model: string; quantity_hh: number; quantity_bp: number; band?: string }>;
-  iemSystems?: Array<{ model: string; quantity_hh: number; quantity_bp: number; band?: string }>;
+  wirelessSystems?: Array<{ model: string; quantity_hh: number; quantity_bp: number; quantity_ch?: number; band?: FrequencyBandSelection | string }>;
+  iemSystems?: Array<{ model: string; quantity_hh: number; quantity_bp: number; band?: FrequencyBandSelection | string }>;
   wiredMics?: Array<{ model: string; quantity: number }>;
   monitorsQuantity?: number;
   hasSideFill?: boolean;
@@ -318,7 +321,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       tx("Sistemas RF", "Wireless Systems"),
       (data.festivalOptions.wirelessSystems || []).map((system) => ({
         label: system.model,
-        availability: `${tx("HH", "HH")} ${system.quantity_hh || 0} / ${tx("BP", "BP")} ${system.quantity_bp || 0}${system.band ? ` | ${system.band}` : ""}`,
+        availability: `${tx("Canales", "Channels")} ${system.quantity_ch || 0} / ${tx("HH", "HH")} ${system.quantity_hh || 0} / ${tx("BP", "BP")} ${system.quantity_bp || 0}${formatFrequencyBand(system.band) ? ` | ${formatFrequencyBand(system.band)}` : ""}`,
       })),
     );
 
@@ -326,7 +329,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
       tx("Sistemas IEM", "IEM Systems"),
       (data.festivalOptions.iemSystems || []).map((system) => ({
         label: system.model,
-        availability: `${tx("Canales", "Channels")} ${system.quantity_hh || 0} / ${tx("Petacas", "Bodypacks")} ${system.quantity_bp || 0}${system.band ? ` | ${system.band}` : ""}`,
+        availability: `${tx("Canales", "Channels")} ${system.quantity_hh || 0} / ${tx("Petacas", "Bodypacks")} ${system.quantity_bp || 0}${formatFrequencyBand(system.band) ? ` | ${formatFrequencyBand(system.band)}` : ""}`,
       })),
     );
 
@@ -567,6 +570,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
 
     if (wirelessOptions.length === 0 && iemOptions.length === 0) {
       wirelessRows.push(
+        [tx("Canales RF", "RF Channels"), "____", "", "", ""],
         [tx("Mano", "Handheld"), "____", "", "", ""],
         [tx("Petaca", "Bodypack"), "____", "", "", ""],
         [tx("Canales IEM", "IEM Channels"), "____", "", "", ""],
@@ -578,8 +582,8 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
           index === 0 ? tx("Sistemas RF", "Wireless Systems") : "",
           "____",
           `${checklist} ${system.model}`,
-          system.band || "-",
-          `${tx("HH", "HH")} ${system.quantity_hh || 0} / ${tx("BP", "BP")} ${system.quantity_bp || 0}`,
+          formatFrequencyBand(system.band) || "-",
+          `${tx("Canales", "Channels")} ${system.quantity_ch || 0} / ${tx("HH", "HH")} ${system.quantity_hh || 0} / ${tx("BP", "BP")} ${system.quantity_bp || 0}`,
         ]);
       });
 
@@ -588,7 +592,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
           index === 0 ? tx("Sistemas IEM", "IEM Systems") : "",
           "____",
           `${checklist} ${system.model}`,
-          system.band || "-",
+          formatFrequencyBand(system.band) || "-",
           `${tx("Canales", "Channels")} ${system.quantity_hh || 0} / ${tx("Petacas", "Bodypacks")} ${system.quantity_bp || 0}`,
         ]);
       });
@@ -598,16 +602,28 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     if (data.technical.wireless.systems && data.technical.wireless.systems.length > 0) {
       data.technical.wireless.systems.forEach(system => {
         const rowProvider = resolveRowProvider(system.provided_by, data.technical.wireless.providedBy || "festival");
+        const channels = Number(system.quantity_ch || 0);
         const handhelds = Number(system.quantity_hh || 0);
         const bodypacks = Number(system.quantity_bp || 0);
         const hasModel = typeof system.model === "string" && system.model.trim().length > 0;
+        const formattedBand = formatFrequencyBand(system.band) || '-';
+
+        if (channels > 0) {
+          wirelessRows.push([
+            tx('Canales RF', 'RF Channels'),
+            channels,
+            system.model,
+            formattedBand,
+            rowProvider
+          ]);
+        }
         
         if (handhelds > 0) {
           wirelessRows.push([
             tx('Mano', 'Handheld'),
             handhelds,
             system.model,
-            system.band || '-',
+            formattedBand,
             rowProvider
           ]);
         }
@@ -616,17 +632,17 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
             tx('Petaca', 'Bodypack'),
             bodypacks,
             system.model,
-            system.band || '-',
+            formattedBand,
             rowProvider
           ]);
         }
 
-        if (handhelds <= 0 && bodypacks <= 0 && hasModel) {
+        if (channels <= 0 && handhelds <= 0 && bodypacks <= 0 && hasModel) {
           wirelessRows.push([
             tx('Sistema RF', 'Wireless System'),
             0,
             system.model,
-            system.band || '-',
+            formattedBand,
             rowProvider
           ]);
         }
@@ -638,7 +654,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
           tx('Mano', 'Handheld'),
           data.technical.wireless.handhelds,
           data.technical.wireless.model || '-',
-          data.technical.wireless.band || '-',
+          formatFrequencyBand(data.technical.wireless.band) || '-',
           providerLabel(data.technical.wireless.providedBy)
         ]);
       }
@@ -647,7 +663,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
           tx('Petaca', 'Bodypack'),
           data.technical.wireless.bodypacks,
           data.technical.wireless.model || '-',
-          data.technical.wireless.band || '-',
+          formatFrequencyBand(data.technical.wireless.band) || '-',
           providerLabel(data.technical.wireless.providedBy)
         ]);
       }
@@ -660,13 +676,14 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
         const channels = Number(system.quantity_hh ?? system.quantity ?? 0);
         const bodypacks = Number(system.quantity_bp || 0);
         const hasModel = typeof system.model === "string" && system.model.trim().length > 0;
+        const formattedBand = formatFrequencyBand(system.band) || '-';
         
         if (channels > 0) {
           wirelessRows.push([
             tx('Canales IEM', 'IEM Channels'),
             channels,
             system.model,
-            system.band || '-',
+            formattedBand,
             rowProvider
           ]);
         }
@@ -675,7 +692,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
             tx('Petacas IEM', 'IEM Bodypacks'),
             bodypacks,
             system.model,
-            system.band || '-',
+            formattedBand,
             rowProvider
           ]);
         }
@@ -685,7 +702,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
             tx('Sistema IEM', 'IEM System'),
             0,
             system.model,
-            system.band || '-',
+            formattedBand,
             rowProvider
           ]);
         }
@@ -696,7 +713,7 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
         tx('Sistema IEM', 'IEM System'),
         data.technical.iem.quantity,
         data.technical.iem.model || '-',
-        data.technical.iem.band || '-',
+        formatFrequencyBand(data.technical.iem.band) || '-',
         providerLabel(data.technical.iem.providedBy)
       ]);
     }

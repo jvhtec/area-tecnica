@@ -1,4 +1,6 @@
 
+import type { FrequencyBandSelection } from "@/lib/frequencyBands";
+
 export const WIRELESS_SYSTEMS = [
   'Shure AD Series',
   'Shure AXT Series',
@@ -32,7 +34,8 @@ export interface WirelessSystem {
   model: WirelessSystemModel | string;
   quantity_hh?: number;
   quantity_bp?: number;
-  band?: string;
+  quantity_ch?: number;
+  band?: FrequencyBandSelection | string;
   provided_by?: 'festival' | 'band' | 'mixed';
 }
 
@@ -42,6 +45,6 @@ export interface IEMSystem {
   quantity?: number;  // Keep for backward compatibility
   quantity_hh?: number;  // Channels
   quantity_bp?: number;  // Bodypacks
-  band?: string;
+  band?: FrequencyBandSelection | string;
   provided_by?: 'festival' | 'band' | 'mixed';
 }

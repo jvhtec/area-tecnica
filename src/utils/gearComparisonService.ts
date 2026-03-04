@@ -1,4 +1,5 @@
 import { ConsoleSetup, WirelessSetup, FestivalGearSetup, StageGearSetup, WiredMicSetup } from "@/types/festival";
+import { getAvailableWirelessChannels, getRequiredWirelessChannels } from "@/lib/frequencyBands";
 
 export interface GearMismatch {
   type: 'console' | 'wireless' | 'iem' | 'infrastructure' | 'extras' | 'monitors' | 'microphones';
@@ -19,7 +20,7 @@ export interface EquipmentNeeds {
     foh: Array<{ model: string; additionalQuantity: number; requiredBy: string[] }>;
     monitor: Array<{ model: string; additionalQuantity: number; requiredBy: string[] }>;
   };
-  wireless: Array<{ model: string; additionalHH: number; additionalBP: number; requiredBy: string[] }>;
+  wireless: Array<{ model: string; additionalChannels: number; additionalHH: number; additionalBP: number; requiredBy: string[] }>;
   iem: Array<{ model: string; additionalChannels: number; additionalBP: number; requiredBy: string[] }>;
   microphones: Array<{ model: string; additionalQuantity: number; requiredBy: string[] }>;
   monitors: { additionalQuantity: number; requiredBy: string[] };
@@ -338,10 +339,21 @@ export const compareArtistRequirements = (
               details: `Disponible: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'Ninguno'}`
             });
           } else {
+            const requiredChannels = getRequiredWirelessChannels(artistWireless);
+            const availableChannels = getAvailableWirelessChannels(availableWireless);
             const requiredHH = artistWireless.quantity_hh || 0;
             const requiredBP = artistWireless.quantity_bp || 0;
             const availableHH = availableWireless.quantity_hh || 0;
             const availableBP = availableWireless.quantity_bp || 0;
+
+            if (requiredChannels > availableChannels) {
+              mismatches.push({
+                type: 'wireless',
+                severity: 'error',
+                message: `Canales RF insuficientes para "${artistWireless.model}"`,
+                details: `Requiere: ${requiredChannels}, Disponible: ${availableChannels}`
+              });
+            }
             
             if (requiredHH > availableHH) {
               mismatches.push({
@@ -387,10 +399,21 @@ export const compareArtistRequirements = (
             details: `Disponible: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'Ninguno'}`
           });
         } else {
+          const requiredChannels = getRequiredWirelessChannels(artistWireless);
+          const availableChannels = getAvailableWirelessChannels(availableWireless);
           const requiredHH = artistWireless.quantity_hh || 0;
           const requiredBP = artistWireless.quantity_bp || 0;
           const availableHH = availableWireless.quantity_hh || 0;
           const availableBP = availableWireless.quantity_bp || 0;
+
+          if (requiredChannels > availableChannels) {
+            mismatches.push({
+              type: 'wireless',
+              severity: 'error',
+              message: `Canales RF insuficientes para "${artistWireless.model}"`,
+              details: `Requiere: ${requiredChannels}, Disponible: ${availableChannels}`
+            });
+          }
           
           if (requiredHH > availableHH) {
             mismatches.push({
@@ -767,7 +790,7 @@ export const calculateEquipmentNeeds = (
   const stageRequirements: Record<number, {
     fohConsoles: Record<string, number>;
     monConsoles: Record<string, number>;
-    wireless: Record<string, { hh: number; bp: number }>;
+    wireless: Record<string, { channels: number; hh: number; bp: number }>;
     iem: Record<string, { channels: number; bp: number }>;
     microphones: Record<string, number>;
     monitors: number;
@@ -823,8 +846,9 @@ export const calculateEquipmentNeeds = (
         if (system.provided_by !== 'band') {
           const key = system.model;
           if (!stageReq.wireless[key]) {
-            stageReq.wireless[key] = { hh: 0, bp: 0 };
+            stageReq.wireless[key] = { channels: 0, hh: 0, bp: 0 };
           }
+          stageReq.wireless[key].channels += getRequiredWirelessChannels(system);
           stageReq.wireless[key].hh += system.quantity_hh || 0;
           stageReq.wireless[key].bp += system.quantity_bp || 0;
         }
@@ -935,14 +959,17 @@ export const calculateEquipmentNeeds = (
     // Wireless shortfalls
     Object.entries(requirements.wireless).forEach(([model, required]) => {
       const available = availableGear.wireless_systems?.find(w => w.model === model);
+      const availableChannels = available ? getAvailableWirelessChannels(available) : 0;
       const availableHH = available?.quantity_hh || 0;
       const availableBP = available?.quantity_bp || 0;
+      const shortageChannels = Math.max(0, required.channels - availableChannels);
       const shortageHH = Math.max(0, required.hh - availableHH);
       const shortageBP = Math.max(0, required.bp - availableBP);
       
-      if (shortageHH > 0 || shortageBP > 0) {
+      if (shortageChannels > 0 || shortageHH > 0 || shortageBP > 0) {
         const existing = needs.wireless.find(w => w.model === model);
         if (existing) {
+          existing.additionalChannels += shortageChannels;
           existing.additionalHH += shortageHH;
           existing.additionalBP += shortageBP;
           if (!existing.requiredBy.includes(`Stage ${stage}`)) {
@@ -951,6 +978,7 @@ export const calculateEquipmentNeeds = (
         } else {
           needs.wireless.push({
             model,
+            additionalChannels: shortageChannels,
             additionalHH: shortageHH,
             additionalBP: shortageBP,
             requiredBy: [`Stage ${stage}`]

@@ -1,11 +1,14 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
 
 export interface RfIemSystemData {
   model: string;
+  quantity?: number;
+  quantity_ch?: number;
   quantity_hh?: number;
   quantity_bp?: number;
-  band?: string;
-  provided_by?: 'festival' | 'band';
+  band?: FrequencyBandSelection | string;
+  provided_by?: 'festival' | 'band' | 'mixed';
 }
 
 export interface ArtistRfIemData {
@@ -29,10 +32,56 @@ const getProviderSummary = (systems: RfIemSystemData[]): string => {
   const uniqueProviders = [...new Set(providers)];
   
   if (uniqueProviders.length === 1) {
-    return uniqueProviders[0] === 'festival' ? 'Festival' : 'Banda';
+    if (uniqueProviders[0] === 'festival') return 'Festival';
+    if (uniqueProviders[0] === 'band') return 'Banda';
+    return 'Mixto';
   } else {
     return 'Mixto';
   }
+};
+
+const getRfSystemChannels = (system: RfIemSystemData): number => {
+  if (typeof system.quantity_ch === 'number' && Number.isFinite(system.quantity_ch)) {
+    return system.quantity_ch;
+  }
+  return (system.quantity_hh || 0) + (system.quantity_bp || 0);
+};
+
+export const getUniqueFormattedBands = (systems: RfIemSystemData[] = []): string => {
+  return [...new Set(systems
+    .map(sys => formatFrequencyBand(sys.band))
+    .filter(Boolean)
+  )].join(', ');
+};
+
+export const buildRfIemTableRow = (artist: ArtistRfIemData): Array<string | number> => {
+  const totalRfChannels = artist.wirelessSystems.reduce((sum, sys) => sum + getRfSystemChannels(sys), 0);
+  const totalRfHH = artist.wirelessSystems.reduce((sum, sys) => sum + (sys.quantity_hh || 0), 0);
+  const totalRfBP = artist.wirelessSystems.reduce((sum, sys) => sum + (sys.quantity_bp || 0), 0);
+  const totalIemChannels = artist.iemSystems.reduce((sum, sys) => sum + (sys.quantity_hh || sys.quantity || 0), 0);
+  const totalIemBodpacks = artist.iemSystems.reduce((sum, sys) => sum + (sys.quantity_bp || 0), 0);
+  const rfModels = [...new Set(artist.wirelessSystems.map(sys => sys.model))].join(', ');
+  const rfBands = getUniqueFormattedBands(artist.wirelessSystems);
+  const iemModels = [...new Set(artist.iemSystems.map(sys => sys.model))].join(', ');
+  const iemBands = getUniqueFormattedBands(artist.iemSystems);
+  const rfProvidedBy = getProviderSummary(artist.wirelessSystems);
+  const iemProvidedBy = getProviderSummary(artist.iemSystems);
+
+  return [
+    artist.name,
+    `Escenario ${artist.stage}`,
+    rfProvidedBy,
+    rfModels,
+    rfBands,
+    totalRfChannels,
+    totalRfHH,
+    totalRfBP,
+    iemProvidedBy,
+    iemModels,
+    iemBands,
+    totalIemChannels,
+    totalIemBodpacks
+  ];
 };
 
 export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob> => {
@@ -85,48 +134,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
   );
   
   // Prepare table data
-  const tableData = filteredArtists.map(artist => {
-    // Calculate total RF handhelds and bodypacks
-    const totalRfHH = artist.wirelessSystems.reduce((sum, sys) => sum + (sys.quantity_hh || 0), 0);
-    const totalRfBP = artist.wirelessSystems.reduce((sum, sys) => sum + (sys.quantity_bp || 0), 0);
-    
-    // Calculate total IEM channels and bodypacks
-    const totalIemChannels = artist.iemSystems.reduce((sum, sys) => sum + (sys.quantity_hh || 0), 0);
-    const totalIemBodpacks = artist.iemSystems.reduce((sum, sys) => sum + (sys.quantity_bp || 0), 0);
-    
-    // Get RF models and frequency bands
-    const rfModels = [...new Set(artist.wirelessSystems.map(sys => sys.model))].join(', ');
-    const rfBands = [...new Set(artist.wirelessSystems
-      .filter(sys => sys.band)
-      .map(sys => sys.band)
-    )].join(', ');
-    
-    // Get IEM models and frequency bands
-    const iemModels = [...new Set(artist.iemSystems.map(sys => sys.model))].join(', ');
-    const iemBands = [...new Set(artist.iemSystems
-      .filter(sys => sys.band)
-      .map(sys => sys.band)
-    )].join(', ');
-
-    // Get provider summaries from individual systems
-    const rfProvidedBy = getProviderSummary(artist.wirelessSystems);
-    const iemProvidedBy = getProviderSummary(artist.iemSystems);
-
-    return [
-      artist.name,
-      `Escenario ${artist.stage}`,
-      rfProvidedBy,
-      rfModels,
-      rfBands, 
-      totalRfHH,
-      totalRfBP,
-      iemProvidedBy,
-      iemModels,
-      iemBands,
-      totalIemChannels,
-      totalIemBodpacks
-    ];
-  });
+  const tableData = filteredArtists.map(buildRfIemTableRow);
 
   // Add the table with headers
   autoTable(pdf, {
@@ -135,7 +143,8 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
       'Escenario',
       'RF Proporcionado por',
       'Modelos RF',
-      'Bandas RF', 
+      'Bandas RF',
+      'Canales RF',
       'Manos',
       'Petacas',
       'IEM Proporcionado por',
@@ -166,13 +175,14 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
       2: { cellWidth: 22 }, // RF Provider
       3: { cellWidth: 30 }, // RF Models
       4: { cellWidth: 25 }, // RF Bands
-      5: { cellWidth: 15 }, // Handhelds
-      6: { cellWidth: 15 }, // Bodypacks
-      7: { cellWidth: 22 }, // IEM Provider
-      8: { cellWidth: 30 }, // IEM Models
-      9: { cellWidth: 25 }, // IEM Bands
-      10: { cellWidth: 15 }, // IEM Channels
-      11: { cellWidth: 15 }, // IEM Bodypacks
+      5: { cellWidth: 15 }, // RF Channels
+      6: { cellWidth: 15 }, // Handhelds
+      7: { cellWidth: 15 }, // Bodypacks
+      8: { cellWidth: 22 }, // IEM Provider
+      9: { cellWidth: 30 }, // IEM Models
+      10: { cellWidth: 25 }, // IEM Bands
+      11: { cellWidth: 15 }, // IEM Channels
+      12: { cellWidth: 15 }, // IEM Bodypacks
     }
   });
 

@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { PdfFestivalGearOptions } from "@/utils/artistPdfExport";
+import { formatFrequencyBand, type FrequencyBandSelection } from "@/lib/frequencyBands";
 
 interface ConsoleOption {
   model: string;
@@ -10,6 +11,7 @@ interface WirelessOption {
   model: string;
   quantity_hh: number;
   quantity_bp: number;
+  quantity_ch?: number;
   band?: string;
 }
 
@@ -43,12 +45,14 @@ const toWirelessOptions = (value: unknown): WirelessOption[] => {
       const model = typeof record.model === "string" ? record.model.trim() : "";
       const quantityHh = Number(record.quantity_hh);
       const quantityBp = Number(record.quantity_bp);
-      const band = typeof record.band === "string" ? record.band.trim() : "";
+      const quantityCh = Number(record.quantity_ch);
+      const band = formatFrequencyBand(record.band as FrequencyBandSelection | string | undefined);
 
       return {
         model,
         quantity_hh: Number.isFinite(quantityHh) ? quantityHh : 0,
         quantity_bp: Number.isFinite(quantityBp) ? quantityBp : 0,
+        quantity_ch: Number.isFinite(quantityCh) ? quantityCh : 0,
         band: band || undefined,
       };
     })

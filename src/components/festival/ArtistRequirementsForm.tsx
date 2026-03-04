@@ -13,9 +13,10 @@ import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSecti
 import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
 import { MicKitSection } from "./form/sections/MicKitSection";
-import { FestivalGearSetup, WirelessSetup } from "@/types/festival";
+import { FestivalGearSetup } from "@/types/festival";
 import { ArtistSectionProps } from "@/types/artist-form";
 import { Download, Eye, FileText, Loader2, Printer, Trash2 } from "lucide-react";
+import { normalizeWirelessSystem, normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
 
 interface ArtistRequirementsFormProps {
   isBlank?: boolean;
@@ -50,14 +51,32 @@ type RiderFileRecord = {
   uploaded_by_name: string | null;
 };
 
-const makeBlankSystem = () => ({
-  model: "",
-  quantity: 0,
-  quantity_hh: 0,
-  quantity_bp: 0,
-  band: "",
-  provided_by: "festival",
-});
+const makeBlankWirelessSystem = () =>
+  normalizeWirelessSystem(
+    {
+      model: "",
+      quantity: 0,
+      quantity_ch: 0,
+      quantity_hh: 0,
+      quantity_bp: 0,
+      band: undefined,
+      provided_by: "festival",
+    },
+    "wireless",
+  );
+
+const makeBlankIemSystem = () =>
+  normalizeWirelessSystem(
+    {
+      model: "",
+      quantity: 0,
+      quantity_hh: 0,
+      quantity_bp: 0,
+      band: undefined,
+      provided_by: "festival",
+    },
+    "iem",
+  );
 
 const normalizeTime = (value: string | null | undefined) => {
   if (!value) return "";
@@ -100,8 +119,8 @@ const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistFormStat
   foh_waves_outboard: "",
   mon_waves_outboard: "",
   mon_tech: false,
-  wireless_systems: isBlank ? [makeBlankSystem()] : [],
-  iem_systems: isBlank ? [makeBlankSystem()] : [],
+  wireless_systems: isBlank ? [makeBlankWirelessSystem()] : [],
+  iem_systems: isBlank ? [makeBlankIemSystem()] : [],
   wireless_provided_by: "festival",
   iem_provided_by: "festival",
   monitors_enabled: false,
@@ -212,7 +231,11 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
         if (cancelled) return;
         if (gearData) {
-          setGearSetup(gearData as FestivalGearSetup);
+          setGearSetup({
+            ...(gearData as FestivalGearSetup),
+            wireless_systems: normalizeWirelessSystems((gearData as FestivalGearSetup).wireless_systems, "wireless"),
+            iem_systems: normalizeWirelessSystems((gearData as FestivalGearSetup).iem_systems, "iem"),
+          });
         }
 
         const { data: stagesData } = await supabase
@@ -410,8 +433,8 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         monitors_from_foh: asBoolean(artistData.monitors_from_foh),
         mon_waves_outboard: asString(artistData.mon_waves_outboard),
         mon_tech: asBoolean(artistData.mon_tech),
-        wireless_systems: asArray<WirelessSetup>(artistData.wireless_systems),
-        iem_systems: asArray<WirelessSetup>(artistData.iem_systems),
+        wireless_systems: normalizeWirelessSystems(artistData.wireless_systems, "wireless"),
+        iem_systems: normalizeWirelessSystems(artistData.iem_systems, "iem"),
         wireless_provided_by: asString(artistData.wireless_provided_by) || "festival",
         iem_provided_by: asString(artistData.iem_provided_by) || "festival",
         monitors_enabled: asBoolean(artistData.monitors_enabled),
@@ -446,7 +469,11 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
       }));
 
       if (context.gear_setup) {
-        setGearSetup(context.gear_setup);
+        setGearSetup({
+          ...context.gear_setup,
+          wireless_systems: normalizeWirelessSystems(context.gear_setup.wireless_systems, "wireless"),
+          iem_systems: normalizeWirelessSystems(context.gear_setup.iem_systems, "iem"),
+        });
       }
 
       const stageMapFromContext = contextStageNames.reduce<Record<number, string>>((acc, stage) => {

@@ -1,4 +1,6 @@
 
+import type { FrequencyBandSelection } from "@/lib/frequencyBands";
+
 export interface ConsoleSetup {
   model: string;
   quantity: number;
@@ -11,7 +13,8 @@ export interface WirelessSetup {
   quantity?: number; // Make quantity optional since we're using quantity_hh/quantity_bp instead
   quantity_hh?: number;
   quantity_bp?: number;
-  band?: string;
+  quantity_ch?: number;
+  band?: FrequencyBandSelection | string;
   notes?: string;
   provided_by?: 'festival' | 'band' | 'mixed';
 }

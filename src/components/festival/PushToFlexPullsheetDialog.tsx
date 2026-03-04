@@ -214,7 +214,9 @@ export function PushToFlexPullsheetDialog({
     // Add wireless models
     gearSetup.wireless_systems.forEach(w => {
       if (w.model) {
-        const qty = (w.quantity_hh || 0) + (w.quantity_bp || 0) + (w.quantity || 0);
+        const channels = w.quantity_ch || 0;
+        const tx = (w.quantity_hh || 0) + (w.quantity_bp || 0);
+        const qty = channels + tx > 0 ? channels + tx : (w.quantity || 0);
         if (qty > 0) models.push(w.model);
       }
     });
@@ -222,7 +224,9 @@ export function PushToFlexPullsheetDialog({
     // Add IEM models
     gearSetup.iem_systems.forEach(i => {
       if (i.model) {
-        const qty = (i.quantity_hh || 0) + (i.quantity_bp || 0) + (i.quantity || 0);
+        const channels = i.quantity_hh || i.quantity || 0;
+        const bodypacks = i.quantity_bp || 0;
+        const qty = channels + bodypacks;
         if (qty > 0) models.push(i.model);
       }
     });
@@ -264,6 +268,7 @@ export function PushToFlexPullsheetDialog({
         interface EquipmentItemWithModel {
           model: string;
           quantity?: number;
+          quantity_ch?: number;
           quantity_hh?: number;
           quantity_bp?: number;
         }
@@ -295,8 +300,24 @@ export function PushToFlexPullsheetDialog({
 
         processItems(gearSetup.foh_consoles, c => c.quantity, 'foh_console');
         processItems(gearSetup.mon_consoles, c => c.quantity, 'mon_console');
-        processItems(gearSetup.wireless_systems, w => (w.quantity_hh || 0) + (w.quantity_bp || 0) + (w.quantity || 0), 'wireless');
-        processItems(gearSetup.iem_systems, i => (i.quantity_hh || 0) + (i.quantity_bp || 0) + (i.quantity || 0), 'iem');
+        processItems(
+          gearSetup.wireless_systems,
+          w => {
+            const channels = w.quantity_ch || 0;
+            const tx = (w.quantity_hh || 0) + (w.quantity_bp || 0);
+            return channels + tx > 0 ? channels + tx : (w.quantity || 0);
+          },
+          'wireless'
+        );
+        processItems(
+          gearSetup.iem_systems,
+          i => {
+            const channels = i.quantity_hh || i.quantity || 0;
+            const bodypacks = i.quantity_bp || 0;
+            return channels + bodypacks;
+          },
+          'iem'
+        );
         processItems(gearSetup.wired_mics, m => m.quantity, 'wired_mics');
 
         setEquipmentLookup({ found, missing });

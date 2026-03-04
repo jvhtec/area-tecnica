@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { supabase } from '@/lib/supabase';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { formatFrequencyBand } from '@/lib/frequencyBands';
 
 export const generateStageGearPDF = async (
   jobId: string,
@@ -270,15 +271,16 @@ export const generateStageGearPDF = async (
 
         const wirelessData = setupToUse.wireless_systems.map((system: any) => [
           system.model || 'N/A',
+          system.quantity_ch?.toString() || '0',
           system.quantity_hh?.toString() || '0',
           system.quantity_bp?.toString() || '0',
-          system.band || 'N/A',
+          formatFrequencyBand(system.band) || 'N/A',
           system.notes || ''
         ]);
 
         autoTable(doc, {
           startY: yPosition,
-          head: [['Modelo', 'Cant. HH', 'Cant. BP', 'Banda', 'Notas']],
+          head: [['Modelo', 'Canales', 'Cant. HH', 'Cant. BP', 'Banda', 'Notas']],
           body: wirelessData,
           theme: 'grid',
           headStyles: { fillColor: [125, 1, 1] },
@@ -308,7 +310,7 @@ export const generateStageGearPDF = async (
           system.model || 'N/A',
           system.quantity_hh?.toString() || '0',
           system.quantity_bp?.toString() || '0',
-          system.band || 'N/A',
+          formatFrequencyBand(system.band) || 'N/A',
           system.notes || ''
         ]);
 

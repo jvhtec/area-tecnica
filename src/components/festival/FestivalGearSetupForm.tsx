@@ -18,6 +18,7 @@ import { FestivalConsoleSetupSection } from "./form/sections/FestivalConsoleSetu
 import { FestivalMicKitConfig } from "./gear-setup/FestivalMicKitConfig";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { PushToFlexPullsheetDialog } from "./PushToFlexPullsheetDialog";
+import { normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
 
 interface FestivalGearSetupFormProps {
   jobId: string;
@@ -126,8 +127,8 @@ export const FestivalGearSetupForm = ({
                 mon_consoles: stageSetupData.mon_consoles || [],
                 foh_waves_outboard: stageSetupData.foh_waves_outboard || "",
                 mon_waves_outboard: stageSetupData.mon_waves_outboard || "",
-                wireless_systems: stageSetupData.wireless_systems || [],
-                iem_systems: stageSetupData.iem_systems || [],
+                wireless_systems: normalizeWirelessSystems(stageSetupData.wireless_systems, "wireless"),
+                iem_systems: normalizeWirelessSystems(stageSetupData.iem_systems, "iem"),
                 wired_mics: stageSetupData.wired_mics || [],
                 monitors_enabled: stageSetupData.monitors_enabled || false,
                 monitors_quantity: stageSetupData.monitors_quantity || 0,
@@ -158,8 +159,8 @@ export const FestivalGearSetupForm = ({
                 mon_consoles: setupData.mon_consoles || [],
                 foh_waves_outboard: setupData.foh_waves_outboard || "",
                 mon_waves_outboard: setupData.mon_waves_outboard || "",
-                wireless_systems: setupData.wireless_systems || [],
-                iem_systems: setupData.iem_systems || [],
+                wireless_systems: normalizeWirelessSystems(setupData.wireless_systems, "wireless"),
+                iem_systems: normalizeWirelessSystems(setupData.iem_systems, "iem"),
                 wired_mics: setupData.wired_mics || [],
                 monitors_enabled: setupData.available_monitors > 0,
                 monitors_quantity: setupData.available_monitors || 0,
@@ -191,8 +192,8 @@ export const FestivalGearSetupForm = ({
               mon_consoles: setupData.mon_consoles || [],
               foh_waves_outboard: setupData.foh_waves_outboard || "",
               mon_waves_outboard: setupData.mon_waves_outboard || "",
-              wireless_systems: setupData.wireless_systems || [],
-              iem_systems: setupData.iem_systems || [],
+              wireless_systems: normalizeWirelessSystems(setupData.wireless_systems, "wireless"),
+              iem_systems: normalizeWirelessSystems(setupData.iem_systems, "iem"),
               wired_mics: setupData.wired_mics || [],
               monitors_enabled: setupData.available_monitors > 0,
               monitors_quantity: setupData.available_monitors || 0,

@@ -183,13 +183,18 @@ const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "
         const beltpacks = system.quantity_bp || 0;
         return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''} ${providerLabel}`;
       } else {
+        const channels = system.quantity_ch || 0;
         const hh = system.quantity_hh || 0;
         const bp = system.quantity_bp || 0;
         const total = hh + bp;
+        const channelPart = channels > 0 ? `${channels} ch` : '';
         if (hh > 0 && bp > 0) {
-          return `${system.model}: ${hh}x HH, ${bp}x BP ${providerLabel}`;
+          const txPart = `${hh}x HH, ${bp}x BP`;
+          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${txPart} ${providerLabel}`;
         } else if (total > 0) {
-          return `${system.model}: ${total}x ${providerLabel}`;
+          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${total}x ${providerLabel}`;
+        } else if (channels > 0) {
+          return `${system.model}: ${channels} ch ${providerLabel}`;
         }
         return `${system.model} ${providerLabel}`;
       }
@@ -202,13 +207,18 @@ const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "
         const beltpacks = system.quantity_bp || 0;
         return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
       } else {
+        const channels = system.quantity_ch || 0;
         const hh = system.quantity_hh || 0;
         const bp = system.quantity_bp || 0;
         const total = hh + bp;
+        const channelPart = channels > 0 ? `${channels} ch` : '';
         if (hh > 0 && bp > 0) {
-          return `${system.model}: ${hh}x HH, ${bp}x BP`;
+          const txPart = `${hh}x HH, ${bp}x BP`;
+          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${txPart}`;
         } else if (total > 0) {
-          return `${system.model}: ${total}x`;
+          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${total}x`;
+        } else if (channels > 0) {
+          return `${system.model}: ${channels} ch`;
         }
         return system.model;
       }
@@ -305,6 +315,7 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
   if (needs.wireless.length > 0) {
     needs.wireless.forEach(wireless => {
       const parts: string[] = [];
+      if (wireless.additionalChannels > 0) parts.push(`${wireless.additionalChannels} canales`);
       if (wireless.additionalHH > 0) parts.push(`${wireless.additionalHH} manos`);
       if (wireless.additionalBP > 0) parts.push(`${wireless.additionalBP} petacas`);
       if (parts.length > 0) {
