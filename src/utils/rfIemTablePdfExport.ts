@@ -247,10 +247,36 @@ const getRfSystemChannels = (system: RfIemSystemData): number => {
 };
 
 export const getUniqueFormattedBands = (systems: RfIemSystemData[] = []): string => {
-  return [...new Set(systems
-    .map(sys => formatFrequencyBand(sys.band))
-    .filter(Boolean)
-  )].join(', ');
+  const providers = [...new Set(systems.map((system) => toProvider(system.provided_by, 'festival')))];
+  const isMixed = providers.length > 1;
+
+  if (!isMixed) {
+    return [...new Set(systems
+      .map(sys => formatFrequencyBand(sys.band))
+      .filter(Boolean)
+    )].join(', ');
+  }
+
+  const bandsByProvider = new Map<'festival' | 'band' | 'mixed', Set<string>>();
+  for (const system of systems) {
+    const provider = toProvider(system.provided_by, 'festival');
+    if (!bandsByProvider.has(provider)) {
+      bandsByProvider.set(provider, new Set<string>());
+    }
+    const formattedBand = formatFrequencyBand(system.band);
+    if (formattedBand) {
+      bandsByProvider.get(provider)?.add(formattedBand);
+    }
+  }
+
+  return [...bandsByProvider.entries()]
+    .map(([provider, bands]) => {
+      const providerToken = provider === 'festival' ? FESTIVAL_TEXT_TOKEN : BAND_TEXT_TOKEN;
+      const providerLabel = provider === 'festival' ? 'Festival' : provider === 'band' ? 'Banda' : 'Mixto';
+      const formattedBands = [...bands].join(', ') || '-';
+      return `${providerToken}${providerLabel}: ${formattedBands}`;
+    })
+    .join('\n');
 };
 
 const aggregateByModel = (
@@ -265,32 +291,42 @@ const aggregateByModel = (
   return [...byModel.entries()].map(([model, metric]) => ({ model, metric }));
 };
 
-const formatModelWithCounts = (systems: RfIemSystemData[], isIem: boolean): string => {
-  const byModel = new Map<string, { channels: number; hh: number; bp: number }>();
+const formatModelWithCounts = (systems: RfIemSystemData[]): string => {
+  const providers = [...new Set(systems.map((system) => toProvider(system.provided_by, 'festival')))];
+  const isMixed = providers.length > 1;
+
+  if (isMixed) {
+    const byModelProvider = new Map<string, {
+      provider: 'festival' | 'band' | 'mixed';
+      model: string;
+    }>();
+
+    for (const system of systems) {
+      const model = (system.model || '').trim() || 'Modelo sin nombre';
+      const provider = toProvider(system.provided_by, 'festival');
+      const key = `${provider}::${model}`;
+      if (!byModelProvider.has(key)) {
+        byModelProvider.set(key, { provider, model });
+      }
+    }
+
+    return [...byModelProvider.values()]
+      .map((entry) => {
+        const providerToken = entry.provider === 'festival' ? FESTIVAL_TEXT_TOKEN : BAND_TEXT_TOKEN;
+        const providerLabel = entry.provider === 'festival' ? 'Festival' : entry.provider === 'band' ? 'Banda' : 'Mixto';
+        return `${providerToken}${providerLabel}: ${entry.model}`;
+      })
+      .join('\n');
+  }
+
+  const modelNames = new Set<string>();
 
   for (const system of systems) {
     const model = (system.model || '').trim() || 'Modelo sin nombre';
-    if (!byModel.has(model)) {
-      byModel.set(model, { channels: 0, hh: 0, bp: 0 });
-    }
-    const current = byModel.get(model)!;
-    if (isIem) {
-      current.channels += system.quantity_hh || system.quantity || 0;
-      current.bp += system.quantity_bp || 0;
-    } else {
-      current.channels += getRfSystemChannels(system);
-      current.hh += system.quantity_hh || 0;
-      current.bp += system.quantity_bp || 0;
-    }
+    modelNames.add(model);
   }
 
-  return [...byModel.entries()]
-    .map(([model, values]) =>
-      isIem
-        ? `${model} (${values.channels}ch, ${values.bp}bp)`
-        : `${model} (${values.channels}ch, ${values.hh}hh, ${values.bp}bp)`,
-    )
-    .join(', ');
+  return [...modelNames].join(', ');
 };
 
 const formatMetricBreakdown = (
@@ -306,6 +342,92 @@ const formatMetricBreakdown = (
   return `${values.join('+')} (${total})`;
 };
 
+const formatMetricBreakdownByProvider = (
+  systems: RfIemSystemData[],
+  getMetric: (system: RfIemSystemData) => number,
+): string | number => {
+  const formatBandLabelForMetric = (band: FrequencyBandSelection | string | undefined): string => {
+    if (!band) return '-';
+    if (typeof band === 'string') {
+      const match = band.trim().match(/^([A-Za-z0-9-]+)/);
+      return match ? match[1] : band.trim();
+    }
+    if (typeof band.code === 'string' && band.code.trim().length > 0) {
+      return band.code.trim();
+    }
+    const formatted = formatFrequencyBand(band);
+    const match = formatted.match(/^([A-Za-z0-9-]+)/);
+    return match ? match[1] : formatted;
+  };
+
+  const buildProviderMetricParts = (
+    totals: Map<'festival' | 'band' | 'mixed', number>,
+  ): { text: string; total: number } => {
+    const orderedProviders: Array<'festival' | 'band' | 'mixed'> = ['festival', 'band', 'mixed'];
+    const parts: string[] = [];
+    let total = 0;
+    for (const provider of orderedProviders) {
+      const value = totals.get(provider);
+      if (!value || value <= 0) continue;
+      total += value;
+      const suffix = provider === 'festival' ? 'F' : provider === 'band' ? 'B' : 'M';
+      const token = provider === 'festival' ? FESTIVAL_TEXT_TOKEN : BAND_TEXT_TOKEN;
+      parts.push(`${token}${value}${suffix}`);
+    }
+    return { text: parts.join('+'), total };
+  };
+
+  const uniqueBandLabels = [...new Set(systems
+    .map((system) => formatBandLabelForMetric(system.band))
+    .filter((band) => band && band !== '-'))];
+
+  if (uniqueBandLabels.length > 1) {
+    const byBand = new Map<string, Map<'festival' | 'band' | 'mixed', number>>();
+    for (const system of systems) {
+      const metric = getMetric(system);
+      if (!metric || metric <= 0) continue;
+      const bandLabel = formatBandLabelForMetric(system.band);
+      const provider = toProvider(system.provided_by, 'festival');
+      if (!byBand.has(bandLabel)) {
+        byBand.set(bandLabel, new Map());
+      }
+      const providerTotalsForBand = byBand.get(bandLabel)!;
+      providerTotalsForBand.set(provider, (providerTotalsForBand.get(provider) || 0) + metric);
+    }
+
+    const lines: string[] = [];
+    let grandTotal = 0;
+    for (const [bandLabel, providerTotalsForBand] of byBand.entries()) {
+      const { text, total } = buildProviderMetricParts(providerTotalsForBand);
+      if (!text) continue;
+      grandTotal += total;
+      lines.push(`${bandLabel}: ${text}`);
+    }
+
+    if (lines.length === 0) return 0;
+    lines.push(`(${grandTotal})`);
+    return lines.join('\n');
+  }
+
+  const providerTotals = new Map<'festival' | 'band' | 'mixed', number>();
+
+  for (const system of systems) {
+    const provider = toProvider(system.provided_by, 'festival');
+    const metric = getMetric(system);
+    providerTotals.set(provider, (providerTotals.get(provider) || 0) + metric);
+  }
+
+  if (providerTotals.size <= 1) {
+    return formatMetricBreakdown(systems, getMetric);
+  }
+
+  const { text, total } = buildProviderMetricParts(providerTotals);
+  if (!text) return 0;
+  const plainText = stripProviderTextTokens(text);
+  if (!plainText.includes('+')) return total;
+  return `${text} (${total})`;
+};
+
 const getProviderCellColor = (provider: string): [number, number, number] => {
   const normalized = provider.toLowerCase();
   if (normalized === 'festival') {
@@ -315,6 +437,56 @@ const getProviderCellColor = (provider: string): [number, number, number] => {
     return [255, 226, 204];
   }
   return [232, 232, 232];
+};
+
+const FESTIVAL_TEXT_TOKEN = '__FESTIVAL_ITEM__';
+const BAND_TEXT_TOKEN = '__BAND_ITEM__';
+
+const hasProviderTextToken = (value: string): boolean =>
+  value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN);
+
+const stripProviderTextTokens = (value: string): string =>
+  value.replaceAll(FESTIVAL_TEXT_TOKEN, '').replaceAll(BAND_TEXT_TOKEN, '');
+
+const getProviderTokenType = (line: string): 'festival' | 'band' | 'default' => {
+  if (line.includes(FESTIVAL_TEXT_TOKEN)) return 'festival';
+  if (line.includes(BAND_TEXT_TOKEN)) return 'band';
+  return 'default';
+};
+
+const splitTokenizedSegments = (
+  value: string,
+): Array<{ text: string; provider: 'festival' | 'band' | 'default' }> => {
+  const segments: Array<{ text: string; provider: 'festival' | 'band' | 'default' }> = [];
+  const tokenPattern = /(__FESTIVAL_ITEM__|__BAND_ITEM__)/g;
+  let activeProvider: 'festival' | 'band' | 'default' = 'default';
+  let lastIndex = 0;
+
+  for (const match of value.matchAll(tokenPattern)) {
+    const token = match[0];
+    const startIndex = match.index ?? 0;
+    const textBeforeToken = value.slice(lastIndex, startIndex);
+    if (textBeforeToken) {
+      segments.push({ text: textBeforeToken, provider: activeProvider });
+    }
+
+    activeProvider = token === FESTIVAL_TEXT_TOKEN ? 'festival' : 'band';
+    lastIndex = startIndex + token.length;
+  }
+
+  const trailingText = value.slice(lastIndex);
+  if (trailingText) {
+    segments.push({ text: trailingText, provider: activeProvider });
+  }
+
+  return segments.filter((segment) => segment.text.length > 0);
+};
+
+const isMixedMetricValue = (value: string): boolean =>
+  hasProviderTextToken(value) || /^\d+[FB](?:\+\d+[FB])+ \(\d+\)$/.test(value.trim());
+
+const splitMixedMetricSegments = (value: string): Array<{ text: string; provider: 'festival' | 'band' | 'default' }> => {
+  return splitTokenizedSegments(value);
 };
 
 const getStageCellColor = (stageLabel: string): [number, number, number] => {
@@ -343,14 +515,14 @@ const formatTimeRange = (start?: string, end?: string): string => {
 };
 
 export const buildRfIemTableRow = (artist: ArtistRfIemData): Array<string | number> => {
-  const totalRfChannels = formatMetricBreakdown(artist.wirelessSystems, getRfSystemChannels);
-  const totalRfHH = formatMetricBreakdown(artist.wirelessSystems, (sys) => sys.quantity_hh || 0);
-  const totalRfBP = formatMetricBreakdown(artist.wirelessSystems, (sys) => sys.quantity_bp || 0);
-  const totalIemChannels = formatMetricBreakdown(artist.iemSystems, (sys) => sys.quantity_hh || sys.quantity || 0);
-  const totalIemBodpacks = formatMetricBreakdown(artist.iemSystems, (sys) => sys.quantity_bp || 0);
-  const rfModels = formatModelWithCounts(artist.wirelessSystems, false);
+  const totalRfChannels = formatMetricBreakdownByProvider(artist.wirelessSystems, getRfSystemChannels);
+  const totalRfHH = formatMetricBreakdownByProvider(artist.wirelessSystems, (sys) => sys.quantity_hh || 0);
+  const totalRfBP = formatMetricBreakdownByProvider(artist.wirelessSystems, (sys) => sys.quantity_bp || 0);
+  const totalIemChannels = formatMetricBreakdownByProvider(artist.iemSystems, (sys) => sys.quantity_hh || sys.quantity || 0);
+  const totalIemBodpacks = formatMetricBreakdownByProvider(artist.iemSystems, (sys) => sys.quantity_bp || 0);
+  const rfModels = formatModelWithCounts(artist.wirelessSystems);
   const rfBands = getUniqueFormattedBands(artist.wirelessSystems);
-  const iemModels = formatModelWithCounts(artist.iemSystems, true);
+  const iemModels = formatModelWithCounts(artist.iemSystems);
   const iemBands = getUniqueFormattedBands(artist.iemSystems);
   const rfProvidedBy = getProviderSummary(artist.wirelessSystems);
   const iemProvidedBy = getProviderSummary(artist.iemSystems);
@@ -384,40 +556,60 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
 
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const horizontalMargin = 10;
+  const leftMargin = 10;
+  const rightMargin = leftMargin;
+  const tableStartY = 30;
   const footerBandHeight = 22;
 
   let headerLogoObjectUrl: string | undefined;
+  let headerLogoFormat: 'PNG' | 'JPEG' = 'PNG';
+  let headerLogoDimensions: { width: number; height: number } | undefined;
   if (data.logoUrl) {
     try {
       const response = await fetch(data.logoUrl);
       const logoBlob = await response.blob();
       headerLogoObjectUrl = URL.createObjectURL(logoBlob);
+      headerLogoFormat = logoBlob.type.toLowerCase().includes('png') ? 'PNG' : 'JPEG';
+
+      headerLogoDimensions = await new Promise<{ width: number; height: number } | undefined>((resolve) => {
+        const image = new Image();
+        image.onload = () => {
+          resolve({ width: image.width, height: image.height });
+        };
+        image.onerror = () => resolve(undefined);
+        image.src = headerLogoObjectUrl as string;
+      });
     } catch (err) {
       console.error('Error loading logo:', err);
     }
   }
 
   const drawPageHeader = (festivalDayLabel: string): void => {
-    if (headerLogoObjectUrl) {
+    if (headerLogoObjectUrl && headerLogoDimensions && headerLogoDimensions.width > 0 && headerLogoDimensions.height > 0) {
       const maxLogoWidth = 40;
       const maxLogoHeight = 15;
+      const scale = Math.min(
+        maxLogoWidth / headerLogoDimensions.width,
+        maxLogoHeight / headerLogoDimensions.height,
+      );
+      const drawWidth = headerLogoDimensions.width * scale;
+      const drawHeight = headerLogoDimensions.height * scale;
       pdf.addImage(
         headerLogoObjectUrl,
-        'PNG',
-        pageWidth - maxLogoWidth - horizontalMargin,
+        headerLogoFormat,
+        pageWidth - drawWidth - rightMargin,
         10,
-        maxLogoWidth,
-        maxLogoHeight
+        drawWidth,
+        drawHeight
       );
     }
 
     pdf.setTextColor(0);
     pdf.setFontSize(18);
-    pdf.text(`${data.jobTitle} - Resumen RF e IEM`, horizontalMargin, 18);
+    pdf.text(`${data.jobTitle} - Resumen RF e IEM`, leftMargin, 18);
     pdf.setFontSize(11);
     pdf.setTextColor(80);
-    pdf.text(`Día festival: ${festivalDayLabel}`, horizontalMargin, 25);
+    pdf.text(`Día festival: ${festivalDayLabel}`, leftMargin, 25);
   };
 
   const normalizedArtists = (data.artists || []).map((artist) => normalizeRfIemArtistInput(artist as RawArtistLike));
@@ -433,22 +625,23 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
     throw new Error('No hay datos RF/IEM para los escenarios seleccionados.');
   }
 
-  const availableWidth = pageWidth - (horizontalMargin * 2);
-  const ratios = [0.11, 0.05, 0.095, 0.07, 0.10, 0.08, 0.045, 0.035, 0.035, 0.07, 0.10, 0.08, 0.045, 0.04];
+  const availableWidth = pageWidth - leftMargin - rightMargin;
+  const ratios = [0.10, 0.05, 0.09, 0.06, 0.095, 0.075, 0.05, 0.04, 0.04, 0.06, 0.095, 0.075, 0.06, 0.06];
+  const ratioSum = ratios.reduce((sum, ratio) => sum + ratio, 0) || 1;
   const columnStyles = ratios.reduce((acc, ratio, index) => {
-    acc[index] = { cellWidth: availableWidth * ratio };
+    acc[index] = { cellWidth: availableWidth * (ratio / ratioSum) };
     return acc;
   }, {} as Record<number, { cellWidth: number }>);
 
   for (let index = 0; index < dayGroups.length; index += 1) {
     const group = dayGroups[index];
     const tableData = group.artists.map(buildRfIemTableRow);
+    const tokenizedCellText = new Map<string, string>();
+    const mixedMetricText = new Map<string, string>();
 
     if (index > 0) {
       pdf.addPage('a4', 'landscape');
     }
-
-    drawPageHeader(group.label);
 
     autoTable(pdf, {
       head: [[
@@ -468,10 +661,11 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
         'BP IEM'
       ]],
       body: tableData,
-      startY: 30,
+      startY: tableStartY,
       margin: {
-        left: horizontalMargin,
-        right: horizontalMargin,
+        left: leftMargin,
+        right: rightMargin,
+        top: tableStartY,
         bottom: footerBandHeight,
       },
       headStyles: {
@@ -492,6 +686,9 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
       },
       rowPageBreak: 'avoid',
       columnStyles,
+      didDrawPage: () => {
+        drawPageHeader(group.label);
+      },
       didParseCell: (cellData) => {
         if (cellData.section !== 'body') return;
         const rowValues = tableData[cellData.row.index];
@@ -518,6 +715,132 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
           cellData.cell.styles.fillColor = iemColor;
           cellData.cell.styles.textColor = [35, 35, 35];
         }
+
+        const cellText = Array.isArray(cellData.cell.text)
+          ? cellData.cell.text.join('\n')
+          : String(cellData.cell.text || '');
+        const isMixedDetailColumn = (
+          cellData.column.index === 4 ||
+          cellData.column.index === 5 ||
+          cellData.column.index === 10 ||
+          cellData.column.index === 11
+        );
+        if (isMixedDetailColumn && hasProviderTextToken(cellText)) {
+          tokenizedCellText.set(`${cellData.row.index}-${cellData.column.index}`, cellText);
+          const visibleText = stripProviderTextTokens(cellText);
+          cellData.cell.text = visibleText.split('\n');
+          const fillColor = cellData.cell.styles.fillColor;
+          if (Array.isArray(fillColor)) {
+            cellData.cell.styles.textColor = [fillColor[0], fillColor[1], fillColor[2]];
+          }
+        }
+
+        const isMetricColumn = (
+          cellData.column.index === 6 ||
+          cellData.column.index === 7 ||
+          cellData.column.index === 8 ||
+          cellData.column.index === 12 ||
+          cellData.column.index === 13
+        );
+        if (isMetricColumn && isMixedMetricValue(cellText)) {
+          mixedMetricText.set(`${cellData.row.index}-${cellData.column.index}`, cellText);
+          const fillColor = cellData.cell.styles.fillColor;
+          cellData.cell.text = [''];
+          if (Array.isArray(fillColor)) {
+            cellData.cell.styles.textColor = [fillColor[0], fillColor[1], fillColor[2]];
+          }
+        }
+      },
+      didDrawCell: (cellData) => {
+        if (cellData.section !== 'body') return;
+        const key = `${cellData.row.index}-${cellData.column.index}`;
+        const metricText = mixedMetricText.get(key);
+        if (metricText) {
+          const docInstance = (cellData as any).doc;
+          const cellPadding = typeof cellData.cell.styles.cellPadding === 'number'
+            ? cellData.cell.styles.cellPadding
+            : 2;
+          const maxTextWidth = Math.max(0, cellData.cell.width - (cellPadding * 2));
+          const maxTextHeight = Math.max(0, cellData.cell.height - (cellPadding * 2));
+          const minFontSize = 7;
+          let fontSize = Number(cellData.cell.styles.fontSize || 9);
+          const lines = metricText
+            .split('\n')
+            .map((line) => line.trim())
+            .filter(Boolean);
+
+          if (lines.length === 0) return;
+
+          const lineSegments = lines.map((line) => splitMixedMetricSegments(line));
+          const computeLineWidth = (segments: Array<{ text: string; provider: 'festival' | 'band' | 'default' }>): number =>
+            segments.reduce((sum, segment) => sum + docInstance.getTextWidth(segment.text), 0);
+
+          while (fontSize > minFontSize) {
+            docInstance.setFontSize(fontSize);
+            const tooWide = lineSegments.some((segments) => computeLineWidth(segments) > maxTextWidth);
+            const lineHeight = fontSize * 0.5;
+            const tooTall = (lineHeight * lineSegments.length) > maxTextHeight;
+            if (!tooWide && !tooTall) break;
+            fontSize -= 0.3;
+          }
+
+          docInstance.setFontSize(fontSize);
+          const lineHeight = fontSize * 0.5;
+          const firstBaselineY = cellData.cell.y + cellPadding + (fontSize * 0.35);
+
+          lineSegments.forEach((segments, lineIndex) => {
+            const startX = cellData.cell.x + cellPadding;
+            const baselineY = firstBaselineY + (lineIndex * lineHeight);
+            let cursorX = startX;
+
+            for (const segment of segments) {
+              if (segment.provider === 'festival') {
+                docInstance.setTextColor(72, 105, 136);
+              } else {
+                docInstance.setTextColor(35, 35, 35);
+              }
+              docInstance.text(segment.text, cursorX, baselineY);
+              cursorX += docInstance.getTextWidth(segment.text);
+            }
+          });
+          return;
+        }
+
+        const tokenizedText = tokenizedCellText.get(key);
+        if (!tokenizedText) return;
+
+        const docInstance = (cellData as any).doc;
+        const cellPadding = typeof cellData.cell.styles.cellPadding === 'number'
+          ? cellData.cell.styles.cellPadding
+          : 2;
+        const textX = cellData.cell.x + cellPadding;
+        const maxTextWidth = Math.max(0, cellData.cell.width - (cellPadding * 2));
+        const wrappedWithProvider: Array<{ providerType: 'festival' | 'band' | 'default'; text: string }> = [];
+        for (const rawLine of tokenizedText.split('\n')) {
+          const providerType = getProviderTokenType(rawLine);
+          const visibleLine = stripProviderTextTokens(rawLine);
+          const wrappedLines: string[] = docInstance.splitTextToSize(visibleLine, maxTextWidth);
+          for (const wrappedLine of wrappedLines) {
+            wrappedWithProvider.push({ providerType, text: wrappedLine });
+          }
+        }
+
+        if (wrappedWithProvider.length === 0) return;
+        const usableHeight = Math.max(2, cellData.cell.height - (cellPadding * 2));
+        const lineStep = usableHeight / wrappedWithProvider.length;
+        let textY = cellData.cell.y + cellPadding + (lineStep * 0.8);
+        const cellBottomLimit = cellData.cell.y + cellData.cell.height - 1;
+
+        for (const line of wrappedWithProvider) {
+          if (textY > cellBottomLimit) break;
+          if (line.providerType === 'festival') {
+            docInstance.setTextColor(72, 105, 136);
+          } else {
+            docInstance.setTextColor(35, 35, 35);
+          }
+          docInstance.text(line.text, textX, textY);
+          textY += lineStep;
+        }
       },
     });
   }
@@ -533,8 +856,8 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
         pdf.setTextColor(100);
 
         const date = new Date().toLocaleDateString('es-ES');
-        pdf.text(`Generado: ${date}`, horizontalMargin, pageHeight - 8);
-        pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - horizontalMargin - 5, pageHeight - 8, { align: 'right' });
+        pdf.text(`Generado: ${date}`, leftMargin, pageHeight - 8);
+        pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
       }
 
       const logo = new Image();

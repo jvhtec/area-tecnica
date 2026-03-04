@@ -19,10 +19,13 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
       const createdDate = format(new Date(), 'dd/MM/yyyy');
+      const leftMargin = 10;
+      const rightMargin = 10;
+      const tableTopMargin = 25;
+      const footerReserve = 24;
 
-      // Header with correct corporate red color (125, 1, 1)
-      doc.setFillColor(125, 1, 1);  // Corporate red
-      doc.rect(0, 0, pageWidth, 20, 'F');
+      let headerLogoImg: HTMLImageElement | null = null;
+      let headerLogoFormat: 'PNG' | 'JPEG' = 'JPEG';
 
       // Logo loading promise
       const loadLogoPromise = data.logoUrl 
@@ -33,21 +36,8 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
             img.onload = () => {
               try {
                 console.log("Logo loaded successfully, dimensions:", img.width, "x", img.height);
-                // Calculate logo dimensions (max height 18px in header)
-                const maxHeight = 18;
-                const ratio = img.width / img.height;
-                const logoHeight = Math.min(maxHeight, img.height);
-                const logoWidth = logoHeight * ratio;
-                
-                // Add logo to top left corner
-                doc.addImage(
-                  img, 
-                  'JPEG', 
-                  5, // X position (left margin)
-                  1, // Y position (top margin)
-                  logoWidth,
-                  logoHeight
-                );
+                headerLogoImg = img;
+                headerLogoFormat = (data.logoUrl || '').toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
                 resolveLogoLoad();
               } catch (err) {
                 console.error('Error adding logo to PDF:', err);
@@ -63,11 +53,34 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
         : Promise.resolve();
 
       loadLogoPromise.then(() => {
+        const drawRunningHeader = () => {
+          doc.setFillColor(125, 1, 1);  // Corporate red
+          doc.rect(0, 0, pageWidth, 20, 'F');
+
+          if (headerLogoImg && headerLogoImg.width > 0 && headerLogoImg.height > 0) {
+            const maxLogoWidth = 40;
+            const maxLogoHeight = 18;
+            const scale = Math.min(maxLogoWidth / headerLogoImg.width, maxLogoHeight / headerLogoImg.height);
+            const drawWidth = headerLogoImg.width * scale;
+            const drawHeight = headerLogoImg.height * scale;
+            doc.addImage(
+              headerLogoImg,
+              headerLogoFormat,
+              pageWidth - drawWidth - rightMargin,
+              1,
+              drawWidth,
+              drawHeight,
+            );
+          }
+
+          doc.setFontSize(14);
+          doc.setTextColor(255, 255, 255);  // White
+          doc.text(`${data.jobTitle} - Turnos de Personal`, pageWidth / 2, 12, { align: 'center' });
+          doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
+        };
+
         // Continue with PDF generation
-        doc.setFontSize(14);
-        doc.setTextColor(255, 255, 255);  // White
-        doc.text(`${data.jobTitle} - Turnos de Personal`, pageWidth / 2, 12, { align: 'center' });
-        doc.text(format(new Date(data.date), 'dd/MM/yyyy'), pageWidth / 2, 18, { align: 'center' });
+        drawRunningHeader();
 
         // Group shifts by department
         const departmentShifts: { [key: string]: ShiftWithAssignments[] } = {};
@@ -148,6 +161,11 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
               halign: 'left',
               cellPadding: 4
             },
+            margin: { left: leftMargin, right: rightMargin, top: tableTopMargin, bottom: footerReserve },
+            rowPageBreak: 'avoid',
+            didDrawPage: () => {
+              drawRunningHeader();
+            },
             columnStyles: {
               0: { cellWidth: 40 },
               1: { cellWidth: 30 },
@@ -165,59 +183,42 @@ export const exportShiftsTablePDF = async (data: ShiftsTablePdfData): Promise<Bl
           }
         }
 
-        // Add footer with date and try to add sector pro logo
-        doc.setFontSize(8);
-        doc.setTextColor(51, 51, 51);
-        doc.text(`Generado: ${createdDate}`, pageWidth - 10, pageHeight - 10, { align: 'right' });
-        
-        // Try to add Sector Pro logo at the bottom center
-        try {
-          // Logo at bottom center
-          const sectorLogoPath = '/sector pro logo.png';
-          console.log("Attempting to add Sector Pro logo from:", sectorLogoPath);
-          
-          const sectorImg = new Image();
-          sectorImg.onload = () => {
-            try {
-              const logoWidth = 30;
-              const ratio = sectorImg.width / sectorImg.height;
-              const logoHeight = logoWidth / ratio;
-              
-              doc.addImage(
-                sectorImg, 
-                'PNG', 
-                pageWidth/2 - logoWidth/2, // Center horizontally 
-                pageHeight - logoHeight - 10, // Position at the bottom
-                logoWidth,
-                logoHeight
-              );
-              
-              // Now resolve with the final PDF
-              const blob = doc.output('blob');
-              console.log(`Shifts PDF generated successfully, blob size: ${blob.size}`);
-              resolve(blob);
-            } catch (err) {
-              console.error("Error adding Sector Pro logo to PDF:", err);
-              // If logo fails, just return the PDF without it
-              const blob = doc.output('blob');
-              resolve(blob);
+        const applyFooterAndResolve = (sectorImg?: HTMLImageElement) => {
+          const totalPages = doc.getNumberOfPages();
+          for (let i = 1; i <= totalPages; i += 1) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(51, 51, 51);
+            doc.text(`Generado: ${createdDate}`, leftMargin, pageHeight - 10);
+            doc.text(`Pagina ${i} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 10, { align: 'right' });
+
+            if (sectorImg && sectorImg.width > 0 && sectorImg.height > 0) {
+              try {
+                const logoWidth = 30;
+                const logoHeight = logoWidth * (sectorImg.height / sectorImg.width);
+                doc.addImage(
+                  sectorImg,
+                  'PNG',
+                  pageWidth / 2 - logoWidth / 2,
+                  pageHeight - logoHeight - 10,
+                  logoWidth,
+                  logoHeight,
+                );
+              } catch (err) {
+                console.error('Error adding Sector Pro logo to shifts footer:', err);
+              }
             }
-          };
-          
-          sectorImg.onerror = (err) => {
-            console.error("Could not load Sector Pro logo:", err);
-            // If logo loading fails, just return the PDF without it
-            const blob = doc.output('blob');
-            resolve(blob);
-          };
-          
-          sectorImg.src = sectorLogoPath;
-        } catch (logoErr) {
-          console.error("Exception trying to add Sector Pro logo:", logoErr);
-          // Return PDF without the logo
+          }
+
           const blob = doc.output('blob');
+          console.log(`Shifts PDF generated successfully, blob size: ${blob.size}`);
           resolve(blob);
-        }
+        };
+
+        const sectorImg = new Image();
+        sectorImg.onload = () => applyFooterAndResolve(sectorImg);
+        sectorImg.onerror = () => applyFooterAndResolve();
+        sectorImg.src = '/sector pro logo.png';
       }).catch(err => {
         console.error("Error in PDF generation:", err);
         reject(err);

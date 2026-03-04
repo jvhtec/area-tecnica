@@ -176,12 +176,13 @@ const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "
     // Show individual system providers when mixed
     return systems.map(system => {
       const provider = system.provided_by || "festival";
-      const providerLabel = provider === "festival" ? "(F)" : "(B)";
+      const providerLabel = provider === "festival" ? "Festival" : "Banda";
+      const providerToken = provider === "festival" ? FESTIVAL_TEXT_TOKEN : BAND_TEXT_TOKEN;
       
       if (isIEM) {
         const channels = system.quantity_hh || system.quantity || 0;
         const beltpacks = system.quantity_bp || 0;
-        return `${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''} ${providerLabel}`;
+        return `${providerToken}${providerLabel}: ${system.model}: ${channels} ch${beltpacks > 0 ? `, ${beltpacks} bp` : ''}`;
       } else {
         const channels = system.quantity_ch || 0;
         const hh = system.quantity_hh || 0;
@@ -190,15 +191,15 @@ const formatWirelessSystemsForPdf = (systems: any[] = [], providedBy: string = "
         const channelPart = channels > 0 ? `${channels} ch` : '';
         if (hh > 0 && bp > 0) {
           const txPart = `${hh}x HH, ${bp}x BP`;
-          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${txPart} ${providerLabel}`;
+          return `${providerToken}${providerLabel}: ${system.model}: ${channelPart ? `${channelPart}, ` : ''}${txPart}`;
         } else if (total > 0) {
-          return `${system.model}: ${channelPart ? `${channelPart}, ` : ''}${total}x ${providerLabel}`;
+          return `${providerToken}${providerLabel}: ${system.model}: ${channelPart ? `${channelPart}, ` : ''}${total}x`;
         } else if (channels > 0) {
-          return `${system.model}: ${channels} ch ${providerLabel}`;
+          return `${providerToken}${providerLabel}: ${system.model}: ${channels} ch`;
         }
-        return `${system.model} ${providerLabel}`;
+        return `${providerToken}${providerLabel}: ${system.model}`;
       }
-    }).join("; ");
+    }).join("\n");
   } else {
     // Original formatting for single provider
     return systems.map(system => {
@@ -270,7 +271,63 @@ const formatGearMismatchesForPdf = (mismatches: GearMismatch[] = []) => {
   return parts.join(', ');
 };
 
-const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: number): number => {
+const normalizeProviderToken = (value: string | undefined): 'festival' | 'band' | 'mixed' => {
+  const normalized = (value || '').toLowerCase().trim();
+  if (normalized === 'festival') return 'festival';
+  if (normalized === 'banda' || normalized === 'band') return 'band';
+  if (normalized === 'mixto' || normalized === 'mixed') return 'mixed';
+  return 'festival';
+};
+
+const summarizeProvider = (values: Array<string | undefined>): 'festival' | 'band' | 'mixed' => {
+  const unique = new Set(values.map(normalizeProviderToken));
+  if (unique.size === 1) {
+    return unique.values().next().value || 'festival';
+  }
+  return 'mixed';
+};
+
+const getProviderCellColor = (provider: 'festival' | 'band' | 'mixed'): [number, number, number] => {
+  if (provider === 'festival') return [214, 232, 255];
+  if (provider === 'band') return [255, 226, 204];
+  return [232, 232, 232];
+};
+
+const FESTIVAL_TEXT_TOKEN = '__FESTIVAL_ITEM__';
+const BAND_TEXT_TOKEN = '__BAND_ITEM__';
+
+const hasProviderTextToken = (value: string): boolean =>
+  value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN);
+
+const stripProviderTextTokens = (value: string): string =>
+  value.replaceAll(FESTIVAL_TEXT_TOKEN, '').replaceAll(BAND_TEXT_TOKEN, '');
+
+const getProviderTokenType = (line: string): 'festival' | 'band' | 'default' => {
+  if (line.includes(FESTIVAL_TEXT_TOKEN)) return 'festival';
+  if (line.includes(BAND_TEXT_TOKEN)) return 'band';
+  return 'default';
+};
+
+const getStageCellColor = (stageNumber: number): [number, number, number] => {
+  const palette: Array<[number, number, number]> = [
+    [238, 244, 252],
+    [242, 250, 238],
+    [252, 245, 236],
+    [245, 240, 252],
+    [239, 250, 250],
+  ];
+  if (!Number.isFinite(stageNumber) || stageNumber <= 0) {
+    return [245, 245, 245];
+  }
+  return palette[(stageNumber - 1) % palette.length];
+};
+
+const formatEquipmentNeedsForPdf = (
+  needs: EquipmentNeeds,
+  doc: jsPDF,
+  startY: number,
+  onAddPage?: () => void,
+): number => {
   let currentY = startY;
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
@@ -279,7 +336,8 @@ const formatEquipmentNeedsForPdf = (needs: EquipmentNeeds, doc: jsPDF, startY: n
   const checkPageBreak = (requiredSpace: number) => {
     if (currentY + requiredSpace > pageHeight - 20) {
       doc.addPage();
-      currentY = 20;
+      onAddPage?.();
+      currentY = 40;
     }
   };
 
@@ -482,64 +540,72 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   const pageWidth = doc.internal.pageSize.width;
   const pageHeight = doc.internal.pageSize.height;
   const createdDate = new Date().toLocaleDateString('es-ES');
+  const leftMargin = 10;
+  const rightMargin = 10;
+  const headerBottomY = 40;
+  const footerReserve = 24;
 
-  // === HEADER SECTION ===
-  doc.setFillColor(125, 1, 1);
-  doc.rect(0, 0, pageWidth, 30, 'F');
+  const stageText = data.stage && data.stage !== 'all'
+    ? ` - ${data.stageNames?.[parseInt(data.stage)] || `Escenario ${data.stage}`}`
+    : '';
+  const titleText = `${data.jobTitle} - Tabla de Artistas${stageText}`;
+  const dateText = new Date(data.date).toLocaleDateString('es-ES');
 
-  // Load festival logo if provided
-  let festivalLogoLoaded = false;
+  let headerLogoImage: HTMLImageElement | null = null;
+  let headerLogoFormat: 'PNG' | 'JPEG' = 'PNG';
   if (data.logoUrl) {
     console.log("Attempting to load festival logo:", data.logoUrl);
-    
-    const festivalImg = await loadImageSafely(data.logoUrl, 'festival logo');
-    if (festivalImg) {
-      try {
-        console.log("Festival logo loaded, dimensions:", festivalImg.width, "x", festivalImg.height);
-        const maxHeight = 18;
-        const ratio = festivalImg.width / festivalImg.height;
-        const logoHeight = Math.min(maxHeight, festivalImg.height);
-        const logoWidth = logoHeight * ratio;
-        
-        doc.addImage(festivalImg, 'JPEG', 5, 5, logoWidth, logoHeight);
-        festivalLogoLoaded = true;
-        console.log("Festival logo added successfully to PDF");
-      } catch (error) {
-        console.error('Error adding festival logo to PDF:', error);
-      }
+    headerLogoImage = await loadImageSafely(data.logoUrl, 'festival logo');
+    if (headerLogoImage) {
+      headerLogoFormat = data.logoUrl.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
     }
   }
 
-  // If festival logo failed, try fallback logo
-  if (!festivalLogoLoaded) {
+  if (!headerLogoImage) {
     console.log("Trying fallback logo");
-    const fallbackImg = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'fallback logo');
-    if (fallbackImg) {
-      try {
-        const maxHeight = 18;
-        const ratio = fallbackImg.width / fallbackImg.height;
-        const logoHeight = Math.min(maxHeight, fallbackImg.height);
-        const logoWidth = logoHeight * ratio;
-        
-        doc.addImage(fallbackImg, 'PNG', 5, 5, logoWidth, logoHeight);
-        console.log("Fallback logo added successfully");
-      } catch (error) {
-        console.error('Error adding fallback logo to PDF:', error);
-      }
+    headerLogoImage = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'fallback logo');
+    if (headerLogoImage) {
+      headerLogoFormat = 'PNG';
     }
   }
 
-  // Add title
-  doc.setFontSize(18);
-  doc.setTextColor(255, 255, 255);
-  const titleText = `${data.jobTitle} - Tabla de Artistas`;
-  const stageText = data.stage && data.stage !== 'all' ? ` - ${data.stageNames?.[parseInt(data.stage)] || `Escenario ${data.stage}`}` : '';
-  doc.text(`${titleText}${stageText}`, pageWidth / 2, 15, { align: 'center' });
-  
-  doc.setFontSize(12);
-  doc.text(new Date(data.date).toLocaleDateString('es-ES'), pageWidth / 2, 25, { align: 'center' });
+  const drawPageHeader = (): void => {
+    doc.setFillColor(125, 1, 1);
+    doc.rect(0, 0, pageWidth, 30, 'F');
+
+    if (headerLogoImage && headerLogoImage.width > 0 && headerLogoImage.height > 0) {
+      const maxLogoWidth = 40;
+      const maxLogoHeight = 18;
+      const scale = Math.min(maxLogoWidth / headerLogoImage.width, maxLogoHeight / headerLogoImage.height);
+      const drawWidth = headerLogoImage.width * scale;
+      const drawHeight = headerLogoImage.height * scale;
+      doc.addImage(
+        headerLogoImage,
+        headerLogoFormat,
+        pageWidth - drawWidth - rightMargin,
+        6,
+        drawWidth,
+        drawHeight,
+      );
+    }
+
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.text(titleText, pageWidth / 2, 15, { align: 'center' });
+    doc.setFontSize(12);
+    doc.text(dateText, pageWidth / 2, 25, { align: 'center' });
+  };
+
+  drawPageHeader();
 
   // === ARTIST TABLE ===
+  const rowColorMeta: Array<{
+    stage: number;
+    consolesProvider: 'festival' | 'band' | 'mixed';
+    rfIemProvider: 'festival' | 'band' | 'mixed';
+    micProvider: 'festival' | 'band' | 'mixed';
+  }> = [];
+
   const tableData = data.artists.map(artist => {
     console.log(`Processing artist: ${artist.name}`, {
       infrastructure: artist.infrastructure,
@@ -553,12 +619,28 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     // Format microphones column with enhanced mixed provider support
     let microphonesDisplay = '';
     if (artist.micKit === 'mixed') {
-      microphonesDisplay = `Kit: Mixto\nFestival: ${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
+      microphonesDisplay = `Kit: Mixto\n${FESTIVAL_TEXT_TOKEN}Festival: ${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
     } else if (artist.micKit === 'festival') {
       microphonesDisplay = `Kit: Festival\n${formatWiredMicsForPdf(artist.wiredMics, artist.micKit)}`;
     } else {
       microphonesDisplay = `Kit: Banda\nBanda provee`;
     }
+
+    const rfIemProvider = summarizeProvider([
+      artist.technical.wireless.providedBy,
+      artist.technical.iem.providedBy,
+    ]);
+    const consolesProvider = summarizeProvider([
+      artist.technical.fohConsole.providedBy,
+      artist.technical.monConsole.providedBy,
+    ]);
+    const micProvider = normalizeProviderToken(artist.micKit);
+    rowColorMeta.push({
+      stage: artist.stage,
+      consolesProvider,
+      rfIemProvider,
+      micProvider,
+    });
 
     return [
       artist.name,
@@ -582,6 +664,15 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
 
   console.log('Table data prepared:', tableData.length, 'rows');
 
+  const availableTableWidth = pageWidth - leftMargin - rightMargin;
+  const baseColumnWidths = [25, 18, 18, 35, 35, 30, 12, 20, 12, 25, 15, 20];
+  const totalBaseWidth = baseColumnWidths.reduce((sum, width) => sum + width, 0) || 1;
+  const normalizedColumnStyles = baseColumnWidths.reduce((acc, width, index) => {
+    acc[index] = { cellWidth: availableTableWidth * (width / totalBaseWidth) };
+    return acc;
+  }, {} as Record<number, { cellWidth: number }>);
+  const tokenizedCellText = new Map<string, string>();
+
   autoTable(doc, {
     head: [['Artista', 'Show', 'Check', 'Consolas', 'RF/IEM', 'Microfonos', 'Mons', 'Infra', 'Extras', 'Notas', 'Rider', 'Material']],
     body: tableData,
@@ -598,39 +689,115 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       fontSize: 9,
       fontStyle: 'bold',
     },
-    columnStyles: {
-      0: { cellWidth: 25 }, // Artist
-      1: { cellWidth: 18 }, // Show Time
-      2: { cellWidth: 18 }, // Soundcheck
-      3: { cellWidth: 35 }, // Consoles
-      4: { cellWidth: 35 }, // Wireless/IEM
-      5: { cellWidth: 30 }, // Microphones
-      6: { cellWidth: 12 }, // Monitors
-      7: { cellWidth: 20 }, // Infrastructure
-      8: { cellWidth: 12 }, // Extras
-      9: { cellWidth: 25 }, // Notes
-      10: { cellWidth: 15 }, // Rider Status
-      11: { cellWidth: 20 }, // Gear Status (new column)
-    },
-    didParseCell: (data) => {
+    columnStyles: normalizedColumnStyles,
+    didParseCell: (cellData) => {
+      if (cellData.section === 'body') {
+        const rowMeta = rowColorMeta[cellData.row.index];
+        if (rowMeta) {
+          const stageColor = getStageCellColor(rowMeta.stage);
+          const consoleColor = getProviderCellColor(rowMeta.consolesProvider);
+          const rfIemColor = getProviderCellColor(rowMeta.rfIemProvider);
+          const micColor = getProviderCellColor(rowMeta.micProvider);
+
+          if (cellData.column.index >= 0 && cellData.column.index <= 2) {
+            cellData.cell.styles.fillColor = stageColor;
+            cellData.cell.styles.textColor = [30, 30, 30];
+          }
+          if (cellData.column.index === 3) {
+            cellData.cell.styles.fillColor = consoleColor;
+            cellData.cell.styles.textColor = [35, 35, 35];
+          }
+          if (cellData.column.index === 4) {
+            cellData.cell.styles.fillColor = rfIemColor;
+            cellData.cell.styles.textColor = [35, 35, 35];
+          }
+          if (cellData.column.index === 5) {
+            cellData.cell.styles.fillColor = micColor;
+            cellData.cell.styles.textColor = [35, 35, 35];
+          }
+        }
+      }
+
+      const mixedDetailColumns = cellData.column.index === 4 || cellData.column.index === 5;
+      if (mixedDetailColumns) {
+        const cellText = Array.isArray(cellData.cell.text)
+          ? cellData.cell.text.join('\n')
+          : String(cellData.cell.text || '');
+        if (hasProviderTextToken(cellText)) {
+          tokenizedCellText.set(`${cellData.row.index}-${cellData.column.index}`, cellText);
+          const visibleText = stripProviderTextTokens(cellText);
+          cellData.cell.text = visibleText.split('\n');
+          const fillColor = cellData.cell.styles.fillColor;
+          if (Array.isArray(fillColor)) {
+            cellData.cell.styles.textColor = [fillColor[0], fillColor[1], fillColor[2]];
+          }
+        }
+      }
+
       // Make "Missing" text red in the Rider Status column (column 10)
-      if (data.column.index === 10 && data.cell.text[0] === 'Falta') {
-        data.cell.styles.textColor = [255, 0, 0]; // Red color
+      if (cellData.column.index === 10 && cellData.cell.text[0] === 'Falta') {
+        cellData.cell.styles.textColor = [255, 0, 0]; // Red color
       }
       
       // Color code gear status column (column 11) - now looking for text instead of icons
-      if (data.column.index === 11) {
-        const cellText = data.cell.text[0];
+      if (cellData.column.index === 11) {
+        const cellText = cellData.cell.text[0];
         if (cellText.includes('Error')) {
-          data.cell.styles.textColor = [255, 0, 0]; // Red for errors
-        } else if (cellText.includes('Warning')) {
-          data.cell.styles.textColor = [255, 165, 0]; // Orange for warnings
+          cellData.cell.styles.textColor = [255, 0, 0]; // Red for errors
+        } else if (cellText.includes('Warning') || cellText.includes('Aviso')) {
+          cellData.cell.styles.textColor = [255, 165, 0]; // Orange for warnings
         } else if (cellText === 'OK') {
-          data.cell.styles.textColor = [0, 128, 0]; // Green for OK
+          cellData.cell.styles.textColor = [0, 128, 0]; // Green for OK
         }
       }
     },
-    margin: { left: 10, right: 10 },
+    didDrawCell: (cellData) => {
+      if (cellData.section !== 'body') return;
+      const key = `${cellData.row.index}-${cellData.column.index}`;
+      const tokenizedText = tokenizedCellText.get(key);
+      if (!tokenizedText) return;
+
+      const docInstance = (cellData as any).doc;
+      const cellPadding = typeof cellData.cell.styles.cellPadding === 'number'
+        ? cellData.cell.styles.cellPadding
+        : 2;
+      const textX = cellData.cell.x + cellPadding;
+      const maxTextWidth = Math.max(0, cellData.cell.width - (cellPadding * 2));
+      const wrappedWithProvider: Array<{ providerType: 'festival' | 'band' | 'default'; text: string }> = [];
+      for (const rawLine of tokenizedText.split('\n')) {
+        const providerType = getProviderTokenType(rawLine);
+        const visibleLine = stripProviderTextTokens(rawLine);
+        const wrappedLines: string[] = docInstance.splitTextToSize(visibleLine, maxTextWidth);
+
+        for (const wrappedLine of wrappedLines) {
+          wrappedWithProvider.push({ providerType, text: wrappedLine });
+        }
+      }
+
+      if (wrappedWithProvider.length === 0) return;
+      const usableHeight = Math.max(2, cellData.cell.height - (cellPadding * 2));
+      const lineStep = usableHeight / wrappedWithProvider.length;
+      let textY = cellData.cell.y + cellPadding + (lineStep * 0.8);
+      const cellBottomLimit = cellData.cell.y + cellData.cell.height - 1;
+
+      for (const line of wrappedWithProvider) {
+        if (textY > cellBottomLimit) break;
+
+        if (line.providerType === 'festival') {
+          docInstance.setTextColor(72, 105, 136);
+        } else {
+          docInstance.setTextColor(35, 35, 35);
+        }
+
+        docInstance.text(line.text, textX, textY);
+        textY += lineStep;
+      }
+    },
+    margin: { left: leftMargin, right: rightMargin, top: headerBottomY, bottom: footerReserve },
+    rowPageBreak: 'avoid',
+    didDrawPage: () => {
+      drawPageHeader();
+    },
   });
 
   // Add gear conflicts summary ONLY if includeGearConflicts is true
@@ -642,7 +809,8 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       // Check if we need a new page for the summary
       if (currentY > pageHeight - 60) {
         doc.addPage();
-        currentY = 20;
+        drawPageHeader();
+        currentY = 40;
       }
       
       // Add summary header
@@ -661,7 +829,8 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
           // Check if we need a new page
           if (currentY > pageHeight - 40) {
             doc.addPage();
-            currentY = 20;
+            drawPageHeader();
+            currentY = 40;
           }
           
           doc.setTextColor(0, 0, 0);
@@ -672,7 +841,8 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
             // Check if we need a new page for each mismatch
             if (currentY > pageHeight - 25) {
               doc.addPage();
-              currentY = 20;
+              drawPageHeader();
+              currentY = 40;
             }
             
             const color = mismatch.severity === 'error' ? [255, 0, 0] : [255, 165, 0];
@@ -686,7 +856,8 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
             if (mismatch.details) {
               if (currentY > pageHeight - 20) {
                 doc.addPage();
-                currentY = 20;
+                drawPageHeader();
+                currentY = 40;
               }
               
               doc.setTextColor(100, 100, 100);
@@ -703,7 +874,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       // Add Equipment Needs section after conflicts summary
       if (data.equipmentNeeds) {
         currentY += 10;
-        currentY = formatEquipmentNeedsForPdf(data.equipmentNeeds, doc, currentY);
+        currentY = formatEquipmentNeedsForPdf(data.equipmentNeeds, doc, currentY, drawPageHeader);
       }
     } else if (data.equipmentNeeds) {
       // Add Equipment Needs section even if no conflicts
@@ -712,61 +883,45 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       // Check if we need a new page for the equipment needs
       if (currentY > pageHeight - 60) {
         doc.addPage();
-        currentY = 20;
+        drawPageHeader();
+        currentY = 40;
       }
       
-      currentY = formatEquipmentNeedsForPdf(data.equipmentNeeds, doc, currentY);
+      currentY = formatEquipmentNeedsForPdf(data.equipmentNeeds, doc, currentY, drawPageHeader);
     }
   }
 
-  // === COMPANY LOGO (CENTERED AT BOTTOM) ===
-  console.log("Attempting to load Sector Pro logo");
-  const sectorImg = await loadImageSafely('/sector pro logo.png', 'Sector Pro logo');
-  if (sectorImg) {
-    try {
-      const logoWidth = 20;
-      const ratio = sectorImg.width / sectorImg.height;
-      const logoHeight = logoWidth / ratio;
-      
-      doc.addImage(
-        sectorImg, 
-        'PNG', 
-        pageWidth / 2 - logoWidth / 2,
-        pageHeight - logoHeight - 5,
-        logoWidth,
-        logoHeight
-      );
-      console.log("Sector Pro logo added successfully at bottom center");
-    } catch (error) {
-      console.error('Error adding Sector Pro logo to PDF:', error);
-    }
-  } else {
-    const altSectorImg = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'alternative Sector Pro logo');
-    if (altSectorImg) {
+  const sectorImg =
+    (await loadImageSafely('/sector pro logo.png', 'Sector Pro logo')) ||
+    (await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'alternative Sector Pro logo'));
+
+  const totalPages = doc.getNumberOfPages();
+  for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+    doc.setPage(pageNumber);
+    drawPageHeader();
+
+    if (sectorImg && sectorImg.width > 0 && sectorImg.height > 0) {
       try {
         const logoWidth = 20;
-        const ratio = altSectorImg.width / altSectorImg.height;
-        const logoHeight = logoWidth / ratio;
-        
+        const logoHeight = logoWidth * (sectorImg.height / sectorImg.width);
         doc.addImage(
-          altSectorImg, 
-          'PNG', 
+          sectorImg,
+          'PNG',
           pageWidth / 2 - logoWidth / 2,
-          pageHeight - logoHeight - 10, 
-          logoWidth, 
-          logoHeight
+          pageHeight - logoHeight - 5,
+          logoWidth,
+          logoHeight,
         );
-        console.log("Alternative Sector Pro logo added successfully at bottom center");
       } catch (error) {
-        console.error('Error adding alternative Sector Pro logo to PDF:', error);
+        console.error('Error adding Sector Pro logo to PDF:', error);
       }
     }
-  }
 
-  // Footer with date
-  doc.setFontSize(8);
-  doc.setTextColor(51, 51, 51);
-  doc.text(`Generado: ${createdDate}`, 10, pageHeight - 10);
+    doc.setFontSize(8);
+    doc.setTextColor(51, 51, 51);
+    doc.text(`Generado: ${createdDate}`, leftMargin, pageHeight - 10);
+    doc.text(`Pagina ${pageNumber} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 10, { align: 'right' });
+  }
   
   console.log('Artist table PDF generation completed');
   return doc.output('blob');

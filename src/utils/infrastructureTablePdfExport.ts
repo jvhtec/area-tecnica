@@ -116,6 +116,70 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
     unit: 'mm',
     format: 'a4'
   });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const leftMargin = 10;
+  const rightMargin = 10;
+  const headerStartY = 30;
+  const bottomMargin = 24;
+
+  type HeaderLogo = {
+    objectUrl: string;
+    format: 'PNG' | 'JPEG';
+    width: number;
+    height: number;
+  };
+  let headerLogo: HeaderLogo | undefined;
+
+  if (data.logoUrl) {
+    try {
+      const response = await fetch(data.logoUrl);
+      if (response.ok) {
+        const logoBlob = await response.blob();
+        const objectUrl = URL.createObjectURL(logoBlob);
+        const dimensions = await new Promise<{ width: number; height: number } | undefined>((resolve) => {
+          const image = new Image();
+          image.onload = () => resolve({ width: image.width, height: image.height });
+          image.onerror = () => resolve(undefined);
+          image.src = objectUrl;
+        });
+        if (dimensions && dimensions.width > 0 && dimensions.height > 0) {
+          headerLogo = {
+            objectUrl,
+            format: logoBlob.type.toLowerCase().includes('png') ? 'PNG' : 'JPEG',
+            width: dimensions.width,
+            height: dimensions.height,
+          };
+        } else {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }
+    } catch (err) {
+      console.error('Error loading logo:', err);
+    }
+  }
+
+  const drawStageHeader = (stageNum: number): void => {
+    if (headerLogo) {
+      const maxLogoWidth = 40;
+      const maxLogoHeight = 15;
+      const scale = Math.min(maxLogoWidth / headerLogo.width, maxLogoHeight / headerLogo.height);
+      const drawWidth = headerLogo.width * scale;
+      const drawHeight = headerLogo.height * scale;
+      pdf.addImage(
+        headerLogo.objectUrl,
+        headerLogo.format,
+        pageWidth - drawWidth - rightMargin,
+        10,
+        drawWidth,
+        drawHeight,
+      );
+    }
+
+    pdf.setTextColor(0);
+    pdf.setFontSize(18);
+    pdf.text(`${data.jobTitle} - Infraestructura - Escenario ${stageNum}`, leftMargin, 20);
+  };
 
   let isFirstPage = true;
 
@@ -126,38 +190,6 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
       pdf.addPage();
     }
     isFirstPage = false;
-
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const horizontalMargin = 10;
-    const bottomMargin = 24;
-
-    if (data.logoUrl) {
-      try {
-        const response = await fetch(data.logoUrl);
-        const logoBlob = await response.blob();
-        const logoUrl = URL.createObjectURL(logoBlob);
-
-        const maxLogoWidth = 40;
-        const maxLogoHeight = 15;
-
-        pdf.addImage(
-          logoUrl,
-          'PNG',
-          pageWidth - maxLogoWidth - horizontalMargin,
-          10,
-          maxLogoWidth,
-          maxLogoHeight
-        );
-
-        URL.revokeObjectURL(logoUrl);
-      } catch (err) {
-        console.error('Error loading logo:', err);
-      }
-    }
-
-    pdf.setFontSize(18);
-    pdf.text(`${data.jobTitle} - Infraestructura - Escenario ${stageNum}`, horizontalMargin, 20);
 
     const tableData = stageArtists.map(artist => {
       return [
@@ -173,10 +205,11 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
       ];
     });
 
-    const availableWidth = pageWidth - (horizontalMargin * 2);
+    const availableWidth = pageWidth - leftMargin - rightMargin;
     const ratios = [0.26, 0.10, 0.12, 0.07, 0.07, 0.07, 0.12, 0.07, 0.12];
+    const ratioSum = ratios.reduce((sum, ratio) => sum + ratio, 0) || 1;
     const columnStyles = ratios.reduce((acc, ratio, index) => {
-      acc[index] = { cellWidth: availableWidth * ratio };
+      acc[index] = { cellWidth: availableWidth * (ratio / ratioSum) };
       return acc;
     }, {} as Record<number, { cellWidth: number }>);
 
@@ -193,10 +226,11 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
         'Otros'
       ]],
       body: tableData,
-      startY: 30,
+      startY: headerStartY,
       margin: {
-        left: horizontalMargin,
-        right: horizontalMargin,
+        left: leftMargin,
+        right: rightMargin,
+        top: headerStartY,
         bottom: bottomMargin,
       },
       headStyles: {
@@ -214,49 +248,46 @@ export const exportInfrastructureTablePDF = async (data: InfrastructureTablePdfD
         lineWidth: 0.1,
         overflow: 'linebreak',
       },
+      rowPageBreak: 'avoid',
       columnStyles,
-    });
-
-    const date = new Date().toLocaleDateString('es-ES');
-    pdf.setFontSize(8);
-    pdf.setTextColor(100);
-    pdf.text(`Generado: ${date}`, horizontalMargin, pageHeight - 8);
-
-    const logo = new Image();
-    logo.crossOrigin = 'anonymous';
-    logo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
-
-    await new Promise<void>((resolve) => {
-      logo.onload = () => {
-        const logoWidth = 50;
-        const logoHeight = logoWidth * (logo.height / logo.width);
-
-        const xPosition = (pageWidth - logoWidth) / 2;
-        const yLogo = pageHeight - 5 - logoHeight;
-
-        try {
-          pdf.addImage(logo, 'PNG', xPosition, yLogo, logoWidth, logoHeight);
-        } catch (error) {
-          console.error(`Error adding logo on page for stage ${stageNum}:`, error);
-        }
-
-        resolve();
-      };
-
-      logo.onerror = () => {
-        resolve();
-      };
+      didDrawPage: () => {
+        drawStageHeader(stageNum);
+      },
     });
   }
+
+  const sectorLogo = new Image();
+  sectorLogo.crossOrigin = 'anonymous';
+  sectorLogo.src = '/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png';
+  await new Promise<void>((resolve) => {
+    sectorLogo.onload = () => resolve();
+    sectorLogo.onerror = () => resolve();
+  });
 
   const totalPages = pdf.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     pdf.setPage(i);
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
     pdf.setFontSize(8);
     pdf.setTextColor(100);
-    pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - 15, pageHeight - 8, { align: 'right' });
+    const date = new Date().toLocaleDateString('es-ES');
+    pdf.text(`Generado: ${date}`, leftMargin, pageHeight - 8);
+    pdf.text(`Pagina ${i} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 8, { align: 'right' });
+
+    if (sectorLogo.width > 0 && sectorLogo.height > 0) {
+      const logoWidth = 50;
+      const logoHeight = logoWidth * (sectorLogo.height / sectorLogo.width);
+      const xPosition = (pageWidth - logoWidth) / 2;
+      const yLogo = pageHeight - 5 - logoHeight;
+      try {
+        pdf.addImage(sectorLogo, 'PNG', xPosition, yLogo, logoWidth, logoHeight);
+      } catch (error) {
+        console.error(`Error adding footer logo on page ${i}:`, error);
+      }
+    }
+  }
+
+  if (headerLogo) {
+    URL.revokeObjectURL(headerLogo.objectUrl);
   }
 
   return pdf.output('blob');

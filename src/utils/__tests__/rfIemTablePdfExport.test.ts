@@ -102,12 +102,46 @@ describe('rfIemTablePdfExport helpers', () => {
       ],
     });
 
-    expect(String(row[4])).toContain('RF A (2ch');
-    expect(String(row[4])).toContain('RF B (2ch');
-    expect(String(row[10])).toContain('IEM A (2ch, 2bp)');
-    expect(String(row[10])).toContain('IEM B (4ch, 4bp)');
+    expect(String(row[4])).toContain('RF A');
+    expect(String(row[4])).toContain('RF B');
+    expect(String(row[4])).not.toContain('(2ch');
+    expect(String(row[10])).toContain('IEM A');
+    expect(String(row[10])).toContain('IEM B');
+    expect(String(row[10])).not.toContain('(2ch, 2bp)');
     expect(String(row[12])).toBe('2+4 (6)');
     expect(String(row[13])).toBe('2+4 (6)');
+  });
+
+  it('renders mixed-provider edge cases with explicit provider labeling and totals', () => {
+    const row = buildRfIemTableRow({
+      name: 'Artist Mixed',
+      stage: 2,
+      wirelessSystems: [],
+      iemSystems: [
+        { model: 'Shure PSM1000 Series', quantity_hh: 2, quantity_bp: 2, band: 'G10E', provided_by: 'festival' },
+        { model: 'Shure PSM1000 Series', quantity_hh: 8, quantity_bp: 8, band: 'G10E', provided_by: 'band' },
+        { model: 'Shure PSM1000 Series', quantity_hh: 4, quantity_bp: 4, band: 'L8E', provided_by: 'band' },
+      ],
+    });
+
+    expect(String(row[10])).toContain('Festival: Shure PSM1000 Series');
+    expect(String(row[10])).toContain('Banda: Shure PSM1000 Series');
+    expect(String(row[10])).not.toContain('(2ch, 2bp)');
+    expect(String(row[11])).toContain('Festival: G10E');
+    expect(String(row[11])).toContain('Banda: G10E');
+    expect(String(row[11])).toContain('L8E');
+    expect(String(row[12])).toContain('G10E: ');
+    expect(String(row[12])).toContain('2F');
+    expect(String(row[12])).toContain('8B');
+    expect(String(row[12])).toContain('L8E: ');
+    expect(String(row[12])).toContain('4B');
+    expect(String(row[12])).toContain('(14)');
+    expect(String(row[13])).toContain('G10E: ');
+    expect(String(row[13])).toContain('2F');
+    expect(String(row[13])).toContain('8B');
+    expect(String(row[13])).toContain('L8E: ');
+    expect(String(row[13])).toContain('4B');
+    expect(String(row[13])).toContain('(14)');
   });
 
   it('computes festival day with 07:00 rollover and explicit after-midnight override', () => {

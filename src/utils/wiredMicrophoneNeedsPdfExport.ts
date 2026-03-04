@@ -12,12 +12,50 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
   const pageWidth = pdf.internal.pageSize.width;
   const pageHeight = pdf.internal.pageSize.height;
   const margin = 20;
+  const footerReserve = 28;
   
   // Festival document styling
   const primaryColor: [number, number, number] = [139, 21, 33]; // Burgundy/red
   const secondaryColor: [number, number, number] = [52, 73, 94]; // Dark gray
   const lightGray: [number, number, number] = [240, 240, 240];
   const headerGray: [number, number, number] = [248, 249, 250];
+
+  type HeaderLogo = {
+    dataUrl: string;
+    format: 'PNG' | 'JPEG';
+    width: number;
+    height: number;
+  };
+  const loadHeaderLogo = async (url?: string): Promise<HeaderLogo | undefined> => {
+    if (!url) return undefined;
+    try {
+      const logoResponse = await fetch(url);
+      if (!logoResponse.ok) return undefined;
+      const logoBlob = await logoResponse.blob();
+      const dataUrl = await new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(logoBlob);
+      });
+      const dimensions = await new Promise<{ width: number; height: number } | undefined>((resolve) => {
+        const image = new Image();
+        image.onload = () => resolve({ width: image.width, height: image.height });
+        image.onerror = () => resolve(undefined);
+        image.src = dataUrl;
+      });
+      if (!dimensions || dimensions.width <= 0 || dimensions.height <= 0) return undefined;
+      return {
+        dataUrl,
+        format: logoBlob.type.toLowerCase().includes('png') ? 'PNG' : 'JPEG',
+        width: dimensions.width,
+        height: dimensions.height,
+      };
+    } catch {
+      return undefined;
+    }
+  };
+
+  const headerLogo = await loadHeaderLogo(data.logoUrl);
   
   let isFirstPage = true;
   
@@ -45,52 +83,50 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
       }
       isFirstPage = false;
 
-      let yPosition = 20;
-      
-      // Add logo if available
-      if (data.logoUrl && yPosition === 20) {
-        try {
-          const logoResponse = await fetch(data.logoUrl);
-          const logoBlob = await logoResponse.blob();
-          const logoDataUrl = await new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.readAsDataURL(logoBlob);
-          });
-          
-          pdf.addImage(logoDataUrl, 'PNG', margin, yPosition, 50, 25);
-          yPosition += 35;
-        } catch (error) {
-          console.error('❌ Logo loading error:', error);
-        }
-      }
-      
-      // Header with burgundy background
-      pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      pdf.rect(0, yPosition, pageWidth, 25, 'F');
-      
-      pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('Matriz de Microfonia Cableada', pageWidth / 2, yPosition + 16, { align: 'center' });
-      yPosition += 35;
-      
-      // Job title
-      pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-      pdf.setFontSize(14);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(data.jobTitle, pageWidth / 2, yPosition, { align: 'center' });
-      yPosition += 20;
-      
-      // Date and stage header
       const formattedDate = formatDateSimply(date);
-      pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
-      pdf.rect(margin, yPosition - 5, pageWidth - (margin * 2), 20, 'F');
-      
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`${formattedDate} - Escenario ${stage}`, pageWidth / 2, yPosition + 8, { align: 'center' });
-      yPosition += 30;
+      const drawSectionHeader = (): number => {
+        let yPosition = 20;
+
+        if (headerLogo) {
+          const maxLogoWidth = 50;
+          const maxLogoHeight = 25;
+          const scale = Math.min(maxLogoWidth / headerLogo.width, maxLogoHeight / headerLogo.height);
+          const drawWidth = headerLogo.width * scale;
+          const drawHeight = headerLogo.height * scale;
+          pdf.addImage(
+            headerLogo.dataUrl,
+            headerLogo.format,
+            margin,
+            yPosition,
+            drawWidth,
+            drawHeight,
+          );
+          yPosition += 35;
+        }
+
+        pdf.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+        pdf.rect(0, yPosition, pageWidth, 25, 'F');
+        pdf.setTextColor(255, 255, 255);
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Matriz de Microfonia Cableada', pageWidth / 2, yPosition + 16, { align: 'center' });
+        yPosition += 35;
+
+        pdf.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+        pdf.setFontSize(14);
+        pdf.setFont('helvetica', 'normal');
+        pdf.text(data.jobTitle, pageWidth / 2, yPosition, { align: 'center' });
+        yPosition += 20;
+
+        pdf.setFillColor(headerGray[0], headerGray[1], headerGray[2]);
+        pdf.rect(margin, yPosition - 5, pageWidth - (margin * 2), 20, 'F');
+        pdf.setFontSize(12);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`${formattedDate} - Escenario ${stage}`, pageWidth / 2, yPosition + 8, { align: 'center' });
+        return yPosition + 30;
+      };
+
+      let yPosition = drawSectionHeader();
       
       // Generate matrix data with simple approach
       const matrixData = generateSimplifiedMatrixData(artists);
@@ -176,6 +212,11 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
           lineWidth: 0.5,
           overflow: 'linebreak'
         },
+        rowPageBreak: 'avoid',
+        margin: { left: margin, right: margin, top: yPosition, bottom: footerReserve },
+        didDrawPage: () => {
+          drawSectionHeader();
+        },
         columnStyles: {
           0: {
             cellWidth: micModelColumnWidth,
@@ -201,7 +242,6 @@ export const exportWiredMicrophoneMatrixPDF = async (data: WiredMicrophoneMatrix
             }
           }
         },
-        margin: { left: margin, right: margin }
       });
     }
   }

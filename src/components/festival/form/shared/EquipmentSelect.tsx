@@ -12,6 +12,35 @@ interface EquipmentSelectProps {
   disabled?: boolean;
 }
 
+type SelectOptionItem = { model: string; quantity?: number };
+
+const toOptionItems = (
+  input: Array<{ model: string; quantity?: number }> | readonly string[],
+): SelectOptionItem[] =>
+  input
+    .map((option) =>
+      typeof option === "string"
+        ? { model: option.trim() }
+        : { model: option.model?.trim() || "", quantity: option.quantity },
+    )
+    .filter((option) => option.model.length > 0);
+
+const mergeUniqueByModel = (...lists: SelectOptionItem[][]): SelectOptionItem[] => {
+  const seen = new Set<string>();
+  const merged: SelectOptionItem[] = [];
+
+  lists.forEach((list) => {
+    list.forEach((item) => {
+      const key = item.model.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      merged.push(item);
+    });
+  });
+
+  return merged;
+};
+
 export const EquipmentSelect = ({
   value,
   onChange,
@@ -22,25 +51,16 @@ export const EquipmentSelect = ({
   disabled = false,
 }: EquipmentSelectProps) => {
   const { models, isLoading } = useEquipmentModels();
-  
-  // Filter models by category if provided
-  const categoryModels = category 
-    ? models.filter(model => model.category === category).map(model => model.name)
-    : [];
 
-  // Determine what options to use: database models, provided options, or fallback
-  let itemsToRender: Array<{ model: string; quantity?: number }> | readonly string[] = [];
-  
-  if (category && categoryModels.length > 0) {
-    // Use database models for this category
-    itemsToRender = categoryModels;
-  } else if (Array.isArray(options) && options.length > 0) {
-    // Use provided options
-    itemsToRender = options;
-  } else {
-    // Use fallback options
-    itemsToRender = fallbackOptions;
-  }
+  const categoryItems: SelectOptionItem[] = category
+    ? models
+        .filter((model) => model.category === category)
+        .map((model) => ({ model: model.name.trim() }))
+        .filter((model) => model.model.length > 0)
+    : [];
+  const providedItems = toOptionItems(options);
+  const fallbackItems = toOptionItems(fallbackOptions);
+  const itemsToRender = mergeUniqueByModel(categoryItems, providedItems, fallbackItems);
 
   return (
     <Select value={value} onValueChange={onChange} disabled={isLoading || disabled}>
@@ -48,24 +68,12 @@ export const EquipmentSelect = ({
         <SelectValue placeholder={isLoading ? "Cargando..." : placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {Array.isArray(itemsToRender) && itemsToRender.length > 0 &&
-          itemsToRender.map((option) => {
-            if (typeof option === 'string') {
-              return (
-                <SelectItem key={option} value={option}>
-                  {option}
-                </SelectItem>
-              );
-            } else if (option && typeof option === 'object') {
-              return (
-                <SelectItem key={option.model} value={option.model}>
-                  {option.model}{option.quantity ? ` (${option.quantity} disponibles)` : ''}
-                </SelectItem>
-              );
-            }
-            return null;
-          })
-        }
+        {itemsToRender.map((option) => (
+          <SelectItem key={option.model} value={option.model}>
+            {option.model}
+            {option.quantity ? ` (${option.quantity} disponibles)` : ""}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
