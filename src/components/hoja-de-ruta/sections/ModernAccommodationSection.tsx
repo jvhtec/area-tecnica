@@ -15,7 +15,7 @@ interface ModernAccommodationSectionProps {
   accommodations: Accommodation[];
   eventData: EventData;
   onUpdateAccommodation: (accommodationIndex: number, data: Partial<Accommodation>) => void;
-  onUpdateRoom: (accommodationIndex: number, roomIndex: number, field: keyof RoomAssignment, value: any) => void;
+  onUpdateRoom: (accommodationIndex: number, roomIndex: number, field: keyof RoomAssignment, value: string) => void;
   onAddAccommodation: () => void;
   onRemoveAccommodation: (index: number) => void;
   onAddRoom: (accommodationIndex: number) => void;
@@ -81,16 +81,14 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                       <Building2 className="w-5 h-5 text-pink-600" />
                       <h3 className="text-lg font-semibold">Hotel {accommodationIndex + 1}</h3>
                     </div>
-                    {accommodationIndex > 0 && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onRemoveAccommodation(accommodationIndex)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onRemoveAccommodation(accommodationIndex)}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
 
                   {/* Hotel Details */}
@@ -194,16 +192,14 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                         >
                           <div className="flex items-center justify-between mb-4">
                             <h5 className="font-medium text-sm">Habitación {roomIndex + 1}</h5>
-                            {roomIndex > 0 && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => onRemoveRoom(accommodationIndex, roomIndex)}
-                                className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
-                              >
-                                <Trash2 className="w-3 h-3" />
-                              </Button>
-                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => onRemoveRoom(accommodationIndex, roomIndex)}
+                              className="text-red-600 hover:text-red-700 h-8 w-8 p-0"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
                           </div>
 
                           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -246,13 +242,14 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                             <div className="space-y-2">
                               <Label className="text-sm font-medium">Personal 1</Label>
                               <Select
-                                value={room.staff_member1_id || ''}
-                                onValueChange={(value) => onUpdateRoom(accommodationIndex, roomIndex, 'staff_member1_id', value)}
+                                value={room.staff_member1_id || '__none__'}
+                                onValueChange={(value) => onUpdateRoom(accommodationIndex, roomIndex, 'staff_member1_id', value === '__none__' ? '' : value)}
                               >
                                 <SelectTrigger className="border-2 focus:border-pink-300">
                                   <SelectValue placeholder="Seleccionar personal" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                  <SelectItem value="__none__">Sin asignar</SelectItem>
                                   {eventData.staff.map((staff, staffIndex) => (
                                     <SelectItem key={staffIndex} value={staffIndex.toString()}>
                                       {staff.name} {staff.surname1}
@@ -266,13 +263,14 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                               <div className="space-y-2">
                                 <Label className="text-sm font-medium">Personal 2</Label>
                                 <Select
-                                  value={room.staff_member2_id || ''}
-                                  onValueChange={(value) => onUpdateRoom(accommodationIndex, roomIndex, 'staff_member2_id', value)}
+                                  value={room.staff_member2_id || '__none__'}
+                                  onValueChange={(value) => onUpdateRoom(accommodationIndex, roomIndex, 'staff_member2_id', value === '__none__' ? '' : value)}
                                 >
                                   <SelectTrigger className="border-2 focus:border-pink-300">
                                     <SelectValue placeholder="Seleccionar personal" />
                                   </SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="__none__">Sin asignar</SelectItem>
                                     {eventData.staff.map((staff, staffIndex) => (
                                       <SelectItem key={staffIndex} value={staffIndex.toString()}>
                                         {staff.name} {staff.surname1}

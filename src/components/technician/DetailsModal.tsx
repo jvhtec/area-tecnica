@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
-import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon, Users } from 'lucide-react';
+import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon, Users, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TourDocumentUploader } from '@/components/tours/TourDocumentUploader';
@@ -30,7 +30,7 @@ interface DetailsModalProps {
 
 // (TourDocument type imported from useTourDocuments)
 
-type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
+type TabId = 'Info' | 'Ubicación' | 'Transp.' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
 type RiderFile = {
     id: string;
     file_name: string;
@@ -41,6 +41,11 @@ type RiderFile = {
 type FestivalStageName = {
     number: number;
     name: string;
+};
+type JobArtist = {
+    id: string;
+    name: string;
+    stage: number | null;
 };
 type FestivalShiftAssignment = {
     id: string;
@@ -61,6 +66,55 @@ type TechShiftAssignmentDetail = {
     assignment_id: string;
     role: string;
     shift: FestivalShiftInfo;
+};
+type HojaDeRutaMeta = {
+    id: string;
+};
+type HojaDeRutaRoomAssignment = {
+    id: string;
+    room_type: string;
+    room_number: string | null;
+    staff_member1_id: string | null;
+    staff_member2_id: string | null;
+};
+type HojaDeRutaAccommodation = {
+    id: string;
+    hotel_name: string;
+    address: string | null;
+    check_in: string | null;
+    check_out: string | null;
+    hoja_de_ruta_room_assignments?: HojaDeRutaRoomAssignment[] | null;
+};
+type HojaDeRutaTravelArrangement = {
+    id: string;
+    transportation_type: string;
+    pickup_address: string | null;
+    pickup_time: string | null;
+    departure_time: string | null;
+    arrival_time: string | null;
+    flight_train_number: string | null;
+    driver_name: string | null;
+    driver_phone: string | null;
+    plate_number: string | null;
+    notes: string | null;
+};
+type HojaDeRutaTransport = {
+    id: string;
+    transport_type: string;
+    driver_name: string | null;
+    driver_phone: string | null;
+    license_plate: string | null;
+    company: string | null;
+    date_time: string | null;
+    has_return: boolean | null;
+    return_date_time: string | null;
+    logistics_categories: string[] | null;
+};
+type RoomOccupantProfile = {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    nickname: string | null;
 };
 
 export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
@@ -231,16 +285,17 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
             if (!job?.id) return [];
             const { data, error } = await supabase
                 .from('festival_artists')
-                .select('id, name')
+                .select('id, name, stage')
                 .eq('job_id', job.id);
             if (error) throw error;
-            return (data || []) as Array<{ id: string; name: string }>;
+            return (data || []) as JobArtist[];
         },
         enabled: !!job?.id,
     });
 
     const artistIdList = useMemo(() => jobArtists.map((artist) => artist.id), [jobArtists]);
     const artistNameMap = useMemo(() => new Map(jobArtists.map((artist) => [artist.id, artist.name])), [jobArtists]);
+    const artistStageMap = useMemo(() => new Map(jobArtists.map((artist) => [artist.id, artist.stage])), [jobArtists]);
 
     const { data: riderFiles = [], isLoading: isRidersLoading, error: riderFilesError } = useQuery({
         queryKey: ['technician-job-rider-files', job?.id, artistIdList],
@@ -255,6 +310,129 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
             return (data || []) as RiderFile[];
         },
         enabled: artistIdList.length > 0,
+    });
+
+    // Fetch hoja de ruta metadata (if linked to this job)
+    const { data: hojaDeRutaMeta, isLoading: hojaDeRutaLoading } = useQuery({
+        queryKey: ['technician-hoja-de-ruta-meta', job?.id],
+        queryFn: async () => {
+            if (!job?.id) return null;
+            const { data, error } = await supabase
+                .from('hoja_de_ruta')
+                .select('id')
+                .eq('job_id', job.id)
+                .maybeSingle();
+
+            if (error) {
+                console.warn('No se pudo cargar hoja de ruta para el técnico:', error.message);
+                return null;
+            }
+
+            return data as HojaDeRutaMeta | null;
+        },
+        enabled: !!job?.id,
+    });
+
+    const hojaDeRutaId = hojaDeRutaMeta?.id || null;
+
+    // Fetch accommodations + rooming from hoja de ruta
+    const { data: hojaAccommodations = [], isLoading: hojaAccommodationsLoading } = useQuery({
+        queryKey: ['technician-hoja-accommodations', hojaDeRutaId],
+        queryFn: async () => {
+            if (!hojaDeRutaId) return [];
+            const { data, error } = await supabase
+                .from('hoja_de_ruta_accommodations')
+                .select(`
+                    id,
+                    hotel_name,
+                    address,
+                    check_in,
+                    check_out,
+                    hoja_de_ruta_room_assignments(
+                        id,
+                        room_type,
+                        room_number,
+                        staff_member1_id,
+                        staff_member2_id
+                    )
+                `)
+                .eq('hoja_de_ruta_id', hojaDeRutaId)
+                .order('check_in', { ascending: true });
+
+            if (error) {
+                console.warn('No se pudo cargar alojamientos de hoja de ruta:', error.message);
+                return [];
+            }
+
+            return (data || []) as HojaDeRutaAccommodation[];
+        },
+        enabled: !!hojaDeRutaId,
+    });
+
+    // Fetch travel arrangements from hoja de ruta
+    const { data: hojaTravelArrangements = [], isLoading: hojaTravelLoading } = useQuery({
+        queryKey: ['technician-hoja-travel-arrangements', hojaDeRutaId],
+        queryFn: async () => {
+            if (!hojaDeRutaId) return [];
+            const { data, error } = await supabase
+                .from('hoja_de_ruta_travel_arrangements')
+                .select(`
+                    id,
+                    transportation_type,
+                    pickup_address,
+                    pickup_time,
+                    departure_time,
+                    arrival_time,
+                    flight_train_number,
+                    driver_name,
+                    driver_phone,
+                    plate_number,
+                    notes
+                `)
+                .eq('hoja_de_ruta_id', hojaDeRutaId)
+                .order('pickup_time', { ascending: true });
+
+            if (error) {
+                console.warn('No se pudo cargar traslados de hoja de ruta:', error.message);
+                return [];
+            }
+
+            return (data || []) as HojaDeRutaTravelArrangement[];
+        },
+        enabled: !!hojaDeRutaId,
+    });
+
+    // Fetch logistics transport from hoja de ruta
+    const { data: hojaTransportEntries = [], isLoading: hojaTransportLoading } = useQuery({
+        queryKey: ['technician-hoja-logistics-transport', hojaDeRutaId],
+        queryFn: async () => {
+            if (!hojaDeRutaId) return [];
+            const { data, error } = await supabase
+                .from('hoja_de_ruta_transport')
+                .select(`
+                    id,
+                    transport_type,
+                    driver_name,
+                    driver_phone,
+                    license_plate,
+                    company,
+                    date_time,
+                    has_return,
+                    return_date_time,
+                    logistics_categories
+                `)
+                .eq('hoja_de_ruta_id', hojaDeRutaId)
+                .or('is_hoja_relevant.eq.true,is_hoja_relevant.is.null')
+                .order('date_time', { ascending: true });
+
+            if (error) {
+                console.warn('No se pudo cargar transporte logístico de hoja de ruta:', error.message);
+                return [];
+            }
+
+            return (data || []) as HojaDeRutaTransport[];
+        },
+        enabled: !!hojaDeRutaId,
     });
 
     // Fetch nearby restaurants using Google Places API
@@ -487,6 +665,12 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         window.open(url, '_blank');
     };
 
+    const handleOpenAddressInMaps = (address: string) => {
+        if (!address) return;
+        const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+        window.open(url, '_blank');
+    };
+
     const locationData = jobDetails?.locations || job?.location;
     const jobStartDate = (jobDetails?.start_time || job?.start_time)
         ? format(new Date(jobDetails?.start_time || job?.start_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
@@ -498,6 +682,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
     const tabs: { id: TabId; label: string }[] = [
         { id: 'Info', label: 'Info' },
         { id: 'Ubicación', label: 'Ubicación' },
+        { id: 'Transp.', label: 'Transp.' },
         { id: 'Personal', label: 'Personal' },
         { id: 'Docs', label: 'Docs' },
         { id: 'Restau.', label: 'Restau.' },
@@ -579,12 +764,226 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         return Array.from(dates).sort((a, b) => a.localeCompare(b));
     }, [assignedDates, techShiftAssignmentsByDate]);
 
+    const assignedTechNameById = useMemo(() => {
+        const map = new Map<string, string>();
+        (staffAssignments as StaffAssignment[]).forEach((assignment, index) => {
+            const tech = assignment.technician;
+            if (!tech?.id) return;
+            const fullName = [tech.first_name, tech.last_name]
+                .filter((value): value is string => Boolean(value && value.trim()))
+                .join(' ');
+            map.set(tech.id, fullName || tech.email || `Técnico ${index + 1}`);
+        });
+        return map;
+    }, [staffAssignments]);
+
+    const assignedTechIdByIndex = useMemo(() => {
+        const map = new Map<string, string>();
+        (staffAssignments as StaffAssignment[]).forEach((assignment, index) => {
+            const techId = assignment.technician?.id;
+            if (!techId) return;
+            map.set(String(index), techId);
+        });
+        return map;
+    }, [staffAssignments]);
+
+    const roomStaffIds = useMemo(() => {
+        const ids = new Set<string>();
+        hojaAccommodations.forEach((accommodation) => {
+            (accommodation.hoja_de_ruta_room_assignments || []).forEach((room) => {
+                if (room.staff_member1_id) ids.add(room.staff_member1_id);
+                if (room.staff_member2_id) ids.add(room.staff_member2_id);
+            });
+        });
+        return Array.from(ids).sort((a, b) => a.localeCompare(b));
+    }, [hojaAccommodations]);
+
+    const isUuidLike = (value: string): boolean =>
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
+    const roomStaffProfileIds = useMemo(
+        () => roomStaffIds.filter((id) => isUuidLike(id)),
+        [roomStaffIds]
+    );
+
+    const { data: roomOccupantProfiles = [], isLoading: roomOccupantsLoading } = useQuery({
+        queryKey: ['technician-hoja-room-occupants', roomStaffProfileIds],
+        queryFn: async () => {
+            if (roomStaffProfileIds.length === 0) return [];
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('id, first_name, last_name, nickname')
+                .in('id', roomStaffProfileIds);
+
+            if (error) {
+                console.warn('No se pudieron cargar perfiles de rooming:', error.message);
+                return [];
+            }
+
+            return (data || []) as RoomOccupantProfile[];
+        },
+        enabled: roomStaffProfileIds.length > 0,
+    });
+
+    const roomOccupantNameMap = useMemo(() => {
+        const map = new Map<string, string>();
+        assignedTechNameById.forEach((name, id) => map.set(id, name));
+
+        roomOccupantProfiles.forEach((profile) => {
+            const fullName = [profile.first_name, profile.last_name]
+                .filter((value): value is string => Boolean(value && value.trim()))
+                .join(' ');
+            map.set(profile.id, fullName || profile.nickname || 'Técnico');
+        });
+        return map;
+    }, [assignedTechNameById, roomOccupantProfiles]);
+
+    const normalizeRoomOccupantId = useCallback((rawId?: string | null): string | null => {
+        if (!rawId || !rawId.trim()) return null;
+        const trimmed = rawId.trim();
+        return assignedTechIdByIndex.get(trimmed) || trimmed;
+    }, [assignedTechIdByIndex]);
+
+    const resolveRoomOccupantName = useCallback((rawId?: string | null): string => {
+        const normalizedId = normalizeRoomOccupantId(rawId);
+        if (!normalizedId) return 'Sin asignar';
+
+        const mappedName = roomOccupantNameMap.get(normalizedId);
+        if (mappedName) return mappedName;
+
+        if (rawId && /^\d+$/.test(rawId)) {
+            const byIndex = (staffAssignments as StaffAssignment[])[Number(rawId)]?.technician;
+            if (byIndex) {
+                const fullName = [byIndex.first_name, byIndex.last_name]
+                    .filter((value): value is string => Boolean(value && value.trim()))
+                    .join(' ');
+                if (fullName) return fullName;
+                if (byIndex.email) return byIndex.email;
+            }
+        }
+
+        return `Técnico (${normalizedId.slice(0, 8)})`;
+    }, [normalizeRoomOccupantId, roomOccupantNameMap, staffAssignments]);
+
+    const roomieNamesByTechId = useMemo(() => {
+        const map = new Map<string, Set<string>>();
+
+        hojaAccommodations.forEach((accommodation) => {
+            (accommodation.hoja_de_ruta_room_assignments || []).forEach((room) => {
+                const normalizedOccupants = [room.staff_member1_id, room.staff_member2_id]
+                    .map((id) => normalizeRoomOccupantId(id))
+                    .filter((id): id is string => Boolean(id));
+                const uniqueOccupants = Array.from(new Set(normalizedOccupants));
+                if (uniqueOccupants.length < 2) return;
+
+                uniqueOccupants.forEach((techId) => {
+                    const others = uniqueOccupants.filter((otherId) => otherId !== techId);
+                    if (others.length === 0) return;
+
+                    if (!map.has(techId)) map.set(techId, new Set<string>());
+                    const roomieSet = map.get(techId)!;
+                    others.forEach((otherId) => roomieSet.add(resolveRoomOccupantName(otherId)));
+                });
+            });
+        });
+
+        return new Map(
+            Array.from(map.entries()).map(([techId, names]) => [
+                techId,
+                Array.from(names).sort((a, b) => a.localeCompare(b)),
+            ])
+        );
+    }, [hojaAccommodations, normalizeRoomOccupantId, resolveRoomOccupantName]);
+
     const formatShiftTime = (value?: string | null): string => {
         if (!value) return '';
         const trimmed = value.trim();
         if (trimmed.length >= 5 && trimmed.includes(':')) return trimmed.slice(0, 5);
         return trimmed;
     };
+
+    const formatDateTimeLabel = (value?: string | null): string => {
+        if (!value) return 'Pendiente';
+
+        const trimmed = value.trim();
+        if (/^\d{2}:\d{2}(:\d{2})?$/.test(trimmed)) {
+            return trimmed.slice(0, 5);
+        }
+
+        try {
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return value;
+            return format(parsed, "d 'de' MMM yyyy, HH:mm", { locale: es });
+        } catch {
+            return value;
+        }
+    };
+
+    const formatTransportCategory = (category: string): string => {
+        return category.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+    };
+
+    const getTravelTransportTypeLabel = (type?: string | null): string => {
+        const labels: Record<string, string> = {
+            van: 'Furgoneta',
+            sleeper_bus: 'Autobús cama',
+            train: 'Tren',
+            plane: 'Avión',
+            rv: 'Autocaravana',
+        };
+        if (!type) return 'Transporte';
+        return labels[type] || formatTransportCategory(type);
+    };
+
+    const getLogisticsTransportTypeLabel = (type?: string | null): string => {
+        const labels: Record<string, string> = {
+            trailer: 'Tráiler',
+            '9m': 'Camión 9m',
+            '8m': 'Camión 8m',
+            '6m': 'Camión 6m',
+            '4m': 'Camión 4m',
+            furgoneta: 'Furgoneta',
+            rv: 'Autocaravana',
+        };
+        if (!type) return 'Transporte';
+        return labels[type] || formatTransportCategory(type);
+    };
+
+    const formatCompanyLabel = (company?: string | null): string => {
+        if (!company) return 'Pendiente';
+        const labels: Record<string, string> = {
+            pantoja: 'Pantoja',
+            transluminaria: 'Transluminaria',
+            transcamarena: 'Transcamarena',
+            camionaje: 'Camionaje',
+            sector_pro: 'Sector Pro',
+            other: 'Otra',
+            'wild tour': 'Wild Tour',
+        };
+        return labels[company] || formatTransportCategory(company);
+    };
+
+    const getRoomOccupantsLabel = (room: HojaDeRutaRoomAssignment): string => {
+        const occupants = [room.staff_member1_id, room.staff_member2_id]
+            .filter((id): id is string => Boolean(id))
+            .map((id) => resolveRoomOccupantName(id));
+        return occupants.length > 0 ? occupants.join(' · ') : 'Sin ocupantes asignados';
+    };
+
+    const formatRoomTypeLabel = (roomType?: string | null): string => {
+        const labels: Record<string, string> = {
+            single: 'Individual',
+            double: 'Doble',
+            twin: 'Twin',
+            triple: 'Triple',
+        };
+        if (!roomType) return 'Habitación';
+        return labels[roomType] || roomType;
+    };
+
+    const hasHojaAccommodationData = hojaAccommodations.length > 0;
+    const hasHojaTransportData = hojaTravelArrangements.length > 0 || hojaTransportEntries.length > 0;
+    const isTransportDataLoading = hojaDeRutaLoading || hojaTravelLoading || hojaTransportLoading;
 
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
@@ -726,6 +1125,89 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                 </div>
                             )}
 
+                            {/* Accommodation + Rooming (Hoja de Ruta) */}
+                            {(hojaDeRutaLoading || hojaAccommodationsLoading || hasHojaAccommodationData) && (
+                                <div>
+                                    <label className={`text-xs ${theme.textMuted} font-bold uppercase mb-2 block`}>Alojamiento y rooming</label>
+
+                                    {hojaDeRutaLoading || hojaAccommodationsLoading ? (
+                                        <div className="flex items-center gap-2 text-sm">
+                                            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                                            <span className={theme.textMuted}>Cargando alojamiento...</span>
+                                        </div>
+                                    ) : hasHojaAccommodationData ? (
+                                        <div className="space-y-3">
+                                            {hojaAccommodations.map((accommodation) => {
+                                                const rooms = accommodation.hoja_de_ruta_room_assignments || [];
+                                                return (
+                                                    <div
+                                                        key={accommodation.id}
+                                                        className={`p-3 rounded-lg ${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border`}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className="min-w-0">
+                                                                <div className={`text-sm font-semibold ${theme.textMain}`}>
+                                                                    {accommodation.hotel_name}
+                                                                </div>
+                                                                {accommodation.address && (
+                                                                    <div className={`text-xs ${theme.textMuted} mt-1`}>
+                                                                        {accommodation.address}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            {accommodation.address && (
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    onClick={() => handleOpenAddressInMaps(accommodation.address || '')}
+                                                                >
+                                                                    <MapPin size={12} className="mr-1" /> Mapa
+                                                                </Button>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                            <div>
+                                                                <div className={`text-[11px] uppercase font-semibold ${theme.textMuted}`}>Check-in</div>
+                                                                <div className={`text-xs ${theme.textMain}`}>{formatDateTimeLabel(accommodation.check_in)}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className={`text-[11px] uppercase font-semibold ${theme.textMuted}`}>Check-out</div>
+                                                                <div className={`text-xs ${theme.textMain}`}>{formatDateTimeLabel(accommodation.check_out)}</div>
+                                                            </div>
+                                                        </div>
+
+                                                        {rooms.length > 0 ? (
+                                                            <div className={`mt-3 pt-3 border-t ${theme.divider} space-y-1.5`}>
+                                                                {rooms.map((room) => (
+                                                                        <div key={room.id} className="text-xs">
+                                                                            <div className={`font-medium ${theme.textMain}`}>
+                                                                            {formatRoomTypeLabel(room.room_type)}{room.room_number ? ` · ${room.room_number}` : ''}
+                                                                            </div>
+                                                                            <div className={theme.textMuted}>{getRoomOccupantsLabel(room)}</div>
+                                                                        </div>
+                                                                ))}
+                                                            </div>
+                                                        ) : (
+                                                            <div className={`mt-3 text-xs ${theme.textMuted} italic`}>
+                                                                Sin habitaciones asignadas todavía
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+
+                                            {roomStaffIds.length > 0 && roomOccupantsLoading && (
+                                                <div className="flex items-center gap-2 text-xs">
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />
+                                                    <span className={theme.textMuted}>Resolviendo nombres de rooming...</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            )}
+
                             {/* Description */}
                             {job?.description && (
                                 <div>
@@ -815,6 +1297,190 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                         </div>
                     )}
 
+                    {/* TAB: TRANSP. */}
+                    {activeTab === 'Transp.' && (
+                        <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Car size={18} className={theme.textMuted} />
+                                <h3 className={`text-lg font-bold ${theme.textMain}`}>Transporte</h3>
+                            </div>
+
+                            {isTransportDataLoading ? (
+                                <div className="flex items-center gap-2 text-sm py-2">
+                                    <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                                    <span className={theme.textMuted}>Cargando detalles de transporte...</span>
+                                </div>
+                            ) : !hojaDeRutaId ? (
+                                <div className={`h-32 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                                    <span className="text-xs text-center px-4">
+                                        Este trabajo no tiene hoja de ruta vinculada.
+                                    </span>
+                                </div>
+                            ) : !hasHojaTransportData ? (
+                                <div className={`h-32 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                                    <span className="text-xs text-center px-4">
+                                        No hay detalles de transporte disponibles en la hoja de ruta.
+                                    </span>
+                                </div>
+                            ) : (
+                                <>
+                                    {hojaTravelArrangements.length > 0 && (
+                                        <div>
+                                            <label className={`text-xs ${theme.textMuted} font-bold uppercase mb-2 block`}>
+                                                Traslados de viaje ({hojaTravelArrangements.length})
+                                            </label>
+                                            <div className="space-y-2">
+                                                {hojaTravelArrangements.map((travel) => {
+                                                    const missingCoreDetails = [
+                                                        travel.pickup_time,
+                                                        travel.departure_time,
+                                                        travel.arrival_time,
+                                                        travel.pickup_address,
+                                                    ].filter((value) => !value).length;
+
+                                                    return (
+                                                        <div
+                                                            key={travel.id}
+                                                            className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-3`}
+                                                        >
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div className={`text-sm font-semibold ${theme.textMain}`}>
+                                                                    {getTravelTransportTypeLabel(travel.transportation_type)}
+                                                                </div>
+                                                                <div className="flex items-center gap-1">
+                                                                    {travel.pickup_time && (
+                                                                        <Badge variant="outline" className="text-[10px]">
+                                                                            {formatDateTimeLabel(travel.pickup_time)}
+                                                                        </Badge>
+                                                                    )}
+                                                                    {missingCoreDetails >= 3 && (
+                                                                        <Badge variant="outline" className="text-[10px] text-amber-500 border-amber-500/40">
+                                                                            Pendiente de confirmar
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                                                <div>
+                                                                    <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Punto de recogida</div>
+                                                                    <div className={theme.textMain}>{travel.pickup_address || 'Pendiente'}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Referencia</div>
+                                                                    <div className={theme.textMain}>{travel.flight_train_number || 'Pendiente'}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Hora salida</div>
+                                                                    <div className={theme.textMain}>{formatDateTimeLabel(travel.departure_time)}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Hora llegada</div>
+                                                                    <div className={theme.textMain}>{formatDateTimeLabel(travel.arrival_time)}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Conductor</div>
+                                                                    <div className={theme.textMain}>{travel.driver_name || 'Pendiente'}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Contacto</div>
+                                                                    <div className={theme.textMain}>{travel.driver_phone || 'Pendiente'}</div>
+                                                                </div>
+                                                                <div>
+                                                                    <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Matrícula</div>
+                                                                    <div className={theme.textMain}>{travel.plate_number || 'Pendiente'}</div>
+                                                                </div>
+                                                            </div>
+
+                                                            {(travel.pickup_address || travel.notes) && (
+                                                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                                                    {travel.pickup_address && (
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            onClick={() => handleOpenAddressInMaps(travel.pickup_address || '')}
+                                                                        >
+                                                                            <MapPin size={12} className="mr-1" /> Ver recogida
+                                                                        </Button>
+                                                                    )}
+                                                                    {travel.notes && (
+                                                                        <span className={`text-xs ${theme.textMuted}`}>
+                                                                            Nota: <span className={theme.textMain}>{travel.notes}</span>
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {hojaTransportEntries.length > 0 && (
+                                        <div>
+                                            <label className={`text-xs ${theme.textMuted} font-bold uppercase mb-2 block`}>
+                                                Transporte logístico ({hojaTransportEntries.length})
+                                            </label>
+                                            <div className="space-y-2">
+                                                {hojaTransportEntries.map((transport) => (
+                                                    <div
+                                                        key={transport.id}
+                                                        className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-3`}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className={`text-sm font-semibold ${theme.textMain}`}>
+                                                                {getLogisticsTransportTypeLabel(transport.transport_type)}
+                                                            </div>
+                                                            <Badge variant="outline" className="text-[10px]">
+                                                                {formatDateTimeLabel(transport.date_time)}
+                                                            </Badge>
+                                                        </div>
+
+                                                        <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                                                            <div>
+                                                                <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Empresa</div>
+                                                                <div className={theme.textMain}>{formatCompanyLabel(transport.company)}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Conductor</div>
+                                                                <div className={theme.textMain}>{transport.driver_name || 'Pendiente'}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Contacto</div>
+                                                                <div className={theme.textMain}>{transport.driver_phone || 'Pendiente'}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Matrícula</div>
+                                                                <div className={theme.textMain}>{transport.license_plate || 'Pendiente'}</div>
+                                                            </div>
+                                                            <div>
+                                                                <div className={`text-[10px] uppercase font-semibold ${theme.textMuted}`}>Vuelta</div>
+                                                                <div className={theme.textMain}>
+                                                                    {transport.has_return ? formatDateTimeLabel(transport.return_date_time) : 'No'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {transport.logistics_categories && transport.logistics_categories.length > 0 && (
+                                                            <div className="mt-2 flex flex-wrap gap-1">
+                                                                {transport.logistics_categories.map((category) => (
+                                                                    <Badge key={`${transport.id}-${category}`} variant="outline" className="text-[10px]">
+                                                                        {formatTransportCategory(category)}
+                                                                    </Badge>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
+
                     {/* TAB: PERSONAL */}
                     {activeTab === 'Personal' && (
                         <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
@@ -838,6 +1504,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                         const tech = assignment.technician;
                                         const dept = getDepartmentFromAssignment(assignment);
                                         const role = getRoleFromAssignment(assignment);
+                                        const roomieNames = tech?.id ? (roomieNamesByTechId.get(tech.id) || []) : [];
                                         const deptColors: Record<string, string> = {
                                             sound: 'text-blue-400 bg-blue-900/30 border-blue-900/50',
                                             lights: 'text-amber-400 bg-amber-900/30 border-amber-900/50',
@@ -864,6 +1531,13 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                                     <div className={`mt-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${deptColors[dept] || theme.textMuted}`}>
                                                         {dept}
                                                     </div>
+                                                    {roomieNames.length > 0 && (
+                                                        <div className="mt-2">
+                                                            <Badge variant="outline" className="text-[10px]">
+                                                                Roomie: {roomieNames.join(' · ')}
+                                                            </Badge>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -982,6 +1656,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                     <div className="space-y-2">
                                         {riderFiles.map((file) => {
                                             const key = `rider:${file.id}`;
+                                            const artistStageNumber = artistStageMap.get(file.artist_id);
+                                            const artistStageLabel = artistStageNumber != null
+                                                ? (festivalStageNameMap.get(artistStageNumber) || `Escenario ${artistStageNumber}`)
+                                                : 'Escenario sin definir';
                                             return (
                                                 <div
                                                     key={file.id}
@@ -997,6 +1675,11 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                                             </div>
                                                             <div className={`text-xs ${theme.textMuted}`}>
                                                                 Artista: {artistNameMap.get(file.artist_id) || 'Desconocido'}
+                                                            </div>
+                                                            <div className="mt-1">
+                                                                <Badge variant="outline" className="text-[10px]">
+                                                                    {artistStageLabel}
+                                                                </Badge>
                                                             </div>
                                                             <div className={`text-xs ${theme.textMuted}`}>
                                                                 {file.uploaded_at && `Subido el ${format(new Date(file.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}

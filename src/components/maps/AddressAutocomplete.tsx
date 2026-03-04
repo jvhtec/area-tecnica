@@ -20,18 +20,20 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   className,
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<any>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [apiKey, setApiKey] = useState<string | null>(null);
 
   // Fetch Google Maps API key
   useEffect(() => {
     const fetchApiKey = async () => {
+      setIsLoading(true);
       try {
         const { data, error } = await supabase.functions.invoke('get-google-maps-key');
         
         if (error) {
           console.error('Failed to fetch Google Maps API key:', error);
+          setIsLoading(false);
           return;
         }
         
@@ -40,110 +42,68 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         }
       } catch (err) {
         console.error('Error fetching API key:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     fetchApiKey();
   }, []);
 
-  // Initialize autocomplete with new Places API
+  // Initialize autocomplete with stable legacy Places binding.
+  // Important: keep the React-controlled <Input> mounted so value always stays in sync with form state.
   useEffect(() => {
     if (!apiKey || !inputRef.current) return;
 
-    const loadAutocomplete = () => {
-      if (!window.google) {
-        const script = document.createElement('script');
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
-        script.async = true;
-        script.defer = true;
-        script.onload = initAutocomplete;
-        document.head.appendChild(script);
-      } else {
-        initAutocomplete();
-      }
-    };
-
-    const initAutocomplete = async () => {
-      if (!inputRef.current || !window.google) return;
-
-      try {
-        // Import the Places library
-        const { PlaceAutocompleteElement } = await window.google.maps.importLibrary("places");
-        
-        // Create PlaceAutocompleteElement instead of legacy Autocomplete
-        autocompleteRef.current = new PlaceAutocompleteElement();
-        autocompleteRef.current.id = 'address-autocomplete';
-        
-        // Configure the autocomplete
-        autocompleteRef.current.setAttribute('placeholder', placeholder);
-        
-        // Replace the input with the PlaceAutocompleteElement
-        if (inputRef.current.parentNode) {
-          inputRef.current.parentNode.replaceChild(autocompleteRef.current, inputRef.current);
-        }
-
-        // Listen for place selection
-        autocompleteRef.current.addEventListener('gmp-placeselect', async (event) => {
-          const place = event.target.place;
-          
-          if (!place.location) {
-            console.log('No details available for input: ' + place.name);
-            return;
-          }
-
-          // Fetch additional place details
-          await place.fetchFields({
-            fields: ['displayName', 'formattedAddress', 'location']
-          });
-
-          const coordinates = place.location ? {
-            lat: place.location.lat(),
-            lng: place.location.lng(),
-          } : undefined;
-
-          onChange(place.formattedAddress || place.displayName, coordinates);
-        });
-
-      } catch (error) {
-        console.error('Error initializing autocomplete:', error);
-        // Fallback to legacy API if new one fails
-        initLegacyAutocomplete();
-      }
-    };
-
     const initLegacyAutocomplete = () => {
-      if (!inputRef.current || !window.google) return;
+      if (!inputRef.current || !window.google?.maps?.places?.Autocomplete) return;
+
+      // Clear previous listener bindings when effect re-runs.
+      if (autocompleteRef.current) {
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
+      }
 
       autocompleteRef.current = new window.google.maps.places.Autocomplete(
         inputRef.current,
         {
-          types: ['establishment', 'geocode'],
+          types: ['geocode'],
           fields: ['formatted_address', 'geometry', 'name'],
         }
       );
 
       autocompleteRef.current.addListener('place_changed', () => {
         const place = autocompleteRef.current.getPlace();
-        
-        if (place.formatted_address) {
-          const coordinates = place.geometry?.location ? {
-            lat: place.geometry.location.lat(),
-            lng: place.geometry.location.lng(),
-          } : undefined;
+        const address = place.formatted_address || place.name || inputRef.current?.value || '';
+        const coordinates = place.geometry?.location ? {
+          lat: place.geometry.location.lat(),
+          lng: place.geometry.location.lng(),
+        } : undefined;
 
-          onChange(place.formatted_address, coordinates);
-        }
+        onChange(address, coordinates);
       });
+    };
+
+    const loadAutocomplete = () => {
+      if (!window.google?.maps?.places?.Autocomplete) {
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
+        script.async = true;
+        script.defer = true;
+        script.onload = initLegacyAutocomplete;
+        document.head.appendChild(script);
+      } else {
+        initLegacyAutocomplete();
+      }
     };
 
     loadAutocomplete();
 
     return () => {
       if (autocompleteRef.current) {
-        (window.google?.maps?.event as any)?.clearInstanceListeners?.(autocompleteRef.current);
+        window.google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
     };
-  }, [apiKey, onChange, placeholder]);
+  }, [apiKey, onChange]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value);
