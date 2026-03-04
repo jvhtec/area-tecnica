@@ -7,11 +7,13 @@ describe('payout permissions', () => {
     expect(canManagePayouts('admin', null)).toBe(true);
   });
 
-  it('allows management only in administrative department aliases', () => {
+  it('allows management only in sound, lights, and administrative department aliases', () => {
+    expect(canManagePayouts('management', 'sound')).toBe(true);
+    expect(canManagePayouts('management', 'lights')).toBe(true);
     expect(canManagePayouts('management', 'administrative')).toBe(true);
     expect(canManagePayouts('management', 'administracion')).toBe(true);
     expect(canManagePayouts('management', 'Administración')).toBe(true);
-    expect(canManagePayouts('management', 'sound')).toBe(false);
+    expect(canManagePayouts('management', 'video')).toBe(false);
   });
 
   it('denies non-admin non-management roles', () => {

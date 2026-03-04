@@ -2,6 +2,7 @@ export type UserRole = string | null | undefined;
 export type UserDepartment = string | null | undefined;
 
 const ADMINISTRATIVE_DEPARTMENT_KEYS = new Set(['administrative', 'administracion']);
+const PAYOUT_MANAGEMENT_DEPARTMENT_KEYS = new Set(['sound', 'lights', ...ADMINISTRATIVE_DEPARTMENT_KEYS]);
 
 export const normalizeDepartmentKey = (value?: UserDepartment): string =>
   value
@@ -13,7 +14,7 @@ export const isAdministrativeDepartment = (department?: UserDepartment): boolean
   ADMINISTRATIVE_DEPARTMENT_KEYS.has(normalizeDepartmentKey(department));
 
 export const canManagePayouts = (role: UserRole, department?: UserDepartment): boolean =>
-  role === 'admin' || (role === 'management' && isAdministrativeDepartment(department));
+  role === 'admin' || (role === 'management' && PAYOUT_MANAGEMENT_DEPARTMENT_KEYS.has(normalizeDepartmentKey(department)));
 
 export const isTechnicianRole = (role: UserRole) => role === 'technician' || role === 'house_tech';
 
