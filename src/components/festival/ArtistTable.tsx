@@ -93,6 +93,40 @@ interface ArtistTableProps {
   onArtistStagePlotUpdated?: () => void;
 }
 
+type EquipmentSystem = {
+  quantity?: number | string | null;
+  quantity_hh?: number | string | null;
+  quantity_bp?: number | string | null;
+};
+
+const hasSystemsWithPositiveQuantities = (systems: EquipmentSystem[] = []) => {
+  return Array.isArray(systems) &&
+    systems.length > 0 &&
+    systems.some(system =>
+      Number(system?.quantity || 0) > 0 ||
+      Number(system?.quantity_hh || 0) > 0 ||
+      Number(system?.quantity_bp || 0) > 0
+    );
+};
+
+const matchesEquipmentFilter = (artist: Artist, equipmentFilter: string) => {
+  const filterKey = (equipmentFilter || "").trim().toLowerCase();
+
+  switch (filterKey) {
+    case "":
+    case "all":
+      return true;
+    case "wireless":
+      return hasSystemsWithPositiveQuantities(artist.wireless_systems);
+    case "iem":
+      return hasSystemsWithPositiveQuantities(artist.iem_systems);
+    case "monitors":
+      return Boolean(artist.monitors_enabled) || Number(artist.monitors_quantity || 0) > 0;
+    default:
+      return true;
+  }
+};
+
 export const ArtistTable = ({
   artists,
   isLoading,
@@ -504,13 +538,7 @@ export const ArtistTable = ({
   const filteredArtists = artists.filter(artist => {
     const matchesSearch = artist.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStage = stageFilter === "all" || artist.stage?.toString() === stageFilter;
-    const filterText = equipmentFilter.toLowerCase();
-    const matchesEquipment = !equipmentFilter ||
-      artist.foh_console.toLowerCase().includes(filterText) ||
-      artist.mon_console.toLowerCase().includes(filterText) ||
-      (artist.foh_waves_outboard || "").toLowerCase().includes(filterText) ||
-      (artist.mon_waves_outboard || "").toLowerCase().includes(filterText) ||
-      (artist.wired_mics && artist.wired_mics.some(mic => mic.model.toLowerCase().includes(filterText)));
+    const matchesEquipment = matchesEquipmentFilter(artist, equipmentFilter);
     const matchesRider = riderFilter === "all" || riderFilter === "missing" && artist.rider_missing || riderFilter === "complete" && !artist.rider_missing;
     return matchesSearch && matchesStage && matchesEquipment && matchesRider;
   });

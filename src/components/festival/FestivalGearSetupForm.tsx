@@ -31,10 +31,8 @@ export const FestivalGearSetupForm = ({
   stageNumber = 1,
   onSave
 }: FestivalGearSetupFormProps) => {
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [setup, setSetup] = useState<GearSetupFormData>({
-    max_stages: 1,
+  const buildEmptyStageSetup = (maxStages = 1): GearSetupFormData => ({
+    max_stages: maxStages,
     foh_consoles: [],
     mon_consoles: [],
     foh_waves_outboard: "",
@@ -60,6 +58,10 @@ export const FestivalGearSetupForm = ({
     other_infrastructure: "",
     notes: "",
   });
+
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [setup, setSetup] = useState<GearSetupFormData>(buildEmptyStageSetup());
   const [globalSetup, setGlobalSetup] = useState(null);
   const [existingSetupId, setExistingSetupId] = useState<string | null>(null);
   const [stageSetupId, setStageSetupId] = useState<string | null>(null);
@@ -90,6 +92,7 @@ export const FestivalGearSetupForm = ({
           setGlobalSetup(null);
           setStageSetupId(null);
           setHasStageSpecificSetup(false);
+          setSetup(buildEmptyStageSetup());
           return;
         }
         
@@ -149,37 +152,9 @@ export const FestivalGearSetupForm = ({
                 notes: stageSetupData.notes || ""
               });
             } else {
-              // For non-primary stage without stage-specific setup, use global setup data
+              // For non-primary stage without stage-specific setup, initialize an empty setup
               setHasStageSpecificSetup(false);
-              
-              // Update form values with global data
-              setSetup({
-                max_stages: setupData.max_stages || 1,
-                foh_consoles: setupData.foh_consoles || [],
-                mon_consoles: setupData.mon_consoles || [],
-                foh_waves_outboard: setupData.foh_waves_outboard || "",
-                mon_waves_outboard: setupData.mon_waves_outboard || "",
-                wireless_systems: normalizeWirelessSystems(setupData.wireless_systems, "wireless"),
-                iem_systems: normalizeWirelessSystems(setupData.iem_systems, "iem"),
-                wired_mics: setupData.wired_mics || [],
-                monitors_enabled: setupData.available_monitors > 0,
-                monitors_quantity: setupData.available_monitors || 0,
-                extras_sf: setupData.has_side_fills || false,
-                extras_df: setupData.has_drum_fills || false,
-                extras_djbooth: setupData.has_dj_booths || false,
-                extras_wired: setupData.extras_wired || "",
-                infra_cat6: setupData.available_cat6_runs > 0,
-                infra_cat6_quantity: setupData.available_cat6_runs || 0,
-                infra_hma: setupData.available_hma_runs > 0,
-                infra_hma_quantity: setupData.available_hma_runs || 0,
-                infra_coax: setupData.available_coax_runs > 0,
-                infra_coax_quantity: setupData.available_coax_runs || 0,
-                infra_opticalcon_duo: setupData.available_opticalcon_duo_runs > 0,
-                infra_opticalcon_duo_quantity: setupData.available_opticalcon_duo_runs || 0,
-                infra_analog: setupData.available_analog_runs || 0,
-                other_infrastructure: setupData.other_infrastructure || "",
-                notes: setupData.notes || ""
-              });
+              setSetup(buildEmptyStageSetup(setupData.max_stages || 1));
             }
           } else {
             // For primary stage (stage 1), always use global setup directly
@@ -461,7 +436,7 @@ export const FestivalGearSetupForm = ({
     ? "Está editando la configuración de stage predeterminada. Esta configuración se utilizará como predeterminada para todos los stages."
     : hasStageSpecificSetup
       ? `Este stage tiene una configuración de equipamiento personalizada que difiere de la configuración global.`
-      : `Este stage está usando actualmente la configuración global. Cualquier cambio creará una configuración personalizada para Stage ${stageNumber}.`;
+      : `Este stage aún no tiene configuración de equipamiento. Cualquier cambio creará una configuración personalizada para Stage ${stageNumber}.`;
 
   const alertVariant = isPrimaryStage ? "default" : hasStageSpecificSetup ? "info" : "default";
 
