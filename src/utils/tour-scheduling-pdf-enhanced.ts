@@ -6,6 +6,7 @@ import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { getWeatherForJob } from '@/utils/weather/weatherApi';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { buildReadableFilename } from '@/utils/fileName';
 
 const CORPORATE_RED: [number, number, number] = [125, 1, 1];
 const HEADER_HEIGHT = 30;
@@ -376,7 +377,12 @@ export const generateTravelDaySheet = async (
 
   await addPDFFooter(pdf);
 
-  const filename = `${tourData.name}_${format(new Date(tourDate.date), 'yyyy-MM-dd')}_travel_${direction}.pdf`;
+  const filename = buildReadableFilename([
+    tourData.name,
+    format(new Date(tourDate.date), 'yyyy-MM-dd'),
+    'travel',
+    direction,
+  ]);
   pdf.save(filename);
 };
 
@@ -696,7 +702,11 @@ export const generateEnhancedEventDaySheet = async (
 
   await addPDFFooter(pdf);
 
-  const filename = `${tourData.name}_${format(new Date(tourDate.date), 'yyyy-MM-dd')}_event.pdf`;
+  const filename = buildReadableFilename([
+    tourData.name,
+    format(new Date(tourDate.date), 'yyyy-MM-dd'),
+    'event',
+  ]);
   pdf.save(filename);
 };
 

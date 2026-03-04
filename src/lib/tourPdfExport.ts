@@ -2,6 +2,7 @@
 import { format } from 'date-fns';
 import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { buildReadableFilename } from '@/utils/fileName';
 
 export const exportTourPDF = async (tour: any) => {
   const { jsPDF, autoTable } = await loadPdfLibs();
@@ -175,7 +176,7 @@ export const exportTourPDF = async (tour: any) => {
     
     // Always save the PDF, regardless of logo success/failure
     console.log('Saving PDF...');
-    pdf.save(`${tour.name}_schedule.pdf`);
+    pdf.save(buildReadableFilename([tour.name, 'schedule']));
   };
 
   // Execute logo loading and save

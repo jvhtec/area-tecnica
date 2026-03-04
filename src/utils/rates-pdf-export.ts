@@ -102,6 +102,24 @@ const HEADER_HEIGHT = 44;
 const HEADER_CONTENT_OFFSET = HEADER_HEIGHT + 18;
 // Reserve space at the bottom for footer so tables/text never collide with it
 const FOOTER_RESERVED = 38; // px, keep enough room for logo + page text
+const INVALID_FILENAME_CHARS_REGEX = /[<>:"/\\|?*]/g;
+
+const sanitizeFilenamePart = (value: string): string => {
+  return value
+    .replace(INVALID_FILENAME_CHARS_REGEX, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/[. ]+$/g, '');
+};
+
+const buildPdfFilename = (parts: Array<string | null | undefined>, fallback = 'Documento') => {
+  const safeParts = parts
+    .map((part) => sanitizeFilenamePart(part ?? ''))
+    .filter(Boolean);
+  const baseName = safeParts.join(' - ') || fallback;
+  return `${baseName}.pdf`;
+};
+
 const loadImageSafely = (src: string, description: string): Promise<HTMLImageElement | null> => {
   return new Promise((resolve) => {
     if (!src || typeof Image === 'undefined') {
@@ -559,10 +577,11 @@ export async function generateRateQuotePDF(
   const footerLogo = companyLogo ?? headerLogo;
   drawCorporateFooter(doc, footerLogo);
 
-  const filename = `presupuesto_${jobDetails.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
-    new Date(),
-    'yyyy-MM-dd'
-  )}.pdf`;
+  const filename = buildPdfFilename([
+    'Presupuesto',
+    jobDetails.title,
+    format(new Date(), 'yyyy-MM-dd'),
+  ]);
   if (options?.download === false) {
     const blob = doc.output('blob') as Blob;
     return blob;
@@ -845,10 +864,11 @@ export async function generateTourRatesSummaryPDF(
   const footerLogo = companyLogo ?? headerLogo;
   drawCorporateFooter(doc, footerLogo);
 
-  const filename = `resumen_gira_${tourName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
-    new Date(),
-    'yyyy-MM-dd'
-  )}.pdf`;
+  const filename = buildPdfFilename([
+    'Resumen Gira',
+    tourName,
+    format(new Date(), 'yyyy-MM-dd'),
+  ]);
   doc.save(filename);
 }
 
@@ -1327,10 +1347,11 @@ export async function generateJobPayoutPDF(
   const footerLogo = companyLogo ?? headerLogo;
   drawCorporateFooter(doc, footerLogo);
 
-  const filename = `pago_${jobDetails.title.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_')}_${format(
-    new Date(),
-    'yyyy-MM-dd'
-  )}.pdf`;
+  const filename = buildPdfFilename([
+    'Pago',
+    jobDetails.title,
+    format(new Date(), 'yyyy-MM-dd'),
+  ]);
   if (options?.download === false) {
     const blob = doc.output('blob') as Blob;
     return blob;

@@ -1,6 +1,7 @@
 import { format } from 'date-fns';
 import { VacationRequest } from '@/lib/vacation-requests';
 import { supabase } from '@/integrations/supabase/client';
+import { buildVacationRequestPdfFilename } from '@/utils/pdfFileNames';
 import { loadJsPDF } from '@/utils/pdf/lazyPdf';
 
 interface VacationRequestPDFOptions {
@@ -252,17 +253,7 @@ export const downloadVacationRequestPDF = async (options: VacationRequestPDFOpti
     
     // Get technician info for filename
     const techInfo = await getTechnicianInfo(options.request.technician_id);
-    const cleanTechName = techInfo.name
-      .replace(/[^a-zA-Z0-9\s]/g, '') // Remove special characters
-      .replace(/\s+/g, ' ') // Replace multiple spaces with single space
-      .trim() // Remove leading/trailing spaces
-      .replace(/\s/g, '_'); // Replace spaces with underscores
-    
-    // Format request date for filename
-    const requestDate = format(new Date(options.request.created_at), 'MMM_dd_yyyy');
-    
-    // Generate readable filename: "vacation request tech name date.pdf"
-    link.download = `vacation_request_${cleanTechName}_${requestDate}.pdf`;
+    link.download = buildVacationRequestPdfFilename(techInfo.name, options.request.created_at);
     document.body.appendChild(link);
     link.click();
     

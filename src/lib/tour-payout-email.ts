@@ -1,6 +1,6 @@
-import { format } from 'date-fns';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { TourJobRateQuote } from '@/types/tourRates';
+import { buildTourPayoutPdfFilename } from '@/utils/pdfFileNames';
 import type { TechnicianProfile } from '@/utils/rates-pdf-export';
 import { generateRateQuotePDF } from '@/utils/rates-pdf-export';
 
@@ -88,15 +88,6 @@ export function adjustRehearsalQuotesForMultiDay(
       },
     };
   });
-}
-
-function sanitizeForFilename(value: string) {
-  return value
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .toLowerCase();
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -224,10 +215,13 @@ export async function prepareTourJobEmailContext(
     }
 
     const pdfBase64 = await blobToBase64(blob);
-    const jobSlug = sanitizeForFilename(job.title || job.id);
-    const techSlug = sanitizeForFilename(fullName);
-    const datePart = format(new Date(), 'yyyy-MM-dd');
-    const filename = `pago_${jobSlug || job.id}_${techSlug || techId}_${datePart}.pdf`;
+    const filename = buildTourPayoutPdfFilename({
+      jobTitle: job.title,
+      jobId: job.id,
+      technicianName: fullName,
+      technicianId: techId,
+      generatedAt: new Date(),
+    });
 
     attachments.push({
       technician_id: techId,

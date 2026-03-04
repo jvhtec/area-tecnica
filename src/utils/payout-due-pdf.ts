@@ -1,6 +1,7 @@
 import { es } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 
+import { buildPayoutDuePdfFilename } from "@/utils/pdfFileNames";
 import { loadPdfLibs } from "@/utils/pdf/lazyPdf";
 import { getCompanyLogo } from "@/utils/pdf/logoUtils";
 
@@ -41,15 +42,6 @@ const formatCurrency = (amount: number): string =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount);
-
-const sanitizeFileName = (value: string): string =>
-  value
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9_-]+/g, "_")
-    .replace(/_+/g, "_")
-    .replace(/^_+|_+$/g, "")
-    .toLowerCase();
 
 const formatAutonomoForPdf = (isHouseTech: boolean, isAutonomo: boolean | null): string => {
   if (isHouseTech) return "Empleado";
@@ -178,8 +170,6 @@ export async function downloadPayoutDueGroupPdf({
     doc.text(`Página ${pageNumber} de ${pageCount}`, pageWidth - 14, footerY, { align: "right" });
   }
 
-  const fromSlug = formatInTimeZone(paymentFrom, MADRID_TIMEZONE, "yyyyMMdd");
-  const toSlug = formatInTimeZone(paymentTo, MADRID_TIMEZONE, "yyyyMMdd");
-  const fileName = sanitizeFileName(`pagos_previstos_${fromSlug}_${toSlug}.pdf`) || "pagos_previstos.pdf";
+  const fileName = buildPayoutDuePdfFilename(paymentFrom, paymentTo);
   doc.save(fileName);
 }

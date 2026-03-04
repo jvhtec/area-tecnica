@@ -1,6 +1,6 @@
-import { format } from 'date-fns';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { JobPayoutTotals } from '@/types/jobExtras';
+import { buildJobPayoutPdfFilename } from '@/utils/pdfFileNames';
 import { generateJobPayoutPDF, TimesheetLine } from '@/utils/rates-pdf-export';
 
 export interface TechnicianProfileWithEmail {
@@ -54,15 +54,6 @@ export interface JobPayoutEmailInput {
   profiles?: TechnicianProfileWithEmail[];
   lpoMap?: Map<string, string | null>;
   jobDetails?: JobPayoutEmailJobDetails | null;
-}
-
-function sanitizeForFilename(value: string) {
-  return value
-    .replace(/[^\w\s-]/g, '')
-    .replace(/\s+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .toLowerCase();
 }
 
 async function blobToBase64(blob: Blob): Promise<string> {
@@ -342,10 +333,13 @@ export async function prepareJobPayoutEmailContext(
       continue;
     }
     const pdfBase64 = await blobToBase64(blob);
-    const jobSlug = sanitizeForFilename(job.title || job.id);
-    const techSlug = sanitizeForFilename(fullName);
-    const datePart = format(new Date(), 'yyyy-MM-dd');
-    const filename = `pago_${jobSlug || job.id}_${techSlug || payout.technician_id}_${datePart}.pdf`;
+    const filename = buildJobPayoutPdfFilename({
+      jobTitle: job.title,
+      jobId: job.id,
+      technicianName: fullName,
+      technicianId: payout.technician_id,
+      generatedAt: new Date(),
+    });
     attachments.push({
       technician_id: payout.technician_id,
       email: profile?.email ?? null,

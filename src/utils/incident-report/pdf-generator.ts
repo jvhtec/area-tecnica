@@ -1,6 +1,7 @@
 import { PDFDocument } from '@/utils/hoja-de-ruta/pdf/core/pdf-document';
 import { LogoService } from '@/utils/hoja-de-ruta/pdf/services/logo-service';
 import { uploadJobPdfWithCleanup } from '@/utils/jobDocumentsUpload';
+import { buildIncidentReportPdfFilename } from '@/utils/pdfFileNames';
 import { getCompanyLogo } from '@/utils/pdf/logoUtils';
 import { format } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
@@ -395,9 +396,7 @@ export const generateIncidentReportPDF = async (
   }
 
   // ── OUTPUT ──────────────────────────────────────────────────────
-  const safeJobTitle = data.jobTitle.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-  const timeStamp = format(currentDate, 'yyyy-MM-dd_HH-mm-ss');
-  const filename = `reporte_incidencia_${safeJobTitle}_${timeStamp}.pdf`;
+  const filename = buildIncidentReportPdfFilename(data.jobTitle, currentDate);
 
   if (options.saveToDatabase) {
     const pdfOutput = pdfDoc.document.output('blob');

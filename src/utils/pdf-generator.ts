@@ -13,6 +13,21 @@ const formatPickupDateTime = (datetime: string | undefined): string => {
   return result === 'N/A' ? '' : result;
 };
 
+const sanitizeFileNameSegment = (value: string | undefined): string => {
+  const sanitized = (value ?? "")
+    .normalize("NFKC")
+    .replace(/[\u0000-\u001F\u007F-\u009F]/g, " ")
+    .replace(/[<>:"/\\|?*]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[. ]+$/g, "");
+
+  return sanitized || "Sin titulo";
+};
+
+const buildRouteSheetFileName = (value: string | undefined): string =>
+  `Hoja de Ruta - ${sanitizeFileNameSegment(value)}.pdf`;
+
 export const uploadPdfToJob = async (
   jobId: string,
   pdfBlob: Blob,
@@ -72,7 +87,8 @@ export const generatePDF = async (
   }
 
   const selectedJob = jobs?.find((job: any) => job.id === selectedJobId);
-  const jobTitle = selectedJob?.title || "Trabajo_Sin_Nombre";
+  const titleForFileName = selectedJob?.title?.trim() || eventData.eventName?.trim();
+  const fileName = buildRouteSheetFileName(titleForFileName);
 
   const doc = new jsPDF() as AutoTableJsPDF;
   const pageWidth = doc.internal.pageSize.width;
@@ -368,7 +384,6 @@ export const generatePDF = async (
       doc.addImage(logo, "PNG", xPositionLogo, yPositionLogo, logoWidth, logoHeight);
     }
     const blob = doc.output("blob");
-    const fileName = `hoja_de_ruta_${jobTitle.replace(/\s+/g, "_")}.pdf`;
     uploadPdfToJob(selectedJobId, blob, fileName);
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -384,7 +399,7 @@ export const generatePDF = async (
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `hoja_de_ruta_${eventData.eventName.replace(/\s+/g, "_")}.pdf`;
+    link.download = fileName;
     link.click();
     URL.revokeObjectURL(url);
   };
