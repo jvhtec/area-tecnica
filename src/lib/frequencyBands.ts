@@ -59,6 +59,24 @@ export const WIRELESS_BANDS_EU: Record<string, FrequencyBandOption[]> = {
     option('P51', 710, 782),
     option('V51', 174, 216),
   ],
+  [normalizeModelKey('Audio-Technica 3000 Series')]: [
+    option('DE2', 470, 530),
+    option('EE1', 530, 590),
+    option('EF1', 590, 650),
+    option('FG1', 650, 700),
+    option('GH2', 795, 806),
+    option('HH2-A', 821.1, 831.9),
+    option('HH2-B', 863.1, 864.9),
+  ],
+  [normalizeModelKey('Sound Devices Astral Series')]: [
+    option('UK-UHF', 470, 702),
+    option('UK-DUPLEX', 823, 832),
+    option('UK-LF', 863, 865),
+    option('UK-DME1', 961, 1015),
+    option('UK-DME2', 1045, 1075),
+    option('UK-DME3', 1105, 1154),
+    option('UK-IMT', 1518, 1525),
+  ],
   [normalizeModelKey('Sennheiser 2000 Series')]: [
     option('Aw', 516, 558),
     option('Gw', 558, 626),
@@ -111,6 +129,22 @@ export const WIRELESS_BANDS_EU: Record<string, FrequencyBandOption[]> = {
     option('K+', 925, 937.5),
     option('1G8', 1785, 1800),
   ],
+  [normalizeModelKey('Sennheiser Spectera')]: [
+    option('Z01-UHF-L', 470, 608),
+    option('Z01-UHF-H', 630, 698),
+    option('Z01-1G4', 1350, 1400),
+  ],
+  [normalizeModelKey('Sennheiser 6000 Series')]: [
+    option('A1-A4', 470.2, 558),
+    option('A5-A8', 550, 638),
+    option('B1-B4', 630, 718),
+  ],
+  [normalizeModelKey('Sony UWP Series')]: [
+    option('CE21', 470.025, 542),
+    option('CE33', 566.025, 630),
+    option('CE42', 638.025, 694),
+    option('CE51', 710.025, 782),
+  ],
 };
 
 export const IEM_BANDS_EU: Record<string, FrequencyBandOption[]> = {
@@ -135,11 +169,21 @@ export const IEM_BANDS_EU: Record<string, FrequencyBandOption[]> = {
   ],
   [normalizeModelKey('Shure PSM300 Series')]: [
     option('H8E', 518, 542),
+    option('H20', 518, 542),
+    option('J10', 584, 608),
+    option('J13', 566, 590),
     option('K3E', 606, 630),
     option('K12', 614, 638),
     option('L19', 630, 654),
     option('M16', 686, 710),
     option('Q25', 742, 766),
+    option('S8', 823, 832),
+    option('T11', 863, 865),
+    option('X7', 925, 937.5),
+  ],
+  [normalizeModelKey('Audio-Technica 3000 IEM Series')]: [
+    option('DF2', 470, 608),
+    option('EG2', 580, 714),
   ],
   [normalizeModelKey('Sennheiser 2000 series')]: [
     option('Aw+', 470, 558),
@@ -164,6 +208,11 @@ export const IEM_BANDS_EU: Record<string, FrequencyBandOption[]> = {
     option('A', 516, 558),
     option('G', 566, 608),
     option('B', 626, 668),
+  ],
+  [normalizeModelKey('Sennheiser Spectera')]: [
+    option('Z01-UHF-L', 470, 608),
+    option('Z01-UHF-H', 630, 698),
+    option('Z01-1G4', 1350, 1400),
   ],
   [normalizeModelKey('Wysicom MTK')]: [
     option('WB', 470, 800),

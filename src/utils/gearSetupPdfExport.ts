@@ -6,7 +6,8 @@ import { formatFrequencyBand } from '@/lib/frequencyBands';
 export const generateStageGearPDF = async (
   jobId: string,
   stageNumber: number,
-  stageName?: string
+  stageName?: string,
+  logoUrl?: string,
 ): Promise<Blob> => {
   return new Promise(async (resolve, reject) => {
     try {
@@ -113,36 +114,53 @@ export const generateStageGearPDF = async (
       // Initial header
       addPageHeader();
 
-      // Load logo
+      // Load logo from provided URL first, then fall back to legacy path.
       const loadLogoPromise = new Promise<void>((resolveLogoLoad) => {
-        const img = new Image();
-        img.crossOrigin = 'Anonymous';
-        img.onload = () => {
-          try {
-            const maxHeight = 18;
-            const ratio = img.width / img.height;
-            const logoHeight = Math.min(maxHeight, img.height);
-            const logoWidth = logoHeight * ratio;
-            
-            doc.addImage(
-              img, 
-              'JPEG', 
-              5, 
-              1,
-              logoWidth,
-              logoHeight
-            );
-            resolveLogoLoad();
-          } catch (err) {
-            console.error('Error adding logo to PDF:', err);
-            resolveLogoLoad();
-          }
-        };
-        img.onerror = (e) => {
-          console.error('Error loading logo image:', e);
+        const logoCandidates = [logoUrl, `/logos/${jobId}.jpg`].filter(
+          (candidate): candidate is string => Boolean(candidate),
+        );
+
+        if (logoCandidates.length === 0) {
           resolveLogoLoad();
+          return;
+        }
+
+        const tryLoadAt = (index: number) => {
+          if (index >= logoCandidates.length) {
+            resolveLogoLoad();
+            return;
+          }
+
+          const currentLogo = logoCandidates[index];
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.onload = () => {
+            try {
+              const maxHeight = 18;
+              const ratio = img.width / img.height;
+              const logoHeight = Math.min(maxHeight, img.height);
+              const logoWidth = logoHeight * ratio;
+
+              doc.addImage(
+                img,
+                'JPEG',
+                5,
+                1,
+                logoWidth,
+                logoHeight
+              );
+            } catch (err) {
+              console.warn('Error adding logo to PDF:', err);
+            }
+            resolveLogoLoad();
+          };
+          img.onerror = () => {
+            tryLoadAt(index + 1);
+          };
+          img.src = currentLogo;
         };
-        img.src = `/logos/${jobId}.jpg`;
+
+        tryLoadAt(0);
       });
 
       await loadLogoPromise;

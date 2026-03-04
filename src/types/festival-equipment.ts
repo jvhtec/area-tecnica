@@ -7,10 +7,15 @@ export const WIRELESS_SYSTEMS = [
   'Shure UR Series',
   'Shure ULX Series',
   'Shure QLX Series',
+  'Audio-Technica 3000 Series',
+  'Sound Devices Astral Series',
   'Sennheiser 2000 Series',
   'Sennheiser EW500 Series',
   'Sennheiser EW300 Series',
   'Sennheiser EW100 Series',
+  'Sennheiser Spectera',
+  'Sennheiser 6000 Series',
+  'Sony UWP Series',
   'Other'
 ] as const;
 
@@ -19,9 +24,11 @@ export const IEM_SYSTEMS = [
   'Shure PSM1000 Series',
   'Shure PSM900 Series',
   'Shure PSM300 Series',
+  'Audio-Technica 3000 IEM Series',
   'Sennheiser 2000 series',
   'Sennheiser 300 G4 Series',
   'Sennheiser 300 G3 Series',
+  'Sennheiser Spectera',
   'Wysicom MTK',
   'Other'
 ] as const;

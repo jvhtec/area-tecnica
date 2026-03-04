@@ -15,39 +15,13 @@ import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArti
 import { generateWeatherPDF, WeatherPdfData } from './weatherPdfGenerator';
 import { ensurePublicArtistFormLinks } from '../publicArtistFormLinks';
 import { buildReadableFilename } from '@/utils/fileName';
-
-// Helper function to sort artists chronologically across all dates
-const sortArtistsChronologically = (artists: any[]) => {
-  return artists.sort((a, b) => {
-    // First sort by date
-    if (a.date !== b.date) {
-      return new Date(a.date).getTime() - new Date(b.date).getTime();
-    }
-    
-    // Then sort by stage within the same date
-    if (a.stage !== b.stage) {
-      return a.stage - b.stage;
-    }
-    
-    // Finally sort by show time within the same date and stage
-    const aTime = a.show_start || '';
-    const bTime = b.show_start || '';
-    
-    // Handle shows that cross midnight (early morning shows)
-    const aHour = aTime ? parseInt(aTime.split(':')[0], 10) : 0;
-    const bHour = bTime ? parseInt(bTime.split(':')[0], 10) : 0;
-    
-    // If show starts between 00:00-06:59, treat it as next day for sorting
-    const adjustedATime = aHour >= 0 && aHour < 7 ? `${aHour + 24}${aTime.substring(aTime.indexOf(':'))}` : aTime;
-    const adjustedBTime = bHour >= 0 && bHour < 7 ? `${bHour + 24}${bTime.substring(bTime.indexOf(':'))}` : bTime;
-    
-    if (adjustedATime < adjustedBTime) return -1;
-    if (adjustedATime > adjustedBTime) return 1;
-    
-    // Fallback to artist name
-    return (a.name || '').localeCompare(b.name || '');
-  });
-};
+import {
+  attachShiftAssignmentsAndProfiles,
+  buildArtistTableArtists,
+  buildInfrastructureArtists,
+  buildRfIemArtists,
+  sortArtistsChronologically,
+} from './festivalPdfSectionBuilders';
 
 export const generateAndMergeFestivalPDFs = async (
   jobId: string,
@@ -75,6 +49,10 @@ export const generateAndMergeFestivalPDFs = async (
     const stage = stageNames?.find(s => s.number === stageNumber);
     return stage?.name || `Stage ${stageNumber}`;
   };
+  const stageNamesByNumber = (stageNames || []).reduce((acc, stage) => {
+    acc[Number(stage.number)] = stage.name || `Escenario ${stage.number}`;
+    return acc;
+  }, {} as Record<number, string>);
   
   const gearPdfs: Blob[] = [];
   const shiftPdfs: Blob[] = [];
@@ -122,7 +100,7 @@ export const generateAndMergeFestivalPDFs = async (
         try {
           const stageName = getStageNameByNumber(stageNum);
           
-          const pdf = await generateStageGearPDF(jobId, stageNum, stageName);
+          const pdf = await generateStageGearPDF(jobId, stageNum, stageName, logoUrl);
           
           if (pdf && pdf.size > 0) {
             console.log(`Generated gear setup PDF for ${stageName}, size: ${pdf.size} bytes`);
@@ -172,76 +150,52 @@ export const generateAndMergeFestivalPDFs = async (
           if (filteredShifts && filteredShifts.length > 0) {
             try {
               console.log(`Generating shifts PDF for date ${date} with ${filteredShifts.length} shifts`);
-            
-              const shiftsWithAssignments = await Promise.all(filteredShifts.map(async (shift) => {
-                try {
-                  const { data: assignmentsData, error: assignmentsError } = await supabase
-                    .from("festival_shift_assignments")
-                    .select(`
-                      id, shift_id, technician_id, external_technician_name, role
-                    `)
-                    .eq("shift_id", shift.id);
-                
-                  if (assignmentsError) {
-                    console.error(`Error fetching assignments for shift ${shift.id}:`, assignmentsError);
-                    return { ...shift, assignments: [] };
-                  }
-                
-                  const assignmentsWithProfiles = await Promise.all((assignmentsData || []).map(async (assignment) => {
-                    if (!assignment.technician_id && !assignment.external_technician_name) {
-                      return { ...assignment, profiles: null };
-                    }
-                    
-                    if (assignment.external_technician_name) {
-                      return { 
-                        ...assignment, 
-                        profiles: null,
-                        external_technician_name: assignment.external_technician_name
-                      };
-                    }
-                    
-                    try {
-                      const { data: profileData, error: profileError } = await supabase
-                        .from("profiles")
-                        .select(`id, first_name, last_name, email, department, role`)
-                        .eq("id", assignment.technician_id)
-                        .single();
-                        
-                      if (profileError) {
-                        console.error(`Error fetching profile for technician ${assignment.technician_id}:`, profileError);
-                        return { ...assignment, profiles: null };
-                      }
-                      
-                      return { ...assignment, profiles: profileData };
-                    } catch (err) {
-                      console.error(`Error processing profile data for technician ${assignment.technician_id}:`, err);
-                      return { ...assignment, profiles: null };
-                    }
-                  }));
-                
-                  return { ...shift, assignments: assignmentsWithProfiles || [] };
-                } catch (err) {
-                  console.error(`Error processing assignments for shift ${shift.id}:`, err);
-                  return { ...shift, assignments: [] };
+              const shiftIds = filteredShifts.map((shift) => shift.id);
+              const { data: assignmentsData, error: assignmentsError } = await supabase
+                .from("festival_shift_assignments")
+                .select("id, shift_id, technician_id, external_technician_name, role")
+                .in("shift_id", shiftIds);
+
+              if (assignmentsError) {
+                console.error(`Error fetching assignments for date ${date}:`, assignmentsError);
+                continue;
+              }
+
+              const technicianIds = Array.from(
+                new Set(
+                  (assignmentsData || [])
+                    .map((assignment) => assignment.technician_id)
+                    .filter((technicianId): technicianId is string => Boolean(technicianId)),
+                ),
+              );
+
+              let profilesById = new Map<string, {
+                id: string;
+                first_name: string | null;
+                last_name: string | null;
+                email: string | null;
+                department: string | null;
+                role: string | null;
+              }>();
+
+              if (technicianIds.length > 0) {
+                const { data: profilesData, error: profilesError } = await supabase
+                  .from("profiles")
+                  .select("id, first_name, last_name, email, department, role")
+                  .in("id", technicianIds);
+
+                if (profilesError) {
+                  console.error(`Error fetching profiles for date ${date}:`, profilesError);
+                } else {
+                  profilesById = new Map((profilesData || []).map((profile) => [profile.id, profile]));
                 }
-              }));
-            
-              const typedShifts = shiftsWithAssignments.map(shift => {
-                return {
-                  id: shift.id,
-                  job_id: shift.job_id,
-                  date: shift.date,
-                  start_time: shift.start_time,
-                  end_time: shift.end_time,
-                  name: shift.name,
-                  department: shift.department || undefined,
-                  stage: shift.stage ? Number(shift.stage) : undefined,
-                  assignments: shift.assignments.map(assignment => ({
-                    ...assignment,
-                    external_technician_name: assignment.external_technician_name || undefined
-                  }))
-                };
-              });
+              }
+
+              const typedShifts = attachShiftAssignmentsAndProfiles(
+                filteredShifts,
+                assignmentsData || [],
+                profilesById,
+              );
             
               const shiftsTableData: ShiftsTablePdfData = {
                 jobTitle: jobTitle || 'Festival',
@@ -291,11 +245,6 @@ export const generateAndMergeFestivalPDFs = async (
           dateGroups.get(artist.date)?.push(artist);
         });
         
-        const { data: stages } = await supabase
-          .from("festival_stages")
-          .select("*")
-          .eq("job_id", jobId);
-        
         // Process dates in chronological order
         for (const [date, dateArtists] of dateGroups.entries()) {
           if (!dateArtists || dateArtists.length === 0) continue;
@@ -318,86 +267,9 @@ export const generateAndMergeFestivalPDFs = async (
             const tableData: ArtistTablePdfData = {
               jobTitle: jobTitle,
               date: date,
-              stage: stageName,
-              artists: stageArtists.map(artist => {
-                // Convert the database wireless_systems and iem_systems to the correct format
-                const wirelessSystems = (artist.wireless_systems || []).map((system: any) => ({
-                  model: system.model || '',
-                  quantity_hh: system.quantity_hh || 0,
-                  quantity_bp: system.quantity_bp || 0,
-                  band: system.band || ''
-                }));
-                
-                const iemSystems = (artist.iem_systems || []).map((system: any) => ({
-                  model: system.model || '',
-                  quantity_hh: system.quantity_hh || 0,
-                  quantity_bp: system.quantity_bp || 0,
-                  quantity: system.quantity || 0,
-                  band: system.band || ''
-                }));
-                
-                return {
-                  name: String(artist.name || ''),
-                  stage: Number(artist.stage || 1),
-                  showTime: { 
-                    start: String(artist.show_start || ''), 
-                    end: String(artist.show_end || '') 
-                  },
-                  soundcheck: artist.soundcheck_start ? { 
-                    start: String(artist.soundcheck_start || ''), 
-                    end: String(artist.soundcheck_end || '') 
-                  } : undefined,
-                  technical: {
-                    fohTech: Boolean(artist.foh_tech || false),
-                    monTech: Boolean(artist.mon_tech || false),
-                    fohConsole: { 
-                      model: String(artist.foh_console || ''), 
-                      providedBy: String(artist.foh_console_provided_by || 'festival') 
-                    },
-                    monConsole: { 
-                      model: String(artist.mon_console || ''), 
-                      providedBy: String(artist.mon_console_provided_by || 'festival') 
-                    },
-                    monitorsFromFoh: Boolean(artist.monitors_from_foh || false),
-                    fohWavesOutboard: String(artist.foh_waves_outboard || ""),
-                    monWavesOutboard: String(artist.mon_waves_outboard || ""),
-                    wireless: {
-                      systems: wirelessSystems,
-                      providedBy: String(artist.wireless_provided_by || 'festival')
-                    },
-                    iem: {
-                      systems: iemSystems,
-                      providedBy: String(artist.iem_provided_by || 'festival')
-                    },
-                    monitors: {
-                      enabled: Boolean(artist.monitors_enabled || false),
-                      quantity: Number(artist.monitors_quantity || 0)
-                    }
-                  },
-                  extras: {
-                    sideFill: Boolean(artist.extras_sf || false),
-                    drumFill: Boolean(artist.extras_df || false),
-                    djBooth: Boolean(artist.extras_djbooth || false)
-                  },
-                  notes: String(artist.notes || ''),
-                  micKit: artist.mic_kit || 'band',
-                  wiredMics: artist.wired_mics || [],
-                  infrastructure: {
-                    infra_cat6: artist.infra_cat6,
-                    infra_cat6_quantity: artist.infra_cat6_quantity,
-                    infra_hma: artist.infra_hma,
-                    infra_hma_quantity: artist.infra_hma_quantity,
-                    infra_coax: artist.infra_coax,
-                    infra_coax_quantity: artist.infra_coax_quantity,
-                    infra_opticalcon_duo: artist.infra_opticalcon_duo,
-                    infra_opticalcon_duo_quantity: artist.infra_opticalcon_duo_quantity,
-                    infra_analog: artist.infra_analog,
-                    other_infrastructure: artist.other_infrastructure,
-                    infrastructure_provided_by: artist.infrastructure_provided_by
-                  },
-                  riderMissing: Boolean(artist.rider_missing || false)
-                };
-              }),
+              stage: String(stageNum),
+              stageNames: stageNamesByNumber,
+              artists: buildArtistTableArtists(stageArtists as unknown as Record<string, unknown>[]),
               logoUrl
             };
             
@@ -540,19 +412,11 @@ export const generateAndMergeFestivalPDFs = async (
       console.log(`Generating RF & IEM table with ${sortedArtists.length} artists`);
       
       if (sortedArtists.length > 0) {
+        const rfIemArtists = buildRfIemArtists(sortedArtists as unknown as Record<string, unknown>[]);
         const rfIemData: RfIemTablePdfData = {
           jobTitle,
           logoUrl,
-          artists: sortedArtists.map(artist => {
-            return {
-              name: artist.name || 'Unnamed Artist',
-              stage: artist.stage || 1,
-              wirelessSystems: artist.wireless_systems || [],
-              iemSystems: artist.iem_systems || [],
-              wirelessProvidedBy: artist.wireless_provided_by || 'festival',
-              iemProvidedBy: artist.iem_provided_by || 'festival'
-            };
-          })
+          artists: rfIemArtists
         };
         
         try {
@@ -576,34 +440,13 @@ export const generateAndMergeFestivalPDFs = async (
       console.log(`Generating Infrastructure table with ${sortedArtists.length} artists`);
       
       if (sortedArtists.length > 0) {
+        const normalizedInfrastructureArtists = buildInfrastructureArtists(
+          sortedArtists as unknown as Record<string, unknown>[],
+        );
         const infrastructureData: InfrastructureTablePdfData = {
           jobTitle,
           logoUrl,
-          artists: sortedArtists.map(artist => {
-            return {
-              name: artist.name || 'Unnamed Artist',
-              stage: artist.stage || 1,
-              providedBy: artist.infrastructure_provided_by || 'festival',
-              cat6: { 
-                enabled: Boolean(artist.infra_cat6 || false), 
-                quantity: Number(artist.infra_cat6_quantity || 0) 
-              },
-              hma: { 
-                enabled: Boolean(artist.infra_hma || false), 
-                quantity: Number(artist.infra_hma_quantity || 0) 
-              },
-              coax: { 
-                enabled: Boolean(artist.infra_coax || false), 
-                quantity: Number(artist.infra_coax_quantity || 0) 
-              },
-              opticalconDuo: { 
-                enabled: Boolean(artist.infra_opticalcon_duo || false), 
-                quantity: Number(artist.infra_opticalcon_duo_quantity || 0) 
-              },
-              analog: Number(artist.infra_analog || 0),
-              other: String(artist.other_infrastructure || '')
-            };
-          })
+          artists: normalizedInfrastructureArtists
         };
         
         try {

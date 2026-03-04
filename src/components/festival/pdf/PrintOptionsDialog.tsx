@@ -14,9 +14,19 @@ import { exportRfIemTablePDF, RfIemTablePdfData } from "@/utils/rfIemTablePdfExp
 import { exportInfrastructureTablePDF, InfrastructureTablePdfData } from "@/utils/infrastructureTablePdfExport";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from "@/utils/wiredMicrophoneNeedsPdfExport";
 import { generateStageGearPDF } from "@/utils/gearSetupPdfExport";
+import { mergePDFs } from "@/utils/pdf/pdfMerge";
 import { fetchJobLogo, fetchLogoUrl } from "@/utils/pdf/logoUtils";
 import { ensurePublicArtistFormLinks } from "@/utils/publicArtistFormLinks";
 import { buildReadableFilename } from "@/utils/fileName";
+import {
+  attachShiftAssignmentsAndProfiles,
+  buildArtistTableArtists,
+  buildInfrastructureArtists,
+  buildRfIemArtists,
+  hasInfrastructureNeeds,
+  hasRfIemSystems,
+  sortArtistsChronologically,
+} from "@/utils/pdf/festivalPdfSectionBuilders";
 import { toast } from "sonner";
 
 export interface PrintOptions {
@@ -390,14 +400,17 @@ export const PrintOptionsDialog = ({
     try {
       console.log('Downloading Gear Setup for job:', jobId);
       
-      const logoUrl = await fetchLogoUrl(jobId);
+      const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
       
       // Generate gear setup PDF for selected stages
       const stagePromises = options.gearSetupStages.map(async (stageNumber) => {
-        return await generateStageGearPDF(jobId, stageNumber, logoUrl);
+        return await generateStageGearPDF(jobId, stageNumber, undefined, logoUrl);
       });
 
       const gearBlobs = await Promise.all(stagePromises);
+      if (gearBlobs.length === 0) {
+        throw new Error('No se pudo generar ningún PDF de equipamiento.');
+      }
       
       if (gearBlobs.length === 1) {
         // Single stage - download directly
@@ -415,7 +428,6 @@ export const PrintOptionsDialog = ({
         URL.revokeObjectURL(url);
       } else {
         // Multiple stages - merge and download
-        const { mergePDFs } = await import('@/utils/pdf/pdfMerge');
         const mergedBlob = await mergePDFs(gearBlobs);
         
         const url = URL.createObjectURL(mergedBlob);
@@ -444,37 +456,90 @@ export const PrintOptionsDialog = ({
     try {
       console.log('Downloading Shift Schedules for job:', jobId);
       
-      const logoUrl = await fetchLogoUrl(jobId);
-      
-      // Fetch shifts data
+      const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
+
       const { data: shifts, error } = await supabase
         .from('festival_shifts')
-        .select(`
-          *,
-          festival_shift_assignments (
-            technician_id,
-            external_technician_name,
-            role,
-            profiles (first_name, last_name)
-          )
-        `)
+        .select('id, job_id, name, date, start_time, end_time, department, stage')
         .eq('job_id', jobId)
-        .in('stage', options.shiftScheduleStages)
         .order('date')
         .order('start_time');
 
       if (error) throw error;
+      const filteredShifts = (shifts || []).filter((shift) =>
+        !shift.stage || options.shiftScheduleStages.includes(Number(shift.stage))
+      );
+      if (filteredShifts.length === 0) {
+        toast.error('No hay turnos para los escenarios seleccionados.');
+        return;
+      }
 
-      const shiftsData: ShiftsTablePdfData = {
-        jobTitle,
-        date: new Date().toISOString().split('T')[0], // Current date as fallback
-        logoUrl,
-        shifts: shifts || []
-      };
+      const shiftIds = filteredShifts.map((shift) => shift.id);
+      const { data: assignments, error: assignmentsError } = await supabase
+        .from('festival_shift_assignments')
+        .select('id, shift_id, technician_id, external_technician_name, role')
+        .in('shift_id', shiftIds);
 
-      const pdfBlob = await exportShiftsTablePDF(shiftsData);
-      
-      const url = URL.createObjectURL(pdfBlob);
+      if (assignmentsError) throw assignmentsError;
+
+      const technicianIds = Array.from(
+        new Set(
+          (assignments || [])
+            .map((assignment) => assignment.technician_id)
+            .filter((technicianId): technicianId is string => Boolean(technicianId))
+        ),
+      );
+
+      let profilesById = new Map<string, {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        email: string | null;
+        department: string | null;
+        role: string | null;
+      }>();
+
+      if (technicianIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email, department, role')
+          .in('id', technicianIds);
+        if (profilesError) throw profilesError;
+        profilesById = new Map((profiles || []).map((profile) => [profile.id, profile]));
+      }
+
+      const hydratedShifts = attachShiftAssignmentsAndProfiles(filteredShifts, assignments || [], profilesById);
+      const shiftsByDate = new Map<string, typeof hydratedShifts>();
+      for (const shift of hydratedShifts) {
+        if (!shiftsByDate.has(shift.date)) shiftsByDate.set(shift.date, []);
+        shiftsByDate.get(shift.date)?.push(shift);
+      }
+
+      const sortedDates = [...shiftsByDate.keys()].sort();
+      const shiftPdfs: Blob[] = [];
+
+      for (const date of sortedDates) {
+        const dailyShifts = shiftsByDate.get(date) || [];
+        if (dailyShifts.length === 0) continue;
+        const shiftsData: ShiftsTablePdfData = {
+          jobTitle,
+          date,
+          logoUrl,
+          shifts: dailyShifts,
+        };
+        const pdfBlob = await exportShiftsTablePDF(shiftsData);
+        if (pdfBlob.size > 0) {
+          shiftPdfs.push(pdfBlob);
+        }
+      }
+
+      if (shiftPdfs.length === 0) {
+        toast.error('No se pudieron generar PDFs de turnos para los escenarios seleccionados.');
+        return;
+      }
+
+      const outputBlob = shiftPdfs.length === 1 ? shiftPdfs[0] : await mergePDFs(shiftPdfs);
+      const url = URL.createObjectURL(outputBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = buildReadableFilename([jobTitle || "Festival", "Horarios de turnos"]);
@@ -499,7 +564,7 @@ export const PrintOptionsDialog = ({
     try {
       console.log('Downloading Artist Tables for job:', jobId);
       
-      const logoUrl = await fetchLogoUrl(jobId);
+      const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
       
       // Fetch artists data
       const { data: artists, error } = await supabase
@@ -512,17 +577,57 @@ export const PrintOptionsDialog = ({
         .order('show_start');
 
       if (error) throw error;
+      if (!artists || artists.length === 0) {
+        toast.error('No hay artistas para los escenarios seleccionados.');
+        return;
+      }
 
-      const artistData: ArtistTablePdfData = {
-        jobTitle,
-        date: new Date().toISOString().split('T')[0], // Current date as fallback
-        logoUrl,
-        artists: artists || []
-      };
+      const sortedArtists = sortArtistsChronologically(artists);
+      const { data: stageRows, error: stageError } = await supabase
+        .from('festival_stages')
+        .select('number, name')
+        .eq('job_id', jobId);
+      if (stageError) throw stageError;
 
-      const pdfBlob = await exportArtistTablePDF(artistData);
-      
-      const url = URL.createObjectURL(pdfBlob);
+      const stageNames = (stageRows || []).reduce((acc, stage) => {
+        acc[Number(stage.number)] = stage.name || `Escenario ${stage.number}`;
+        return acc;
+      }, {} as Record<number, string>);
+
+      const artistsByDateAndStage = new Map<string, Map<number, Record<string, unknown>[]>>();
+      for (const artist of sortedArtists) {
+        const date = String(artist.date || '');
+        const stage = Number(artist.stage || 1);
+        if (!artistsByDateAndStage.has(date)) artistsByDateAndStage.set(date, new Map());
+        const byStage = artistsByDateAndStage.get(date)!;
+        if (!byStage.has(stage)) byStage.set(stage, []);
+        byStage.get(stage)!.push(artist as unknown as Record<string, unknown>);
+      }
+
+      const artistTablePdfs: Blob[] = [];
+      for (const [date, byStage] of artistsByDateAndStage.entries()) {
+        for (const [stage, stageArtists] of byStage.entries()) {
+          const artistData: ArtistTablePdfData = {
+            jobTitle,
+            date,
+            stage: String(stage),
+            stageNames,
+            logoUrl,
+            artists: buildArtistTableArtists(stageArtists),
+          };
+
+          const pdfBlob = await exportArtistTablePDF(artistData);
+          if (pdfBlob.size > 0) artistTablePdfs.push(pdfBlob);
+        }
+      }
+
+      if (artistTablePdfs.length === 0) {
+        toast.error('No se pudieron generar tablas de artistas para los escenarios seleccionados.');
+        return;
+      }
+
+      const outputBlob = artistTablePdfs.length === 1 ? artistTablePdfs[0] : await mergePDFs(artistTablePdfs);
+      const url = URL.createObjectURL(outputBlob);
       const a = document.createElement('a');
       a.href = url;
       a.download = buildReadableFilename([jobTitle || "Festival", "Cronograma artistas"]);
@@ -547,7 +652,7 @@ export const PrintOptionsDialog = ({
     try {
       console.log('Downloading RF/IEM Table for job:', jobId);
       
-      const logoUrl = await fetchLogoUrl(jobId);
+      const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
       
       // Fetch artists data
       const { data: artists, error } = await supabase
@@ -561,10 +666,18 @@ export const PrintOptionsDialog = ({
 
       if (error) throw error;
 
+      const sortedArtists = sortArtistsChronologically((artists || []) as any[]);
+      const normalizedArtists = buildRfIemArtists(sortedArtists as unknown as Record<string, unknown>[]);
+      const artistsWithRfIem = normalizedArtists.filter(hasRfIemSystems);
+      if (artistsWithRfIem.length === 0) {
+        toast.error('No hay datos RF/IEM para los escenarios seleccionados.');
+        return;
+      }
+
       const rfIemData: RfIemTablePdfData = {
         jobTitle,
         logoUrl,
-        artists: artists || []
+        artists: artistsWithRfIem
       };
 
       const pdfBlob = await exportRfIemTablePDF(rfIemData);
@@ -594,7 +707,7 @@ export const PrintOptionsDialog = ({
     try {
       console.log('Downloading Infrastructure Table for job:', jobId);
       
-      const logoUrl = await fetchLogoUrl(jobId);
+      const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
       
       // Fetch artists data
       const { data: artists, error } = await supabase
@@ -608,10 +721,18 @@ export const PrintOptionsDialog = ({
 
       if (error) throw error;
 
+      const sortedArtists = sortArtistsChronologically((artists || []) as any[]);
+      const normalizedInfrastructureArtists = buildInfrastructureArtists(sortedArtists as unknown as Record<string, unknown>[]);
+      const artistsWithInfrastructure = normalizedInfrastructureArtists.filter(hasInfrastructureNeeds);
+      if (artistsWithInfrastructure.length === 0) {
+        toast.error('No hay necesidades de infraestructura para los escenarios seleccionados.');
+        return;
+      }
+
       const infraData: InfrastructureTablePdfData = {
         jobTitle,
         logoUrl,
-        artists: artists || []
+        artists: artistsWithInfrastructure
       };
 
       const pdfBlob = await exportInfrastructureTablePDF(infraData);
