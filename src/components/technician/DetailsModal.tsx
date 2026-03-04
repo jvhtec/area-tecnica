@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
-import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon } from 'lucide-react';
+import { Loader2, X, Calendar as CalendarIcon, MapPin, User, FileText, Eye, Download, Utensils, Phone, Globe, CloudRain, RefreshCw, AlertTriangle, Map as MapIcon, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TourDocumentUploader } from '@/components/tours/TourDocumentUploader';
@@ -31,6 +31,13 @@ interface DetailsModalProps {
 // (TourDocument type imported from useTourDocuments)
 
 type TabId = 'Info' | 'Ubicación' | 'Personal' | 'Docs' | 'Restau.' | 'Clima';
+type RiderFile = {
+    id: string;
+    file_name: string;
+    file_path: string;
+    uploaded_at: string;
+    artist_id: string;
+};
 
 export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
     const { user, userRole } = useOptimizedAuth();
@@ -134,6 +141,39 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
             return (data || []) as TourDocument[];
         },
         enabled: !!tourId,
+    });
+
+    // Fetch artists linked to this job, then their rider files
+    const { data: jobArtists = [], isLoading: isArtistsLoading, error: jobArtistsError } = useQuery({
+        queryKey: ['technician-job-artists', job?.id],
+        queryFn: async () => {
+            if (!job?.id) return [];
+            const { data, error } = await supabase
+                .from('festival_artists')
+                .select('id, name')
+                .eq('job_id', job.id);
+            if (error) throw error;
+            return (data || []) as Array<{ id: string; name: string }>;
+        },
+        enabled: !!job?.id,
+    });
+
+    const artistIdList = useMemo(() => jobArtists.map((artist) => artist.id), [jobArtists]);
+    const artistNameMap = useMemo(() => new Map(jobArtists.map((artist) => [artist.id, artist.name])), [jobArtists]);
+
+    const { data: riderFiles = [], isLoading: isRidersLoading, error: riderFilesError } = useQuery({
+        queryKey: ['technician-job-rider-files', job?.id, artistIdList],
+        queryFn: async () => {
+            if (artistIdList.length === 0) return [];
+            const { data, error } = await supabase
+                .from('festival_artist_files')
+                .select('id, file_name, file_path, uploaded_at, artist_id')
+                .in('artist_id', artistIdList)
+                .order('uploaded_at', { ascending: false });
+            if (error) throw error;
+            return (data || []) as RiderFile[];
+        },
+        enabled: artistIdList.length > 0,
     });
 
     // Fetch nearby restaurants using Google Places API
@@ -309,6 +349,52 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Error desconocido';
             toast.error(`No se pudo descargar el documento de gira: ${message}`);
+        } finally {
+            setDocumentLoading(prev => { const s = new Set(prev); s.delete(key); return s; });
+        }
+    };
+
+    const handleViewRider = async (file: RiderFile) => {
+        const key = `rider:${file.id}`;
+        setDocumentLoading(prev => new Set(prev).add(key));
+        try {
+            const { data, error } = await supabase.storage
+                .from('festival_artist_files')
+                .createSignedUrl(file.file_path, 60);
+            if (error || !data?.signedUrl) {
+                throw error || new Error('No se pudo generar la URL');
+            }
+            window.open(data.signedUrl, '_blank');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            toast.error(`No se pudo abrir el rider: ${message}`);
+        } finally {
+            setDocumentLoading(prev => { const s = new Set(prev); s.delete(key); return s; });
+        }
+    };
+
+    const handleDownloadRider = async (file: RiderFile) => {
+        const key = `rider:${file.id}`;
+        setDocumentLoading(prev => new Set(prev).add(key));
+        try {
+            const { data, error } = await supabase.storage
+                .from('festival_artist_files')
+                .download(file.file_path);
+            if (error || !data) {
+                throw error || new Error('No se pudo descargar el archivo');
+            }
+
+            const url = window.URL.createObjectURL(data);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = file.file_name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error desconocido';
+            toast.error(`No se pudo descargar el rider: ${message}`);
         } finally {
             setDocumentLoading(prev => { const s = new Set(prev); s.delete(key); return s; });
         }
@@ -715,6 +801,99 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                     <div className={`h-32 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
                                         <FileText size={24} className="mb-2 opacity-50" />
                                         <span className="text-xs">No hay documentos disponibles</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div>
+                                <div className="flex items-center gap-2 mb-3">
+                                    <Users size={18} className={theme.textMuted} />
+                                    <h3 className={`text-lg font-bold ${theme.textMain}`}>Riders de artistas</h3>
+                                </div>
+
+                                {(jobArtistsError || riderFilesError) && (
+                                    <div className={`mb-3 rounded-lg border p-3 ${theme.danger}`}>
+                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                            <AlertTriangle size={14} />
+                                            No se pudieron cargar todos los riders
+                                        </div>
+                                    </div>
+                                )}
+
+                                {isArtistsLoading || isRidersLoading ? (
+                                    <div className="flex items-center justify-center py-6">
+                                        <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
+                                    </div>
+                                ) : jobArtists.length === 0 ? (
+                                    <div className={`h-24 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                                        <span className="text-xs">No hay artistas asociados a este trabajo</span>
+                                    </div>
+                                ) : riderFiles.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {riderFiles.map((file) => {
+                                            const key = `rider:${file.id}`;
+                                            return (
+                                                <div
+                                                    key={file.id}
+                                                    className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-3`}
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <div
+                                                                className={`text-sm font-bold ${theme.textMain} leading-snug break-words line-clamp-2 mb-1`}
+                                                                title={file.file_name}
+                                                            >
+                                                                {file.file_name}
+                                                            </div>
+                                                            <div className={`text-xs ${theme.textMuted}`}>
+                                                                Artista: {artistNameMap.get(file.artist_id) || 'Desconocido'}
+                                                            </div>
+                                                            <div className={`text-xs ${theme.textMuted}`}>
+                                                                {file.uploaded_at && `Subido el ${format(new Date(file.uploaded_at), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-3 shrink-0">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                onClick={() => handleViewRider(file)}
+                                                                disabled={documentLoading.has(key)}
+                                                                className="h-10 w-10 p-0"
+                                                                title={`Ver ${file.file_name}`}
+                                                                aria-label={`Ver ${file.file_name}`}
+                                                            >
+                                                                {documentLoading.has(key) ? (
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                ) : (
+                                                                    <Eye size={18} />
+                                                                )}
+                                                            </Button>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                onClick={() => handleDownloadRider(file)}
+                                                                disabled={documentLoading.has(key)}
+                                                                className="h-10 w-10 p-0"
+                                                                title={`Descargar ${file.file_name}`}
+                                                                aria-label={`Descargar ${file.file_name}`}
+                                                            >
+                                                                {documentLoading.has(key) ? (
+                                                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                                                ) : (
+                                                                    <Download size={18} />
+                                                                )}
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className={`h-24 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
+                                        <span className="text-xs">
+                                            No hay riders subidos para los {jobArtists.length} {jobArtists.length === 1 ? 'artista' : 'artistas'} asociados
+                                        </span>
                                     </div>
                                 )}
                             </div>
