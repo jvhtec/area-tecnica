@@ -81,14 +81,18 @@ export class ProgramSection {
 
     this.pdfDoc.setText(10, [51, 51, 51]);
     if (DataValidators.hasData(eventData.schedule)) {
-      const scheduleLines = eventData.schedule!.split('\n');
+      const lineHeight = 6;
+      const scheduleLines = eventData.schedule!
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
       for (const line of scheduleLines) {
-        if (line.trim()) {
-          this.pdfDoc.addText(line.trim(), 30, yPosition);
-          yPosition += 12;
-        }
+        yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);
+        this.pdfDoc.addText(line, 30, yPosition);
+        yPosition += lineHeight;
       }
-      return yPosition + 10;
+      return yPosition + 6;
     }
 
     return yPosition;

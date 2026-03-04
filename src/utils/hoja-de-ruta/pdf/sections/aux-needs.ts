@@ -15,14 +15,18 @@ export class AuxNeedsSection {
       return yPosition;
     }
 
-    const auxLines = eventData.auxiliaryNeeds!.split('\n');
+    const lineHeight = 6;
+    const auxLines = eventData.auxiliaryNeeds!
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
     for (const line of auxLines) {
-      if (line.trim()) {
-        this.pdfDoc.addText(line.trim(), 30, yPosition);
-        yPosition += 12;
-      }
+      yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);
+      this.pdfDoc.addText(line, 30, yPosition);
+      yPosition += lineHeight;
     }
 
-    return yPosition + 10;
+    return yPosition + 6;
   }
 }

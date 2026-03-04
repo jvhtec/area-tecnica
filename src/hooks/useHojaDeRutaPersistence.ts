@@ -4,9 +4,24 @@ import type { Database } from "@/integrations/supabase/types";
 import { EventData, TravelArrangement, Accommodation } from "@/types/hoja-de-ruta";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 
 const PARTIAL_ISO_NO_TZ_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+const ISO_WITH_TZ_REGEX = /([zZ]|[+-]\d{2}:\d{2})$/;
+const MADRID_TIMEZONE = "Europe/Madrid";
+
+const toDateTimeLocalInMadrid = (value: string | null | undefined): string => {
+  if (!value || !value.trim()) return "";
+
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "";
+    return formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd'T'HH:mm");
+  } catch {
+    return "";
+  }
+};
 
 /**
  * Normalize datetime-local or ISO-ish inputs into explicit UTC ISO timestamps
@@ -20,7 +35,10 @@ const toSafeTimestamptz = (value: string | null | undefined): string | null => {
     ? (raw.length === 16 ? `${raw}:00` : raw)
     : raw;
 
-  const date = new Date(normalizedInput);
+  const date = ISO_WITH_TZ_REGEX.test(normalizedInput)
+    ? new Date(normalizedInput)
+    : fromZonedTime(normalizedInput, MADRID_TIMEZONE);
+
   if (Number.isNaN(date.getTime())) {
     console.warn('SAVE: Invalid datetime for timestamptz, storing null:', value);
     return null;
@@ -168,9 +186,9 @@ export const useHojaDeRutaPersistence = (
             driver_phone: t.driver_phone,
             license_plate: t.license_plate,
             company: t.company,
-            date_time: t.date_time ? String(t.date_time).replace(' ', 'T').slice(0, 16) : '',
+            date_time: toDateTimeLocalInMadrid(t.date_time),
             has_return: t.has_return,
-            return_date_time: t.return_date_time ? String(t.return_date_time).replace(' ', 'T').slice(0, 16) : '',
+            return_date_time: toDateTimeLocalInMadrid(t.return_date_time),
             source_logistics_event_id: t.source_logistics_event_id || undefined,
             is_hoja_relevant: t.is_hoja_relevant ?? true,
             logistics_categories: t.logistics_categories || [],

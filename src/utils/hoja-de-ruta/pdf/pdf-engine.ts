@@ -171,20 +171,6 @@ export class PDFEngine {
         this.contentSections.addLogisticsSection(this.options.eventData, currentY);
       }
 
-      // 9b. Certificado de entrega (logística)
-      if (includeLogisticsTransport && this.contentSections.hasDeliveryCertificateData(this.options.eventData)) {
-        const [certificateJobContext, sectorProStamp] = await Promise.all([
-          this.fetchDeliveryCertificateJobContext(selectedJobId),
-          StampService.loadExactSectorProStamp(),
-        ]);
-        const currentY = this.headerSection.addSectionHeader("Certificado de Entrega");
-        this.contentSections.addDeliveryCertificateSection(this.options.eventData, currentY, {
-          ...certificateJobContext,
-          issueDate: new Date(),
-          stamp: sectorProStamp,
-        });
-      }
-
       // 10. Power Requirements
       if (this.contentSections.hasPowerData(this.options.eventData)) {
         const currentY = this.headerSection.addSectionHeader("Requerimientos eléctricos");
@@ -207,6 +193,20 @@ export class PDFEngine {
       if (this.contentSections.hasRestaurantsData(this.options.eventData)) {
         const currentY = this.headerSection.addSectionHeader("Restaurantes");
         await this.contentSections.addRestaurantsSection(this.options.eventData, currentY);
+      }
+
+      // 14. Certificado de entrega (siempre al final)
+      if (includeLogisticsTransport && this.contentSections.hasDeliveryCertificateData(this.options.eventData)) {
+        const [certificateJobContext, sectorProStamp] = await Promise.all([
+          this.fetchDeliveryCertificateJobContext(selectedJobId),
+          StampService.loadExactSectorProStamp(),
+        ]);
+        const currentY = this.headerSection.addSectionHeader("Certificado de Entrega");
+        this.contentSections.addDeliveryCertificateSection(this.options.eventData, currentY, {
+          ...certificateJobContext,
+          issueDate: new Date(),
+          stamp: sectorProStamp,
+        });
       }
 
       // Add Sector-Pro footer to all pages with page numbers and job name
@@ -262,11 +262,11 @@ export class PDFEngine {
     
     // Generate filename
     const eventName = eventData.eventName || jobTitle || 'Evento';
-    const safeEventName = eventName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+    const safeEventName = eventName.replace(/_/g, ' ').replace(/\s+/g, ' ').trim() || 'Evento';
     const nowIso = new Date().toISOString();
     const datePart = nowIso.slice(0, 10); // YYYY-MM-DD (UTC)
-    const timePart = nowIso.slice(11, 19).replace(/:/g, ''); // HHMMSS (UTC)
-    const filename = `hoja_de_ruta_${safeEventName}_${datePart}_${timePart}.pdf`;
+    const timePart = nowIso.slice(11, 19).replace(/:/g, '-'); // HH-MM-SS (UTC)
+    const filename = `Hoja de Ruta - ${safeEventName} - ${datePart} ${timePart}.pdf`;
 
     // Save locally
     this.pdfDoc.save(filename);

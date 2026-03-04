@@ -10,6 +10,7 @@ export class LogisticsSection {
   addLogisticsSection(eventData: EventData, yPosition: number): number {
     const logistics = eventData.logistics;
     if (!logistics) return yPosition;
+    const lineHeight = 6;
 
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
 
@@ -58,17 +59,20 @@ export class LogisticsSection {
       
       this.pdfDoc.setText(12, [125, 1, 1]);
       this.pdfDoc.addText("Detalles de Carga:", 20, yPosition);
-      yPosition += 15;
+      yPosition += 10;
 
       this.pdfDoc.setText(10, [51, 51, 51]);
-      const loadingLines = logistics.loadingDetails!.split('\n');
+      const loadingLines = logistics.loadingDetails!
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
       for (const line of loadingLines) {
-        if (line.trim()) {
-          this.pdfDoc.addText(line.trim(), 30, yPosition);
-          yPosition += 12;
-        }
+        yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);
+        this.pdfDoc.addText(line, 30, yPosition);
+        yPosition += lineHeight;
       }
-      yPosition += 10;
+      yPosition += 6;
     }
 
     // Unloading details
@@ -77,17 +81,20 @@ export class LogisticsSection {
       
       this.pdfDoc.setText(12, [125, 1, 1]);
       this.pdfDoc.addText("Detalles de Descarga:", 20, yPosition);
-      yPosition += 15;
+      yPosition += 10;
 
       this.pdfDoc.setText(10, [51, 51, 51]);
-      const unloadingLines = logistics.unloadingDetails!.split('\n');
+      const unloadingLines = logistics.unloadingDetails!
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
       for (const line of unloadingLines) {
-        if (line.trim()) {
-          this.pdfDoc.addText(line.trim(), 30, yPosition);
-          yPosition += 12;
-        }
+        yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);
+        this.pdfDoc.addText(line, 30, yPosition);
+        yPosition += lineHeight;
       }
-      yPosition += 10;
+      yPosition += 6;
     }
 
     // Equipment logistics
@@ -96,17 +103,20 @@ export class LogisticsSection {
       
       this.pdfDoc.setText(12, [125, 1, 1]);
       this.pdfDoc.addText("Logística de Equipos:", 20, yPosition);
-      yPosition += 15;
+      yPosition += 10;
 
       this.pdfDoc.setText(10, [51, 51, 51]);
-      const equipmentLines = logistics.equipmentLogistics!.split('\n');
+      const equipmentLines = logistics.equipmentLogistics!
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+
       for (const line of equipmentLines) {
-        if (line.trim()) {
-          this.pdfDoc.addText(line.trim(), 30, yPosition);
-          yPosition += 12;
-        }
+        yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);
+        this.pdfDoc.addText(line, 30, yPosition);
+        yPosition += lineHeight;
       }
-      yPosition += 10;
+      yPosition += 6;
     }
 
     return yPosition;

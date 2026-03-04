@@ -3,11 +3,13 @@ import { supabase } from "@/lib/supabase";
 
 export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: string): Promise<void> => {
   try {
-    // Sanitize filename for storage - remove special characters and spaces
+    // Sanitize filename for storage while preserving human-readable spaces.
     const sanitizedFileName = fileName
-      .replace(/[^a-zA-Z0-9._-]/g, '_') // Replace special chars with underscore
-      .replace(/_{2,}/g, '_') // Replace multiple underscores with single
-      .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+      .replace(/_/g, ' ')
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, ' ') // illegal file/path chars
+      .replace(/\s+/g, ' ')
+      .replace(/\s+\./g, '.')
+      .trim();
 
     const folderPath = `hojas-de-ruta/${jobId}`;
     const filePath = `${folderPath}/${sanitizedFileName}`;
