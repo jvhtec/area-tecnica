@@ -38,6 +38,30 @@ type RiderFile = {
     uploaded_at: string;
     artist_id: string;
 };
+type FestivalStageName = {
+    number: number;
+    name: string;
+};
+type FestivalShiftAssignment = {
+    id: string;
+    role: string;
+    shift_id: string | null;
+};
+type FestivalShiftInfo = {
+    id: string;
+    job_id: string | null;
+    date: string;
+    name: string;
+    start_time: string;
+    end_time: string;
+    stage: number | null;
+    department: string | null;
+};
+type TechShiftAssignmentDetail = {
+    assignment_id: string;
+    role: string;
+    shift: FestivalShiftInfo;
+};
 
 export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
     const { user, userRole } = useOptimizedAuth();
@@ -107,6 +131,63 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                 .order('date', { ascending: true });
             if (error) throw error;
             return data?.map(t => t.date) || [];
+        },
+        enabled: !!job?.id && !!user?.id,
+    });
+
+    // Fetch stage names (if this job has festival stages configured)
+    const { data: festivalStages = [] } = useQuery({
+        queryKey: ['technician-job-festival-stages', job?.id],
+        queryFn: async () => {
+            if (!job?.id) return [];
+            const { data, error } = await supabase
+                .from('festival_stages')
+                .select('number, name')
+                .eq('job_id', job.id);
+            if (error) throw error;
+            return (data || []) as FestivalStageName[];
+        },
+        enabled: !!job?.id,
+    });
+
+    // Fetch this technician's shift assignments for the job (used to enrich Info tab)
+    const { data: techShiftAssignments = [], isLoading: techShiftAssignmentsLoading } = useQuery({
+        queryKey: ['technician-job-shift-assignments', job?.id, user?.id],
+        queryFn: async () => {
+            if (!job?.id || !user?.id) return [];
+
+            const { data: shifts, error: shiftsError } = await supabase
+                .from('festival_shifts')
+                .select('id, job_id, date, name, start_time, end_time, stage, department')
+                .eq('job_id', job.id);
+
+            if (shiftsError) throw shiftsError;
+
+            const shiftIds = (shifts || []).map((shift) => shift.id);
+            if (shiftIds.length === 0) return [];
+
+            const { data: assignments, error: assignmentsError } = await supabase
+                .from('festival_shift_assignments')
+                .select('id, role, shift_id')
+                .eq('technician_id', user.id)
+                .in('shift_id', shiftIds);
+
+            if (assignmentsError) throw assignmentsError;
+
+            const shiftById = new Map((shifts || []).map((shift) => [shift.id, shift as FestivalShiftInfo]));
+
+            return (assignments as FestivalShiftAssignment[])
+                .map((assignment) => {
+                    if (!assignment.shift_id) return null;
+                    const shift = shiftById.get(assignment.shift_id);
+                    if (!shift) return null;
+                    return {
+                        assignment_id: assignment.id,
+                        role: assignment.role,
+                        shift,
+                    } as TechShiftAssignmentDetail;
+                })
+                .filter((item): item is TechShiftAssignmentDetail => Boolean(item));
         },
         enabled: !!job?.id && !!user?.id,
     });
@@ -469,6 +550,42 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         return map;
     }, [jobDateTypes]);
 
+    const festivalStageNameMap = useMemo(() => {
+        const map = new Map<number, string>();
+        festivalStages.forEach((stage) => {
+            map.set(stage.number, stage.name);
+        });
+        return map;
+    }, [festivalStages]);
+
+    const techShiftAssignmentsByDate = useMemo(() => {
+        const map = new Map<string, TechShiftAssignmentDetail[]>();
+        techShiftAssignments.forEach((assignment) => {
+            const date = assignment.shift.date;
+            if (!map.has(date)) map.set(date, []);
+            map.get(date)!.push(assignment);
+        });
+
+        map.forEach((list) => {
+            list.sort((a, b) => a.shift.start_time.localeCompare(b.shift.start_time));
+        });
+
+        return map;
+    }, [techShiftAssignments]);
+
+    const allAssignedDates = useMemo(() => {
+        const dates = new Set<string>(assignedDates);
+        techShiftAssignmentsByDate.forEach((_, date) => dates.add(date));
+        return Array.from(dates).sort((a, b) => a.localeCompare(b));
+    }, [assignedDates, techShiftAssignmentsByDate]);
+
+    const formatShiftTime = (value?: string | null): string => {
+        if (!value) return '';
+        const trimmed = value.trim();
+        if (trimmed.length >= 5 && trimmed.includes(':')) return trimmed.slice(0, 5);
+        return trimmed;
+    };
+
     return (
         <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
             <div className={`w-full max-w-md md:max-w-lg lg:max-w-xl h-[85vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200`}>
@@ -536,33 +653,66 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                             {user?.id && (
                                 <div>
                                     <label className={`text-xs ${theme.textMuted} font-bold uppercase mb-2 block`}>Mis fechas asignadas</label>
-                                    {assignedDatesLoading || jobDateTypesLoading ? (
+                                    {assignedDatesLoading || jobDateTypesLoading || techShiftAssignmentsLoading ? (
                                         <div className="flex items-center gap-2 text-sm">
                                             <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
                                             <span className={theme.textMuted}>Cargando fechas...</span>
                                         </div>
-                                    ) : assignedDates.length > 0 ? (
+                                    ) : allAssignedDates.length > 0 ? (
                                         <div className="space-y-2">
-                                            {assignedDates.map((date) => {
+                                            {allAssignedDates.map((date) => {
                                                 const dateTypeValue = dateTypeMap.get(date);
+                                                const dateShiftAssignments = techShiftAssignmentsByDate.get(date) || [];
                                                 return (
                                                     <div
                                                         key={date}
-                                                        className={`flex items-center justify-between p-3 rounded-lg ${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border`}
+                                                        className={`p-3 rounded-lg ${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border`}
                                                     >
-                                                        <div className="flex items-center gap-2">
-                                                            <CalendarIcon size={14} className={theme.textMuted} />
-                                                            <span className={`text-sm font-medium ${theme.textMain}`}>
-                                                                {formatInTimeZone(parseISO(date), 'Europe/Madrid', "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
-                                                            </span>
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <div className="flex items-center gap-2 min-w-0">
+                                                                <CalendarIcon size={14} className={theme.textMuted} />
+                                                                <span className={`text-sm font-medium ${theme.textMain}`}>
+                                                                    {formatInTimeZone(parseISO(date), 'Europe/Madrid', "EEEE, d 'de' MMMM 'de' yyyy", { locale: es })}
+                                                                </span>
+                                                            </div>
+                                                            {dateTypeValue && (
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className={`text-xs font-bold border ${getDateTypeBadgeClass(dateTypeValue)}`}
+                                                                >
+                                                                    {getDateTypeLabel(dateTypeValue)}
+                                                                </Badge>
+                                                            )}
                                                         </div>
-                                                        {dateTypeValue && (
-                                                            <Badge
-                                                                variant="outline"
-                                                                className={`text-xs font-bold border ${getDateTypeBadgeClass(dateTypeValue)}`}
-                                                            >
-                                                                {getDateTypeLabel(dateTypeValue)}
-                                                            </Badge>
+
+                                                        {dateShiftAssignments.length > 0 && (
+                                                            <div className="mt-2 pl-6 space-y-1">
+                                                                {dateShiftAssignments.map((assignment) => {
+                                                                    const stageLabel = assignment.shift.stage != null
+                                                                        ? (festivalStageNameMap.get(assignment.shift.stage) || `Escenario ${assignment.shift.stage}`)
+                                                                        : 'Escenario sin definir';
+                                                                    const roleLabel = labelForCode(assignment.role) || assignment.role;
+                                                                    const timeRange = `${formatShiftTime(assignment.shift.start_time)} - ${formatShiftTime(assignment.shift.end_time)}`;
+
+                                                                    return (
+                                                                        <div
+                                                                            key={assignment.assignment_id}
+                                                                            className="flex flex-wrap items-center gap-1.5"
+                                                                        >
+                                                                            <span className={`text-xs font-semibold ${theme.textMain}`}>
+                                                                                {assignment.shift.name}
+                                                                            </span>
+                                                                            <span className={`text-[11px] ${theme.textMuted}`}>{timeRange}</span>
+                                                                            <Badge variant="outline" className="text-[10px]">
+                                                                                {stageLabel}
+                                                                            </Badge>
+                                                                            <Badge variant="outline" className="text-[10px]">
+                                                                                {roleLabel}
+                                                                            </Badge>
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         )}
                                                     </div>
                                                 );
