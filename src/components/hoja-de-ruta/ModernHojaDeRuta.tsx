@@ -258,7 +258,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     if (!selectedJobId) {
       toast({
         title: "Error",
-        description: "Por favor, seleccione un trabajo antes de generar el certificado.",
+        description: "Por favor, seleccione un trabajo antes de generar la hoja de transportes.",
         variant: "destructive",
       });
       return;
@@ -286,7 +286,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
       console.error("Error generating driver certificate PDF:", error);
       toast({
         title: "❌ Error",
-        description: "Hubo un problema al generar el certificado de conductores.",
+        description: "Hubo un problema al generar la hoja de transportes.",
         variant: "destructive",
       });
     } finally {

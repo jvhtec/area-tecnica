@@ -40,7 +40,7 @@ export const HojaDeRutaPrintDialog: React.FC<HojaDeRutaPrintDialogProps> = ({
             </Button>
             <Button onClick={() => { void onGenerateDriverCertificatePDF(); }} disabled={isGenerating} variant="outline">
               <Printer className="h-4 w-4 mr-2" />
-              Certificado Conductores PDF
+              Hoja de Transportes PDF
             </Button>
           </div>
           <div className="flex flex-col gap-2">

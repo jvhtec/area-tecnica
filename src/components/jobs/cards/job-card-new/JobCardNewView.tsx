@@ -50,6 +50,9 @@ export interface JobCardNewViewProps {
 
   routeSheetOpen: boolean;
   setRouteSheetOpen: (open: boolean) => void;
+  canGenerateTransportPdf: boolean;
+  isGeneratingTransportPdf: boolean;
+  handleGenerateTransportPdf: (e: React.MouseEvent) => void;
 
   foldersAreCreated: boolean;
   isFoldersLoading: boolean;
@@ -158,6 +161,9 @@ export function JobCardNewView({
   handleJobCardClick,
   routeSheetOpen,
   setRouteSheetOpen,
+  canGenerateTransportPdf,
+  isGeneratingTransportPdf,
+  handleGenerateTransportPdf,
   foldersAreCreated,
   isFoldersLoading,
   showUpload,
@@ -331,6 +337,17 @@ export function JobCardNewView({
                 title="Abrir Hoja de Ruta"
               >
                 Hoja de Ruta
+              </button>
+            )}
+            {isProjectManagementPage && job.job_type !== "dryhire" && canGenerateTransportPdf && (
+              <button
+                type="button"
+                onClick={handleGenerateTransportPdf}
+                disabled={isGeneratingTransportPdf}
+                className="text-xs px-3 py-1 border rounded-md hover:bg-secondary disabled:opacity-60 disabled:cursor-not-allowed"
+                title="Generar Hoja de Transportes PDF"
+              >
+                {isGeneratingTransportPdf ? "Generando PDF..." : "Hoja de Transportes PDF"}
               </button>
             )}
             {job.job_type === "dryhire" && <Badge variant="destructive">RECOGIDA CLIENTE</Badge>}

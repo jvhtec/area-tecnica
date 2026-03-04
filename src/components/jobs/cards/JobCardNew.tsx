@@ -22,6 +22,7 @@ import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSani
 import type { JobDocument } from './JobCardDocuments';
 import { JobCardNewDetailsOnly } from "./job-card-new/JobCardNewDetailsOnly";
 import { JobCardNewView } from "./job-card-new/JobCardNewView";
+import { loadHojaDeRutaPdfData } from "@/utils/hoja-de-ruta/load-hoja-de-ruta-pdf-data";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreateFoldersOptions } from "@/utils/flex-folders";
@@ -102,6 +103,7 @@ function JobCardNewFull({
   const isSelected = isJobSelected(job.id);
   const [routeSheetOpen, setRouteSheetOpen] = useState(false);
   const [taskManagerOpen, setTaskManagerOpen] = useState(false);
+  const [isGeneratingTransportPdf, setIsGeneratingTransportPdf] = useState(false);
 
   // Add folder creation loading state
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
@@ -197,6 +199,16 @@ function JobCardNewFull({
   const [selectedTransportRequest, setSelectedTransportRequest] = useState<any | null>(null);
   const [logisticsInitialEventType, setLogisticsInitialEventType] = useState<'load' | 'unload' | undefined>(undefined);
   const { user, userDepartment: currentUserDepartment } = useOptimizedAuth();
+
+  const canGenerateTransportPdf = React.useMemo(() => {
+    const normalizedRole = (userRole || '').trim().toLowerCase();
+    const normalizedDepartment = (currentUserDepartment || '').trim().toLowerCase();
+
+    if (normalizedRole === 'admin') return true;
+    if (normalizedRole !== 'management') return false;
+
+    return ['logistics', 'production', 'produccion', 'producción'].includes(normalizedDepartment);
+  }, [currentUserDepartment, userRole]);
 
   const {
     appliedBorderColor,
@@ -1027,6 +1039,45 @@ function JobCardNewFull({
     navigate(`/festival-management/${job.id}`);
   };
 
+  const handleGenerateTransportPdf = React.useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!canGenerateTransportPdf || isGeneratingTransportPdf) return;
+
+    setIsGeneratingTransportPdf(true);
+    try {
+      const hojaPdfData = await loadHojaDeRutaPdfData(job.id);
+
+      if (!hojaPdfData) {
+        toast({
+          title: "Sin datos de Hoja de Ruta",
+          description: "No existe una Hoja de Ruta guardada para este trabajo.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const { generateDriverCertificatePDF } = await import("@/utils/hoja-de-ruta/pdf");
+
+      await generateDriverCertificatePDF({
+        eventData: hojaPdfData.eventData,
+        selectedJobId: job.id,
+        jobTitle: job.title || "",
+        jobDate: job.start_time || undefined,
+        venueMapPreview: hojaPdfData.venueMapPreview,
+        toast,
+      });
+    } catch (error) {
+      console.error("JobCardNew: Error generating Hoja de Transportes PDF:", error);
+      toast({
+        title: "Error al generar PDF",
+        description: "No se pudo generar la Hoja de Transportes para este trabajo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingTransportPdf(false);
+    }
+  }, [canGenerateTransportPdf, isGeneratingTransportPdf, job.id, job.start_time, job.title, toast]);
+
   // Show loading state if job is being deleted
   const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
   const pointerEvents = isJobBeingDeleted ? "pointer-events-none" : "";
@@ -1049,6 +1100,9 @@ function JobCardNewFull({
       handleJobCardClick={handleJobCardClick}
       routeSheetOpen={routeSheetOpen}
       setRouteSheetOpen={setRouteSheetOpen}
+      canGenerateTransportPdf={canGenerateTransportPdf}
+      isGeneratingTransportPdf={isGeneratingTransportPdf}
+      handleGenerateTransportPdf={handleGenerateTransportPdf}
       foldersAreCreated={foldersAreCreated}
       isFoldersLoading={isFoldersLoading}
       showUpload={showUpload}

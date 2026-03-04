@@ -62,7 +62,7 @@ export class DriverCertificatePDFEngine {
       const headerLogoDims = await this.getHeaderLogoDims(logoData);
       HeaderService.addHeaderToCurrentPage(
         this.pdfDoc,
-        'Certificado Conductores',
+        'Hoja de Transportes',
         jobTitle,
         jobDate,
         logoData || undefined,
@@ -90,13 +90,13 @@ export class DriverCertificatePDFEngine {
 
       toast?.({
         title: '✅ Documento generado',
-        description: 'El certificado de conductores ha sido generado y descargado correctamente.',
+        description: 'La hoja de transportes ha sido generada y descargada correctamente.',
       });
     } catch (error) {
       console.error('Error generating driver certificate PDF:', error);
       toast?.({
         title: '❌ Error',
-        description: 'Hubo un problema al generar el certificado de conductores.',
+        description: 'Hubo un problema al generar la hoja de transportes.',
         variant: 'destructive',
       });
       throw error;
@@ -462,7 +462,7 @@ export class DriverCertificatePDFEngine {
     const nowIso = new Date().toISOString();
     const datePart = nowIso.slice(0, 10);
     const timePart = nowIso.slice(11, 19).replace(/:/g, '-');
-    const filename = `Certificado de Entrega - ${safeEventName} - ${datePart} ${timePart}.pdf`;
+    const filename = `Hoja de Transportes - ${safeEventName} - ${datePart} ${timePart}.pdf`;
 
     this.pdfDoc.save(filename);
 
