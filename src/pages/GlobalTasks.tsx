@@ -41,6 +41,7 @@ import {
   utcToLocalInput,
   localInputToUTC,
 } from '@/utils/timezoneUtils';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 interface DeptUser {
   id: string;
@@ -74,12 +75,6 @@ const STATUS_LABELS: Record<string, string> = {
   in_progress: 'En progreso',
   completed: 'Completada',
 };
-
-function getErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'string') return err;
-  return String(err);
-}
 
 function useAllEligibleUsers(userDepartment: string | null) {
   return useQuery<{ flat: DeptUser[]; groups: ComboboxGroup[]; items: ComboboxItem[] }>({
@@ -652,14 +647,26 @@ export default function GlobalTasks() {
                         <Combobox
                           groups={userGroups}
                           value={task.assigned_to || ''}
-                          onValueChange={(v) =>
-                            mutations
-                              .assignUser(task.id, v || null)
-                              .then(() => refetch())
-                              .catch((err: unknown) =>
-                                toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' })
-                              )
-                          }
+                          onValueChange={async (v) => {
+                            try {
+                              const result = await mutations.assignUser(task.id, v || null);
+
+                              if (result.status === 'updated') {
+                                await refetch();
+                                return;
+                              }
+
+                              if (result.status === 'already_assigned') {
+                                toast({
+                                  title: 'Asignación sin cambios',
+                                  description: 'Ya tienes esta tarea asignada en este contexto; no se realizaron cambios.',
+                                });
+                                await refetch();
+                              }
+                            } catch (err: unknown) {
+                              toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+                            }
+                          }}
                           placeholder="Sin asignar"
                           searchPlaceholder="Buscar..."
                           triggerClassName="w-[160px] h-8 text-xs"

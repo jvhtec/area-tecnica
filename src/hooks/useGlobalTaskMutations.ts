@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { completeTask, revertTask, Department } from '@/services/taskCompletion';
 import type { Database } from '@/integrations/supabase/types';
 import { type Dept } from '@/utils/tasks';
+import { isTaskAssigneeUniqueConflict } from '@/utils/taskAssignment';
 
 type SoundTaskUpdate = Database['public']['Tables']['sound_job_tasks']['Update'];
 type LightsTaskUpdate = Database['public']['Tables']['lights_job_tasks']['Update'];
@@ -61,6 +62,19 @@ function resolveTaskDocBucket(filePath: string): string {
 }
 
 export { resolveTaskDocBucket };
+
+export type AssignUserResult =
+  | { status: 'updated'; taskId: string; userId: string | null }
+  | { status: 'no_change'; taskId: string; userId: string | null }
+  | {
+      status: 'already_assigned';
+      taskId: string;
+      userId: string;
+      conflictTaskId?: string | null;
+      taskType?: string | null;
+      jobId?: string | null;
+      tourId?: string | null;
+    };
 
 /**
  * Provides mutation functions for managing global tasks in a specific department.
@@ -360,9 +374,49 @@ export function useGlobalTaskMutations(department: Dept) {
     }
   };
 
-  const assignUser = async (id: string, userId: string | null) => {
+  const assignUser = async (id: string, userId: string | null): Promise<AssignUserResult> => {
     const { data: authData } = await supabase.auth.getUser();
     const assignerId = authData?.user?.id ?? null;
+
+    const { data: currentTask, error: currentTaskError } = await supabase
+      .from(table as any)
+      .select('id, task_type, job_id, tour_id, assigned_to, created_by')
+      .eq('id', id)
+      .maybeSingle();
+    if (currentTaskError) throw currentTaskError;
+    if (!currentTask) throw new Error('Task not found');
+
+    if ((currentTask.assigned_to ?? null) === userId) {
+      return { status: 'no_change', taskId: id, userId };
+    }
+
+    if (userId) {
+      let conflictQuery = supabase
+        .from(table as any)
+        .select('id')
+        .eq('task_type', currentTask.task_type)
+        .eq('assigned_to', userId)
+        .neq('id', id)
+        .limit(1);
+
+      conflictQuery = currentTask.job_id ? conflictQuery.eq('job_id', currentTask.job_id) : conflictQuery.is('job_id', null);
+      conflictQuery = currentTask.tour_id ? conflictQuery.eq('tour_id', currentTask.tour_id) : conflictQuery.is('tour_id', null);
+
+      const { data: conflictTask, error: conflictError } = await conflictQuery.maybeSingle();
+      if (conflictError) throw conflictError;
+
+      if (conflictTask?.id) {
+        return {
+          status: 'already_assigned',
+          taskId: id,
+          userId,
+          conflictTaskId: conflictTask.id,
+          taskType: currentTask.task_type ?? null,
+          jobId: currentTask.job_id ?? null,
+          tourId: currentTask.tour_id ?? null,
+        };
+      }
+    }
 
     const { data, error } = await supabase
       .from(table as any)
@@ -370,7 +424,20 @@ export function useGlobalTaskMutations(department: Dept) {
       .eq('id', id)
       .select('id, task_type, created_by')
       .maybeSingle();
-    if (error) throw error;
+    if (error) {
+      if (userId && isTaskAssigneeUniqueConflict(error)) {
+        return {
+          status: 'already_assigned',
+          taskId: id,
+          userId,
+          taskType: currentTask.task_type ?? null,
+          jobId: currentTask.job_id ?? null,
+          tourId: currentTask.tour_id ?? null,
+        };
+      }
+      throw error;
+    }
+    if (!data) throw new Error('Task not found or update not permitted');
 
     if (assignerId && userId) {
       const recipients = new Set<string>();
@@ -393,6 +460,8 @@ export function useGlobalTaskMutations(department: Dept) {
         console.warn('[useGlobalTaskMutations] push failed', e);
       }
     }
+
+    return { status: 'updated', taskId: id, userId };
   };
 
   const setStatus = async (id: string, status: 'not_started' | 'in_progress' | 'completed') => {

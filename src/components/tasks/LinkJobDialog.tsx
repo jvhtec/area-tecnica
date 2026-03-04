@@ -8,14 +8,9 @@ import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { getErrorMessage } from '@/utils/errorMessage';
 
 type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
-
-function getErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'string') return err;
-  return String(err);
-}
 
 interface LinkJobDialogProps {
   open: boolean;

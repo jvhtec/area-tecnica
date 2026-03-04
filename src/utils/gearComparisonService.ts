@@ -95,6 +95,63 @@ interface AvailableGear {
   available_analog_runs: number;
 }
 
+const EMPTY_AVAILABLE_GEAR: AvailableGear = {
+  foh_consoles: [],
+  mon_consoles: [],
+  foh_waves_outboard: "",
+  mon_waves_outboard: "",
+  wireless_systems: [],
+  iem_systems: [],
+  wired_mics: [],
+  available_monitors: 0,
+  has_side_fills: false,
+  has_drum_fills: false,
+  has_dj_booths: false,
+  available_cat6_runs: 0,
+  available_hma_runs: 0,
+  available_coax_runs: 0,
+  available_opticalcon_duo_runs: 0,
+  available_analog_runs: 0
+};
+
+const mapStageSetupToAvailableGear = (stageSetup: StageGearSetup): AvailableGear => ({
+  foh_consoles: stageSetup.foh_consoles || [],
+  mon_consoles: stageSetup.mon_consoles || [],
+  foh_waves_outboard: stageSetup.foh_waves_outboard || "",
+  mon_waves_outboard: stageSetup.mon_waves_outboard || "",
+  wireless_systems: stageSetup.wireless_systems || [],
+  iem_systems: stageSetup.iem_systems || [],
+  wired_mics: stageSetup.wired_mics || [],
+  available_monitors: stageSetup.monitors_quantity || 0,
+  has_side_fills: stageSetup.extras_sf || false,
+  has_drum_fills: stageSetup.extras_df || false,
+  has_dj_booths: stageSetup.extras_djbooth || false,
+  available_cat6_runs: stageSetup.infra_cat6_quantity || 0,
+  available_hma_runs: stageSetup.infra_hma_quantity || 0,
+  available_coax_runs: stageSetup.infra_coax_quantity || 0,
+  available_opticalcon_duo_runs: stageSetup.infra_opticalcon_duo_quantity || 0,
+  available_analog_runs: stageSetup.infra_analog || 0
+});
+
+const mapGlobalSetupToAvailableGear = (globalSetup: FestivalGearSetup): AvailableGear => ({
+  foh_consoles: globalSetup.foh_consoles || [],
+  mon_consoles: globalSetup.mon_consoles || [],
+  foh_waves_outboard: globalSetup.foh_waves_outboard || "",
+  mon_waves_outboard: globalSetup.mon_waves_outboard || "",
+  wireless_systems: globalSetup.wireless_systems || [],
+  iem_systems: globalSetup.iem_systems || [],
+  wired_mics: globalSetup.wired_mics || [],
+  available_monitors: globalSetup.available_monitors || 0,
+  has_side_fills: globalSetup.has_side_fills || false,
+  has_drum_fills: globalSetup.has_drum_fills || false,
+  has_dj_booths: globalSetup.has_dj_booths || false,
+  available_cat6_runs: globalSetup.available_cat6_runs || 0,
+  available_hma_runs: globalSetup.available_hma_runs || 0,
+  available_coax_runs: globalSetup.available_coax_runs || 0,
+  available_opticalcon_duo_runs: globalSetup.available_opticalcon_duo_runs || 0,
+  available_analog_runs: globalSetup.available_analog_runs || 0
+});
+
 export const compareArtistRequirements = (
   artist: ArtistRequirements,
   globalSetup: FestivalGearSetup | null,
@@ -109,59 +166,12 @@ export const compareArtistRequirements = (
   console.log('Global setup wired_mics:', globalSetup?.wired_mics);
   console.log('Stage setup wired_mics:', stageSetup?.wired_mics);
   
-  // Each stage uses only its own configured microphones - NO FALLBACK
-  const availableGear: AvailableGear = stageSetup ? {
-    foh_consoles: stageSetup.foh_consoles,
-    mon_consoles: stageSetup.mon_consoles,
-    foh_waves_outboard: stageSetup.foh_waves_outboard || "",
-    mon_waves_outboard: stageSetup.mon_waves_outboard || "",
-    wireless_systems: stageSetup.wireless_systems,
-    iem_systems: stageSetup.iem_systems,
-    wired_mics: stageSetup.wired_mics || [], // Use stage mics only, even if empty
-    available_monitors: stageSetup.monitors_quantity,
-    has_side_fills: stageSetup.extras_sf,
-    has_drum_fills: stageSetup.extras_df,
-    has_dj_booths: stageSetup.extras_djbooth,
-    available_cat6_runs: stageSetup.infra_cat6_quantity,
-    available_hma_runs: stageSetup.infra_hma_quantity,
-    available_coax_runs: stageSetup.infra_coax_quantity,
-    available_opticalcon_duo_runs: stageSetup.infra_opticalcon_duo_quantity,
-    available_analog_runs: stageSetup.infra_analog
-  } : globalSetup ? {
-    foh_consoles: globalSetup.foh_consoles,
-    mon_consoles: globalSetup.mon_consoles,
-    foh_waves_outboard: globalSetup.foh_waves_outboard || "",
-    mon_waves_outboard: globalSetup.mon_waves_outboard || "",
-    wireless_systems: globalSetup.wireless_systems,
-    iem_systems: globalSetup.iem_systems,
-    wired_mics: globalSetup.wired_mics || [],
-    available_monitors: globalSetup.available_monitors,
-    has_side_fills: globalSetup.has_side_fills,
-    has_drum_fills: globalSetup.has_drum_fills,
-    has_dj_booths: globalSetup.has_dj_booths,
-    available_cat6_runs: globalSetup.available_cat6_runs,
-    available_hma_runs: globalSetup.available_hma_runs,
-    available_coax_runs: globalSetup.available_coax_runs,
-    available_opticalcon_duo_runs: globalSetup.available_opticalcon_duo_runs,
-    available_analog_runs: globalSetup.available_analog_runs
-  } : {
-    foh_consoles: [],
-    mon_consoles: [],
-    foh_waves_outboard: "",
-    mon_waves_outboard: "",
-    wireless_systems: [],
-    iem_systems: [],
-    wired_mics: [],
-    available_monitors: 0,
-    has_side_fills: false,
-    has_drum_fills: false,
-    has_dj_booths: false,
-    available_cat6_runs: 0,
-    available_hma_runs: 0,
-    available_coax_runs: 0,
-    available_opticalcon_duo_runs: 0,
-    available_analog_runs: 0
-  };
+  // Stage 1 uses global setup. Other stages use only stage-specific setup; missing setup means empty inventory.
+  const availableGear: AvailableGear = stageSetup
+    ? mapStageSetupToAvailableGear(stageSetup)
+    : artist.stage === 1 && globalSetup
+      ? mapGlobalSetupToAvailableGear(globalSetup)
+      : EMPTY_AVAILABLE_GEAR;
 
   console.log('Final availableGear.wired_mics:', availableGear.wired_mics);
   console.log('Final availableGear.wired_mics length:', availableGear.wired_mics?.length || 0);
@@ -910,13 +920,15 @@ export const calculateEquipmentNeeds = (
   Object.entries(stageRequirements).forEach(([stageNum, requirements]) => {
     const stage = parseInt(stageNum);
     const stageSetup = stageSetups[stage];
-    const availableGear = stageSetup || globalSetup;
-    
-    if (!availableGear) return;
+    const availableGear: AvailableGear = stageSetup
+      ? mapStageSetupToAvailableGear(stageSetup)
+      : stage === 1 && globalSetup
+        ? mapGlobalSetupToAvailableGear(globalSetup)
+        : EMPTY_AVAILABLE_GEAR;
 
     // FOH Console shortfalls
     Object.entries(requirements.fohConsoles).forEach(([model, required]) => {
-      const available = availableGear.foh_consoles?.find(c => c.model === model)?.quantity || 0;
+      const available = availableGear.foh_consoles.find(c => c.model === model)?.quantity || 0;
       const shortage = Math.max(0, required - available);
       if (shortage > 0) {
         const existing = needs.consoles.foh.find(c => c.model === model);
@@ -937,7 +949,7 @@ export const calculateEquipmentNeeds = (
 
     // Monitor Console shortfalls
     Object.entries(requirements.monConsoles).forEach(([model, required]) => {
-      const available = availableGear.mon_consoles?.find(c => c.model === model)?.quantity || 0;
+      const available = availableGear.mon_consoles.find(c => c.model === model)?.quantity || 0;
       const shortage = Math.max(0, required - available);
       if (shortage > 0) {
         const existing = needs.consoles.monitor.find(c => c.model === model);
@@ -958,7 +970,7 @@ export const calculateEquipmentNeeds = (
 
     // Wireless shortfalls
     Object.entries(requirements.wireless).forEach(([model, required]) => {
-      const available = availableGear.wireless_systems?.find(w => w.model === model);
+      const available = availableGear.wireless_systems.find(w => w.model === model);
       const availableChannels = available ? getAvailableWirelessChannels(available) : 0;
       const availableHH = available?.quantity_hh || 0;
       const availableBP = available?.quantity_bp || 0;
@@ -989,7 +1001,7 @@ export const calculateEquipmentNeeds = (
 
     // IEM shortfalls
     Object.entries(requirements.iem).forEach(([model, required]) => {
-      const available = availableGear.iem_systems?.find(i => i.model === model);
+      const available = availableGear.iem_systems.find(i => i.model === model);
       const availableChannels = available?.quantity_hh || available?.quantity || 0;
       const availableBP = available?.quantity_bp || 0;
       const shortageChannels = Math.max(0, required.channels - availableChannels);
@@ -1016,7 +1028,7 @@ export const calculateEquipmentNeeds = (
 
     // Microphone shortfalls
     Object.entries(requirements.microphones).forEach(([model, required]) => {
-      const available = availableGear.wired_mics?.find(m => m.model === model)?.quantity || 0;
+      const available = availableGear.wired_mics.find(m => m.model === model)?.quantity || 0;
       const shortage = Math.max(0, required - available);
       if (shortage > 0) {
         const existing = needs.microphones.find(m => m.model === model);
@@ -1036,8 +1048,7 @@ export const calculateEquipmentNeeds = (
     });
 
     // Monitor shortfalls  
-    const availableMonitors = stageSetup ? (stageSetup.monitors_quantity || 0) : (globalSetup?.available_monitors || 0);
-    const monitorShortage = Math.max(0, requirements.monitors - availableMonitors);
+    const monitorShortage = Math.max(0, requirements.monitors - availableGear.available_monitors);
     if (monitorShortage > 0) {
       needs.monitors.additionalQuantity += monitorShortage;
       if (!needs.monitors.requiredBy.includes(`Stage ${stage}`)) {
@@ -1047,11 +1058,11 @@ export const calculateEquipmentNeeds = (
 
     // Infrastructure shortfalls
     const infraShortages = {
-      cat6: Math.max(0, requirements.infrastructure.cat6 - (stageSetup ? (stageSetup.infra_cat6_quantity || 0) : (globalSetup?.available_cat6_runs || 0))),
-      hma: Math.max(0, requirements.infrastructure.hma - (stageSetup ? (stageSetup.infra_hma_quantity || 0) : (globalSetup?.available_hma_runs || 0))),
-      coax: Math.max(0, requirements.infrastructure.coax - (stageSetup ? (stageSetup.infra_coax_quantity || 0) : (globalSetup?.available_coax_runs || 0))),
-      opticalcon_duo: Math.max(0, requirements.infrastructure.opticalcon_duo - (stageSetup ? (stageSetup.infra_opticalcon_duo_quantity || 0) : (globalSetup?.available_opticalcon_duo_runs || 0))),
-      analog: Math.max(0, requirements.infrastructure.analog - (stageSetup ? (stageSetup.infra_analog || 0) : (globalSetup?.available_analog_runs || 0)))
+      cat6: Math.max(0, requirements.infrastructure.cat6 - availableGear.available_cat6_runs),
+      hma: Math.max(0, requirements.infrastructure.hma - availableGear.available_hma_runs),
+      coax: Math.max(0, requirements.infrastructure.coax - availableGear.available_coax_runs),
+      opticalcon_duo: Math.max(0, requirements.infrastructure.opticalcon_duo - availableGear.available_opticalcon_duo_runs),
+      analog: Math.max(0, requirements.infrastructure.analog - availableGear.available_analog_runs)
     };
 
     Object.entries(infraShortages).forEach(([type, shortage]) => {
@@ -1065,19 +1076,19 @@ export const calculateEquipmentNeeds = (
     });
 
     // Extras shortfalls
-    if (requirements.extras.sideFills && !(stageSetup ? stageSetup.extras_sf : globalSetup?.has_side_fills)) {
+    if (requirements.extras.sideFills && !availableGear.has_side_fills) {
       needs.extras.sideFills.additionalStages += 1;
       if (!needs.extras.sideFills.requiredBy.includes(`Stage ${stage}`)) {
         needs.extras.sideFills.requiredBy.push(`Stage ${stage}`);
       }
     }
-    if (requirements.extras.drumFills && !(stageSetup ? stageSetup.extras_df : globalSetup?.has_drum_fills)) {
+    if (requirements.extras.drumFills && !availableGear.has_drum_fills) {
       needs.extras.drumFills.additionalStages += 1;
       if (!needs.extras.drumFills.requiredBy.includes(`Stage ${stage}`)) {
         needs.extras.drumFills.requiredBy.push(`Stage ${stage}`);
       }
     }
-    if (requirements.extras.djBooths && !(stageSetup ? stageSetup.extras_djbooth : globalSetup?.has_dj_booths)) {
+    if (requirements.extras.djBooths && !availableGear.has_dj_booths) {
       needs.extras.djBooths.additionalStages += 1;
       if (!needs.extras.djBooths.requiredBy.includes(`Stage ${stage}`)) {
         needs.extras.djBooths.requiredBy.push(`Stage ${stage}`);

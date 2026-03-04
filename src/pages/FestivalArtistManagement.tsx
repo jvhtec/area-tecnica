@@ -714,6 +714,7 @@ const FestivalArtistManagement = () => {
                 onSearchChange={setSearchTerm}
                 stageFilter={stageFilter}
                 onStageFilterChange={setStageFilter}
+                hideStageFilter
                 equipmentFilter={equipmentFilter}
                 onEquipmentFilterChange={setEquipmentFilter}
                 riderFilter={riderFilter}

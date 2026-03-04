@@ -26,39 +26,39 @@ interface FestivalGearSetupFormProps {
   onSave?: () => void;
 }
 
+const buildEmptyStageSetup = (maxStages = 1): GearSetupFormData => ({
+  max_stages: maxStages,
+  foh_consoles: [],
+  mon_consoles: [],
+  foh_waves_outboard: "",
+  mon_waves_outboard: "",
+  wireless_systems: [],
+  iem_systems: [],
+  wired_mics: [],
+  monitors_enabled: false,
+  monitors_quantity: 0,
+  extras_sf: false,
+  extras_df: false,
+  extras_djbooth: false,
+  extras_wired: "",
+  infra_cat6: false,
+  infra_cat6_quantity: 0,
+  infra_hma: false,
+  infra_hma_quantity: 0,
+  infra_coax: false,
+  infra_coax_quantity: 0,
+  infra_opticalcon_duo: false,
+  infra_opticalcon_duo_quantity: 0,
+  infra_analog: 0,
+  other_infrastructure: "",
+  notes: "",
+});
+
 export const FestivalGearSetupForm = ({
   jobId,
   stageNumber = 1,
   onSave
 }: FestivalGearSetupFormProps) => {
-  const buildEmptyStageSetup = (maxStages = 1): GearSetupFormData => ({
-    max_stages: maxStages,
-    foh_consoles: [],
-    mon_consoles: [],
-    foh_waves_outboard: "",
-    mon_waves_outboard: "",
-    wireless_systems: [],
-    iem_systems: [],
-    wired_mics: [],
-    monitors_enabled: false,
-    monitors_quantity: 0,
-    extras_sf: false,
-    extras_df: false,
-    extras_djbooth: false,
-    extras_wired: "",
-    infra_cat6: false,
-    infra_cat6_quantity: 0,
-    infra_hma: false,
-    infra_hma_quantity: 0,
-    infra_coax: false,
-    infra_coax_quantity: 0,
-    infra_opticalcon_duo: false,
-    infra_opticalcon_duo_quantity: 0,
-    infra_analog: 0,
-    other_infrastructure: "",
-    notes: "",
-  });
-
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [setup, setSetup] = useState<GearSetupFormData>(buildEmptyStageSetup());
@@ -153,11 +153,13 @@ export const FestivalGearSetupForm = ({
               });
             } else {
               // For non-primary stage without stage-specific setup, initialize an empty setup
+              setStageSetupId(null);
               setHasStageSpecificSetup(false);
               setSetup(buildEmptyStageSetup(setupData.max_stages || 1));
             }
           } else {
             // For primary stage (stage 1), always use global setup directly
+            setStageSetupId(null);
             setHasStageSpecificSetup(false);
             
             // Update form values with global data
