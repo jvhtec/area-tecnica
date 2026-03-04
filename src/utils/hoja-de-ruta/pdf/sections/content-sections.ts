@@ -8,6 +8,8 @@ import { TravelSection } from './travel';
 import { AccommodationSection } from './accommodation';
 import { ScheduleSection } from './schedule';
 import { LogisticsSection } from './logistics';
+import { DeliveryCertificateSection } from './delivery-certificate';
+import type { StampImage } from '../services/stamp-service';
 import { WeatherSection } from './weather';
 import { RoomingSection } from './rooming';
 import { PowerSection } from './power';
@@ -25,6 +27,7 @@ export class ContentSections {
   private accommodationSection: AccommodationSection;
   private scheduleSection: ScheduleSection;
   private logisticsSection: LogisticsSection;
+  private deliveryCertificateSection: DeliveryCertificateSection;
   private weatherSection: WeatherSection;
   private roomingSection: RoomingSection;
   private powerSection: PowerSection;
@@ -41,6 +44,7 @@ export class ContentSections {
     this.accommodationSection = new AccommodationSection(pdfDoc);
     this.scheduleSection = new ScheduleSection(pdfDoc);
     this.logisticsSection = new LogisticsSection(pdfDoc);
+    this.deliveryCertificateSection = new DeliveryCertificateSection(pdfDoc);
     this.weatherSection = new WeatherSection(pdfDoc);
     this.roomingSection = new RoomingSection(pdfDoc);
     this.powerSection = new PowerSection(pdfDoc);
@@ -93,6 +97,14 @@ export class ContentSections {
 
   addLogisticsSection(eventData: EventData, yPosition: number): number {
     return this.logisticsSection.addLogisticsSection(eventData, yPosition);
+  }
+
+  addDeliveryCertificateSection(
+    eventData: EventData,
+    yPosition: number,
+    context: { invoicingCompany?: string | null; jobLocation?: string | null; issueDate?: Date; stamp?: StampImage | null }
+  ): number {
+    return this.deliveryCertificateSection.addDeliveryCertificateSection(eventData, yPosition, context);
   }
 
   addWeatherSection(eventData: EventData, yPosition: number): number {
@@ -183,6 +195,11 @@ export class ContentSections {
       DataValidators.hasData(equipmentLogistics);
 
     return hasTransportEntries || hasDetails;
+  }
+
+  hasDeliveryCertificateData(eventData: EventData): boolean {
+    const transports = eventData.logistics?.transport || [];
+    return Array.isArray(transports) && transports.some((t) => t?.is_hoja_relevant !== false);
   }
 
   hasPowerData(eventData: EventData): boolean {

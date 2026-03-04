@@ -567,7 +567,21 @@ export function JobCardNewView({
                   <div className="space-y-4">
                     <div className="text-lg font-semibold">Transport Requests</div>
                     {allRequests.length === 0 ? (
-                      <div className="text-muted-foreground">No pending requests for this job.</div>
+                      <div className="space-y-3">
+                        <div className="text-muted-foreground">No pending requests for this job.</div>
+                        <button
+                          className="px-3 py-1 text-sm rounded border hover:bg-accent w-fit"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            setSelectedTransportRequest(null);
+                            setLogisticsInitialEventType("load");
+                            setTransportDialogOpen(false);
+                            setLogisticsDialogOpen(true);
+                          }}
+                        >
+                          Create Event
+                        </button>
+                      </div>
                     ) : (
                       <div className="space-y-2">
                         {allRequests.map((req: any) => (
@@ -622,25 +636,27 @@ export function JobCardNewView({
               </Dialog>
             )}
 
-          {logisticsDialogOpen && selectedTransportRequest && (
+          {logisticsDialogOpen && (
             <LogisticsEventDialog
               open={logisticsDialogOpen}
               onOpenChange={(open) => {
                 setLogisticsDialogOpen(open);
                 if (!open) {
+                  setSelectedTransportRequest(null);
                   queryClient.invalidateQueries({ queryKey: ["logistics-events-for-job", job.id] });
                   queryClient.invalidateQueries({ queryKey: ["today-logistics"] });
                 }
               }}
               selectedDate={new Date(job.start_time)}
               initialJobId={job.id}
-              initialDepartments={[selectedTransportRequest.department]}
-              initialTransportType={selectedTransportRequest.selectedItem?.transport_type}
+              initialDepartments={selectedTransportRequest?.department ? [selectedTransportRequest.department] : []}
+              initialTransportType={selectedTransportRequest?.selectedItem?.transport_type}
               initialEventType={logisticsInitialEventType}
               onCreated={(_details) => {
                 if (selectedTransportRequest?.id && selectedTransportRequest?.department) {
                   void checkAndFulfillRequest(selectedTransportRequest.id, selectedTransportRequest.department);
                 }
+                setSelectedTransportRequest(null);
                 setLogisticsInitialEventType(undefined);
               }}
             />

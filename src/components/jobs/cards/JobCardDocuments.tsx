@@ -41,7 +41,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
       const { data, error } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(path, 60);
+        .createSignedUrl(path, 60 * 60);
 
       if (error || !data?.signedUrl) {
         console.error("Error creating signed URL:", error || 'No signedUrl returned', { bucket, path });
@@ -49,7 +49,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
       }
 
       console.log("Signed URL created:", data.signedUrl);
-      window.open(data.signedUrl, "_blank");
+      window.open(data.signedUrl, "_blank", "noopener");
     } catch (err: any) {
       console.error("Error in handleViewDocument:", err);
       alert(`Error viewing document: ${err.message}`);
@@ -61,23 +61,20 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
       console.log('Starting download for document:', doc.file_name);
 
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data, error } = await supabase.storage
-        .from(bucket)
-        .createSignedUrl(path, 60);
-
-      if (error || !data?.signedUrl) {
-        console.error('Error creating signed URL for download:', error || 'No signedUrl returned', { bucket, path });
-        throw error || new Error('Failed to generate download URL');
+      const { data, error } = await supabase.storage.from(bucket).download(path);
+      if (error) {
+        console.error('Error downloading document:', error, { bucket, path });
+        throw error;
       }
-      
-      console.log('Download URL created:', data.signedUrl);
-      
+
+      const url = window.URL.createObjectURL(data);
       const link = document.createElement('a');
-      link.href = data.signedUrl;
+      link.href = url;
       link.download = doc.file_name;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
       
     } catch (err: any) {
       console.error('Error in handleDownload:', err);

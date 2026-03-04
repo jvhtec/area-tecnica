@@ -6,6 +6,8 @@ import { HeaderSection } from './sections/header-section';
 import { CoverSection } from './sections/cover-section';
 import { ContentSections } from './sections/content-sections';
 import { FooterService } from './services/footer-service';
+import { StampService } from './services/stamp-service';
+import { supabase } from '@/lib/supabase';
 
 export class PDFEngine {
   private pdfDoc: PDFDocument;
@@ -169,6 +171,20 @@ export class PDFEngine {
         this.contentSections.addLogisticsSection(this.options.eventData, currentY);
       }
 
+      // 9b. Certificado de entrega (logística)
+      if (includeLogisticsTransport && this.contentSections.hasDeliveryCertificateData(this.options.eventData)) {
+        const [certificateJobContext, sectorProStamp] = await Promise.all([
+          this.fetchDeliveryCertificateJobContext(selectedJobId),
+          StampService.loadExactSectorProStamp(),
+        ]);
+        const currentY = this.headerSection.addSectionHeader("Certificado de Entrega");
+        this.contentSections.addDeliveryCertificateSection(this.options.eventData, currentY, {
+          ...certificateJobContext,
+          issueDate: new Date(),
+          stamp: sectorProStamp,
+        });
+      }
+
       // 10. Power Requirements
       if (this.contentSections.hasPowerData(this.options.eventData)) {
         const currentY = this.headerSection.addSectionHeader("Requerimientos eléctricos");
@@ -215,14 +231,42 @@ export class PDFEngine {
     }
   }
 
+  private async fetchDeliveryCertificateJobContext(jobId: string): Promise<{ invoicingCompany?: string | null; jobLocation?: string | null }> {
+    try {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          invoicing_company,
+          location:locations(name, formatted_address)
+        `)
+        .eq('id', jobId)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      const location = (data as any)?.location;
+      const jobLocation = (location?.formatted_address || location?.name || null) as string | null;
+
+      return {
+        invoicingCompany: (data as any)?.invoicing_company || null,
+        jobLocation,
+      };
+    } catch (error) {
+      console.warn('Unable to fetch delivery certificate job context:', error);
+      return { invoicingCompany: null, jobLocation: null };
+    }
+  }
+
   private async saveAndUploadPDF(): Promise<void> {
     const { eventData, selectedJobId, jobTitle } = this.options;
     
     // Generate filename
     const eventName = eventData.eventName || jobTitle || 'Evento';
     const safeEventName = eventName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-    const timestamp = new Date().toISOString().split('T')[0];
-    const filename = `hoja_de_ruta_${safeEventName}_${timestamp}.pdf`;
+    const nowIso = new Date().toISOString();
+    const datePart = nowIso.slice(0, 10); // YYYY-MM-DD (UTC)
+    const timePart = nowIso.slice(11, 19).replace(/:/g, ''); // HHMMSS (UTC)
+    const filename = `hoja_de_ruta_${safeEventName}_${datePart}_${timePart}.pdf`;
 
     // Save locally
     this.pdfDoc.save(filename);

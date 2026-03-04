@@ -84,14 +84,14 @@ export const JobDocuments = ({
       const { bucket, path } = resolveJobDocLocation(jobDocument.file_path);
       const { data: { signedUrl }, error } = await supabase.storage
         .from(bucket)
-        .createSignedUrl(path, 60);
+        .createSignedUrl(path, 60 * 60);
 
       if (error) {
         console.error('View error:', error);
         throw error;
       }
 
-      window.open(signedUrl, '_blank');
+      window.open(signedUrl, '_blank', 'noopener');
     } catch (error: any) {
       console.error('View error:', error);
       toast.error("View failed", {

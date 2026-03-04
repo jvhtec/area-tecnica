@@ -9,48 +9,43 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
       .replace(/_{2,}/g, '_') // Replace multiple underscores with single
       .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
 
-    console.log('Uploading PDF:', sanitizedFileName, 'to job:', jobId);
-    console.log('User authenticated:', (await supabase.auth.getUser()).data.user?.id);
+    const folderPath = `hojas-de-ruta/${jobId}`;
+    const filePath = `${folderPath}/${sanitizedFileName}`;
 
-    // 1) Clean up existing Hoja de Ruta PDFs for this job (storage + DB)
-    try {
-      // List existing files under the job's Hoja de Ruta folder
-      const { data: existingFiles, error: listError } = await supabase.storage
-        .from('job-documents')
-        .list(`hojas-de-ruta/${jobId}`);
-
-      if (listError) {
-        console.warn('Storage list warning (hoja de ruta cleanup):', listError);
-      } else if (existingFiles && existingFiles.length > 0) {
-        const pathsToRemove = existingFiles.map(f => `hojas-de-ruta/${jobId}/${f.name}`);
-        const { error: removeError } = await supabase.storage
-          .from('job-documents')
-          .remove(pathsToRemove);
-        if (removeError) {
-          console.warn('Storage remove warning (hoja de ruta cleanup):', removeError);
-        } else {
-          console.log(`Removed ${pathsToRemove.length} previous Hoja de Ruta file(s) from storage.`);
-        }
-      }
-
-      // Remove previous DB references for this job's Hoja de Ruta PDFs
-      const { error: dbDeleteError } = await supabase
-        .from('job_documents')
-        .delete()
-        .like('file_path', `hojas-de-ruta/${jobId}/%`)
-        .eq('job_id', jobId);
-      if (dbDeleteError) {
-        console.warn('DB delete warning (hoja de ruta cleanup):', dbDeleteError);
-      } else {
-        console.log('Cleared previous Hoja de Ruta document references in DB.');
-      }
-    } catch (cleanupErr) {
-      console.warn('Hoja de Ruta cleanup step encountered an issue but will not block upload:', cleanupErr);
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError) {
+      console.warn('Auth getUser warning (hoja de ruta upload):', authError);
     }
-    
+    const userId = authData.user?.id || null;
+
+    console.log('Uploading Hoja de Ruta PDF:', sanitizedFileName, 'to job:', jobId, 'user:', userId);
+
+    // Snapshot existing Hoja PDFs so we can clean up *after* a successful upload+insert.
+    // This avoids a window where the DB row exists but the file has already been deleted.
+    let previousDocs: Array<{ id: string; file_path: string }> = [];
+    try {
+      const { data, error } = await supabase
+        .from('job_documents')
+        .select('id,file_path')
+        .eq('job_id', jobId)
+        .like('file_path', `${folderPath}/%`)
+        .order('uploaded_at', { ascending: false });
+
+      if (error) {
+        console.warn('DB select warning (hoja de ruta cleanup snapshot):', error);
+      } else if (Array.isArray(data)) {
+        previousDocs = data
+          .filter((doc) => doc.file_path !== filePath)
+          .map((doc) => ({ id: doc.id, file_path: doc.file_path }));
+      }
+    } catch (snapshotErr) {
+      console.warn('Cleanup snapshot step encountered an issue (non-blocking):', snapshotErr);
+    }
+
+    // Upload new PDF first (no pre-delete)
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from("job-documents")
-      .upload(`hojas-de-ruta/${jobId}/${sanitizedFileName}`, pdfBlob, {
+      .upload(filePath, pdfBlob, {
         cacheControl: '3600',
         upsert: false
       });
@@ -62,20 +57,16 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
       throw uploadError;
     }
 
-    const { data: urlData } = supabase.storage
-      .from("job-documents")
-      .getPublicUrl(`hojas-de-ruta/${jobId}/${sanitizedFileName}`);
-
     // Insert document reference into the database using correct column names
     const { error: insertError } = await supabase
       .from("job_documents")
       .insert({
         job_id: jobId,
         file_name: sanitizedFileName,
-        file_path: `hojas-de-ruta/${jobId}/${sanitizedFileName}`,
+        file_path: filePath,
         file_type: 'application/pdf',
         file_size: pdfBlob.size,
-        uploaded_by: (await supabase.auth.getUser()).data.user?.id,
+        uploaded_by: userId,
         original_type: 'pdf',
         visible_to_tech: true
       });
@@ -86,6 +77,36 @@ export const uploadPdfToJob = async (jobId: string, pdfBlob: Blob, fileName: str
     }
     
     console.log('PDF uploaded successfully:', sanitizedFileName);
+
+    // Best-effort cleanup: delete previous DB rows first, then their storage objects.
+    // If DB delete is not permitted, we intentionally skip storage removal to avoid broken download links.
+    if (previousDocs.length > 0) {
+      try {
+        const previousIds = previousDocs.map((doc) => doc.id);
+        const previousPaths = previousDocs.map((doc) => doc.file_path);
+
+        const { error: dbDeleteError } = await supabase
+          .from('job_documents')
+          .delete()
+          .in('id', previousIds);
+
+        if (dbDeleteError) {
+          console.warn('DB delete warning (hoja de ruta cleanup):', dbDeleteError);
+        } else if (previousPaths.length > 0) {
+          const { error: removeError } = await supabase.storage
+            .from('job-documents')
+            .remove(previousPaths);
+
+          if (removeError) {
+            console.warn('Storage remove warning (hoja de ruta cleanup):', removeError);
+          } else {
+            console.log(`Removed ${previousPaths.length} previous Hoja de Ruta file(s) from storage.`);
+          }
+        }
+      } catch (cleanupErr) {
+        console.warn('Hoja de Ruta cleanup step encountered an issue (non-blocking):', cleanupErr);
+      }
+    }
 
     // Broadcast push: new Hoja de Ruta uploaded
     try {

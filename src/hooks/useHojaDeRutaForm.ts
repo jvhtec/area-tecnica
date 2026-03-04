@@ -366,12 +366,14 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
 
               if (existingIndex >= 0) {
                 const existing = current[existingIndex];
+                const shouldSyncDateTime = !existing.date_time || !String(existing.date_time).trim();
                 current[existingIndex] = {
                   ...existing,
                   transport_type: incoming.transport_type,
                   license_plate: incoming.license_plate,
                   company: incoming.company,
-                  date_time: incoming.date_time,
+                  // Preserve any manually-edited Hoja de Ruta datetime; only sync if empty.
+                  date_time: shouldSyncDateTime ? incoming.date_time : existing.date_time,
                   source_logistics_event_id: sourceId,
                   is_hoja_relevant: incoming.is_hoja_relevant ?? true,
                   logistics_categories: incoming.logistics_categories || [],

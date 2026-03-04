@@ -293,7 +293,7 @@ function JobCardNewFull({
     enabled: !!job?.id && !!currentUserDepartment,
   });
 
-  const { data: allRequests = [] } = useQuery({
+  const { data: allRequests = [], isLoading: isAllRequestsLoading } = useQuery({
     queryKey: ['transport-requests-all', job.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -364,6 +364,14 @@ function JobCardNewFull({
   const handleTransportClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if ((currentUserDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) {
+      // If there are no pending requests, allow creating a logistics event directly.
+      if (!isAllRequestsLoading && allRequests.length === 0) {
+        setSelectedTransportRequest(null);
+        setLogisticsInitialEventType("load");
+        setTransportDialogOpen(false);
+        setLogisticsDialogOpen(true);
+        return;
+      }
       setTransportDialogOpen(true); // open requests manager
     } else if (isTechDept && currentUserDepartment) {
       setTransportDialogOpen(true); // open request creator
