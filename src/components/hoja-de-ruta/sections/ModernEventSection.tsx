@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { motion } from "framer-motion";
-import { Calendar, MapPin, Sparkles, Zap, Building2 } from "lucide-react";
-import { EventData } from "@/types/hoja-de-ruta";
+import { Calendar, Plus, Sparkles, Trash2, Zap, Building2 } from "lucide-react";
+import type { AuxiliaryMachineryType, EventData } from "@/types/hoja-de-ruta";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
+import { AUXILIARY_MACHINERY_OPTIONS } from "@/constants/hojaDeRutaAuxiliaryNeeds";
 
 interface ModernEventSectionProps {
   eventData: EventData;
@@ -47,6 +48,70 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
       }
     }));
   };
+
+  const handleAuxStaffQtyChange = (
+    field: "auxiliaryStaffSetupQty" | "auxiliaryStaffDismantleQty",
+    value: string
+  ) => {
+    const parsed = Number.parseInt(value, 10);
+    setEventData(prev => ({
+      ...prev,
+      [field]: Number.isNaN(parsed) || parsed < 0 ? 0 : parsed,
+    }));
+  };
+
+  const handleAuxMachineryTypeChange = (index: number, machineType: AuxiliaryMachineryType) => {
+    setEventData(prev => ({
+      ...prev,
+      auxiliaryMachinery: (prev.auxiliaryMachinery || []).map((item, itemIndex) =>
+        itemIndex === index ? { ...item, machineType } : item
+      ),
+    }));
+  };
+
+  const handleAuxMachineryQtyChange = (index: number, value: string) => {
+    const parsed = Number.parseInt(value, 10);
+    setEventData(prev => ({
+      ...prev,
+      auxiliaryMachinery: (prev.auxiliaryMachinery || []).map((item, itemIndex) =>
+        itemIndex === index
+          ? { ...item, quantity: Number.isNaN(parsed) || parsed < 0 ? 0 : parsed }
+          : item
+      ),
+    }));
+  };
+
+  const addAuxMachineryRow = () => {
+    setEventData(prev => {
+      const currentRows = prev.auxiliaryMachinery || [];
+      const selectedTypes = new Set(currentRows.map(row => row.machineType));
+      const firstAvailableType = AUXILIARY_MACHINERY_OPTIONS.find(
+        option => !selectedTypes.has(option.value)
+      );
+      if (!firstAvailableType) return prev;
+
+      return {
+        ...prev,
+        auxiliaryMachinery: [
+          ...currentRows,
+          {
+            machineType: firstAvailableType.value,
+            quantity: 0,
+          },
+        ],
+      };
+    });
+  };
+
+  const removeAuxMachineryRow = (index: number) => {
+    setEventData(prev => ({
+      ...prev,
+      auxiliaryMachinery: (prev.auxiliaryMachinery || []).filter((_, rowIndex) => rowIndex !== index),
+    }));
+  };
+
+  const auxiliaryMachinery = eventData.auxiliaryMachinery || [];
+  const selectedAuxMachineryTypes = new Set(auxiliaryMachinery.map((row) => row.machineType));
 
   return (
     <div className="space-y-6">
@@ -195,17 +260,127 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="auxiliary-needs" className="text-sm font-medium">
-                Necesidades Auxiliares
-              </Label>
-              <Textarea
-                id="auxiliary-needs"
-                value={eventData.auxiliaryNeeds}
-                onChange={(e) => setEventData(prev => ({ ...prev, auxiliaryNeeds: e.target.value }))}
-                placeholder="Especifica cualquier necesidad adicional para el evento..."
-                className="border-2 focus:border-purple-300 min-h-[100px]"
-              />
+            <div className="space-y-4">
+              <Label className="text-sm font-medium">Necesidades Auxiliares</Label>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="aux-staff-setup" className="text-sm font-medium">
+                    Personal de Carga y Descarga - montaje
+                  </Label>
+                  <Input
+                    id="aux-staff-setup"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={eventData.auxiliaryStaffSetupQty ?? 0}
+                    onChange={(e) => handleAuxStaffQtyChange("auxiliaryStaffSetupQty", e.target.value)}
+                    className="border-2 focus:border-purple-300"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="aux-staff-dismantle" className="text-sm font-medium">
+                    Personal de Carga y Descarga - desmontaje
+                  </Label>
+                  <Input
+                    id="aux-staff-dismantle"
+                    type="number"
+                    min={0}
+                    step={1}
+                    value={eventData.auxiliaryStaffDismantleQty ?? 0}
+                    onChange={(e) => handleAuxStaffQtyChange("auxiliaryStaffDismantleQty", e.target.value)}
+                    className="border-2 focus:border-purple-300"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Maquinaria</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addAuxMachineryRow}
+                    disabled={auxiliaryMachinery.length >= AUXILIARY_MACHINERY_OPTIONS.length}
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Añadir maquinaria
+                  </Button>
+                </div>
+
+                {auxiliaryMachinery.length > 0 && (
+                  <div className="space-y-3">
+                    {auxiliaryMachinery.map((machineryRow, index) => {
+                      const rowOptions = AUXILIARY_MACHINERY_OPTIONS.filter(option =>
+                        option.value === machineryRow.machineType ||
+                        !selectedAuxMachineryTypes.has(option.value)
+                      );
+
+                      return (
+                        <div key={`${machineryRow.machineType}-${index}`} className="grid grid-cols-1 md:grid-cols-[1fr_120px_auto] gap-3 items-end">
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Tipo</Label>
+                            <Select
+                              value={machineryRow.machineType}
+                              onValueChange={(value) =>
+                                handleAuxMachineryTypeChange(index, value as AuxiliaryMachineryType)
+                              }
+                            >
+                              <SelectTrigger className="border-2 focus:border-purple-300">
+                                <SelectValue placeholder="Selecciona maquinaria..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {rowOptions.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label className="text-sm font-medium">Cantidad</Label>
+                            <Input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={machineryRow.quantity ?? 0}
+                              onChange={(e) => handleAuxMachineryQtyChange(index, e.target.value)}
+                              className="border-2 focus:border-purple-300"
+                            />
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeAuxMachineryRow(index)}
+                            className="mb-0.5"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="auxiliary-needs" className="text-sm font-medium">
+                  Notas auxiliares
+                </Label>
+                <Textarea
+                  id="auxiliary-needs"
+                  value={eventData.auxiliaryNeeds}
+                  onChange={(e) => setEventData(prev => ({ ...prev, auxiliaryNeeds: e.target.value }))}
+                  placeholder="Añade observaciones adicionales de necesidades auxiliares..."
+                  className="border-2 focus:border-purple-300 min-h-[100px]"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>

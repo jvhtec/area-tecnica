@@ -207,7 +207,14 @@ export class ContentSections {
   }
 
   hasAuxNeedsData(eventData: EventData): boolean {
-    return eventData.auxiliaryNeeds && eventData.auxiliaryNeeds.trim().length > 0;
+    const hasNotes = !!(eventData.auxiliaryNeeds && eventData.auxiliaryNeeds.trim().length > 0);
+    const hasSetupStaff = (eventData.auxiliaryStaffSetupQty ?? 0) > 0;
+    const hasDismantleStaff = (eventData.auxiliaryStaffDismantleQty ?? 0) > 0;
+    const hasMachinery = (eventData.auxiliaryMachinery || []).some(
+      (item) => (item.quantity ?? 0) > 0
+    );
+
+    return hasNotes || hasSetupStaff || hasDismantleStaff || hasMachinery;
   }
 
   hasProgramData(eventData: EventData): boolean {

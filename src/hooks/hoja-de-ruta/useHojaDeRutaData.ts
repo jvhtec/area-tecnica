@@ -84,6 +84,12 @@ export const useHojaDeRutaData = () => {
     try {
       // Check if exists
       const existing = await fetchHojaDeRutaByJobId(jobId);
+
+      const toSafeNonNegativeInt = (value: unknown): number => {
+        const parsed = Number.parseInt(String(value ?? 0), 10);
+        if (Number.isNaN(parsed) || parsed < 0) return 0;
+        return parsed;
+      };
       
       const hojaData = {
         job_id: jobId,
@@ -96,6 +102,11 @@ export const useHojaDeRutaData = () => {
         schedule: eventData.schedule,
         power_requirements: eventData.powerRequirements,
         auxiliary_needs: eventData.auxiliaryNeeds,
+        aux_staff_setup_qty: toSafeNonNegativeInt(eventData.auxiliaryStaffSetupQty),
+        aux_staff_dismantle_qty: toSafeNonNegativeInt(eventData.auxiliaryStaffDismantleQty),
+        aux_machinery_requirements: Array.isArray(eventData.auxiliaryMachinery)
+          ? eventData.auxiliaryMachinery.filter(item => item.quantity > 0)
+          : [],
         status: 'draft',
         last_modified: new Date().toISOString()
       };

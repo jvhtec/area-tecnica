@@ -86,7 +86,10 @@ export const useJobIntegration = (jobId: string) => {
       },
       schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
       powerRequirements: "",
-      auxiliaryNeeds: ""
+      auxiliaryNeeds: "",
+      auxiliaryStaffSetupQty: 0,
+      auxiliaryStaffDismantleQty: 0,
+      auxiliaryMachinery: [],
     };
   };
 

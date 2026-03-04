@@ -75,6 +75,16 @@ export interface Accommodation {
   rooms: RoomAssignment[];
 }
 
+export type AuxiliaryMachineryType =
+  | "carretilla_elevadora"
+  | "plataforma_elevadora_tijera"
+  | "plataforma_elevadora_movil";
+
+export interface AuxiliaryMachineryRequirement {
+  machineType: AuxiliaryMachineryType;
+  quantity: number;
+}
+
 // Most comprehensive EventData interface
 export interface EventData {
   eventName?: string;
@@ -145,6 +155,9 @@ export interface EventData {
   programScheduleDays?: ProgramDay[];
   powerRequirements?: string;
   auxiliaryNeeds?: string;
+  auxiliaryStaffSetupQty?: number;
+  auxiliaryStaffDismantleQty?: number;
+  auxiliaryMachinery?: AuxiliaryMachineryRequirement[];
   weather?: WeatherData[];
   restaurants?: Restaurant[];
   selectedRestaurants?: string[];

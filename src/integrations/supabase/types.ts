@@ -2178,6 +2178,9 @@ export type Database = {
       hoja_de_ruta: {
         Row: {
           alerts: Json | null
+          aux_machinery_requirements: Json
+          aux_staff_dismantle_qty: number
+          aux_staff_setup_qty: number
           approved_at: string | null
           approved_by: string | null
           auxiliary_needs: string | null
@@ -2210,6 +2213,9 @@ export type Database = {
         }
         Insert: {
           alerts?: Json | null
+          aux_machinery_requirements?: Json
+          aux_staff_dismantle_qty?: number
+          aux_staff_setup_qty?: number
           approved_at?: string | null
           approved_by?: string | null
           auxiliary_needs?: string | null
@@ -2242,6 +2248,9 @@ export type Database = {
         }
         Update: {
           alerts?: Json | null
+          aux_machinery_requirements?: Json
+          aux_staff_dismantle_qty?: number
+          aux_staff_setup_qty?: number
           approved_at?: string | null
           approved_by?: string | null
           auxiliary_needs?: string | null

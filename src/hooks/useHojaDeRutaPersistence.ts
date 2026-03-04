@@ -1,10 +1,16 @@
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
-import { EventData, TravelArrangement, Accommodation } from "@/types/hoja-de-ruta";
+import type {
+  EventData,
+  TravelArrangement,
+  Accommodation,
+  AuxiliaryMachineryRequirement,
+} from "@/types/hoja-de-ruta";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { isAuxiliaryMachineryType } from "@/constants/hojaDeRutaAuxiliaryNeeds";
 
 
 const PARTIAL_ISO_NO_TZ_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
@@ -45,6 +51,37 @@ const toSafeTimestamptz = (value: string | null | undefined): string | null => {
   }
 
   return date.toISOString();
+};
+
+const toSafeNonNegativeInt = (value: unknown): number => {
+  const parsed = Number.parseInt(String(value ?? 0), 10);
+  if (Number.isNaN(parsed) || parsed < 0) return 0;
+  return parsed;
+};
+
+const normalizeAuxiliaryMachinery = (value: unknown): AuxiliaryMachineryRequirement[] => {
+  if (!Array.isArray(value)) return [];
+
+  const deduped = new Map<AuxiliaryMachineryRequirement["machineType"], number>();
+
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+
+    const machineTypeRaw = (item as { machineType?: unknown; machine_type?: unknown }).machineType
+      ?? (item as { machineType?: unknown; machine_type?: unknown }).machine_type;
+    const quantityRaw = (item as { quantity?: unknown }).quantity;
+    if (!isAuxiliaryMachineryType(machineTypeRaw)) continue;
+
+    const quantity = toSafeNonNegativeInt(quantityRaw);
+    if (quantity <= 0) continue;
+
+    deduped.set(machineTypeRaw, quantity);
+  }
+
+  return Array.from(deduped.entries()).map(([machineType, quantity]) => ({
+    machineType,
+    quantity,
+  }));
 };
 
 interface SaveCallbacks {
@@ -210,6 +247,9 @@ export const useHojaDeRutaPersistence = (
         programScheduleDays: (mainData as any).program_schedule_json || undefined,
         powerRequirements: mainData.power_requirements || '',
         auxiliaryNeeds: mainData.auxiliary_needs || '',
+        auxiliaryStaffSetupQty: toSafeNonNegativeInt(mainData.aux_staff_setup_qty),
+        auxiliaryStaffDismantleQty: toSafeNonNegativeInt(mainData.aux_staff_dismantle_qty),
+        auxiliaryMachinery: normalizeAuxiliaryMachinery(mainData.aux_machinery_requirements),
         weather: mainData.weather_data || []
       };
 
@@ -280,6 +320,9 @@ export const useHojaDeRutaPersistence = (
       }
 
       const now = new Date().toISOString();
+      const auxiliaryStaffSetupQty = toSafeNonNegativeInt(eventData.auxiliaryStaffSetupQty);
+      const auxiliaryStaffDismantleQty = toSafeNonNegativeInt(eventData.auxiliaryStaffDismantleQty);
+      const auxiliaryMachinery = normalizeAuxiliaryMachinery(eventData.auxiliaryMachinery);
 
       // First, upsert the main hoja de ruta record
       const mainData = {
@@ -295,6 +338,9 @@ export const useHojaDeRutaPersistence = (
         program_schedule_json: eventData.programScheduleDays && eventData.programScheduleDays.length > 0 ? eventData.programScheduleDays : null,
         power_requirements: eventData.powerRequirements || '',
         auxiliary_needs: eventData.auxiliaryNeeds || '',
+        aux_staff_setup_qty: auxiliaryStaffSetupQty,
+        aux_staff_dismantle_qty: auxiliaryStaffDismantleQty,
+        aux_machinery_requirements: auxiliaryMachinery,
         weather_data: eventData.weather || null,
         updated_at: now,
         last_modified: now,

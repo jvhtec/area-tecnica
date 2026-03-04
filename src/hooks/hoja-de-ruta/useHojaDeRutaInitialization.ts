@@ -177,6 +177,9 @@ export const useHojaDeRutaInitialization = (
         // Use fetched power requirements from database
         powerRequirements: powerRequirementsText || "",
         auxiliaryNeeds: "",
+        auxiliaryStaffSetupQty: 0,
+        auxiliaryStaffDismantleQty: 0,
+        auxiliaryMachinery: [],
         weather: undefined,
       };
 
@@ -361,6 +364,9 @@ export const useHojaDeRutaInitialization = (
           // Use fresh power requirements from database, fallback to saved if none found
           powerRequirements: powerRequirementsText || savedEventData?.powerRequirements || "",
           auxiliaryNeeds: savedEventData?.auxiliaryNeeds || "",
+          auxiliaryStaffSetupQty: savedEventData?.auxiliaryStaffSetupQty ?? 0,
+          auxiliaryStaffDismantleQty: savedEventData?.auxiliaryStaffDismantleQty ?? 0,
+          auxiliaryMachinery: savedEventData?.auxiliaryMachinery || [],
           weather: savedEventData?.weather || undefined,
           // Restaurants
           restaurants: savedEventData?.restaurants || undefined,
@@ -413,6 +419,9 @@ export const useHojaDeRutaInitialization = (
           // Use fetched power requirements from database
           powerRequirements: powerRequirementsText || "",
           auxiliaryNeeds: "",
+          auxiliaryStaffSetupQty: 0,
+          auxiliaryStaffDismantleQty: 0,
+          auxiliaryMachinery: [],
           weather: undefined,
         };
 

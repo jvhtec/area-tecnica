@@ -15,7 +15,10 @@ const initialEventData: EventData = {
   },
   schedule: '',
   powerRequirements: '',
-  auxiliaryNeeds: ''
+  auxiliaryNeeds: '',
+  auxiliaryStaffSetupQty: 0,
+  auxiliaryStaffDismantleQty: 0,
+  auxiliaryMachinery: [],
 };
 
 export const useHojaDeRutaState = () => {
@@ -45,7 +48,10 @@ export const useHojaDeRutaState = () => {
                      eventData.venue.address || 
                      eventData.schedule || 
                      eventData.powerRequirements ||
-                     eventData.auxiliaryNeeds || 
+                     eventData.auxiliaryNeeds ||
+                     (eventData.auxiliaryStaffSetupQty ?? 0) > 0 ||
+                     (eventData.auxiliaryStaffDismantleQty ?? 0) > 0 ||
+                     (eventData.auxiliaryMachinery?.some(item => (item.quantity ?? 0) > 0) ?? false) ||
                      eventData.contacts.some(c => c.name) ||
                      eventData.staff.some(s => s.name) || 
                      travelArrangements.length > 0 ||
