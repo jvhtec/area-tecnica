@@ -21,6 +21,7 @@ import { JobDetailsRestaurantsTab } from "./job-details-dialog/tabs/JobDetailsRe
 import { JobDetailsWeatherTab } from "./job-details-dialog/tabs/JobDetailsWeatherTab";
 import { StaffingOrchestratorPanel } from "@/components/matrix/StaffingOrchestratorPanel";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
+import { canManagePayouts } from "@/utils/permissions";
 
 export { enrichTimesheetsWithProfiles } from "./job-details-dialog/enrichTimesheetsWithProfiles";
 
@@ -33,8 +34,9 @@ interface JobDetailsDialogProps {
 
 const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOpenChange, job, department = "sound" }) => {
   const [selectedTab, setSelectedTab] = useState("info");
-  const { userRole, user } = useOptimizedAuth();
+  const { userRole, user, userDepartment } = useOptimizedAuth();
   const isManager = ["admin", "management"].includes(userRole || "");
+  const canManagePayoutsForUser = canManagePayouts(userRole, userDepartment);
   const isTechnicianRole = ["technician", "house_tech"].includes(userRole || "");
   const isHouseTech = userRole === "house_tech";
   const canSeeAutoStaffing = ["admin", "management", "logistics"].includes(userRole || "");
@@ -259,6 +261,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
                 jobDetails={jobDetails}
                 resolvedJobId={resolvedJobId}
                 isManager={isManager}
+                canManagePayouts={canManagePayoutsForUser}
                 isTechnicianRole={isTechnicianRole}
                 isDryhire={isDryhire}
                 jobRatesApproved={jobRatesApproved}
@@ -300,7 +303,12 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
               {showTourRatesTab && resolvedJobId && (
                 <TabsContent value="tour-rates" className="space-y-4 min-w-0 overflow-x-hidden">
-                  <TourRatesPanel jobId={resolvedJobId} />
+                  <TourRatesPanel
+                    jobId={resolvedJobId}
+                    jobType={jobDetails?.job_type || job?.job_type || null}
+                    tourId={jobDetails?.tour_id || job?.tour_id || null}
+                    canReviewPayouts={canManagePayoutsForUser}
+                  />
                 </TabsContent>
               )}
 

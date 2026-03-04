@@ -21,6 +21,7 @@ import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
+import { canManagePayouts } from '@/utils/permissions';
 
 interface EnhancedJobDetailsModalProps {
     theme: {
@@ -36,6 +37,7 @@ interface EnhancedJobDetailsModalProps {
     job: any;
     onClose: () => void;
     userRole?: string | null;
+    userDepartment?: string | null;
     department?: string;
 }
 
@@ -53,7 +55,7 @@ interface StaffAssignment {
     } | null;
 }
 
-export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole, department = 'sound' }: EnhancedJobDetailsModalProps) => {
+export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole, userDepartment, department = 'sound' }: EnhancedJobDetailsModalProps) => {
     const [activeTab, setActiveTab] = useState<TabId>('Info');
     const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
     const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
@@ -63,6 +65,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     const queryClient = useQueryClient();
 
     const isManager = ['admin', 'management'].includes(userRole || '');
+    const canManageJobPayouts = canManagePayouts(userRole, userDepartment);
     const isHouseTech = userRole === 'house_tech';
 
     // Fetch full job details with location
@@ -489,7 +492,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                 </div>
                             )}
 
-                            {isManager && resolvedJobId && (
+                            {canManageJobPayouts && resolvedJobId && (
                                 <div className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-xl p-3 w-full min-w-0 overflow-hidden`}>
                                     <h3 className={`text-sm font-semibold mb-3 ${theme.textMain}`}>Job Payout Totals</h3>
                                     <JobPayoutTotalsPanel jobId={resolvedJobId} />
@@ -875,6 +878,9 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                             <div className={`${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 w-full min-w-0 overflow-hidden`}>
                                 <TourRatesPanel
                                     jobId={resolvedJobId}
+                                    jobType={jobType || null}
+                                    tourId={jobDetails?.tour_id || job?.tour_id || null}
+                                    canReviewPayouts={canManageJobPayouts}
                                 />
                             </div>
                         </div>

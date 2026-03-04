@@ -33,6 +33,7 @@ interface JobDetailsInfoTabProps {
   jobDetails: any;
   resolvedJobId: string;
   isManager: boolean;
+  canManagePayouts: boolean;
   isTechnicianRole: boolean;
   isDryhire: boolean;
   jobRatesApproved: boolean;
@@ -44,6 +45,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
   jobDetails,
   resolvedJobId,
   isManager,
+  canManagePayouts,
   isTechnicianRole,
   isDryhire,
   jobRatesApproved,
@@ -333,8 +335,10 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                         queryClient.invalidateQueries({ queryKey: ["job-approval-status", resolvedJobId] });
                         if (approvalSucceeded) {
                           toast.success("Tarifas aprobadas", {
-                            description: "¿Quieres enviar los resúmenes de pagos por correo ahora?",
-                            action: resolvedJobId
+                            description: canManagePayouts
+                              ? "¿Quieres enviar los resúmenes de pagos por correo ahora?"
+                              : undefined,
+                            action: canManagePayouts && resolvedJobId
                               ? {
                                 label: "Enviar ahora",
                                 onClick: () => {
@@ -393,7 +397,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
         </div>
       </Card>
 
-      {isManager && resolvedJobId && <JobPayoutTotalsPanel jobId={resolvedJobId} />}
+      {canManagePayouts && resolvedJobId && <JobPayoutTotalsPanel jobId={resolvedJobId} />}
 
       {isManager && !isDryhire && (
         <Card className="p-3">

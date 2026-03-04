@@ -6,6 +6,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Euro, Users, Calendar, AlertCircle, Send } from "lucide-react";
 import { format } from "date-fns";
 import { useTourJobRateQuotes } from "@/hooks/useTourJobRateQuotes";
+import { useTourJobRateQuotesForManager } from "@/hooks/useTourJobRateQuotesForManager";
+import { useManagerJobQuotes } from "@/hooks/useManagerJobQuotes";
 import { useToggleTechnicianPayoutApproval } from "@/hooks/useToggleTechnicianPayoutApproval";
 import { TourJobRateQuote } from "@/types/tourRates";
 import { useQuery } from "@tanstack/react-query";
@@ -19,23 +21,114 @@ import { getAutonomoBadgeLabel } from "@/utils/autonomo";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import type { TechnicianProfile } from "@/utils/rates-pdf-export";
 
-const NON_AUTONOMO_DEDUCTION_EUR = 30;
-
 interface TourRatesPanelProps {
   jobId: string;
+  jobType?: string | null;
+  tourId?: string | null;
+  canReviewPayouts?: boolean;
 }
 
-export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
-  const { data: quotes, isLoading, error } = useTourJobRateQuotes(jobId);
+const normalizeQuoteRow = (quote: TourJobRateQuote): TourJobRateQuote => {
+  const extrasTotalFromField =
+    typeof quote.extras_total_eur === 'number' && Number.isFinite(quote.extras_total_eur)
+      ? quote.extras_total_eur
+      : undefined;
+  const extrasTotalFromBreakdown =
+    quote.extras?.total_eur != null && Number.isFinite(Number(quote.extras.total_eur))
+      ? Number(quote.extras.total_eur)
+      : undefined;
+  const extrasTotal = extrasTotalFromField ?? extrasTotalFromBreakdown ?? 0;
+  const totalWithExtras =
+    typeof quote.total_with_extras_eur === 'number' && Number.isFinite(quote.total_with_extras_eur)
+      ? quote.total_with_extras_eur
+      : (Number(quote.total_eur ?? 0) + extrasTotal);
+  const overrideAmount =
+    typeof quote.override_amount_eur === 'number' && Number.isFinite(quote.override_amount_eur)
+      ? quote.override_amount_eur
+      : undefined;
+  const hasOverride = quote.has_override ?? overrideAmount != null;
+
+  return {
+    ...quote,
+    extras: quote.extras ?? { items: [], total_eur: extrasTotal },
+    extras_total_eur: extrasTotal,
+    total_with_extras_eur: totalWithExtras,
+    has_override: hasOverride,
+    override_amount_eur: overrideAmount,
+    calculated_total_eur: quote.calculated_total_eur ?? totalWithExtras,
+  };
+};
+
+export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({
+  jobId,
+  jobType,
+  tourId,
+  canReviewPayouts = false,
+}) => {
   const toggleApprovalMutation = useToggleTechnicianPayoutApproval();
+
+  const { data: jobMeta } = useQuery({
+    queryKey: ['tour-rates-job-meta', jobId],
+    enabled: !!jobId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('id, title, start_time, end_time, timezone, tour_id, job_type, rates_approved')
+        .eq('id', jobId)
+        .maybeSingle();
+      if (error) throw error;
+      return data as {
+        id: string;
+        title: string;
+        start_time: string;
+        end_time: string | null;
+        timezone: string | null;
+        tour_id: string | null;
+        job_type: string | null;
+        rates_approved: boolean | null;
+      } | null;
+    },
+    staleTime: 60_000,
+  });
+  const resolvedTourId = tourId ?? jobMeta?.tour_id ?? null;
+  const resolvedJobType = (jobType ?? jobMeta?.job_type ?? '').toLowerCase();
+  const shouldUseManagerTourdateSource =
+    canReviewPayouts && resolvedJobType === 'tourdate' && !!resolvedTourId;
+  const shouldUseManagerGenericSource =
+    canReviewPayouts && !shouldUseManagerTourdateSource;
+
+  const regularQuotesQuery = useTourJobRateQuotes(
+    shouldUseManagerTourdateSource || shouldUseManagerGenericSource ? undefined : jobId
+  );
+  const managerTourdateQuotesQuery = useTourJobRateQuotesForManager(
+    shouldUseManagerTourdateSource ? jobId : undefined,
+    shouldUseManagerTourdateSource ? resolvedTourId ?? undefined : undefined
+  );
+  const managerGenericQuotesQuery = useManagerJobQuotes(
+    shouldUseManagerGenericSource ? jobId : undefined,
+    shouldUseManagerGenericSource ? resolvedJobType || undefined : undefined,
+    shouldUseManagerGenericSource ? resolvedTourId ?? undefined : undefined
+  );
+
+  const activeQuotesQuery = shouldUseManagerTourdateSource
+    ? managerTourdateQuotesQuery
+    : shouldUseManagerGenericSource
+      ? managerGenericQuotesQuery
+      : regularQuotesQuery;
+  const quotes = React.useMemo(
+    () => (activeQuotesQuery.data || []).map(normalizeQuoteRow),
+    [activeQuotesQuery.data]
+  );
+  const isLoading = activeQuotesQuery.isLoading;
+  const error = activeQuotesQuery.error as Error | null;
 
   // Fetch technician profiles for display names
   type ProfileWithEmail = TechnicianProfile & { email?: string | null };
 
   const { data: profiles = [] } = useQuery({
-    queryKey: ['profiles-for-tour-rates', quotes?.map(q => q.technician_id)],
+    queryKey: ['profiles-for-tour-rates', quotes.map(q => q.technician_id)],
     queryFn: async () => {
-      if (!quotes?.length) return [];
+      if (!quotes.length) return [];
 
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
       const { data, error } = await supabase
@@ -46,27 +139,12 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
       if (error) throw error;
       return data;
     },
-    enabled: !!quotes?.length,
+    enabled: quotes.length > 0,
   });
 
   const typedProfiles = profiles as ProfileWithEmail[];
   const profileMap = React.useMemo(() => new Map(typedProfiles.map((p) => [p.id, p])), [typedProfiles]);
 
-  const { data: jobMeta } = useQuery({
-    queryKey: ['tour-rates-job-meta', jobId],
-    enabled: !!jobId,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('id, title, start_time, end_time, timezone, tour_id, rates_approved')
-        .eq('id', jobId)
-        .maybeSingle();
-      if (error) throw error;
-      return data as { id: string; title: string; start_time: string; end_time: string | null; timezone: string | null; tour_id: string | null; rates_approved: boolean | null } | null;
-    },
-    staleTime: 60_000,
-  });
-  const jobRatesApproved = Boolean(jobMeta?.rates_approved);
   const isClosureLocked = isJobPastClosureWindow(jobMeta?.end_time, jobMeta?.timezone ?? 'Europe/Madrid');
   const [isSendingEmails, setIsSendingEmails] = React.useState(false);
   const [sendingByTech, setSendingByTech] = React.useState<Record<string, boolean>>({});
@@ -390,10 +468,11 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({ jobId }) => {
                               if (result.error) {
                                 toast.error('No se pudo enviar el correo a este técnico');
                               } else {
-                                const r = Array.isArray(result.response?.results)
-                                  ? (result.response.results as Array<{ technician_id: string; sent: boolean }>).
-                                    find((x) => x.technician_id === quote.technician_id)
-                                  : { sent: result.success } as any;
+                                const r: { technician_id?: string; sent: boolean } | undefined =
+                                  Array.isArray(result.response?.results)
+                                    ? (result.response.results as Array<{ technician_id: string; sent: boolean }>).
+                                      find((x) => x.technician_id === quote.technician_id)
+                                    : { sent: result.success };
                                 if (r?.sent) {
                                   toast.success('Correo enviado a este técnico');
                                 } else {

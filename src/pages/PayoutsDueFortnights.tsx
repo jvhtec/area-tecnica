@@ -18,6 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { createQueryKey } from "@/lib/optimized-react-query";
+import { canManagePayouts } from "@/utils/permissions";
 
 const MADRID_TIMEZONE = "Europe/Madrid";
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -350,15 +351,6 @@ function formatEstimateText(fromDate: Date, toDate: Date): string {
   return `${formatLongDate(fromDate)} - ${formatLongDate(toDate)}`;
 }
 
-function normalizeDepartmentKey(value?: string | null): string {
-  return (
-    value
-      ?.toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "") ?? ""
-  );
-}
-
 function formatAutonomoCellValue(isHouseTech: boolean, isAutonomo: boolean | null): string {
   if (isHouseTech) return "Empleado";
   if (isAutonomo === null) return "—";
@@ -586,13 +578,9 @@ export default function PayoutsDueFortnights() {
   const [printingGroupKey, setPrintingGroupKey] = useState<string | null>(null);
   const [updatingInvoiceKeys, setUpdatingInvoiceKeys] = useState<Record<string, boolean>>({});
 
-  const normalizedDepartment = normalizeDepartmentKey(userDepartment);
   const queryFromInput = fromDateFilter || todayInput;
   const queryToInput = toDateFilter || defaultToInput;
-  const canManageInvoice =
-    userRole === "admin" ||
-    (userRole === "management" &&
-      (normalizedDepartment === "administrative" || normalizedDepartment === "administracion"));
+  const canManageInvoice = canManagePayouts(userRole, userDepartment);
 
   const {
     data,

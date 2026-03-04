@@ -29,6 +29,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { canManagePayouts } from "@/utils/permissions"
 
 import { SidebarNavigationSkeleton } from "./SidebarNavigationSkeleton"
 
@@ -81,12 +82,6 @@ const departmentIconMap: Record<string, LucideIcon> = {
   lights: Lightbulb,
   video: Video,
 }
-
-const normalizeDepartmentKey = (value?: string | null): string =>
-  value
-    ?.toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") ?? ""
 
 const baseNavigationConfig: NavigationItemConfig[] = [
   {
@@ -197,12 +192,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
      mobilePriority: 9,
      mobileSlot: "secondary",
      getPath: () => "/management/payouts-due",
-     isVisible: ({ userRole, userDepartment }) => {
-       if (userRole === "admin") return true;
-       if (userRole !== "management") return false;
-       const normalized = normalizeDepartmentKey(userDepartment);
-       return normalized === "administrative" || normalized === "administracion";
-     },
+     isVisible: ({ userRole, userDepartment }) => canManagePayouts(userRole, userDepartment),
    },
    {
      id: "expenses",

@@ -8,6 +8,7 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
+import { canManagePayouts } from '@/utils/permissions';
 import type { JobPayoutTotals, JobExpenseBreakdownItem } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { FLEX_UI_BASE_URL } from '@/utils/flexUrlResolver';
@@ -17,8 +18,8 @@ const FIN_DOC_VIEW_ID = '8238f39c-f42e-11e0-a8de-00e08175e43e';
 
 export function useJobPayoutData(jobId: string, technicianId?: string): JobPayoutData {
   /* ── Auth ── */
-  const { userRole } = useOptimizedAuth();
-  const isManager = userRole === 'admin' || userRole === 'management';
+  const { userRole, userDepartment } = useOptimizedAuth();
+  const isManager = canManagePayouts(userRole, userDepartment);
 
   /* ── Job metadata ── */
   const {

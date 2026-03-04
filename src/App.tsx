@@ -18,6 +18,7 @@ import { Loader2 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { GlobalCreateJobDialog } from '@/components/jobs/GlobalCreateJobDialog';
 import { useShortcutInitialization } from '@/hooks/useShortcutInitialization';
+import { canManagePayouts } from '@/utils/permissions';
 
 const ReactQueryDevtoolsLazy = import.meta.env.DEV
   ? lazy(() =>
@@ -144,15 +145,8 @@ function RouteAwareGlobalOverlays() {
 
 const SOUND_DEPARTMENT = "sound";
 const LIGHTS_DEPARTMENT = "lights";
-const ADMINISTRATIVE_DEPARTMENT = "administrative";
 const SOUND_TOOL_ROLES = ["admin", "management", "house_tech"] as const;
 const SOUND_TOOL_ROLES_WITH_TECH = [...SOUND_TOOL_ROLES, "technician"] as const;
-
-const normalizeDepartmentKey = (value?: string | null): string =>
-  value
-    ?.toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "") ?? "";
 
 const FestivalsAccessGuard = () => {
   const { userRole, userDepartment, isLoading } = useOptimizedAuth();
@@ -199,16 +193,7 @@ const PayoutsDueAccessGuard = () => {
     return null;
   }
 
-  if (userRole === "admin") {
-    return <PayoutsDueFortnights />;
-  }
-
-  const normalizedDepartment = normalizeDepartmentKey(userDepartment);
-  const hasAdministrativeManagementAccess =
-    userRole === "management" &&
-    (normalizedDepartment === ADMINISTRATIVE_DEPARTMENT || normalizedDepartment === "administracion");
-
-  if (!hasAdministrativeManagementAccess) {
+  if (!canManagePayouts(userRole, userDepartment)) {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -513,6 +513,7 @@ const Sound = () => {
             setSelectedJobForDetails(null);
           }}
           userRole={userRole}
+          userDepartment={userDepartment}
           department={currentDepartment}
         />
       )}
