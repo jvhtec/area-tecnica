@@ -1,7 +1,17 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { MobileArtistCard, type MobileConfigCategory } from "./MobileArtistCard";
-import { MobileArtistConfigEditor } from "./MobileArtistConfigEditor";
+import { MobileArtistConfigEditor, ReadOnlyArtistCategoryContent } from "./MobileArtistConfigEditor";
 import type { ArtistGearComparison } from "@/utils/gearComparisonService";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+
+const CATEGORY_TITLES: Record<MobileConfigCategory, string> = {
+  consoles: "Consolas",
+  wireless: "Wireless / IEM",
+  microphones: "Micrófonos",
+  monitors: "Monitores y Extras",
+  infrastructure: "Infraestructura",
+  notes: "Notas",
+};
 
 interface Artist {
   id: string;
@@ -75,6 +85,7 @@ interface MobileArtistListProps {
   deletingArtistId: string | null;
   uploadingStagePlotArtistId: string | null;
   deletingStagePlotArtistId: string | null;
+  mode?: 'edit' | 'readonly';
 }
 
 export const MobileArtistList = ({
@@ -96,9 +107,14 @@ export const MobileArtistList = ({
   deletingArtistId,
   uploadingStagePlotArtistId,
   deletingStagePlotArtistId,
+  mode = 'edit',
 }: MobileArtistListProps) => {
   const [editingCategory, setEditingCategory] = useState<{
     artistId: string;
+    category: MobileConfigCategory;
+  } | null>(null);
+  const [readonlyDetail, setReadonlyDetail] = useState<{
+    artist: Artist;
     category: MobileConfigCategory;
   } | null>(null);
 
@@ -125,6 +141,12 @@ export const MobileArtistList = ({
   }, []);
 
   const handleEditCategory = (artistId: string, category: MobileConfigCategory) => {
+    if (mode === 'readonly') {
+      const selectedArtist = artists.find((artist) => artist.id === artistId);
+      if (!selectedArtist) return;
+      setReadonlyDetail({ artist: selectedArtist, category });
+      return;
+    }
     setEditingCategory({ artistId, category });
   };
 
@@ -139,7 +161,7 @@ export const MobileArtistList = ({
   };
 
   // Full-screen editor overlay
-  if (editingCategory) {
+  if (mode === 'edit' && editingCategory) {
     const editingArtist = artists.find(a => a.id === editingCategory.artistId);
     if (editingArtist) {
       return (
@@ -165,6 +187,7 @@ export const MobileArtistList = ({
             stageName={stageNames[artist.stage] || `Stage ${artist.stage}`}
             stagePlotUrl={stagePlotUrls[artist.id]}
             gearComparison={gearComparisons[artist.id]}
+            mode={mode}
             onEditCategory={handleEditCategory}
             onEditArtist={onEditArtist}
             onGenerateLink={onGenerateLink}
@@ -180,6 +203,27 @@ export const MobileArtistList = ({
           />
         </div>
       ))}
+
+      {mode === 'readonly' && readonlyDetail && (
+        <Sheet
+          open={Boolean(readonlyDetail)}
+          onOpenChange={(open) => {
+            if (!open) setReadonlyDetail(null);
+          }}
+        >
+            <SheetContent side="bottom" className="rounded-t-2xl max-h-[85vh] overflow-y-auto">
+              <SheetHeader className="mb-4">
+                <SheetTitle className="text-left">
+                  {readonlyDetail.artist.name} · {CATEGORY_TITLES[readonlyDetail.category]}
+                </SheetTitle>
+              </SheetHeader>
+            <ReadOnlyArtistCategoryContent
+              artist={readonlyDetail.artist}
+              category={readonlyDetail.category}
+            />
+          </SheetContent>
+        </Sheet>
+      )}
     </div>
   );
 };

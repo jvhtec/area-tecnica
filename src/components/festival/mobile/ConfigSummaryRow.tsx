@@ -5,6 +5,7 @@ interface ConfigSummaryRowProps {
   title: string;
   summary: string;
   warning?: boolean;
+  mode?: 'edit' | 'readonly';
   onClick: () => void;
 }
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MapPin, Clock, User, FileText, Lightbulb, Receipt } from 'lucide-react';
+import { MapPin, Clock, User, FileText, Lightbulb, Receipt, Users } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { labelForCode } from '@/utils/roles';
 import { TechnicianIncidentReportDialog } from '@/components/incident-reports/TechnicianIncidentReportDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { useExpensePermissions, isPermissionActive } from '@/hooks/useExpensePermissions';
 import { useJobExpenses } from '@/hooks/useJobExpenses';
 import { ExpenseForm, ExpenseList, ExpenseSummaryCard } from '@/components/expenses';
+import { supabase } from '@/lib/supabase';
 import { JobCardProps } from './types';
 
 export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techName, onOpenObliqueStrategy }: JobCardProps) => {
@@ -57,6 +59,30 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
     const isDryhire = jobType === 'dryhire' || jobType === 'dry_hire';
     const showTimesheetButton = !isTourdate && !isDryhire;
     const showIncidentReport = !isDryhire;
+    const artistCountFromJob = Number(jobData?.artist_count || 0);
+    const shouldFetchArtistCountFallback = jobData?.artist_count == null && Boolean(jobData?.id);
+
+    const { data: artistCountFallback = 0 } = useQuery({
+        queryKey: ['tech-job-artist-count-fallback', jobData?.id],
+        queryFn: async () => {
+            if (!jobData?.id) return 0;
+            const { count, error } = await supabase
+                .from('festival_artists')
+                .select('id', { count: 'exact', head: true })
+                .eq('job_id', jobData.id);
+
+            if (error) {
+                console.warn('TechJobCard: failed to fetch artist count fallback', error);
+                return 0;
+            }
+
+            return count || 0;
+        },
+        enabled: shouldFetchArtistCountFallback,
+        staleTime: 1000 * 60 * 5,
+    });
+
+    const hasArtists = artistCountFromJob > 0 || artistCountFallback > 0;
 
     return (
         <div className={`rounded-xl border border-l-4 ${statusColor} ${theme.card} p-5 relative overflow-hidden group mb-4`}>
@@ -111,6 +137,14 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
                         className={`py-2.5 rounded-lg ${theme.accent} text-xs font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20`}
                     >
                         <Clock size={14} /> Horas
+                    </button>
+                )}
+                {hasArtists && (
+                    <button
+                        onClick={() => onAction('artists', jobData)}
+                        className={`py-2.5 rounded-lg border border-dashed ${theme.divider} ${theme.textMuted} text-xs font-bold hover:bg-white/5 transition-colors flex items-center justify-center gap-2 ${showTimesheetButton ? 'col-span-2' : ''}`}
+                    >
+                        <Users size={14} /> Artistas
                     </button>
                 )}
                 {showIncidentReport && (

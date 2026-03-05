@@ -79,6 +79,173 @@ const CATEGORY_LABELS: Record<MobileConfigCategory, { title: string; subtitle: s
   notes: { title: "Notas de Producción", subtitle: "Notas y comentarios" },
 };
 
+const formatProviderLabel = (provider?: string | null) => {
+  if (!provider) return "Sin especificar";
+  if (provider === "festival") return "Festival";
+  if (provider === "band") return "Artista";
+  if (provider === "mixed") return "Mixto";
+  return provider;
+};
+
+const formatWiredMics = (
+  wiredMics?: Array<{ model: string; quantity: number; exclusive_use?: boolean; notes?: string }> | null
+) => {
+  if (!wiredMics || wiredMics.length === 0) return "Sin micros cableados especificados";
+  return wiredMics
+    .map((mic) => {
+      const exclusive = mic.exclusive_use ? " (uso exclusivo)" : "";
+      return `${mic.quantity}x ${mic.model}${exclusive}`;
+    })
+    .join(", ");
+};
+
+const formatSystems = (systems: any[] = []) => {
+  if (!Array.isArray(systems) || systems.length === 0) return "Sin sistemas";
+  return systems
+    .map((system) => {
+      const hh = Number(system.quantity_hh || 0);
+      const bp = Number(system.quantity_bp || 0);
+      const qty = Number(system.quantity || 0);
+      const model = system.model || "Modelo";
+      if (hh > 0 || bp > 0) {
+        return `${model}: ${hh} HH, ${bp} BP`;
+      }
+      return `${model}: ${qty}`;
+    })
+    .join(" · ");
+};
+
+const formatInfrastructure = (artist: Artist) => {
+  const infra: string[] = [];
+  if (artist.infra_cat6 && artist.infra_cat6_quantity) infra.push(`${artist.infra_cat6_quantity}x CAT6`);
+  if (artist.infra_hma && artist.infra_hma_quantity) infra.push(`${artist.infra_hma_quantity}x HMA`);
+  if (artist.infra_coax && artist.infra_coax_quantity) infra.push(`${artist.infra_coax_quantity}x Coax`);
+  if (artist.infra_opticalcon_duo && artist.infra_opticalcon_duo_quantity) {
+    infra.push(`${artist.infra_opticalcon_duo_quantity}x OpticalCON DUO`);
+  }
+  if (artist.infra_analog && artist.infra_analog > 0) infra.push(`${artist.infra_analog}x Analog`);
+  if (artist.other_infrastructure) infra.push(artist.other_infrastructure);
+  if (infra.length === 0) return "Sin infraestructura adicional";
+  return infra.join(" · ");
+};
+
+export const ReadOnlyArtistCategoryContent = ({
+  artist,
+  category,
+}: {
+  artist: Artist;
+  category: MobileConfigCategory;
+}) => {
+  if (category === "consoles") {
+    return (
+      <div className="space-y-3 text-sm">
+        <div>
+          <div className="text-xs uppercase text-muted-foreground font-semibold">FOH</div>
+          <div className="font-medium">{artist.foh_console || "Sin especificar"}</div>
+          <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.foh_console_provided_by)}</div>
+          {artist.foh_waves_outboard && (
+            <div className="text-muted-foreground">Waves/Outboard: {artist.foh_waves_outboard}</div>
+          )}
+        </div>
+        <div>
+          <div className="text-xs uppercase text-muted-foreground font-semibold">Monitores</div>
+          {artist.monitors_from_foh ? (
+            <div className="font-medium">Monitores desde FOH</div>
+          ) : (
+            <>
+              <div className="font-medium">{artist.mon_console || "Sin especificar"}</div>
+              <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.mon_console_provided_by)}</div>
+              {artist.mon_waves_outboard && (
+                <div className="text-muted-foreground">Waves/Outboard: {artist.mon_waves_outboard}</div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (category === "wireless") {
+    return (
+      <div className="space-y-3 text-sm">
+        <div>
+          <div className="text-xs uppercase text-muted-foreground font-semibold">Wireless</div>
+          <div className="font-medium">{formatSystems(artist.wireless_systems || [])}</div>
+          <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.wireless_provided_by)}</div>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-muted-foreground font-semibold">IEM</div>
+          <div className="font-medium">{formatSystems(artist.iem_systems || [])}</div>
+          <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.iem_provided_by)}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (category === "microphones") {
+    return (
+      <div className="space-y-3 text-sm">
+        <div>
+          <div className="text-xs uppercase text-muted-foreground font-semibold">Kit</div>
+          <div className="font-medium">{formatProviderLabel(artist.mic_kit)}</div>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-muted-foreground font-semibold">Micros cableados</div>
+          <div className="text-muted-foreground">{formatWiredMics(artist.wired_mics)}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (category === "monitors") {
+    return (
+      <div className="space-y-3 text-sm">
+        <div>
+          <div className="text-xs uppercase text-muted-foreground font-semibold">Monitores</div>
+          <div className="font-medium">
+            {artist.monitors_enabled ? `${artist.monitors_quantity}x cuñas` : "Sin cuñas solicitadas"}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-muted-foreground font-semibold">Extras</div>
+          <div className="text-muted-foreground">
+            {artist.extras_sf ? "Side Fill" : ""}
+            {artist.extras_sf && (artist.extras_df || artist.extras_djbooth) ? " · " : ""}
+            {artist.extras_df ? "Drum Fill" : ""}
+            {artist.extras_df && artist.extras_djbooth ? " · " : ""}
+            {artist.extras_djbooth ? "DJ Booth" : ""}
+            {!artist.extras_sf && !artist.extras_df && !artist.extras_djbooth ? "Sin extras" : ""}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (category === "infrastructure") {
+    return (
+      <div className="space-y-3 text-sm">
+        <div>
+          <div className="text-xs uppercase text-muted-foreground font-semibold">Conexiones</div>
+          <div className="text-muted-foreground">{formatInfrastructure(artist)}</div>
+        </div>
+        <div>
+          <div className="text-xs uppercase text-muted-foreground font-semibold">Proveedor</div>
+          <div className="font-medium">{formatProviderLabel(artist.infrastructure_provided_by)}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 text-sm">
+      <div className="text-xs uppercase text-muted-foreground font-semibold">Notas</div>
+      <div className="text-muted-foreground whitespace-pre-wrap">
+        {artist.notes && artist.notes.trim() !== "" ? artist.notes : "Sin notas"}
+      </div>
+    </div>
+  );
+};
+
 function buildFormData(artist: Artist) {
   return {
     name: artist.name || "",

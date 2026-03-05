@@ -141,6 +141,19 @@ function hasInfraData(artist: Artist): boolean {
   return !!(artist.infra_cat6 || artist.infra_hma || artist.infra_coax || artist.infra_opticalcon_duo || (artist.infra_analog && artist.infra_analog > 0) || artist.other_infrastructure);
 }
 
+function formatTimeCompact(value?: string | null): string {
+  if (!value) return "--:--";
+  const trimmed = String(value).trim();
+  if (trimmed.length >= 5 && trimmed.includes(":")) {
+    return trimmed.slice(0, 5);
+  }
+  return trimmed;
+}
+
+function formatTimeRange(start?: string | null, end?: string | null): string {
+  return `${formatTimeCompact(start)}-${formatTimeCompact(end)}`;
+}
+
 // --- Types ---
 
 export type MobileConfigCategory = 'consoles' | 'wireless' | 'microphones' | 'monitors' | 'infrastructure' | 'notes';
@@ -150,6 +163,7 @@ interface MobileArtistCardProps {
   stageName: string;
   stagePlotUrl?: string;
   gearComparison?: ArtistGearComparison;
+  mode?: 'edit' | 'readonly';
   onEditCategory: (artistId: string, category: MobileConfigCategory) => void;
   onEditArtist: (artist: Artist) => void;
   onGenerateLink: (artist: Artist) => void;
@@ -169,6 +183,7 @@ export const MobileArtistCard = ({
   stageName,
   stagePlotUrl,
   gearComparison,
+  mode = 'edit',
   onEditCategory,
   onEditArtist,
   onGenerateLink,
@@ -215,15 +230,15 @@ export const MobileArtistCard = ({
         </div>
 
         {/* Time Row */}
-        <div className="grid grid-cols-2 gap-2 mt-3">
-          <div className="p-2.5 rounded-lg bg-muted/50 border">
+        <div className={`grid gap-2 mt-3 ${artist.soundcheck ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
             <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Hora del Show</div>
-            <div className="text-sm font-bold font-mono">{artist.show_start} - {artist.show_end}</div>
+            <div className="text-xs font-bold font-mono truncate">{formatTimeRange(artist.show_start, artist.show_end)}</div>
           </div>
           {artist.soundcheck && (
-            <div className="p-2.5 rounded-lg bg-muted/50 border">
+            <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
               <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Soundcheck</div>
-              <div className="text-sm font-mono text-muted-foreground">{artist.soundcheck_start} - {artist.soundcheck_end}</div>
+              <div className="text-xs font-mono text-muted-foreground truncate">{formatTimeRange(artist.soundcheck_start, artist.soundcheck_end)}</div>
             </div>
           )}
         </div>
@@ -303,59 +318,68 @@ export const MobileArtistCard = ({
       {/* Notes placeholder if no notes */}
       {(!artist.notes || artist.notes.trim() === '') && (
         <div className="px-4 pb-3">
-          <button
-            type="button"
-            onClick={() => onEditCategory(artist.id, 'notes')}
-            className="w-full p-3 rounded-lg border border-dashed text-left"
-          >
-            <div className="text-xs font-semibold text-muted-foreground">Notas de Producción</div>
-            <div className="text-xs text-muted-foreground/60 mt-0.5">Toca para añadir notas...</div>
-          </button>
+          {mode === 'edit' ? (
+            <button
+              type="button"
+              onClick={() => onEditCategory(artist.id, 'notes')}
+              className="w-full p-3 rounded-lg border border-dashed text-left"
+            >
+              <div className="text-xs font-semibold text-muted-foreground">Notas de Producción</div>
+              <div className="text-xs text-muted-foreground/60 mt-0.5">Toca para añadir notas...</div>
+            </button>
+          ) : (
+            <div className="w-full p-3 rounded-lg border border-dashed text-left">
+              <div className="text-xs font-semibold text-muted-foreground">Notas de Producción</div>
+              <div className="text-xs text-muted-foreground/60 mt-0.5">Sin notas</div>
+            </div>
+          )}
         </div>
       )}
 
       {/* Action Bar */}
-      <div className="flex items-center justify-between gap-1 px-3 py-2 border-t bg-muted/30">
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onGenerateLink(artist)}>
-          <Link className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onManageFiles(artist)}>
-          <FileText className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost" size="icon" className="h-8 w-8"
-          onClick={() => onPrintArtist(artist)}
-          disabled={printingArtistId === artist.id}
-        >
-          {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-        </Button>
-        <Button
-          variant="ghost" size="icon" className="h-8 w-8"
-          onClick={() => onOpenStagePlotCapture(artist)}
-          disabled={uploadingStagePlotArtistId === artist.id}
-        >
-          {uploadingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-        </Button>
-        {artist.stage_plot_file_path && (
+      {mode === 'edit' && (
+        <div className="flex items-center justify-between gap-1 px-3 py-2 border-t bg-muted/30">
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onGenerateLink(artist)}>
+            <Link className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onManageFiles(artist)}>
+            <FileText className="h-4 w-4" />
+          </Button>
           <Button
             variant="ghost" size="icon" className="h-8 w-8"
-            onClick={() => onDeleteStagePlot(artist)}
-            disabled={deletingStagePlotArtistId === artist.id}
+            onClick={() => onPrintArtist(artist)}
+            disabled={printingArtistId === artist.id}
           >
-            {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
+            {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
           </Button>
-        )}
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditArtist(artist)}>
-          <Pencil className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost" size="icon" className="h-8 w-8 text-destructive"
-          onClick={() => onDeleteArtist(artist)}
-          disabled={deletingArtistId === artist.id}
-        >
-          {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-        </Button>
-      </div>
+          <Button
+            variant="ghost" size="icon" className="h-8 w-8"
+            onClick={() => onOpenStagePlotCapture(artist)}
+            disabled={uploadingStagePlotArtistId === artist.id}
+          >
+            {uploadingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
+          </Button>
+          {artist.stage_plot_file_path && (
+            <Button
+              variant="ghost" size="icon" className="h-8 w-8"
+              onClick={() => onDeleteStagePlot(artist)}
+              disabled={deletingStagePlotArtistId === artist.id}
+            >
+              {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditArtist(artist)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost" size="icon" className="h-8 w-8 text-destructive"
+            onClick={() => onDeleteArtist(artist)}
+            disabled={deletingArtistId === artist.id}
+          >
+            {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

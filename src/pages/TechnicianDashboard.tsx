@@ -27,6 +27,7 @@ import { MessagesModal } from '@/components/technician/MessagesModal';
 import { TourDetailView } from '@/components/technician/TourDetailView';
 import { SoundVisionModal } from '@/components/technician/SoundVisionModal';
 import { TechnicianTourRates } from '@/components/dashboard/TechnicianTourRates';
+import { TechnicianArtistReadOnlyModal } from '@/components/technician/TechnicianArtistReadOnlyModal';
 
 // Type definitions
 interface TechnicianJobData {
@@ -41,6 +42,7 @@ interface TechnicianJobData {
   color?: string;
   status?: string;
   created_at?: string;
+  artist_count?: number;
   location?: { name: string } | null;
   job_documents?: Array<{
     id: string;
@@ -226,6 +228,32 @@ const TechnicianDashboard = () => {
         return true;
       });
 
+      const dedupedJobIds = Array.from(new Set(jobAssignments.map((row) => row.job_id)));
+      const artistCountByJob = new Map<string, number>();
+
+      if (dedupedJobIds.length > 0) {
+        try {
+          const { data: artistRows, error: artistsError } = await supabase
+            .from('festival_artists')
+            .select('job_id')
+            .in('job_id', dedupedJobIds);
+
+          if (artistsError) {
+            console.warn('Error fetching artist counts:', artistsError);
+          } else {
+            (artistRows || []).forEach((artistRow) => {
+              if (!artistRow?.job_id) return;
+              artistCountByJob.set(
+                artistRow.job_id,
+                (artistCountByJob.get(artistRow.job_id) || 0) + 1
+              );
+            });
+          }
+        } catch (artistCountError) {
+          console.warn('Unexpected error fetching artist counts:', artistCountError);
+        }
+      }
+
       return jobAssignments
         .filter(row => row.jobs)
         .map(row => {
@@ -251,7 +279,10 @@ const TechnicianDashboard = () => {
             sound_role: assignment?.sound_role,
             lights_role: assignment?.lights_role,
             video_role: assignment?.video_role,
-            jobs: row.jobs
+            jobs: {
+              ...row.jobs,
+              artist_count: artistCountByJob.get(row.job_id) || 0
+            }
           };
         });
     },
@@ -335,6 +366,14 @@ const TechnicianDashboard = () => {
       )}
       {activeModal === 'details' && selectedJob && (
         <DetailsModal theme={t} isDark={isDark} job={selectedJob as any} onClose={() => setActiveModal(null)} />
+      )}
+      {activeModal === 'artists' && selectedJob && (
+        <TechnicianArtistReadOnlyModal
+          theme={t}
+          isDark={isDark}
+          job={selectedJob}
+          onClose={() => setActiveModal(null)}
+        />
       )}
       {activeModal === 'soundvision' && hasSoundVisionAccess && (
         <SoundVisionModal theme={t} isDark={isDark} onClose={() => setActiveModal(null)} />
