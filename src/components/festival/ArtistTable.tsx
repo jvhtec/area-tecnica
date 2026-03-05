@@ -18,6 +18,7 @@ import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearCom
 import { GearMismatchIndicator } from "./GearMismatchIndicator";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { buildReadableFilename } from "@/utils/fileName";
+import { MobileArtistList } from "./mobile/MobileArtistList";
 
 interface Artist {
   id: string;
@@ -1093,263 +1094,27 @@ export const ArtistTable = ({
           </div>
 
           {/* Mobile Card Layout */}
-          <div className="md:hidden space-y-4">
-            {sortedFilteredArtists.map(artist => {
-              const gearComparison = gearComparisons[artist.id];
-              
-              return (
-                <div key={artist.id} className="border rounded-lg p-4 space-y-3 bg-card">
-                  {/* Header */}
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-base truncate">{artist.name}</h3>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {artist.artist_submitted && (
-                          <Badge variant="outline" className="text-xs bg-amber-100 text-amber-900 border-amber-300">
-                            Enviado por artista
-                          </Badge>
-                        )}
-                        <Badge variant="outline" className="text-xs">{getStageDisplayName(artist.stage)}</Badge>
-                        <Badge variant={artist.rider_missing ? "destructive" : "default"} className="text-xs">
-                          {artist.rider_missing ? "Faltante" : "Completo"}
-                        </Badge>
-                        {artist.isaftermidnight && <Badge variant="outline" className="text-xs bg-blue-700">Después de medianoche</Badge>}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">Stage Plot</div>
-                    {stagePlotUrls[artist.id] ? (
-                      <button
-                        type="button"
-                        className="h-20 w-full overflow-hidden rounded border"
-                        onClick={() => window.open(stagePlotUrls[artist.id], "_blank", "noopener,noreferrer")}
-                      >
-                        <img
-                          src={stagePlotUrls[artist.id]}
-                          alt={`Stage plot de ${artist.name}`}
-                          className="h-full w-full object-cover"
-                        />
-                      </button>
-                    ) : (
-                      <div className="rounded border border-dashed p-2 text-xs text-muted-foreground">
-                        Sin stage plot cargado
-                      </div>
-                    )}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenStagePlotCapture(artist)}
-                      disabled={uploadingStagePlotArtistId === artist.id}
-                    >
-                      {uploadingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <ImagePlus className="h-4 w-4 mr-1" />}
-                      <span className="text-xs">Pegar/Cargar stage plot</span>
-                    </Button>
-                  </div>
-
-                  {/* Show Time */}
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">Hora del show</div>
-                    <div className="text-sm">{artist.show_start} - {artist.show_end}</div>
-                  </div>
-
-                  {/* Soundcheck */}
-                  {artist.soundcheck && (
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium">Soundcheck</div>
-                      <div className="text-sm">{artist.soundcheck_start} - {artist.soundcheck_end}</div>
-                    </div>
-                  )}
-
-                  {/* Consoles */}
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">Consolas</div>
-                    <div className="text-sm space-y-1">
-                      <div className="flex items-center gap-1 flex-wrap">
-                        <span className="text-xs text-muted-foreground">FOH:</span>
-                        <span>{artist.foh_console || "No especificado"}</span>
-                        {artist.foh_console_provided_by && (
-                          <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.foh_console_provided_by)}`}>
-                            {artist.foh_console_provided_by}
-                          </Badge>
-                        )}
-                        {artist.foh_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
-                      </div>
-                      {artist.foh_waves_outboard && (
-                        <div className="text-xs text-muted-foreground">
-                          FOH Waves/Outboard: {artist.foh_waves_outboard}
-                        </div>
-                      )}
-                      {artist.monitors_from_foh ? (
-                        <div className="text-xs text-muted-foreground">Monitores desde FOH</div>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <span className="text-xs text-muted-foreground">MON:</span>
-                            <span>{artist.mon_console || "No especificado"}</span>
-                            {artist.mon_console_provided_by && (
-                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.mon_console_provided_by)}`}>
-                                {artist.mon_console_provided_by}
-                              </Badge>
-                            )}
-                            {artist.mon_tech && <Badge variant="outline" className="text-xs">Técnico</Badge>}
-                          </div>
-                          {artist.mon_waves_outboard && (
-                            <div className="text-xs text-muted-foreground">
-                              MON Waves/Outboard: {artist.mon_waves_outboard}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Wireless/IEM */}
-                  {((artist.wireless_systems && artist.wireless_systems.length > 0) || 
-                    (artist.iem_systems && artist.iem_systems.length > 0)) && (
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium">Wireless/IEM</div>
-                      <div className="text-sm space-y-1">
-                        {artist.wireless_systems && artist.wireless_systems.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <span className="text-xs">Wireless: {formatWirelessSystems(artist.wireless_systems)}</span>
-                            {artist.wireless_provided_by && (
-                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.wireless_provided_by)}`}>
-                                {artist.wireless_provided_by}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                        {artist.iem_systems && artist.iem_systems.length > 0 && (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <span className="text-xs">IEM: {formatWirelessSystems(artist.iem_systems, true)}</span>
-                            {artist.iem_provided_by && (
-                              <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.iem_provided_by)}`}>
-                                {artist.iem_provided_by}
-                              </Badge>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Microphones */}
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium flex items-center gap-1">
-                      <Mic className="h-4 w-4" />
-                      Micrófonos
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge variant={
-                        artist.mic_kit === 'festival' ? 'default' : 
-                        artist.mic_kit === 'mixed' ? 'secondary' : 
-                        'outline'
-                      } className={
-                        artist.mic_kit === 'mixed' ? 'bg-purple-100 text-purple-800' : ''
-                      }>
-                        {artist.mic_kit === 'festival' ? 'Festival' : 
-                         artist.mic_kit === 'mixed' ? 'Mixed' : 
-                         'Band'}
-                      </Badge>
-                    </div>
-                    {(artist.mic_kit === 'festival' || artist.mic_kit === 'mixed') && artist.wired_mics && artist.wired_mics.length > 0 && (
-                      <div className="text-xs text-muted-foreground">
-                        {formatWiredMics(artist.wired_mics)}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Monitors */}
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">Monitores</div>
-                    <div>
-                      {artist.monitors_enabled ? (
-                        <Badge variant="secondary">{artist.monitors_quantity}x</Badge>
-                      ) : (
-                        <Badge variant="outline">Ninguno</Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Infrastructure */}
-                  <div className="space-y-1">
-                    <div className="text-sm font-medium">Infraestructura</div>
-                    <div className="text-xs text-muted-foreground">
-                      {formatInfrastructure(artist)}
-                    </div>
-                    {artist.infrastructure_provided_by && (
-                      <Badge variant="outline" className={`text-xs ${getProviderBadge(artist.infrastructure_provided_by)}`}>
-                        {artist.infrastructure_provided_by}
-                      </Badge>
-                    )}
-                  </div>
-
-                  {/* Extras */}
-                  {(artist.extras_sf || artist.extras_df || artist.extras_djbooth) && (
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium">Extras</div>
-                      <div className="flex flex-wrap gap-1">
-                        {artist.extras_sf && <Badge variant="outline" className="text-xs">Side Fill</Badge>}
-                        {artist.extras_df && <Badge variant="outline" className="text-xs">Drum Fill</Badge>}
-                        {artist.extras_djbooth && <Badge variant="outline" className="text-xs">Cabina DJ</Badge>}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Notes */}
-                  {artist.notes && artist.notes.trim() !== '' && (
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium">Notas</div>
-                      <div className="text-xs text-muted-foreground whitespace-pre-wrap">{artist.notes}</div>
-                    </div>
-                  )}
-
-                  {/* Gear Status */}
-                  {gearComparison && (
-                    <div className="space-y-1">
-                      <div className="text-sm font-medium">Estado del equipo</div>
-                      <GearMismatchIndicator mismatches={gearComparison.mismatches} compact />
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-end gap-2 pt-2 border-t">
-                    <Button variant="ghost" size="sm" onClick={() => handleGenerateLink(artist)}>
-                      <Link className="h-4 w-4 mr-1" />
-                      <span className="text-xs">Enlace</span>
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleManageFiles(artist)}>
-                      <FileText className="h-4 w-4 mr-1" />
-                      <span className="text-xs">Archivos</span>
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handlePrintArtist(artist)} disabled={printingArtistId === artist.id}>
-                      {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4 mr-1" />}
-                      <span className="text-xs">Imprimir</span>
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleOpenStagePlotCapture(artist)} disabled={uploadingStagePlotArtistId === artist.id}>
-                      {uploadingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4 mr-1" />}
-                      <span className="text-xs">Plot</span>
-                    </Button>
-                    {artist.stage_plot_file_path && (
-                      <Button variant="ghost" size="sm" onClick={() => handleDeleteStagePlot(artist)} disabled={deletingStagePlotArtistId === artist.id}>
-                        {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4 mr-1" />}
-                        <span className="text-xs">Quitar</span>
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="sm" onClick={() => onEditArtist(artist)}>
-                      <Pencil className="h-4 w-4 mr-1" />
-                      <span className="text-xs">Editar</span>
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(artist)} disabled={deletingArtistId === artist.id}>
-                      {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
-                      <span className="text-xs">Eliminar</span>
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
+          <div className="md:hidden">
+            <MobileArtistList
+              artists={sortedFilteredArtists}
+              stageNames={stageNames}
+              stagePlotUrls={stagePlotUrls}
+              gearComparisons={gearComparisons}
+              jobId={jobId || ""}
+              selectedDate={selectedDate || ""}
+              onEditArtist={onEditArtist}
+              onDeleteArtist={handleDeleteClick}
+              onGenerateLink={handleGenerateLink}
+              onManageFiles={handleManageFiles}
+              onPrintArtist={handlePrintArtist}
+              onOpenStagePlotCapture={handleOpenStagePlotCapture}
+              onDeleteStagePlot={handleDeleteStagePlot}
+              onArtistsChanged={() => onArtistStagePlotUpdated?.()}
+              printingArtistId={printingArtistId}
+              deletingArtistId={deletingArtistId}
+              uploadingStagePlotArtistId={uploadingStagePlotArtistId}
+              deletingStagePlotArtistId={deletingStagePlotArtistId}
+            />
           </div>
 
           {sortedFilteredArtists.length === 0 && !isLoading && (
