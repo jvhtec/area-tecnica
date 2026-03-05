@@ -65,7 +65,7 @@ export const ArtistManagementDialog = ({
   // Desktop: standard dialog
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">
         <DialogHeader>
           <DialogTitle>
             {artist ? "Editar Artista" : "Agregar Artista"}

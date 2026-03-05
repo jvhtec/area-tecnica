@@ -194,53 +194,63 @@ export const ArtistManagementForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Basic Info spans full width */}
       <BasicInfoSection
         formData={formData as any}
         onChange={updateFormData}
         gearSetup={combinedSetup?.globalSetup || null}
       />
 
-      <ConsoleSetupSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
+      {/* Two-column layout for technical sections on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left column: Consoles + Mics + Notes */}
+        <div className="space-y-6">
+          <ConsoleSetupSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
 
-      <WirelessSetupSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
+          <MicKitSection
+            micKit={formData.mic_kit}
+            wiredMics={formData.wired_mics}
+            onMicKitChange={(provider) => updateFormData({ mic_kit: provider })}
+            onWiredMicsChange={(mics) => updateFormData({ wired_mics: mics })}
+          />
 
-      <MicKitSection
-        micKit={formData.mic_kit}
-        wiredMics={formData.wired_mics}
-        onMicKitChange={(provider) => updateFormData({ mic_kit: provider })}
-        onWiredMicsChange={(mics) => updateFormData({ wired_mics: mics })}
-      />
+          <NotesSection
+            formData={formData as any}
+            onChange={updateFormData}
+          />
+        </div>
 
-      <MonitorSetupSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
+        {/* Right column: Wireless + Monitors + Extras + Infrastructure */}
+        <div className="space-y-6">
+          <WirelessSetupSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
 
-      <ExtraRequirementsSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
+          <MonitorSetupSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
 
-      <InfrastructureSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
+          <ExtraRequirementsSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
 
-      <NotesSection
-        formData={formData as any}
-        onChange={updateFormData}
-      />
+          <InfrastructureSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
+        </div>
+      </div>
 
       <Button type="submit" disabled={isSubmitting} className="w-full">
         {isSubmitting ? "Guardando..." : artist ? "Actualizar Artista" : "Agregar Artista"}
