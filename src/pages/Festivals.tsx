@@ -1,12 +1,13 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useJobsRealtime } from "@/hooks/useJobsRealtime";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
-import { Tent, Printer, Loader2, RefreshCw, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { Tent, Printer, Loader2, RefreshCw, AlertTriangle, Eye, EyeOff, Search } from "lucide-react";
 import { supabase, ensureRealtimeConnection } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
@@ -43,6 +44,7 @@ const Festivals = () => {
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [selectedJobForPrint, setSelectedJobForPrint] = useState<{ id: string; title: string } | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const { status: connectionStatus, recoverConnection } = useConnectionStatus();
   const festivalRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
@@ -97,7 +99,27 @@ const Festivals = () => {
   const totalPages = Math.ceil(festivalJobs.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedFestivals = festivalJobs.slice(startIndex, endIndex);
+
+  // Filter festivals by search query
+  const filteredFestivals = useMemo(() => {
+    if (!searchQuery.trim()) return festivalJobs;
+    const query = searchQuery.toLowerCase().trim();
+    return festivalJobs.filter((job: any) => 
+      (job.title?.toLowerCase().includes(query)) ||
+      (job.client?.toLowerCase().includes(query)) ||
+      (job.location?.name?.toLowerCase().includes(query)) ||
+      (job.location?.formatted_address?.toLowerCase().includes(query))
+    );
+  }, [festivalJobs, searchQuery]);
+
+  // Reset to first page when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  // Calculate pagination for filtered results
+  const filteredTotalPages = Math.ceil(filteredFestivals.length / ITEMS_PER_PAGE);
+  const paginatedFestivals = filteredFestivals.slice(startIndex, endIndex);
 
   // Auto-recover connection if needed
   useEffect(() => {
@@ -253,6 +275,18 @@ const Festivals = () => {
           <p className="text-muted-foreground mb-6">
             Accede y gestiona todos los eventos tipo festival en un solo lugar.
           </p>
+          
+          {/* Search Input */}
+          <div className="relative mb-6 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar festivales..."
+              className="pl-10"
+            />
+          </div>
+          
           <Separator className="my-6" />
           
           {isLoading ? (
@@ -286,6 +320,13 @@ const Festivals = () => {
               <h3 className="text-lg font-medium">No se encontraron festivales</h3>
               <p className="text-muted-foreground mt-2">
                 Actualmente no hay trabajos tipo festival programados.
+              </p>
+            </div>
+          ) : filteredFestivals.length === 0 ? (
+            <div className="text-center py-10">
+              <h3 className="text-lg font-medium">No se encontraron resultados</h3>
+              <p className="text-muted-foreground mt-2">
+                No hay festivales que coincidan con "{searchQuery}"
               </p>
             </div>
           ) : (
@@ -341,12 +382,12 @@ const Festivals = () => {
                 ))}
               </div>
               
-              {totalPages > 1 && (
+              {filteredTotalPages > 1 && (
                 <FestivalsPagination
                   currentPage={currentPage}
-                  totalPages={totalPages}
+                  totalPages={filteredTotalPages}
                   onPageChange={setCurrentPage}
-                  totalItems={festivalJobs.length}
+                  totalItems={filteredFestivals.length}
                   itemsPerPage={ITEMS_PER_PAGE}
                 />
               )}
