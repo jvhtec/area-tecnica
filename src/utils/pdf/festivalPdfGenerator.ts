@@ -1,3 +1,4 @@
+import { PDFArray, PDFDocument, PDFName } from 'pdf-lib';
 import { supabase } from '@/lib/supabase';
 import { exportArtistPDF, ArtistPdfData } from '../artistPdfExport';
 import { exportArtistTablePDF, ArtistTablePdfData } from '../artistTablePdfExport';
@@ -8,7 +9,7 @@ import { exportMissingRiderReportPDF, MissingRiderReportData } from '../missingR
 import { generateStageGearPDF } from '../gearSetupPdfExport';
 import { fetchJobLogo, fetchLogoUrl } from './logoUtils';
 import { generateCoverPage } from './coverPageGenerator';
-import { generateTableOfContents } from './tocGenerator';
+import { generateTableOfContents, TocLinkRegion, TocSection } from './tocGenerator';
 import { mergePDFs } from './pdfMerge';
 import { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from '../wiredMicrophoneNeedsPdfExport';
@@ -22,6 +23,60 @@ import {
   buildRfIemArtists,
   sortArtistsChronologically,
 } from './festivalPdfSectionBuilders';
+
+
+const addTableOfContentsLinks = async (mergedBlob: Blob, links: TocLinkRegion[]): Promise<Blob> => {
+  if (links.length === 0) return mergedBlob;
+
+  const mergedBytes = await mergedBlob.arrayBuffer();
+  const mergedPdf = await PDFDocument.load(mergedBytes, {
+    ignoreEncryption: true,
+    throwOnInvalidObject: false,
+    updateMetadata: false,
+  });
+
+  for (const link of links) {
+    const tocPage = mergedPdf.getPage(1 + link.pageIndex);
+    const destinationPage = mergedPdf.getPage(link.targetPage - 1);
+
+    if (!tocPage || !destinationPage) continue;
+
+    const context = mergedPdf.context;
+    const destination = context.obj([
+      destinationPage.ref,
+      PDFName.of('XYZ'),
+      null,
+      null,
+      null,
+    ]);
+
+    const action = context.obj({
+      Type: 'Action',
+      S: 'GoTo',
+      D: destination,
+    });
+
+    const annotation = context.obj({
+      Type: 'Annot',
+      Subtype: 'Link',
+      Rect: [link.x, link.y, link.x + link.width, link.y + link.height],
+      Border: [0, 0, 0],
+      A: action,
+    });
+
+    const pageNode = tocPage.node as any;
+    const existingAnnots = pageNode.lookupMaybe(PDFName.of('Annots'), PDFArray);
+
+    if (existingAnnots) {
+      existingAnnots.push(annotation);
+    } else {
+      pageNode.set(PDFName.of('Annots'), context.obj([annotation]));
+    }
+  }
+
+  const linkedPdfBytes = await mergedPdf.save();
+  return new Blob([new Uint8Array(linkedPdfBytes)], { type: 'application/pdf' });
+};
 
 export const generateAndMergeFestivalPDFs = async (
   jobId: string,
@@ -58,6 +113,7 @@ export const generateAndMergeFestivalPDFs = async (
   const shiftPdfs: Blob[] = [];
   const artistTablePdfs: Blob[] = [];
   const individualArtistPdfs: Blob[] = [];
+  const individualArtistIndexEntries: { title: string; pageCount: number }[] = [];
   let rfIemTablePdf: Blob | null = null;
   let infrastructureTablePdf: Blob | null = null;
   let missingRiderReportPdf: Blob | null = null;
@@ -391,6 +447,10 @@ export const generateAndMergeFestivalPDFs = async (
           console.log(`Generated PDF for artist ${artist.name}, size: ${pdf.size} bytes`);
           if (pdf && pdf.size > 0) {
             individualArtistPdfs.push(pdf);
+            individualArtistIndexEntries.push({
+              title: artist.name || 'Unnamed Artist',
+              pageCount: 1,
+            });
           } else {
             console.warn(`Generated empty PDF for artist ${artist.name}, skipping`);
           }
@@ -606,7 +666,7 @@ export const generateAndMergeFestivalPDFs = async (
       }
     }
     
-    const tocSections = [];
+    const tocSections: TocSection[] = [];
     
     if (options.includeShiftSchedules && shiftPdfs.length > 0) {
       tocSections.push({ title: "Turnos de Personal", pageCount: shiftPdfs.length });
@@ -633,13 +693,17 @@ export const generateAndMergeFestivalPDFs = async (
       tocSections.push({ title: "Reporte de Riders Faltantes", pageCount: 1 });
     }
     if (options.includeArtistRequirements && individualArtistPdfs.length > 0) {
-      tocSections.push({ title: "Requerimientos Individuales por Artista", pageCount: individualArtistPdfs.length });
+      tocSections.push({
+        title: "Requerimientos Individuales por Artista",
+        pageCount: individualArtistPdfs.length,
+        children: individualArtistIndexEntries,
+      });
     }
     
     console.log(`Table of contents sections:`, tocSections);
     
     const coverPage = await generateCoverPage(jobId, jobTitle, logoUrl);
-    const tableOfContents = await generateTableOfContents(tocSections, logoUrl);
+    const { blob: tableOfContents, links: tocLinks } = await generateTableOfContents(tocSections, logoUrl);
     
     // Updated PDF order according to requirements
     const selectedPdfs = [
@@ -693,11 +757,12 @@ export const generateAndMergeFestivalPDFs = async (
     }
     
     const mergedBlob = await mergePDFs(selectedPdfs);
+    const mergedBlobWithTocLinks = await addTableOfContentsLinks(mergedBlob, tocLinks);
     
     // Generate filename if not provided
     const filename = customFilename || buildReadableFilename([jobTitle || "Festival", "Documentación completa"]);
     
-    return { blob: mergedBlob, filename };
+    return { blob: mergedBlobWithTocLinks, filename };
   } catch (error) {
     console.error('Error generating festival PDFs:', error);
     throw error;
