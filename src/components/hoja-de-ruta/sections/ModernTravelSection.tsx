@@ -13,7 +13,7 @@ import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 interface ModernTravelSectionProps {
   travelArrangements: TravelArrangement[];
-  onUpdate: (index: number, field: keyof TravelArrangement, value: any) => void;
+  onUpdate: (index: number, field: keyof TravelArrangement, value: string | undefined) => void;
   onAdd: () => void;
   onRemove: (index: number) => void;
 }
@@ -28,8 +28,11 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
     switch (type) {
       case 'plane': return Plane;
       case 'train': return Train;
+      case 'autobus': return Bus;
       case 'sleeper_bus': return Bus;
-      case 'RV': return Car;
+      case 'RV':
+      case 'rv':
+        return Car;
       case 'own_means': return Car;
       default: return Car;
     }
@@ -121,16 +124,14 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                         <TransportIcon className="w-5 h-5 text-cyan-600" />
                         <h4 className="font-medium">Viaje {index + 1}</h4>
                       </div>
-                      {index > 0 && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onRemove(index)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onRemove(index)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
 
                     <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -158,6 +159,12 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                                 Autobús Cama
                               </div>
                             </SelectItem>
+                            <SelectItem value="autobus">
+                              <div className="flex items-center gap-2">
+                                <Bus className="w-4 h-4" />
+                                Autobús
+                              </div>
+                            </SelectItem>
                             <SelectItem value="train">
                               <div className="flex items-center gap-2">
                                 <Train className="w-4 h-4" />
@@ -170,7 +177,7 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
                                 Avión
                               </div>
                             </SelectItem>
-                            <SelectItem value="RV">
+                            <SelectItem value="rv">
                               <div className="flex items-center gap-2">
                                 <Car className="w-4 h-4" />
                                 Autocaravana
@@ -257,8 +264,10 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
 
                       {/* Driver Information - Only for ground transportation */}
                       {(arrangement.transportation_type === 'van' || 
+                        arrangement.transportation_type === 'autobus' ||
                         arrangement.transportation_type === 'sleeper_bus' || 
-                        arrangement.transportation_type === 'RV') && (
+                        arrangement.transportation_type === 'RV' ||
+                        arrangement.transportation_type === 'rv') && (
                         <>
                           <div className="space-y-2">
                             <Label className="text-sm font-medium flex items-center gap-2">

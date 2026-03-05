@@ -23,9 +23,12 @@ export class Formatters {
     
     const translations: Record<string, string> = {
       'van': 'Furgoneta',
+      'autobus': 'Autobús',
+      'bus': 'Autobús',
       'sleeper_bus': 'Autobús Cama',
       'train': 'Tren',
       'plane': 'Avión',
+      'rv': 'Autocaravana',
       'RV': 'Autocaravana',
       'own_means': 'Medios propios',
       'trailer': 'Trailer',

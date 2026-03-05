@@ -84,6 +84,16 @@ const normalizeAuxiliaryMachinery = (value: unknown): AuxiliaryMachineryRequirem
   }));
 };
 
+const normalizeTravelTransportationType = (value: string | null | undefined): string => {
+  const raw = (value || "").trim();
+  if (!raw) return "van";
+
+  if (raw === "RV" || raw === "rv") return "rv";
+  if (raw === "bus") return "autobus";
+
+  return raw;
+};
+
 interface SaveCallbacks {
   onSuccess?: () => void;
   onError?: (error: any) => void;
@@ -274,7 +284,7 @@ export const useHojaDeRutaPersistence = (
 
       // Transform travel arrangements
       const travelData = travelArrangements?.map(travel => ({
-        transportation_type: travel.transportation_type,
+        transportation_type: normalizeTravelTransportationType(travel.transportation_type),
         pickup_address: travel.pickup_address,
         pickup_time: travel.pickup_time,
         flight_train_number: travel.flight_train_number,
@@ -514,7 +524,7 @@ export const useHojaDeRutaPersistence = (
       if (validArrangements.length > 0) {
         const travelData = validArrangements.map(arrangement => ({
           hoja_de_ruta_id: hojaDeRutaId,
-          transportation_type: arrangement.transportation_type,
+          transportation_type: normalizeTravelTransportationType(arrangement.transportation_type),
           pickup_address: arrangement.pickup_address || '',
           pickup_time: arrangement.pickup_time || null,
           flight_train_number: arrangement.flight_train_number || '',

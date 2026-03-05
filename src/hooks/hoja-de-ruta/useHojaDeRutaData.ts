@@ -24,6 +24,16 @@ const normalizeDateTime = (value: string | undefined | null): string | null => {
   }
 };
 
+const normalizeTravelTransportationType = (value: string | undefined | null): string => {
+  const raw = (value || '').trim();
+  if (!raw) return 'van';
+
+  if (raw === 'RV' || raw === 'rv') return 'rv';
+  if (raw === 'bus') return 'autobus';
+
+  return raw;
+};
+
 export const useHojaDeRutaData = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -248,7 +258,7 @@ const saveTravelArrangements = async (hojaId: string, arrangements: TravelArrang
       .filter(arr => arr.transportation_type?.trim() || arr.pickup_address?.trim())
       .map(arr => ({
         hoja_de_ruta_id: hojaId,
-        transportation_type: arr.transportation_type,
+        transportation_type: normalizeTravelTransportationType(arr.transportation_type),
         pickup_address: arr.pickup_address || null,
         // Normalize datetime fields to ensure valid UTC ISO strings
         pickup_time: normalizeDateTime(arr.pickup_time),

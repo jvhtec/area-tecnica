@@ -220,7 +220,7 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
     });
   }, [setEventData]);
 
-  const updateTravelArrangement = useCallback((index: number, field: string, value: string) => {
+  const updateTravelArrangement = useCallback((index: number, field: string, value: string | undefined) => {
     setTravelArrangements(prev => 
       prev.map((arrangement, i) => 
         i === index ? { ...arrangement, [field]: value } : arrangement

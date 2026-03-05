@@ -1,9 +1,14 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { EventData, TravelArrangement, Accommodation } from '@/types/hoja-de-ruta';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 
-const debounce = <T extends (...args: any[]) => void>(
+type SaveHojaDeRutaFn = (args: { eventData: EventData; userId: string }) => Promise<unknown>;
+type SaveTravelArrangementsFn = (travel: TravelArrangement[]) => Promise<unknown>;
+type SaveAccommodationsFn = (accommodations: Accommodation[]) => Promise<unknown>;
+type SaveVenueImagesFn = (images: { image_path: string; image_type: string }[]) => Promise<unknown>;
+
+const debounce = <T extends (...args: unknown[]) => void>(
   callback: T,
   delay: number,
 ) => {
@@ -26,10 +31,10 @@ export const useHojaDeRutaSave = (
   eventData: EventData,
   travelArrangements: TravelArrangement[],
   accommodations: Accommodation[],
-  saveHojaDeRuta: any,
-  saveTravelArrangements: any,
-  saveAccommodations: any,
-  saveVenueImages: any,
+  saveHojaDeRuta: SaveHojaDeRutaFn,
+  saveTravelArrangements: SaveTravelArrangementsFn,
+  saveAccommodations: SaveAccommodationsFn,
+  saveVenueImages: SaveVenueImagesFn,
   venueImages: { image_path: string; image_type: string }[],
   isSaving: boolean,
   isSavingTravel: boolean,
@@ -38,6 +43,7 @@ export const useHojaDeRutaSave = (
   const { toast } = useToast();
   const saveInProgressRef = useRef<boolean>(false);
   const lastSaveDataRef = useRef<string>("");
+  const debouncedSaveRef = useRef<(() => void) | null>(null);
 
   // Enhanced function to fetch and merge additional job data (power requirements)
   const autoPopulateFromJob = useCallback(async () => {
@@ -65,11 +71,18 @@ export const useHojaDeRutaSave = (
       if (powerRequirements && powerRequirements.length > 0) {
         console.log("⚡ SAVE: Updating power requirements");
         const powerText = powerRequirements
-          .map((req: any) => {
-            return `${req.department.toUpperCase()} - ${req.table_name}:\n` +
-              `Potencia Total: ${req.total_watts}W\n` +
-              `Corriente por Fase: ${req.current_per_phase}A\n` +
-              `PDU Recomendado: ${req.pdu_type}\n`;
+          .map((req: {
+            department?: string | null;
+            table_name?: string | null;
+            total_watts?: number | string | null;
+            current_per_phase?: number | string | null;
+            pdu_type?: string | null;
+          }) => {
+            const department = (req.department || 'general').toUpperCase();
+            return `${department} - ${req.table_name || 'tabla'}:\n` +
+              `Potencia Total: ${req.total_watts ?? 'N/D'}W\n` +
+              `Corriente por Fase: ${req.current_per_phase ?? 'N/D'}A\n` +
+              `PDU Recomendado: ${req.pdu_type ?? 'N/D'}\n`;
           })
           .join("\n");
 
@@ -78,7 +91,7 @@ export const useHojaDeRutaSave = (
       
       console.log("✅ SAVE: Power requirements loaded successfully");
       return { powerRequirements: eventData.powerRequirements };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ SAVE: Error auto-populating from job:", error);
       toast({
         title: "Error",
@@ -153,34 +166,25 @@ export const useHojaDeRutaSave = (
       // Now save related data in parallel (they all depend on hoja_de_ruta existing)
       const savePromises = [];
 
-      // Save travel arrangements if any exist
-      if (travelArrangements.length > 0) {
-        console.log("🚗 SAVE: Saving travel arrangements...", travelArrangements.length);
-        savePromises.push(
-          saveTravelArrangements(travelArrangements)
-        );
-      }
+      // Always persist child collections, even when empty.
+      // Their mutation functions delete existing DB rows first, so this is required for deletions to stick.
+      console.log("🚗 SAVE: Syncing travel arrangements...", travelArrangements.length);
+      savePromises.push(
+        saveTravelArrangements(travelArrangements)
+      );
 
-      // Save accommodations if any exist
-      if (accommodations.length > 0) {
-        console.log("🏨 SAVE: Saving accommodations...", accommodations.length);
-        savePromises.push(
-          saveAccommodations(accommodations)
-        );
-      }
+      console.log("🏨 SAVE: Syncing accommodations...", accommodations.length);
+      savePromises.push(
+        saveAccommodations(accommodations)
+      );
 
-      // Save venue images if any exist
-      if (venueImages.length > 0) {
-        console.log("📸 SAVE: Saving venue images...", venueImages.length);
-        savePromises.push(
-          saveVenueImages(venueImages)
-        );
-      }
+      console.log("📸 SAVE: Syncing venue images...", venueImages.length);
+      savePromises.push(
+        saveVenueImages(venueImages)
+      );
 
       // Execute related saves in parallel
-      if (savePromises.length > 0) {
-        await Promise.all(savePromises);
-      }
+      await Promise.all(savePromises);
 
       // Update tracking
       lastSaveDataRef.current = currentDataSignature;
@@ -191,16 +195,17 @@ export const useHojaDeRutaSave = (
         title: "✅ Guardado exitoso",
         description: `Todos los datos han sido guardados correctamente.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("❌ SAVE: Error saving data:", error);
       
       let errorMessage = "Error desconocido al guardar los datos.";
-      if (error.message?.includes("duplicate key")) {
+      const rawMessage = error instanceof Error ? error.message : String(error);
+      if (rawMessage.includes("duplicate key")) {
         errorMessage = "Ya existe un registro con estos datos.";
-      } else if (error.message?.includes("network")) {
+      } else if (rawMessage.includes("network")) {
         errorMessage = "Error de conexión. Verifique su conexión a internet.";
-      } else if (error.message) {
-        errorMessage = error.message;
+      } else if (rawMessage) {
+        errorMessage = rawMessage;
       }
 
       toast({
@@ -227,15 +232,18 @@ export const useHojaDeRutaSave = (
     toast
   ]);
 
-  // Debounced save for auto-save functionality
-  const debouncedSave = useCallback(
-    debounce(() => {
+  useEffect(() => {
+    debouncedSaveRef.current = debounce(() => {
       if (!isSaving && !isSavingTravel) {
         handleSaveAll().catch(console.error);
       }
-    }, 2000),
-    [handleSaveAll, isSaving, isSavingTravel]
-  );
+    }, 2000);
+  }, [handleSaveAll, isSaving, isSavingTravel]);
+
+  // Debounced save for auto-save functionality
+  const debouncedSave = useCallback(() => {
+    debouncedSaveRef.current?.();
+  }, []);
 
   return {
     handleSaveAll,

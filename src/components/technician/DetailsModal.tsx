@@ -926,10 +926,13 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
     const getTravelTransportTypeLabel = (type?: string | null): string => {
         const labels: Record<string, string> = {
             van: 'Furgoneta',
+            autobus: 'Autobús',
             sleeper_bus: 'Autobús cama',
             train: 'Tren',
             plane: 'Avión',
             rv: 'Autocaravana',
+            RV: 'Autocaravana',
+            bus: 'Autobús',
         };
         if (!type) return 'Transporte';
         return labels[type] || formatTransportCategory(type);

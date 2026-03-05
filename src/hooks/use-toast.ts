@@ -26,13 +26,6 @@ const actionTypes = {
   REMOVE_TOAST: "REMOVE_TOAST",
 } as const;
 
-let count = 0;
-
-function genId() {
-  count = (count + 1) % Number.MAX_SAFE_INTEGER;
-  return count.toString();
-}
-
 type ActionType = typeof actionTypes;
 
 type Action =
@@ -154,51 +147,39 @@ function toast(options: string | React.ReactNode | Omit<ToastData, "id"> | {
     return toastPrimitive(options);
   }
   
-  const { id = genId(), variant, ...rest } = options as any;
+  const {
+    id,
+    variant,
+    title,
+    description,
+    ...rest
+  } = options as any;
+
+  const toastOptions = {
+    description,
+    ...rest,
+    ...(id !== undefined ? { id } : {}),
+  };
   
   // Map variant to the appropriate sonner method
   if (variant) {
     switch (variant) {
       case "destructive":
-        return toastPrimitive.error(rest.title, {
-          description: rest.description,
-          id,
-          ...rest
-        });
+        return toastPrimitive.error(title, toastOptions);
       case "success":
-        return toastPrimitive.success(rest.title, {
-          description: rest.description,
-          id,
-          ...rest
-        });
+        return toastPrimitive.success(title, toastOptions);
       case "warning":
-        return toastPrimitive.warning(rest.title, {
-          description: rest.description,
-          id,
-          ...rest
-        });
+        return toastPrimitive.warning(title, toastOptions);
       case "info":
-        return toastPrimitive.info(rest.title, {
-          description: rest.description,
-          id,
-          ...rest
-        });
+        return toastPrimitive.info(title, toastOptions);
       default:
         // Default case for "default" variant or no variant
-        return toastPrimitive(rest.title, {
-          description: rest.description,
-          id,
-          ...rest
-        });
+        return toastPrimitive(title, toastOptions);
     }
   }
 
   // Use sonner's API for default case
-  return toastPrimitive(rest.title, {
-    description: rest.description,
-    id,
-    ...rest
-  });
+  return toastPrimitive(title, toastOptions);
 }
 
 // Add API-compatible methods for backward compatibility

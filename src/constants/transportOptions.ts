@@ -3,6 +3,7 @@ export const LOGISTICS_TRANSPORT_OPTIONS = [
   'trailer',
   'rv',
   'van',
+  'autobus',
   'sleeper_bus',
   '9m',
   '8m',
