@@ -141,6 +141,7 @@ const LightsConsumosTool: React.FC = () => {
   const { toast } = useToast();
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
+  const jobIdFromUrl = searchParams.get('jobId');
 
   // Tour override mode detection
   const tourId = searchParams.get('tourId');
@@ -199,6 +200,39 @@ const LightsConsumosTool: React.FC = () => {
       setDefaultTables(powerDefaults);
     }
   }, [isOverrideMode, overrideData]);
+
+  // Preselect job from query param and fetch details if not in the list
+  useEffect(() => {
+    const applyJobFromUrl = async () => {
+      if (!jobIdFromUrl) return;
+      try {
+        setSelectedJobId(jobIdFromUrl);
+        const found = (jobs || []).find((j) => j.id === jobIdFromUrl) || null;
+        if (found) {
+          setSelectedJob(found);
+          return;
+        }
+        const { data } = await supabase
+          .from('jobs')
+          .select('id, title, start_time')
+          .eq('id', jobIdFromUrl)
+          .single();
+        if (data) {
+          setSelectedJob({
+            id: data.id,
+            title: data.title,
+            start_time: data.start_time,
+            end_time: data.start_time,
+            tour_date_id: null,
+            tour_date: null,
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to preselect job from URL in lights consumos tool', error);
+      }
+    };
+    applyJobFromUrl();
+  }, [jobIdFromUrl, jobs]);
 
   useEffect(() => {
     setVoltage(phaseMode === 'single' ? 230 : 400);
@@ -379,7 +413,7 @@ const LightsConsumosTool: React.FC = () => {
         title: "Éxito",
         description: "La tabla de requerimientos de potencia se ha guardado exitosamente",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving power requirement table:', error);
       toast({
         title: "Error",
