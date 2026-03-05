@@ -32,6 +32,10 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
   const footerReserve = 24;
   const topMarginForContinuedPages = 30;
   const contentBottomY = pageHeight - footerReserve;
+  const contentPageNumbers = new Set<number>();
+  const markCurrentPageAsContent = () => {
+    contentPageNumbers.add(doc.getCurrentPageInfo().pageNumber);
+  };
   const getLastAutoTableFinalY = (fallback: number) => {
     const docWithTable = doc as unknown as { lastAutoTable?: { finalY?: number } };
     return docWithTable.lastAutoTable?.finalY ?? fallback;
@@ -160,6 +164,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
   doc.setTextColor(warningColor);
   doc.setFont('helvetica', 'bold');
   doc.text('Aún no hemos recibido los riders de los siguientes artistas:', 20, yPosition);
+  markCurrentPageAsContent();
   
   yPosition += 15;
   
@@ -168,6 +173,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
     doc.setTextColor('#059669');
     doc.setFont('helvetica', 'normal');
     doc.text('Todos los artistas tienen su rider técnico completo.', 20, yPosition);
+    markCurrentPageAsContent();
   } else {
     const qrByRowIndex = await Promise.all(
       data.artists.map(async (artist) => {
@@ -245,7 +251,10 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
         row: { index: number };
         cell: { x: number; y: number; width: number; height: number };
       }) => {
-        if (hookData.section !== 'body' || hookData.column.index !== 3) return;
+        if (hookData.section !== 'body') return;
+        markCurrentPageAsContent();
+
+        if (hookData.column.index !== 3) return;
 
         const qrDataUrl = qrByRowIndex[hookData.row.index];
         const formUrl = data.artists[hookData.row.index]?.formUrl;
@@ -274,6 +283,7 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
     doc.setTextColor(textColor);
     doc.setFont('helvetica', 'bold');
     doc.text('Acción Requerida:', marginLeft, currentY);
+    markCurrentPageAsContent();
     currentY += 8;
     
     doc.setFont('helvetica', 'normal');
@@ -298,8 +308,16 @@ export const exportMissingRiderReportPDF = async (data: MissingRiderReportData):
       }
 
       doc.text(wrappedItem, marginLeft + 5, currentY);
+      markCurrentPageAsContent();
       currentY += itemHeight;
     });
+  }
+
+  // Remove trailing pages that have header/footer but no report body content.
+  while (doc.getNumberOfPages() > 1) {
+    const lastPageNumber = doc.getNumberOfPages();
+    if (contentPageNumbers.has(lastPageNumber)) break;
+    doc.deletePage(lastPageNumber);
   }
   
   // Add consistent footer on every page with final page count
