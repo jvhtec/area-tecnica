@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { MobileArtistCard, type MobileConfigCategory } from "./MobileArtistCard";
 import { MobileArtistConfigEditor } from "./MobileArtistConfigEditor";
 import type { ArtistGearComparison } from "@/utils/gearComparisonService";
@@ -102,11 +102,35 @@ export const MobileArtistList = ({
     category: MobileConfigCategory;
   } | null>(null);
 
+  // Track which artist to scroll to after returning from editor
+  const [scrollToArtistId, setScrollToArtistId] = useState<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Scroll to the artist card after returning from editor
+  useEffect(() => {
+    if (scrollToArtistId && !editingCategory) {
+      const el = cardRefs.current[scrollToArtistId];
+      if (el) {
+        // Small delay to ensure DOM is rendered
+        requestAnimationFrame(() => {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        });
+      }
+      setScrollToArtistId(null);
+    }
+  }, [scrollToArtistId, editingCategory]);
+
+  const setCardRef = useCallback((artistId: string, el: HTMLDivElement | null) => {
+    cardRefs.current[artistId] = el;
+  }, []);
+
   const handleEditCategory = (artistId: string, category: MobileConfigCategory) => {
     setEditingCategory({ artistId, category });
   };
 
   const handleEditorBack = () => {
+    const artistId = editingCategory?.artistId || null;
+    setScrollToArtistId(artistId);
     setEditingCategory(null);
   };
 
@@ -135,25 +159,26 @@ export const MobileArtistList = ({
   return (
     <div className="space-y-4">
       {artists.map(artist => (
-        <MobileArtistCard
-          key={artist.id}
-          artist={artist}
-          stageName={stageNames[artist.stage] || `Stage ${artist.stage}`}
-          stagePlotUrl={stagePlotUrls[artist.id]}
-          gearComparison={gearComparisons[artist.id]}
-          onEditCategory={handleEditCategory}
-          onEditArtist={onEditArtist}
-          onGenerateLink={onGenerateLink}
-          onManageFiles={onManageFiles}
-          onPrintArtist={onPrintArtist}
-          onDeleteArtist={onDeleteArtist}
-          onOpenStagePlotCapture={onOpenStagePlotCapture}
-          onDeleteStagePlot={onDeleteStagePlot}
-          printingArtistId={printingArtistId}
-          deletingArtistId={deletingArtistId}
-          uploadingStagePlotArtistId={uploadingStagePlotArtistId}
-          deletingStagePlotArtistId={deletingStagePlotArtistId}
-        />
+        <div key={artist.id} ref={(el) => setCardRef(artist.id, el)}>
+          <MobileArtistCard
+            artist={artist}
+            stageName={stageNames[artist.stage] || `Stage ${artist.stage}`}
+            stagePlotUrl={stagePlotUrls[artist.id]}
+            gearComparison={gearComparisons[artist.id]}
+            onEditCategory={handleEditCategory}
+            onEditArtist={onEditArtist}
+            onGenerateLink={onGenerateLink}
+            onManageFiles={onManageFiles}
+            onPrintArtist={onPrintArtist}
+            onDeleteArtist={onDeleteArtist}
+            onOpenStagePlotCapture={onOpenStagePlotCapture}
+            onDeleteStagePlot={onDeleteStagePlot}
+            printingArtistId={printingArtistId}
+            deletingArtistId={deletingArtistId}
+            uploadingStagePlotArtistId={uploadingStagePlotArtistId}
+            deletingStagePlotArtistId={deletingStagePlotArtistId}
+          />
+        </div>
       ))}
     </div>
   );

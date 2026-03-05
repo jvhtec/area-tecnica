@@ -15,8 +15,8 @@ export const ProviderSelector = ({
   const tx = (es: string, en: string) => (language === "en" ? en : es);
 
   return (
-    <div className="flex items-center justify-between">
-      <h4 className="font-medium">{label}</h4>
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <h4 className="font-medium text-sm">{label}</h4>
       <RadioGroup
         value={value}
         onValueChange={onChange}
