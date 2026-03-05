@@ -11,6 +11,7 @@ import { NotesSection } from "../form/sections/NotesSection";
 import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { formatBandOptionLabel, getBandOptionsEU, isFrequencyBandSelection } from "@/lib/frequencyBands";
 import type { MobileConfigCategory } from "./MobileArtistCard";
 
 interface Artist {
@@ -115,6 +116,60 @@ const formatSystems = (systems: any[] = []) => {
     .join(" · ");
 };
 
+type WirelessSystemLike = {
+  model?: string;
+  quantity?: number;
+  quantity_hh?: number;
+  quantity_bp?: number;
+  quantity_ch?: number;
+  band?: unknown;
+  provided_by?: string;
+  notes?: string;
+};
+
+const formatSystemBand = (category: "wireless" | "iem", system: WirelessSystemLike) => {
+  const rawBand = system.band;
+  if (isFrequencyBandSelection(rawBand)) {
+    return formatBandOptionLabel(rawBand);
+  }
+
+  if (typeof rawBand === "string") {
+    const trimmedBand = rawBand.trim();
+    if (!trimmedBand) return "Sin especificar";
+
+    const options = getBandOptionsEU(category, system.model || "");
+    const matched = options.find((option) => option.code.toLowerCase() === trimmedBand.toLowerCase());
+    if (matched) return formatBandOptionLabel(matched);
+    return trimmedBand;
+  }
+
+  return "Sin especificar";
+};
+
+const formatSystemQuantity = (category: "wireless" | "iem", system: WirelessSystemLike) => {
+  const quantityCh = Number(system.quantity_ch || 0);
+  const quantityHh = Number(system.quantity_hh || 0);
+  const quantityBp = Number(system.quantity_bp || 0);
+  const legacyQuantity = Number(system.quantity || 0);
+
+  if (category === "wireless") {
+    const parts = [
+      quantityCh > 0 ? `Canales: ${quantityCh}` : null,
+      quantityHh > 0 ? `HH: ${quantityHh}` : null,
+      quantityBp > 0 ? `BP: ${quantityBp}` : null,
+    ].filter(Boolean);
+    if (parts.length > 0) return parts.join(" · ");
+    return legacyQuantity > 0 ? `Cantidad: ${legacyQuantity}` : "Cantidad no especificada";
+  }
+
+  const parts = [
+    quantityHh > 0 ? `Canales: ${quantityHh}` : null,
+    quantityBp > 0 ? `Petacas: ${quantityBp}` : null,
+  ].filter(Boolean);
+  if (parts.length > 0) return parts.join(" · ");
+  return legacyQuantity > 0 ? `Cantidad: ${legacyQuantity}` : "Cantidad no especificada";
+};
+
 const formatInfrastructure = (artist: Artist) => {
   const infra: string[] = [];
   if (artist.infra_cat6 && artist.infra_cat6_quantity) infra.push(`${artist.infra_cat6_quantity}x CAT6`);
@@ -166,17 +221,43 @@ export const ReadOnlyArtistCategoryContent = ({
   }
 
   if (category === "wireless") {
+    const renderSystemDetails = (systems: WirelessSystemLike[], systemCategory: "wireless" | "iem") => {
+      if (!Array.isArray(systems) || systems.length === 0) {
+        return <div className="text-muted-foreground">Sin sistemas</div>;
+      }
+
+      return (
+        <div className="space-y-2">
+          {systems.map((system, index) => (
+            <div key={`${system.model || "model"}-${index}`} className="rounded-md border p-2.5 bg-muted/20 space-y-1.5">
+              <div className="font-medium break-words">{system.model || "Modelo sin especificar"}</div>
+              <div className="text-muted-foreground break-words">{formatSystemQuantity(systemCategory, system)}</div>
+              <div className="text-muted-foreground break-words">Banda: {formatSystemBand(systemCategory, system)}</div>
+              {system.provided_by && (
+                <div className="text-muted-foreground">Sistema proporcionado por: {formatProviderLabel(system.provided_by)}</div>
+              )}
+              {system.notes && system.notes.trim() !== "" && (
+                <div className="text-muted-foreground break-words">Notas: {system.notes}</div>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    };
+
     return (
       <div className="space-y-3 text-sm">
         <div>
           <div className="text-xs uppercase text-muted-foreground font-semibold">Wireless</div>
-          <div className="font-medium">{formatSystems(artist.wireless_systems || [])}</div>
+          <div className="font-medium break-words">{formatSystems(artist.wireless_systems || [])}</div>
           <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.wireless_provided_by)}</div>
+          <div className="mt-2">{renderSystemDetails((artist.wireless_systems || []) as WirelessSystemLike[], "wireless")}</div>
         </div>
         <div>
           <div className="text-xs uppercase text-muted-foreground font-semibold">IEM</div>
-          <div className="font-medium">{formatSystems(artist.iem_systems || [])}</div>
+          <div className="font-medium break-words">{formatSystems(artist.iem_systems || [])}</div>
           <div className="text-muted-foreground">Proveedor: {formatProviderLabel(artist.iem_provided_by)}</div>
+          <div className="mt-2">{renderSystemDetails((artist.iem_systems || []) as WirelessSystemLike[], "iem")}</div>
         </div>
       </div>
     );

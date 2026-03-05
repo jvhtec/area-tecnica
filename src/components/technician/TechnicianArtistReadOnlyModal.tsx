@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
-import { Loader2, Users, X } from "lucide-react";
+import { ChevronDown, Loader2, SlidersHorizontal, Users, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MobileArtistList } from "@/components/festival/mobile/MobileArtistList";
 import { Theme } from "./types";
 
@@ -86,6 +87,14 @@ const formatGroupDate = (date: string) => {
   }
 };
 
+const formatChipDate = (date: string) => {
+  try {
+    return format(parseISO(date), "EEE d MMM", { locale: es });
+  } catch {
+    return date;
+  }
+};
+
 export function TechnicianArtistReadOnlyModal({
   theme,
   isDark,
@@ -93,6 +102,8 @@ export function TechnicianArtistReadOnlyModal({
   onClose,
 }: TechnicianArtistReadOnlyModalProps) {
   const [selectedStage, setSelectedStage] = useState<string>("all");
+  const [selectedDay, setSelectedDay] = useState<string>("all");
+  const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
   const [stagePlotUrls, setStagePlotUrls] = useState<Record<string, string>>({});
 
   const { data: artists = [], isLoading: artistsLoading } = useQuery({
@@ -188,10 +199,44 @@ export function TechnicianArtistReadOnlyModal({
     }));
   }, [artists, stageNames]);
 
-  const filteredArtists = useMemo(() => {
+  const stageFilteredArtists = useMemo(() => {
     if (selectedStage === "all") return artists;
     return artists.filter((artist) => String(artist.stage) === selectedStage);
   }, [artists, selectedStage]);
+
+  const dayOptions = useMemo(() => {
+    const uniqueDates = Array.from(new Set(stageFilteredArtists.map((artist) => artist.date)))
+      .filter((date): date is string => Boolean(date))
+      .sort((a, b) => a.localeCompare(b));
+
+    return uniqueDates.map((date) => ({
+      value: date,
+      label: formatChipDate(date),
+      count: stageFilteredArtists.filter((artist) => artist.date === date).length,
+    }));
+  }, [stageFilteredArtists]);
+
+  useEffect(() => {
+    if (selectedDay === "all") return;
+    if (!dayOptions.some((option) => option.value === selectedDay)) {
+      setSelectedDay("all");
+    }
+  }, [dayOptions, selectedDay]);
+
+  const filteredArtists = useMemo(() => {
+    if (selectedDay === "all") return stageFilteredArtists;
+    return stageFilteredArtists.filter((artist) => artist.date === selectedDay);
+  }, [selectedDay, stageFilteredArtists]);
+
+  const selectedStageLabel = useMemo(() => {
+    if (selectedStage === "all") return "Todos los escenarios";
+    return stageOptions.find((stage) => stage.value === selectedStage)?.label || "Escenario";
+  }, [selectedStage, stageOptions]);
+
+  const selectedDayLabel = useMemo(() => {
+    if (selectedDay === "all") return "Todos los días";
+    return dayOptions.find((day) => day.value === selectedDay)?.label || "Día";
+  }, [selectedDay, dayOptions]);
 
   const artistsByDate = useMemo(() => {
     const byDate = new Map<string, ReadOnlyArtist[]>();
@@ -215,7 +260,7 @@ export function TechnicianArtistReadOnlyModal({
       className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}
     >
       <div
-        className={`w-full max-w-md md:max-w-lg lg:max-w-xl h-[85vh] ${isDark ? "bg-[#0f1219]" : "bg-white"} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200`}
+        className={`w-full max-w-md md:max-w-lg lg:max-w-xl h-[85vh] ${isDark ? "bg-[#0f1219]" : "bg-white"} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden overflow-x-hidden animate-in zoom-in-95 duration-200`}
       >
         <div className={`p-4 border-b ${theme.divider} flex justify-between items-center shrink-0`}>
           <div className="flex items-center gap-2 min-w-0">
@@ -234,36 +279,91 @@ export function TechnicianArtistReadOnlyModal({
         </div>
 
         <div className={`px-4 py-3 border-b ${theme.divider} shrink-0`}>
-          <div className="flex items-center justify-between gap-2 mb-2">
-            <span className={`text-xs font-bold uppercase ${theme.textMuted}`}>Escenarios</span>
-            <Badge variant="outline">{filteredArtists.length} artistas</Badge>
-          </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <Button
-              type="button"
-              size="sm"
-              variant={selectedStage === "all" ? "default" : "outline"}
-              onClick={() => setSelectedStage("all")}
-              className="shrink-0"
-            >
-              Todos ({artists.length})
-            </Button>
-            {stageOptions.map((stage) => (
-              <Button
-                key={stage.value}
+          <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+            <CollapsibleTrigger asChild>
+              <button
                 type="button"
-                size="sm"
-                variant={selectedStage === stage.value ? "default" : "outline"}
-                onClick={() => setSelectedStage(stage.value)}
-                className="shrink-0"
+                className="w-full rounded-lg border px-3 py-2.5 flex items-center justify-between gap-2 text-left"
               >
-                {stage.label} ({stage.count})
-              </Button>
-            ))}
-          </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <SlidersHorizontal size={14} className={theme.textMuted} />
+                  <div className="min-w-0">
+                    <div className={`text-[11px] font-bold uppercase ${theme.textMuted}`}>Filtros</div>
+                    <div className={`text-xs ${theme.textMain} truncate`}>
+                      {selectedStageLabel} · {selectedDayLabel}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Badge variant="outline">{filteredArtists.length} artistas</Badge>
+                  <ChevronDown
+                    size={16}
+                    className={`${theme.textMuted} transition-transform ${filtersOpen ? "rotate-180" : ""}`}
+                  />
+                </div>
+              </button>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent className="mt-3 space-y-3">
+              <div>
+                <div className={`text-xs font-bold uppercase ${theme.textMuted} mb-2`}>Escenarios</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={selectedStage === "all" ? "default" : "outline"}
+                    onClick={() => setSelectedStage("all")}
+                    className="max-w-full"
+                  >
+                    Todos ({artists.length})
+                  </Button>
+                  {stageOptions.map((stage) => (
+                    <Button
+                      key={stage.value}
+                      type="button"
+                      size="sm"
+                      variant={selectedStage === stage.value ? "default" : "outline"}
+                      onClick={() => setSelectedStage(stage.value)}
+                      className="max-w-full"
+                    >
+                      {stage.label} ({stage.count})
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className={`text-xs font-bold uppercase ${theme.textMuted} mb-2`}>Días</div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={selectedDay === "all" ? "default" : "outline"}
+                    onClick={() => setSelectedDay("all")}
+                    className="max-w-full"
+                  >
+                    Todos ({stageFilteredArtists.length})
+                  </Button>
+                  {dayOptions.map((day) => (
+                    <Button
+                      key={day.value}
+                      type="button"
+                      size="sm"
+                      variant={selectedDay === day.value ? "default" : "outline"}
+                      onClick={() => setSelectedDay(day.value)}
+                      className="max-w-full"
+                    >
+                      {day.label} ({day.count})
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
 
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea className="flex-1 overflow-x-hidden">
+          <div className="p-4 overflow-x-hidden">
           {artistsLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
@@ -311,6 +411,7 @@ export function TechnicianArtistReadOnlyModal({
               ))}
             </div>
           )}
+          </div>
         </ScrollArea>
       </div>
     </div>

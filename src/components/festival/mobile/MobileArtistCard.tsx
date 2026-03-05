@@ -198,7 +198,7 @@ export const MobileArtistCard = ({
   deletingStagePlotArtistId,
 }: MobileArtistCardProps) => {
   return (
-    <div className="border rounded-xl bg-card overflow-hidden">
+    <div className="border rounded-xl bg-card overflow-hidden max-w-full">
       {/* Header */}
       <div className="p-4 pb-3">
         <div className="flex items-start justify-between gap-2">
@@ -230,7 +230,7 @@ export const MobileArtistCard = ({
         </div>
 
         {/* Time Row */}
-        <div className={`grid gap-2 mt-3 ${artist.soundcheck ? 'grid-cols-2' : 'grid-cols-1'}`}>
+        <div className={`grid gap-2 mt-3 ${artist.soundcheck ? 'grid-cols-1 min-[380px]:grid-cols-2' : 'grid-cols-1'}`}>
           <div className="p-2.5 rounded-lg bg-muted/50 border min-w-0 overflow-hidden">
             <div className="text-[10px] font-bold uppercase text-muted-foreground mb-0.5">Hora del Show</div>
             <div className="text-xs font-bold font-mono truncate">{formatTimeRange(artist.show_start, artist.show_end)}</div>
