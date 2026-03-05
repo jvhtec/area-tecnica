@@ -847,7 +847,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-6">
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="max-w-[min(96vw,1900px)] mx-auto space-y-8">
           <div className="flex justify-center">
             <Loader2 className="h-8 w-8 animate-spin" />
           </div>
@@ -858,7 +858,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
   return (
     <div className="min-h-screen bg-background p-6 print:p-0">
-      <div className="max-w-4xl mx-auto space-y-8 print:space-y-4">
+      <div className="max-w-[min(96vw,1900px)] mx-auto space-y-8 print:space-y-4">
         <div className="flex flex-col items-center space-y-8 print:space-y-4">
           {festivalLogo && (
             <img
@@ -900,17 +900,6 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-8">
-                <BasicInfoSection
-                  formData={formData}
-                  onChange={handleFormChange}
-                  gearSetup={gearSetup}
-                  isFieldLocked={isFieldLocked}
-                  language={formLanguage}
-                  stageNames={stageNames}
-                  showInternalFlags={false}
-                  showSoundcheckTimes={false}
-                />
-
                 {shouldShowRiderSection && (
                   <div className="space-y-4 border rounded-lg p-4">
                     <h3 className="text-lg font-semibold">{tx("Rider Técnico", "Technical Rider")}</h3>
@@ -1018,65 +1007,79 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
                   </div>
                 )}
 
-                <ConsoleSetupSection
-                  formData={formData}
-                  onChange={handleFormChange}
-                  gearSetup={gearSetup}
-                  isFieldLocked={isFieldLocked}
-                  language={formLanguage}
-                />
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+                  <div className="space-y-4">
+                    <BasicInfoSection
+                      formData={formData}
+                      onChange={handleFormChange}
+                      gearSetup={gearSetup}
+                      isFieldLocked={isFieldLocked}
+                      language={formLanguage}
+                      stageNames={stageNames}
+                      showInternalFlags={false}
+                      showSoundcheckTimes={false}
+                    />
+                    <ConsoleSetupSection
+                      formData={formData}
+                      onChange={handleFormChange}
+                      gearSetup={gearSetup}
+                      isFieldLocked={isFieldLocked}
+                      language={formLanguage}
+                    />
+                    <MonitorSetupSection
+                      formData={formData}
+                      onChange={handleFormChange}
+                      gearSetup={gearSetup}
+                      isFieldLocked={isFieldLocked}
+                      language={formLanguage}
+                    />
+                  </div>
 
-                <ArtistWirelessSetupSection
-                  formData={formData}
-                  onChange={handleFormChange}
-                  gearSetup={gearSetup}
-                  isFieldLocked={isFieldLocked}
-                  language={formLanguage}
-                />
+                  <div className="space-y-4">
+                    <InfrastructureSection
+                      formData={formData}
+                      onChange={handleFormChange}
+                      gearSetup={gearSetup}
+                      isFieldLocked={isFieldLocked}
+                      language={formLanguage}
+                      restrictToAvailable={!isBlank}
+                    />
+                    <NotesSection
+                      formData={formData}
+                      onChange={handleFormChange}
+                      isFieldLocked={isFieldLocked}
+                      language={formLanguage}
+                    />
+                    <ArtistWirelessSetupSection
+                      formData={formData}
+                      onChange={handleFormChange}
+                      gearSetup={gearSetup}
+                      isFieldLocked={isFieldLocked}
+                      language={formLanguage}
+                    />
+                  </div>
 
-                <MicKitSection
-                  micKit={formData.mic_kit}
-                  wiredMics={formData.wired_mics}
-                  onMicKitChange={(provider) => handleFormChange({ mic_kit: provider })}
-                  onWiredMicsChange={(mics) => handleFormChange({ wired_mics: mics })}
-                  readOnly={isFieldLocked("mic_kit") || isFieldLocked("wired_mics")}
-                  language={formLanguage}
-                  festivalAvailableMics={(gearSetup?.wired_mics || [])
-                    .map((mic) => mic?.model?.trim())
-                    .filter((model): model is string => Boolean(model))}
-                />
-
-                <MonitorSetupSection
-                  formData={formData}
-                  onChange={handleFormChange}
-                  gearSetup={gearSetup}
-                  isFieldLocked={isFieldLocked}
-                  language={formLanguage}
-                />
-
-                <ExtraRequirementsSection
-                  formData={formData}
-                  onChange={handleFormChange}
-                  gearSetup={gearSetup}
-                  isFieldLocked={isFieldLocked}
-                  language={formLanguage}
-                />
-
-                <InfrastructureSection
-                  formData={formData}
-                  onChange={handleFormChange}
-                  gearSetup={gearSetup}
-                  isFieldLocked={isFieldLocked}
-                  language={formLanguage}
-                  restrictToAvailable={!isBlank}
-                />
-
-                <NotesSection
-                  formData={formData}
-                  onChange={handleFormChange}
-                  isFieldLocked={isFieldLocked}
-                  language={formLanguage}
-                />
+                  <div className="space-y-4">
+                    <ExtraRequirementsSection
+                      formData={formData}
+                      onChange={handleFormChange}
+                      gearSetup={gearSetup}
+                      isFieldLocked={isFieldLocked}
+                      language={formLanguage}
+                    />
+                    <MicKitSection
+                      micKit={formData.mic_kit}
+                      wiredMics={formData.wired_mics}
+                      onMicKitChange={(provider) => handleFormChange({ mic_kit: provider })}
+                      onWiredMicsChange={(mics) => handleFormChange({ wired_mics: mics })}
+                      readOnly={isFieldLocked("mic_kit") || isFieldLocked("wired_mics")}
+                      language={formLanguage}
+                      festivalAvailableMics={(gearSetup?.wired_mics || [])
+                        .map((mic) => mic?.model?.trim())
+                        .filter((model): model is string => Boolean(model))}
+                    />
+                  </div>
+                </div>
 
                 {!isBlank && (
                   <Button type="submit" disabled={isSubmitting} className="w-full">
