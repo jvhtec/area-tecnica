@@ -227,7 +227,7 @@ export const WirelessConfig = ({
         const showCustomBandInput = bandSelectValue === CUSTOM_BAND_VALUE;
 
         return (
-          <div key={systemKey} className="space-y-4 p-4 border rounded-lg">
+          <div key={systemKey} className="space-y-3 p-3 md:p-4 border rounded-lg">
             <div className="flex gap-4 items-start">
               <div className="flex-1">
                 {(() => {
@@ -369,14 +369,14 @@ export const WirelessConfig = ({
             </div>
 
             {!hideProvidedBy && (
-              <div>
-                <Label>{tx("Proporcionado por", "Provided by")}</Label>
+              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+                <Label className="text-sm">{tx("Proporcionado por", "Provided by")}</Label>
                 <RadioGroup
                   value={system.provided_by || "festival"}
                   onValueChange={(value: "festival" | "band") => {
                     updateSystem(index, "provided_by", value);
                   }}
-                  className="flex space-x-4 mt-1"
+                  className="flex space-x-4"
                   disabled={readOnly}
                 >
                   <div className="flex items-center space-x-2">

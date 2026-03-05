@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
@@ -20,7 +19,7 @@ interface ArtistManagementFormProps {
   selectedDate: string;
   dayStartTime: string;
   onSubmit: (data: any) => Promise<void>;
-  isSubmitting: boolean;
+  formId?: string;
 }
 
 // Define the correct form data type for this component
@@ -81,7 +80,7 @@ export const ArtistManagementForm = ({
   selectedDate,
   dayStartTime = "07:00",
   onSubmit,
-  isSubmitting
+  formId
 }: ArtistManagementFormProps) => {
   const { toast } = useToast();
   const { combinedSetup } = useCombinedGearSetup(jobId || '', selectedDate, 1);
@@ -193,58 +192,57 @@ export const ArtistManagementForm = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <BasicInfoSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
+    <form id={formId} onSubmit={handleSubmit} className="space-y-4 pb-1">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-start">
+        <div className="space-y-4">
+          <BasicInfoSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
+          <ConsoleSetupSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
+          <MonitorSetupSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
+        </div>
 
-      <ConsoleSetupSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
+        <div className="space-y-4">
+          <InfrastructureSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
+          <NotesSection
+            formData={formData as any}
+            onChange={updateFormData}
+          />
+          <WirelessSetupSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
+        </div>
 
-      <WirelessSetupSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
-
-      <MicKitSection
-        micKit={formData.mic_kit}
-        wiredMics={formData.wired_mics}
-        onMicKitChange={(provider) => updateFormData({ mic_kit: provider })}
-        onWiredMicsChange={(mics) => updateFormData({ wired_mics: mics })}
-      />
-
-      <MonitorSetupSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
-
-      <ExtraRequirementsSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
-
-      <InfrastructureSection
-        formData={formData as any}
-        onChange={updateFormData}
-        gearSetup={combinedSetup?.globalSetup || null}
-      />
-
-      <NotesSection
-        formData={formData as any}
-        onChange={updateFormData}
-      />
-
-      <Button type="submit" disabled={isSubmitting} className="w-full">
-        {isSubmitting ? "Guardando..." : artist ? "Actualizar Artista" : "Agregar Artista"}
-      </Button>
+        <div className="space-y-4">
+          <ExtraRequirementsSection
+            formData={formData as any}
+            onChange={updateFormData}
+            gearSetup={combinedSetup?.globalSetup || null}
+          />
+          <MicKitSection
+            micKit={formData.mic_kit}
+            wiredMics={formData.wired_mics}
+            onMicKitChange={(provider) => updateFormData({ mic_kit: provider })}
+            onWiredMicsChange={(mics) => updateFormData({ wired_mics: mics })}
+          />
+        </div>
+      </div>
     </form>
   );
 };
