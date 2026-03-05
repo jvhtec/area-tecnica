@@ -109,7 +109,7 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
       {/* FOH Console */}
       <div className="space-y-4">
         <h4 className="font-medium">{tx("Consola FOH", "FOH Console")}</h4>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label>{tx("Modelo de Consola", "Console Model")}</Label>
             <Select
@@ -195,7 +195,7 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
         </div>
         {!formData.monitors_from_foh ? (
           <>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>{tx("Modelo de Consola", "Console Model")}</Label>
                 <Select

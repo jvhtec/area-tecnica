@@ -1,8 +1,9 @@
 
-import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ArtistManagementForm } from "./ArtistManagementForm";
+import { MobileArtistFormSheet } from "./mobile/MobileArtistFormSheet";
 import { useArtistMutations } from "@/hooks/useArtistMutations";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface ArtistManagementDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ export const ArtistManagementDialog = ({
   dayStartTime = "07:00"
 }: ArtistManagementDialogProps) => {
   const { createArtist, updateArtist, isCreating, isUpdating } = useArtistMutations(jobId, selectedDate);
+  const isMobile = useIsMobile();
 
   const handleSave = async (data: any) => {
     try {
@@ -32,7 +34,7 @@ export const ArtistManagementDialog = ({
         // Create new artist
         await createArtist(data);
       }
-      
+
       // Close dialog and notify that there was an update
       onOpenChange(false, true);
     } catch (error) {
@@ -45,6 +47,22 @@ export const ArtistManagementDialog = ({
     onOpenChange(false, false);
   };
 
+  // Mobile: full-screen stepped form
+  if (isMobile && open) {
+    return (
+      <MobileArtistFormSheet
+        artist={artist}
+        jobId={jobId}
+        selectedDate={selectedDate}
+        dayStartTime={dayStartTime}
+        onSubmit={handleSave}
+        isSubmitting={isCreating || isUpdating}
+        onClose={handleClose}
+      />
+    );
+  }
+
+  // Desktop: standard dialog
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto w-[95vw] sm:w-full">

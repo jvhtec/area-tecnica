@@ -30,7 +30,7 @@ export const BasicInfoSection = ({
     <div className="space-y-4 border rounded-lg p-4">
       <h3 className="text-lg font-semibold">{tx("Información Básica", "Basic Info")}</h3>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <Label>{tx("Nombre del Artista/Banda", "Artist/Band Name")}</Label>
           <Input
