@@ -17,6 +17,7 @@ import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload"
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
+import { FlexApiKeySettings } from "@/components/settings/FlexApiKeySettings";
 
 export const Profile = () => {
   const { toast } = useToast();
@@ -500,6 +501,21 @@ export const Profile = () => {
                     )}
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Flex API Key - management users can set their own key */}
+          {['admin', 'management'].includes(profile?.role) && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Clave API de Flex</CardTitle>
+                <CardDescription>
+                  Configura tu propia clave API de Flex para distribuir las llamadas y evitar límites de uso.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FlexApiKeySettings />
               </CardContent>
             </Card>
           )}

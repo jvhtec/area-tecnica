@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { resolveFlexAuthToken } from '../_shared/flexAuthToken.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,13 @@ const corsHeaders = {
 }
 
 const FLEX_API_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/api';
+
+class ServiceUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ServiceUnavailableError';
+  }
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -21,9 +29,7 @@ serve(async (req) => {
     // Initialize Supabase client for authentication
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const authToken = Deno.env.get('X_AUTH_TOKEN')
-    
-    if (!supabaseUrl || !supabaseKey || !authToken) {
+    if (!supabaseUrl || !supabaseKey) {
       throw new Error('Missing required environment variables')
     }
 
@@ -41,6 +47,16 @@ serve(async (req) => {
 
     if (authError || !user) {
       throw new Error('Invalid authentication')
+    }
+
+    // Resolve Flex API token (per-user key with global fallback)
+    let authToken: string;
+    try {
+      authToken = await resolveFlexAuthToken(supabase, user.id);
+    } catch (tokenErr) {
+      throw new ServiceUnavailableError(
+        tokenErr instanceof Error ? tokenErr.message : 'No Flex API token available'
+      );
     }
 
     // Parse request body
@@ -92,14 +108,23 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error("Error in secure-flex-api:", error)
+    
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    let status = 400;
+    if (error instanceof ServiceUnavailableError) {
+      status = 503;
+    } else if (errorMessage.includes('authentication')) {
+      status = 401;
+    }
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message || 'Internal server error' 
+        error: errorMessage,
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: error.message?.includes('authentication') ? 401 : 400,
+        status,
       },
     )
   }

@@ -16,6 +16,7 @@ export type Profile = {
   profile_picture_url?: string | null;
   assignable_as_tech?: boolean | null;
   flex_resource_id?: string | null;
+  flex_api_key?: string | null;
   soundvision_access_enabled?: boolean | null;
   autonomo?: boolean | null;
   bg_color?: string | null;

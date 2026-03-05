@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { resolveFlexAuthToken } from '../_shared/flexAuthToken.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -147,14 +148,25 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const authToken = Deno.env.get('X_AUTH_TOKEN')
-    
-    if (!supabaseUrl || !supabaseKey || !authToken) {
+    if (!supabaseUrl || !supabaseKey) {
       throw new Error('Missing environment variables')
     }
 
     const supabase = createClient(supabaseUrl, supabaseKey)
     const actorId = await resolveActorId(supabase, req)
+    
+    // Require authenticated actor for folder creation
+    if (!actorId) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized - authentication required' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 401 }
+      );
+    }
+    
+    const authToken = await resolveFlexAuthToken(supabase, actorId)
+    if (!authToken) {
+      throw new Error('No Flex API token available')
+    }
     const actorName = await resolveActorName(supabase, actorId)
     const activityEvents: Array<{ payload: Record<string, unknown>; visibility?: 'management' | 'job_participants' | 'house_plus_job' | 'actor_only' }> = []
 

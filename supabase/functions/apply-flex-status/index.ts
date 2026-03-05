@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { resolveFlexAuthToken } from '../_shared/flexAuthToken.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -200,19 +201,8 @@ serve(async (req) => {
     const type: 'master'|'sub' = isMaster ? 'master' : 'sub';
     const workflowActionId = workflowActions[type][status];
 
-    // Resolve Flex auth token: prefer env, else fetch via get-secret using caller's auth
-    let flexAuthToken = Deno.env.get('X_AUTH_TOKEN') || Deno.env.get('FLEX_X_AUTH_TOKEN') || '';
-    if (!flexAuthToken) {
-      try {
-        const { data: secretData, error: secretError } = await supabase.functions.invoke('get-secret', {
-          body: { secretName: 'X_AUTH_TOKEN' },
-          headers: authHeader ? { authorization: authHeader } : undefined,
-        });
-        if (!secretError && secretData?.X_AUTH_TOKEN) {
-          flexAuthToken = secretData.X_AUTH_TOKEN as string;
-        }
-      } catch {}
-    }
+    // Resolve Flex auth token (per-user key with global fallback)
+    const flexAuthToken = await resolveFlexAuthToken(supabase, processedBy);
     if (!flexAuthToken) {
       return new Response(JSON.stringify({ success: false, error: 'Flex authentication token missing' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
     }

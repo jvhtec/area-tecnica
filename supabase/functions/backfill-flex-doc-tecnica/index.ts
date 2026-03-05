@@ -1,12 +1,12 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { resolveFlexAuthToken } from "../_shared/flexAuthToken.ts";
 
 type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comercial" | "logistics" | "administrative";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const FLEX_API_BASE_URL = Deno.env.get("FLEX_API_BASE_URL") || "https://sectorpro.flexrentalsolutions.com/f5/api";
-const FLEX_AUTH_TOKEN = Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,14 +33,14 @@ function normalize(str: string): string {
 
 const DEF_ID_DOCUMENTACION_TECNICA = "3787806c-af2d-11df-b8d5-00e08175e43e";
 
-async function fetchElementTree(elementId: string): Promise<any[]> {
-  if (!FLEX_AUTH_TOKEN) throw new Error('Missing FLEX auth token');
+async function fetchElementTree(elementId: string, flexAuthToken: string): Promise<any[]> {
+  if (!flexAuthToken) throw new Error('Missing FLEX auth token');
   const r = await fetch(`${FLEX_API_BASE_URL}/element/${encodeURIComponent(elementId)}/tree`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
-      'X-Auth-Token': FLEX_AUTH_TOKEN,
-      'apikey': FLEX_AUTH_TOKEN,
+      'X-Auth-Token': flexAuthToken,
+      'apikey': flexAuthToken,
       'accept': '*/*',
     }
   });
@@ -158,6 +158,17 @@ serve(async (req) => {
 
   const sb = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
+  // Resolve per-user Flex API token
+  let actorId: string | null = null;
+  try {
+    const authHeader = req.headers.get("Authorization");
+    if (authHeader?.startsWith("Bearer ")) {
+      const { data } = await sb.auth.getUser(authHeader.replace("Bearer ", ""));
+      actorId = data.user?.id ?? null;
+    }
+  } catch (_) { /* ignore */ }
+  const flexAuthToken = await resolveFlexAuthToken(sb, actorId);
+
   // 1) Candidate roots: department folders, tour-level folders per dept, and main job element
   const { data: deptRows } = await sb
     .from('flex_folders')
@@ -231,7 +242,7 @@ serve(async (req) => {
 
   for (const row of candidates) {
     try {
-      const tree = await fetchElementTree(row.elementId as string);
+      const tree = await fetchElementTree(row.elementId as string, flexAuthToken);
       let docIds: string[] = [];
       if (row.dept) {
         // Prefer department-targeted discovery
