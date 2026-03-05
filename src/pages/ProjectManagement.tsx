@@ -385,7 +385,7 @@ const ProjectManagement = () => {
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search projects..."
+                placeholder="Buscar proyectos..."
                 className={cn("pl-8 h-9", isMobile && "w-full")}
               />
               {(jobsLoading) && (
