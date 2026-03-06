@@ -241,9 +241,22 @@ export function TechnicianArtistReadOnlyModal({
   }, [artists]);
 
   const handleViewRiderFile = async (file: { file_path: string }) => {
+    const pendingWindow = window.open("about:blank", "_blank", "noopener,noreferrer");
+
     const { data, error } = await supabase.storage.from("festival_artist_files").createSignedUrl(file.file_path, 3600);
-    if (error || !data?.signedUrl) return;
-    window.open(data.signedUrl, "_blank", "noopener");
+    if (error || !data?.signedUrl) {
+      if (pendingWindow && !pendingWindow.closed) {
+        pendingWindow.close();
+      }
+      return;
+    }
+
+    if (pendingWindow && !pendingWindow.closed) {
+      pendingWindow.location.href = data.signedUrl;
+      return;
+    }
+
+    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
   };
 
   const handleDownloadRiderFile = async (file: { file_path: string; file_name: string }) => {
