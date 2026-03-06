@@ -1,7 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
-  Sliders, Radio, Mic2, Speaker, Cable, StickyNote,
+  Sliders, Radio, Mic2, Speaker, Cable, StickyNote, FileDown,
   Link, FileText, Printer, Pencil, Trash2, ImagePlus, ImageOff,
   Loader2, MoreHorizontal
 } from "lucide-react";
@@ -156,7 +156,14 @@ function formatTimeRange(start?: string | null, end?: string | null): string {
 
 // --- Types ---
 
-export type MobileConfigCategory = 'consoles' | 'wireless' | 'microphones' | 'monitors' | 'infrastructure' | 'notes';
+export type MobileConfigCategory = 'consoles' | 'wireless' | 'microphones' | 'monitors' | 'infrastructure' | 'notes' | 'rider';
+
+export type MobileArtistRiderFile = {
+  id: string;
+  file_name: string;
+  file_path: string;
+  uploaded_at?: string | null;
+};
 
 interface MobileArtistCardProps {
   artist: Artist;
@@ -176,6 +183,7 @@ interface MobileArtistCardProps {
   deletingArtistId: string | null;
   uploadingStagePlotArtistId: string | null;
   deletingStagePlotArtistId: string | null;
+  riderFiles?: MobileArtistRiderFile[];
 }
 
 export const MobileArtistCard = ({
@@ -196,6 +204,7 @@ export const MobileArtistCard = ({
   deletingArtistId,
   uploadingStagePlotArtistId,
   deletingStagePlotArtistId,
+  riderFiles = [],
 }: MobileArtistCardProps) => {
   return (
     <div className="border rounded-xl bg-card overflow-hidden max-w-full">
@@ -311,6 +320,15 @@ export const MobileArtistCard = ({
             title="Notas"
             summary={artist.notes.length > 60 ? artist.notes.substring(0, 60) + "..." : artist.notes}
             onClick={() => onEditCategory(artist.id, 'notes')}
+          />
+        )}
+
+        {mode === 'readonly' && riderFiles.length > 0 && (
+          <ConfigSummaryRow
+            icon={FileDown}
+            title="Riders"
+            summary={riderFiles.length === 1 ? riderFiles[0].file_name : `${riderFiles.length} archivos disponibles`}
+            onClick={() => onEditCategory(artist.id, 'rider')}
           />
         )}
       </div>
