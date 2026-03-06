@@ -12,7 +12,7 @@ import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { formatBandOptionLabel, getBandOptionsEU, isFrequencyBandSelection } from "@/lib/frequencyBands";
-import type { MobileConfigCategory } from "./MobileArtistCard";
+import type { MobileArtistRiderFile, MobileConfigCategory } from "./MobileArtistCard";
 
 interface Artist {
   id: string;
@@ -187,9 +187,15 @@ const formatInfrastructure = (artist: Artist) => {
 export const ReadOnlyArtistCategoryContent = ({
   artist,
   category,
+  riderFiles = [],
+  onViewRiderFile,
+  onDownloadRiderFile,
 }: {
   artist: Artist;
   category: MobileConfigCategory;
+  riderFiles?: MobileArtistRiderFile[];
+  onViewRiderFile?: (file: MobileArtistRiderFile) => void;
+  onDownloadRiderFile?: (file: MobileArtistRiderFile) => void;
 }) => {
   if (category === "consoles") {
     return (
@@ -313,6 +319,43 @@ export const ReadOnlyArtistCategoryContent = ({
           <div className="text-xs uppercase text-muted-foreground font-semibold">Proveedor</div>
           <div className="font-medium">{formatProviderLabel(artist.infrastructure_provided_by)}</div>
         </div>
+      </div>
+    );
+  }
+
+
+  if (category === "rider") {
+    if (riderFiles.length === 0) {
+      return <div className="text-sm text-muted-foreground">No hay riders disponibles para este artista.</div>;
+    }
+
+    return (
+      <div className="space-y-2.5">
+        {riderFiles.map((file) => (
+          <div key={file.id} className="rounded-md border p-3 bg-muted/20">
+            <div className="text-sm font-medium break-words">{file.file_name}</div>
+            <div className="mt-2 flex items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => onViewRiderFile?.(file)}
+                disabled={!onViewRiderFile}
+              >
+                Ver
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => onDownloadRiderFile?.(file)}
+                disabled={!onDownloadRiderFile}
+              >
+                Descargar
+              </Button>
+            </div>
+          </div>
+        ))}
       </div>
     );
   }

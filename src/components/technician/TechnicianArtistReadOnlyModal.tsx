@@ -105,6 +105,7 @@ export function TechnicianArtistReadOnlyModal({
   const [selectedDay, setSelectedDay] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
   const [stagePlotUrls, setStagePlotUrls] = useState<Record<string, string>>({});
+  const [riderFilesByArtistId, setRiderFilesByArtistId] = useState<Record<string, Array<{ id: string; file_name: string; file_path: string; uploaded_at?: string | null }>>>({});
 
   const { data: artists = [], isLoading: artistsLoading } = useQuery({
     queryKey: ["technician-readonly-artists", job?.id],
@@ -186,6 +187,77 @@ export function TechnicianArtistReadOnlyModal({
       cancelled = true;
     };
   }, [artists]);
+
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadRiderFiles = async () => {
+      const artistIds = artists.map((artist) => artist.id).filter(Boolean);
+      if (artistIds.length === 0) {
+        if (!cancelled) setRiderFilesByArtistId({});
+        return;
+      }
+
+      let query = supabase
+        .from("festival_artist_files")
+        .select("id, file_name, file_path, uploaded_at, artist_id")
+        .order("uploaded_at", { ascending: false });
+
+      if (artistIds.length === 1) {
+        query = query.eq("artist_id", artistIds[0]);
+      } else {
+        const orExpr = artistIds.map((id) => `artist_id.eq.${id}`).join(",");
+        query = query.or(orExpr);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        console.warn("TechnicianArtistReadOnlyModal: failed loading rider files", error);
+        if (!cancelled) setRiderFilesByArtistId({});
+        return;
+      }
+
+      const grouped: Record<string, Array<{ id: string; file_name: string; file_path: string; uploaded_at?: string | null }>> = {};
+      (data || []).forEach((file) => {
+        if (!file.artist_id) return;
+        if (!grouped[file.artist_id]) grouped[file.artist_id] = [];
+        grouped[file.artist_id].push({
+          id: file.id,
+          file_name: file.file_name,
+          file_path: file.file_path,
+          uploaded_at: file.uploaded_at,
+        });
+      });
+
+      if (!cancelled) setRiderFilesByArtistId(grouped);
+    };
+
+    void loadRiderFiles();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [artists]);
+
+  const handleViewRiderFile = async (file: { file_path: string }) => {
+    const { data, error } = await supabase.storage.from("festival_artist_files").createSignedUrl(file.file_path, 3600);
+    if (error || !data?.signedUrl) return;
+    window.open(data.signedUrl, "_blank", "noopener");
+  };
+
+  const handleDownloadRiderFile = async (file: { file_path: string; file_name: string }) => {
+    const { data, error } = await supabase.storage.from("festival_artist_files").download(file.file_path);
+    if (error || !data) return;
+    const url = window.URL.createObjectURL(data);
+    const link = window.document.createElement("a");
+    link.href = url;
+    link.download = file.file_name;
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  };
 
   const stageOptions = useMemo(() => {
     const uniqueStages = Array.from(new Set(artists.map((artist) => artist.stage)))
@@ -406,6 +478,9 @@ export function TechnicianArtistReadOnlyModal({
                     uploadingStagePlotArtistId={null}
                     deletingStagePlotArtistId={null}
                     mode="readonly"
+                    riderFilesByArtistId={riderFilesByArtistId}
+                    onViewRiderFile={handleViewRiderFile}
+                    onDownloadRiderFile={handleDownloadRiderFile}
                   />
                 </section>
               ))}

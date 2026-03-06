@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MobileArtistCard, type MobileConfigCategory } from "./MobileArtistCard";
+import { MobileArtistCard, type MobileArtistRiderFile, type MobileConfigCategory } from "./MobileArtistCard";
 import { MobileArtistConfigEditor, ReadOnlyArtistCategoryContent } from "./MobileArtistConfigEditor";
 import type { ArtistGearComparison } from "@/utils/gearComparisonService";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -11,6 +11,7 @@ const CATEGORY_TITLES: Record<MobileConfigCategory, string> = {
   monitors: "Monitores y Extras",
   infrastructure: "Infraestructura",
   notes: "Notas",
+  rider: "Riders",
 };
 
 interface Artist {
@@ -86,6 +87,9 @@ interface MobileArtistListProps {
   uploadingStagePlotArtistId: string | null;
   deletingStagePlotArtistId: string | null;
   mode?: 'edit' | 'readonly';
+  riderFilesByArtistId?: Record<string, MobileArtistRiderFile[]>;
+  onViewRiderFile?: (file: MobileArtistRiderFile) => void;
+  onDownloadRiderFile?: (file: MobileArtistRiderFile) => void;
 }
 
 export const MobileArtistList = ({
@@ -108,6 +112,9 @@ export const MobileArtistList = ({
   uploadingStagePlotArtistId,
   deletingStagePlotArtistId,
   mode = 'edit',
+  riderFilesByArtistId = {},
+  onViewRiderFile,
+  onDownloadRiderFile,
 }: MobileArtistListProps) => {
   const [editingCategory, setEditingCategory] = useState<{
     artistId: string;
@@ -200,6 +207,7 @@ export const MobileArtistList = ({
             deletingArtistId={deletingArtistId}
             uploadingStagePlotArtistId={uploadingStagePlotArtistId}
             deletingStagePlotArtistId={deletingStagePlotArtistId}
+            riderFiles={riderFilesByArtistId[artist.id] || []}
           />
         </div>
       ))}
@@ -220,6 +228,9 @@ export const MobileArtistList = ({
             <ReadOnlyArtistCategoryContent
               artist={readonlyDetail.artist}
               category={readonlyDetail.category}
+              riderFiles={riderFilesByArtistId[readonlyDetail.artist.id] || []}
+              onViewRiderFile={onViewRiderFile}
+              onDownloadRiderFile={onDownloadRiderFile}
             />
           </SheetContent>
         </Sheet>
