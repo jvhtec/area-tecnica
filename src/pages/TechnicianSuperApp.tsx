@@ -54,6 +54,7 @@ import { TimesheetView } from '@/components/technician/TimesheetView';
 import { DetailsModal } from '@/components/technician/DetailsModal';
 import { AboutModal } from '@/components/technician/AboutModal';
 import { TechnicianArtistReadOnlyModal } from '@/components/technician/TechnicianArtistReadOnlyModal';
+import { TechnicianRfTableModal } from '@/components/technician/TechnicianRfTableModal';
 
 // --- TYPE DEFINITIONS ---
 interface TechnicianJobData {
@@ -418,6 +419,14 @@ export default function TechnicianSuperApp() {
       )}
       {activeModal === 'artists' && selectedJob && (
         <TechnicianArtistReadOnlyModal
+          theme={t}
+          isDark={isDark}
+          job={selectedJob}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+      {activeModal === 'rf-table' && selectedJob && (
+        <TechnicianRfTableModal
           theme={t}
           isDark={isDark}
           job={selectedJob}

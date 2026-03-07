@@ -124,7 +124,7 @@ const formatFestivalDayLabel = (dayKey: string): string => {
   return parsed.toLocaleDateString('es-ES');
 };
 
-const groupArtistsByFestivalDay = (artists: ArtistRfIemData[]): Array<{
+export const groupArtistsByFestivalDay = (artists: ArtistRfIemData[]): Array<{
   key: string;
   label: string;
   artists: ArtistRfIemData[];
@@ -224,7 +224,7 @@ export const hasRfIemContent = (artist: ArtistRfIemData): boolean => {
 };
 
 // Helper function to aggregate provider information from systems
-const getProviderSummary = (systems: RfIemSystemData[]): string => {
+export const getProviderSummary = (systems: RfIemSystemData[]): string => {
   if (!systems || systems.length === 0) return '';
 
   const providers = systems.map(system => system.provided_by || 'festival');
@@ -239,7 +239,7 @@ const getProviderSummary = (systems: RfIemSystemData[]): string => {
   return 'Mixto';
 };
 
-const getRfSystemChannels = (system: RfIemSystemData): number => {
+export const getRfSystemChannels = (system: RfIemSystemData): number => {
   if (typeof system.quantity_ch === 'number' && Number.isFinite(system.quantity_ch)) {
     return system.quantity_ch;
   }
@@ -291,7 +291,7 @@ const aggregateByModel = (
   return [...byModel.entries()].map(([model, metric]) => ({ model, metric }));
 };
 
-const formatModelWithCounts = (systems: RfIemSystemData[]): string => {
+export const formatModelWithCounts = (systems: RfIemSystemData[]): string => {
   const providers = [...new Set(systems.map((system) => toProvider(system.provided_by, 'festival')))];
   const isMixed = providers.length > 1;
 
@@ -342,7 +342,7 @@ const formatMetricBreakdown = (
   return `${values.join('+')} (${total})`;
 };
 
-const formatMetricBreakdownByProvider = (
+export const formatMetricBreakdownByProvider = (
   systems: RfIemSystemData[],
   getMetric: (system: RfIemSystemData) => number,
 ): string | number => {
@@ -439,13 +439,13 @@ const getProviderCellColor = (provider: string): [number, number, number] => {
   return [232, 232, 232];
 };
 
-const FESTIVAL_TEXT_TOKEN = '__FESTIVAL_ITEM__';
-const BAND_TEXT_TOKEN = '__BAND_ITEM__';
+export const FESTIVAL_TEXT_TOKEN = '__FESTIVAL_ITEM__';
+export const BAND_TEXT_TOKEN = '__BAND_ITEM__';
 
-const hasProviderTextToken = (value: string): boolean =>
+export const hasProviderTextToken = (value: string): boolean =>
   value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN);
 
-const stripProviderTextTokens = (value: string): string =>
+export const stripProviderTextTokens = (value: string): string =>
   value.replaceAll(FESTIVAL_TEXT_TOKEN, '').replaceAll(BAND_TEXT_TOKEN, '');
 
 const getProviderTokenType = (line: string): 'festival' | 'band' | 'default' => {
@@ -454,7 +454,7 @@ const getProviderTokenType = (line: string): 'festival' | 'band' | 'default' => 
   return 'default';
 };
 
-const splitTokenizedSegments = (
+export const splitTokenizedSegments = (
   value: string,
 ): Array<{ text: string; provider: 'festival' | 'band' | 'default' }> => {
   const segments: Array<{ text: string; provider: 'festival' | 'band' | 'default' }> = [];
@@ -505,7 +505,7 @@ const getStageCellColor = (stageLabel: string): [number, number, number] => {
   return palette[(stageNumber - 1) % palette.length];
 };
 
-const formatTimeRange = (start?: string, end?: string): string => {
+export const formatTimeRange = (start?: string, end?: string): string => {
   const safeStart = (start || '').trim();
   const safeEnd = (end || '').trim();
   if (!safeStart && !safeEnd) return '-';

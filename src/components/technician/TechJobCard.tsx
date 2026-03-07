@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MapPin, Clock, User, FileText, Lightbulb, Receipt, Users } from 'lucide-react';
+import { MapPin, Clock, User, FileText, Lightbulb, Receipt, Users, Radio } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { labelForCode } from '@/utils/roles';
 import { TechnicianIncidentReportDialog } from '@/components/incident-reports/TechnicianIncidentReportDialog';
@@ -145,6 +145,14 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
                         className={`py-2.5 rounded-lg border border-dashed ${theme.divider} ${theme.textMuted} text-xs font-bold hover:bg-white/5 transition-colors flex items-center justify-center gap-2 ${showTimesheetButton ? 'col-span-2' : ''}`}
                     >
                         <Users size={14} /> Artistas
+                    </button>
+                )}
+                {job.sound_role === 'SND-RF-E' && hasArtists && (
+                    <button
+                        onClick={() => onAction('rf-table', jobData)}
+                        className={`py-2.5 rounded-lg border border-dashed ${theme.divider} ${theme.textMuted} text-xs font-bold hover:bg-white/5 transition-colors flex items-center justify-center gap-2 ${showTimesheetButton ? 'col-span-2' : ''}`}
+                    >
+                        <Radio size={14} /> Tabla RF / IEM
                     </button>
                 )}
                 {showIncidentReport && (

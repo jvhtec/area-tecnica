@@ -28,6 +28,7 @@ import { TourDetailView } from '@/components/technician/TourDetailView';
 import { SoundVisionModal } from '@/components/technician/SoundVisionModal';
 import { TechnicianTourRates } from '@/components/dashboard/TechnicianTourRates';
 import { TechnicianArtistReadOnlyModal } from '@/components/technician/TechnicianArtistReadOnlyModal';
+import { TechnicianRfTableModal } from '@/components/technician/TechnicianRfTableModal';
 
 // Type definitions
 interface TechnicianJobData {
@@ -369,6 +370,14 @@ const TechnicianDashboard = () => {
       )}
       {activeModal === 'artists' && selectedJob && (
         <TechnicianArtistReadOnlyModal
+          theme={t}
+          isDark={isDark}
+          job={selectedJob}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
+      {activeModal === 'rf-table' && selectedJob && (
+        <TechnicianRfTableModal
           theme={t}
           isDark={isDark}
           job={selectedJob}
