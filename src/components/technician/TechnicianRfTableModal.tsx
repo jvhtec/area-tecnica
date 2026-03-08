@@ -3,13 +3,15 @@ import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
+  Activity,
   ChevronDown,
+  Clock,
   Headphones,
   Loader2,
-  MapPin,
+  Package,
   Radio,
   Search,
-  SlidersHorizontal,
+  Wifi,
   X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -38,20 +40,22 @@ import {
 } from "@/utils/rfIemTablePdfExport";
 import { Theme } from "./types";
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
 type TechnicianRfTableModalProps = {
   theme: Theme;
   isDark: boolean;
-  job: {
-    id: string;
-    title?: string;
-  };
+  job: { id: string; title?: string };
   onClose: () => void;
 };
 
-type FestivalStage = {
-  number: number;
-  name: string;
-};
+type FestivalStage = { number: number; name: string };
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const formatChipDate = (date: string) => {
   try {
@@ -61,22 +65,34 @@ const formatChipDate = (date: string) => {
   }
 };
 
-// --- Tokenized text renderer for mixed-provider values ---
+const extractTotal = (value: string | number): number => {
+  if (typeof value === "number") return value;
+  const match = String(value).match(/\((\d+)\)/);
+  if (match) return parseInt(match[1], 10) || 0;
+  const num = parseInt(String(value), 10);
+  return Number.isFinite(num) ? num : 0;
+};
 
-function TokenizedText({
-  value,
-  isDark,
-}: {
-  value: string;
-  isDark: boolean;
-}) {
+const getProviderColor = (provider: string): string => {
+  const p = provider.toLowerCase();
+  if (p === "festival") return "#3B82F6";
+  if (p === "banda" || p === "band") return "#F59E0B";
+  if (p === "mixto" || p === "mixed") return "#22C55E";
+  return "#6B7280";
+};
+
+// ---------------------------------------------------------------------------
+// TokenizedText — renders mixed-provider values with colored segments
+// ---------------------------------------------------------------------------
+
+function TokenizedText({ value, isDark }: { value: string; isDark: boolean }) {
   const clean = stripProviderTextTokens(value);
   if (!hasProviderTextToken(value)) {
-    return <span>{clean || "—"}</span>;
+    return <>{clean || "—"}</>;
   }
   const lines = value.split("\n");
   return (
-    <span>
+    <>
       {lines.map((line, li) => {
         const segments = splitTokenizedSegments(line);
         return (
@@ -87,13 +103,9 @@ function TokenizedText({
                 key={si}
                 className={
                   seg.provider === "festival"
-                    ? isDark
-                      ? "text-blue-300"
-                      : "text-blue-700"
+                    ? isDark ? "text-blue-400" : "text-blue-600"
                     : seg.provider === "band"
-                      ? isDark
-                        ? "text-orange-300"
-                        : "text-orange-700"
+                      ? isDark ? "text-amber-400" : "text-amber-600"
                       : ""
                 }
               >
@@ -103,264 +115,315 @@ function TokenizedText({
           </span>
         );
       })}
-    </span>
+    </>
   );
 }
 
-// --- Detail row for card sections ---
+// ---------------------------------------------------------------------------
+// InventoryBadge — compact metric box for collapsed card header
+// ---------------------------------------------------------------------------
 
-function DetailRow({
+function InventoryBadge({
   label,
-  value,
-  colorClass,
+  count,
+  icon: Icon,
   isDark,
 }: {
   label: string;
-  value: string | number;
-  colorClass: string;
+  count: number;
+  icon: React.ElementType;
   isDark: boolean;
 }) {
-  const strVal = String(value);
-  const isEmpty = !strVal || strVal === "0" || strVal === "—";
   return (
-    <div className="flex flex-col mb-2.5">
+    <div
+      className={`flex flex-col items-center rounded-lg p-1.5 min-w-[52px] ${
+        isDark
+          ? "bg-zinc-800/50 border border-zinc-700/50"
+          : "bg-slate-100 border border-slate-200"
+      }`}
+    >
+      <Icon size={11} className={isDark ? "text-zinc-500" : "text-slate-400"} />
+      <span className={`text-base font-black leading-none mt-0.5 ${isDark ? "text-white" : "text-slate-900"}`}>
+        {count}
+      </span>
       <span
-        className={`text-[10px] font-semibold ${colorClass} uppercase tracking-wide`}
+        className={`text-[7px] font-bold uppercase tracking-tighter mt-0.5 ${
+          isDark ? "text-zinc-500" : "text-slate-400"
+        }`}
       >
         {label}
-      </span>
-      <span className={`text-sm font-medium ${isDark ? "text-gray-200" : "text-gray-900"}`}>
-        {isEmpty ? (
-          "—"
-        ) : hasProviderTextToken(strVal) ? (
-          <TokenizedText value={strVal} isDark={isDark} />
-        ) : (
-          strVal
-        )}
       </span>
     </div>
   );
 }
 
-// --- Artist expandable card ---
+// ---------------------------------------------------------------------------
+// SpecRow — key/value row inside expanded spec sheet
+// ---------------------------------------------------------------------------
+
+function SpecRow({
+  label,
+  value,
+  isDark,
+}: {
+  label: string;
+  value: string | number;
+  isDark: boolean;
+}) {
+  const strVal = String(value);
+  const isEmpty = !strVal || strVal === "0" || strVal === "—";
+  return (
+    <div className={`flex justify-between items-start gap-4 pb-2 border-b ${isDark ? "border-zinc-800" : "border-slate-200"}`}>
+      <span className={`text-xs font-medium shrink-0 ${isDark ? "text-zinc-400" : "text-slate-500"}`}>
+        {label}
+      </span>
+      <span className={`text-xs font-bold text-right ${isDark ? "text-white" : "text-slate-900"}`}>
+        {isEmpty ? "—" : hasProviderTextToken(strVal) ? <TokenizedText value={strVal} isDark={isDark} /> : strVal}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// FrequencyBox — monospace styled frequency band display
+// ---------------------------------------------------------------------------
+
+function FrequencyBox({
+  label,
+  value,
+  accentBg,
+  accentText,
+  accentBorder,
+  isDark,
+}: {
+  label: string;
+  value: string;
+  accentBg: string;
+  accentText: string;
+  accentBorder: string;
+  isDark: boolean;
+}) {
+  const strVal = String(value);
+  const isEmpty = !strVal || strVal === "—" || strVal === "-" || strVal.trim() === "";
+  return (
+    <div className="flex flex-col gap-1">
+      <span className={`text-[10px] font-bold uppercase ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
+        {label}
+      </span>
+      <span className={`text-xs font-mono p-2 rounded border whitespace-pre-line ${accentBg} ${accentText} ${accentBorder}`}>
+        {isEmpty ? "—" : hasProviderTextToken(strVal) ? <TokenizedText value={strVal} isDark={isDark} /> : strVal}
+      </span>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// ArtistRfCard — tactical expandable card per artist
+// ---------------------------------------------------------------------------
 
 function ArtistRfCard({
   artist,
   stageName,
-  theme,
   isDark,
 }: {
   artist: ArtistRfIemData;
   stageName: string;
-  theme: Theme;
   isDark: boolean;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
+  // Compute all metrics using existing helpers
   const rfProvider = getProviderSummary(artist.wirelessSystems);
   const iemProvider = getProviderSummary(artist.iemSystems);
   const rfModels = formatModelWithCounts(artist.wirelessSystems);
   const rfBands = getUniqueFormattedBands(artist.wirelessSystems);
-  const rfChannels = formatMetricBreakdownByProvider(
-    artist.wirelessSystems,
-    getRfSystemChannels
-  );
-  const rfHH = formatMetricBreakdownByProvider(
-    artist.wirelessSystems,
-    (sys) => sys.quantity_hh || 0
-  );
-  const rfBP = formatMetricBreakdownByProvider(
-    artist.wirelessSystems,
-    (sys) => sys.quantity_bp || 0
-  );
+  const rfChannels = formatMetricBreakdownByProvider(artist.wirelessSystems, getRfSystemChannels);
+  const rfHH = formatMetricBreakdownByProvider(artist.wirelessSystems, (s) => s.quantity_hh || 0);
+  const rfBP = formatMetricBreakdownByProvider(artist.wirelessSystems, (s) => s.quantity_bp || 0);
   const iemModels = formatModelWithCounts(artist.iemSystems);
   const iemBands = getUniqueFormattedBands(artist.iemSystems);
-  const iemChannels = formatMetricBreakdownByProvider(
-    artist.iemSystems,
-    (sys) => sys.quantity_hh || sys.quantity || 0
-  );
-  const iemBP = formatMetricBreakdownByProvider(
-    artist.iemSystems,
-    (sys) => sys.quantity_bp || 0
-  );
+  const iemChannels = formatMetricBreakdownByProvider(artist.iemSystems, (s) => s.quantity_hh || s.quantity || 0);
+  const iemBP = formatMetricBreakdownByProvider(artist.iemSystems, (s) => s.quantity_bp || 0);
 
-  const totalRf = typeof rfChannels === "number" ? rfChannels : parseInt(String(rfChannels).match(/\((\d+)\)/)?.[1] || "0") || 0;
-  const totalIem = typeof iemChannels === "number" ? iemChannels : parseInt(String(iemChannels).match(/\((\d+)\)/)?.[1] || "0") || 0;
+  const totalRf = extractTotal(rfChannels);
+  const totalIem = extractTotal(iemChannels);
+  const totalHH = extractTotal(rfHH);
+  const totalBP = extractTotal(rfBP);
 
-  // Provider-based card border color
-  const providerBorderClass = (() => {
-    const mixed = rfProvider === "Mixto" || iemProvider === "Mixto";
-    const hasBand = rfProvider === "Banda" || iemProvider === "Banda";
-    if (mixed) return isDark ? "border-l-green-500" : "border-l-green-400";
-    if (hasBand) return isDark ? "border-l-orange-500" : "border-l-orange-400";
-    return isDark ? "border-l-blue-500" : "border-l-blue-400";
-  })();
+  // Pick a dominant provider to determine left bar color
+  const dominantProvider = rfProvider || iemProvider || "Festival";
+  const barColor = getProviderColor(dominantProvider);
 
   return (
-    <div
-      className={`border-l-4 ${providerBorderClass} ${isDark ? "border-b border-gray-700/50" : "border-b border-gray-200"} overflow-hidden transition-all duration-200`}
-    >
-      {/* Card Header — always visible */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`w-full p-3.5 flex items-center justify-between gap-2 text-left ${isDark ? "active:bg-white/5" : "active:bg-gray-50/50"}`}
-      >
-        <div className="flex-1 min-w-0">
-          <h3
-            className={`text-base font-bold ${theme.textMain} truncate`}
-          >
-            {artist.name}
-          </h3>
-          <p
-            className={`text-xs ${theme.textMuted} flex items-center gap-1 mt-0.5`}
-          >
-            <MapPin size={12} />
-            {stageName} · Show: {artist.showStart || "—"}
-          </p>
-        </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${isDark ? "bg-blue-900/40 text-blue-300" : "bg-blue-100 text-blue-800"}`}
-          >
-            <Radio size={13} /> {totalRf}
-          </span>
-          <span
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold ${isDark ? "bg-orange-900/40 text-orange-300" : "bg-orange-100 text-orange-800"}`}
-          >
-            <Headphones size={13} /> {totalIem}
-          </span>
-          <ChevronDown
-            size={16}
-            className={`${theme.textMuted} transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
-          />
-        </div>
-      </button>
-
-      {/* Expanded Details */}
+    <div className={`mb-3 transition-all duration-300 ${expanded ? (isDark ? "ring-2 ring-yellow-400/20" : "ring-2 ring-blue-400/20") : ""}`}>
       <div
-        className={`transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? "max-h-[1200px] opacity-100" : "max-h-0 opacity-0"}`}
+        className={`overflow-hidden rounded-2xl shadow-xl relative cursor-pointer transition-transform active:scale-[0.98] ${
+          isDark
+            ? "bg-zinc-900 border border-zinc-800"
+            : "bg-white border border-slate-200"
+        }`}
+        onClick={() => setExpanded(!expanded)}
       >
-        <div
-          className={`px-3.5 pb-4 pt-2 ${isDark ? "border-t border-dashed border-gray-600/50" : "border-t border-dashed border-gray-300"}`}
-        >
-          <div className="grid grid-cols-1 gap-3">
-            {/* RF Section */}
-            <div
-              className={`p-3 rounded-xl border ${isDark ? "border-blue-800/50 bg-blue-950/30" : "border-blue-200 bg-blue-50/50"}`}
+        {/* Left color bar */}
+        <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ backgroundColor: barColor }} />
+
+        {/* Card header — always visible */}
+        <div className="p-4 pl-5">
+          {/* Top row: stage chip + provider chip */}
+          <div className="flex items-center gap-2 mb-1">
+            <span
+              className={`text-[10px] font-black px-1.5 py-0.5 rounded tracking-widest ${
+                isDark ? "bg-zinc-800 text-zinc-400" : "bg-slate-100 text-slate-500"
+              }`}
             >
-              <h4
-                className={`text-sm font-semibold flex items-center gap-1.5 mb-3 pb-2 border-b ${isDark ? "text-blue-300 border-blue-800/50" : "text-blue-900 border-blue-100"}`}
+              {stageName.toUpperCase()}
+            </span>
+            {dominantProvider && (
+              <span
+                className="text-[10px] font-black px-1.5 py-0.5 rounded tracking-widest"
+                style={{
+                  backgroundColor: `${barColor}22`,
+                  color: barColor,
+                }}
               >
-                <Radio size={15} /> Radiofrecuencia (RF)
-              </h4>
-              <div className="grid grid-cols-2 gap-x-4">
-                <DetailRow
-                  label="Proveedor"
-                  value={rfProvider}
-                  colorClass={isDark ? "text-blue-400" : "text-blue-600"}
+                {dominantProvider.toUpperCase()}
+              </span>
+            )}
+          </div>
+
+          {/* Artist name + show time */}
+          <div className="flex justify-between items-end mb-3">
+            <h2 className={`text-xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+              {artist.name}
+            </h2>
+            <div className="text-right shrink-0 ml-3">
+              <p className={`text-[10px] font-bold uppercase ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
+                Show
+              </p>
+              <p className={`text-lg font-black tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}>
+                {artist.showStart || "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Inventory badges row */}
+          <div className="flex gap-1.5">
+            <InventoryBadge label="RF CH" count={totalRf} icon={Radio} isDark={isDark} />
+            <InventoryBadge label="IEM CH" count={totalIem} icon={Headphones} isDark={isDark} />
+            <InventoryBadge label="HH" count={totalHH} icon={Wifi} isDark={isDark} />
+            <InventoryBadge label="BP" count={totalBP} icon={Package} isDark={isDark} />
+          </div>
+        </div>
+
+        {/* Expandable spec sheet */}
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-in-out ${
+            expanded ? "max-h-[800px]" : "max-h-0"
+          }`}
+        >
+          <div
+            className={`p-4 pl-5 space-y-4 ${
+              isDark
+                ? "border-t border-zinc-800 bg-zinc-950"
+                : "border-t border-slate-200 bg-slate-50"
+            }`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Soundcheck strip */}
+            <div
+              className={`flex items-center justify-between p-3 rounded-xl border ${
+                isDark
+                  ? "bg-zinc-900/50 border-zinc-800"
+                  : "bg-white border-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Clock size={14} className={isDark ? "text-yellow-500" : "text-amber-500"} />
+                <span className={`text-xs font-bold ${isDark ? "text-zinc-300" : "text-slate-600"}`}>
+                  Soundcheck
+                </span>
+              </div>
+              <span className={`text-sm font-black ${isDark ? "text-white" : "text-slate-900"}`}>
+                {formatTimeRange(artist.soundcheckStart, artist.soundcheckEnd)}
+              </span>
+            </div>
+
+            {/* Show time strip */}
+            <div
+              className={`flex items-center justify-between p-3 rounded-xl border ${
+                isDark
+                  ? "bg-zinc-900/50 border-zinc-800"
+                  : "bg-white border-slate-200"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Clock size={14} className={isDark ? "text-blue-500" : "text-blue-500"} />
+                <span className={`text-xs font-bold ${isDark ? "text-zinc-300" : "text-slate-600"}`}>
+                  Show
+                </span>
+              </div>
+              <span className={`text-sm font-black ${isDark ? "text-white" : "text-slate-900"}`}>
+                {formatTimeRange(artist.showStart, artist.showEnd)}
+              </span>
+            </div>
+
+            {/* RF Section */}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Activity size={14} className="text-blue-500" />
+                <span
+                  className={`text-[10px] font-black uppercase tracking-widest ${
+                    isDark ? "text-zinc-500" : "text-slate-400"
+                  }`}
+                >
+                  RF · {rfProvider || "—"}
+                </span>
+              </div>
+              <div className="space-y-2">
+                <SpecRow label="Hardware" value={rfModels} isDark={isDark} />
+                <SpecRow
+                  label="Equipos"
+                  value={`${rfHH} HH / ${rfBP} BP`}
                   isDark={isDark}
                 />
-                <DetailRow
-                  label="Total Canales"
-                  value={String(rfChannels)}
-                  colorClass={isDark ? "text-blue-400" : "text-blue-600"}
+                <FrequencyBox
+                  label="Espectro de frecuencia"
+                  value={rfBands}
+                  accentBg={isDark ? "bg-blue-500/10" : "bg-blue-50"}
+                  accentText={isDark ? "text-blue-400" : "text-blue-700"}
+                  accentBorder={isDark ? "border-blue-500/20" : "border-blue-200"}
                   isDark={isDark}
                 />
               </div>
-              <DetailRow
-                label="Modelos"
-                value={rfModels}
-                colorClass={isDark ? "text-blue-400" : "text-blue-600"}
-                isDark={isDark}
-              />
-              <DetailRow
-                label="Bandas"
-                value={rfBands}
-                colorClass={isDark ? "text-blue-400" : "text-blue-600"}
-                isDark={isDark}
-              />
-              <DetailRow
-                label="Equipos (HH / BP)"
-                value={`${rfHH} HH / ${rfBP} BP`}
-                colorClass={isDark ? "text-blue-400" : "text-blue-600"}
-                isDark={isDark}
-              />
             </div>
 
             {/* IEM Section */}
-            <div
-              className={`p-3 rounded-xl border ${isDark ? "border-orange-800/50 bg-orange-950/30" : "border-orange-200 bg-orange-50/50"}`}
-            >
-              <h4
-                className={`text-sm font-semibold flex items-center gap-1.5 mb-3 pb-2 border-b ${isDark ? "text-orange-300 border-orange-800/50" : "text-orange-900 border-orange-100"}`}
-              >
-                <Headphones size={15} /> In-Ear Monitors (IEM)
-              </h4>
-              <div className="grid grid-cols-2 gap-x-4">
-                <DetailRow
-                  label="Proveedor"
-                  value={iemProvider}
-                  colorClass={isDark ? "text-orange-400" : "text-orange-600"}
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Activity size={14} className="text-purple-500" />
+                <span
+                  className={`text-[10px] font-black uppercase tracking-widest ${
+                    isDark ? "text-zinc-500" : "text-slate-400"
+                  }`}
+                >
+                  IEM · {iemProvider || "—"}
+                </span>
+              </div>
+              <div className="space-y-2">
+                <SpecRow label="Sistemas" value={iemModels} isDark={isDark} />
+                <SpecRow
+                  label="Canales / BP"
+                  value={`${iemChannels} CH / ${iemBP} BP`}
                   isDark={isDark}
                 />
-                <DetailRow
-                  label="Total Canales"
-                  value={String(iemChannels)}
-                  colorClass={isDark ? "text-orange-400" : "text-orange-600"}
+                <FrequencyBox
+                  label="Bandas asignadas"
+                  value={iemBands}
+                  accentBg={isDark ? "bg-purple-500/10" : "bg-purple-50"}
+                  accentText={isDark ? "text-purple-400" : "text-purple-700"}
+                  accentBorder={isDark ? "border-purple-500/20" : "border-purple-200"}
                   isDark={isDark}
                 />
-              </div>
-              <DetailRow
-                label="Modelos"
-                value={iemModels}
-                colorClass={isDark ? "text-orange-400" : "text-orange-600"}
-                isDark={isDark}
-              />
-              <DetailRow
-                label="Bandas"
-                value={iemBands}
-                colorClass={isDark ? "text-orange-400" : "text-orange-600"}
-                isDark={isDark}
-              />
-              <DetailRow
-                label="Bodypacks IEM"
-                value={String(iemBP)}
-                colorClass={isDark ? "text-orange-400" : "text-orange-600"}
-                isDark={isDark}
-              />
-            </div>
-
-            {/* Schedule Section */}
-            <div
-              className={`grid grid-cols-2 gap-3`}
-            >
-              <div
-                className={`p-2.5 rounded-lg text-center ${isDark ? "bg-gray-800/60" : "bg-gray-100"}`}
-              >
-                <p
-                  className={`text-[10px] uppercase font-bold ${theme.textMuted}`}
-                >
-                  Soundcheck
-                </p>
-                <p
-                  className={`text-sm font-medium ${theme.textMain} mt-0.5`}
-                >
-                  {formatTimeRange(artist.soundcheckStart, artist.soundcheckEnd)}
-                </p>
-              </div>
-              <div
-                className={`p-2.5 rounded-lg text-center ${isDark ? "bg-gray-800/60" : "bg-gray-100"}`}
-              >
-                <p
-                  className={`text-[10px] uppercase font-bold ${theme.textMuted}`}
-                >
-                  Show
-                </p>
-                <p
-                  className={`text-sm font-medium ${theme.textMain} mt-0.5`}
-                >
-                  {formatTimeRange(artist.showStart, artist.showEnd)}
-                </p>
               </div>
             </div>
           </div>
@@ -370,7 +433,9 @@ function ArtistRfCard({
   );
 }
 
-// --- Main Modal ---
+// ---------------------------------------------------------------------------
+// Main Modal
+// ---------------------------------------------------------------------------
 
 export function TechnicianRfTableModal({
   theme,
@@ -380,8 +445,10 @@ export function TechnicianRfTableModal({
 }: TechnicianRfTableModalProps) {
   const [selectedStage, setSelectedStage] = useState<string>("all");
   const [selectedDay, setSelectedDay] = useState<string>("all");
-  const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // --- Data fetching (unchanged) ---
 
   const { data: rawArtists = [], isLoading } = useQuery({
     queryKey: ["technician-rf-table-artists", job?.id],
@@ -412,51 +479,37 @@ export function TechnicianRfTableModal({
 
   const stageNames = useMemo(() => {
     const names: Record<number, string> = {};
-    festivalStages.forEach((s) => {
-      names[s.number] = s.name;
-    });
+    festivalStages.forEach((s) => { names[s.number] = s.name; });
     return names;
   }, [festivalStages]);
 
-  const normalizedArtists = useMemo(() => {
-    return rawArtists
-      .map((a: any) => normalizeRfIemArtistInput(a))
-      .filter(hasRfIemContent);
-  }, [rawArtists]);
+  // --- Normalization & filtering (unchanged) ---
 
-  // Search filter
+  const normalizedArtists = useMemo(
+    () => rawArtists.map((a: any) => normalizeRfIemArtistInput(a)).filter(hasRfIemContent),
+    [rawArtists]
+  );
+
   const searchFilteredArtists = useMemo(() => {
     if (!searchQuery.trim()) return normalizedArtists;
     const q = searchQuery.trim().toLowerCase();
-    return normalizedArtists.filter((a) =>
-      a.name.toLowerCase().includes(q)
-    );
+    return normalizedArtists.filter((a) => a.name.toLowerCase().includes(q));
   }, [normalizedArtists, searchQuery]);
 
-  // Stage filter
   const stageFilteredArtists = useMemo(() => {
     if (selectedStage === "all") return searchFilteredArtists;
-    return searchFilteredArtists.filter(
-      (a) => String(a.stage) === selectedStage
-    );
+    return searchFilteredArtists.filter((a) => String(a.stage) === selectedStage);
   }, [searchFilteredArtists, selectedStage]);
 
-  // Day groups
-  const dayGroups = useMemo(
-    () => groupArtistsByFestivalDay(stageFilteredArtists),
-    [stageFilteredArtists]
-  );
+  const dayGroups = useMemo(() => groupArtistsByFestivalDay(stageFilteredArtists), [stageFilteredArtists]);
 
-  // Filter by selected day
   const filteredDayGroups = useMemo(() => {
     if (selectedDay === "all") return dayGroups;
     return dayGroups.filter((g) => g.key === selectedDay);
   }, [dayGroups, selectedDay]);
 
   const stageOptions = useMemo(() => {
-    const stages = Array.from(
-      new Set(normalizedArtists.map((a) => a.stage))
-    )
+    const stages = Array.from(new Set(normalizedArtists.map((a) => a.stage)))
       .filter((s): s is number => typeof s === "number")
       .sort((a, b) => a - b);
     return stages.map((num) => ({
@@ -466,48 +519,59 @@ export function TechnicianRfTableModal({
     }));
   }, [normalizedArtists, stageNames]);
 
-  const dayOptions = useMemo(() => {
-    return dayGroups.map((g) => ({
-      value: g.key,
-      label: formatChipDate(g.key),
-      count: g.artists.length,
-    }));
-  }, [dayGroups]);
+  const dayOptions = useMemo(
+    () => dayGroups.map((g) => ({ value: g.key, label: formatChipDate(g.key), count: g.artists.length })),
+    [dayGroups]
+  );
 
   useEffect(() => {
-    if (selectedDay === "all") return;
-    if (!dayOptions.some((o) => o.value === selectedDay)) {
+    if (selectedDay !== "all" && !dayOptions.some((o) => o.value === selectedDay)) {
       setSelectedDay("all");
     }
   }, [dayOptions, selectedDay]);
 
-  const totalFilteredArtists = filteredDayGroups.reduce(
-    (sum, g) => sum + g.artists.length,
-    0
-  );
+  const totalFilteredArtists = filteredDayGroups.reduce((sum, g) => sum + g.artists.length, 0);
+
+  // --- Render ---
 
   return (
     <div
       className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}
     >
       <div
-        className={`w-full max-w-lg h-[90vh] ${isDark ? "bg-[#0f1219]" : "bg-white"} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200`}
+        className={`w-full max-w-lg h-[92vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 ${
+          isDark
+            ? "bg-black border-zinc-800"
+            : "bg-slate-50 border-slate-200"
+        }`}
       >
         {/* Header */}
         <div
-          className={`p-4 border-b ${theme.divider} flex justify-between items-center shrink-0`}
+          className={`p-4 pb-3 flex justify-between items-center shrink-0 border-b ${
+            isDark ? "border-zinc-800 bg-black/80" : "border-slate-200 bg-white"
+          }`}
         >
-          <div className="flex items-center gap-2 min-w-0">
-            <Radio size={18} className={theme.textMuted} />
-            <h2
-              className={`text-lg font-bold ${theme.textMain} truncate`}
-            >
-              RF / IEM · {job?.title || "Trabajo"}
-            </h2>
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${isDark ? "bg-yellow-500" : "bg-blue-600"}`}>
+              <Radio size={16} className={isDark ? "text-black" : "text-white"} />
+            </div>
+            <div className="min-w-0">
+              <h1 className={`text-sm font-black tracking-tight truncate ${isDark ? "text-white" : "text-slate-900"}`}>
+                {job?.title?.toUpperCase() || "RF / IEM"}
+              </h1>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                <span className={`text-[9px] font-bold uppercase tracking-widest ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
+                  Resumen RF / IEM
+                </span>
+              </div>
+            </div>
           </div>
           <button
             onClick={onClose}
-            className={`p-2 ${theme.textMuted} hover:${theme.textMain} rounded-full transition-colors`}
+            className={`p-2 rounded-full transition-colors ${
+              isDark ? "text-zinc-500 hover:text-white" : "text-slate-400 hover:text-slate-900"
+            }`}
             aria-label="Cerrar"
           >
             <X size={20} />
@@ -515,118 +579,104 @@ export function TechnicianRfTableModal({
         </div>
 
         {/* Search */}
-        <div className={`px-4 pt-3 shrink-0`}>
+        <div className={`px-4 py-3 shrink-0 ${isDark ? "bg-black" : "bg-white"}`}>
           <div className="relative">
             <Search
               size={15}
-              className={`absolute left-3 top-1/2 -translate-y-1/2 ${theme.textMuted}`}
+              className={`absolute left-3.5 top-1/2 -translate-y-1/2 ${isDark ? "text-zinc-500" : "text-slate-400"}`}
             />
             <input
               type="text"
-              placeholder="Buscar artista..."
+              placeholder="Buscar por artista, escenario o frecuencia..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className={`w-full pl-9 pr-4 py-2 text-sm border rounded-full ${isDark ? "bg-gray-800/60 border-gray-700 text-gray-200 placeholder:text-gray-500" : "bg-white border-gray-200 text-gray-900 placeholder:text-gray-400"} focus:outline-none focus:ring-2 ${isDark ? "focus:ring-blue-800" : "focus:ring-blue-100"}`}
+              className={`w-full pl-10 pr-4 py-2.5 text-xs rounded-xl outline-none transition-all ${
+                isDark
+                  ? "bg-zinc-900 border border-zinc-800 text-white placeholder:text-zinc-600 focus:ring-2 focus:ring-yellow-500/20 focus:border-yellow-500/50"
+                  : "bg-slate-50 border border-slate-200 text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-blue-100 focus:border-blue-300"
+              }`}
             />
           </div>
         </div>
 
-        {/* Filters */}
-        <div className={`px-4 py-3 border-b ${theme.divider} shrink-0`}>
-          <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className={`w-full rounded-lg border px-3 py-2.5 flex items-center justify-between gap-2 text-left ${isDark ? "border-gray-700" : ""}`}
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <SlidersHorizontal
-                    size={14}
-                    className={theme.textMuted}
-                  />
-                  <div className="min-w-0">
-                    <div
-                      className={`text-[11px] font-bold uppercase ${theme.textMuted}`}
-                    >
-                      Filtros
-                    </div>
-                    <div
-                      className={`text-xs ${theme.textMain} truncate`}
-                    >
-                      {selectedStage === "all"
-                        ? "Todos los escenarios"
-                        : stageOptions.find(
-                            (s) => s.value === selectedStage
-                          )?.label || "Escenario"}{" "}
-                      ·{" "}
+        {/* Stage filter strip */}
+        <div
+          className={`flex px-4 gap-1.5 overflow-x-auto shrink-0 pb-2 ${
+            isDark ? "bg-zinc-950 border-b border-zinc-900" : "bg-slate-50 border-b border-slate-100"
+          }`}
+          style={{ scrollbarWidth: "none" }}
+        >
+          <button
+            onClick={() => setSelectedStage("all")}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors ${
+              selectedStage === "all"
+                ? isDark
+                  ? "bg-zinc-800 text-white"
+                  : "bg-slate-900 text-white"
+                : isDark
+                  ? "bg-zinc-900 text-zinc-500"
+                  : "bg-white text-slate-500 border border-slate-200"
+            }`}
+          >
+            TODOS ({normalizedArtists.length})
+          </button>
+          {stageOptions.map((s) => (
+            <button
+              key={s.value}
+              onClick={() => setSelectedStage(s.value)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors ${
+                selectedStage === s.value
+                  ? isDark
+                    ? "bg-zinc-800 text-white"
+                    : "bg-slate-900 text-white"
+                  : isDark
+                    ? "bg-zinc-900 text-zinc-500"
+                    : "bg-white text-slate-500 border border-slate-200"
+              }`}
+            >
+              {s.label.toUpperCase()} ({s.count})
+            </button>
+          ))}
+        </div>
+
+        {/* Day filter (collapsible, only shown when multiple days) */}
+        {dayOptions.length > 1 && (
+          <div className={`px-4 py-2 border-b shrink-0 ${isDark ? "border-zinc-900" : "border-slate-100"}`}>
+            <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen}>
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className={`w-full rounded-lg border px-3 py-2 flex items-center justify-between gap-2 text-left ${
+                    isDark ? "border-zinc-800" : "border-slate-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-[10px] font-bold uppercase ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
+                      Día:
+                    </span>
+                    <span className={`text-xs font-bold ${isDark ? "text-white" : "text-slate-900"}`}>
                       {selectedDay === "all"
-                        ? "Todos los días"
-                        : dayOptions.find(
-                            (d) => d.value === selectedDay
-                          )?.label || "Día"}
-                    </div>
+                        ? "Todos"
+                        : dayOptions.find((d) => d.value === selectedDay)?.label || "—"}
+                    </span>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Badge variant="outline">
-                    {totalFilteredArtists}
-                  </Badge>
-                  <ChevronDown
-                    size={16}
-                    className={`${theme.textMuted} transition-transform ${filtersOpen ? "rotate-180" : ""}`}
-                  />
-                </div>
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-3 space-y-3">
-              <div>
-                <div
-                  className={`text-xs font-bold uppercase ${theme.textMuted} mb-2`}
-                >
-                  Escenarios
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Badge variant="outline">{totalFilteredArtists}</Badge>
+                    <ChevronDown
+                      size={14}
+                      className={`transition-transform ${filtersOpen ? "rotate-180" : ""} ${isDark ? "text-zinc-500" : "text-slate-400"}`}
+                    />
+                  </div>
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="mt-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <Button
                     type="button"
                     size="sm"
-                    variant={
-                      selectedStage === "all" ? "default" : "outline"
-                    }
-                    onClick={() => setSelectedStage("all")}
-                  >
-                    Todos ({normalizedArtists.length})
-                  </Button>
-                  {stageOptions.map((s) => (
-                    <Button
-                      key={s.value}
-                      type="button"
-                      size="sm"
-                      variant={
-                        selectedStage === s.value
-                          ? "default"
-                          : "outline"
-                      }
-                      onClick={() => setSelectedStage(s.value)}
-                    >
-                      {s.label} ({s.count})
-                    </Button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <div
-                  className={`text-xs font-bold uppercase ${theme.textMuted} mb-2`}
-                >
-                  Días
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant={
-                      selectedDay === "all" ? "default" : "outline"
-                    }
+                    variant={selectedDay === "all" ? "default" : "outline"}
                     onClick={() => setSelectedDay("all")}
+                    className="text-xs"
                   >
                     Todos ({stageFilteredArtists.length})
                   </Button>
@@ -635,23 +685,20 @@ export function TechnicianRfTableModal({
                       key={d.value}
                       type="button"
                       size="sm"
-                      variant={
-                        selectedDay === d.value
-                          ? "default"
-                          : "outline"
-                      }
+                      variant={selectedDay === d.value ? "default" : "outline"}
                       onClick={() => setSelectedDay(d.value)}
+                      className="text-xs"
                     >
                       {d.label} ({d.count})
                     </Button>
                   ))}
                 </div>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        )}
 
-        {/* Card List */}
+        {/* Card list */}
         <ScrollArea className="flex-1">
           <div className="p-4">
             {isLoading ? (
@@ -660,12 +707,11 @@ export function TechnicianRfTableModal({
               </div>
             ) : filteredDayGroups.length === 0 ? (
               <div
-                className={`h-32 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}
+                className={`h-32 border border-dashed rounded-xl flex flex-col items-center justify-center ${
+                  isDark ? "border-zinc-800 text-zinc-600" : "border-slate-200 text-slate-400"
+                }`}
               >
-                <Radio
-                  size={28}
-                  className={`mb-2 ${isDark ? "text-gray-600" : "text-gray-300"}`}
-                />
+                <Radio size={28} className="mb-2 opacity-40" />
                 <span className="text-xs">
                   {normalizedArtists.length === 0
                     ? "No hay datos RF/IEM para este trabajo"
@@ -675,33 +721,32 @@ export function TechnicianRfTableModal({
             ) : (
               <div className="space-y-5">
                 {filteredDayGroups.map((group) => (
-                  <section key={group.key} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3
-                        className={`text-sm font-bold ${theme.textMain}`}
+                  <section key={group.key}>
+                    {/* Day group divider */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className={`h-px flex-1 ${isDark ? "bg-zinc-800" : "bg-slate-200"}`} />
+                      <span
+                        className={`text-[10px] font-black uppercase tracking-[0.2em] ${
+                          isDark ? "text-zinc-600" : "text-slate-400"
+                        }`}
                       >
                         {group.label}
-                      </h3>
-                      <Badge variant="outline">
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
                         {group.artists.length}
                       </Badge>
+                      <div className={`h-px flex-1 ${isDark ? "bg-zinc-800" : "bg-slate-200"}`} />
                     </div>
-                    <div
-                      className={`rounded-xl border overflow-hidden ${isDark ? "border-gray-700/50" : "border-gray-200"}`}
-                    >
-                      {group.artists.map((artist, ri) => (
-                        <ArtistRfCard
-                          key={ri}
-                          artist={artist}
-                          stageName={
-                            stageNames[artist.stage] ||
-                            `Escenario ${artist.stage}`
-                          }
-                          theme={theme}
-                          isDark={isDark}
-                        />
-                      ))}
-                    </div>
+
+                    {/* Artist cards */}
+                    {group.artists.map((artist, ri) => (
+                      <ArtistRfCard
+                        key={ri}
+                        artist={artist}
+                        stageName={stageNames[artist.stage] || `Escenario ${artist.stage}`}
+                        isDark={isDark}
+                      />
+                    ))}
                   </section>
                 ))}
               </div>
