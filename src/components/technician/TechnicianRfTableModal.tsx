@@ -531,8 +531,19 @@ export function TechnicianRfTableModal({
   const searchFilteredArtists = useMemo(() => {
     if (!searchQuery.trim()) return normalizedArtists;
     const q = searchQuery.trim().toLowerCase();
-    return normalizedArtists.filter((a) => a.name.toLowerCase().includes(q));
-  }, [normalizedArtists, searchQuery]);
+    return normalizedArtists.filter((a) => {
+      // Search by artist name
+      if (a.name.toLowerCase().includes(q)) return true;
+      // Search by stage name or number
+      const stageLabel = stageNames[a.stage]?.toLowerCase() || `escenario ${a.stage}`;
+      if (stageLabel.includes(q)) return true;
+      // Search by frequency bands
+      const rfBands = getUniqueFormattedBands(a.wirelessSystems).toLowerCase();
+      const iemBands = getUniqueFormattedBands(a.iemSystems).toLowerCase();
+      if (rfBands.includes(q) || iemBands.includes(q)) return true;
+      return false;
+    });
+  }, [normalizedArtists, searchQuery, stageNames]);
 
   const stageFilteredArtists = useMemo(() => {
     if (selectedStage === "all") return searchFilteredArtists;

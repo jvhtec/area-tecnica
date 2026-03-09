@@ -240,10 +240,16 @@ export const getProviderSummary = (systems: RfIemSystemData[]): string => {
 };
 
 export const getRfSystemChannels = (system: RfIemSystemData): number => {
-  if (typeof system.quantity_ch === 'number' && Number.isFinite(system.quantity_ch)) {
+  // Only use quantity_ch if it's a positive number (> 0)
+  // When quantity_ch is undefined, toNumber() coerces it to 0, which would incorrectly
+  // bypass the HH+BP fallback for systems that only have HH/BP data
+  if (typeof system.quantity_ch === 'number' && system.quantity_ch > 0 && Number.isFinite(system.quantity_ch)) {
     return system.quantity_ch;
   }
-  return (system.quantity_hh || 0) + (system.quantity_bp || 0);
+  // Derive channels from handheld + bodypack counts
+  const hh = typeof system.quantity_hh === 'number' && Number.isFinite(system.quantity_hh) ? system.quantity_hh : 0;
+  const bp = typeof system.quantity_bp === 'number' && Number.isFinite(system.quantity_bp) ? system.quantity_bp : 0;
+  return hh + bp;
 };
 
 export const getUniqueFormattedBands = (systems: RfIemSystemData[] = []): string => {
