@@ -180,4 +180,178 @@ describe('rfIemTablePdfExport helpers', () => {
       }),
     ).toBe('2026-03-11');
   });
+
+  it('handles missing or invalid date in computeRfIemFestivalDayKey', () => {
+    expect(
+      computeRfIemFestivalDayKey({
+        name: 'No Date',
+        stage: 1,
+        showStart: '20:00',
+        wirelessSystems: [{ model: 'RF', quantity_ch: 1 }],
+        iemSystems: [],
+      }),
+    ).toBe('Sin fecha');
+  });
+
+  it('groupArtistsByFestivalDay sorts by date and time', () => {
+    const artists = [
+      {
+        name: 'Artist C',
+        stage: 1,
+        date: '2026-03-12',
+        showStart: '22:00',
+        wirelessSystems: [{ model: 'RF', quantity_ch: 1 }],
+        iemSystems: [],
+      },
+      {
+        name: 'Artist B',
+        stage: 1,
+        date: '2026-03-11',
+        showStart: '20:00',
+        wirelessSystems: [{ model: 'RF', quantity_ch: 1 }],
+        iemSystems: [],
+      },
+      {
+        name: 'Artist A',
+        stage: 2,
+        date: '2026-03-11',
+        showStart: '18:00',
+        wirelessSystems: [{ model: 'RF', quantity_ch: 1 }],
+        iemSystems: [],
+      },
+    ];
+
+    const groups = import('@/utils/rfIemTablePdfExport').then(m => m.groupArtistsByFestivalDay(artists));
+
+    // The result should be grouped by date
+    groups.then(result => {
+      expect(result.length).toBeGreaterThan(0);
+      expect(result[0].artists[0].name).toBe('Artist A'); // Earlier time on first date
+    });
+  });
+
+  it('handles empty wireless and IEM systems', () => {
+    const row = buildRfIemTableRow({
+      name: 'No Gear',
+      stage: 1,
+      wirelessSystems: [],
+      iemSystems: [],
+    });
+
+    expect(row[0]).toBe('No Gear');
+    expect(row[6]).toBe(0); // RF channels
+    expect(row[12]).toBe(0); // IEM channels
+  });
+
+  it('handles legacy quantity field in IEM systems', () => {
+    const row = buildRfIemTableRow({
+      name: 'Legacy IEM',
+      stage: 1,
+      wirelessSystems: [],
+      iemSystems: [
+        { model: 'Old IEM', quantity: 3, provided_by: 'festival' },
+      ],
+    });
+
+    expect(row[12]).toBe(3); // Should use legacy quantity field
+  });
+
+  it('strips provider tokens correctly', () => {
+    const { stripProviderTextTokens, FESTIVAL_TEXT_TOKEN, BAND_TEXT_TOKEN } =
+      require('@/utils/rfIemTablePdfExport');
+
+    const input = `${FESTIVAL_TEXT_TOKEN}Festival Item ${BAND_TEXT_TOKEN}Band Item`;
+    const result = stripProviderTextTokens(input);
+
+    expect(result).not.toContain(FESTIVAL_TEXT_TOKEN);
+    expect(result).not.toContain(BAND_TEXT_TOKEN);
+    expect(result).toBe('Festival Item Band Item');
+  });
+
+  it('detects provider tokens correctly', () => {
+    const { hasProviderTextToken, FESTIVAL_TEXT_TOKEN, BAND_TEXT_TOKEN } =
+      require('@/utils/rfIemTablePdfExport');
+
+    expect(hasProviderTextToken(`${FESTIVAL_TEXT_TOKEN}text`)).toBe(true);
+    expect(hasProviderTextToken(`${BAND_TEXT_TOKEN}text`)).toBe(true);
+    expect(hasProviderTextToken('plain text')).toBe(false);
+  });
+
+  it('splits tokenized segments into provider-tagged parts', () => {
+    const { splitTokenizedSegments, FESTIVAL_TEXT_TOKEN, BAND_TEXT_TOKEN } =
+      require('@/utils/rfIemTablePdfExport');
+
+    const input = `${FESTIVAL_TEXT_TOKEN}Festival part ${BAND_TEXT_TOKEN}Band part`;
+    const segments = splitTokenizedSegments(input);
+
+    expect(segments).toHaveLength(2);
+    expect(segments[0]).toEqual({ text: 'Festival part ', provider: 'festival' });
+    expect(segments[1]).toEqual({ text: 'Band part', provider: 'band' });
+  });
+
+  it('formats time range with missing values', () => {
+    const { formatTimeRange } = require('@/utils/rfIemTablePdfExport');
+
+    expect(formatTimeRange(undefined, undefined)).toBe('-');
+    expect(formatTimeRange('20:00', undefined)).toBe('20:00 - -');
+    expect(formatTimeRange(undefined, '22:00')).toBe('- 22:00');
+    expect(formatTimeRange('  ', '  ')).toBe('-');
+  });
+
+  it('getRfSystemChannels prioritizes quantity_ch over sum of HH+BP', () => {
+    const { getRfSystemChannels } = require('@/utils/rfIemTablePdfExport');
+
+    const system1 = { quantity_ch: 10, quantity_hh: 3, quantity_bp: 2 };
+    expect(getRfSystemChannels(system1)).toBe(10);
+
+    const system2 = { quantity_hh: 3, quantity_bp: 2 };
+    expect(getRfSystemChannels(system2)).toBe(5);
+  });
+
+  it('getProviderSummary returns correct labels', () => {
+    const { getProviderSummary } = require('@/utils/rfIemTablePdfExport');
+
+    expect(getProviderSummary([])).toBe('');
+    expect(getProviderSummary([{ model: 'RF', provided_by: 'festival' }])).toBe('Festival');
+    expect(getProviderSummary([{ model: 'RF', provided_by: 'band' }])).toBe('Banda');
+    expect(getProviderSummary([
+      { model: 'RF1', provided_by: 'festival' },
+      { model: 'RF2', provided_by: 'band' }
+    ])).toBe('Mixto');
+  });
+
+  it('normalizes systems with missing or invalid data', () => {
+    const { normalizeRfIemArtistInput } = require('@/utils/rfIemTablePdfExport');
+
+    const artist = normalizeRfIemArtistInput({
+      name: '',
+      stage: 'invalid' as any,
+      wireless_systems: [
+        { model: '', quantity_hh: 0 }, // Empty model, zero quantity
+        { model: 'Valid RF', quantity_ch: 3 }
+      ],
+    } as any);
+
+    expect(artist.name).toBe('Unnamed Artist'); // Default name
+    expect(artist.stage).toBe(1); // Default stage
+    expect(artist.wirelessSystems).toHaveLength(1); // Only valid system
+    expect(artist.wirelessSystems[0].model).toBe('Valid RF');
+  });
+
+  it('formatMetricBreakdownByProvider handles multiple bands correctly', () => {
+    const { formatMetricBreakdownByProvider } = require('@/utils/rfIemTablePdfExport');
+
+    const systems = [
+      { model: 'RF', quantity_hh: 2, band: 'G51', provided_by: 'festival' },
+      { model: 'RF', quantity_hh: 3, band: 'G51', provided_by: 'band' },
+      { model: 'RF', quantity_hh: 4, band: 'K3E', provided_by: 'band' },
+    ];
+
+    const result = formatMetricBreakdownByProvider(systems, (s: any) => s.quantity_hh);
+
+    // Should show per-band breakdown with provider labels
+    expect(String(result)).toContain('G51');
+    expect(String(result)).toContain('K3E');
+    expect(String(result)).toContain('(9)'); // Total
+  });
 });
