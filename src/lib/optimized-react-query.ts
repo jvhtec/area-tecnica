@@ -138,8 +138,10 @@ export const createQueryKey = {
     all: ['payout-due-fortnights'] as const,
   },
   technician: {
-    rfTableArtists: (jobId: string) => ['technician', 'rf-table-artists', jobId] as const,
-    rfTableStages: (jobId: string) => ['technician', 'rf-table-stages', jobId] as const,
+    rfTableArtists: (jobId?: string) => ['technician', 'rf-table-artists', jobId ?? null] as const,
+    rfTableStages: (jobId?: string) => ['technician', 'rf-table-stages', jobId ?? null] as const,
+    technicianReadonlyArtists: (jobId?: string) => ['technician', 'readonly-artists', jobId ?? null] as const,
+    technicianReadonlyFestivalStages: (jobId?: string) => ['technician', 'readonly-festival-stages', jobId ?? null] as const,
   },
 };
 

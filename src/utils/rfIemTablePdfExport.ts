@@ -1,3 +1,6 @@
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { formatFrequencyBand, type FrequencyBandSelection } from '@/lib/frequencyBands';
 
@@ -12,6 +15,7 @@ export interface RfIemSystemData {
 }
 
 export interface ArtistRfIemData {
+  id?: string;
   name: string;
   stage: number;
   wirelessSystems: RfIemSystemData[];
@@ -58,6 +62,7 @@ const toProvider = (value: unknown, fallback: 'festival' | 'band' | 'mixed' = 'f
 };
 
 const FESTIVAL_DAY_ROLLOVER_HOUR = 7;
+const MADRID_TIMEZONE = 'Europe/Madrid';
 
 const parseTimeToMinutes = (value: string | null | undefined): number => {
   if (!value || typeof value !== 'string') return Number.NaN;
@@ -73,16 +78,11 @@ const parseTimeToMinutes = (value: string | null | undefined): number => {
 
 const parseIsoDate = (value: string | undefined): Date | null => {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const parsed = new Date(`${value}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const utcDate = fromZonedTime(`${value}T00:00:00`, MADRID_TIMEZONE);
+  return Number.isNaN(utcDate.getTime()) ? null : utcDate;
 };
 
-const toIsoDate = (value: Date): string => {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
+const toMadridIsoDate = (value: Date): string => format(toZonedTime(value, MADRID_TIMEZONE), 'yyyy-MM-dd');
 
 const getShowSortMinutes = (artist: ArtistRfIemData): number => {
   const parsed = parseTimeToMinutes(artist.showStart);
@@ -109,19 +109,19 @@ export const computeRfIemFestivalDayKey = (artist: ArtistRfIemData): string => {
     showMinutes < FESTIVAL_DAY_ROLLOVER_HOUR * 60;
 
   if (!shouldUsePreviousDay) {
-    return toIsoDate(parsedDate);
+    return toMadridIsoDate(parsedDate);
   }
 
-  const previousDay = new Date(parsedDate);
-  previousDay.setDate(previousDay.getDate() - 1);
-  return toIsoDate(previousDay);
+  const madridDate = toZonedTime(parsedDate, MADRID_TIMEZONE);
+  madridDate.setDate(madridDate.getDate() - 1);
+  return format(madridDate, 'yyyy-MM-dd');
 };
 
 const formatFestivalDayLabel = (dayKey: string): string => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dayKey)) return dayKey;
   const parsed = parseIsoDate(dayKey);
   if (!parsed) return dayKey;
-  return parsed.toLocaleDateString('es-ES');
+  return format(toZonedTime(parsed, MADRID_TIMEZONE), 'dd/MM/yyyy', { locale: es });
 };
 
 export const groupArtistsByFestivalDay = (artists: ArtistRfIemData[]): Array<{
@@ -198,6 +198,7 @@ export const normalizeRfIemArtistInput = (artist: RawArtistLike): ArtistRfIemDat
   );
 
   return {
+    id: typeof (artist as { id?: unknown }).id === 'string' ? String((artist as { id?: unknown }).id) : undefined,
     name: typeof artist.name === 'string' && artist.name.trim().length > 0 ? artist.name : 'Unnamed Artist',
     stage: toNumber(artist.stage, 1),
     wirelessSystems: normalizedWireless,
@@ -277,7 +278,7 @@ export const getUniqueFormattedBands = (systems: RfIemSystemData[] = []): string
 
   return [...bandsByProvider.entries()]
     .map(([provider, bands]) => {
-      const providerToken = provider === 'festival' ? FESTIVAL_TEXT_TOKEN : BAND_TEXT_TOKEN;
+      const providerToken = provider === 'festival' ? FESTIVAL_TEXT_TOKEN : provider === 'band' ? BAND_TEXT_TOKEN : MIXED_TEXT_TOKEN;
       const providerLabel = provider === 'festival' ? 'Festival' : provider === 'band' ? 'Banda' : 'Mixto';
       const formattedBands = [...bands].join(', ') || '-';
       return `${providerToken}${providerLabel}: ${formattedBands}`;
@@ -318,7 +319,7 @@ export const formatModelWithCounts = (systems: RfIemSystemData[]): string => {
 
     return [...byModelProvider.values()]
       .map((entry) => {
-        const providerToken = entry.provider === 'festival' ? FESTIVAL_TEXT_TOKEN : BAND_TEXT_TOKEN;
+        const providerToken = entry.provider === 'festival' ? FESTIVAL_TEXT_TOKEN : entry.provider === 'band' ? BAND_TEXT_TOKEN : MIXED_TEXT_TOKEN;
         const providerLabel = entry.provider === 'festival' ? 'Festival' : entry.provider === 'band' ? 'Banda' : 'Mixto';
         return `${providerToken}${providerLabel}: ${entry.model}`;
       })
@@ -377,7 +378,7 @@ export const formatMetricBreakdownByProvider = (
       if (!value || value <= 0) continue;
       total += value;
       const suffix = provider === 'festival' ? 'F' : provider === 'band' ? 'B' : 'M';
-      const token = provider === 'festival' ? FESTIVAL_TEXT_TOKEN : BAND_TEXT_TOKEN;
+      const token = provider === 'festival' ? FESTIVAL_TEXT_TOKEN : provider === 'band' ? BAND_TEXT_TOKEN : MIXED_TEXT_TOKEN;
       parts.push(`${token}${value}${suffix}`);
     }
     return { text: parts.join('+'), total };
@@ -447,25 +448,27 @@ const getProviderCellColor = (provider: string): [number, number, number] => {
 
 export const FESTIVAL_TEXT_TOKEN = '__FESTIVAL_ITEM__';
 export const BAND_TEXT_TOKEN = '__BAND_ITEM__';
+export const MIXED_TEXT_TOKEN = '__MIXED_ITEM__';
 
 export const hasProviderTextToken = (value: string): boolean =>
-  value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN);
+  value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN) || value.includes(MIXED_TEXT_TOKEN);
 
 export const stripProviderTextTokens = (value: string): string =>
-  value.replaceAll(FESTIVAL_TEXT_TOKEN, '').replaceAll(BAND_TEXT_TOKEN, '');
+  value.replaceAll(FESTIVAL_TEXT_TOKEN, '').replaceAll(BAND_TEXT_TOKEN, '').replaceAll(MIXED_TEXT_TOKEN, '');
 
-const getProviderTokenType = (line: string): 'festival' | 'band' | 'default' => {
+const getProviderTokenType = (line: string): 'festival' | 'band' | 'mixed' | 'default' => {
   if (line.includes(FESTIVAL_TEXT_TOKEN)) return 'festival';
   if (line.includes(BAND_TEXT_TOKEN)) return 'band';
+  if (line.includes(MIXED_TEXT_TOKEN)) return 'mixed';
   return 'default';
 };
 
 export const splitTokenizedSegments = (
   value: string,
-): Array<{ text: string; provider: 'festival' | 'band' | 'default' }> => {
-  const segments: Array<{ text: string; provider: 'festival' | 'band' | 'default' }> = [];
-  const tokenPattern = /(__FESTIVAL_ITEM__|__BAND_ITEM__)/g;
-  let activeProvider: 'festival' | 'band' | 'default' = 'default';
+): Array<{ text: string; provider: 'festival' | 'band' | 'mixed' | 'default' }> => {
+  const segments: Array<{ text: string; provider: 'festival' | 'band' | 'mixed' | 'default' }> = [];
+  const tokenPattern = /(__FESTIVAL_ITEM__|__BAND_ITEM__|__MIXED_ITEM__)/g;
+  let activeProvider: 'festival' | 'band' | 'mixed' | 'default' = 'default';
   let lastIndex = 0;
 
   for (const match of value.matchAll(tokenPattern)) {
@@ -476,7 +479,7 @@ export const splitTokenizedSegments = (
       segments.push({ text: textBeforeToken, provider: activeProvider });
     }
 
-    activeProvider = token === FESTIVAL_TEXT_TOKEN ? 'festival' : 'band';
+    activeProvider = token === FESTIVAL_TEXT_TOKEN ? 'festival' : token === BAND_TEXT_TOKEN ? 'band' : token === MIXED_TEXT_TOKEN ? 'mixed' : 'default';
     lastIndex = startIndex + token.length;
   }
 
@@ -491,7 +494,7 @@ export const splitTokenizedSegments = (
 const isMixedMetricValue = (value: string): boolean =>
   hasProviderTextToken(value) || /^\d+[FB](?:\+\d+[FB])+ \(\d+\)$/.test(value.trim());
 
-const splitMixedMetricSegments = (value: string): Array<{ text: string; provider: 'festival' | 'band' | 'default' }> => {
+const splitMixedMetricSegments = (value: string): Array<{ text: string; provider: 'festival' | 'band' | 'mixed' | 'default' }> => {
   return splitTokenizedSegments(value);
 };
 
@@ -778,7 +781,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
           if (lines.length === 0) return;
 
           const lineSegments = lines.map((line) => splitMixedMetricSegments(line));
-          const computeLineWidth = (segments: Array<{ text: string; provider: 'festival' | 'band' | 'default' }>): number =>
+          const computeLineWidth = (segments: Array<{ text: string; provider: 'festival' | 'band' | 'mixed' | 'default' }>): number =>
             segments.reduce((sum, segment) => sum + docInstance.getTextWidth(segment.text), 0);
 
           while (fontSize > minFontSize) {
@@ -802,6 +805,8 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
             for (const segment of segments) {
               if (segment.provider === 'festival') {
                 docInstance.setTextColor(72, 105, 136);
+              } else if (segment.provider === 'mixed') {
+                docInstance.setTextColor(22, 163, 74);
               } else {
                 docInstance.setTextColor(35, 35, 35);
               }
@@ -821,7 +826,7 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
           : 2;
         const textX = cellData.cell.x + cellPadding;
         const maxTextWidth = Math.max(0, cellData.cell.width - (cellPadding * 2));
-        const wrappedWithProvider: Array<{ providerType: 'festival' | 'band' | 'default'; text: string }> = [];
+        const wrappedWithProvider: Array<{ providerType: 'festival' | 'band' | 'mixed' | 'default'; text: string }> = [];
         for (const rawLine of tokenizedText.split('\n')) {
           const providerType = getProviderTokenType(rawLine);
           const visibleLine = stripProviderTextTokens(rawLine);
@@ -841,6 +846,8 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
           if (textY > cellBottomLimit) break;
           if (line.providerType === 'festival') {
             docInstance.setTextColor(72, 105, 136);
+          } else if (line.providerType === 'mixed') {
+            docInstance.setTextColor(22, 163, 74);
           } else {
             docInstance.setTextColor(35, 35, 35);
           }

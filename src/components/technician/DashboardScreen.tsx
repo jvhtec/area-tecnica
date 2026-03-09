@@ -1,7 +1,7 @@
 import React from 'react';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { Map as MapIcon, Calendar as CalendarIcon, MessageSquare, Euro, Loader2, Briefcase, Binary } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
@@ -11,6 +11,12 @@ import { TechJobCard } from './TechJobCard';
 import { TourCard } from './TourCard';
 import { Theme } from './types';
 import { PendingExpensesSummary } from '@/components/expenses/PendingExpensesSummary';
+
+
+const MADRID_TIMEZONE = 'Europe/Madrid';
+
+const toMadridDate = (value: Date | string): Date => toZonedTime(new Date(value), MADRID_TIMEZONE);
+const toUtcFromMadrid = (value: Date): Date => fromZonedTime(value, MADRID_TIMEZONE);
 
 interface DashboardScreenProps {
     theme: Theme;
@@ -50,9 +56,10 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
     const todayAssignment = assignments.find(a => {
         const jobData = a.jobs || a;
         if (!jobData?.start_time) return false;
-        const jobDate = new Date(jobData.start_time);
-        const today = new Date();
-        return jobDate.toDateString() === today.toDateString();
+        const todayMadrid = toMadridDate(new Date());
+        const todayKey = format(todayMadrid, 'yyyy-MM-dd');
+        const jobMadrid = toMadridDate(jobData.start_time);
+        return format(jobMadrid, 'yyyy-MM-dd') === todayKey;
     });
 
     // Calculate weekly hours (simplified)
@@ -60,22 +67,27 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
 
     // Get next upcoming shift (first assignment with start_time >= now)
     const now = new Date();
+    const nowMadrid = toMadridDate(now);
     const nextAssignment = assignments.find(a => {
         const startTime = a.jobs?.start_time;
-        return startTime && new Date(startTime) >= now;
+        if (!startTime) return false;
+        return toUtcFromMadrid(toMadridDate(startTime)) >= toUtcFromMadrid(nowMadrid);
     });
     const nextShift = nextAssignment?.jobs?.start_time
-        ? formatInTimeZone(new Date(nextAssignment.jobs.start_time), 'Europe/Madrid', 'HH:mm')
+        ? formatInTimeZone(new Date(nextAssignment.jobs.start_time), MADRID_TIMEZONE, 'HH:mm')
         : '--:--';
 
     // Count assignments within the current week (Mon–Sun)
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+    const weekStartMadrid = startOfWeek(nowMadrid, { weekStartsOn: 1 });
+    const weekEndMadrid = endOfWeek(nowMadrid, { weekStartsOn: 1 });
+    const weekStart = toUtcFromMadrid(weekStartMadrid);
+    const weekEnd = toUtcFromMadrid(weekEndMadrid);
     const weeklyAssignments = assignments.filter(a => {
         const startTime = a.jobs?.start_time;
         if (!startTime) return false;
-        const d = new Date(startTime);
-        return d >= weekStart && d <= weekEnd;
+        const madridStart = toMadridDate(startTime);
+        const assignmentDate = toUtcFromMadrid(madridStart);
+        return assignmentDate >= weekStart && assignmentDate <= weekEnd;
     });
 
     return (

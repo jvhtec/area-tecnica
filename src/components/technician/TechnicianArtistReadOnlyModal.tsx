@@ -13,6 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { MobileArtistList } from "@/components/festival/mobile/MobileArtistList";
 import type { MobileArtistRiderFile } from "@/components/festival/mobile/MobileArtistCard";
 import { Theme } from "./types";
+import { createQueryKey } from "@/lib/optimized-react-query";
 
 type TechnicianArtistReadOnlyModalProps = {
   theme: Theme;
@@ -115,12 +116,12 @@ export function TechnicianArtistReadOnlyModal({
   const [riderFilesByArtistId, setRiderFilesByArtistId] = useState<Record<string, MobileArtistRiderFile[]>>({});
 
   const { data: artists = [], isLoading: artistsLoading } = useQuery({
-    queryKey: ["technician-readonly-artists", job?.id],
+    queryKey: createQueryKey.technician.technicianReadonlyArtists(job?.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("festival_artists")
         .select("*")
-        .eq("job_id", job.id)
+        .eq("job_id", job?.id)
         .order("date", { ascending: true });
 
       if (error) throw error;
@@ -135,12 +136,12 @@ export function TechnicianArtistReadOnlyModal({
   });
 
   const { data: festivalStages = [] } = useQuery({
-    queryKey: ["technician-readonly-festival-stages", job?.id],
+    queryKey: createQueryKey.technician.technicianReadonlyFestivalStages(job?.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("festival_stages")
         .select("number, name")
-        .eq("job_id", job.id);
+        .eq("job_id", job?.id);
       if (error) {
         console.warn("TechnicianArtistReadOnlyModal: failed loading stage names", error);
         return [];
