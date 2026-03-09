@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import { ChevronDown, Loader2, SlidersHorizontal, Users, X } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { MobileArtistList } from "@/components/festival/mobile/MobileArtistList";
+import type { MobileArtistRiderFile } from "@/components/festival/mobile/MobileArtistCard";
 import { Theme } from "./types";
 
 type TechnicianArtistReadOnlyModalProps = {
@@ -79,9 +82,12 @@ type FestivalStage = {
 
 const NOOP = () => {};
 
+const TIMEZONE = "Europe/Madrid";
+
 const formatGroupDate = (date: string) => {
   try {
-    return format(parseISO(date), "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
+    const zonedDate = toZonedTime(parseISO(date), TIMEZONE);
+    return format(zonedDate, "EEEE, d 'de' MMMM 'de' yyyy", { locale: es });
   } catch {
     return date;
   }
@@ -89,7 +95,8 @@ const formatGroupDate = (date: string) => {
 
 const formatChipDate = (date: string) => {
   try {
-    return format(parseISO(date), "EEE d MMM", { locale: es });
+    const zonedDate = toZonedTime(parseISO(date), TIMEZONE);
+    return format(zonedDate, "EEE d MMM", { locale: es });
   } catch {
     return date;
   }
@@ -105,7 +112,7 @@ export function TechnicianArtistReadOnlyModal({
   const [selectedDay, setSelectedDay] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
   const [stagePlotUrls, setStagePlotUrls] = useState<Record<string, string>>({});
-  const [riderFilesByArtistId, setRiderFilesByArtistId] = useState<Record<string, Array<{ id: string; file_name: string; file_path: string; uploaded_at?: string | null }>>>({});
+  const [riderFilesByArtistId, setRiderFilesByArtistId] = useState<Record<string, MobileArtistRiderFile[]>>({});
 
   const { data: artists = [], isLoading: artistsLoading } = useQuery({
     queryKey: ["technician-readonly-artists", job?.id],
@@ -218,7 +225,7 @@ export function TechnicianArtistReadOnlyModal({
         return;
       }
 
-      const grouped: Record<string, Array<{ id: string; file_name: string; file_path: string; uploaded_at?: string | null }>> = {};
+      const grouped: Record<string, MobileArtistRiderFile[]> = {};
       (data || []).forEach((file) => {
         if (!file.artist_id) return;
         if (!grouped[file.artist_id]) grouped[file.artist_id] = [];
@@ -240,36 +247,24 @@ export function TechnicianArtistReadOnlyModal({
     };
   }, [artists]);
 
-  const handleViewRiderFile = async (file: { file_path: string }) => {
-    const pendingWindow = window.open("about:blank", "_blank", "noopener,noreferrer");
-
-    const { data, error } = await supabase.storage.from("festival_artist_files").createSignedUrl(file.file_path, 3600);
-    if (error || !data?.signedUrl) {
-      if (pendingWindow && !pendingWindow.closed) {
-        pendingWindow.close();
-      }
-      return;
-    }
-
-    if (pendingWindow && !pendingWindow.closed) {
-      pendingWindow.location.href = data.signedUrl;
-      return;
-    }
-
-    window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-  };
-
   const handleDownloadRiderFile = async (file: { file_path: string; file_name: string }) => {
-    const { data, error } = await supabase.storage.from("festival_artist_files").download(file.file_path);
-    if (error || !data) return;
-    const url = window.URL.createObjectURL(data);
-    const link = window.document.createElement("a");
-    link.href = url;
-    link.download = file.file_name;
-    window.document.body.appendChild(link);
-    link.click();
-    window.document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+    try {
+      const { data, error } = await supabase.storage.from("festival_artist_files").download(file.file_path);
+      if (error || !data) {
+        toast.error("Error al descargar el archivo", { description: error?.message || "No se pudo obtener el archivo" });
+        return;
+      }
+      const url = window.URL.createObjectURL(data);
+      const link = window.document.createElement("a");
+      link.href = url;
+      link.download = file.file_name;
+      window.document.body.appendChild(link);
+      link.click();
+      window.document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error("Error al descargar el archivo", { description: String(err) });
+    }
   };
 
   const stageOptions = useMemo(() => {
@@ -492,7 +487,6 @@ export function TechnicianArtistReadOnlyModal({
                     deletingStagePlotArtistId={null}
                     mode="readonly"
                     riderFilesByArtistId={riderFilesByArtistId}
-                    onViewRiderFile={handleViewRiderFile}
                     onDownloadRiderFile={handleDownloadRiderFile}
                   />
                 </section>

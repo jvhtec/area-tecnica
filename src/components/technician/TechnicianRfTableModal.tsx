@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import {
   Activity,
   ChevronDown,
@@ -15,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import type { Tables } from "@/integrations/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -23,6 +25,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { createQueryKey } from "@/lib/optimized-react-query";
 import {
   normalizeRfIemArtistInput,
   hasRfIemContent,
@@ -52,14 +55,18 @@ type TechnicianRfTableModalProps = {
 };
 
 type FestivalStage = { number: number; name: string };
+type FestivalArtistRow = Tables<"festival_artists">;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
+const TIMEZONE = "Europe/Madrid";
+
 const formatChipDate = (date: string) => {
   try {
-    return format(parseISO(date), "EEE d MMM", { locale: es });
+    const zonedDate = toZonedTime(parseISO(date), TIMEZONE);
+    return format(zonedDate, "EEE d MMM", { locale: es });
   } catch {
     return date;
   }
@@ -71,6 +78,22 @@ const extractTotal = (value: string | number): number => {
   if (match) return parseInt(match[1], 10) || 0;
   const num = parseInt(String(value), 10);
   return Number.isFinite(num) ? num : 0;
+};
+
+const computeTotalRfChannels = (artist: ArtistRfIemData): number => {
+  return artist.wirelessSystems.reduce((sum, sys) => sum + getRfSystemChannels(sys), 0);
+};
+
+const computeTotalIemChannels = (artist: ArtistRfIemData): number => {
+  return artist.iemSystems.reduce((sum, sys) => sum + (sys.quantity_hh || sys.quantity || 0), 0);
+};
+
+const computeTotalHH = (artist: ArtistRfIemData): number => {
+  return artist.wirelessSystems.reduce((sum, sys) => sum + (sys.quantity_hh || 0), 0);
+};
+
+const computeTotalBP = (artist: ArtistRfIemData): number => {
+  return artist.wirelessSystems.reduce((sum, sys) => sum + (sys.quantity_bp || 0), 0);
 };
 
 const getProviderColor = (provider: string): string => {
@@ -245,10 +268,11 @@ function ArtistRfCard({
   const iemChannels = formatMetricBreakdownByProvider(artist.iemSystems, (s) => s.quantity_hh || s.quantity || 0);
   const iemBP = formatMetricBreakdownByProvider(artist.iemSystems, (s) => s.quantity_bp || 0);
 
-  const totalRf = extractTotal(rfChannels);
-  const totalIem = extractTotal(iemChannels);
-  const totalHH = extractTotal(rfHH);
-  const totalBP = extractTotal(rfBP);
+  // Direct calculation for totals (no regex parsing)
+  const totalRf = computeTotalRfChannels(artist);
+  const totalIem = computeTotalIemChannels(artist);
+  const totalHH = computeTotalHH(artist);
+  const totalBP = computeTotalBP(artist);
 
   // Pick a dominant provider to determine left bar color
   const dominantProvider = rfProvider || iemProvider || "Festival";
@@ -448,10 +472,24 @@ export function TechnicianRfTableModal({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // --- Data fetching (unchanged) ---
+  // --- Keyboard handler: Escape to close ---
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
 
-  const { data: rawArtists = [], isLoading } = useQuery({
-    queryKey: ["technician-rf-table-artists", job?.id],
+  // --- Data fetching ---
+
+  const {
+    data: rawArtists = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery({
+    queryKey: createQueryKey.technician.rfTableArtists(job?.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("festival_artists")
@@ -459,13 +497,13 @@ export function TechnicianRfTableModal({
         .eq("job_id", job.id)
         .order("date", { ascending: true });
       if (error) throw error;
-      return data || [];
+      return (data || []) as FestivalArtistRow[];
     },
     enabled: !!job?.id,
   });
 
   const { data: festivalStages = [] } = useQuery({
-    queryKey: ["technician-rf-table-stages", job?.id],
+    queryKey: createQueryKey.technician.rfTableStages(job?.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("festival_stages")
@@ -483,10 +521,10 @@ export function TechnicianRfTableModal({
     return names;
   }, [festivalStages]);
 
-  // --- Normalization & filtering (unchanged) ---
+  // --- Normalization & filtering ---
 
   const normalizedArtists = useMemo(
-    () => rawArtists.map((a: any) => normalizeRfIemArtistInput(a)).filter(hasRfIemContent),
+    () => rawArtists.map((a) => normalizeRfIemArtistInput(a)).filter(hasRfIemContent),
     [rawArtists]
   );
 
@@ -705,6 +743,16 @@ export function TechnicianRfTableModal({
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-blue-500" />
               </div>
+            ) : isError ? (
+              <div
+                className={`h-32 border border-dashed rounded-xl flex flex-col items-center justify-center ${
+                  isDark ? "border-red-800 text-red-400" : "border-red-200 text-red-500"
+                }`}
+              >
+                <Radio size={28} className="mb-2 opacity-40" />
+                <span className="text-xs font-medium">Error al cargar datos RF/IEM</span>
+                {error && <span className="text-[10px] mt-1 opacity-70">{String(error)}</span>}
+              </div>
             ) : filteredDayGroups.length === 0 ? (
               <div
                 className={`h-32 border border-dashed rounded-xl flex flex-col items-center justify-center ${
@@ -739,9 +787,9 @@ export function TechnicianRfTableModal({
                     </div>
 
                     {/* Artist cards */}
-                    {group.artists.map((artist, ri) => (
+                    {group.artists.map((artist) => (
                       <ArtistRfCard
-                        key={ri}
+                        key={`${artist.stage}-${artist.name}-${artist.showStart || "no-time"}`}
                         artist={artist}
                         stageName={stageNames[artist.stage] || `Escenario ${artist.stage}`}
                         isDark={isDark}

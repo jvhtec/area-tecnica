@@ -78,6 +78,7 @@ const CATEGORY_LABELS: Record<MobileConfigCategory, { title: string; subtitle: s
   monitors: { title: "Monitores y Extras", subtitle: "Cuñas, side fills, drum fills" },
   infrastructure: { title: "Infraestructura", subtitle: "Conexiones de red y audio" },
   notes: { title: "Notas de Producción", subtitle: "Notas y comentarios" },
+  rider: { title: "Riders", subtitle: "Archivos de rider del artista" },
 };
 
 const formatProviderLabel = (provider?: string | null) => {
@@ -335,15 +336,6 @@ export const ReadOnlyArtistCategoryContent = ({
           <div key={file.id} className="rounded-md border p-3 bg-muted/20">
             <div className="text-sm font-medium break-words">{file.file_name}</div>
             <div className="mt-2 flex items-center gap-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => onViewRiderFile?.(file)}
-                disabled={!onViewRiderFile}
-              >
-                Ver
-              </Button>
               <Button
                 type="button"
                 size="sm"
