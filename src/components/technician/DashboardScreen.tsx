@@ -1,5 +1,5 @@
 import React from 'react';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
 import { Map as MapIcon, Calendar as CalendarIcon, MessageSquare, Euro, Loader2, Briefcase, Binary } from 'lucide-react';
@@ -58,10 +58,25 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
     // Calculate weekly hours (simplified)
     const weeklyHours = assignments.length * 8; // Placeholder
 
-    // Get next shift time
-    const nextShift = assignments[0]?.jobs?.start_time
-        ? formatInTimeZone(new Date(assignments[0].jobs.start_time), 'Europe/Madrid', 'HH:mm')
+    // Get next upcoming shift (first assignment with start_time >= now)
+    const now = new Date();
+    const nextAssignment = assignments.find(a => {
+        const startTime = a.jobs?.start_time;
+        return startTime && new Date(startTime) >= now;
+    });
+    const nextShift = nextAssignment?.jobs?.start_time
+        ? formatInTimeZone(new Date(nextAssignment.jobs.start_time), 'Europe/Madrid', 'HH:mm')
         : '--:--';
+
+    // Count assignments within the current week (Mon–Sun)
+    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+    const weeklyAssignments = assignments.filter(a => {
+        const startTime = a.jobs?.start_time;
+        if (!startTime) return false;
+        const d = new Date(startTime);
+        return d >= weekStart && d <= weekEnd;
+    });
 
     return (
         <div className="space-y-6 animate-in fade-in">
@@ -88,7 +103,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
                 </div>
                 <div className={`p-2 rounded-xl border ${theme.card}`}>
                     <div className={`text-[10px] font-bold uppercase ${theme.textMuted} mb-1`}>Esta semana</div>
-                    <div className={`text-lg font-bold ${theme.textMain}`}>{assignments.length} trabajos</div>
+                    <div className={`text-lg font-bold ${theme.textMain}`}>{weeklyAssignments.length} trabajos</div>
                 </div>
                 <div className={`p-2 rounded-xl border ${theme.card} relative overflow-hidden`}>
                     <div className="absolute inset-0 bg-blue-600/10" />
