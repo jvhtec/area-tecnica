@@ -72,13 +72,6 @@ const formatChipDate = (date: string) => {
   }
 };
 
-const extractTotal = (value: string | number): number => {
-  if (typeof value === "number") return value;
-  const match = String(value).match(/\((\d+)\)/);
-  if (match) return parseInt(match[1], 10) || 0;
-  const num = parseInt(String(value), 10);
-  return Number.isFinite(num) ? num : 0;
-};
 
 const computeTotalRfChannels = (artist: ArtistRfIemData): number => {
   return artist.wirelessSystems.reduce((sum, sys) => sum + getRfSystemChannels(sys), 0);
@@ -129,7 +122,9 @@ function TokenizedText({ value, isDark }: { value: string; isDark: boolean }) {
                     ? isDark ? "text-blue-400" : "text-blue-600"
                     : seg.provider === "band"
                       ? isDark ? "text-amber-400" : "text-amber-600"
-                      : ""
+                      : seg.provider === "mixed"
+                        ? isDark ? "text-green-400" : "text-green-600"
+                        : ""
                 }
               >
                 {seg.text}
@@ -322,7 +317,7 @@ function ArtistRfCard({
             </h2>
             <div className="text-right shrink-0 ml-3">
               <p className={`text-[10px] font-bold uppercase ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
-                Show
+                Actuación
               </p>
               <p className={`text-lg font-black tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}>
                 {artist.showStart || "—"}
@@ -383,7 +378,7 @@ function ArtistRfCard({
               <div className="flex items-center gap-2">
                 <Clock size={14} className={isDark ? "text-blue-500" : "text-blue-500"} />
                 <span className={`text-xs font-bold ${isDark ? "text-zinc-300" : "text-slate-600"}`}>
-                  Show
+                  Actuación
                 </span>
               </div>
               <span className={`text-sm font-black ${isDark ? "text-white" : "text-slate-900"}`}>
@@ -491,10 +486,11 @@ export function TechnicianRfTableModal({
   } = useQuery({
     queryKey: createQueryKey.technician.rfTableArtists(job?.id),
     queryFn: async () => {
+      if (!job?.id) return [];
       const { data, error } = await supabase
         .from("festival_artists")
         .select("*")
-        .eq("job_id", job.id)
+        .eq("job_id", job?.id)
         .order("date", { ascending: true });
       if (error) throw error;
       return (data || []) as FestivalArtistRow[];
@@ -505,10 +501,11 @@ export function TechnicianRfTableModal({
   const { data: festivalStages = [] } = useQuery({
     queryKey: createQueryKey.technician.rfTableStages(job?.id),
     queryFn: async () => {
+      if (!job?.id) return [];
       const { data, error } = await supabase
         .from("festival_stages")
         .select("number, name")
-        .eq("job_id", job.id);
+        .eq("job_id", job?.id);
       if (error) return [];
       return (data || []) as FestivalStage[];
     },
@@ -800,7 +797,7 @@ export function TechnicianRfTableModal({
                     {/* Artist cards */}
                     {group.artists.map((artist) => (
                       <ArtistRfCard
-                        key={`${artist.stage}-${artist.name}-${artist.showStart || "no-time"}`}
+                        key={`${artist.id ?? artist.name}-${artist.stage}-${artist.showStart || "no-time"}`}
                         artist={artist}
                         stageName={stageNames[artist.stage] || `Escenario ${artist.stage}`}
                         isDark={isDark}

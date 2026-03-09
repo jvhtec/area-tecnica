@@ -148,12 +148,14 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
                     </button>
                 )}
                 {job.sound_role === 'SND-RF-E' && hasArtists && (
-                    <button
+                    <Button
                         onClick={() => onAction('rf-table', jobData)}
+                        variant="outline"
+                        size="sm"
                         className={`py-2.5 rounded-lg border border-dashed ${theme.divider} ${theme.textMuted} text-xs font-bold hover:bg-white/5 transition-colors flex items-center justify-center gap-2 ${showTimesheetButton ? 'col-span-2' : ''}`}
                     >
                         <Radio size={14} /> Tabla RF / IEM
-                    </button>
+                    </Button>
                 )}
                 {showIncidentReport && (
                     <TechnicianIncidentReportDialog
