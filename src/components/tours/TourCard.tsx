@@ -29,9 +29,10 @@ interface TourCardProps {
   onTourClick?: (tourId: string) => void;
   onManageDates: () => void;
   onPrint: () => void;
+  readOnly?: boolean;
 }
 
-export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDates, onPrint }: TourCardProps) {
+export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDates, onPrint, readOnly = false }: TourCardProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -100,6 +101,10 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
   const upcomingDates = getUpcomingDates();
 
   const handleCardClick = () => {
+    if (readOnly) {
+      return;
+    }
+
     if (onTourClick) {
       onTourClick(tour.id);
     } else {

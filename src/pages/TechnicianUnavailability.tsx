@@ -62,8 +62,16 @@ export default function TechnicianUnavailability() {
       const s = new Date(payload.startDate + 'T00:00');
       const e = new Date(payload.endDate + 'T00:00');
       if (isNaN(s.getTime()) || isNaN(e.getTime()) || e < s) throw new Error('Invalid date range');
+
+      const spanishDateFormatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Europe/Madrid',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+
       for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
-        rows.push({ technician_id: user.id, date: d.toISOString().slice(0,10), status: payload.status });
+        rows.push({ technician_id: user.id, date: spanishDateFormatter.format(d), status: payload.status });
       }
       const { error } = await supabase
         .from('technician_availability')

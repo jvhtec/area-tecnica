@@ -36,7 +36,7 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { Loader2, Calendar as CalendarIcon, Clock, CalendarDays, CalendarRange } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, startOfDay } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -422,8 +422,8 @@ export const AssignJobDialog = ({
             .single();
 
           if (jobData) {
-            const startDate = new Date(jobData.start_time);
-            const endDate = new Date(jobData.end_time);
+            const startDate = startOfDay(new Date(jobData.start_time));
+            const endDate = startOfDay(new Date(jobData.end_time));
             const dates: string[] = [];
 
             for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {

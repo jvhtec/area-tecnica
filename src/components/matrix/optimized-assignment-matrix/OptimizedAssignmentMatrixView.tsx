@@ -164,12 +164,11 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   handleEmailError,
   conflictDialog,
   setConflictDialog,
-  isGlobalCellSelected, // TODO: Will be used for Stream Deck integration - reserved for future use
+  isGlobalCellSelected: _isGlobalCellSelected,
   techMedalRankings,
   techLastYearMedalRankings,
 }: OptimizedAssignmentMatrixViewProps) => {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _unusedIsGlobalCellSelected = isGlobalCellSelected; // Reserved for Stream Deck integration
+  void _isGlobalCellSelected;
 
   return (
     <div className="matrix-layout relative">

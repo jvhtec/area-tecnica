@@ -155,6 +155,9 @@ Each branch gets a unique preview URL:
 
 Preview deployments help test changes before merging to production.
 
+For full staging setup (Cloudflare Preview + Supabase staging + local staging mode), see:
+- [docs/STAGING_SETUP.md](./docs/STAGING_SETUP.md)
+
 ### Performance Optimization
 
 Cloudflare Pages provides:
@@ -208,5 +211,6 @@ To update custom domain settings:
 ### Related Documentation
 
 - [DEVELOPMENT.md](./DEVELOPMENT.md) - Local development setup
+- [docs/STAGING_SETUP.md](./docs/STAGING_SETUP.md) - End-to-end staging setup
 - [SECURITY.md](./SECURITY.md) - Security practices and credential management
 - [CLAUDE.md](./CLAUDE.md) - Complete project documentation

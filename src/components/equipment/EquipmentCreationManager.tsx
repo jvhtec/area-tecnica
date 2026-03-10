@@ -14,7 +14,7 @@ import { Plus, Trash2, Pencil, Loader2, ClipboardPaste, Link, Download } from 'l
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { useDepartment } from '@/contexts/DepartmentContext';
+import { useOptionalDepartment } from '@/contexts/DepartmentContext';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 // UUID regex for extracting Flex resource IDs
@@ -29,15 +29,8 @@ interface EditEquipmentDialogProps {
 
 function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEquipmentDialogProps) {
   const { toast } = useToast();
-
-  // Optionally use department context
-  let department: Department | undefined;
-  try {
-    const context = useDepartment();
-    department = context.department;
-  } catch {
-    department = undefined;
-  }
+  const context = useOptionalDepartment();
+  const department: Department | undefined = context?.department;
 
   const categories = department ? getCategoriesForDepartment(department) : [...SOUND_CATEGORIES, ...LIGHTS_CATEGORIES];
   const [name, setName] = useState(equipment?.name || '');
@@ -239,17 +232,8 @@ export function EquipmentCreationManager({ onEquipmentChange, department: propDe
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-
-  // Use prop department if provided, otherwise try context
-  let department: Department | undefined = propDepartment as Department | undefined;
-  if (!department) {
-    try {
-      const context = useDepartment();
-      department = context.department;
-    } catch {
-      department = undefined;
-    }
-  }
+  const context = useOptionalDepartment();
+  const department: Department | undefined = (propDepartment as Department | undefined) ?? context?.department;
 
   const categories = department ? getCategoriesForDepartment(department) : [...SOUND_CATEGORIES, ...LIGHTS_CATEGORIES];
 

@@ -1,45 +1,75 @@
-import { expect, afterEach, vi } from 'vitest';
+import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, beforeEach, vi } from "vitest";
 
-// Global mock: prevent sonner from trying to inject CSS into jsdom (or crashing in node).
-// Some files import `toast as showToast` and then call `showToast.error(...)`.
-vi.mock('sonner', () => {
-  const toast = Object.assign(vi.fn(), {
-    error: vi.fn(),
-    success: vi.fn(),
-    message: vi.fn(),
-  });
-  return { toast };
+import { resetMockSupabase } from "./mockSupabase";
+
+const toast = Object.assign(vi.fn(), {
+  error: vi.fn(),
+  success: vi.fn(),
+  warning: vi.fn(),
+  message: vi.fn(),
 });
 
-// Only import testing-library/react and jest-dom if we're in a DOM environment
-if (typeof window !== 'undefined') {
-  // @ts-ignore
-  import('@testing-library/jest-dom');
-  const { cleanup } = await import('@testing-library/react');
-  
-  // Cleanup after each test case (e.g. clearing jsdom)
-  afterEach(() => {
-    cleanup();
-  });
+vi.mock("sonner", () => ({
+  toast,
+  Toaster: () => null,
+}));
 
-  // Mock window.matchMedia
-  Object.defineProperty(window, 'matchMedia', {
+const createUnexpectedFetchError = (input?: RequestInfo | URL) => {
+  const url =
+    typeof input === "string"
+      ? input
+      : input instanceof URL
+        ? input.toString()
+        : input && "url" in input
+          ? input.url
+          : "unknown-url";
+
+  return new Error(
+    `[tests] Unexpected network request to ${url}. Mock the module, Supabase client, or fetch in this test.`,
+  );
+};
+
+beforeEach(() => {
+  resetMockSupabase();
+  toast.mockClear();
+  toast.error.mockClear();
+  toast.success.mockClear();
+  toast.warning.mockClear();
+  toast.message.mockClear();
+
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((input: RequestInfo | URL) => Promise.reject(createUnexpectedFetchError(input))),
+  );
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+if (typeof window !== "undefined") {
+  Object.defineProperty(window, "matchMedia", {
     writable: true,
-    value: vi.fn().mockImplementation(query => ({
+    value: vi.fn().mockImplementation((query) => ({
       matches: false,
       media: query,
       onchange: null,
-      addListener: vi.fn(), // deprecated
-      removeListener: vi.fn(), // deprecated
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
       dispatchEvent: vi.fn(),
     })),
   });
 
-  // Mock IntersectionObserver
+  Object.defineProperty(window, "open", {
+    writable: true,
+    value: vi.fn(),
+  });
+
   global.IntersectionObserver = class IntersectionObserver {
-    constructor() {}
     disconnect() {}
     observe() {}
     takeRecords() {
@@ -48,27 +78,30 @@ if (typeof window !== 'undefined') {
     unobserve() {}
   } as any;
 
-  // Mock ResizeObserver
   global.ResizeObserver = class ResizeObserver {
-    constructor() {}
     disconnect() {}
     observe() {}
     unobserve() {}
   } as any;
 
-  // Mock getElementsByTagName for CSS injection (used by sonner)
-  if (typeof document !== 'undefined' && document.getElementsByTagName) {
-    const originalGetElementsByTagName = document.getElementsByTagName.bind(document);
-    document.getElementsByTagName = function(tagName: string) {
-      if (tagName === 'head') {
-        const head = originalGetElementsByTagName('head');
-        if (head.length > 0) return head;
-        // Create a fake head if it doesn't exist
-        const fakeHead = document.createElement('head');
-        document.documentElement?.appendChild(fakeHead);
-        return [fakeHead] as any;
-      }
-      return originalGetElementsByTagName(tagName);
-    } as any;
+  if (!document.head) {
+    const head = document.createElement("head");
+    document.documentElement?.appendChild(head);
+  }
+
+  if (!HTMLElement.prototype.scrollIntoView) {
+    HTMLElement.prototype.scrollIntoView = vi.fn();
+  }
+
+  if (!HTMLElement.prototype.hasPointerCapture) {
+    HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
+  }
+
+  if (!HTMLElement.prototype.setPointerCapture) {
+    HTMLElement.prototype.setPointerCapture = vi.fn();
+  }
+
+  if (!HTMLElement.prototype.releasePointerCapture) {
+    HTMLElement.prototype.releasePointerCapture = vi.fn();
   }
 }

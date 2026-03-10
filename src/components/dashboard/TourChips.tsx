@@ -14,10 +14,11 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 interface TourChipsProps {
-  onTourClick: (tourId: string) => void;
+  onTourClick?: (tourId: string) => void;
+  readOnly?: boolean;
 }
 
-export const TourChips = ({ onTourClick }: TourChipsProps) => {
+export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => {
   const [selectedTourId, setSelectedTourId] = useState<string | null>(null);
   const [isDatesDialogOpen, setIsDatesDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -237,6 +238,8 @@ export const TourChips = ({ onTourClick }: TourChipsProps) => {
           >
             <TourCard
               tour={tour}
+              readOnly={readOnly}
+              onTourClick={onTourClick}
               onManageDates={() => handleManageDates(tour.id)}
               onPrint={() => handlePrint(tour)}
             />

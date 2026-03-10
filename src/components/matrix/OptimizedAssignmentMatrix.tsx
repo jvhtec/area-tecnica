@@ -853,7 +853,7 @@ export const OptimizedAssignmentMatrix = ({
 
   // Batched staffing statuses for visible window
   const orderedTechnicians = useMemo(() => {
-    let techs = [...technicians];
+    const techs = [...technicians];
 
     // Job sorting takes precedence over column sorting
     if (sortJobId) {

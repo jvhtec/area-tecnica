@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { fromZonedTime } from 'date-fns-tz';
 import { type Dept } from '@/utils/tasks';
+import { TASK_TYPES } from '@/constants/taskTypes';
 
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
@@ -24,14 +25,6 @@ const DEPARTMENT_NAME: Record<Dept, string> = {
   video: 'video',
   production: 'producción',
   administrative: 'administración',
-};
-
-const TASK_TYPES: Record<Dept, string[]> = {
-  sound: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
-  lights: ['QT', 'Rigging Plot', 'Pesos', 'Consumos', 'PS'],
-  video: ['QT', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
-  production: ['QT', 'Rigging Plot', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
-  administrative: ['QT', 'Prediccion', 'Pesos', 'Consumos', 'PS'],
 };
 
 interface CreateGlobalTaskDialogProps {

@@ -6,11 +6,13 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { TourChips } from "@/components/dashboard/TourChips";
 import { supabase } from "@/lib/supabase";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useNavigate } from "react-router-dom";
 
 const Tours = () => {
   const [showTours, setShowTours] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const { userRole } = useOptimizedAuth();
+  const navigate = useNavigate();
 
   // House techs have view-only access
   const readOnly = userRole === 'house_tech';
@@ -75,9 +77,9 @@ const Tours = () => {
         {showTours && (
           <CardContent className="px-3 pb-3 sm:px-4 sm:pb-4 md:px-6 md:pb-6">
             <TourChips
-              onTourClick={readOnly ? undefined : (tourId) => {
-                // This handles navigation to tour management (disabled for house techs)
-                console.log("Tour clicked:", tourId);
+              readOnly={readOnly}
+              onTourClick={(tourId) => {
+                navigate(`/tour-management/${tourId}`);
               }}
             />
           </CardContent>

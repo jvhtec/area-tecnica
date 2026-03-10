@@ -22,3 +22,7 @@ export function useDepartment() {
   }
   return context;
 }
+
+export function useOptionalDepartment() {
+  return useContext(DepartmentContext);
+}

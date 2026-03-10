@@ -90,6 +90,7 @@ npm run cap:android
 
 ## Documentation
 Start here: **`docs/README.md`** (index of product/ops/engineering docs).
+Staging guide: **`docs/STAGING_SETUP.md`**.
 
 ---
 

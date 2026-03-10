@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+playwright-report/
+test-results/
 *.local
 
 # Lock files - See DEVELOPMENT.md for rationale
@@ -19,6 +21,7 @@ package-lock.json
 .env
 .env.*
 !.env.example
+!.env.staging.example
 .envrc
 .direnv/
 
@@ -47,6 +50,7 @@ ios/App/App/public
 ios/App/Pods
 ios/App/Podfile.lock
 ios/App/.DS_Store
+ios/App/*.xcarchive
 android/app/src/main/assets/public
 android/.gradle
 android/.idea
