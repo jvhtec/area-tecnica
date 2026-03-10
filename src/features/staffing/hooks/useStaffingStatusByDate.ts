@@ -54,7 +54,7 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
       const batchResults = await Promise.all(batchPromises);
 
       // Collect all results and check for errors
-      let rawStatuses: any[] = [];
+      const rawStatuses: any[] = [];
       let statusesError = null;
       for (const result of batchResults) {
         if (result.error) {
