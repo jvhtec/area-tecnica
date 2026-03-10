@@ -805,6 +805,8 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
             for (const segment of segments) {
               if (segment.provider === 'festival') {
                 docInstance.setTextColor(72, 105, 136);
+              } else if (segment.provider === 'band') {
+                docInstance.setTextColor(217, 119, 6);
               } else if (segment.provider === 'mixed') {
                 docInstance.setTextColor(22, 163, 74);
               } else {
@@ -846,6 +848,8 @@ export const exportRfIemTablePDF = async (data: RfIemTablePdfData): Promise<Blob
           if (textY > cellBottomLimit) break;
           if (line.providerType === 'festival') {
             docInstance.setTextColor(72, 105, 136);
+          } else if (line.providerType === 'band') {
+            docInstance.setTextColor(217, 119, 6);
           } else if (line.providerType === 'mixed') {
             docInstance.setTextColor(22, 163, 74);
           } else {

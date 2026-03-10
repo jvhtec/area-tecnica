@@ -25,6 +25,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { createQueryKey } from "@/lib/optimized-react-query";
 import {
   normalizeRfIemArtistInput,
@@ -274,181 +275,189 @@ function ArtistRfCard({
   const barColor = getProviderColor(dominantProvider);
 
   return (
-    <div className={`mb-3 transition-all duration-300 ${expanded ? (isDark ? "ring-2 ring-yellow-400/20" : "ring-2 ring-blue-400/20") : ""}`}>
-      <div
-        className={`overflow-hidden rounded-2xl shadow-xl relative cursor-pointer transition-transform active:scale-[0.98] ${
-          isDark
-            ? "bg-zinc-900 border border-zinc-800"
-            : "bg-white border border-slate-200"
-        }`}
-        onClick={() => setExpanded(!expanded)}
-      >
-        {/* Left color bar */}
-        <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ backgroundColor: barColor }} />
-
-        {/* Card header — always visible */}
-        <div className="p-4 pl-5">
-          {/* Top row: stage chip + provider chip */}
-          <div className="flex items-center gap-2 mb-1">
-            <span
-              className={`text-[10px] font-black px-1.5 py-0.5 rounded tracking-widest ${
-                isDark ? "bg-zinc-800 text-zinc-400" : "bg-slate-100 text-slate-500"
-              }`}
-            >
-              {stageName.toUpperCase()}
-            </span>
-            {dominantProvider && (
-              <span
-                className="text-[10px] font-black px-1.5 py-0.5 rounded tracking-widest"
-                style={{
-                  backgroundColor: `${barColor}22`,
-                  color: barColor,
-                }}
-              >
-                {dominantProvider.toUpperCase()}
-              </span>
-            )}
-          </div>
-
-          {/* Artist name + show time */}
-          <div className="flex justify-between items-end mb-3">
-            <h2 className={`text-xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
-              {artist.name}
-            </h2>
-            <div className="text-right shrink-0 ml-3">
-              <p className={`text-[10px] font-bold uppercase ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
-                Actuación
-              </p>
-              <p className={`text-lg font-black tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}>
-                {artist.showStart || "—"}
-              </p>
-            </div>
-          </div>
-
-          {/* Inventory badges row */}
-          <div className="flex gap-1.5">
-            <InventoryBadge label="RF CH" count={totalRf} icon={Radio} isDark={isDark} />
-            <InventoryBadge label="IEM CH" count={totalIem} icon={Headphones} isDark={isDark} />
-            <InventoryBadge label="HH" count={totalHH} icon={Wifi} isDark={isDark} />
-            <InventoryBadge label="BP" count={totalBP} icon={Package} isDark={isDark} />
-          </div>
-        </div>
-
-        {/* Expandable spec sheet */}
+    <Collapsible open={expanded} onOpenChange={setExpanded}>
+      <div className={`mb-3 transition-all duration-300 ${expanded ? (isDark ? "ring-2 ring-yellow-400/20" : "ring-2 ring-blue-400/20") : ""}`}>
         <div
-          className={`overflow-hidden transition-all duration-300 ease-in-out ${
-            expanded ? "max-h-[800px]" : "max-h-0"
+          className={`overflow-hidden rounded-2xl shadow-xl relative ${
+            isDark
+              ? "bg-zinc-900 border border-zinc-800"
+              : "bg-white border border-slate-200"
           }`}
         >
-          <div
-            className={`p-4 pl-5 space-y-4 ${
-              isDark
-                ? "border-t border-zinc-800 bg-zinc-950"
-                : "border-t border-slate-200 bg-slate-50"
-            }`}
-            onClick={(e) => e.stopPropagation()}
+          {/* Left color bar */}
+          <div className="absolute top-0 left-0 w-1 h-full rounded-l-2xl" style={{ backgroundColor: barColor }} />
+
+          <CollapsibleTrigger
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded(!expanded)}
+            className="w-full text-left transition-transform active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40"
           >
-            {/* Soundcheck strip */}
-            <div
-              className={`flex items-center justify-between p-3 rounded-xl border ${
-                isDark
-                  ? "bg-zinc-900/50 border-zinc-800"
-                  : "bg-white border-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Clock size={14} className={isDark ? "text-yellow-500" : "text-amber-500"} />
-                <span className={`text-xs font-bold ${isDark ? "text-zinc-300" : "text-slate-600"}`}>
-                  Soundcheck
-                </span>
-              </div>
-              <span className={`text-sm font-black ${isDark ? "text-white" : "text-slate-900"}`}>
-                {formatTimeRange(artist.soundcheckStart, artist.soundcheckEnd)}
-              </span>
-            </div>
-
-            {/* Show time strip */}
-            <div
-              className={`flex items-center justify-between p-3 rounded-xl border ${
-                isDark
-                  ? "bg-zinc-900/50 border-zinc-800"
-                  : "bg-white border-slate-200"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Clock size={14} className={isDark ? "text-blue-500" : "text-blue-500"} />
-                <span className={`text-xs font-bold ${isDark ? "text-zinc-300" : "text-slate-600"}`}>
-                  Actuación
-                </span>
-              </div>
-              <span className={`text-sm font-black ${isDark ? "text-white" : "text-slate-900"}`}>
-                {formatTimeRange(artist.showStart, artist.showEnd)}
-              </span>
-            </div>
-
-            {/* RF Section */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Activity size={14} className="text-blue-500" />
+            {/* Card header — always visible */}
+            <div className="p-4 pl-5">
+              {/* Top row: stage chip + provider chip */}
+              <div className="flex items-center gap-2 mb-1">
                 <span
-                  className={`text-[10px] font-black uppercase tracking-widest ${
-                    isDark ? "text-zinc-500" : "text-slate-400"
+                  className={`text-[10px] font-black px-1.5 py-0.5 rounded tracking-widest ${
+                    isDark ? "bg-zinc-800 text-zinc-400" : "bg-slate-100 text-slate-500"
                   }`}
                 >
-                  RF · {rfProvider || "—"}
+                  {stageName.toUpperCase()}
                 </span>
+                {dominantProvider && (
+                  <span
+                    className="text-[10px] font-black px-1.5 py-0.5 rounded tracking-widest"
+                    style={{
+                      backgroundColor: `${barColor}22`,
+                      color: barColor,
+                    }}
+                  >
+                    {dominantProvider.toUpperCase()}
+                  </span>
+                )}
               </div>
-              <div className="space-y-2">
-                <SpecRow label="Hardware" value={rfModels} isDark={isDark} />
-                <SpecRow
-                  label="Equipos"
-                  value={`${rfHH} HH / ${rfBP} BP`}
-                  isDark={isDark}
-                />
-                <FrequencyBox
-                  label="Espectro de frecuencia"
-                  value={rfBands}
-                  accentBg={isDark ? "bg-blue-500/10" : "bg-blue-50"}
-                  accentText={isDark ? "text-blue-400" : "text-blue-700"}
-                  accentBorder={isDark ? "border-blue-500/20" : "border-blue-200"}
-                  isDark={isDark}
-                />
-              </div>
-            </div>
 
-            {/* IEM Section */}
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Activity size={14} className="text-purple-500" />
-                <span
-                  className={`text-[10px] font-black uppercase tracking-widest ${
-                    isDark ? "text-zinc-500" : "text-slate-400"
-                  }`}
-                >
-                  IEM · {iemProvider || "—"}
-                </span>
+              {/* Artist name + show time */}
+              <div className="flex justify-between items-end mb-3">
+                <h2 className={`text-xl font-black tracking-tight ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {artist.name}
+                </h2>
+                <div className="text-right shrink-0 ml-3">
+                  <p className={`text-[10px] font-bold uppercase ${isDark ? "text-zinc-500" : "text-slate-400"}`}>
+                    Actuación
+                  </p>
+                  <p className={`text-lg font-black tracking-tighter ${isDark ? "text-white" : "text-slate-900"}`}>
+                    {artist.showStart || "—"}
+                  </p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <SpecRow label="Sistemas" value={iemModels} isDark={isDark} />
-                <SpecRow
-                  label="Canales / BP"
-                  value={`${iemChannels} CH / ${iemBP} BP`}
-                  isDark={isDark}
-                />
-                <FrequencyBox
-                  label="Bandas asignadas"
-                  value={iemBands}
-                  accentBg={isDark ? "bg-purple-500/10" : "bg-purple-50"}
-                  accentText={isDark ? "text-purple-400" : "text-purple-700"}
-                  accentBorder={isDark ? "border-purple-500/20" : "border-purple-200"}
-                  isDark={isDark}
-                />
+
+              {/* Inventory badges row */}
+              <div className="flex gap-1.5">
+                <InventoryBadge label="RF CH" count={totalRf} icon={Radio} isDark={isDark} />
+                <InventoryBadge label="IEM CH" count={totalIem} icon={Headphones} isDark={isDark} />
+                <InventoryBadge label="HH" count={totalHH} icon={Wifi} isDark={isDark} />
+                <InventoryBadge label="BP" count={totalBP} icon={Package} isDark={isDark} />
               </div>
             </div>
-          </div>
+          </CollapsibleTrigger>
+
+          {/* Expandable spec sheet */}
+          <CollapsibleContent
+            forceMount
+            className={`overflow-hidden transition-all duration-300 ease-in-out ${
+              expanded ? "max-h-[800px]" : "max-h-0"
+            }`}
+          >
+            <div
+              className={`p-4 pl-5 space-y-4 ${
+                isDark
+                  ? "border-t border-zinc-800 bg-zinc-950"
+                  : "border-t border-slate-200 bg-slate-50"
+              }`}
+            >
+              {/* Soundcheck strip */}
+              <div
+                className={`flex items-center justify-between p-3 rounded-xl border ${
+                  isDark
+                    ? "bg-zinc-900/50 border-zinc-800"
+                    : "bg-white border-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Clock size={14} className={isDark ? "text-yellow-500" : "text-amber-500"} />
+                  <span className={`text-xs font-bold ${isDark ? "text-zinc-300" : "text-slate-600"}`}>
+                    Soundcheck
+                  </span>
+                </div>
+                <span className={`text-sm font-black ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {formatTimeRange(artist.soundcheckStart, artist.soundcheckEnd)}
+                </span>
+              </div>
+
+              {/* Show time strip */}
+              <div
+                className={`flex items-center justify-between p-3 rounded-xl border ${
+                  isDark
+                    ? "bg-zinc-900/50 border-zinc-800"
+                    : "bg-white border-slate-200"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Clock size={14} className={isDark ? "text-blue-500" : "text-blue-500"} />
+                  <span className={`text-xs font-bold ${isDark ? "text-zinc-300" : "text-slate-600"}`}>
+                    Actuación
+                  </span>
+                </div>
+                <span className={`text-sm font-black ${isDark ? "text-white" : "text-slate-900"}`}>
+                  {formatTimeRange(artist.showStart, artist.showEnd)}
+                </span>
+              </div>
+
+              {/* RF Section */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity size={14} className="text-blue-500" />
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-widest ${
+                      isDark ? "text-zinc-500" : "text-slate-400"
+                    }`}
+                  >
+                    RF · {rfProvider || "—"}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <SpecRow label="Hardware" value={rfModels} isDark={isDark} />
+                  <SpecRow
+                    label="Equipos"
+                    value={`${rfHH} HH / ${rfBP} BP`}
+                    isDark={isDark}
+                  />
+                  <FrequencyBox
+                    label="Espectro de frecuencia"
+                    value={rfBands}
+                    accentBg={isDark ? "bg-blue-500/10" : "bg-blue-50"}
+                    accentText={isDark ? "text-blue-400" : "text-blue-700"}
+                    accentBorder={isDark ? "border-blue-500/20" : "border-blue-200"}
+                    isDark={isDark}
+                  />
+                </div>
+              </div>
+
+              {/* IEM Section */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity size={14} className="text-purple-500" />
+                  <span
+                    className={`text-[10px] font-black uppercase tracking-widest ${
+                      isDark ? "text-zinc-500" : "text-slate-400"
+                    }`}
+                  >
+                    IEM · {iemProvider || "—"}
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  <SpecRow label="Sistemas" value={iemModels} isDark={isDark} />
+                  <SpecRow
+                    label="Canales / BP"
+                    value={`${iemChannels} CH / ${iemBP} BP`}
+                    isDark={isDark}
+                  />
+                  <FrequencyBox
+                    label="Bandas asignadas"
+                    value={iemBands}
+                    accentBg={isDark ? "bg-purple-500/10" : "bg-purple-50"}
+                    accentText={isDark ? "text-purple-400" : "text-purple-700"}
+                    accentBorder={isDark ? "border-purple-500/20" : "border-purple-200"}
+                    isDark={isDark}
+                  />
+                </div>
+              </div>
+            </div>
+          </CollapsibleContent>
         </div>
       </div>
-    </div>
+    </Collapsible>
   );
 }
 
@@ -466,15 +475,6 @@ export function TechnicianRfTableModal({
   const [selectedDay, setSelectedDay] = useState<string>("all");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
-  // --- Keyboard handler: Escape to close ---
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
 
   // --- Data fetching ---
 
@@ -581,16 +581,18 @@ export function TechnicianRfTableModal({
   // --- Render ---
 
   return (
-    <div
-      className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} px-2 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}
-    >
-      <div
-        className={`w-full max-w-lg h-[92vh] rounded-2xl border shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 ${
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        className={`w-[calc(100vw-1rem)] max-w-lg h-[92vh] rounded-2xl border shadow-2xl p-0 gap-0 overflow-hidden [&>button]:hidden ${
           isDark
             ? "bg-black border-zinc-800"
             : "bg-slate-50 border-slate-200"
-        }`}
+        } ${theme.modalOverlay.includes("backdrop-blur") ? "backdrop-blur-sm" : ""}`}
       >
+        <DialogTitle className="sr-only">
+          {job?.title?.toUpperCase() || "RF / IEM"} · Resumen RF / IEM
+        </DialogTitle>
+        <div className="flex h-full flex-col">
         {/* Header */}
         <div
           className={`p-4 pb-3 flex justify-between items-center shrink-0 border-b ${
@@ -613,15 +615,17 @@ export function TechnicianRfTableModal({
               </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className={`p-2 rounded-full transition-colors ${
-              isDark ? "text-zinc-500 hover:text-white" : "text-slate-400 hover:text-slate-900"
-            }`}
-            aria-label="Cerrar"
-          >
-            <X size={20} />
-          </button>
+          <DialogClose asChild>
+            <button
+              type="button"
+              className={`p-2 rounded-full transition-colors ${
+                isDark ? "text-zinc-500 hover:text-white" : "text-slate-400 hover:text-slate-900"
+              }`}
+              aria-label="Cerrar"
+            >
+              <X size={20} />
+            </button>
+          </DialogClose>
         </div>
 
         {/* Search */}
@@ -809,7 +813,8 @@ export function TechnicianRfTableModal({
             )}
           </div>
         </ScrollArea>
-      </div>
-    </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

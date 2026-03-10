@@ -65,16 +65,25 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
     // Calculate weekly hours (simplified)
     const weeklyHours = assignments.length * 8; // Placeholder
 
+    const assignmentsByStartTime = assignments
+        .map(assignment => {
+            const normalizedStart = assignment.jobs?.start_time || assignment.start_time;
+            if (!normalizedStart) return null;
+            const normalizedStartUtc = toUtcFromMadrid(toMadridDate(normalizedStart));
+            return { assignment, normalizedStart, normalizedStartUtc };
+        })
+        .filter((entry): entry is { assignment: any; normalizedStart: string; normalizedStartUtc: Date } => entry !== null)
+        .sort((a, b) => a.normalizedStartUtc.getTime() - b.normalizedStartUtc.getTime());
+
     // Get next upcoming shift (first assignment with start_time >= now)
     const now = new Date();
     const nowMadrid = toMadridDate(now);
-    const nextAssignment = assignments.find(a => {
-        const startTime = a.jobs?.start_time;
-        if (!startTime) return false;
-        return toUtcFromMadrid(toMadridDate(startTime)) >= toUtcFromMadrid(nowMadrid);
-    });
-    const nextShift = nextAssignment?.jobs?.start_time
-        ? formatInTimeZone(new Date(nextAssignment.jobs.start_time), MADRID_TIMEZONE, 'HH:mm')
+    const nowUtc = toUtcFromMadrid(nowMadrid);
+    const nextAssignmentEntry = assignmentsByStartTime.find(({ normalizedStartUtc }) => normalizedStartUtc >= nowUtc);
+    const nextAssignment = nextAssignmentEntry?.assignment;
+    const nextShiftStart = nextAssignment?.jobs?.start_time || nextAssignment?.start_time;
+    const nextShift = nextShiftStart
+        ? formatInTimeZone(new Date(nextShiftStart), MADRID_TIMEZONE, 'HH:mm')
         : '--:--';
 
     // Count assignments within the current week (Mon–Sun)
@@ -82,13 +91,9 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
     const weekEndMadrid = endOfWeek(nowMadrid, { weekStartsOn: 1 });
     const weekStart = toUtcFromMadrid(weekStartMadrid);
     const weekEnd = toUtcFromMadrid(weekEndMadrid);
-    const weeklyAssignments = assignments.filter(a => {
-        const startTime = a.jobs?.start_time;
-        if (!startTime) return false;
-        const madridStart = toMadridDate(startTime);
-        const assignmentDate = toUtcFromMadrid(madridStart);
-        return assignmentDate >= weekStart && assignmentDate <= weekEnd;
-    });
+    const weeklyAssignments = assignmentsByStartTime.filter(({ normalizedStartUtc }) =>
+        normalizedStartUtc >= weekStart && normalizedStartUtc <= weekEnd
+    );
 
     return (
         <div className="space-y-6 animate-in fade-in">
