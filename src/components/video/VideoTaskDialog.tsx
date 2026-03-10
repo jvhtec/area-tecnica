@@ -30,7 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-const TASK_TYPES = ["QT", "Rigging Plot", "Memorias técnicas", "Pesos", "Consumos"];
+const TASK_TYPES = ["QT", "Rigging Plot", "Prediccion", "Memorias técnicas", "Pesos", "Consumos", "PS"];
 
 interface VideoTaskDialogProps {
   jobId: string;
