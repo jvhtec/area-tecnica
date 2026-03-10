@@ -1,12 +1,12 @@
 import { createBrowserRouter } from "react-router-dom";
-import Layout from "@/components/Layout";
+import Layout from "@/legacy/components/Layout";
 import Dashboard from "@/pages/Dashboard";
 import TechnicianDashboard from "@/pages/TechnicianDashboard";
 import Personal from "@/pages/Personal";
-import VacationManagement from "@/pages/VacationManagement";
+import VacationManagement from "@/legacy/pages/VacationManagement";
 import Tours from "@/pages/Tours";
-import Landing from "@/pages/Landing";
-import { FestivalManagementWrapper } from "@/components/festival/FestivalManagementWrapper";
+import Landing from "@/legacy/pages/Landing";
+import { FestivalManagementWrapper } from "@/legacy/components/festival/FestivalManagementWrapper";
 import { TourManagementWrapper } from "@/components/tours/TourManagementWrapper";
 import Auth from "@/pages/Auth";
 import { RequireAuth } from "@/components/RequireAuth";
