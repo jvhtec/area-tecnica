@@ -1,100 +1,129 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { JobPayoutTotalsPanel } from '../JobPayoutTotalsPanel';
-import { NO_AUTONOMO_LABEL } from '@/utils/autonomo';
+import React from "react";
+import { screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const useJobPayoutTotalsMock = vi.fn();
-const useManagerJobQuotesMock = vi.fn();
+import { renderWithProviders } from "@/test/renderWithProviders";
+import { NO_AUTONOMO_LABEL } from "@/utils/autonomo";
 
-vi.mock('@/hooks/useJobPayoutTotals', () => ({
-  useJobPayoutTotals: (...args: any[]) => useJobPayoutTotalsMock(...args),
+const { useJobPayoutDataMock, usePayoutActionsMock } = vi.hoisted(() => ({
+  useJobPayoutDataMock: vi.fn(),
+  usePayoutActionsMock: vi.fn(),
 }));
 
-vi.mock('@/hooks/useManagerJobQuotes', () => ({
-  useManagerJobQuotes: (...args: any[]) => useManagerJobQuotesMock(...args),
+vi.mock("@/components/jobs/payout-totals/useJobPayoutData", () => ({
+  useJobPayoutData: (...args: any[]) => useJobPayoutDataMock(...args),
 }));
 
-const useQueryMock = vi.fn();
-
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: (options: any) => useQueryMock(options),
+vi.mock("@/components/jobs/payout-totals/usePayoutActions", () => ({
+  usePayoutActions: (...args: any[]) => usePayoutActionsMock(...args),
 }));
 
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {},
-}));
+import { JobPayoutTotalsPanel } from "../JobPayoutTotalsPanel";
 
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    warning: vi.fn(),
-  },
-}));
-
-describe('JobPayoutTotalsPanel autonomo badge', () => {
+describe("JobPayoutTotalsPanel autonomo badge", () => {
   beforeEach(() => {
-    useJobPayoutTotalsMock.mockReturnValue({
-      data: [
+    useJobPayoutDataMock.mockReturnValue({
+      jobMeta: {
+        id: "job-1",
+        title: "Job Uno",
+        start_time: "2024-01-01T00:00:00Z",
+        end_time: "2024-01-01T06:00:00Z",
+        timezone: "Europe/Madrid",
+        tour_id: null,
+        rates_approved: true,
+        job_type: "single",
+        invoicing_company: null,
+      },
+      isTourDate: false,
+      isLoading: false,
+      error: null,
+      isClosureLocked: false,
+      payoutTotals: [
         {
-          technician_id: 'tech-1',
-          job_id: 'job-1',
+          technician_id: "tech-1",
+          job_id: "job-1",
           timesheets_total_eur: 100,
           extras_total_eur: 0,
           total_eur: 100,
+          payout_approved: true,
+          extras_breakdown: { items: [], total_eur: 0 },
+          vehicle_disclaimer: false,
+          vehicle_disclaimer_text: null,
+          expenses_total_eur: 0,
+          expenses_breakdown: [],
         },
       ],
-      isLoading: false,
-      error: null,
-    });
-
-    useManagerJobQuotesMock.mockReturnValue({
-      data: [],
-      isLoading: false,
-      error: null,
-    });
-
-    useQueryMock.mockImplementation(({ queryKey }: { queryKey: any[] }) => {
-      const key = queryKey[0];
-      if (key === 'flex-work-orders-by-job') {
-        return { data: [], isLoading: false, error: null };
-      }
-      if (key === 'profiles-for-job-payout') {
-        return {
-          data: [
-            {
-              id: 'tech-1',
-              first_name: 'Ana',
-              last_name: 'Lopez',
-              email: 'ana@example.com',
-              autonomo: false,
-            },
-          ],
-          isLoading: false,
-          error: null,
-        };
-      }
-      if (key === 'job-payout-metadata') {
-        return {
-          data: {
-            id: 'job-1',
-            title: 'Job Uno',
-            start_time: '2024-01-01T00:00:00Z',
-            tour_id: null,
-            rates_approved: true,
-            job_type: null,
+      visibleTourQuotes: [],
+      tourTimesheetDays: new Map(),
+      profilesWithEmail: [
+        {
+          id: "tech-1",
+          first_name: "Ana",
+          last_name: "Lopez",
+          email: "ana@example.com",
+          autonomo: false,
+        },
+      ],
+      profileMap: new Map([
+        [
+          "tech-1",
+          {
+            id: "tech-1",
+            first_name: "Ana",
+            last_name: "Lopez",
+            email: "ana@example.com",
+            autonomo: false,
           },
-          isLoading: false,
-          error: null,
-        };
-      }
-      return { data: undefined, isLoading: false, error: null };
+        ],
+      ]),
+      autonomoMap: new Map([["tech-1", false]]),
+      getTechName: () => "Ana Lopez",
+      lpoMap: new Map(),
+      flexElementMap: new Map(),
+      buildFinDocUrl: () => null,
+      techDaysMap: new Map([["tech-1", 1]]),
+      techTotalDaysMap: new Map([["tech-1", 1]]),
+      payoutOverrides: [],
+      overrideActorMap: new Map(),
+      getTechOverride: () => undefined,
+      calculatedGrandTotal: 100,
+      isManager: true,
+      rehearsalDateSet: new Set(),
+      jobTimesheetDates: [],
+      allDatesMarked: false,
+      toggleDateRehearsalMutation: { mutate: vi.fn(), isPending: false },
+      toggleAllDatesRehearsalMutation: { mutate: vi.fn(), isPending: false },
+      standardPayoutTotals: [],
+    });
+
+    usePayoutActionsMock.mockReturnValue({
+      isExporting: false,
+      isSendingEmails: false,
+      sendingByTech: {},
+      missingEmailTechIds: [],
+      previewOpen: false,
+      previewContext: null,
+      isLoadingPreview: false,
+      editingTechId: null,
+      editingAmount: "",
+      setEditingAmount: vi.fn(),
+      handleExport: vi.fn(),
+      handleSendEmails: vi.fn(),
+      handlePreviewEmails: vi.fn(),
+      handleSendEmailForTech: vi.fn(),
+      handleStartEdit: vi.fn(),
+      handleSaveOverride: vi.fn(),
+      handleRemoveOverride: vi.fn(),
+      handleCancelEdit: vi.fn(),
+      closePreview: vi.fn(),
+      isSavingOverride: false,
+      isRemovingOverride: false,
+      toggleApprovalMutation: { mutate: vi.fn(), isPending: false },
     });
   });
 
-  it('renders the non-autonomo badge when the flag is false', () => {
-    render(<JobPayoutTotalsPanel jobId="job-1" />);
+  it("renders the non-autonomo badge when the flag is false", () => {
+    renderWithProviders(<JobPayoutTotalsPanel jobId="job-1" />);
 
     expect(screen.getByText(NO_AUTONOMO_LABEL)).toBeInTheDocument();
   });

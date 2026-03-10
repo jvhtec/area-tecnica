@@ -1,19 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { completeTask, revertTask, bulkCompleteTasks } from './taskCompletion';
-import { supabase } from '@/lib/supabase';
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Mock Supabase client
-vi.mock('@/lib/supabase', () => ({
-  supabase: {
-    auth: {
-      getUser: vi.fn(),
-    },
-    from: vi.fn(),
-    functions: {
-      invoke: vi.fn(),
-    },
-  },
+import { createTask } from "@/test/fixtures";
+import { createMockQueryBuilder, mockSupabase } from "@/test/mockSupabase";
+
+vi.mock("@/integrations/supabase/client", () => ({
+  supabase: mockSupabase,
 }));
+
+import { bulkCompleteTasks, completeTask, revertTask } from "./taskCompletion";
 
 describe('taskCompletion service', () => {
   beforeEach(() => {
@@ -24,56 +18,33 @@ describe('taskCompletion service', () => {
     it('should complete a task with all metadata', async () => {
       const mockUserId = 'user-123';
       const mockTaskId = 'task-456';
-      const mockTask = {
+      const mockTask = createTask({
         id: mockTaskId,
         task_type: 'Pesos',
         assigned_to: 'user-789',
         job_id: 'job-001',
-      };
+      });
 
-      // Mock auth.getUser
-      (supabase.auth.getUser as any) = vi.fn().mockResolvedValue({
+      mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: mockUserId } },
         error: null,
       });
 
-      // Mock from().select() chain
-      const mockSelect = vi.fn().mockReturnThis();
-      const mockEq = vi.fn().mockReturnThis();
-      const mockMaybeSingle = vi.fn().mockResolvedValue({
+      const fetchBuilder = createMockQueryBuilder({
         data: mockTask,
         error: null,
       });
-
-      // Mock from().update() chain
-      const mockUpdate = vi.fn().mockReturnThis();
-      const mockUpdateEq = vi.fn().mockResolvedValue({ error: null });
-
-      (supabase.from as any) = vi.fn((table: string) => {
-        if (table === 'sound_job_tasks') {
-          return {
-            select: mockSelect,
-            eq: mockEq,
-            maybeSingle: mockMaybeSingle,
-            update: mockUpdate,
-          };
-        }
+      const updateBuilder = createMockQueryBuilder({
+        data: null,
+        error: null,
       });
 
-      mockSelect.mockReturnValue({
-        eq: mockEq,
+      mockSupabase.from.mockImplementationOnce(() => fetchBuilder);
+      mockSupabase.from.mockImplementationOnce(() => updateBuilder);
+      mockSupabase.functions.invoke.mockResolvedValue({
+        data: null,
+        error: null,
       });
-
-      mockEq.mockReturnValue({
-        maybeSingle: mockMaybeSingle,
-      });
-
-      mockUpdate.mockReturnValue({
-        eq: mockUpdateEq,
-      });
-
-      // Mock push function
-      (supabase.functions.invoke as any) = vi.fn().mockResolvedValue({});
 
       const result = await completeTask({
         taskId: mockTaskId,
@@ -83,7 +54,7 @@ describe('taskCompletion service', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(mockUpdate).toHaveBeenCalledWith(
+      expect(updateBuilder.update).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'completed',
           progress: 100,
@@ -94,31 +65,17 @@ describe('taskCompletion service', () => {
     });
 
     it('should handle errors gracefully', async () => {
-      (supabase.auth.getUser as any) = vi.fn().mockResolvedValue({
+      mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
         error: null,
       });
 
-      const mockSelect = vi.fn().mockReturnThis();
-      const mockEq = vi.fn().mockReturnThis();
-      const mockMaybeSingle = vi.fn().mockResolvedValue({
+      const fetchBuilder = createMockQueryBuilder({
         data: null,
         error: { message: 'Task not found' },
       });
 
-      (supabase.from as any) = vi.fn(() => ({
-        select: mockSelect,
-        eq: mockEq,
-        maybeSingle: mockMaybeSingle,
-      }));
-
-      mockSelect.mockReturnValue({
-        eq: mockEq,
-      });
-
-      mockEq.mockReturnValue({
-        maybeSingle: mockMaybeSingle,
-      });
+      mockSupabase.from.mockImplementationOnce(() => fetchBuilder);
 
       const result = await completeTask({
         taskId: 'task-456',
@@ -133,16 +90,12 @@ describe('taskCompletion service', () => {
 
   describe('revertTask', () => {
     it('should clear completion metadata when reverting', async () => {
-      const mockUpdate = vi.fn().mockReturnThis();
-      const mockUpdateEq = vi.fn().mockResolvedValue({ error: null });
-
-      (supabase.from as any) = vi.fn(() => ({
-        update: mockUpdate,
-      }));
-
-      mockUpdate.mockReturnValue({
-        eq: mockUpdateEq,
+      const updateBuilder = createMockQueryBuilder({
+        data: null,
+        error: null,
       });
+
+      mockSupabase.from.mockImplementationOnce(() => updateBuilder);
 
       const result = await revertTask({
         taskId: 'task-456',
@@ -151,7 +104,7 @@ describe('taskCompletion service', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(mockUpdate).toHaveBeenCalledWith(
+      expect(updateBuilder.update).toHaveBeenCalledWith(
         expect.objectContaining({
           status: 'in_progress',
           progress: 50,
@@ -165,25 +118,17 @@ describe('taskCompletion service', () => {
 
   describe('bulkCompleteTasks', () => {
     it('should return a result object with expected shape', async () => {
-      // Mock auth
-      (supabase.auth.getUser as any) = vi.fn().mockResolvedValue({
+      mockSupabase.auth.getUser.mockResolvedValue({
         data: { user: { id: 'user-123' } },
         error: null,
       });
 
-      // Mock empty results (no tasks found)
-      (supabase.from as any) = vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              neq: vi.fn().mockResolvedValue({
-                data: [],
-                error: null,
-              }),
-            })),
-          })),
-        })),
-      }));
+      const queryBuilder = createMockQueryBuilder({
+        data: [],
+        error: null,
+      });
+
+      mockSupabase.from.mockImplementationOnce(() => queryBuilder);
 
       const result = await bulkCompleteTasks({
         jobId: 'job-001',

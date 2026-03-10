@@ -424,6 +424,8 @@ export const AssignJobDialog = ({
           if (jobData) {
             const startDate = new Date(jobData.start_time);
             const endDate = new Date(jobData.end_time);
+            startDate.setHours(0, 0, 0, 0);
+            endDate.setHours(0, 0, 0, 0);
             const dates: string[] = [];
 
             for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {

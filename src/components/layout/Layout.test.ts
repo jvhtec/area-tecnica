@@ -116,45 +116,25 @@ describe("buildNavigationItems - management department navigation", () => {
   })
 })
 
-describe("buildNavigationItems - SoundVision visibility", () => {
-  it("shows SoundVision item for technician without access", () => {
+describe("buildNavigationItems - technician navigation", () => {
+  it("keeps technician navigation limited to the technician app entrypoint and profile", () => {
     const context = buildContext({ userRole: "technician", hasSoundVisionAccess: false })
     const items = buildNavigationItems(context)
 
-    const soundVisionItem = items.find((item) => item.id === "soundvision-files")
-    expect(soundVisionItem).toBeDefined()
+    expect(items.map((item) => item.id)).toEqual(["technician-dashboard", "profile"])
   })
 
-  it("shows SoundVision item for technician with access", () => {
-    const context = buildContext({ userRole: "technician", hasSoundVisionAccess: true })
+  it("shows the house-tech department routes for house technicians", () => {
+    const context = buildContext({
+      userRole: "house_tech",
+      userDepartment: "sound",
+      hasSoundVisionAccess: true,
+    })
     const items = buildNavigationItems(context)
 
-    const soundVisionItem = items.find((item) => item.id === "soundvision-files")
-    expect(soundVisionItem).toBeDefined()
-  })
-
-  it("shows SoundVision item for house_tech without access", () => {
-    const context = buildContext({ userRole: "house_tech", hasSoundVisionAccess: false })
-    const items = buildNavigationItems(context)
-
-    const soundVisionItem = items.find((item) => item.id === "soundvision-files")
-    expect(soundVisionItem).toBeDefined()
-  })
-
-  it("shows SoundVision item for house_tech with access", () => {
-    const context = buildContext({ userRole: "house_tech", hasSoundVisionAccess: true })
-    const items = buildNavigationItems(context)
-
-    const soundVisionItem = items.find((item) => item.id === "soundvision-files")
-    expect(soundVisionItem).toBeDefined()
-  })
-
-  it("hides SoundVision item for management role", () => {
-    const context = buildContext({ userRole: "management", hasSoundVisionAccess: true })
-    const items = buildNavigationItems(context)
-
-    const soundVisionItem = items.find((item) => item.id === "soundvision-files")
-    expect(soundVisionItem).toBeUndefined()
+    expect(items.find((item) => item.id === "house-department")).toBeDefined()
+    expect(items.find((item) => item.id === "technician-dashboard")).toBeDefined()
+    expect(items.find((item) => item.id === "logistics")).toBeDefined()
   })
 })
 
@@ -171,7 +151,7 @@ describe("buildNavigationItems - admin visibility", () => {
     expect(items.find((item) => item.id === "admin-lights")).toBeDefined()
     expect(items.find((item) => item.id === "admin-video")).toBeDefined()
     expect(items.find((item) => item.id === "logistics")).toBeDefined()
-    expect(items.find((item) => item.id === "soundvision-files")).toBeDefined()
+    expect(items.find((item) => item.id === "feedback")).toBeDefined()
   })
 
   it("automatically renders future routes for admins", () => {

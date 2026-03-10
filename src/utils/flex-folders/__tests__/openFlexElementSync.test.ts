@@ -2,15 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-// Mock toast BEFORE importing the module that uses it
-vi.mock('sonner', () => ({
-  toast: {
-    error: vi.fn(),
-    warning: vi.fn(),
-    success: vi.fn(),
-  },
-}));
+import { toast } from 'sonner';
 
 import { openFlexElementSync } from '../openFlexElementSync';
 import * as resolverModule from '../resolveFlexUrl';
@@ -94,8 +86,6 @@ describe('openFlexElementSync', () => {
   });
 
   it('should reject empty elementId', () => {
-    const { toast } = require('sonner');
-
     openFlexElementSync({
       elementId: '',
     });
@@ -108,8 +98,6 @@ describe('openFlexElementSync', () => {
   });
 
   it('should reject null elementId', () => {
-    const { toast } = require('sonner');
-
     openFlexElementSync({
       elementId: null as any,
     });
@@ -122,8 +110,6 @@ describe('openFlexElementSync', () => {
   });
 
   it('should reject undefined elementId', () => {
-    const { toast } = require('sonner');
-
     openFlexElementSync({
       elementId: undefined as any,
     });
@@ -136,8 +122,6 @@ describe('openFlexElementSync', () => {
   });
 
   it('should reject whitespace-only elementId', () => {
-    const { toast } = require('sonner');
-
     openFlexElementSync({
       elementId: '   ',
     });
@@ -149,9 +133,10 @@ describe('openFlexElementSync', () => {
     expect(createElementSpy).not.toHaveBeenCalled();
   });
 
-  it('should use fallback URL when resolver returns empty', () => {
-    const { toast } = require('sonner');
-    vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue('');
+  it('should use fallback URL when resolver throws', () => {
+    vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockImplementation(() => {
+      throw new Error('Resolver blew up');
+    });
 
     openFlexElementSync({
       elementId: 'test-id',
@@ -170,7 +155,6 @@ describe('openFlexElementSync', () => {
   });
 
   it('should show error toast when both primary and fallback fail', () => {
-    const { toast } = require('sonner');
     vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockImplementation(() => {
       throw new Error('URL construction failed');
     });
@@ -234,7 +218,6 @@ describe('openFlexElementSync', () => {
   });
 
   it('should handle element with display name in error messages', () => {
-    const { toast } = require('sonner');
     vi.spyOn(resolverModule, 'resolveFlexUrlSync').mockReturnValue('');
 
     openFlexElementSync({

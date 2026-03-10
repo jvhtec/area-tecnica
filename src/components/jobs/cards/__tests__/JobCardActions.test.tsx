@@ -34,7 +34,13 @@ vi.mock('@/hooks/use-mobile', () => ({
   useIsMobile: () => false,
 }));
 
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/hooks/useOptimizedAuth', () => ({
+  useOptimizedAuth: () => ({
+    userDepartment: 'sound',
+  }),
+}));
+
+vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: vi.fn(() => ({
       select: vi.fn(() => ({
@@ -54,15 +60,19 @@ vi.mock('@/lib/supabase', () => ({
   },
 }));
 
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: () => ({
-    data: undefined,
-    isLoading: false,
-    isError: false,
-    error: null,
-    refetch: vi.fn(),
-  }),
-}));
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+  return {
+    ...actual,
+    useQuery: () => ({
+      data: undefined,
+      isLoading: false,
+      isError: false,
+      error: null,
+      refetch: vi.fn(),
+    }),
+  };
+});
 
 vi.mock('@/components/incident-reports/TechnicianIncidentReportDialog', () => ({
   TechnicianIncidentReportDialog: () => null,

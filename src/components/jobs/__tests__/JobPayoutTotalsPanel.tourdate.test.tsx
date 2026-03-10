@@ -1,138 +1,152 @@
-import React from 'react';
-import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { JobPayoutTotalsPanel } from '../JobPayoutTotalsPanel';
-import { formatCurrency } from '@/lib/utils';
-import type { TourJobRateQuote } from '@/types/tourRates';
+import React from "react";
+import { screen } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const useJobPayoutTotalsMock = vi.fn();
-const useManagerJobQuotesMock = vi.fn();
+import { formatCurrency } from "@/lib/utils";
+import { renderWithProviders } from "@/test/renderWithProviders";
 
-vi.mock('@/hooks/useJobPayoutTotals', () => ({
-  useJobPayoutTotals: (...args: any[]) => useJobPayoutTotalsMock(...args),
+const { useJobPayoutDataMock, usePayoutActionsMock } = vi.hoisted(() => ({
+  useJobPayoutDataMock: vi.fn(),
+  usePayoutActionsMock: vi.fn(),
 }));
 
-vi.mock('@/hooks/useManagerJobQuotes', () => ({
-  useManagerJobQuotes: (...args: any[]) => useManagerJobQuotesMock(...args),
+vi.mock("@/components/jobs/payout-totals/useJobPayoutData", () => ({
+  useJobPayoutData: (...args: any[]) => useJobPayoutDataMock(...args),
 }));
 
-const useQueryMock = vi.fn();
-
-vi.mock('@tanstack/react-query', () => ({
-  useQuery: (options: any) => useQueryMock(options),
+vi.mock("@/components/jobs/payout-totals/usePayoutActions", () => ({
+  usePayoutActions: (...args: any[]) => usePayoutActionsMock(...args),
 }));
 
-vi.mock('@/integrations/supabase/client', () => ({
-  supabase: {},
-}));
+import { JobPayoutTotalsPanel } from "../JobPayoutTotalsPanel";
 
-vi.mock('sonner', () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    warning: vi.fn(),
-  },
-}));
-
-describe('JobPayoutTotalsPanel tourdate payouts', () => {
+describe("JobPayoutTotalsPanel tourdate payouts", () => {
   beforeEach(() => {
-    useJobPayoutTotalsMock.mockReturnValue({
-      data: [],
+    useJobPayoutDataMock.mockReturnValue({
+      jobMeta: {
+        id: "job-tour-1",
+        title: "Tour Date",
+        start_time: "2024-01-01T00:00:00Z",
+        end_time: "2024-01-01T06:00:00Z",
+        timezone: "Europe/Madrid",
+        tour_id: "tour-1",
+        rates_approved: true,
+        job_type: "tourdate",
+        invoicing_company: null,
+      },
+      isTourDate: true,
       isLoading: false,
       error: null,
-    });
-
-    const quote: TourJobRateQuote = {
-      job_id: 'job-tour-1',
-      technician_id: 'tech-1',
-      start_time: '2024-01-01T00:00:00Z',
-      end_time: '2024-01-01T06:00:00Z',
-      job_type: 'tourdate',
-      tour_id: 'tour-1',
-      title: 'Tour Date',
-      is_house_tech: false,
-      category: 'tecnico',
-      base_day_eur: 150,
-      week_count: 1,
-      multiplier: 1,
-      iso_year: 2024,
-      iso_week: 1,
-      total_eur: 150,
-      extras: {
-        items: [
+      isClosureLocked: false,
+      payoutTotals: [
+        {
+          technician_id: "tech-1",
+          job_id: "job-tour-1",
+          timesheets_total_eur: 150,
+          extras_total_eur: 25,
+          total_eur: 175,
+          payout_approved: true,
+          extras_breakdown: {
+            items: [
+              {
+                extra_type: "travel_half",
+                quantity: 1,
+                unit_eur: 25,
+                amount_eur: 25,
+              },
+            ],
+            total_eur: 25,
+          },
+          vehicle_disclaimer: true,
+          vehicle_disclaimer_text: "Vehículo asignado por la gira.",
+          expenses_total_eur: 0,
+          expenses_breakdown: [],
+        },
+      ],
+      visibleTourQuotes: [],
+      tourTimesheetDays: new Map([["tech-1", 1]]),
+      profilesWithEmail: [
+        {
+          id: "tech-1",
+          first_name: "Ana",
+          last_name: "Lopez",
+          email: "ana@example.com",
+          autonomo: false,
+        },
+      ],
+      profileMap: new Map([
+        [
+          "tech-1",
           {
-            extra_type: 'travel_half',
-            quantity: 1,
-            unit_eur: 25,
-            amount_eur: 25,
+            id: "tech-1",
+            first_name: "Ana",
+            last_name: "Lopez",
+            email: "ana@example.com",
+            autonomo: false,
           },
         ],
-        total_eur: 25,
-      },
-      extras_total_eur: 25,
-      total_with_extras_eur: 175,
-      vehicle_disclaimer: true,
-      vehicle_disclaimer_text: 'Vehículo asignado por la gira.',
-      breakdown: {},
-    };
-
-    useManagerJobQuotesMock.mockReturnValue({
-      data: [quote],
-      isLoading: false,
-      error: null,
+      ]),
+      autonomoMap: new Map([["tech-1", false]]),
+      getTechName: () => "Ana Lopez",
+      lpoMap: new Map(),
+      flexElementMap: new Map(),
+      buildFinDocUrl: () => null,
+      techDaysMap: new Map(),
+      techTotalDaysMap: new Map(),
+      payoutOverrides: [],
+      overrideActorMap: new Map(),
+      getTechOverride: () => undefined,
+      calculatedGrandTotal: 175,
+      isManager: true,
+      rehearsalDateSet: new Set(),
+      jobTimesheetDates: [],
+      allDatesMarked: false,
+      toggleDateRehearsalMutation: { mutate: vi.fn(), isPending: false },
+      toggleAllDatesRehearsalMutation: { mutate: vi.fn(), isPending: false },
+      standardPayoutTotals: [],
     });
 
-    useQueryMock.mockImplementation(({ queryKey }: { queryKey: any[] }) => {
-      const key = queryKey[0];
-      if (key === 'flex-work-orders-by-job') {
-        return { data: [], isLoading: false, error: null };
-      }
-      if (key === 'profiles-for-job-payout') {
-        return {
-          data: [
-            {
-              id: 'tech-1',
-              first_name: 'Ana',
-              last_name: 'Lopez',
-              email: 'ana@example.com',
-              autonomo: false,
-            },
-          ],
-          isLoading: false,
-          error: null,
-        };
-      }
-      if (key === 'job-payout-metadata') {
-        return {
-          data: {
-            id: 'job-tour-1',
-            title: 'Tour Date',
-            start_time: '2024-01-01T00:00:00Z',
-            tour_id: 'tour-1',
-            rates_approved: true,
-            job_type: 'tourdate',
-          },
-          isLoading: false,
-          error: null,
-        };
-      }
-      return { data: undefined, isLoading: false, error: null };
+    usePayoutActionsMock.mockReturnValue({
+      isExporting: false,
+      isSendingEmails: false,
+      sendingByTech: {},
+      missingEmailTechIds: [],
+      previewOpen: false,
+      previewContext: null,
+      isLoadingPreview: false,
+      editingTechId: null,
+      editingAmount: "",
+      setEditingAmount: vi.fn(),
+      handleExport: vi.fn(),
+      handleSendEmails: vi.fn(),
+      handlePreviewEmails: vi.fn(),
+      handleSendEmailForTech: vi.fn(),
+      handleStartEdit: vi.fn(),
+      handleSaveOverride: vi.fn(),
+      handleRemoveOverride: vi.fn(),
+      handleCancelEdit: vi.fn(),
+      closePreview: vi.fn(),
+      isSavingOverride: false,
+      isRemovingOverride: false,
+      toggleApprovalMutation: { mutate: vi.fn(), isPending: false },
     });
   });
 
-  it('renders mapped tour payouts with totals and extras', () => {
-    render(<JobPayoutTotalsPanel jobId="job-tour-1" />);
+  it("renders mapped tour payouts with totals and extras", () => {
+    renderWithProviders(<JobPayoutTotalsPanel jobId="job-tour-1" />);
 
-    const normalize = (value: string) => value.replace(/\s+/g, '');
+    const normalize = (value: string) => value.replace(/\s+/g, "");
     const grandTotals = screen.getAllByText(
-      (content) => normalize(content) === normalize(formatCurrency(175))
+      (content) => normalize(content) === normalize(formatCurrency(175)),
     );
     const baseTotals = screen.getAllByText(
-      (content) => normalize(content) === normalize(formatCurrency(150))
+      (content) => normalize(content) === normalize(formatCurrency(150)),
     );
+
     expect(grandTotals.length).toBeGreaterThan(0);
     expect(baseTotals.length).toBeGreaterThan(0);
-    expect(screen.getByText('travel half × 1')).toBeInTheDocument();
-    expect(screen.queryByText('No payout information available for this job.')).not.toBeInTheDocument();
+    expect(screen.getByText(/travel half/i)).toBeInTheDocument();
+    expect(screen.getByText(/vehículo asignado por la gira/i)).toBeInTheDocument();
+    expect(screen.queryByText(/no hay información de pagos para este trabajo/i)).not.toBeInTheDocument();
   });
 });

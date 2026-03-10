@@ -2,19 +2,37 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
+import { createMockQueryBuilder } from '@/test/mockSupabase';
 import { AssignJobDialog } from '../AssignJobDialog';
 
-const useQueryMock = vi.fn();
-const checkTimeConflictEnhancedMock = vi.fn();
-const insertMock = vi.fn();
-const deleteMock = vi.fn();
-const fromMock = vi.fn();
-const authGetUserMock = vi.fn();
-const functionsInvokeMock = vi.fn();
-const toastFn = Object.assign(vi.fn(), {
-  error: vi.fn(),
-  success: vi.fn(),
-});
+const {
+  useQueryMock,
+  checkTimeConflictEnhancedMock,
+  insertMock,
+  deleteMock,
+  fromMock,
+  authGetUserMock,
+  functionsInvokeMock,
+  toastFn,
+  toggleTimesheetDayMock,
+  removeTimesheetAssignmentMock,
+  syncTimesheetCategoriesMock,
+} = vi.hoisted(() => ({
+  useQueryMock: vi.fn(),
+  checkTimeConflictEnhancedMock: vi.fn(),
+  insertMock: vi.fn(),
+  deleteMock: vi.fn(),
+  fromMock: vi.fn(),
+  authGetUserMock: vi.fn(),
+  functionsInvokeMock: vi.fn(),
+  toastFn: Object.assign(vi.fn(), {
+    error: vi.fn(),
+    success: vi.fn(),
+  }),
+  toggleTimesheetDayMock: vi.fn(),
+  removeTimesheetAssignmentMock: vi.fn(),
+  syncTimesheetCategoriesMock: vi.fn(),
+}));
 
 type ConflictCheckResult = {
   hasHardConflict: boolean;
@@ -24,8 +42,8 @@ type ConflictCheckResult = {
   unavailabilityConflicts: Array<{ date: string; reason: string; source: string; notes?: string }>;
 };
 
-vi.mock('@tanstack/react-query', async () => {
-  const actual = await vi.importActual<typeof import('@tanstack/react-query')>('@tanstack/react-query');
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
   return {
     ...actual,
     useQuery: useQueryMock,
@@ -40,7 +58,7 @@ vi.mock('@/utils/technicianAvailability', async () => {
   };
 });
 
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: fromMock,
     auth: {
@@ -54,6 +72,18 @@ vi.mock('@/lib/supabase', () => ({
 
 vi.mock('sonner', () => ({
   toast: toastFn,
+}));
+
+vi.mock('@/services/toggleTimesheetDay', () => ({
+  toggleTimesheetDay: (...args: any[]) => toggleTimesheetDayMock(...args),
+}));
+
+vi.mock('@/services/removeTimesheetAssignment', () => ({
+  removeTimesheetAssignment: (...args: any[]) => removeTimesheetAssignmentMock(...args),
+}));
+
+vi.mock('@/services/syncTimesheetCategories', () => ({
+  syncTimesheetCategoriesForAssignment: (...args: any[]) => syncTimesheetCategoriesMock(...args),
 }));
 
 const baseJob = {
@@ -72,16 +102,63 @@ const defaultTechnician = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useQueryMock.mockReturnValue({ data: defaultTechnician });
+  useQueryMock.mockImplementation(({ queryKey }: { queryKey: any[] }) => {
+    const key = queryKey[0];
+    if (key === 'technician') {
+      return { data: defaultTechnician, isLoading: false };
+    }
+    if (key === 'existing-timesheets') {
+      return { data: [], isLoading: false };
+    }
+    return { data: undefined, isLoading: false };
+  });
   insertMock.mockResolvedValue({ error: null });
   deleteMock.mockResolvedValue({ error: null });
+  toggleTimesheetDayMock.mockResolvedValue(undefined);
+  removeTimesheetAssignmentMock.mockResolvedValue({ deleted_assignment: true, deleted_timesheets: 0 });
+  syncTimesheetCategoriesMock.mockResolvedValue(undefined);
   fromMock.mockImplementation((table: string) => {
     if (table === 'job_assignments') {
       return {
+        select: vi.fn((columns: string) => {
+          if (columns === 'job_id') {
+            return createMockQueryBuilder({
+              data: [{ job_id: baseJob.id }],
+              error: null,
+            });
+          }
+
+          return createMockQueryBuilder({
+            data: null,
+            error: null,
+          });
+        }),
         insert: insertMock,
-        delete: deleteMock,
+        delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
+        update: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
       };
     }
+
+    if (table === 'timesheets') {
+      return {
+        delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
+      };
+    }
+
+    if (table === 'jobs') {
+      return {
+        select: vi.fn(() =>
+          createMockQueryBuilder({
+            data: {
+              start_time: baseJob.start_time,
+              end_time: baseJob.end_time,
+            },
+            error: null,
+          }),
+        ),
+      };
+    }
+
     return {
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -127,26 +204,26 @@ describe('AssignJobDialog conflict handling', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /choose a role/i }));
-    await user.click(screen.getByText(/foh/i));
+    await user.click(screen.getByRole('combobox'));
+    await user.click(await screen.findByRole('option', { name: /foh\s+—\s+responsable/i }));
 
-    await user.click(screen.getByRole('button', { name: /assign job/i }));
+    await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
 
-    expect(await screen.findByText(/scheduling conflict/i)).toBeInTheDocument();
+    expect(await screen.findByText(/conflicto de horario/i)).toBeInTheDocument();
     expect(checkTimeConflictEnhancedMock).toHaveBeenCalledWith('tech-1', 'job-1', expect.objectContaining({ includePending: true }));
     expect(insertMock).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole('button', { name: /go back/i }));
+    await user.click(screen.getByRole('button', { name: /volver/i }));
 
     await waitFor(() => {
-      expect(screen.queryByText(/scheduling conflict/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/conflicto de horario/i)).not.toBeInTheDocument();
     });
     expect(insertMock).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole('button', { name: /assign job/i }));
-    expect(await screen.findByText(/scheduling conflict/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
+    expect(await screen.findByText(/conflicto de horario/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /(force assign anyway|proceed anyway)/i }));
+    await user.click(screen.getByRole('button', { name: /forzar asignación de todos modos/i }));
 
     await waitFor(() => {
       expect(insertMock).toHaveBeenCalledTimes(1);
@@ -181,16 +258,16 @@ describe('AssignJobDialog conflict handling', () => {
       />
     );
 
-    await user.click(screen.getByRole('button', { name: /choose a role/i }));
-    await user.click(screen.getByText(/foh/i));
+    await user.click(screen.getByRole('combobox'));
+    await user.click(await screen.findByRole('option', { name: /foh\s+—\s+responsable/i }));
 
-    await user.click(screen.getByRole('button', { name: /assign job/i }));
+    await user.click(screen.getByRole('button', { name: /asignar trabajo/i }));
 
     await waitFor(() => {
       expect(insertMock).toHaveBeenCalledTimes(1);
     });
     expect(checkTimeConflictEnhancedMock).toHaveBeenCalledWith('tech-2', 'job-1', expect.objectContaining({ includePending: true }));
-    expect(screen.queryByText(/scheduling conflict/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/conflicto de horario/i)).not.toBeInTheDocument();
     await waitFor(() => {
       expect(onClose).toHaveBeenCalled();
     });
