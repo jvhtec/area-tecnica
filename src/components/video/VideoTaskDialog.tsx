@@ -21,6 +21,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { TASK_TYPES } from "@/constants/taskTypes";
 import {
   Table as UITable,
   TableBody,
@@ -29,8 +30,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const TASK_TYPES = ["QT", "Rigging Plot", "Prediccion", "Memorias técnicas", "Pesos", "Consumos", "PS"];
 
 interface VideoTaskDialogProps {
   jobId: string;
@@ -420,7 +419,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {TASK_TYPES.map((taskType) => {
+                  {TASK_TYPES.video.map((taskType) => {
                     const task = tasks?.find(t => t.task_type === taskType);
                     return (
                       <TableRow key={taskType}>

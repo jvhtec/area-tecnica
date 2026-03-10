@@ -22,6 +22,7 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
+import { TASK_TYPES } from "@/constants/taskTypes";
 import {
   Table as UITable,
   TableBody,
@@ -57,8 +58,6 @@ interface Task {
   status: 'not_started' | 'in_progress' | 'completed';
   task_documents?: TaskDocument[];
 }
-
-const TASK_TYPES = ["QT", "Rigging Plot", "Prediccion", "Memorias técnicas", "Pesos", "Consumos", "PS"];
 
 export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogProps) => {
   const [personnel, setPersonnel] = useState({
@@ -491,7 +490,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {TASK_TYPES.map((taskType) => {
+                    {TASK_TYPES.sound.map((taskType) => {
                       const task = tasks?.find(t => t.task_type === taskType);
                       return (
                         <TableRow key={taskType}>

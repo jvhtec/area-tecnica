@@ -11,12 +11,7 @@ import { Upload, Download, Trash2, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-
-const TASK_TYPES: Record<'sound'|'lights'|'video', string[]> = {
-  sound: ["QT","Rigging Plot","Prediccion","Memorias técnicas","Pesos","Consumos","PS"],
-  lights: ["QT","Rigging Plot","Memorias técnicas","Pesos","Consumos","PS"],
-  video: ["QT","Prediccion","Memorias técnicas","Pesos","Consumos","PS"],
-};
+import { TASK_TYPES } from '@/constants/taskTypes';
 const DEPARTMENT_NAME: Record<'sound' | 'lights' | 'video', string> = {
   sound: 'sonido',
   lights: 'luces',
