@@ -19,6 +19,7 @@
     "test:critical": "vitest run src/components/ProtectedRoute.test.tsx src/pages/__tests__/ProjectManagement.test.tsx src/pages/__tests__/EquipmentManagement.test.tsx src/components/matrix/__tests__/AssignJobDialog.test.tsx src/components/jobs/__tests__/JobPayoutTotalsPanel.autonomo.test.tsx src/components/jobs/__tests__/JobPayoutTotalsPanel.tourdate.test.tsx src/services/taskCompletion.test.ts src/utils/__tests__/micListTransform.test.ts tests/assignments/critical-paths.test.ts tests/timesheets/critical-paths.test.ts src/routes/__tests__/AuthenticatedShell.test.tsx src/pages/__tests__/TechnicianSuperApp.test.tsx src/pages/__tests__/TechnicianUnavailability.test.tsx src/lib/__tests__/vacation-requests.test.ts src/pages/__tests__/TourManagement.test.tsx src/pages/__tests__/Settings.test.tsx src/hooks/__tests__/useIncidentReports.test.tsx src/pages/__tests__/SoundVisionFiles.test.tsx",
     "test:e2e": "playwright test --project=chromium",
     "preview": "vite preview",
+    "streamdeck:server": "node scripts/streamdeck/start-streamdeck-server.cjs",
     "supabase:whoami": "npx supabase projects list > /dev/null && echo 'Supabase CLI auth OK'",
     "supabase:link:staging": "[ -n \"$SUPABASE_STAGING_PROJECT_REF\" ] || (echo \"Set SUPABASE_STAGING_PROJECT_REF first\" && exit 1); npx supabase link --project-ref \"$SUPABASE_STAGING_PROJECT_REF\"",
     "supabase:db:push:staging": "[ -n \"$SUPABASE_STAGING_PROJECT_REF\" ] || (echo \"Set SUPABASE_STAGING_PROJECT_REF first\" && exit 1); npx supabase db push --project-ref \"$SUPABASE_STAGING_PROJECT_REF\"",

@@ -237,3 +237,4 @@ To keep the active codebase clean:
 - Use `src/legacy/` for deprecated or superseded app code that is intentionally retained for reference.
 - Do not add new runtime imports from `archive/` or `src/legacy/`.
 - Keep active implementation sources under `src/`, active docs under `docs/`, and active migrations under `supabase/migrations/`.
+- Keep the repository root focused on core project/config files; place helper scripts in `scripts/` (SQL helpers in `scripts/sql/`) and feature documentation in `docs/` subfolders.
