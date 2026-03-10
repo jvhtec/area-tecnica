@@ -228,3 +228,12 @@ See [SECURITY.md](./SECURITY.md) for security best practices.
 - Check [CLAUDE.md](./CLAUDE.md) for architecture and patterns
 - Review existing code for examples
 - Ask in team chat before making major dependency changes
+
+## Archive and Legacy Policy
+
+To keep the active codebase clean:
+
+- Use `archive/` for historical planning docs and backup assets that should stay in git history but not in active runtime/development paths.
+- Use `src/legacy/` for deprecated or superseded app code that is intentionally retained for reference.
+- Do not add new runtime imports from `archive/` or `src/legacy/`.
+- Keep active implementation sources under `src/`, active docs under `docs/`, and active migrations under `supabase/migrations/`.
