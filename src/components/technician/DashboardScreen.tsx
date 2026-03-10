@@ -6,11 +6,22 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { useMyTours } from '@/hooks/useMyTours';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
-import { fromJobTimezone, formatInJobTimezone, toJobTimezone } from '@/utils/timezoneUtils';
+import { formatInJobTimezone, fromJobTimezone, localInputToUTC, toJobTimezone } from '@/utils/timezoneUtils';
 import { TechJobCard } from './TechJobCard';
 import { TourCard } from './TourCard';
 import { Theme, TechnicianAssignment } from './types';
 import { PendingExpensesSummary } from '@/components/expenses/PendingExpensesSummary';
+
+const HAS_TIMEZONE_SUFFIX = /(?:Z|[+-]\d{2}:\d{2})$/i;
+
+const toComparableAssignmentStartUtc = (startValue: string): Date => {
+    // `jobs.start_time` normally arrives as UTC ISO from Supabase.
+    // For legacy flat rows that may lack timezone suffix, interpret wall-clock as job timezone.
+    if (HAS_TIMEZONE_SUFFIX.test(startValue)) {
+        return new Date(startValue);
+    }
+    return localInputToUTC(startValue);
+};
 
 interface DashboardScreenProps {
     theme: Theme;
@@ -63,7 +74,7 @@ export const DashboardScreen = ({ theme, isDark, user, userProfile, assignments,
         .map(assignment => {
             const normalizedStart = assignment.jobs?.start_time || assignment.start_time;
             if (!normalizedStart) return null;
-            const normalizedStartUtc = fromJobTimezone(toJobTimezone(normalizedStart));
+            const normalizedStartUtc = toComparableAssignmentStartUtc(normalizedStart);
             return { assignment, normalizedStart, normalizedStartUtc };
         })
         .filter((entry): entry is { assignment: TechnicianAssignment; normalizedStart: string; normalizedStartUtc: Date } => entry !== null)

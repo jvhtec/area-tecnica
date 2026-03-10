@@ -40,9 +40,9 @@ export interface TechnicianJobData {
 }
 
 export interface TechnicianAssignment {
-  id?: string;
-  job_id?: string;
-  technician_id?: string;
+  id: string;
+  job_id: string;
+  technician_id: string;
   department?: string;
   role?: string;
   category?: string;
@@ -52,6 +52,8 @@ export interface TechnicianAssignment {
   start_time?: string;
   jobs?: TechnicianJobData | null;
 }
+
+export type CreateTechnicianAssignment = Omit<TechnicianAssignment, 'id'> & { id?: never };
 
 export interface JobCardProps {
   job: any;
