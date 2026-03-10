@@ -1,0 +1,6 @@
+# CODEOWNERS for release-critical paths
+
+/supabase/** @jvhtec
+/.github/workflows/** @jvhtec
+/src/integrations/** @jvhtec
+/src/hooks/** @jvhtec
