@@ -11,7 +11,7 @@ This guide helps you identify which foreign keys **actually need** indexes based
 ## Step 1: Run the Analysis Query
 
 1. Open your Supabase SQL Editor
-2. Copy and run the query from `analyze_fk_usage.sql`
+2. Copy and run the query from `scripts/sql/analyze_fk_usage.sql`
 3. Review the results sorted by priority
 
 ## Step 2: Interpret Results
@@ -98,7 +98,7 @@ Run this migration first before adding new foreign key indexes.
 
 ## Next Steps
 
-1. Run `analyze_fk_usage.sql` in Supabase SQL Editor
+1. Run `scripts/sql/analyze_fk_usage.sql` in Supabase SQL Editor
 2. Identify HIGH priority foreign keys
 3. Create a new migration with only those indexes
 4. Apply and monitor
