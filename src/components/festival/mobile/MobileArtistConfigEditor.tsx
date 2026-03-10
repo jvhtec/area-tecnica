@@ -189,13 +189,11 @@ export const ReadOnlyArtistCategoryContent = ({
   artist,
   category,
   riderFiles = [],
-  onViewRiderFile,
   onDownloadRiderFile,
 }: {
   artist: Artist;
   category: MobileConfigCategory;
   riderFiles?: MobileArtistRiderFile[];
-  onViewRiderFile?: (file: MobileArtistRiderFile) => void;
   onDownloadRiderFile?: (file: MobileArtistRiderFile) => void;
 }) => {
   if (category === "consoles") {

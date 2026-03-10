@@ -492,7 +492,7 @@ export const splitTokenizedSegments = (
 };
 
 const isMixedMetricValue = (value: string): boolean =>
-  hasProviderTextToken(value) || /^\d+[FB](?:\+\d+[FB])+ \(\d+\)$/.test(value.trim());
+  hasProviderTextToken(value) || /^\d+[FBM](?:\+\d+[FBM])+ \(\d+\)$/.test(value.trim());
 
 const splitMixedMetricSegments = (value: string): Array<{ text: string; provider: 'festival' | 'band' | 'mixed' | 'default' }> => {
   return splitTokenizedSegments(value);

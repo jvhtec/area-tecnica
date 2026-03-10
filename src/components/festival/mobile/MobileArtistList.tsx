@@ -88,7 +88,6 @@ interface MobileArtistListProps {
   deletingStagePlotArtistId: string | null;
   mode?: 'edit' | 'readonly';
   riderFilesByArtistId?: Record<string, MobileArtistRiderFile[]>;
-  onViewRiderFile?: (file: MobileArtistRiderFile) => void;
   onDownloadRiderFile?: (file: MobileArtistRiderFile) => void;
 }
 
@@ -113,7 +112,6 @@ export const MobileArtistList = ({
   deletingStagePlotArtistId,
   mode = 'edit',
   riderFilesByArtistId = {},
-  onViewRiderFile,
   onDownloadRiderFile,
 }: MobileArtistListProps) => {
   const [editingCategory, setEditingCategory] = useState<{
@@ -229,7 +227,6 @@ export const MobileArtistList = ({
               artist={readonlyDetail.artist}
               category={readonlyDetail.category}
               riderFiles={riderFilesByArtistId[readonlyDetail.artist.id] || []}
-              onViewRiderFile={onViewRiderFile}
               onDownloadRiderFile={onDownloadRiderFile}
             />
           </SheetContent>
