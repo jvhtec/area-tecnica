@@ -42,11 +42,13 @@ describe("micListTransform", () => {
   });
 
   it("sanitizes stored microphone rows and reports invalid payloads", () => {
+    const malformedRows = [
+      { model: "KSM9", quantity: 2, exclusive_use: false, notes: "  Main act  " },
+      { model: "  ", quantity: 0 },
+    ] as unknown as Parameters<typeof sanitizeWiredMics>[0];
+
     expect(
-      sanitizeWiredMics([
-        { model: "KSM9", quantity: 2, exclusive_use: false, notes: "  Main act  " },
-        { model: "  ", quantity: 0 },
-      ] as any),
+      sanitizeWiredMics(malformedRows),
     ).toEqual([{ model: "KSM9", quantity: 2, notes: "Main act" }]);
 
     expect(

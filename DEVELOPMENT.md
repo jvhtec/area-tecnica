@@ -190,6 +190,9 @@ npm run dev -- --mode prod
 
 # Run local UI against a Supabase "branch" / staging project
 npm run dev -- --mode branch
+
+# Run local UI against your dedicated staging mode file (.env.staging.local)
+npm run dev:staging
 ```
 
 Minimal `.env.prod.local` example (never commit):
@@ -199,6 +202,8 @@ VITE_SUPABASE_ANON_KEY="<prod anon/public key>"
 VITE_SUPABASE_FUNCTIONS_URL="https://<prod-project-ref>.supabase.co/functions/v1"
 VITE_VAPID_PUBLIC_KEY="<prod VAPID public key>"
 ```
+
+For a full Cloudflare + Supabase staging workflow, see [docs/STAGING_SETUP.md](./docs/STAGING_SETUP.md).
 
 ### Pre-Commit Secret Check (Optional)
 

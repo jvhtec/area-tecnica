@@ -19,6 +19,8 @@ This index helps you find what you need without having to remember filenames.
   - `WALLBOARD_PRESET_DEBUG.md`
 
 ## Operations
+- **Staging setup (Cloudflare + Supabase)**
+  - `STAGING_SETUP.md`
 - **Push notifications**
   - `PUSH_NOTIFICATIONS_SUMMARY.md`
   - `PUSH_NOTIFICATIONS_IMPLEMENTATION_SUMMARY.md`
