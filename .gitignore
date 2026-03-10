@@ -50,6 +50,7 @@ ios/App/App/public
 ios/App/Pods
 ios/App/Podfile.lock
 ios/App/.DS_Store
+ios/App/*.xcarchive
 android/app/src/main/assets/public
 android/.gradle
 android/.idea

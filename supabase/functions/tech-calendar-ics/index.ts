@@ -56,13 +56,13 @@ function lines(...items: Array<string | null | undefined>) {
   return items.filter(Boolean).map((l) => foldIcsLine(l!)).join("\r\n");
 }
 
-function sha1(s: string) {
+async function sha1(s: string) {
   const enc = new TextEncoder().encode(s);
-  const buf = (globalThis as any).crypto?.subtle ? undefined : undefined; // placeholder to keep Deno linter calm
-  return crypto.subtle.digest("SHA-1", enc).then((ab) => {
-    const arr = new Uint8Array(ab);
-    return Array.from(arr).map((b) => b.toString(16).padStart(2, '0')).join('');
-  });
+  const ab = await crypto.subtle.digest("SHA-1", enc);
+  const arr = new Uint8Array(ab);
+  return Array.from(arr)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 function replaceIsoDateKeepingTimeAndOffset(iso: string, ymd: string): string {
@@ -76,9 +76,17 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const url = new URL(req.url);
 
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform', 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS' } });
-  'Access-Control-Max-Age': '86400',
+  if (req.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Headers":
+          "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Max-Age": "86400",
+      },
+      status: 204,
+    });
   }
 
   if (req.method === 'HEAD') {

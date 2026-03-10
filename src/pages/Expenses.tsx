@@ -566,7 +566,10 @@ const ExpensesPage: React.FC = () => {
                           <div className="text-muted-foreground">{expense.job_id}</div>
                         </td>
                         <td className="py-2 pr-2 align-top">
-                          {expense.category?.label_es || expense.category_slug}
+                          <div>{expense.category?.label_es || expense.category_slug}</div>
+                          {expense.description && (
+                            <div className="text-muted-foreground">{expense.description}</div>
+                          )}
                         </td>
                         <td className="py-2 pr-2 align-top">
                           {format(new Date(expense.expense_date), 'PPP', { locale: es })}
