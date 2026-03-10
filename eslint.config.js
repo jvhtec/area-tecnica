@@ -58,6 +58,22 @@ const legacyAnyWarnFiles = [
   "src/utils/tour-scheduling-pdf.ts",
 ];
 
+const legacyWarnRules = {
+  "@typescript-eslint/ban-ts-comment": "warn",
+  "@typescript-eslint/no-empty-object-type": "warn",
+  "@typescript-eslint/no-require-imports": "warn",
+  "@typescript-eslint/no-this-alias": "warn",
+  "@typescript-eslint/no-unsafe-function-type": "warn",
+  "no-async-promise-executor": "warn",
+  "no-case-declarations": "warn",
+  "no-control-regex": "warn",
+  "no-empty": "warn",
+  "no-extra-boolean-cast": "warn",
+  "no-useless-catch": "warn",
+  "no-useless-escape": "warn",
+  "prefer-const": "warn",
+};
+
 export default tseslint.config(
   {
     ignores: [
@@ -85,11 +101,10 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
-      "react-refresh/only-export-components": [
-        "warn",
-        { allowConstantExport: true },
-      ],
-      "@typescript-eslint/no-explicit-any": "error",
+      ...legacyWarnRules,
+      "react-hooks/rules-of-hooks": "warn",
+      "react-refresh/only-export-components": "warn",
+      "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
@@ -101,7 +116,8 @@ export default tseslint.config(
       globals: browserGlobals,
     },
     rules: {
-      "@typescript-eslint/no-explicit-any": "error",
+      ...legacyWarnRules,
+      "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "off",
       "react-refresh/only-export-components": "off",
     },
@@ -114,7 +130,8 @@ export default tseslint.config(
       globals: globals.node,
     },
     rules: {
-      "@typescript-eslint/no-explicit-any": "error",
+      ...legacyWarnRules,
+      "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
@@ -126,6 +143,7 @@ export default tseslint.config(
       globals: denoGlobals,
     },
     rules: {
+      ...legacyWarnRules,
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "off",
     },

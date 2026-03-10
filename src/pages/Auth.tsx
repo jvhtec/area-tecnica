@@ -236,7 +236,6 @@ const Auth = () => {
         <div className="w-full max-w-md">
           {/* Logo and branding */}
           <div className="text-center mb-8">
-            {/* eslint-disable-next-line react/no-unknown-property */}
             <img
               src={BRAND_CONFIG.logo}
               alt={BRAND_CONFIG.name}

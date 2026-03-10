@@ -26,7 +26,7 @@ export function AchievementsGrid({ targetUserId }: AchievementsGridProps) {
 
   const filtered = useMemo(() => {
     if (!achievements) return [];
-    let list: AchievementWithStatus[] =
+    const list: AchievementWithStatus[] =
       filter === 'all' ? achievements : achievements.filter((a) => a.category === filter);
 
     // Only show unlocked achievements — locked ones stay hidden until earned

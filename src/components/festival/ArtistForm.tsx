@@ -389,9 +389,9 @@ export const ArtistForm = () => {
                     setFormData((prev) => ({
                       ...prev,
                       monitors_from_foh: !!checked,
-                      mon_console: !!checked ? "" : prev.mon_console,
-                      mon_console_provided_by: !!checked ? "festival" : prev.mon_console_provided_by,
-                      mon_waves_outboard: !!checked ? "" : prev.mon_waves_outboard,
+                      mon_console: checked ? "" : prev.mon_console,
+                      mon_console_provided_by: checked ? "festival" : prev.mon_console_provided_by,
+                      mon_waves_outboard: checked ? "" : prev.mon_waves_outboard,
                     }))
                   }
                 />
