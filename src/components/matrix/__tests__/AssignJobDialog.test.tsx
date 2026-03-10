@@ -75,15 +75,15 @@ vi.mock('sonner', () => ({
 }));
 
 vi.mock('@/services/toggleTimesheetDay', () => ({
-  toggleTimesheetDay: (...args: any[]) => toggleTimesheetDayMock(...args),
+  toggleTimesheetDay: toggleTimesheetDayMock,
 }));
 
 vi.mock('@/services/removeTimesheetAssignment', () => ({
-  removeTimesheetAssignment: (...args: any[]) => removeTimesheetAssignmentMock(...args),
+  removeTimesheetAssignment: removeTimesheetAssignmentMock,
 }));
 
 vi.mock('@/services/syncTimesheetCategories', () => ({
-  syncTimesheetCategoriesForAssignment: (...args: any[]) => syncTimesheetCategoriesMock(...args),
+  syncTimesheetCategoriesForAssignment: syncTimesheetCategoriesMock,
 }));
 
 const baseJob = {

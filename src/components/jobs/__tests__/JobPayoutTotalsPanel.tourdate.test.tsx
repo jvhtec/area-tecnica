@@ -11,11 +11,11 @@ const { useJobPayoutDataMock, usePayoutActionsMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/components/jobs/payout-totals/useJobPayoutData", () => ({
-  useJobPayoutData: (...args: any[]) => useJobPayoutDataMock(...args),
+  useJobPayoutData: useJobPayoutDataMock,
 }));
 
 vi.mock("@/components/jobs/payout-totals/usePayoutActions", () => ({
-  usePayoutActions: (...args: any[]) => usePayoutActionsMock(...args),
+  usePayoutActions: usePayoutActionsMock,
 }));
 
 import { JobPayoutTotalsPanel } from "../JobPayoutTotalsPanel";

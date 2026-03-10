@@ -17,7 +17,7 @@ type MockChainMethod =
   | "gte"
   | "lte"
   | "lt"
-  | 'gt'
+  | "gt"
   | "or"
   | "like"
   | "ilike"
@@ -52,19 +52,48 @@ const chainMethods: MockChainMethod[] = [
   "range",
 ];
 
+interface MockQueryBuilder<T> extends Promise<MockSupabaseResult<T>> {
+  select: ReturnType<typeof vi.fn>;
+  insert: ReturnType<typeof vi.fn>;
+  update: ReturnType<typeof vi.fn>;
+  upsert: ReturnType<typeof vi.fn>;
+  delete: ReturnType<typeof vi.fn>;
+  eq: ReturnType<typeof vi.fn>;
+  neq: ReturnType<typeof vi.fn>;
+  in: ReturnType<typeof vi.fn>;
+  gte: ReturnType<typeof vi.fn>;
+  lte: ReturnType<typeof vi.fn>;
+  lt: ReturnType<typeof vi.fn>;
+  gt: ReturnType<typeof vi.fn>;
+  or: ReturnType<typeof vi.fn>;
+  like: ReturnType<typeof vi.fn>;
+  ilike: ReturnType<typeof vi.fn>;
+  match: ReturnType<typeof vi.fn>;
+  contains: ReturnType<typeof vi.fn>;
+  overlaps: ReturnType<typeof vi.fn>;
+  order: ReturnType<typeof vi.fn>;
+  limit: ReturnType<typeof vi.fn>;
+  range: ReturnType<typeof vi.fn>;
+  single: ReturnType<typeof vi.fn>;
+  maybeSingle: ReturnType<typeof vi.fn>;
+  csv: ReturnType<typeof vi.fn>;
+  __setResult: (nextResult: MockSupabaseResult<T>) => MockQueryBuilder<T>;
+}
+
 export function createMockQueryBuilder<T = unknown>(
   initialResult: MockSupabaseResult<T> = { data: null as T, error: null },
-) {
+): MockQueryBuilder<T> {
   let result = initialResult;
-  const builder: Record<string, any> = {};
+  const builder = {} as MockQueryBuilder<T>;
 
   chainMethods.forEach((method) => {
-    builder[method] = vi.fn(() => builder);
+    (builder as Record<string, ReturnType<typeof vi.fn>>)[method] = vi.fn(() => builder);
   });
 
   builder.single = vi.fn(async () => result);
   builder.maybeSingle = vi.fn(async () => result);
   builder.csv = vi.fn(async () => result);
+  // Intentionally make the builder thenable so it can be awaited like a real Supabase query
   builder.then = (onFulfilled?: (value: MockSupabaseResult<T>) => unknown, onRejected?: (reason: unknown) => unknown) =>
     Promise.resolve(result).then(onFulfilled, onRejected);
   builder.catch = (onRejected?: (reason: unknown) => unknown) =>

@@ -71,14 +71,15 @@ test("loads equipment inventory and creates a new equipment row through the form
   await expect(page.getByText(/equipo creado correctamente/i)).toBeVisible();
   await expect.poll(() => calls.tableMutations.length).toBeGreaterThan(0);
   await expect(
-    calls.tableMutations.some(
-      (call) =>
-        call.table === "equipment" &&
-        call.method === "POST" &&
-        typeof call.body === "object" &&
-        call.body !== null &&
-        !Array.isArray(call.body) &&
-        (call.body as Record<string, unknown>).name === "Smoke Wireless Rack",
-    ),
+    calls.tableMutations.some((call) => {
+      if (call.table !== "equipment" || call.method !== "POST") return false;
+      const record = Array.isArray(call.body) ? call.body[0] : call.body;
+      return (
+        typeof record === "object" &&
+        record !== null &&
+        !Array.isArray(record) &&
+        (record as Record<string, unknown>).name === "Smoke Wireless Rack"
+      );
+    }),
   ).toBe(true);
 });

@@ -29,19 +29,19 @@ const {
 }));
 
 vi.mock("@/hooks/useTimesheets", () => ({
-  useTimesheets: (...args: any[]) => useTimesheetsMock(...args),
+  useTimesheets: useTimesheetsMock,
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: useOptimizedAuthMock,
 }));
 
 vi.mock("@/hooks/useJobPayoutTotals", () => ({
-  useJobPayoutTotals: (...args: any[]) => useJobPayoutTotalsMock(...args),
+  useJobPayoutTotals: useJobPayoutTotalsMock,
 }));
 
 vi.mock("@/hooks/useJobRatesApproval", () => ({
-  useJobRatesApproval: (...args: any[]) => useJobRatesApprovalMock(...args),
+  useJobRatesApproval: useJobRatesApprovalMock,
 }));
 
 vi.mock("react-signature-canvas", async () => {
@@ -86,7 +86,7 @@ const baseJob = {
   location: { name: "Madrid Arena" },
 };
 
-const buildTimesheetsReturn = (timesheets: any[] = []) => ({
+const buildTimesheetsReturn = (timesheets: Record<string, unknown>[] = []) => ({
   timesheets,
   isLoading: false,
   isError: false,

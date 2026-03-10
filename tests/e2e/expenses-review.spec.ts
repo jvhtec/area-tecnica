@@ -46,7 +46,7 @@ test("loads the expenses review page and approves a submitted expense", async ({
   await expect(page.getByText("Smoke Expenses Job")).toBeVisible();
   await expect(page.getByText("Alex Doe")).toBeVisible();
 
-  await page.locator('tbody input[type="checkbox"]').first().check();
+  await page.locator('tr', { hasText: 'Taxi aeropuerto' }).locator('input[type="checkbox"]').check();
   await page.getByRole("button", { name: /aprobar seleccionados/i }).click();
 
   await expect(page.getByText(/gastos aprobados/i)).toBeVisible();

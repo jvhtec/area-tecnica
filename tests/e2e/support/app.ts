@@ -132,6 +132,12 @@ async function resolveResponder(
   return responder ?? fallbackValue;
 }
 
+/**
+ * Seeds the browser context with auth state before the page loads.
+ * Note: The user/session construction inside addInitScript is deliberately duplicated
+ * from buildUser/buildSession above because the callback runs in the browser context
+ * and cannot access Node-scoped helper functions.
+ */
 export async function seedAppState(page: Page, authOverrides: AuthSeed = {}) {
   await page.context().addInitScript((auth: AuthSeed & typeof defaultAuth) => {
     window.localStorage.clear();

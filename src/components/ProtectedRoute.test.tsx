@@ -1,4 +1,3 @@
-import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 import { screen } from "@testing-library/react";
@@ -11,7 +10,7 @@ const { useOptimizedAuthMock } = vi.hoisted(() => ({
 }));
 
 vi.mock("@/hooks/useOptimizedAuth", () => ({
-  useOptimizedAuth: (...args: any[]) => useOptimizedAuthMock(...args),
+  useOptimizedAuth: useOptimizedAuthMock,
 }));
 
 import { ProtectedRoute } from "./ProtectedRoute";

@@ -42,20 +42,20 @@ vi.mock("@/utils/technicianAvailability", async () => {
   );
   return {
     ...actual,
-    checkTimeConflictEnhanced: (...args: any[]) => checkTimeConflictEnhancedMock(...args),
+    checkTimeConflictEnhanced: checkTimeConflictEnhancedMock,
   };
 });
 
 vi.mock("@/services/toggleTimesheetDay", () => ({
-  toggleTimesheetDay: (...args: any[]) => toggleTimesheetDayMock(...args),
+  toggleTimesheetDay: toggleTimesheetDayMock,
 }));
 
 vi.mock("@/services/removeTimesheetAssignment", () => ({
-  removeTimesheetAssignment: (...args: any[]) => removeTimesheetAssignmentMock(...args),
+  removeTimesheetAssignment: removeTimesheetAssignmentMock,
 }));
 
 vi.mock("@/services/syncTimesheetCategories", () => ({
-  syncTimesheetCategoriesForAssignment: (...args: any[]) => syncTimesheetCategoriesMock(...args),
+  syncTimesheetCategoriesForAssignment: syncTimesheetCategoriesMock,
 }));
 
 import { AssignJobDialog } from "@/components/matrix/AssignJobDialog";
