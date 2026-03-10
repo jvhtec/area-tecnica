@@ -58,7 +58,7 @@ interface Task {
   task_documents?: TaskDocument[];
 }
 
-const TASK_TYPES = ["QT", "Rigging Plot", "Prediccion", "Pesos", "Consumos", "PS"];
+const TASK_TYPES = ["QT", "Rigging Plot", "Prediccion", "Memorias técnicas", "Pesos", "Consumos", "PS"];
 
 export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogProps) => {
   const [personnel, setPersonnel] = useState({

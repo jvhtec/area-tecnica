@@ -13,9 +13,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 
 const TASK_TYPES: Record<'sound'|'lights'|'video', string[]> = {
-  sound: ["QT","Rigging Plot","Prediccion","Pesos","Consumos","PS"],
-  lights: ["QT","Rigging Plot","Pesos","Consumos","PS"],
-  video: ["QT","Prediccion","Pesos","Consumos","PS"],
+  sound: ["QT","Rigging Plot","Prediccion","Memorias técnicas","Pesos","Consumos","PS"],
+  lights: ["QT","Rigging Plot","Memorias técnicas","Pesos","Consumos","PS"],
+  video: ["QT","Prediccion","Memorias técnicas","Pesos","Consumos","PS"],
 };
 const DEPARTMENT_NAME: Record<'sound' | 'lights' | 'video', string> = {
   sound: 'sonido',
