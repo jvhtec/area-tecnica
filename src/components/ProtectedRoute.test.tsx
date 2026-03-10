@@ -74,4 +74,25 @@ describe("ProtectedRoute", () => {
 
     expect(screen.getByText("Protected Content")).toBeInTheDocument();
   });
+
+  it("renders the protected content for house techs when explicitly allowed", () => {
+    useOptimizedAuthMock.mockReturnValue(createAuthState({ userRole: "house_tech" }));
+
+    renderWithProviders(
+      <Routes>
+        <Route
+          path="/secure"
+          element={
+            <ProtectedRoute allowedRoles={["house_tech"]}>
+              <div>House Tech Content</div>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/dashboard" element={<div>Dashboard</div>} />
+      </Routes>,
+      { route: "/secure" },
+    );
+
+    expect(screen.getByText("House Tech Content")).toBeInTheDocument();
+  });
 });

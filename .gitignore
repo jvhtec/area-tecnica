@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+playwright-report/
+test-results/
 *.local
 
 # Lock files - See DEVELOPMENT.md for rationale

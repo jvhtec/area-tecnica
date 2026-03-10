@@ -298,6 +298,27 @@ export async function installSupabaseMocks(
       });
     }
 
+    if (url.pathname.includes("/auth/v1/session")) {
+      if (auth?.guest) {
+        return route.fulfill({
+          status: 401,
+          contentType: "application/json",
+          body: JSON.stringify({
+            message: "Auth session missing",
+          }),
+        });
+      }
+
+      return route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: buildSession(resolvedAuth),
+          user: buildUser(resolvedAuth),
+        }),
+      });
+    }
+
     if (url.pathname.includes("/rest/v1/rpc/")) {
       const name = url.pathname.split("/rest/v1/rpc/")[1] ?? "";
       calls.rpcCalls.push({ name, method, body });
@@ -331,6 +352,14 @@ export async function installSupabaseMocks(
         body: JSON.stringify({
           signedURL: "/signed/receipt.pdf",
         }),
+      });
+    }
+
+    if (url.pathname.includes("/storage/v1/object/")) {
+      return route.fulfill({
+        status: 200,
+        contentType: method === "GET" ? "application/octet-stream" : "application/json",
+        body: method === "GET" ? "mock-file" : JSON.stringify({}),
       });
     }
 

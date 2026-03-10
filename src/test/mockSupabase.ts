@@ -83,6 +83,7 @@ export interface MockSupabaseClient {
   auth: {
     getUser: ReturnType<typeof vi.fn>;
     getSession: ReturnType<typeof vi.fn>;
+    onAuthStateChange: ReturnType<typeof vi.fn>;
   };
   from: ReturnType<typeof vi.fn>;
   rpc: ReturnType<typeof vi.fn>;
@@ -97,11 +98,15 @@ export interface MockSupabaseClient {
 }
 
 export function createMockSupabaseClient(): MockSupabaseClient {
+  const defaultSubscription = {
+    unsubscribe: vi.fn(),
+  };
+
   const defaultStorageBucket = {
     upload: vi.fn().mockResolvedValue({ data: null, error: null }),
     createSignedUrl: vi.fn().mockResolvedValue({ data: { signedUrl: "https://example.com/receipt" }, error: null }),
     remove: vi.fn().mockResolvedValue({ data: null, error: null }),
-    download: vi.fn().mockResolvedValue({ data: null, error: null }),
+    download: vi.fn().mockResolvedValue({ data: new Blob(["test"]), error: null }),
     getPublicUrl: vi.fn((path?: string) => ({ data: { publicUrl: path ?? "" } })),
   };
 
@@ -109,6 +114,7 @@ export function createMockSupabaseClient(): MockSupabaseClient {
     auth: {
       getUser: vi.fn().mockResolvedValue({ data: { user: null }, error: null }),
       getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
+      onAuthStateChange: vi.fn(() => ({ data: { subscription: defaultSubscription } })),
     },
     from: vi.fn(() => createMockQueryBuilder()),
     rpc: vi.fn().mockResolvedValue({ data: null, error: null }),
@@ -137,6 +143,14 @@ export function resetMockSupabase() {
   mockSupabase.auth.getUser.mockResolvedValue({ data: { user: null }, error: null });
   mockSupabase.auth.getSession.mockReset();
   mockSupabase.auth.getSession.mockResolvedValue({ data: { session: null }, error: null });
+  mockSupabase.auth.onAuthStateChange.mockReset();
+  mockSupabase.auth.onAuthStateChange.mockImplementation(() => ({
+    data: {
+      subscription: {
+        unsubscribe: vi.fn(),
+      },
+    },
+  }));
   mockSupabase.from.mockReset();
   mockSupabase.from.mockImplementation(() => createMockQueryBuilder());
   mockSupabase.rpc.mockReset();
@@ -148,7 +162,7 @@ export function resetMockSupabase() {
     upload: vi.fn().mockResolvedValue({ data: null, error: null }),
     createSignedUrl: vi.fn().mockResolvedValue({ data: { signedUrl: "https://example.com/receipt" }, error: null }),
     remove: vi.fn().mockResolvedValue({ data: null, error: null }),
-    download: vi.fn().mockResolvedValue({ data: null, error: null }),
+    download: vi.fn().mockResolvedValue({ data: new Blob(["test"]), error: null }),
     getPublicUrl: vi.fn((path?: string) => ({ data: { publicUrl: path ?? "" } })),
   }));
   mockSupabase.channel.mockReset();
