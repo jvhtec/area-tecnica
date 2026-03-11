@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +40,16 @@ import {
   type StaffingSummaryRow,
 } from './job-assignment-matrix/utils';
 
+/**
+ * Render the interactive job assignment matrix UI for viewing and managing technician assignments.
+ *
+ * The component provides department selection, virtualized date range navigation, technician and job
+ * filtering (search, skills, specialties, and fridge visibility), direct-assignment and mark-unavailable
+ * toggles (when permitted), background prefetching of adjacent matrix windows, staffing reminders with
+ * an auto-staffing panel, and responsive layouts for desktop and mobile.
+ *
+ * @returns The rendered React element for the job assignment matrix and its associated controls and dialogs.
+ */
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
   const prefetchStatusRef = React.useRef<Map<string, 'pending' | 'done'>>(new Map<string, 'pending' | 'done'>());
