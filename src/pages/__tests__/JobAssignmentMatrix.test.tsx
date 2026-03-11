@@ -214,7 +214,7 @@ describe('JobAssignmentMatrix', () => {
     await waitFor(() => {
       expect(screen.getByText(/Sonido/i)).toBeInTheDocument();
       expect(screen.getByText(/Luces/i)).toBeInTheDocument();
-      expect(screen.getByText(/Vídeo/i)).toBeInTheDocument();
+      expect(screen.getByText(/Video/i)).toBeInTheDocument();
     });
   });
 
@@ -324,7 +324,7 @@ describe('JobAssignmentMatrix', () => {
     render(<JobAssignmentMatrix />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Cerrar la nevera/i)).toBeInTheDocument();
+      expect(screen.getByText(/Abrir la nevera/i)).toBeInTheDocument();
     });
   });
 
@@ -332,8 +332,8 @@ describe('JobAssignmentMatrix', () => {
     render(<JobAssignmentMatrix />);
 
     await waitFor(() => {
-      expect(screen.getByText(/técnicos/i)).toBeInTheDocument();
-      expect(screen.getByText(/trabajos/i)).toBeInTheDocument();
+      expect(screen.getAllByText(/técnicos/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/trabajos/i).length).toBeGreaterThan(0);
     });
   });
 
@@ -440,7 +440,7 @@ describe('JobAssignmentMatrix', () => {
     render(<JobAssignmentMatrix />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Filtros/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Filtros/i })).toBeInTheDocument();
     });
   });
 

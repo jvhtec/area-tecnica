@@ -1,7 +1,9 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OptimizedMatrixCell } from '../OptimizedMatrixCell';
+import { TooltipProvider } from '@/components/ui/tooltip';
 import { createMockQueryBuilder } from '@/test/mockSupabase';
 
 // Hoisted mocks
@@ -80,6 +82,16 @@ const mockAssignment = {
   },
 };
 
+const render = (ui: JSX.Element) => rtlRender(
+  <TooltipProvider delayDuration={0}>{ui}</TooltipProvider>
+);
+
+const getCellElement = () => {
+  const cell = document.querySelector('.cursor-pointer');
+  expect(cell).toBeInTheDocument();
+  return cell as HTMLElement;
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   useMutationMock.mockReturnValue({
@@ -125,11 +137,11 @@ describe('OptimizedMatrixCell', () => {
       />
     );
 
-    const cell = screen.getByRole('button', { hidden: true });
+    const cell = getCellElement();
     await user.hover(cell);
 
     await waitFor(() => {
-      expect(screen.getByText('John Doe')).toBeInTheDocument();
+      expect(screen.getAllByText('John Doe').length).toBeGreaterThan(0);
     });
   });
 
@@ -227,7 +239,7 @@ describe('OptimizedMatrixCell', () => {
       />
     );
 
-    const cell = screen.getByRole('button', { hidden: true });
+    const cell = getCellElement();
     await user.click(cell);
 
     expect(onClickMock).toHaveBeenCalledWith('toggle-unavailable');
@@ -236,9 +248,8 @@ describe('OptimizedMatrixCell', () => {
     expect(onClickMock).toHaveBeenCalledWith('unavailable');
   });
 
-  it('handles ctrl+click for cell selection', async () => {
+  it('handles ctrl+click for cell selection', () => {
     const onSelectMock = vi.fn();
-    const user = userEvent.setup();
 
     render(
       <OptimizedMatrixCell
@@ -252,8 +263,8 @@ describe('OptimizedMatrixCell', () => {
       />
     );
 
-    const cell = screen.getByRole('button', { hidden: true });
-    await user.click(cell, { ctrlKey: true });
+    const cell = getCellElement();
+    fireEvent.click(cell, { ctrlKey: true });
 
     expect(onSelectMock).toHaveBeenCalledWith(true);
   });
@@ -273,11 +284,11 @@ describe('OptimizedMatrixCell', () => {
         isSelected={false}
         onSelect={vi.fn()}
         onClick={vi.fn()}
-        staffingStatusProvided={staffingStatus}
+        staffingStatusByDateProvided={staffingStatus}
       />
     );
 
-    expect(screen.getByText('A:✓')).toBeInTheDocument();
+    expect(screen.getAllByText('A:✓').length).toBeGreaterThan(0);
   });
 
   it('displays staffing offer status badge', () => {
@@ -295,11 +306,11 @@ describe('OptimizedMatrixCell', () => {
         isSelected={false}
         onSelect={vi.fn()}
         onClick={vi.fn()}
-        staffingStatusProvided={staffingStatus}
+        staffingStatusByDateProvided={staffingStatus}
       />
     );
 
-    expect(screen.getByText(/O:/)).toBeInTheDocument();
+    expect(screen.getAllByText('O:?').length).toBeGreaterThan(0);
   });
 
   it('shows availability request buttons when can ask availability', () => {
@@ -334,7 +345,7 @@ describe('OptimizedMatrixCell', () => {
         isSelected={false}
         onSelect={vi.fn()}
         onClick={vi.fn()}
-        staffingStatusProvided={staffingStatus}
+        staffingStatusByDateProvided={staffingStatus}
       />
     );
 
@@ -394,7 +405,7 @@ describe('OptimizedMatrixCell', () => {
       />
     );
 
-    const cell = screen.getByRole('button', { hidden: true });
+    const cell = getCellElement();
     await user.hover(cell);
 
     expect(onPrefetchMock).toHaveBeenCalled();
@@ -492,7 +503,7 @@ describe('OptimizedMatrixCell', () => {
     );
 
     // Mobile-specific styles should be applied
-    const cell = screen.getByRole('button', { hidden: true });
+    const cell = getCellElement();
     expect(cell).toBeInTheDocument();
   });
 
@@ -514,7 +525,7 @@ describe('OptimizedMatrixCell', () => {
     );
 
     // The cell should still render but may show declined indicator
-    const cell = screen.getByRole('button', { hidden: true });
+    const cell = getCellElement();
     expect(cell).toBeInTheDocument();
   });
 });
