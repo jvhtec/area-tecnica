@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OptimizedMatrixCell } from '../OptimizedMatrixCell';
 import { createMockQueryBuilder } from '@/test/mockSupabase';
@@ -231,6 +231,9 @@ describe('OptimizedMatrixCell', () => {
     await user.click(cell);
 
     expect(onClickMock).toHaveBeenCalledWith('toggle-unavailable');
+
+    fireEvent.contextMenu(cell);
+    expect(onClickMock).toHaveBeenCalledWith('unavailable');
   });
 
   it('handles ctrl+click for cell selection', async () => {

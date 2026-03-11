@@ -104,6 +104,7 @@ vi.mock('../optimized-assignment-matrix/OptimizedAssignmentMatrixView', () => ({
       <div data-testid="technicians-count">{props.technicians.length}</div>
       <div data-testid="dates-count">{props.dates.length}</div>
       <div data-testid="jobs-count">{props.jobs.length}</div>
+      <div data-testid="allow-mark-unavailable">{String(props.allowMarkUnavailable)}</div>
     </div>
   ),
 }));
@@ -321,6 +322,7 @@ describe('OptimizedAssignmentMatrix', () => {
     );
 
     expect(screen.getByTestId('matrix-view')).toBeInTheDocument();
+    expect(screen.getByTestId('allow-mark-unavailable')).toHaveTextContent('true');
   });
 
   it('calculates medal rankings correctly', () => {

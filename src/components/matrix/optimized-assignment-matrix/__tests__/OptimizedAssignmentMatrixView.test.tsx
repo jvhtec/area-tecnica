@@ -18,8 +18,13 @@ vi.mock('../../DateHeader', () => ({
 }));
 
 vi.mock('../../OptimizedMatrixCell', () => ({
-  OptimizedMatrixCell: ({ technician, date }: any) => (
-    <div data-testid={`cell-${technician.id}-${date.toISOString()}`}>Cell</div>
+  OptimizedMatrixCell: ({ technician, date, allowMarkUnavailable }: any) => (
+    <div
+      data-testid={`cell-${technician.id}-${date.toISOString()}`}
+      data-allow-mark-unavailable={String(allowMarkUnavailable)}
+    >
+      Cell
+    </div>
   ),
 }));
 
@@ -188,6 +193,14 @@ describe('OptimizedAssignmentMatrixView', () => {
     // Should render cells for 2 technicians × 3 dates = 6 cells
     const cells = screen.getAllByTestId(/cell-tech-/);
     expect(cells.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it('forwards allowMarkUnavailable to OptimizedMatrixCell', () => {
+    const props = createMockProps({ allowMarkUnavailable: true });
+    render(<OptimizedAssignmentMatrixView {...props} />);
+
+    const cells = screen.getAllByTestId(/cell-tech-/);
+    expect(cells[0]).toHaveAttribute('data-allow-mark-unavailable', 'true');
   });
 
   it('shows Add User button for management users', () => {

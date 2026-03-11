@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { format, isSameDay } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
@@ -536,7 +537,7 @@ export const OptimizedAssignmentMatrix = ({
   }, [invalidateAssignmentQueries]);
 
   const handleDirectToggleUnavailable = useCallback(async (technicianId: string, date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
+    const dateStr = formatInTimeZone(date, 'Europe/Madrid', 'yyyy-MM-dd');
     const existing = getAvailabilityForCell(technicianId, date);
     if (existing) {
       const { error } = await supabase.from('technician_availability')
@@ -642,7 +643,7 @@ export const OptimizedAssignmentMatrix = ({
 
     // Default behavior
     setCellAction({ type: action, technicianId, date, assignment, selectedJobId });
-  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast, handleDirectToggleUnavailable]);
+  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast, handleDirectToggleUnavailable, isManagementUser]);
 
   const handleJobSelected = useCallback((jobId: string) => {
     if (cellAction?.type === 'select-job') {
