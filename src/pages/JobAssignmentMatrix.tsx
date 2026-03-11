@@ -788,7 +788,7 @@ export default function JobAssignmentMatrix() {
               <span className="text-sm font-medium">Asignación directa</span>
               <Switch
                 checked={allowDirectAssign}
-                onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))}
+                onCheckedChange={(v) => { setAllowDirectAssign(Boolean(v)); if (v) setAllowMarkUnavailable(false); }}
                 aria-label="Alternar asignación directa"
               />
             </div>
@@ -797,7 +797,7 @@ export default function JobAssignmentMatrix() {
                 <span className="text-sm font-medium">No disponible</span>
                 <Switch
                   checked={allowMarkUnavailable}
-                  onCheckedChange={(v) => setAllowMarkUnavailable(Boolean(v))}
+                  onCheckedChange={(v) => { setAllowMarkUnavailable(Boolean(v)); if (v) setAllowDirectAssign(false); }}
                   aria-label="Alternar marcar no disponible"
                 />
               </div>
@@ -835,7 +835,7 @@ export default function JobAssignmentMatrix() {
             <span className="text-xs">Directa</span>
             <Switch
               checked={allowDirectAssign}
-              onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))}
+              onCheckedChange={(v) => { setAllowDirectAssign(Boolean(v)); if (v) setAllowMarkUnavailable(false); }}
               aria-label="Alternar asignación directa"
             />
           </div>
@@ -844,7 +844,7 @@ export default function JobAssignmentMatrix() {
               <span className="text-xs">No disp.</span>
               <Switch
                 checked={allowMarkUnavailable}
-                onCheckedChange={(v) => setAllowMarkUnavailable(Boolean(v))}
+                onCheckedChange={(v) => { setAllowMarkUnavailable(Boolean(v)); if (v) setAllowDirectAssign(false); }}
                 aria-label="Alternar marcar no disponible"
               />
             </div>
@@ -934,12 +934,12 @@ export default function JobAssignmentMatrix() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Asignación directa</span>
-              <Switch checked={allowDirectAssign} onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))} aria-label="Alternar asignación directa" />
+              <Switch checked={allowDirectAssign} onCheckedChange={(v) => { setAllowDirectAssign(Boolean(v)); if (v) setAllowMarkUnavailable(false); }} aria-label="Alternar asignación directa" />
             </div>
             {canMarkUnavailable && (
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Marcar no disponible</span>
-                <Switch checked={allowMarkUnavailable} onCheckedChange={(v) => setAllowMarkUnavailable(Boolean(v))} aria-label="Alternar marcar no disponible" />
+                <Switch checked={allowMarkUnavailable} onCheckedChange={(v) => { setAllowMarkUnavailable(Boolean(v)); if (v) setAllowDirectAssign(false); }} aria-label="Alternar marcar no disponible" />
               </div>
             )}
           </div>

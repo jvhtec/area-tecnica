@@ -565,6 +565,11 @@ export const OptimizedAssignmentMatrix = ({
       console.log('Direct assign disabled by UI toggle; ignoring click');
       return;
     }
+    // Gate unavailability actions behind management/admin role
+    if ((action === 'unavailable' || action === 'toggle-unavailable') && !isManagementUser) {
+      toast({ title: 'Sin permiso', description: 'Solo managers y administradores pueden marcar disponibilidad.', variant: 'destructive' });
+      return;
+    }
 
     // Special flows
     if (action === 'availability-wa') {
