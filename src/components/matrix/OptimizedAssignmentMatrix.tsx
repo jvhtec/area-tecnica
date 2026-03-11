@@ -539,16 +539,28 @@ export const OptimizedAssignmentMatrix = ({
     const dateStr = format(date, 'yyyy-MM-dd');
     const existing = getAvailabilityForCell(technicianId, date);
     if (existing) {
-      await supabase.from('technician_availability')
+      const { error } = await supabase.from('technician_availability')
         .delete()
         .eq('technician_id', technicianId)
         .eq('date', dateStr);
+      if (error) {
+        console.error('Error removing unavailability:', error);
+        toast({ title: 'Error', description: 'No se pudo eliminar la no disponibilidad.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Disponibilidad restaurada', description: `${dateStr} marcado como disponible.` });
     } else {
-      await supabase.from('technician_availability')
+      const { error } = await supabase.from('technician_availability')
         .upsert([{ technician_id: technicianId, date: dateStr, status: 'day_off' }], { onConflict: 'technician_id,date' });
+      if (error) {
+        console.error('Error marking unavailable:', error);
+        toast({ title: 'Error', description: 'No se pudo marcar como no disponible.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'No disponible', description: `${dateStr} marcado como no disponible.` });
     }
     window.dispatchEvent(new CustomEvent('assignment-updated'));
-  }, [getAvailabilityForCell]);
+  }, [getAvailabilityForCell, toast]);
 
   const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'offer-details-email' | 'availability-wa' | 'availability-email' | 'toggle-unavailable', selectedJobId?: string) => {
     console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
