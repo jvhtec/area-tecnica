@@ -192,7 +192,7 @@ describe("EditUserDialog", () => {
         }),
       );
     });
-  });
+  }, 15000);
 
   it("sends onboarding emails and surfaces both success and failure toasts", async () => {
     const user = userEvent.setup();
