@@ -28,6 +28,7 @@ export const OptimizedAssignmentMatrix = ({
   canExpandBefore = false,
   canExpandAfter = false,
   allowDirectAssign = false,
+  allowMarkUnavailable = false,
   fridgeSet,
   cellWidth,
   cellHeight,
@@ -534,7 +535,22 @@ export const OptimizedAssignmentMatrix = ({
     invalidateAssignmentQueries();
   }, [invalidateAssignmentQueries]);
 
-  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'offer-details-email' | 'availability-wa' | 'availability-email', selectedJobId?: string) => {
+  const handleDirectToggleUnavailable = useCallback(async (technicianId: string, date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const existing = getAvailabilityForCell(technicianId, date);
+    if (existing) {
+      await supabase.from('technician_availability')
+        .delete()
+        .eq('technician_id', technicianId)
+        .eq('date', dateStr);
+    } else {
+      await supabase.from('technician_availability')
+        .upsert([{ technician_id: technicianId, date: dateStr, status: 'day_off' }], { onConflict: 'technician_id,date' });
+    }
+    window.dispatchEvent(new CustomEvent('assignment-updated'));
+  }, [getAvailabilityForCell]);
+
+  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'offer-details-email' | 'availability-wa' | 'availability-email' | 'toggle-unavailable', selectedJobId?: string) => {
     console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
     const assignment = getAssignmentForCell(technicianId, date);
     console.log('Assignment data:', assignment);
@@ -601,9 +617,15 @@ export const OptimizedAssignmentMatrix = ({
       return;
     }
 
+    // Direct toggle unavailable (no dialog, instant write)
+    if (action === 'toggle-unavailable') {
+      handleDirectToggleUnavailable(technicianId, date);
+      return;
+    }
+
     // Default behavior
     setCellAction({ type: action, technicianId, date, assignment, selectedJobId });
-  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast]);
+  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast, handleDirectToggleUnavailable]);
 
   const handleJobSelected = useCallback((jobId: string) => {
     if (cellAction?.type === 'select-job') {
@@ -1199,7 +1221,7 @@ export const OptimizedAssignmentMatrix = ({
     TECHNICIAN_WIDTH, HEADER_HEIGHT, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight,
     dateHeadersRef, technicianScrollRef, mainScrollRef, visibleCols, visibleRows,
     dates, technicians, orderedTechnicians,
-    fridgeSet, allowDirectAssign, mobile, canNavLeft, canNavRight, handleMobileNav,
+    fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile, canNavLeft, canNavRight, handleMobileNav,
     handleDateHeadersScroll, handleTechnicianScroll, handleMainScroll, cycleTechSort, getSortLabel,
     isManagementUser, setCreateUserOpen, createUserOpen, qc, setSortJobId,
     getJobsForDate, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,
