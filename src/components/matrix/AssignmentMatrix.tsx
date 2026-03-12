@@ -229,8 +229,6 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
     };
   }, [handleDateHeadersScroll, handleMainScroll, handleTechnicianScroll]);
 
-  // REMOVED: Complex dimension setup useEffect that was causing issues
-
   const handleCellClick = (technicianId: string, date: Date, action: 'select-job' | 'assign' | 'unavailable' | 'confirm' | 'decline') => {
     const assignment = getAssignmentForCell(technicianId, date);
     setCellAction({ type: action, technicianId, date, assignment });
