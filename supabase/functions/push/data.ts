@@ -136,6 +136,31 @@ export async function getTechnicianDepartment(
   }
 }
 
+/**
+ * Like getTechnicianDepartment but distinguishes "no department" from "lookup error".
+ * Returns { department, error: true } when the query itself failed.
+ */
+export async function lookupTechnicianDepartment(
+  client: ReturnType<typeof createClient>,
+  technicianId: string,
+): Promise<{ department: string | null; error: boolean }> {
+  try {
+    const { data, error } = await client
+      .from('profiles')
+      .select('department')
+      .eq('id', technicianId)
+      .maybeSingle();
+    if (error) {
+      console.error('⚠️ Failed to fetch technician department:', { technicianId, error });
+      return { department: null, error: true };
+    }
+    return { department: data?.department ?? null, error: false };
+  } catch (err) {
+    console.error('⚠️ Exception fetching technician department:', { technicianId, err });
+    return { department: null, error: true };
+  }
+}
+
 export async function getTimesheetSubmittingTechDepartment(
   client: ReturnType<typeof createClient>,
   jobId?: string | null,

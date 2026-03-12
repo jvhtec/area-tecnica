@@ -17,6 +17,7 @@ import {
   getSoundDepartmentUserIds,
   getTechnicianDepartment,
   getTimesheetSubmittingTechDepartment,
+  lookupTechnicianDepartment,
   getTourName,
   normalizeDepartmentRolesPayload,
   resolveSoundVisionVenueName,
@@ -61,16 +62,21 @@ const getScopedManagementIds = async (
   technicianId: string | undefined,
   context?: string,
 ): Promise<string[]> => {
-  const techDepartment = technicianId
-    ? await getTechnicianDepartment(client, technicianId)
-    : null;
+  let techDepartment: string | null = null;
 
-  if (technicianId && !techDepartment) {
-    console.warn(
-      `[push/broadcast] Technician ${technicianId} has no department set` +
-        (context ? ` (context: ${context})` : '') +
-        ' — department-scoped management recipients will be empty',
-    );
+  if (technicianId) {
+    const result = await lookupTechnicianDepartment(client, technicianId);
+    techDepartment = result.department;
+
+    // Only warn when the lookup succeeded but the technician genuinely has no department.
+    // Query errors are already logged by lookupTechnicianDepartment itself.
+    if (!result.error && !techDepartment) {
+      console.warn(
+        `[push/broadcast] Technician ${technicianId} has no department set` +
+          (context ? ` (context: ${context})` : '') +
+          ' — department-scoped management recipients will be empty',
+      );
+    }
   }
 
   const deptMgmt = techDepartment
@@ -623,31 +629,33 @@ export async function handleBroadcast(
       }
     }
 
-    const { data: mgmtSubs } = await client
-      .from('push_subscriptions')
-      .select('endpoint, p256dh, auth, user_id')
-      .in('user_id', scopedMgmtIds);
+    if (scopedMgmtIds.length > 0) {
+      const { data: mgmtSubs } = await client
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth, user_id')
+        .in('user_id', scopedMgmtIds);
 
-    const mgmtTokens = await loadNativeTokens(client, scopedMgmtIds);
+      const mgmtTokens = await loadNativeTokens(client, scopedMgmtIds);
 
-    if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
-      mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
-      const mgmtPayload: PushPayload = {
-        title: mgmtTitle,
-        body: mgmtText,
-        url,
-        type,
-        meta: baseMeta,
-      };
+      if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
+        mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
+        const mgmtPayload: PushPayload = {
+          title: mgmtTitle,
+          body: mgmtText,
+          url,
+          type,
+          meta: baseMeta,
+        };
 
-      await Promise.all([
-        ...(mgmtSubs || []).map(async (sub: any) => {
-          await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
-        }),
-        ...mgmtTokens.map(async (tokenRow) => {
-          await sendNativePushNotification(client, tokenRow.device_token, mgmtPayload);
-        }),
-      ]);
+        await Promise.all([
+          ...(mgmtSubs || []).map(async (sub: any) => {
+            await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
+          }),
+          ...mgmtTokens.map(async (tokenRow) => {
+            await sendNativePushNotification(client, tokenRow.device_token, mgmtPayload);
+          }),
+        ]);
+      }
     }
 
     // Return early since we've already sent the notifications
@@ -715,38 +723,40 @@ export async function handleBroadcast(
       ? `${actor} ha eliminado a ${removedTechName} de "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`
       : `${actor} ha eliminado a ${removedTechName} de "${jobTitle || 'Trabajo'}".`;
 
-    const { data: mgmtSubs } = await client
-      .from('push_subscriptions')
-      .select('endpoint, p256dh, auth, user_id')
-      .in('user_id', scopedMgmtIds);
+    if (scopedMgmtIds.length > 0) {
+      const { data: mgmtSubs } = await client
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth, user_id')
+        .in('user_id', scopedMgmtIds);
 
-    const mgmtTokens = await loadNativeTokens(client, scopedMgmtIds);
+      const mgmtTokens = await loadNativeTokens(client, scopedMgmtIds);
 
-    if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
-      mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
-      const mgmtPayload: PushPayload = {
-        title: mgmtTitle,
-        body: mgmtText,
-        url,
-        type,
-        meta: {
-          jobId: jobId,
-          tourId,
-          tourName: tourName ?? undefined,
-          actor,
-          recipient: removedTechName,
-          ...metaExtras,
-        },
-      };
+      if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
+        mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
+        const mgmtPayload: PushPayload = {
+          title: mgmtTitle,
+          body: mgmtText,
+          url,
+          type,
+          meta: {
+            jobId: jobId,
+            tourId,
+            tourName: tourName ?? undefined,
+            actor,
+            recipient: removedTechName,
+            ...metaExtras,
+          },
+        };
 
-      await Promise.all([
-        ...(mgmtSubs || []).map(async (sub: any) => {
-          await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
-        }),
-        ...mgmtTokens.map(async (tokenRow) => {
-          await sendNativePushNotification(client, tokenRow.device_token, mgmtPayload);
-        }),
-      ]);
+        await Promise.all([
+          ...(mgmtSubs || []).map(async (sub: any) => {
+            await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
+          }),
+          ...mgmtTokens.map(async (tokenRow) => {
+            await sendNativePushNotification(client, tokenRow.device_token, mgmtPayload);
+          }),
+        ]);
+      }
     }
 
     console.log('🚫 Assignment removal notification sent');
