@@ -119,21 +119,8 @@ export async function getTechnicianDepartment(
   technicianId?: string | null
 ): Promise<string | null> {
   if (!technicianId) return null;
-  try {
-    const { data, error } = await client
-      .from('profiles')
-      .select('department')
-      .eq('id', technicianId)
-      .maybeSingle();
-    if (error) {
-      console.error('⚠️ Failed to fetch technician department:', { technicianId, error });
-      return null;
-    }
-    return data?.department ?? null;
-  } catch (err) {
-    console.error('⚠️ Exception fetching technician department:', { technicianId, err });
-    return null;
-  }
+  const result = await lookupTechnicianDepartment(client, technicianId);
+  return result.department;
 }
 
 /**
