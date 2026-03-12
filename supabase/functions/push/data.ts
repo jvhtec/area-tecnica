@@ -69,8 +69,8 @@ export async function getAdminUserIdsForStaffingNotifications(
 
     if (error || !admins) {
       console.error('Failed to fetch admin notification preferences:', error);
-      // Fallback: return all admins if query fails
-      return await getAdminUserIds(client);
+      // Fail-closed: return empty so scoped notifications stay limited to deptMgmt
+      return [];
     }
 
     const relevantAdmins = admins.filter((admin: any) => {
@@ -94,8 +94,8 @@ export async function getAdminUserIdsForStaffingNotifications(
     return relevantAdmins.map((admin: any) => admin.id).filter(Boolean);
   } catch (err) {
     console.error('Exception in getAdminUserIdsForStaffingNotifications:', err);
-    // Fallback: return all admins if something goes wrong
-    return await getAdminUserIds(client);
+    // Fail-closed: return empty so scoped notifications stay limited to deptMgmt
+    return [];
   }
 }
 
