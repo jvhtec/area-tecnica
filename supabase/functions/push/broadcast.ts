@@ -575,6 +575,12 @@ export async function handleBroadcast(
     }
 
     // 2. Send notification to management (using tech's name)
+    // Department-aware: scope management notifications to technician's department
+    const techDepartment = await getTechnicianDepartment(client, assignedTechId);
+    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
+    const scopedMgmtIds = [...new Set([...deptMgmt, ...relevantAdmins])];
+
     const mgmtTitle = 'Asignación directa';
     let mgmtText = '';
     if (assignedTechName) {
@@ -594,9 +600,9 @@ export async function handleBroadcast(
     const { data: mgmtSubs } = await client
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth, user_id')
-      .in('user_id', Array.from(mgmt));
+      .in('user_id', scopedMgmtIds);
 
-    const mgmtTokens = await loadNativeTokens(client, Array.from(mgmt));
+    const mgmtTokens = await loadNativeTokens(client, scopedMgmtIds);
 
     if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
       mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
@@ -675,6 +681,12 @@ export async function handleBroadcast(
     }
 
     // Notify management
+    // Department-aware: scope management notifications to technician's department
+    const techDepartment = await getTechnicianDepartment(client, removedTechId);
+    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
+    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
+    const scopedMgmtIds = [...new Set([...deptMgmt, ...relevantAdmins])];
+
     const mgmtTitle = 'Asignación eliminada';
     const mgmtText = singleDayFlag && formattedTargetDate
       ? `${actor} ha eliminado a ${removedTechName} de "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`
@@ -683,9 +695,9 @@ export async function handleBroadcast(
     const { data: mgmtSubs } = await client
       .from('push_subscriptions')
       .select('endpoint, p256dh, auth, user_id')
-      .in('user_id', Array.from(mgmt));
+      .in('user_id', scopedMgmtIds);
 
-    const mgmtTokens = await loadNativeTokens(client, Array.from(mgmt));
+    const mgmtTokens = await loadNativeTokens(client, scopedMgmtIds);
 
     if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
       mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
