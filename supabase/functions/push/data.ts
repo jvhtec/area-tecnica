@@ -49,8 +49,10 @@ export async function getAdminUserIds(client: ReturnType<typeof createClient>): 
 }
 
 /**
- * Get admin users filtered by their staffing notification scope preference.
- * Returns admins who want all departments OR admins who want only their own department (if it matches).
+ * Selects admin user IDs filtered by each admin's staffing notification scope preference.
+ *
+ * @param jobDepartment - The job's department used to evaluate admins who have `own_department` staffing scope; may be `null` or omitted.
+ * @returns Array of admin profile IDs to notify: includes admins whose staffing scope is `all_departments` or unset, and includes admins with `own_department` only when `jobDepartment` matches their department.
  */
 export async function getAdminUserIdsForStaffingNotifications(
   client: ReturnType<typeof createClient>,
@@ -69,8 +71,8 @@ export async function getAdminUserIdsForStaffingNotifications(
 
     if (error || !admins) {
       console.error('Failed to fetch admin notification preferences:', error);
-      // Fallback: return all admins if query fails
-      return await getAdminUserIds(client);
+      // Fail-closed: return empty so scoped notifications stay limited to deptMgmt
+      return [];
     }
 
     const relevantAdmins = admins.filter((admin: any) => {
@@ -94,8 +96,8 @@ export async function getAdminUserIdsForStaffingNotifications(
     return relevantAdmins.map((admin: any) => admin.id).filter(Boolean);
   } catch (err) {
     console.error('Exception in getAdminUserIdsForStaffingNotifications:', err);
-    // Fallback: return all admins if something goes wrong
-    return await getAdminUserIds(client);
+    // Fail-closed: return empty so scoped notifications stay limited to deptMgmt
+    return [];
   }
 }
 
@@ -111,14 +113,30 @@ export async function getManagementByDepartmentUserIds(client: ReturnType<typeof
 }
 
 /**
- * Get the department of a technician by their user ID.
- * Used for scoping staffing notifications to the correct department managers.
+ * Retrieve the department name for a technician identified by user ID.
+ *
+ * @param technicianId - The technician's user ID; if omitted or null, the function returns `null`
+ * @returns The technician's department name, or `null` if not found or if `technicianId` is not provided
  */
 export async function getTechnicianDepartment(
   client: ReturnType<typeof createClient>,
   technicianId?: string | null
 ): Promise<string | null> {
   if (!technicianId) return null;
+  const result = await lookupTechnicianDepartment(client, technicianId);
+  return result.department;
+}
+
+/**
+ * Look up a technician's profile department and indicate whether the lookup succeeded.
+ *
+ * @param technicianId - The profile id of the technician to query
+ * @returns An object with `department` set to the technician's department or `null` if unknown, and `error` set to `true` if the data lookup failed, `false` otherwise
+ */
+export async function lookupTechnicianDepartment(
+  client: ReturnType<typeof createClient>,
+  technicianId: string,
+): Promise<{ department: string | null; error: boolean }> {
   try {
     const { data, error } = await client
       .from('profiles')
@@ -127,12 +145,12 @@ export async function getTechnicianDepartment(
       .maybeSingle();
     if (error) {
       console.error('⚠️ Failed to fetch technician department:', { technicianId, error });
-      return null;
+      return { department: null, error: true };
     }
-    return data?.department ?? null;
+    return { department: data?.department ?? null, error: false };
   } catch (err) {
     console.error('⚠️ Exception fetching technician department:', { technicianId, err });
-    return null;
+    return { department: null, error: true };
   }
 }
 
