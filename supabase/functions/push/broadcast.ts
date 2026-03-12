@@ -51,6 +51,35 @@ const loadNativeTokens = async (
   return data ?? [];
 };
 
+/**
+ * Resolve department-scoped management + admin IDs for a technician.
+ * Warns when the technician has no department set (notifications will still
+ * be sent to cross-department admins, but department managers are skipped).
+ */
+const getScopedManagementIds = async (
+  client: ReturnType<typeof createClient>,
+  technicianId: string | undefined,
+  context?: string,
+): Promise<string[]> => {
+  const techDepartment = technicianId
+    ? await getTechnicianDepartment(client, technicianId)
+    : null;
+
+  if (technicianId && !techDepartment) {
+    console.warn(
+      `[push/broadcast] Technician ${technicianId} has no department set` +
+        (context ? ` (context: ${context})` : '') +
+        ' — department-scoped management recipients will be empty',
+    );
+  }
+
+  const deptMgmt = techDepartment
+    ? await getManagementByDepartmentUserIds(client, techDepartment)
+    : [];
+  const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
+  return [...new Set([...deptMgmt, ...relevantAdmins])];
+};
+
 export async function handleBroadcast(
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -576,10 +605,7 @@ export async function handleBroadcast(
 
     // 2. Send notification to management (using tech's name)
     // Department-aware: scope management notifications to technician's department
-    const techDepartment = await getTechnicianDepartment(client, assignedTechId);
-    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
-    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
-    const scopedMgmtIds = [...new Set([...deptMgmt, ...relevantAdmins])];
+    const scopedMgmtIds = await getScopedManagementIds(client, assignedTechId, `job.assignment.direct job=${jobId}`);
 
     const mgmtTitle = 'Asignación directa';
     let mgmtText = '';
@@ -682,10 +708,7 @@ export async function handleBroadcast(
 
     // Notify management
     // Department-aware: scope management notifications to technician's department
-    const techDepartment = await getTechnicianDepartment(client, removedTechId);
-    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
-    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
-    const scopedMgmtIds = [...new Set([...deptMgmt, ...relevantAdmins])];
+    const scopedMgmtIds = await getScopedManagementIds(client, removedTechId, `assignment.removed job=${jobId}`);
 
     const mgmtTitle = 'Asignación eliminada';
     const mgmtText = singleDayFlag && formattedTargetDate
