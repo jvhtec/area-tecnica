@@ -85,6 +85,16 @@ const getScopedManagementIds = async (
   return [...new Set([...deptMgmt, ...relevantAdmins])];
 };
 
+/**
+ * Broadcasts a push notification for a given event to the correct audience, constructs localized title/body and metadata, applies routing overrides, and sends both web and native push notifications.
+ *
+ * @param userId - ID of the actor that triggered the event; included for actor self-delivery
+ * @param body - Event payload (e.g., `type`, `job_id`/`doc_id`, `tour_id`, `recipient_id`, `changes`, file/tour/task fields, staffing info, etc.) used to determine message text, URL, recipients, and metadata
+ * @returns An object describing the outcome:
+ * - `'sent'` with `{ results, count }` when notifications were dispatched (results contains per-endpoint/token delivery info),
+ * - `'skipped'` with a `reason` when no recipients or subscriptions were found,
+ * - or an error object when loading subscriptions/tokens fails.
+ */
 export async function handleBroadcast(
   client: ReturnType<typeof createClient>,
   userId: string,

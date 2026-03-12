@@ -49,8 +49,10 @@ export async function getAdminUserIds(client: ReturnType<typeof createClient>): 
 }
 
 /**
- * Get admin users filtered by their staffing notification scope preference.
- * Returns admins who want all departments OR admins who want only their own department (if it matches).
+ * Selects admin user IDs filtered by each admin's staffing notification scope preference.
+ *
+ * @param jobDepartment - The job's department used to evaluate admins who have `own_department` staffing scope; may be `null` or omitted.
+ * @returns Array of admin profile IDs to notify: includes admins whose staffing scope is `all_departments` or unset, and includes admins with `own_department` only when `jobDepartment` matches their department.
  */
 export async function getAdminUserIdsForStaffingNotifications(
   client: ReturnType<typeof createClient>,
@@ -111,8 +113,10 @@ export async function getManagementByDepartmentUserIds(client: ReturnType<typeof
 }
 
 /**
- * Get the department of a technician by their user ID.
- * Used for scoping staffing notifications to the correct department managers.
+ * Retrieve the department name for a technician identified by user ID.
+ *
+ * @param technicianId - The technician's user ID; if omitted or null, the function returns `null`
+ * @returns The technician's department name, or `null` if not found or if `technicianId` is not provided
  */
 export async function getTechnicianDepartment(
   client: ReturnType<typeof createClient>,
@@ -124,8 +128,10 @@ export async function getTechnicianDepartment(
 }
 
 /**
- * Like getTechnicianDepartment but distinguishes "no department" from "lookup error".
- * Returns { department, error: true } when the query itself failed.
+ * Look up a technician's profile department and indicate whether the lookup succeeded.
+ *
+ * @param technicianId - The profile id of the technician to query
+ * @returns An object with `department` set to the technician's department or `null` if unknown, and `error` set to `true` if the data lookup failed, `false` otherwise
  */
 export async function lookupTechnicianDepartment(
   client: ReturnType<typeof createClient>,
