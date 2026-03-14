@@ -8780,7 +8780,7 @@ export type Database = {
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "rigging" | "show" | "off" | "rehearsal"
-      job_extra_type: "travel_half" | "travel_full" | "day_off"
+      job_extra_type: "travel_half" | "travel_full" | "day_off" | "conduccion"
       job_rate_extras_status: "pending" | "approved" | "rejected"
       job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
       job_type: "single" | "tour" | "festival" | "ciclo" | "dryhire" | "tourdate" | "evento"
@@ -9109,7 +9109,7 @@ export const Constants = {
       form_status: ["pending", "submitted", "expired"],
       global_preset_status: ["available", "unavailable", "tentative"],
       job_date_type: ["travel", "setup", "rigging", "show", "off", "rehearsal"],
-      job_extra_type: ["travel_half", "travel_full", "day_off"],
+      job_extra_type: ["travel_half", "travel_full", "day_off", "conduccion"],
       job_rate_extras_status: ["pending", "approved", "rejected"],
       job_status: ["Tentativa", "Confirmado", "Completado", "Cancelado"],
       job_type: ["single", "tour", "festival", "ciclo", "dryhire", "tourdate", "evento"],
