@@ -605,14 +605,43 @@ serve(async (req) => {
 });
 
 /**
- * Renders a self-contained confirmation/result page as inline HTML.
- *
- * Previously this tried to redirect to an external page (temp_error.html) but
- * the SPA catch-all in _redirects made the HEAD probe return 200 for any path,
- * causing a redirect to a blank SPA shell (black screen). Inline rendering is
- * simpler, faster (no extra fetch), and always works.
+ * Redirects to public result page (defaults to sector-pro.work)
  */
 async function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
+  // Prefer redirect if an explicit result page URL is configured and reachable.
+  const configuredBase = Deno.env.get('PUBLIC_CONFIRM_RESULT_URL') || Deno.env.get('PUBLIC_RESULT_PAGE_URL') || '';
+  const defaultBase = 'https://sector-pro.work/temp_error.html';
+  const baseUrl = configuredBase || defaultBase;
+
+  const params = new URLSearchParams({
+    status: opts.status,
+    heading: opts.heading,
+    message: opts.message,
+    ...(opts.submessage ? { submessage: opts.submessage } : {})
+  });
+
+  // Try redirecting to either configuredBase or the default sector-pro URL
+  const shouldTryRedirect = true;
+
+  if (shouldTryRedirect) {
+    try {
+      // Probe the page quickly to avoid redirecting to a 404
+      const controller = new AbortController();
+      const t = setTimeout(() => controller.abort(), 700);
+      const head = await fetch(`${baseUrl}`, { method: 'HEAD', signal: controller.signal }).catch(() => undefined);
+      clearTimeout(t);
+      if (head && head.ok) {
+        console.log('📄 REDIRECTING TO RESULT PAGE:', { status: opts.status, heading: opts.heading, target: baseUrl });
+        return new Response(null, { status: 302, headers: { 'Location': `${baseUrl}?${params.toString()}` } });
+      } else {
+        console.warn('⚠️ Result page not reachable, rendering inline page instead', { baseUrl, status: head?.status });
+      }
+    } catch (e) {
+      console.warn('⚠️ Result page probe error, rendering inline page', { error: (e as Error)?.message });
+    }
+  }
+
+  // Fallback: render inline HTML so the user never sees a 404
   return new Response(renderPage(opts), { headers: { 'Content-Type': 'text/html; charset=UTF-8' } });
 }
 
