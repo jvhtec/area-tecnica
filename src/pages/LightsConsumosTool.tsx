@@ -98,7 +98,8 @@ const lightComponentDatabase: LightComponent[] = [
   { id: 58, name: 'ACME TORNADO', watts: 935, fixtureType: 'led' },
   { id: 59, name: 'CLAY PAKY A-LEDA K15', watts: 760, fixtureType: 'led' },
   { id: 60, name: 'AROLLA AQUA LT', watts: 1400, fixtureType: 'led' },
-  { id: 61, name: 'CUARZO', watts: 400, fixtureType: 'incandescent' }
+  { id: 61, name: 'CUARZO', watts: 400, fixtureType: 'incandescent' },
+  { id: 62, name: 'MINI-B AQUA PX', watts: 375, fixtureType: 'led' }
 
 ];
 
