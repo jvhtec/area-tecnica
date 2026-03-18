@@ -25,7 +25,7 @@
 
 ## 1. Project Structure
 
-```
+```text
 area-tecnica/
 ├── .claude/                          # Claude Code workspace
 │   ├── commands/                     # Custom slash commands (7 commands)
@@ -252,7 +252,7 @@ area-tecnica/
 
 ## 2. High-Level System Diagram
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                                   USERS                                         │
 │  Production Companies · Technical Crews · Freelancers · Coordinators            │
@@ -428,9 +428,9 @@ area-tecnica/
 | Attribute | Detail |
 |-----------|--------|
 | **Type** | PostgreSQL (Supabase-hosted) |
-| **Tables** | 145 tables across `public` and `dreamlit` schemas |
-| **Enums** | 36 custom enum types |
-| **Migrations** | 98 migration files |
+| **Tables** | ~145 tables across `public` and `dreamlit` schemas (as-of 2026-03-18) |
+| **Enums** | ~36 custom enum types (as-of 2026-03-18) |
+| **Migrations** | ~98 migration files (as-of 2026-03-18) |
 | **RLS** | Enabled on all tables with role-based policies |
 | **Functions** | `compute_timesheet_hours()`, `check_technician_conflicts()`, and others |
 
@@ -638,7 +638,7 @@ area-tecnica/
 
 ### 6.3 CI/CD Pipeline
 
-```
+```text
 ┌──────────────┐     ┌──────────────────────────────────────┐
 │  Developer   │     │        GitHub Actions                 │
 │  pushes to   │────▶│                                      │
@@ -674,7 +674,7 @@ area-tecnica/
 ### 6.4 Environment Variables
 
 **Cloudflare Pages** (build-time):
-```
+```dotenv
 VITE_SUPABASE_URL          # Supabase project URL
 VITE_SUPABASE_ANON_KEY     # Supabase anonymous key
 VITE_APP_VERSION           # Auto-set to build timestamp
@@ -682,7 +682,7 @@ VITE_BUILD_TIMESTAMP       # Auto-set to Unix timestamp
 ```
 
 **Supabase Secrets** (Edge Function runtime):
-```
+```dotenv
 BREVO_API_KEY              # Email service
 BREVO_FROM                 # Email sender address
 MAPBOX_PUBLIC_TOKEN        # Mapbox maps
@@ -842,7 +842,7 @@ npm run test:e2e
 
 ### 8.5 Development Workflow
 
-```
+```text
 Feature Branch → PR to dev → CI passes → Merge to dev → Preview deploy
                                                               │
                                     PR to main → CI passes → Merge to main → Production
@@ -963,10 +963,10 @@ Based on the [Tech Debt Audit (2026-02-01)](/.claude/notes/2026-02-01-tech-debt-
 | **Stack** | React 18 + TypeScript, Vite 6, Supabase, Tailwind CSS + shadcn/ui |
 | **License** | Private |
 | **Last Updated** | 2026-03-18 |
-| **Database Tables** | 145 |
-| **Edge Functions** | 61 |
-| **Custom Hooks** | 100+ |
-| **Page Components** | 42 |
-| **Dependencies** | 139 npm packages |
-| **Migrations** | 98 SQL files |
-| **Documentation** | 60+ markdown files |
+| **Database Tables** | ~145 (as-of 2026-03-18) |
+| **Edge Functions** | ~61 (as-of 2026-03-18) |
+| **Custom Hooks** | 100+ (as-of 2026-03-18) |
+| **Page Components** | ~42 (as-of 2026-03-18) |
+| **Dependencies** | ~139 npm packages (as-of 2026-03-18) |
+| **Migrations** | ~98 SQL files (as-of 2026-03-18) |
+| **Documentation** | 60+ markdown files (as-of 2026-03-18) |
