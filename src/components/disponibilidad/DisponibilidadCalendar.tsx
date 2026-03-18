@@ -215,9 +215,6 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect, className }
     stock_ok: { backgroundColor: 'hsl(var(--success, 142 71% 45%) / 0.18)', border: '2px solid hsl(var(--success, 142 71% 45%))' },
   } as const;
 
-  // Keep calendar interactive even during loading to avoid blocking selection
-  // const isLoading = isLoadingAssignments;
-
   // Build quick info for tooltips (preset names + conflict status)
   const infoByDate = useMemo(() => {
     const map: Record<string, { names: string[]; count: number; status: DayStatus }> = {};

@@ -94,11 +94,6 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
   // Allow editing for management/admin or Javier by email
   const canEditChangelog = (userRole === "management" || userRole === "admin") || (userEmail?.toLowerCase() === 'sonido@sector-pro.com')
 
-  // REMOVED: The early return that was hiding the component for management users
-  // if (userRole === "management") {
-  //   return null;
-  // }
-
   // Check for recent updates (within last 24 hours)
   useEffect(() => {
     const now = new Date()
