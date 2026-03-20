@@ -67,6 +67,7 @@ describe("handleGetGoogleMapsKeyRequest", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ apiKey: "maps-key" });
+    expect(response.headers.get("Cache-Control")).toBe("no-store, private, max-age=0");
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "google_maps_key_access",
@@ -121,5 +122,40 @@ describe("handleGetGoogleMapsKeyRequest", () => {
         }),
       }),
     );
+  });
+
+  it("still denies roles outside admin/management even if allowedRoles is wider", async () => {
+    const profiles = createProfilesBuilder({
+      data: { role: "technician", email: "tech@example.com" },
+      error: null,
+    });
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn((table: string) => {
+        if (table === "profiles") {
+          return profiles;
+        }
+
+        return {
+          insert: auditInsert,
+        };
+      }),
+    };
+
+    const response = await handleGetGoogleMapsKeyRequest(
+      new Request("https://example.com/get-google-maps-key", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer token-1",
+        },
+      }),
+      {
+        supabase,
+        allowedRoles: ["management", "technician"],
+        getEnv: () => "maps-key",
+      },
+    );
+
+    expect(response.status).toBe(403);
   });
 });

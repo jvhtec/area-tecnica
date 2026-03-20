@@ -7,9 +7,6 @@ import { handleGetGoogleMapsKeyRequest } from "./handler.ts";
 const DEFAULT_ALLOWED_ROLES = [
   'admin',
   'management',
-  'house_tech',
-  'technician',
-  'logistics',
 ]
 
 const getAllowedRoles = () => {

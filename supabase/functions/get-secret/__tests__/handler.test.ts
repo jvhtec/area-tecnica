@@ -116,4 +116,118 @@ describe("handleGetSecretRequest", () => {
       }),
     );
   });
+
+  it("returns 500 when the profile lookup fails with a database error", async () => {
+    const profiles = createProfilesBuilder({ data: null, error: new Error("db failed") });
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn((table: string) => {
+        if (table === "profiles") {
+          return profiles;
+        }
+
+        return {
+          insert: auditInsert,
+        };
+      }),
+    };
+
+    const response = await handleGetSecretRequest(
+      new Request("https://example.com/get-secret", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer token-1",
+        },
+        body: JSON.stringify({ secretName: "OPENAI_API_KEY" }),
+      }),
+      {
+        supabase,
+        getEnv: () => "super-secret-value",
+      },
+    );
+
+    expect(response.status).toBe(500);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        metadata: expect.objectContaining({
+          outcome: "db_error",
+        }),
+      }),
+    );
+  });
+
+  it("fails closed when the success audit write fails", async () => {
+    const profiles = createProfilesBuilder({ data: { role: "management" }, error: null });
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn((table: string) => {
+        if (table === "profiles") {
+          return profiles;
+        }
+
+        return {
+          insert: vi.fn().mockResolvedValue({ error: new Error("audit failed") }),
+        };
+      }),
+    };
+
+    await expect(
+      handleGetSecretRequest(
+        new Request("https://example.com/get-secret", {
+          method: "POST",
+          headers: {
+            authorization: "Bearer token-1",
+          },
+          body: JSON.stringify({ secretName: "OPENAI_API_KEY" }),
+        }),
+        {
+          supabase,
+          getEnv: () => "super-secret-value",
+        },
+      ),
+    ).rejects.toThrow("Failed to persist security audit log");
+  });
+
+  it("truncates oversized secret names in the audit resource", async () => {
+    const profiles = createProfilesBuilder({ data: { role: "technician" }, error: null });
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn((table: string) => {
+        if (table === "profiles") {
+          return profiles;
+        }
+
+        return {
+          insert: auditInsert,
+        };
+      }),
+    };
+    const oversizedSecretName = "A".repeat(400);
+
+    const response = await handleGetSecretRequest(
+      new Request("https://example.com/get-secret", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer token-1",
+        },
+        body: JSON.stringify({ secretName: oversizedSecretName }),
+      }),
+      {
+        supabase,
+        getEnv: () => "super-secret-value",
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resource: expect.any(String),
+        metadata: expect.objectContaining({
+          secret_name: oversizedSecretName,
+          secret_name_truncated: true,
+        }),
+      }),
+    );
+    expect(auditInsert.mock.calls[0][0].resource.length).toBeLessThanOrEqual(255);
+  });
 });

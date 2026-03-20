@@ -4,6 +4,8 @@ import {
   persistSecurityAuditLog,
 } from "../_shared/securityAudit.ts";
 
+const MANAGEMENT_ROLES = new Set(["admin", "management"]);
+
 interface ProfileRecord {
   role: string | null;
 }
@@ -97,12 +99,14 @@ export async function handleGetGoogleMapsKeyRequest(
     return jsonResponse({ error: "User profile not found" }, { status: 403 });
   }
 
-  if (deps.allowedRoles && !deps.allowedRoles.includes(profile.role ?? "")) {
+  const role = profile.role ?? "";
+
+  if (!MANAGEMENT_ROLES.has(role) || (deps.allowedRoles && !deps.allowedRoles.includes(role))) {
     await auditGoogleMapsKeyAccess(req, deps, {
       userId: user.id,
       success: false,
       outcome: "insufficient_permissions",
-      role: profile.role,
+      role,
     });
     return jsonResponse({ error: "Insufficient permissions" }, { status: 403 });
   }
@@ -123,8 +127,16 @@ export async function handleGetGoogleMapsKeyRequest(
     userId: user.id,
     success: true,
     outcome: "allowed",
-    role: profile.role,
+    role,
   });
 
-  return jsonResponse({ apiKey: googleMapsKey }, { status: 200 });
+  return jsonResponse(
+    { apiKey: googleMapsKey },
+    {
+      status: 200,
+      headers: {
+        "Cache-Control": "no-store, private, max-age=0",
+      },
+    },
+  );
 }

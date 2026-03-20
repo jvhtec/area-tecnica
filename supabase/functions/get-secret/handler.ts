@@ -6,6 +6,9 @@ import {
 
 const ALLOWED_SECRET_NAMES = ["X_AUTH_TOKEN", "OPENAI_API_KEY", "GOOGLE_MAPS_API_KEY"];
 const MANAGEMENT_ROLES = new Set(["admin", "management"]);
+const SECRET_RESOURCE_PREFIX = "secret:";
+const MAX_AUDIT_RESOURCE_LENGTH = 255;
+const MAX_AUDIT_SECRET_NAME_LENGTH = MAX_AUDIT_RESOURCE_LENGTH - SECRET_RESOURCE_PREFIX.length;
 
 interface ProfileRecord {
   role: string | null;
@@ -41,22 +44,21 @@ async function auditSecretAccess(
     role?: string | null;
   },
 ): Promise<void> {
-  try {
-    await persistSecurityAuditLog(req, deps.supabase, {
-      user_id: details.userId ?? null,
-      action: "secret_access",
-      resource: `secret:${details.secretName ?? "unknown"}`,
-      severity: details.success ? "low" : "high",
-      metadata: {
-        success: details.success,
-        outcome: details.outcome,
-        role: details.role ?? null,
-        secret_name: details.secretName ?? null,
-      },
-    });
-  } catch (error) {
-    console.error("Failed to audit get-secret access:", error);
-  }
+  const normalizedSecretName = (details.secretName ?? "unknown").slice(0, MAX_AUDIT_SECRET_NAME_LENGTH);
+
+  await persistSecurityAuditLog(req, deps.supabase, {
+    user_id: details.userId ?? null,
+    action: "secret_access",
+    resource: `${SECRET_RESOURCE_PREFIX}${normalizedSecretName}`,
+    severity: details.success ? "low" : "high",
+    metadata: {
+      success: details.success,
+      outcome: details.outcome,
+      role: details.role ?? null,
+      secret_name: details.secretName ?? null,
+      secret_name_truncated: normalizedSecretName !== (details.secretName ?? "unknown"),
+    },
+  });
 }
 
 export async function handleGetSecretRequest(
@@ -103,7 +105,17 @@ export async function handleGetSecretRequest(
   const profileQuery = deps.supabase.from("profiles").select("role");
   const { data: profile, error: profileError } = await profileQuery.eq("id", user.id).single();
 
-  if (profileError || !profile) {
+  if (profileError) {
+    await auditSecretAccess(req, deps, {
+      userId: user.id,
+      secretName,
+      success: false,
+      outcome: "db_error",
+    });
+    return jsonResponse({ error: "Failed to load user profile" }, { status: 500 });
+  }
+
+  if (!profile) {
     await auditSecretAccess(req, deps, {
       userId: user.id,
       secretName,
