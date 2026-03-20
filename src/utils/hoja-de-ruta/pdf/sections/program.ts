@@ -84,7 +84,7 @@ export class ProgramSection {
       const lineHeight = 6;
       const scheduleLines = eventData.schedule!
         .split(/\r?\n/)
-        .map((line) => line.trim())
+        .flatMap((line) => this.pdfDoc.splitText(line.trim(), 160))
         .filter(Boolean);
 
       for (const line of scheduleLines) {

@@ -79,7 +79,19 @@ export class PDFDocument {
   }
 
   addTable(options: any): void {
-    autoTable(this.doc, options);
+    const currentMargin = options?.margin ?? {};
+    autoTable(this.doc, {
+      ...options,
+      margin: {
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: this.footerSpace,
+        ...currentMargin,
+      },
+      pageBreak: options?.pageBreak ?? 'auto',
+      rowPageBreak: options?.rowPageBreak ?? 'auto',
+    });
   }
 
   setFillColor(r: number, g: number, b: number): void {
