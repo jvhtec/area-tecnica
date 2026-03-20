@@ -19,7 +19,7 @@ interface GetSecretDeps {
       ) => Promise<{ data: { user: { id: string } | null }; error: unknown }>;
     };
     from: (table: string) => {
-      select?: (columns: string) => {
+      select: (columns: string) => {
         eq: (column: string, value: string) => {
           single: () => Promise<{ data: ProfileRecord | null; error: unknown }>;
         };
@@ -100,11 +100,8 @@ export async function handleGetSecretRequest(
     return jsonResponse({ error: "Invalid authentication" }, { status: 401 });
   }
 
-  const profileQuery = deps.supabase.from("profiles").select?.("role");
-  const { data: profile, error: profileError } = await profileQuery?.eq("id", user.id).single() ?? {
-    data: null,
-    error: new Error("Profile query unavailable"),
-  };
+  const profileQuery = deps.supabase.from("profiles").select("role");
+  const { data: profile, error: profileError } = await profileQuery.eq("id", user.id).single();
 
   if (profileError || !profile) {
     await auditSecretAccess(req, deps, {

@@ -36,7 +36,7 @@ create policy "security_audit_log_select_management"
 on public.security_audit_log
 for select
 to authenticated
-using (public.is_admin_or_management() or auth.role() = 'service_role');
+using (public.is_admin_or_management());
 
 create policy "security_audit_log_service_role_all"
 on public.security_audit_log

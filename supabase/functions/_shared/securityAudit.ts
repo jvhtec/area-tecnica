@@ -27,6 +27,8 @@ interface AuditInsertClient {
 }
 
 const ALLOWED_SEVERITIES: SecurityAuditSeverity[] = ["low", "medium", "high", "critical"];
+const ACTION_MAX_LENGTH = 120;
+const RESOURCE_MAX_LENGTH = 255;
 const REDACTED_FIELDS = new Set([
   "authorization",
   "password",
@@ -197,7 +199,12 @@ export function validateSecurityAuditEvent(
         ? null
         : "__invalid__";
 
-  if (!action || action.length > 120 || !resource || resource.length > 255) {
+  if (
+    !action ||
+    action.length > ACTION_MAX_LENGTH ||
+    !resource ||
+    resource.length > RESOURCE_MAX_LENGTH
+  ) {
     return {
       event: null,
       errorResponse: jsonResponse({ error: "Invalid audit payload" }, { status: 400 }),

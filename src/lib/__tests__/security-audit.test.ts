@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { mockSupabase, resetMockSupabase } from "@/test/mockSupabase";
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
 
 import {
   logSecurityEvent,
   logSuspiciousActivity,
-} from "../security-audit";
+} from "@/lib/security-audit";
 
 describe("security-audit", () => {
   beforeEach(() => {
@@ -68,6 +68,7 @@ describe("security-audit", () => {
     ).resolves.toBeUndefined();
 
     expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
   });
 
   it("includes the activity string in suspicious activity metadata", async () => {

@@ -26,7 +26,7 @@ const { tokenManagerMock, logAuthEventMock, logSecurityEventMock } = vi.hoisted(
   logSecurityEventMock: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
 

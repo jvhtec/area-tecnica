@@ -6,7 +6,6 @@ import {
 
 interface ProfileRecord {
   role: string | null;
-  email?: string | null;
 }
 
 interface GetGoogleMapsKeyDeps {
@@ -83,7 +82,7 @@ export async function handleGetGoogleMapsKeyRequest(
     return jsonResponse({ error: "Invalid authentication" }, { status: 401 });
   }
 
-  const profileQuery = deps.supabase.from("profiles").select?.("role, email");
+  const profileQuery = deps.supabase.from("profiles").select?.("role");
   const { data: profile, error: profileError } = await profileQuery?.eq("id", user.id).single() ?? {
     data: null,
     error: new Error("Profile query unavailable"),

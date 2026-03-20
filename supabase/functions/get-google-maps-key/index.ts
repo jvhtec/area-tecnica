@@ -54,9 +54,6 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Error fetching Google Maps API key:", error);
-    return jsonResponse(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 },
-    );
+    return jsonResponse({ error: "Unable to fetch API key" }, { status: 500 });
   }
 });
