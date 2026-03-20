@@ -127,7 +127,7 @@ export async function handleGetGoogleMapsKeyRequest(
       userId: user.id,
       success: false,
       outcome: "key_not_configured",
-      role: profile.role,
+      role,
     });
     return jsonResponse({ error: "Google Maps API key not configured" }, { status: 500 });
   }

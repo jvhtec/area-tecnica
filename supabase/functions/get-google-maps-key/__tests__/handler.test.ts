@@ -71,6 +71,7 @@ describe("handleGetGoogleMapsKeyRequest", () => {
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         action: "google_maps_key_access",
+        user_id: "user-1",
         metadata: expect.objectContaining({
           success: true,
           outcome: "allowed",
