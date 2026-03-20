@@ -72,7 +72,7 @@ area-tecnica/
 │
 ├── scripts/                          # Build & utility scripts
 │   ├── worktree.sh                   # Git worktree management
-│   ├── inject-sw-version.sh          # SW version injection (post-build)
+│   ├── inject-sw-version.mjs         # SW version injection (post-build)
 │   ├── check-staged-secrets.sh       # Pre-commit secret detection
 │   └── streamdeck/                   # Stream Deck server
 │
@@ -515,6 +515,7 @@ area-tecnica/
 | `activity_log` | User action tracking |
 | `assignment_audit_log` | Assignment change history |
 | `corporate_email_logs` | Email audit trail |
+| `security_audit_log` | Persistent security-sensitive access log |
 | `dreamlit.event_log` | Workflow event logging |
 | `dreamlit.error_log` | System error tracking |
 
@@ -702,6 +703,7 @@ WA_DEFAULT_COUNTRY_CODE    # Default country code (+34)
 | `dreamlit.event_log` table | Workflow event logging |
 | `dreamlit.error_log` table | System error tracking |
 | `activity_log` table | User action auditing |
+| `security_audit_log` table | Persistent security access auditing |
 | `push_cron_execution_log` | Cron job execution history |
 | Supabase Dashboard | Database metrics, function logs |
 | Cloudflare Analytics | CDN performance, request metrics |
@@ -770,7 +772,7 @@ WA_DEFAULT_COUNTRY_CODE    # Default country code (+34)
 - [ ] Rotate VAPID keys and Supabase anon key (exposed in git history)
 - [ ] Implement pre-commit hooks (`git-secrets`, `detect-secrets`)
 - [ ] Add automated security scanning to CI (`npm audit`, Snyk)
-- [ ] Persist security audit logging (currently console-only)
+- [x] Persist security audit logging via `public.security_audit_log` and the `security-audit` Edge Function
 - [ ] Plan vitest 4.x upgrade to resolve esbuild vulnerability
 
 ---
@@ -863,7 +865,6 @@ Based on the [Tech Debt Audit (2026-02-01)](/.claude/notes/2026-02-01-tech-debt-
 | Category | Severity | Count | Example |
 |----------|----------|-------|---------|
 | Fire-and-forget DB operations | Critical | 4 | Silent delete failures in stock/logistics |
-| Security audit logging not persisted | Critical | 1 | `src/lib/security-audit.ts` — console only |
 | Direct Supabase calls bypassing hooks | High | 60 files | Should use custom hooks for consistency |
 | Unsafe date handling (no timezone) | High | 68 files | `new Date()` without `Europe/Madrid` |
 | Duplicate job query hooks | High | 3 hooks | `useJobs`, `useOptimizedJobs`, `useJobsRealtime` |
@@ -877,7 +878,6 @@ Based on the [Tech Debt Audit (2026-02-01)](/.claude/notes/2026-02-01-tech-debt-
 
 **Immediate Priority**:
 - Error handling for fire-and-forget Supabase operations
-- Persistent security audit logging
 - Validate truss model placeholder values in rigging calculations
 
 **Sprint Targets**:

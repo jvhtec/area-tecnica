@@ -21,6 +21,8 @@ This index helps you find what you need without having to remember filenames.
 ## Operations
 - **Staging setup (Cloudflare + Supabase)**
   - `STAGING_SETUP.md`
+- **Security audit logging**
+  - `SECURITY_AUDIT_LOGGING.md`
 - **Push notifications**
   - `PUSH_NOTIFICATIONS_SUMMARY.md`
   - `PUSH_NOTIFICATIONS_IMPLEMENTATION_SUMMARY.md`
@@ -39,6 +41,8 @@ This index helps you find what you need without having to remember filenames.
 - **Performance**
   - `PERFORMANCE_AUDIT.md`
   - `PERFORMANCE_AUDIT_REPORT.md`
+- **Security / observability**
+  - `SECURITY_AUDIT_LOGGING.md`
 
 ## Plans / Roadmaps
 - `plans/` (grouped plans)

@@ -7,6 +7,7 @@ import { TokenManager } from "@/lib/token-manager";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { UserRole } from "@/types/user";
+import { logAuthEvent, logSecurityEvent } from "@/lib/security-audit";
 
 interface AuthContextType {
   session: Session | null;
@@ -365,6 +366,24 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     }
   }, [fetchUserProfile, navigate, user, tokenManager, toast, refreshSubscriptions, invalidateQueries, clearProfileCache]);
 
+  const resolveCurrentAuditUserId = useCallback(async (): Promise<string | null> => {
+    if (user?.id) {
+      return user.id;
+    }
+
+    if (session?.user?.id) {
+      return session.user.id;
+    }
+
+    try {
+      const cachedSession = await tokenManager.getCachedSession();
+      return cachedSession?.user?.id ?? null;
+    } catch (error) {
+      console.error("Failed to resolve current audit user id:", error);
+      return null;
+    }
+  }, [session, tokenManager, user]);
+
   // Rest of the implementation similar to original useAuth but with optimizations
   useEffect(() => {
     if (!isInitialized) {
@@ -434,6 +453,10 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       });
 
       if (error) {
+        void logAuthEvent(null, "login", false, {
+          email: email.toLowerCase(),
+          error: error.message,
+        });
         setError(error.message);
         toast({
           title: "Login failed",
@@ -444,6 +467,13 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
 
       if (data.user) {
+        void logAuthEvent(
+          data.user.id,
+          "login",
+          true,
+          { email: data.user.email ?? email.toLowerCase() },
+          { accessToken: data.session?.access_token },
+        );
         const profile = await fetchUserProfile(data.user.id, false); // Fresh fetch on login
         let roleForNavigation = null;
 
@@ -460,6 +490,10 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         navigate(dashboardPath);
       }
     } catch (error: any) {
+      void logAuthEvent(null, "login", false, {
+        email: email.toLowerCase(),
+        error: error.message,
+      });
       setError(error.message);
       toast({
         title: "Login failed",
@@ -596,10 +630,13 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   };
 
   const logout = async () => {
+    const currentUserId = await resolveCurrentAuditUserId();
+
     try {
       setIsLoading(true);
 
       await tokenManager.signOut();
+      void logAuthEvent(currentUserId, "logout", true);
       clearProfileCache();
 
       setSession(null);
@@ -614,6 +651,9 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
       navigate('/auth');
     } catch (error: any) {
+      void logAuthEvent(currentUserId, "logout", false, {
+        error: error.message,
+      });
       setError(error.message);
       toast({
         title: "Logout failed",
@@ -643,12 +683,32 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         throw new Error(data.error || 'Failed to send password reset email');
       }
 
+      void logSecurityEvent({
+        action: "password_reset_request",
+        resource: "authentication",
+        severity: "low",
+        metadata: {
+          success: true,
+          email: email.toLowerCase(),
+        },
+      });
+
       toast({
         title: "Password Reset Email Sent",
         description: "If an account with that email exists, a password reset link has been sent.",
       });
     } catch (error: any) {
       const errorMessage = error.message || "Failed to send password reset email";
+      void logSecurityEvent({
+        action: "password_reset_request",
+        resource: "authentication",
+        severity: "high",
+        metadata: {
+          success: false,
+          email: email.toLowerCase(),
+          error: errorMessage,
+        },
+      });
       setError(errorMessage);
       toast({
         title: "Password Reset Failed",
@@ -662,6 +722,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   };
 
   const resetPassword = async (newPassword: string) => {
+    const currentUserId = await resolveCurrentAuditUserId();
+
     try {
       setIsLoading(true);
       setError(null);
@@ -674,6 +736,16 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         throw error;
       }
 
+      void logSecurityEvent({
+        user_id: currentUserId,
+        action: "password_reset_complete",
+        resource: "authentication",
+        severity: "low",
+        metadata: {
+          success: true,
+        },
+      });
+
       toast({
         title: "Password Updated",
         description: "Your password has been successfully updated.",
@@ -684,6 +756,16 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       navigate(dashboardPath);
     } catch (error: any) {
       const errorMessage = error.message || "Failed to update password";
+      void logSecurityEvent({
+        user_id: currentUserId,
+        action: "password_reset_complete",
+        resource: "authentication",
+        severity: "high",
+        metadata: {
+          success: false,
+          error: errorMessage,
+        },
+      });
       setError(errorMessage);
       toast({
         title: "Password Update Failed",
