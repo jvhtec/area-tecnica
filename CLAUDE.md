@@ -480,7 +480,7 @@ VITE_APP_VERSION        # Auto-set to build timestamp
 VITE_BUILD_TIMESTAMP    # Auto-set to Unix timestamp
 ```
 
-Service worker version injection via `scripts/inject-sw-version.sh` (runs post-build).
+Service worker version injection via `scripts/inject-sw-version.mjs` (runs post-build).
 
 ## Git Workflow
 
