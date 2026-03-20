@@ -64,4 +64,4 @@ begin
       add constraint hoja_de_ruta_aux_machinery_requirements_is_array
       check (jsonb_typeof(aux_machinery_requirements) = 'array');
   end if;
-end $$;
+end $$;;

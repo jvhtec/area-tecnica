@@ -77,5 +77,4 @@ begin
       );
   end if;
 end;
-$$;
-
+$$;;

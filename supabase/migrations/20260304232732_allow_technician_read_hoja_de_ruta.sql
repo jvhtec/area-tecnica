@@ -95,4 +95,4 @@ USING (
       AND ja.technician_id = auth.uid()
       AND ja.status = 'confirmed'::public.assignment_status
   )
-);
+);;

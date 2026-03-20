@@ -30,4 +30,4 @@ ALTER TABLE public.hoja_de_ruta_travel_arrangements
         'own_means'::text
       ]
     )
-  );
+  );;
