@@ -321,6 +321,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
       // Refresh jobs and Hoja de Ruta that depends on the job location
       queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["hoja-de-ruta", job.id] });
       onOpenChange(false);
     } catch (error: any) {

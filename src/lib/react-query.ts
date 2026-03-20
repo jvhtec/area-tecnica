@@ -22,14 +22,27 @@ export const createQueryClient = createOptimizedQueryClient;
 // Custom hook factory for common entity queries with optimized keys
 export const createEntityQueryOptions = <T>(
   entityType: string,
-  id: string,
-  options?: Partial<QueryOptions<T>>
+  idOrOptions?: string | Partial<QueryOptions<T>>,
+  maybeOptions?: Partial<QueryOptions<T>>
 ): QueryOptions<T> => {
   const keyGenerator = createQueryKey[entityType as keyof typeof createQueryKey];
+  const options = (typeof idOrOptions === 'string' ? maybeOptions : idOrOptions) ?? {};
+  const defaultQueryKey =
+    keyGenerator && 'all' in keyGenerator
+      ? (keyGenerator as { all: QueryKey }).all
+      : [entityType];
+
+  if (typeof idOrOptions !== 'string') {
+    return {
+      queryKey: options.queryKey ?? defaultQueryKey,
+      ...options,
+    };
+  }
+
   return {
     queryKey: (keyGenerator && 'detail' in keyGenerator)
-      ? (keyGenerator as { detail: (id: string) => QueryKey }).detail(id)
-      : [entityType, id],
+      ? (keyGenerator as { detail: (id: string) => QueryKey }).detail(idOrOptions)
+      : [entityType, idOrOptions],
     ...options,
   };
 };

@@ -18,6 +18,7 @@ import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
+import { createQueryKey, optimizedInvalidation } from "@/lib/react-query";
 
 const Operaciones = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
@@ -34,7 +35,7 @@ const Operaciones = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  useTabVisibility(['jobs-data']);
+  useTabVisibility([createQueryKey.jobsData.all]);
   const monthAnchor = date ?? new Date();
   const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
@@ -113,7 +114,7 @@ const Operaciones = () => {
         });
 
         // Invalidate queries to refresh the list
-        await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
+        optimizedInvalidation.invalidateJobsCaches(queryClient);
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }

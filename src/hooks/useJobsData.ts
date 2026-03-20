@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
+import { fromZonedTime } from 'date-fns-tz';
 import { useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
@@ -6,6 +8,7 @@ import { Department } from '@/types/department';
 import { sanitizeLogData } from '@/lib/enhanced-security-config';
 import { OPS_JOB_TYPES_NO_DRYHIRE, OPS_JOB_TYPES_WITH_DRYHIRE } from '@/utils/jobType';
 import { useOptimizedRealtime } from '@/hooks/useOptimizedRealtime';
+import { createEntityQueryOptions, createQueryKey } from '@/lib/react-query';
 import { toast } from 'sonner';
 
 export type JobsDataFilters = {
@@ -53,17 +56,26 @@ export interface UseJobsDataResult {
   refetch: () => Promise<unknown>;
 }
 
+const MADRID_TIMEZONE = 'Europe/Madrid';
+
+const normalizeFilterDateToMadridIso = (value?: Date) => {
+  if (!value) {
+    return null;
+  }
+
+  const localWallClock = format(value, "yyyy-MM-dd'T'HH:mm:ss");
+  return fromZonedTime(localWallClock, MADRID_TIMEZONE).toISOString();
+};
+
 export const normalizeJobsFilters = (filters: JobsDataFilters = {}) => ({
   department: filters.department ?? null,
-  startDateIso: filters.startDate ? filters.startDate.toISOString() : null,
-  endDateIso: filters.endDate ? filters.endDate.toISOString() : null,
+  startDateIso: normalizeFilterDateToMadridIso(filters.startDate),
+  endDateIso: normalizeFilterDateToMadridIso(filters.endDate),
   includeDryhire: filters.includeDryhire ?? true,
 });
 
-export const buildJobsDataQueryKey = (filters: JobsDataFilters = {}) => [
-  'jobs-data',
-  normalizeJobsFilters(filters),
-] as const;
+export const buildJobsDataQueryKey = (filters: JobsDataFilters = {}) =>
+  createQueryKey.jobsData.list(normalizeJobsFilters(filters));
 
 export const mergeRealtimeJobEvent = <T extends { id: string }>(
   previous: T[] | undefined,
@@ -124,6 +136,7 @@ export const useJobsData = (options: JobsDataOptions = {}): UseJobsDataResult =>
     () => normalizeJobsFilters({ department, startDate, endDate, includeDryhire }),
     [department, startDate, endDate, includeDryhire]
   );
+  const queryEnabled = enabled && !isPaused;
   const queryKey = useMemo<QueryKey>(
     () => buildJobsDataQueryKey({ department, startDate, endDate, includeDryhire }),
     [department, startDate, endDate, includeDryhire]
@@ -195,12 +208,12 @@ export const useJobsData = (options: JobsDataOptions = {}): UseJobsDataResult =>
       query = query.eq('job_departments.department', department);
     }
 
-    if (startDate) {
-      query = query.gte('end_time', startDate.toISOString());
+    if (normalizedFilters.startDateIso) {
+      query = query.gte('end_time', normalizedFilters.startDateIso);
     }
 
-    if (endDate) {
-      query = query.lte('start_time', endDate.toISOString());
+    if (normalizedFilters.endDateIso) {
+      query = query.lte('start_time', normalizedFilters.endDateIso);
     }
 
     const { data, error } = await query;
@@ -250,51 +263,106 @@ export const useJobsData = (options: JobsDataOptions = {}): UseJobsDataResult =>
     }
 
     return filteredJobs;
-  }, [department, endDate, includeDryhire, normalizedFilters, startDate]);
+  }, [department, includeDryhire, normalizedFilters]);
 
-  const jobsQuery = useQuery({
-    queryKey,
-    queryFn: fetchJobsData,
-    staleTime: 1000 * 60 * 5,
-    gcTime: 1000 * 60 * 10,
-    refetchOnMount,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    enabled: enabled && !isPaused,
-    placeholderData: (previousData) => previousData,
-  });
+  const jobsQuery = useQuery(
+    createEntityQueryOptions<JobRecord[]>('jobsData', {
+      queryKey,
+      queryFn: fetchJobsData,
+      staleTime: 1000 * 60 * 5,
+      gcTime: 1000 * 60 * 10,
+      refetchOnMount,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      enabled: queryEnabled,
+      placeholderData: (previousData) => previousData,
+    })
+  );
 
   const jobsRealtimeStatus = useOptimizedRealtime('jobs', queryKey as string[], {
-    enabled: realtime && !isPaused,
+    enabled: realtime && queryEnabled,
     priority: 'high',
   });
 
-  const timesheetsRealtimeStatus = useOptimizedRealtime('timesheets', [...queryKey, 'timesheets'], {
-    enabled: realtime && !isPaused,
+  const jobAssignmentsRealtimeStatus = useOptimizedRealtime('job_assignments', queryKey as string[], {
+    enabled: realtime && queryEnabled,
+    priority: 'high',
+  });
+
+  const jobDepartmentsRealtimeStatus = useOptimizedRealtime('job_departments', queryKey as string[], {
+    enabled: realtime && queryEnabled,
+    priority: 'high',
+  });
+
+  const profilesRealtimeStatus = useOptimizedRealtime('profiles', queryKey as string[], {
+    enabled: realtime && queryEnabled,
+    priority: 'medium',
+  });
+
+  const timesheetsRealtimeStatus = useOptimizedRealtime('timesheets', queryKey as string[], {
+    enabled: realtime && queryEnabled,
     priority: 'high',
   });
 
   useEffect(() => {
-    if (!realtime || isPaused) {
+    if (!realtime || !queryEnabled) {
       return;
     }
 
     // Ensure cache always stays hydrated/enriched from fetchJobsData.
     void queryClient.invalidateQueries({ queryKey });
-  }, [queryClient, queryKey, realtime, isPaused]);
+  }, [queryClient, queryEnabled, queryKey, realtime]);
 
   const realtimeStatus = useMemo(
     () => ({
-      isConnected: jobsRealtimeStatus.isConnected && timesheetsRealtimeStatus.isConnected,
-      isLoading: jobsRealtimeStatus.isLoading || timesheetsRealtimeStatus.isLoading,
-      error: jobsRealtimeStatus.error || timesheetsRealtimeStatus.error,
-      retryCount: jobsRealtimeStatus.retryCount + timesheetsRealtimeStatus.retryCount,
-      retry: jobsRealtimeStatus.retry,
-      stats: jobsRealtimeStatus.stats,
+      isConnected:
+        jobsRealtimeStatus.isConnected &&
+        jobAssignmentsRealtimeStatus.isConnected &&
+        jobDepartmentsRealtimeStatus.isConnected &&
+        profilesRealtimeStatus.isConnected &&
+        timesheetsRealtimeStatus.isConnected,
+      isLoading:
+        jobsRealtimeStatus.isLoading ||
+        jobAssignmentsRealtimeStatus.isLoading ||
+        jobDepartmentsRealtimeStatus.isLoading ||
+        profilesRealtimeStatus.isLoading ||
+        timesheetsRealtimeStatus.isLoading,
+      error:
+        jobsRealtimeStatus.error ||
+        jobAssignmentsRealtimeStatus.error ||
+        jobDepartmentsRealtimeStatus.error ||
+        profilesRealtimeStatus.error ||
+        timesheetsRealtimeStatus.error,
+      retryCount:
+        jobsRealtimeStatus.retryCount +
+        jobAssignmentsRealtimeStatus.retryCount +
+        jobDepartmentsRealtimeStatus.retryCount +
+        profilesRealtimeStatus.retryCount +
+        timesheetsRealtimeStatus.retryCount,
+      retry: () => {
+        jobsRealtimeStatus.retry();
+        jobAssignmentsRealtimeStatus.retry();
+        jobDepartmentsRealtimeStatus.retry();
+        profilesRealtimeStatus.retry();
+        timesheetsRealtimeStatus.retry();
+      },
+      stats: {
+        jobs: jobsRealtimeStatus.stats,
+        jobAssignments: jobAssignmentsRealtimeStatus.stats,
+        jobDepartments: jobDepartmentsRealtimeStatus.stats,
+        profiles: profilesRealtimeStatus.stats,
+        timesheets: timesheetsRealtimeStatus.stats,
+      },
     }),
-    [jobsRealtimeStatus, timesheetsRealtimeStatus]
+    [
+      jobsRealtimeStatus,
+      jobAssignmentsRealtimeStatus,
+      jobDepartmentsRealtimeStatus,
+      profilesRealtimeStatus,
+      timesheetsRealtimeStatus,
+    ]
   );
 
   useEffect(() => {
@@ -305,14 +373,6 @@ export const useJobsData = (options: JobsDataOptions = {}): UseJobsDataResult =>
       });
     }
   }, [jobsQuery.isLoading, realtime, realtimeStatus.error]);
-
-  useEffect(() => {
-    if (jobsQuery.isError) {
-      setIsPaused(true);
-    } else if (jobsQuery.isSuccess) {
-      setIsPaused(false);
-    }
-  }, [jobsQuery.isError, jobsQuery.isSuccess]);
 
   const manualRefetch = useCallback(async () => {
     setIsPaused(false);

@@ -18,6 +18,7 @@ import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { optimizedInvalidation } from "@/lib/react-query";
 
 const Lights = () => {
   const navigate = useNavigate();
@@ -128,7 +129,7 @@ const Lights = () => {
           });
           
           // Invalidate queries to refresh the list
-          await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
+          optimizedInvalidation.invalidateJobsCaches(queryClient);
         } else {
           throw new Error(result.error || "Unknown deletion error");
         }

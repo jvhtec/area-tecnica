@@ -35,7 +35,7 @@ export function RealTimeJobsList({
   onDeleteClick,
   userRole
 }: RealTimeJobsListProps) {
-  const { jobs, isLoading, isRefreshing, refetch, realtimeStatus } = useJobsData({ realtime: true });
+  const { jobs, isLoading, isRefreshing, refetch } = useJobsData({ realtime: true });
   const [timeFilter, setTimeFilter] = useState<"upcoming" | "past" | "all">("upcoming");
 
   const { jobs: displayedJobs, total: totalMatchingJobs } = useMemo(() => {

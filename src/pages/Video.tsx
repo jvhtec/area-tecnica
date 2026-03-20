@@ -20,6 +20,7 @@ import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { createQueryKey, optimizedInvalidation } from "@/lib/react-query";
 
 const Video = () => {
   const isMobile = useIsMobile();
@@ -46,7 +47,7 @@ const Video = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
-  useTabVisibility(['jobs-data']);
+  useTabVisibility([createQueryKey.jobsData.all]);
 
   const monthAnchor = date ?? new Date();
   const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
@@ -121,7 +122,7 @@ const Video = () => {
         title: "Job deleted",
         description: "The job has been successfully deleted.",
       });
-      await queryClient.invalidateQueries({ queryKey: ['jobs-data'] });
+      optimizedInvalidation.invalidateJobsCaches(queryClient);
     } catch (error: any) {
       toast({
         title: "Error deleting job",

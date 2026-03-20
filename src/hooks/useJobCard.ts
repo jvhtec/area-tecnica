@@ -138,7 +138,6 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
     }
   });

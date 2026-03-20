@@ -33,6 +33,7 @@ import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDeta
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
 import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
 import { isJobOnDate } from "@/utils/timezoneUtils";
+import { optimizedInvalidation } from "@/lib/react-query";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -157,10 +158,10 @@ const Sound = () => {
   const departmentJobs = useMemo(() => {
     if (!jobs) return [];
     return jobs.filter((job) => {
-      if (job.job_type === 'tour') return false;
       if (job.tour_date_id) {
         return Boolean(job.tour_date);
       }
+      if (job.job_type === 'tour') return false;
       return true;
     });
   }, [jobs]);
@@ -210,7 +211,7 @@ const Sound = () => {
           title: "Job deleted",
           description: result.details || "The job has been removed and cleanup is running in background."
         });
-        await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
+        optimizedInvalidation.invalidateJobsCaches(queryClient);
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
