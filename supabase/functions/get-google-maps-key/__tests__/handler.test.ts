@@ -158,4 +158,205 @@ describe("handleGetGoogleMapsKeyRequest", () => {
 
     expect(response.status).toBe(403);
   });
+
+  it("writes an audit row when the auth token is missing", async () => {
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn(() => ({
+        insert: auditInsert,
+      })),
+    };
+
+    const response = await handleGetGoogleMapsKeyRequest(
+      new Request("https://example.com/get-google-maps-key", {
+        method: "POST",
+      }),
+      {
+        supabase,
+        allowedRoles: ["management"],
+        getEnv: () => "maps-key",
+      },
+    );
+
+    expect(response.status).toBe(401);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "google_maps_key_access",
+        metadata: expect.objectContaining({
+          success: false,
+          outcome: "missing_authorization",
+        }),
+      }),
+    );
+  });
+
+  it("writes an audit row when authentication is invalid", async () => {
+    getUser.mockResolvedValue({
+      data: { user: null },
+      error: new Error("invalid token"),
+    });
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn(() => ({
+        insert: auditInsert,
+      })),
+    };
+
+    const response = await handleGetGoogleMapsKeyRequest(
+      new Request("https://example.com/get-google-maps-key", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer token-1",
+        },
+      }),
+      {
+        supabase,
+        allowedRoles: ["management"],
+        getEnv: () => "maps-key",
+      },
+    );
+
+    expect(response.status).toBe(401);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "google_maps_key_access",
+        metadata: expect.objectContaining({
+          success: false,
+          outcome: "invalid_authentication",
+        }),
+      }),
+    );
+  });
+
+  it("writes an audit row when the profile is missing", async () => {
+    const profiles = createProfilesBuilder({
+      data: null,
+      error: null,
+    });
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn((table: string) => {
+        if (table === "profiles") {
+          return profiles;
+        }
+
+        return {
+          insert: auditInsert,
+        };
+      }),
+    };
+
+    const response = await handleGetGoogleMapsKeyRequest(
+      new Request("https://example.com/get-google-maps-key", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer token-1",
+        },
+      }),
+      {
+        supabase,
+        allowedRoles: ["management"],
+        getEnv: () => "maps-key",
+      },
+    );
+
+    expect(response.status).toBe(403);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "google_maps_key_access",
+        metadata: expect.objectContaining({
+          success: false,
+          outcome: "profile_not_found",
+        }),
+      }),
+    );
+  });
+
+  it("writes an audit row when the profile lookup hits a database error", async () => {
+    const profiles = createProfilesBuilder({
+      data: null,
+      error: new Error("db failed"),
+    });
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn((table: string) => {
+        if (table === "profiles") {
+          return profiles;
+        }
+
+        return {
+          insert: auditInsert,
+        };
+      }),
+    };
+
+    const response = await handleGetGoogleMapsKeyRequest(
+      new Request("https://example.com/get-google-maps-key", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer token-1",
+        },
+      }),
+      {
+        supabase,
+        allowedRoles: ["management"],
+        getEnv: () => "maps-key",
+      },
+    );
+
+    expect(response.status).toBe(500);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "google_maps_key_access",
+        metadata: expect.objectContaining({
+          success: false,
+          outcome: "db_error",
+        }),
+      }),
+    );
+  });
+
+  it("writes an audit row when the key is not configured", async () => {
+    const profiles = createProfilesBuilder({
+      data: { role: "management", email: "manager@example.com" },
+      error: null,
+    });
+    const supabase = {
+      auth: { getUser },
+      from: vi.fn((table: string) => {
+        if (table === "profiles") {
+          return profiles;
+        }
+
+        return {
+          insert: auditInsert,
+        };
+      }),
+    };
+
+    const response = await handleGetGoogleMapsKeyRequest(
+      new Request("https://example.com/get-google-maps-key", {
+        method: "POST",
+        headers: {
+          authorization: "Bearer token-1",
+        },
+      }),
+      {
+        supabase,
+        allowedRoles: ["management"],
+        getEnv: () => undefined,
+      },
+    );
+
+    expect(response.status).toBe(500);
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "google_maps_key_access",
+        metadata: expect.objectContaining({
+          success: false,
+          outcome: "key_not_configured",
+        }),
+      }),
+    );
+  });
 });

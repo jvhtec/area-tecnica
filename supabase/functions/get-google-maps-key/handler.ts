@@ -90,7 +90,16 @@ export async function handleGetGoogleMapsKeyRequest(
     error: new Error("Profile query unavailable"),
   };
 
-  if (profileError || !profile) {
+  if (profileError) {
+    await auditGoogleMapsKeyAccess(req, deps, {
+      userId: user.id,
+      success: false,
+      outcome: "db_error",
+    });
+    return jsonResponse({ error: "Failed to load user profile" }, { status: 500 });
+  }
+
+  if (!profile) {
     await auditGoogleMapsKeyAccess(req, deps, {
       userId: user.id,
       success: false,
