@@ -22,6 +22,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { cn } from "@/lib/utils";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useCreateJobDialogStore } from "@/stores/useCreateJobDialogStore";
+import { createQueryKey } from "@/lib/react-query";
 
 const ProjectManagement = () => {
   const navigate = useNavigate();
@@ -66,7 +67,7 @@ const ProjectManagement = () => {
   }, [authLoading, userDepartment]);
 
   // Use custom hook to keep the "jobs" tab active/visible.
-  useTabVisibility(["jobs-data"]);
+  useTabVisibility([createQueryKey.jobsData.all]);
   
   // Force subscription to required tables
   useEffect(() => {

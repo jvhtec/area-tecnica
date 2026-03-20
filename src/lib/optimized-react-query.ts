@@ -130,6 +130,12 @@ export const createQueryKey = {
     /** Current user's profile (role/permissions). */
     currentUser: ['profiles', 'current-user'] as const,
   },
+  messages: {
+    all: ['messages'] as const,
+  },
+  directMessages: {
+    all: ['direct_messages'] as const,
+  },
   payoutOverrides: {
     all: ['payout-overrides'] as const,
     byJobAndTechnician: (jobId?: string | null, technicianId?: string | null) =>
