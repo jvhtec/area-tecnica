@@ -110,7 +110,11 @@ export async function handleGetGoogleMapsKeyRequest(
 
   const role = profile.role ?? "";
 
-  if (!MANAGEMENT_ROLES.has(role) || (deps.allowedRoles && !deps.allowedRoles.includes(role))) {
+  if (
+    !MANAGEMENT_ROLES.has(role)
+    && deps.allowedRoles
+    && !deps.allowedRoles.includes(role)
+  ) {
     await auditGoogleMapsKeyAccess(req, deps, {
       userId: user.id,
       success: false,

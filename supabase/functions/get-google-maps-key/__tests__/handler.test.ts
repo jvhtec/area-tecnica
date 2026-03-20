@@ -125,7 +125,7 @@ describe("handleGetGoogleMapsKeyRequest", () => {
     );
   });
 
-  it("still denies roles outside admin/management even if allowedRoles is wider", async () => {
+  it("allows roles outside admin/management when allowedRoles explicitly includes them", async () => {
     const profiles = createProfilesBuilder({
       data: { role: "technician", email: "tech@example.com" },
       error: null,
@@ -157,7 +157,19 @@ describe("handleGetGoogleMapsKeyRequest", () => {
       },
     );
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ apiKey: "maps-key" });
+    expect(auditInsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "google_maps_key_access",
+        user_id: "user-1",
+        metadata: expect.objectContaining({
+          success: true,
+          outcome: "allowed",
+          role: "technician",
+        }),
+      }),
+    );
   });
 
   it("writes an audit row when the auth token is missing", async () => {
