@@ -19,9 +19,9 @@ vi.mock("@/hooks/useOptimizedAuth", () => ({
   useOptimizedAuth: () => mockUseOptimizedAuth(),
 }));
 
-const mockUseOptimizedJobs = vi.fn();
-vi.mock("@/hooks/useOptimizedJobs", () => ({
-  useOptimizedJobs: (...args: any[]) => mockUseOptimizedJobs(...args),
+const mockUseJobsData = vi.fn();
+vi.mock("@/hooks/useJobsData", () => ({
+  useJobsData: (...args: any[]) => mockUseJobsData(...args),
 }));
 
 vi.mock("@/hooks/useTabVisibility", () => ({
@@ -83,7 +83,7 @@ describe("ProjectManagement department tabs", () => {
     mockNavigate.mockReset();
     mockForceSubscribe.mockReset();
     mockUseOptimizedAuth.mockReset();
-    mockUseOptimizedJobs.mockReset();
+    mockUseJobsData.mockReset();
     mockAutoCompleteJobs.mockClear();
     mockGetSession.mockResolvedValue({
       data: { session: { user: { id: "user-1" } } },
@@ -122,12 +122,13 @@ describe("ProjectManagement department tabs", () => {
       };
     });
 
-    mockUseOptimizedJobs.mockReturnValue({ data: [], isLoading: false, error: null });
+    mockUseJobsData.mockReturnValue({ data: [], isLoading: false, error: null });
   });
 
   it("activates the user's department tab on first render", async () => {
     mockUseOptimizedAuth.mockReturnValue({
       userDepartment: "lights",
+      userRole: "management",
       isLoading: false,
     });
 
@@ -145,7 +146,7 @@ describe("ProjectManagement department tabs", () => {
   });
 
   it("switches to the user's department once auth loading finishes", async () => {
-    let authState = { userDepartment: null as string | null, isLoading: true };
+    let authState = { userDepartment: null as string | null, userRole: "management", isLoading: true };
     mockUseOptimizedAuth.mockImplementation(() => authState);
 
     const { rerender } = render(
@@ -154,7 +155,7 @@ describe("ProjectManagement department tabs", () => {
       </MemoryRouter>
     );
 
-    authState = { userDepartment: "video", isLoading: false };
+    authState = { userDepartment: "video", userRole: "management", isLoading: false };
     rerender(
       <MemoryRouter>
         <ProjectManagement />

@@ -56,8 +56,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
           onDeleteClick(job.id);
         }
         
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+        await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
@@ -140,8 +139,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
 
       // Parallelize independent query invalidations
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs-data"] }),
         queryClient.invalidateQueries({ queryKey: ["folder-existence"] })
       ]);
 

@@ -172,8 +172,7 @@ export const useOptimisticJobManagement = (
         });
       } else {
         // Restore job in cache if deletion failed
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
         throw new Error(result.error || "Unknown deletion error");
       }
     } catch (error: any) {
@@ -190,8 +189,7 @@ export const useOptimisticJobManagement = (
       });
       
       // Restore the cache by refetching
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
       throw error;
     }
   };

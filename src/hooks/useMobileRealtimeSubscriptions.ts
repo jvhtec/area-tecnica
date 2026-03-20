@@ -81,7 +81,7 @@ export const useMobileDayCalendarSubscriptions = () => {
     includeJobs: true,
     includeDateTypes: true,
     includeDepartments: true,
-    queryKey: ['optimized-jobs'],
+    queryKey: ['jobs-data'],
     priority: 'high'
   });
 };

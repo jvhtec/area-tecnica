@@ -398,7 +398,7 @@ export const useOptimizedJobCard = (
       void refreshAssignments();
 
       // Invalidate broader queries so the card and list re-fetch
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs-data'] });
     } catch (err) {
       console.error('Refresh error:', err);
     }

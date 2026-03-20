@@ -130,7 +130,7 @@ export const TourManagementDialog = ({
       await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
 
       toast({
         title: "Éxito",

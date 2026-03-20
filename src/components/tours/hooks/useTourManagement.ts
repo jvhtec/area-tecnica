@@ -51,7 +51,7 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       
       toast({ title: "Color updated successfully" });
@@ -159,7 +159,7 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
 
       await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
       await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       
       toast({ title: "Invoicing company updated successfully" });
@@ -274,7 +274,7 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
       console.log("Tour deletion completed successfully");
       await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       onClose();
       toast({ title: "Tour deleted successfully" });

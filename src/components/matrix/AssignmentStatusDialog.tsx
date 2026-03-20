@@ -172,7 +172,7 @@ export const AssignmentStatusDialog = ({
       queryClient.invalidateQueries({ queryKey: ['job-assignments', variables.jobId] });
       queryClient.invalidateQueries({ queryKey: ['job-details', variables.jobId] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs-data'] });
 
       // Send push notification for confirmations
       if (variables.actionType === 'confirm') {
