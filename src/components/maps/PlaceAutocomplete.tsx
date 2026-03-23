@@ -154,7 +154,6 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
         },
           body: JSON.stringify({
             input: query,
-            maxResultCount: 6,
           }),
       });
 

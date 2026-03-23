@@ -171,7 +171,6 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
         body: JSON.stringify({
           input: query,
           includedPrimaryTypes: ['lodging'],
-          maxResultCount: 5
         })
       });
 
@@ -187,8 +186,7 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
             'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat'
           },
           body: JSON.stringify({
-            input: query,
-            maxResultCount: 5
+            input: query
           })
         });
       }
