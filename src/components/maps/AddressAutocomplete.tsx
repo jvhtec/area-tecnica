@@ -214,7 +214,6 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
 
       const requestBody = {
         input: trimmedQuery,
-        maxResultCount: 6,
         languageCode: 'es',
         sessionToken: ensureSessionToken(),
         includedPrimaryTypes: [...ADDRESS_PRIMARY_TYPES],
@@ -247,7 +246,6 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
           },
           body: JSON.stringify({
             input: trimmedQuery,
-            maxResultCount: 6,
             languageCode: 'es',
             sessionToken: ensureSessionToken(),
           }),
