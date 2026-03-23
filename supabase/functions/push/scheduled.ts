@@ -80,7 +80,8 @@ async function getMorningSummaryDataForDepartment(
     .eq('is_active', true)
     .eq('date', targetDate)
     .eq('profile.department', department)
-    .eq('profile.role', 'house_tech');
+    .eq('profile.role', 'house_tech')
+    .eq('profile.warehouse_duty_exempt', false);
 
   // 2) Get today's unavailability for this department (primary source)
   const { data: unavailable = [] } = await client
@@ -92,15 +93,18 @@ async function getMorningSummaryDataForDepartment(
     `)
     .eq('date', targetDate)
     .eq('status', 'unavailable')
-    .eq('profile.department', department);
-  const unavailableHouseOnly = (unavailable as any[]).filter(u => (u as any)?.profile?.role === 'house_tech');
+    .eq('profile.department', department)
+    .eq('profile.role', 'house_tech')
+    .eq('profile.warehouse_duty_exempt', false);
+  const unavailableHouseOnly = unavailable as any[];
 
   // 3) Get all house techs in department (population)
   const { data: allTechs = [] } = await client
     .from('profiles')
     .select('id, first_name, last_name, nickname')
     .eq('department', department)
-    .eq('role', 'house_tech');
+    .eq('role', 'house_tech')
+    .eq('warehouse_duty_exempt', false);
 
   // 4) Legacy fallback: include legacy table marks (technician_availability)
   // Some environments still record travel/sick/day_off/vacation here.

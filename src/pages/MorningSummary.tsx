@@ -92,7 +92,8 @@ export default function MorningSummary() {
           .eq('date', date)
           .eq('is_active', true)
           .eq('profiles.department', dept)
-          .eq('profiles.role', 'house_tech') as { data: TimesheetWithRelations[] | null };
+          .eq('profiles.role', 'house_tech')
+          .eq('profiles.warehouse_duty_exempt', false) as { data: TimesheetWithRelations[] | null };
 
         // Get unavailable
       const { data: unavailable } = await supabase
@@ -105,14 +106,16 @@ export default function MorningSummary() {
         .eq('date', date)
         .eq('status', 'unavailable')
         .eq('profile.department', dept)
-        .eq('profile.role', 'house_tech');
+        .eq('profile.role', 'house_tech')
+        .eq('profile.warehouse_duty_exempt', false);
 
         // Get all house techs (population)
       const { data: allTechs } = await supabase
         .from('profiles')
         .select('id, first_name, last_name, nickname')
         .eq('department', dept)
-        .eq('role', 'house_tech');
+        .eq('role', 'house_tech')
+        .eq('warehouse_duty_exempt', false);
 
         // Legacy fallback: include legacy per-day marks so counts match the Personal calendar
         let unavailableMerged = unavailable || [];
