@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, MapPin } from 'lucide-react';
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
 interface AddressAutocompleteProps {
@@ -22,6 +23,8 @@ interface PredictionItem {
 }
 
 const ADDRESS_PRIMARY_TYPES = ['geocode', 'street_address', 'route', 'premise', 'subpremise'] as const;
+let cachedGoogleMapsApiKey: string | null = null;
+let googleMapsKeyPromise: Promise<string | null> | null = null;
 
 const createSessionToken = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -30,6 +33,56 @@ const createSessionToken = () => {
 
   return Math.random().toString(36).slice(2, 14);
 };
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === 'string' && error.trim()) {
+    return error;
+  }
+
+  return 'Unknown error';
+};
+
+const getGoogleMapsKeyMemoized = async (): Promise<string | null> => {
+  if (cachedGoogleMapsApiKey) {
+    return cachedGoogleMapsApiKey;
+  }
+
+  if (googleMapsKeyPromise) {
+    return googleMapsKeyPromise;
+  }
+
+  googleMapsKeyPromise = (async () => {
+    const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+
+    if (error) {
+      throw error;
+    }
+
+    const key = data?.apiKey as string | undefined;
+    if (!key) {
+      throw new Error('Google Maps API key not configured');
+    }
+
+    cachedGoogleMapsApiKey = key;
+    return key;
+  })();
+
+  try {
+    return await googleMapsKeyPromise;
+  } finally {
+    googleMapsKeyPromise = null;
+  }
+};
+
+const getPredictionText = (placePrediction: any, fallback: string) =>
+  placePrediction?.structuredFormat?.mainText?.text || placePrediction?.text?.text || fallback;
+
+const getPredictionAddress = (placePrediction: any, fallback: string) =>
+  placePrediction?.structuredFormat?.secondaryText?.text || placePrediction?.text?.text || fallback;
 
 export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   value,
@@ -50,33 +103,33 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   const debounceRef = useRef<number | undefined>(undefined);
   const cacheRef = useRef<Record<string, PredictionItem[]>>({});
   const sessionTokenRef = useRef<string | null>(null);
+  const activeSearchControllerRef = useRef<AbortController | null>(null);
+  const latestSearchRequestIdRef = useRef(0);
+  const hasShownAutocompleteErrorRef = useRef(false);
 
   useEffect(() => {
     setInputValue(value || '');
   }, [value]);
 
   const fetchApiKey = async (): Promise<string | null> => {
+    if (apiKey) {
+      return apiKey;
+    }
+
     try {
-      const { data, error } = await supabase.functions.invoke('get-google-maps-key');
-      if (error) {
-        console.error('Failed to fetch Google Maps API key:', error);
-        return null;
+      const key = await getGoogleMapsKeyMemoized();
+      if (key) {
+        setApiKey((currentKey) => currentKey ?? key);
       }
 
-      if (data?.apiKey) {
-        setApiKey(data.apiKey);
-        return data.apiKey as string;
-      }
+      return key;
     } catch (err) {
       console.error('Error fetching API key:', err);
+      notifyAutocompleteUnavailable(err);
     }
 
     return null;
   };
-
-  useEffect(() => {
-    fetchApiKey();
-  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -94,6 +147,8 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
       if (debounceRef.current) {
         window.clearTimeout(debounceRef.current);
       }
+
+      activeSearchControllerRef.current?.abort();
     };
   }, []);
 
@@ -109,25 +164,54 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     sessionTokenRef.current = null;
   };
 
+  const notifyAutocompleteUnavailable = (error: unknown) => {
+    if (hasShownAutocompleteErrorRef.current) {
+      return;
+    }
+
+    hasShownAutocompleteErrorRef.current = true;
+    toast.error('Autocomplete unavailable', {
+      description: `${getErrorMessage(error)}. You can keep typing manually.`,
+    });
+  };
+
   const searchAddresses = async (query: string) => {
     const trimmedQuery = query.trim();
-    const key = apiKey || (await fetchApiKey());
+    const requestId = latestSearchRequestIdRef.current + 1;
+    latestSearchRequestIdRef.current = requestId;
+    activeSearchControllerRef.current?.abort();
+    activeSearchControllerRef.current = null;
 
-    if (!key || trimmedQuery.length < 2) {
+    if (trimmedQuery.length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
+      setIsLoading(false);
       return;
     }
 
     if (cacheRef.current[trimmedQuery]) {
       setSuggestions(cacheRef.current[trimmedQuery]);
       setShowSuggestions(true);
+      setIsLoading(false);
       return;
     }
 
+    const controller = new AbortController();
+    activeSearchControllerRef.current = controller;
     setIsLoading(true);
 
     try {
+      const key = apiKey || (await fetchApiKey());
+      if (requestId !== latestSearchRequestIdRef.current || controller.signal.aborted) {
+        return;
+      }
+
+      if (!key) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+
       const requestBody = {
         input: trimmedQuery,
         maxResultCount: 6,
@@ -144,11 +228,15 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
           'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
         },
         body: JSON.stringify(requestBody),
+        signal: controller.signal,
       });
 
       if (!autocompleteResponse.ok) {
         const errorText = await autocompleteResponse.text().catch(() => '');
         console.warn('AddressAutocomplete: filtered autocomplete failed, retrying without type filters:', autocompleteResponse.status, errorText);
+        if (requestId !== latestSearchRequestIdRef.current || controller.signal.aborted) {
+          return;
+        }
 
         autocompleteResponse = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
           method: 'POST',
@@ -163,6 +251,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
             languageCode: 'es',
             sessionToken: ensureSessionToken(),
           }),
+          signal: controller.signal,
         });
       }
 
@@ -172,23 +261,38 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
       }
 
       const data = await autocompleteResponse.json();
+      if (requestId !== latestSearchRequestIdRef.current || controller.signal.aborted) {
+        return;
+      }
+
       const results: PredictionItem[] = (data.suggestions || [])
         .filter((suggestion: any) => suggestion.placePrediction)
         .map((suggestion: any) => ({
           place_id: suggestion.placePrediction.placeId,
-          name: suggestion.placePrediction.structuredFormat?.mainText?.text || suggestion.placePrediction.text?.text || trimmedQuery,
-          formatted_address: suggestion.placePrediction.structuredFormat?.secondaryText?.text || '',
+          name: getPredictionText(suggestion.placePrediction, trimmedQuery),
+          formatted_address: getPredictionAddress(suggestion.placePrediction, trimmedQuery),
         }));
 
       cacheRef.current[trimmedQuery] = results;
       setSuggestions(results);
       setShowSuggestions(results.length > 0);
     } catch (error) {
+      if (controller.signal.aborted) {
+        return;
+      }
+
       console.error('Error searching addresses:', error);
       setSuggestions([]);
       setShowSuggestions(false);
+      notifyAutocompleteUnavailable(error);
     } finally {
-      setIsLoading(false);
+      if (activeSearchControllerRef.current === controller) {
+        activeSearchControllerRef.current = null;
+      }
+
+      if (requestId === latestSearchRequestIdRef.current && !controller.signal.aborted) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -241,6 +345,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
       onChange(address);
       setInputValue(address);
       setShowSuggestions(false);
+      notifyAutocompleteUnavailable(error);
     } finally {
       resetSessionToken();
     }
@@ -251,15 +356,19 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     setInputValue(nextValue);
     onChange(nextValue);
 
-    if (!nextValue.trim()) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      resetSessionToken();
-      return;
-    }
-
     if (debounceRef.current) {
       window.clearTimeout(debounceRef.current);
+    }
+
+    if (!nextValue.trim()) {
+      activeSearchControllerRef.current?.abort();
+      activeSearchControllerRef.current = null;
+      latestSearchRequestIdRef.current += 1;
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setIsLoading(false);
+      resetSessionToken();
+      return;
     }
 
     debounceRef.current = window.setTimeout(() => {
@@ -289,7 +398,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
           }}
           onFocus={() => {
             if (!apiKey) {
-              fetchApiKey();
+              void fetchApiKey();
             }
 
             if (suggestions.length > 0) {
