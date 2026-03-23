@@ -15,6 +15,7 @@ export type Profile = {
   home_longitude?: number | null;
   profile_picture_url?: string | null;
   assignable_as_tech?: boolean | null;
+  warehouse_duty_exempt?: boolean | null;
   flex_resource_id?: string | null;
   soundvision_access_enabled?: boolean | null;
   autonomo?: boolean | null;

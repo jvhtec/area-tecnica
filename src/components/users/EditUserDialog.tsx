@@ -27,8 +27,10 @@ interface EditUserDialogProps {
 export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogProps) => {
   // Keep dialog mounted even if user becomes null to avoid portal teardown race conditions
   const [assignableAsTech, setAssignableAsTech] = useState<boolean>(!!user?.assignable_as_tech);
+  const [warehouseDutyExempt, setWarehouseDutyExempt] = useState<boolean>(!!user?.warehouse_duty_exempt);
   const [soundvisionAccessEnabled, setSoundvisionAccessEnabled] = useState<boolean>(!!user?.soundvision_access_enabled);
   const [isAutonomo, setIsAutonomo] = useState<boolean>(user?.autonomo !== false);
+  const [selectedRole, setSelectedRole] = useState<string>(user?.role || "technician");
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
   const [flexUrl, setFlexUrl] = useState<string>("");
@@ -42,8 +44,10 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
 
   useEffect(() => {
     setAssignableAsTech(!!user?.assignable_as_tech);
+    setWarehouseDutyExempt(!!user?.warehouse_duty_exempt);
     const forceSoundvisionForHouseTech = user?.department === 'sound' && user?.role === 'house_tech';
     setSoundvisionAccessEnabled(forceSoundvisionForHouseTech ? true : !!user?.soundvision_access_enabled);
+    setSelectedRole(user?.role || "technician");
     setFlexResourceId(user?.flex_resource_id || "");
     setFlexUrl("");
     setIsAutonomo(user?.autonomo !== false);
@@ -98,6 +102,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       bg_color: bgColor || null,
       role: formData.get('role') as string,
       assignable_as_tech: assignableAsTech,
+      warehouse_duty_exempt: warehouseDutyExempt,
       flex_resource_id: (formData.get('flex_resource_id') as string || flexResourceId || '').trim() || null,
       soundvision_access_enabled: forceSoundvisionAccess ? true : soundvisionAccessEnabled,
       autonomo: isAutonomo,
@@ -290,7 +295,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
             </div>
             <div className="space-y-2">
               <Label htmlFor="role">Role</Label>
-              <Select name="role" defaultValue={user?.role}>
+              <Select name="role" value={selectedRole} onValueChange={setSelectedRole}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select role" />
                 </SelectTrigger>
@@ -304,6 +309,21 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                 </SelectContent>
               </Select>
             </div>
+            {selectedRole === 'house_tech' && (
+              <div className="space-y-2">
+                <Label htmlFor="warehouseDutyExempt">Warehouse Duty Exempt</Label>
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="warehouseDutyExempt"
+                    checked={warehouseDutyExempt}
+                    onCheckedChange={(value) => setWarehouseDutyExempt(!!value)}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    Exclude this house tech from warehouse-duty population queries like the Personal agenda and warehouse summaries.
+                  </span>
+                </div>
+              </div>
+            )}
             {user?.role === 'technician' && (
               <div className="space-y-2">
                 <Label htmlFor="autonomo">Autónomo (Self-employed)</Label>

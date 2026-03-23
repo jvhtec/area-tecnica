@@ -101,6 +101,7 @@ describe("EditUserDialog", () => {
         department: "sound",
         soundvision_access_enabled: false,
         assignable_as_tech: false,
+        warehouse_duty_exempt: false,
         residencia: "Madrid",
         home_latitude: null,
         home_longitude: null,
@@ -122,6 +123,7 @@ describe("EditUserDialog", () => {
 
     await user.click(screen.getByRole("button", { name: /select valencia/i }));
     await user.click(screen.getByRole("checkbox", { name: /assignable to jobs as tech/i }));
+    await user.click(screen.getByRole("checkbox", { name: /warehouse duty exempt/i }));
     await user.click(screen.getByTitle("Blue"));
 
     await user.clear(screen.getByLabelText(/first name/i));
@@ -136,6 +138,7 @@ describe("EditUserDialog", () => {
           role: "house_tech",
           department: "sound",
           assignable_as_tech: true,
+          warehouse_duty_exempt: true,
           soundvision_access_enabled: true,
           residencia: "Valencia",
           home_latitude: 39.4699,
