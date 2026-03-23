@@ -48,7 +48,8 @@ export interface CellAction {
     | "offer-details-wa"
     | "offer-details-email"
     | "availability-wa"
-    | "availability-email";
+    | "availability-email"
+    | "toggle-unavailable";
   technicianId: string;
   date: Date;
   assignment?: any;
@@ -63,6 +64,7 @@ export interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignm
   canExpandBefore?: boolean;
   canExpandAfter?: boolean;
   allowDirectAssign?: boolean;
+  allowMarkUnavailable?: boolean;
   fridgeSet?: Set<string>;
   cellWidth?: number;
   cellHeight?: number;

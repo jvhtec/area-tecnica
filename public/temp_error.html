@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="page-title">Error – SECTOR-PRO</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #eef2f7, #f9fafc);
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .logo-container {
+      text-align: center;
+      margin-bottom: 25px;
+    }
+    .logo {
+      width: 140px;
+      max-width: 40%;
+      height: auto;
+    }
+
+    .container {
+      background: #fff;
+      border-radius: 16px;
+      padding: 40px 30px;
+      text-align: center;
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 12px 35px rgba(0,0,0,0.08);
+      animation: fadeIn 0.8s ease-out;
+      border-top: 5px solid #667eea; /* branded accent bar */
+    }
+
+    .icon {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 25px;
+      font-size: 42px;
+      font-weight: bold;
+      color: #fff;
+      animation: popIn 0.6s ease;
+    }
+    .icon.error {
+      background: linear-gradient(135deg, #e53935, #c62828);
+      box-shadow: 0 6px 15px rgba(229,57,53,0.3);
+    }
+    .icon.success {
+      background: linear-gradient(135deg, #43a047, #2e7d32);
+      box-shadow: 0 6px 15px rgba(67,160,71,0.3);
+    }
+    .icon.warning {
+      background: linear-gradient(135deg, #fb8c00, #ef6c00);
+      box-shadow: 0 6px 15px rgba(251,140,0,0.3);
+    }
+    .icon.neutral {
+      background: linear-gradient(135deg, #1e88e5, #1565c0);
+      box-shadow: 0 6px 15px rgba(30,136,229,0.3);
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: #222;
+    }
+    .message {
+      font-size: 18px;
+      margin-bottom: 10px;
+      color: #555;
+    }
+    .submessage {
+      font-size: 15px;
+      color: #777;
+      font-style: italic;
+      margin-bottom: 30px;
+    }
+
+    .btn {
+      display: inline-block;
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: #fff;
+      font-weight: 600;
+      border-radius: 8px;
+      text-decoration: none;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes popIn {
+      0% { transform: scale(0.5); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 30px 20px;
+      }
+      .logo {
+        width: 100px;
+      }
+      .icon {
+        width: 70px;
+        height: 70px;
+        font-size: 32px;
+      }
+      h1 {
+        font-size: 22px;
+      }
+      .message {
+        font-size: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div>
+    <div class="logo-container">
+      <img src="https://syldobdcdsgfgjtbuwxm.supabase.co/storage/v1/object/public/public%20logos/sectorpro.png"
+           alt="Sector-Pro Logo"
+           class="logo">
+    </div>
+    <div class="container">
+      <div class="icon error" id="status-icon">✗</div>
+      <h1 id="heading">Error</h1>
+      <div class="message" id="message">Ha ocurrido un error.</div>
+      <div class="submessage" id="submessage">Por favor, inténtalo de nuevo más tarde.</div>
+      <a href="https://sector-pro.com" class="btn">Volver al inicio</a>
+    </div>
+  </div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+
+    const title = urlParams.get('title') || 'Error';
+    document.getElementById('page-title').textContent = `${title} – SECTOR-PRO`;
+    document.title = `${title} – SECTOR-PRO`;
+
+    const heading = urlParams.get('heading') || 'Error';
+    document.getElementById('heading').textContent = heading;
+
+    const message = urlParams.get('message') || 'Ha ocurrido un error.';
+    document.getElementById('message').textContent = message;
+
+    const submessage = urlParams.get('submessage');
+    if (submessage) {
+      document.getElementById('submessage').textContent = submessage;
+    }
+
+    const status = urlParams.get('status') || 'error';
+    const iconElement = document.getElementById('status-icon');
+    iconElement.className = `icon ${status}`;
+
+    switch (status) {
+      case 'success':
+        iconElement.textContent = '✓';
+        break;
+      case 'warning':
+        iconElement.textContent = '⚠';
+        break;
+      case 'neutral':
+        iconElement.textContent = 'ℹ';
+        break;
+      case 'error':
+      default:
+        iconElement.textContent = '✗';
+    }
+  </script>
+</body>
+</html>

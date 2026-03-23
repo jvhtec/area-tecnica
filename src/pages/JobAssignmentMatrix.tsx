@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,10 +40,20 @@ import {
   type StaffingSummaryRow,
 } from './job-assignment-matrix/utils';
 
+/**
+ * Render the interactive job assignment matrix UI for viewing and managing technician assignments.
+ *
+ * The component provides department selection, virtualized date range navigation, technician and job
+ * filtering (search, skills, specialties, and fridge visibility), direct-assignment and mark-unavailable
+ * toggles (when permitted), background prefetching of adjacent matrix windows, staffing reminders with
+ * an auto-staffing panel, and responsive layouts for desktop and mobile.
+ *
+ * @returns The rendered React element for the job assignment matrix and its associated controls and dialogs.
+ */
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
   const prefetchStatusRef = React.useRef<Map<string, 'pending' | 'done'>>(new Map<string, 'pending' | 'done'>());
-  const { userDepartment } = useOptimizedAuth();
+  const { userDepartment, userRole } = useOptimizedAuth();
   const [defaultDepartment, setDefaultDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const hasManualDepartmentSelection = React.useRef(false);
@@ -59,6 +68,8 @@ export default function JobAssignmentMatrix() {
   }, [searchTerm]);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allowDirectAssign, setAllowDirectAssign] = useState(false);
+  const [allowMarkUnavailable, setAllowMarkUnavailable] = useState(false);
+  const canMarkUnavailable = userRole === 'management' || userRole === 'admin';
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [hideFridge, setHideFridge] = useState<boolean>(true);
   const [showStaffingReminder, setShowStaffingReminder] = useState(false);
@@ -777,10 +788,20 @@ export default function JobAssignmentMatrix() {
               <span className="text-sm font-medium">Asignación directa</span>
               <Switch
                 checked={allowDirectAssign}
-                onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))}
+                onCheckedChange={(v) => { setAllowDirectAssign(Boolean(v)); if (v) setAllowMarkUnavailable(false); }}
                 aria-label="Alternar asignación directa"
               />
             </div>
+            {canMarkUnavailable && (
+              <div className="flex items-center gap-2 pr-2 border-r">
+                <span className="text-sm font-medium">No disponible</span>
+                <Switch
+                  checked={allowMarkUnavailable}
+                  onCheckedChange={(v) => { setAllowMarkUnavailable(Boolean(v)); if (v) setAllowDirectAssign(false); }}
+                  aria-label="Alternar marcar no disponible"
+                />
+              </div>
+            )}
             <Users className="h-4 w-4" />
             <Badge variant="secondary" className="text-xs">
               {filteredTechnicians.length} técnicos
@@ -814,10 +835,20 @@ export default function JobAssignmentMatrix() {
             <span className="text-xs">Directa</span>
             <Switch
               checked={allowDirectAssign}
-              onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))}
+              onCheckedChange={(v) => { setAllowDirectAssign(Boolean(v)); if (v) setAllowMarkUnavailable(false); }}
               aria-label="Alternar asignación directa"
             />
           </div>
+          {canMarkUnavailable && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs">No disp.</span>
+              <Switch
+                checked={allowMarkUnavailable}
+                onCheckedChange={(v) => { setAllowMarkUnavailable(Boolean(v)); if (v) setAllowDirectAssign(false); }}
+                aria-label="Alternar marcar no disponible"
+              />
+            </div>
+          )}
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <Badge variant="secondary" className="text-xs">
@@ -903,8 +934,14 @@ export default function JobAssignmentMatrix() {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm font-medium">Asignación directa</span>
-              <Switch checked={allowDirectAssign} onCheckedChange={(v) => setAllowDirectAssign(Boolean(v))} aria-label="Alternar asignación directa" />
+              <Switch checked={allowDirectAssign} onCheckedChange={(v) => { setAllowDirectAssign(Boolean(v)); if (v) setAllowMarkUnavailable(false); }} aria-label="Alternar asignación directa" />
             </div>
+            {canMarkUnavailable && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Marcar no disponible</span>
+                <Switch checked={allowMarkUnavailable} onCheckedChange={(v) => { setAllowMarkUnavailable(Boolean(v)); if (v) setAllowDirectAssign(false); }} aria-label="Alternar marcar no disponible" />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -926,6 +963,7 @@ export default function JobAssignmentMatrix() {
             jobs={yearJobs}
             fridgeSet={fridgeSet}
             allowDirectAssign={allowDirectAssign}
+            allowMarkUnavailable={allowMarkUnavailable}
             mobile={isMobile}
             cellWidth={isMobile ? 140 : undefined}
             cellHeight={isMobile ? 80 : undefined}

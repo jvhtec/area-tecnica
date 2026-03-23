@@ -1,6 +1,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { format, isSameDay } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
@@ -28,6 +29,7 @@ export const OptimizedAssignmentMatrix = ({
   canExpandBefore = false,
   canExpandAfter = false,
   allowDirectAssign = false,
+  allowMarkUnavailable = false,
   fridgeSet,
   cellWidth,
   cellHeight,
@@ -534,7 +536,34 @@ export const OptimizedAssignmentMatrix = ({
     invalidateAssignmentQueries();
   }, [invalidateAssignmentQueries]);
 
-  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'offer-details-email' | 'availability-wa' | 'availability-email', selectedJobId?: string) => {
+  const handleDirectToggleUnavailable = useCallback(async (technicianId: string, date: Date) => {
+    const dateStr = formatInTimeZone(date, 'Europe/Madrid', 'yyyy-MM-dd');
+    const existing = getAvailabilityForCell(technicianId, date);
+    if (existing) {
+      const { error } = await supabase.from('technician_availability')
+        .delete()
+        .eq('technician_id', technicianId)
+        .eq('date', dateStr);
+      if (error) {
+        console.error('Error removing unavailability:', error);
+        toast({ title: 'Error', description: 'No se pudo eliminar la no disponibilidad.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'Disponibilidad restaurada', description: `${dateStr} marcado como disponible.` });
+    } else {
+      const { error } = await supabase.from('technician_availability')
+        .upsert([{ technician_id: technicianId, date: dateStr, status: 'day_off' }], { onConflict: 'technician_id,date' });
+      if (error) {
+        console.error('Error marking unavailable:', error);
+        toast({ title: 'Error', description: 'No se pudo marcar como no disponible.', variant: 'destructive' });
+        return;
+      }
+      toast({ title: 'No disponible', description: `${dateStr} marcado como no disponible.` });
+    }
+    window.dispatchEvent(new CustomEvent('assignment-updated'));
+  }, [getAvailabilityForCell, toast]);
+
+  const handleCellClick = useCallback((technicianId: string, date: Date, action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'offer-details-email' | 'availability-wa' | 'availability-email' | 'toggle-unavailable', selectedJobId?: string) => {
     console.log('Matrix handling cell click:', { technicianId, date: format(date, 'yyyy-MM-dd'), action });
     const assignment = getAssignmentForCell(technicianId, date);
     console.log('Assignment data:', assignment);
@@ -547,6 +576,11 @@ export const OptimizedAssignmentMatrix = ({
     // Gate direct assign-related actions behind allowDirectAssign
     if (!allowDirectAssign && (action === 'select-job' || action === 'assign')) {
       console.log('Direct assign disabled by UI toggle; ignoring click');
+      return;
+    }
+    // Gate unavailability actions behind management/admin role
+    if ((action === 'unavailable' || action === 'toggle-unavailable') && !isManagementUser) {
+      toast({ title: 'Sin permiso', description: 'Solo managers y administradores pueden marcar disponibilidad.', variant: 'destructive' });
       return;
     }
 
@@ -601,9 +635,15 @@ export const OptimizedAssignmentMatrix = ({
       return;
     }
 
+    // Direct toggle unavailable (no dialog, instant write)
+    if (action === 'toggle-unavailable') {
+      handleDirectToggleUnavailable(technicianId, date);
+      return;
+    }
+
     // Default behavior
     setCellAction({ type: action, technicianId, date, assignment, selectedJobId });
-  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast]);
+  }, [getAssignmentForCell, allowDirectAssign, fridgeSet, sendStaffingEmail, closeDialogs, toast, handleDirectToggleUnavailable, isManagementUser]);
 
   const handleJobSelected = useCallback((jobId: string) => {
     if (cellAction?.type === 'select-job') {
@@ -1199,7 +1239,7 @@ export const OptimizedAssignmentMatrix = ({
     TECHNICIAN_WIDTH, HEADER_HEIGHT, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight,
     dateHeadersRef, technicianScrollRef, mainScrollRef, visibleCols, visibleRows,
     dates, technicians, orderedTechnicians,
-    fridgeSet, allowDirectAssign, mobile, canNavLeft, canNavRight, handleMobileNav,
+    fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile, canNavLeft, canNavRight, handleMobileNav,
     handleDateHeadersScroll, handleTechnicianScroll, handleMainScroll, cycleTechSort, getSortLabel,
     isManagementUser, setCreateUserOpen, createUserOpen, qc, setSortJobId,
     getJobsForDate, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,

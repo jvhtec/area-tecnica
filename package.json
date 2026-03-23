@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "vite",
     "dev:staging": "vite --mode staging",
-    "build": "vite build && bash scripts/inject-sw-version.sh",
-    "build:dev": "vite build --mode development && bash scripts/inject-sw-version.sh",
-    "build:staging": "vite build --mode staging && bash scripts/inject-sw-version.sh",
+    "build": "vite build && node scripts/inject-sw-version.mjs",
+    "build:dev": "vite build --mode development && node scripts/inject-sw-version.mjs",
+    "build:staging": "vite build --mode staging && node scripts/inject-sw-version.mjs",
     "lint": "npm run lint:all",
     "lint:app": "eslint src tests vite.config.ts",
     "lint:functions": "eslint supabase/functions",

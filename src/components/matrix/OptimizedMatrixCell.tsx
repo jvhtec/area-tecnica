@@ -45,12 +45,13 @@ interface OptimizedMatrixCellProps {
   height: number;
   isSelected: boolean;
   onSelect: (selected: boolean) => void;
-  onClick: (action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'offer-details-email' | 'availability-wa' | 'availability-email', selectedJobId?: string) => void;
+  onClick: (action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'offer-details-email' | 'availability-wa' | 'availability-email' | 'toggle-unavailable', selectedJobId?: string) => void;
   onPrefetch?: () => void;
   onOptimisticUpdate?: (status: string) => void;
   onRender?: () => void;
   jobId?: string;
   allowDirectAssign?: boolean;
+  allowMarkUnavailable?: boolean;
   declinedJobIdsSet?: Set<string>;
   staffingStatusProvided?: { availability_status: any; offer_status: any } | null;
   staffingStatusByDateProvided?: { availability_status: any; offer_status: any; availability_job_id?: string | null; offer_job_id?: string | null } | null;
@@ -73,6 +74,7 @@ export const OptimizedMatrixCell = memo(({
   onRender,
   jobId,
   allowDirectAssign = false,
+  allowMarkUnavailable = false,
   declinedJobIdsSet = new Set<string>(),
   staffingStatusProvided = null,
   staffingStatusByDateProvided = null,
@@ -306,6 +308,12 @@ export const OptimizedMatrixCell = memo(({
       return;
     }
 
+    // Mark unavailable toggle mode: left-click directly toggles unavailability (no dialog)
+    if (allowMarkUnavailable && !hasAssignment) {
+      onClick('toggle-unavailable');
+      return;
+    }
+
     if (hasAssignment) {
       if (allowDirectAssign) {
         onClick('assign'); // Edit existing assignment
@@ -319,7 +327,12 @@ export const OptimizedMatrixCell = memo(({
       } else {
       }
     }
-  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, technician, date, assignment, allowDirectAssign]);
+  }, [hasAssignment, isUnavailable, onClick, onSelect, isSelected, technician, date, assignment, allowDirectAssign, allowMarkUnavailable]);
+
+  const handleRightClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    onClick('unavailable');
+  }, [onClick]);
 
   const handleStatusClick = useCallback((e: React.MouseEvent, action: 'confirm' | 'decline') => {
     e.stopPropagation();
@@ -404,6 +417,7 @@ export const OptimizedMatrixCell = memo(({
               : undefined
           }}
           onClick={handleCellClick}
+          onContextMenu={handleRightClick}
           onMouseEnter={handleMouseEnter}
         >
           {/* Selection indicator */}

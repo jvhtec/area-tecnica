@@ -38,6 +38,7 @@ export interface OptimizedAssignmentMatrixViewProps {
   orderedTechnicians: any[];
   fridgeSet?: Set<string>;
   allowDirectAssign: boolean;
+  allowMarkUnavailable?: boolean;
   mobile: boolean;
   canNavLeft: boolean;
   canNavRight: boolean;
@@ -114,6 +115,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   orderedTechnicians,
   fridgeSet,
   allowDirectAssign,
+  allowMarkUnavailable = false,
   mobile,
   canNavLeft,
   canNavRight,
@@ -377,6 +379,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             jobId={jobId}
                             declinedJobIdsSet={declinedJobsByTech.get(technician.id) || new Set<string>()}
                             allowDirectAssign={allowDirectAssign}
+                            allowMarkUnavailable={allowMarkUnavailable}
                             staffingStatusProvided={providedByJob}
                             staffingStatusByDateProvided={providedByDate}
                             isFridge={fridgeSet?.has(technician.id) || false}
