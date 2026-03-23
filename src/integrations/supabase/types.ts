@@ -5050,6 +5050,7 @@ export type Database = {
           time_span: string | null
           timezone: string | null
           tours_expanded: boolean | null
+          warehouse_duty_exempt: boolean
           waha_endpoint: string | null
         }
         Insert: {
@@ -5083,6 +5084,7 @@ export type Database = {
           time_span?: string | null
           timezone?: string | null
           tours_expanded?: boolean | null
+          warehouse_duty_exempt?: boolean
           waha_endpoint?: string | null
         }
         Update: {
@@ -5116,6 +5118,7 @@ export type Database = {
           time_span?: string | null
           timezone?: string | null
           tours_expanded?: boolean | null
+          warehouse_duty_exempt?: boolean
           waha_endpoint?: string | null
         }
         Relationships: []

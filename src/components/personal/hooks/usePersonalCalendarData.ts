@@ -61,6 +61,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
           .from('profiles')
           .select('id, first_name, last_name, department, phone')
           .eq('role', 'house_tech')
+          .eq('warehouse_duty_exempt', false)
           .order('first_name');
 
         if (techsError) {
