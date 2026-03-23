@@ -123,7 +123,7 @@ describe("EditUserDialog", () => {
 
     await user.click(screen.getByRole("button", { name: /select valencia/i }));
     await user.click(screen.getByRole("checkbox", { name: /assignable to jobs as tech/i }));
-    await user.click(screen.getByRole("checkbox", { name: /warehouse duty exempt/i }));
+    await user.click(screen.getByRole("checkbox", { name: /exento de almac[eé]n/i }));
     await user.click(screen.getByTitle("Blue"));
 
     await user.clear(screen.getByLabelText(/first name/i));

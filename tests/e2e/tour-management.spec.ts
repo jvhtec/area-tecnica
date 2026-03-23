@@ -1,22 +1,26 @@
+import { formatISO, addDays } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { expect, test } from "@playwright/test";
 
 import { bootstrapApp } from "./support/app";
 
+const MADRID_TIMEZONE = "Europe/Madrid";
+
 const makeFutureDate = (offsetDays: number) => {
-  const date = new Date();
-  date.setUTCDate(date.getUTCDate() + offsetDays);
-  return date;
+  const madridToday = formatInTimeZone(new Date(), MADRID_TIMEZONE, "yyyy-MM-dd");
+  const madridTodayAtNoon = fromZonedTime(`${madridToday}T12:00:00`, MADRID_TIMEZONE);
+  return addDays(madridTodayAtNoon, offsetDays);
 };
 
-const toDateOnly = (date: Date) => date.toISOString().slice(0, 10);
+const toDateOnly = (date: Date) => formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd");
 
 const toUtcIsoAtHour = (date: Date, hour: number) =>
-  new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), hour)).toISOString();
+  formatISO(fromZonedTime(`${toDateOnly(date)}T${String(hour).padStart(2, "0")}:00:00`, MADRID_TIMEZONE));
 
-const currentYear = new Date().getFullYear();
 const smokeTourStart = makeFutureDate(7);
 const smokeTourDate = makeFutureDate(14);
 const smokeTourEnd = makeFutureDate(20);
+const smokeTourYear = formatInTimeZone(smokeTourStart, MADRID_TIMEZONE, "yyyy");
 
 const smokeTour = {
   id: "tour-1",
@@ -100,7 +104,7 @@ test.describe("tour management smoke", () => {
 
     await page.goto("/tours");
 
-    await expect(page.getByText(new RegExp(`tours ${currentYear}`, "i"))).toBeVisible();
+    await expect(page.getByText(new RegExp(`tours ${smokeTourYear}`, "i"))).toBeVisible();
     await page.getByRole("heading", { name: "World Tour" }).click();
     await expect(page).toHaveURL(/\/tours$/);
   });

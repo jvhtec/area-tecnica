@@ -311,7 +311,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
             </div>
             {selectedRole === 'house_tech' && (
               <div className="space-y-2">
-                <Label htmlFor="warehouseDutyExempt">Warehouse Duty Exempt</Label>
+                <Label htmlFor="warehouseDutyExempt">Exento de almacén</Label>
                 <div className="flex items-center gap-3">
                   <Checkbox
                     id="warehouseDutyExempt"
@@ -319,12 +319,12 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                     onCheckedChange={(value) => setWarehouseDutyExempt(!!value)}
                   />
                   <span className="text-sm text-muted-foreground">
-                    Exclude this house tech from warehouse-duty population queries like the Personal agenda and warehouse summaries.
+                    Excluir a este house tech de las guardias de almacén en la agenda Personal y en los resúmenes de almacén.
                   </span>
                 </div>
               </div>
             )}
-            {user?.role === 'technician' && (
+            {selectedRole === 'technician' && (
               <div className="space-y-2">
                 <Label htmlFor="autonomo">Autónomo (Self-employed)</Label>
                 <div className="flex items-center gap-3">
