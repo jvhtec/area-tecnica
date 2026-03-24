@@ -280,7 +280,9 @@ export function PushToFlexPullsheetDialog({
 
   useEffect(() => {
     if (!open || allModelNames.length === 0) {
+      ++lookupRequestId.current;
       setEquipmentLookup(null);
+      setIsLookingUp(false);
       return;
     }
 
@@ -637,12 +639,12 @@ export function PushToFlexPullsheetDialog({
                     onCheckedChange={() => toggleSection(key)}
                     disabled={isPushing}
                   />
-                  <label
+                  <Label
                     htmlFor={`section-${key}`}
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   >
                     {label}
-                  </label>
+                  </Label>
                 </div>
               ))}
             </div>
