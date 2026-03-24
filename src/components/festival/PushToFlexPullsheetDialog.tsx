@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,6 +87,13 @@ export function PushToFlexPullsheetDialog({
   const [paPresets, setPaPresets] = useState<PaPresetOption[]>([]);
   const [selectedPaPresetId, setSelectedPaPresetId] = useState<string | null>(null);
   const [isLoadingPaPresets, setIsLoadingPaPresets] = useState(false);
+
+  // Reset selectedSections whenever the dialog closes (covers all close paths)
+  useEffect(() => {
+    if (!open) {
+      setSelectedSections({ ...ALL_SECTIONS_ENABLED });
+    }
+  }, [open]);
 
   // Load available pullsheets when dialog opens
   useEffect(() => {
@@ -269,12 +276,15 @@ export function PushToFlexPullsheetDialog({
   // Look up equipment in database
   const [equipmentLookup, setEquipmentLookup] = useState<EquipmentLookupResult | null>(null);
   const [isLookingUp, setIsLookingUp] = useState(false);
+  const lookupRequestId = useRef(0);
 
   useEffect(() => {
     if (!open || allModelNames.length === 0) {
       setEquipmentLookup(null);
       return;
     }
+
+    const requestId = ++lookupRequestId.current;
 
     const lookupEquipment = async () => {
       setIsLookingUp(true);
@@ -285,6 +295,7 @@ export function PushToFlexPullsheetDialog({
           .in('name', allModelNames)
           .not('resource_id', 'is', null);
 
+        if (requestId !== lookupRequestId.current) return;
         if (error) throw error;
 
         const foundMap = new Map(data.map(eq => [eq.name, eq.resource_id!]));
@@ -357,6 +368,7 @@ export function PushToFlexPullsheetDialog({
 
         setEquipmentLookup({ found, missing });
       } catch (error) {
+        if (requestId !== lookupRequestId.current) return;
         console.error('Failed to lookup equipment:', error);
         toast({
           title: 'Error',
@@ -364,7 +376,9 @@ export function PushToFlexPullsheetDialog({
           variant: 'destructive',
         });
       } finally {
-        setIsLookingUp(false);
+        if (requestId === lookupRequestId.current) {
+          setIsLookingUp(false);
+        }
       }
     };
 
