@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { PA_PRESET_ALLOWED_CATEGORIES, resolveSubsystemForEquipment } from '@/types/equipment';
 
 interface PushToFlexPullsheetDialogProps {
@@ -48,6 +49,19 @@ type PresetItemRow = {
 
 const PA_PRESET_CATEGORIES = new Set(PA_PRESET_ALLOWED_CATEGORIES);
 
+type GearSection = 'consolas' | 'rf' | 'iem' | 'wired_mics';
+
+const GEAR_SECTIONS: { key: GearSection; label: string }[] = [
+  { key: 'consolas', label: 'Consolas' },
+  { key: 'rf', label: 'Microfonía RF' },
+  { key: 'iem', label: 'IEM' },
+  { key: 'wired_mics', label: 'Microfonía Cableada' },
+];
+
+const ALL_SECTIONS_ENABLED: Record<GearSection, boolean> = {
+  consolas: true, rf: true, iem: true, wired_mics: true,
+};
+
 export function PushToFlexPullsheetDialog({
   open,
   onOpenChange,
@@ -64,10 +78,22 @@ export function PushToFlexPullsheetDialog({
   const [selectedPullsheetId, setSelectedPullsheetId] = useState<string | null>(null);
   const [isLoadingPullsheets, setIsLoadingPullsheets] = useState(false);
 
+  const [selectedSections, setSelectedSections] = useState<Record<GearSection, boolean>>({ ...ALL_SECTIONS_ENABLED });
+  const toggleSection = (key: GearSection) => {
+    setSelectedSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
   const [includePaPreset, setIncludePaPreset] = useState(false);
   const [paPresets, setPaPresets] = useState<PaPresetOption[]>([]);
   const [selectedPaPresetId, setSelectedPaPresetId] = useState<string | null>(null);
   const [isLoadingPaPresets, setIsLoadingPaPresets] = useState(false);
+
+  // Reset selectedSections whenever the dialog closes (covers all close paths)
+  useEffect(() => {
+    if (!open) {
+      setSelectedSections({ ...ALL_SECTIONS_ENABLED });
+    }
+  }, [open]);
 
   // Load available pullsheets when dialog opens
   useEffect(() => {
@@ -204,50 +230,63 @@ export function PushToFlexPullsheetDialog({
     const models: string[] = [];
 
     // Add console models
-    gearSetup.foh_consoles.forEach(c => {
-      if (c.model && c.quantity > 0) models.push(c.model);
-    });
-    gearSetup.mon_consoles.forEach(c => {
-      if (c.model && c.quantity > 0) models.push(c.model);
-    });
+    if (selectedSections.consolas) {
+      gearSetup.foh_consoles.forEach(c => {
+        if (c.model && c.quantity > 0) models.push(c.model);
+      });
+      gearSetup.mon_consoles.forEach(c => {
+        if (c.model && c.quantity > 0) models.push(c.model);
+      });
+    }
 
     // Add wireless models
-    gearSetup.wireless_systems.forEach(w => {
-      if (w.model) {
-        const channels = w.quantity_ch || 0;
-        const tx = (w.quantity_hh || 0) + (w.quantity_bp || 0);
-        const qty = channels + tx > 0 ? channels + tx : (w.quantity || 0);
-        if (qty > 0) models.push(w.model);
-      }
-    });
+    if (selectedSections.rf) {
+      gearSetup.wireless_systems.forEach(w => {
+        if (w.model) {
+          const channels = w.quantity_ch || 0;
+          const tx = (w.quantity_hh || 0) + (w.quantity_bp || 0);
+          const qty = channels + tx > 0 ? channels + tx : (w.quantity || 0);
+          if (qty > 0) models.push(w.model);
+        }
+      });
+    }
 
     // Add IEM models
-    gearSetup.iem_systems.forEach(i => {
-      if (i.model) {
-        const channels = i.quantity_hh || i.quantity || 0;
-        const bodypacks = i.quantity_bp || 0;
-        const qty = channels + bodypacks;
-        if (qty > 0) models.push(i.model);
-      }
-    });
+    if (selectedSections.iem) {
+      gearSetup.iem_systems.forEach(i => {
+        if (i.model) {
+          const channels = i.quantity_hh || i.quantity || 0;
+          const bodypacks = i.quantity_bp || 0;
+          const qty = channels + bodypacks;
+          if (qty > 0) models.push(i.model);
+        }
+      });
+    }
 
     // Add wired mic models
-    gearSetup.wired_mics.forEach(m => {
-      if (m.model && m.quantity > 0) models.push(m.model);
-    });
+    if (selectedSections.wired_mics) {
+      gearSetup.wired_mics.forEach(m => {
+        if (m.model && m.quantity > 0) models.push(m.model);
+      });
+    }
 
     return Array.from(new Set(models)); // Remove duplicates
-  }, [gearSetup]);
+  }, [gearSetup, selectedSections]);
 
   // Look up equipment in database
   const [equipmentLookup, setEquipmentLookup] = useState<EquipmentLookupResult | null>(null);
   const [isLookingUp, setIsLookingUp] = useState(false);
+  const lookupRequestId = useRef(0);
 
   useEffect(() => {
     if (!open || allModelNames.length === 0) {
+      ++lookupRequestId.current;
       setEquipmentLookup(null);
+      setIsLookingUp(false);
       return;
     }
+
+    const requestId = ++lookupRequestId.current;
 
     const lookupEquipment = async () => {
       setIsLookingUp(true);
@@ -258,6 +297,7 @@ export function PushToFlexPullsheetDialog({
           .in('name', allModelNames)
           .not('resource_id', 'is', null);
 
+        if (requestId !== lookupRequestId.current) return;
         if (error) throw error;
 
         const foundMap = new Map(data.map(eq => [eq.name, eq.resource_id!]));
@@ -298,30 +338,39 @@ export function PushToFlexPullsheetDialog({
           });
         };
 
-        processItems(gearSetup.foh_consoles, c => c.quantity, 'foh_console');
-        processItems(gearSetup.mon_consoles, c => c.quantity, 'mon_console');
-        processItems(
-          gearSetup.wireless_systems,
-          w => {
-            const channels = w.quantity_ch || 0;
-            const tx = (w.quantity_hh || 0) + (w.quantity_bp || 0);
-            return channels + tx > 0 ? channels + tx : (w.quantity || 0);
-          },
-          'wireless'
-        );
-        processItems(
-          gearSetup.iem_systems,
-          i => {
-            const channels = i.quantity_hh || i.quantity || 0;
-            const bodypacks = i.quantity_bp || 0;
-            return channels + bodypacks;
-          },
-          'iem'
-        );
-        processItems(gearSetup.wired_mics, m => m.quantity, 'wired_mics');
+        if (selectedSections.consolas) {
+          processItems(gearSetup.foh_consoles, c => c.quantity, 'foh_console');
+          processItems(gearSetup.mon_consoles, c => c.quantity, 'mon_console');
+        }
+        if (selectedSections.rf) {
+          processItems(
+            gearSetup.wireless_systems,
+            w => {
+              const channels = w.quantity_ch || 0;
+              const tx = (w.quantity_hh || 0) + (w.quantity_bp || 0);
+              return channels + tx > 0 ? channels + tx : (w.quantity || 0);
+            },
+            'wireless'
+          );
+        }
+        if (selectedSections.iem) {
+          processItems(
+            gearSetup.iem_systems,
+            i => {
+              const channels = i.quantity_hh || i.quantity || 0;
+              const bodypacks = i.quantity_bp || 0;
+              return channels + bodypacks;
+            },
+            'iem'
+          );
+        }
+        if (selectedSections.wired_mics) {
+          processItems(gearSetup.wired_mics, m => m.quantity, 'wired_mics');
+        }
 
         setEquipmentLookup({ found, missing });
       } catch (error) {
+        if (requestId !== lookupRequestId.current) return;
         console.error('Failed to lookup equipment:', error);
         toast({
           title: 'Error',
@@ -329,12 +378,14 @@ export function PushToFlexPullsheetDialog({
           variant: 'destructive',
         });
       } finally {
-        setIsLookingUp(false);
+        if (requestId === lookupRequestId.current) {
+          setIsLookingUp(false);
+        }
       }
     };
 
     lookupEquipment();
-  }, [open, allModelNames, gearSetup]);
+  }, [open, allModelNames, gearSetup, selectedSections]);
 
   const [paPresetLookup, setPaPresetLookup] = useState<EquipmentLookupResult | null>(null);
   const [isLookingUpPaPreset, setIsLookingUpPaPreset] = useState(false);
@@ -501,6 +552,7 @@ export function PushToFlexPullsheetDialog({
       setIncludePaPreset(false);
       setSelectedPaPresetId(null);
       setPaPresetLookup(null);
+      setSelectedSections({ ...ALL_SECTIONS_ENABLED });
       onOpenChange(false);
     }
   };
@@ -573,6 +625,29 @@ export function PushToFlexPullsheetDialog({
                 </Select>
               </div>
             )}
+          </div>
+
+          {/* Secciones a incluir */}
+          <div className="space-y-2">
+            <Label>Secciones a incluir</Label>
+            <div className="grid grid-cols-2 gap-2">
+              {GEAR_SECTIONS.map(({ key, label }) => (
+                <div key={key} className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`section-${key}`}
+                    checked={selectedSections[key]}
+                    onCheckedChange={() => toggleSection(key)}
+                    disabled={isPushing}
+                  />
+                  <Label
+                    htmlFor={`section-${key}`}
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    {label}
+                  </Label>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Pullsheet Selection */}
