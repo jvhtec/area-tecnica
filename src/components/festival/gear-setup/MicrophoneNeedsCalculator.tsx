@@ -146,7 +146,7 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
           ) : (
             <div className="space-y-6">
               <div className="text-sm text-muted-foreground">
-                Esta matriz muestra todos los artistas que usan micrófonos cableados del festival (incluido setup mixto). La exportación PDF calculará
+                Esta matriz muestra todos los artistas que usan micrófonos cableados del festival (incluida configuración mixta). La exportación PDF calculará
                 los requisitos máximos considerando los horarios de shows y las restricciones de compartir micrófonos.
               </div>
 
