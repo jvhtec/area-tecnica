@@ -654,7 +654,7 @@ export const generateAndMergeFestivalPDFs = async (
     if (options.includeWiredMicNeeds && artists && artists.length > 0) {
       const filteredArtists = artists.filter(artist => 
         options.wiredMicNeedsStages.includes(Number(artist.stage)) &&
-        artist.mic_kit === 'festival' &&
+        (artist.mic_kit === 'festival' || artist.mic_kit === 'mixed') &&
         artist.wired_mics &&
         Array.isArray(artist.wired_mics) &&
         artist.wired_mics.length > 0
