@@ -25,7 +25,7 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
         .from('festival_artists')
         .select('id, name, stage, date, show_start, show_end, wired_mics, mic_kit')
         .eq('job_id', jobId)
-        .eq('mic_kit', 'festival')
+        .in('mic_kit', ['festival', 'mixed'])
         .not('wired_mics', 'is', null);
       
       if (error) throw error;
@@ -139,14 +139,14 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
             <div className="text-center py-8">Cargando datos de artistas...</div>
           ) : validArtists.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No se encontraron artistas con requisitos de micrófonos cableados usando kit de festival.
+              No se encontraron artistas con requisitos de micrófonos cableados usando kit de festival o mixto.
               <br />
-              Asegúrese de que los artistas tengan micrófonos cableados configurados con kit de festival seleccionado.
+              Asegúrese de que los artistas tengan micrófonos cableados configurados con kit de festival o mixto seleccionado.
             </div>
           ) : (
             <div className="space-y-6">
               <div className="text-sm text-muted-foreground">
-                Esta matriz muestra todos los artistas que usan micrófonos cableados del festival. La exportación PDF calculará
+                Esta matriz muestra todos los artistas que usan micrófonos cableados del festival (incluido setup mixto). La exportación PDF calculará
                 los requisitos máximos considerando los horarios de shows y las restricciones de compartir micrófonos.
               </div>
 
