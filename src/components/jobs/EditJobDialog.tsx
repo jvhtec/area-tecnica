@@ -223,13 +223,6 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
       const eligibleForPrepDays = ['tourdate', 'festival', 'single', 'ciclo', 'evento'].includes(jobType);
       if (eligibleForPrepDays && prepDaysLoadedSuccessfully) {
-        const { error: deletePrepErr } = await supabase
-          .from("job_date_types")
-          .delete()
-          .eq("job_id", job.id)
-          .eq("type", "prep_day");
-        if (deletePrepErr) throw deletePrepErr;
-
         const localStartDate = startTime?.split('T')?.[0];
         if (localStartDate) {
           const startDateObj = new Date(`${localStartDate}T12:00:00`);
@@ -237,32 +230,37 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             format(subDays(startDateObj, idx + 1), "yyyy-MM-dd")
           );
 
-          if (targetPrepDates.length > 0) {
-            const { error: prepErr } = await supabase
-              .from("job_date_types")
-              .insert(
-                targetPrepDates.map((date) => ({ job_id: job.id, date, type: "prep_day" as const }))
-              );
-            if (prepErr) {
-              // Handle unique constraint violations gracefully
-              if (prepErr.code === '23505') {
-                toast({
-                  title: "Error al actualizar días de preparación",
-                  description: "Algunas fechas de días de preparación confligen con entradas existentes. Por favor, pruebe con fechas diferentes o contacte soporte.",
-                  variant: "destructive",
-                });
-              }
-              throw prepErr;
+          // Use atomic RPC function to replace prep days
+          const { error: prepErr } = await supabase
+            .rpc('replace_prep_days', {
+              p_job_id: job.id,
+              p_dates: targetPrepDates
+            });
+
+          if (prepErr) {
+            // Handle unique constraint violations gracefully
+            if (prepErr.code === '23505') {
+              toast({
+                title: "Error al actualizar días de preparación",
+                description: "Algunas fechas de días de preparación confligen con entradas existentes. Por favor, pruebe con fechas diferentes o contacte soporte.",
+                variant: "destructive",
+              });
+              // Don't re-throw to avoid double toast in outer catch
+              setIsLoading(false);
+              return;
             }
+            // Re-throw other errors to be handled by outer catch
+            throw prepErr;
           }
         }
       } else if (!eligibleForPrepDays) {
         // If the job type is not prep-day-eligible, ensure stale prep_day rows are removed.
+        // Use RPC with empty array to atomically remove all prep days
         const { error: cleanupPrepErr } = await supabase
-          .from("job_date_types")
-          .delete()
-          .eq("job_id", job.id)
-          .eq("type", "prep_day");
+          .rpc('replace_prep_days', {
+            p_job_id: job.id,
+            p_dates: []
+          });
         if (cleanupPrepErr) throw cleanupPrepErr;
       }
 
