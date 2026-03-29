@@ -162,8 +162,22 @@ src/
   - Query key factories in `src/lib/optimized-react-query.ts`
   - Standardized invalidation via `optimizedInvalidation()`
   - Entity-based query options via `createEntityQueryOptions()`
-- **Global State**: Zustand stores in `src/stores/` for UI state (dialogs, selections)
+- **Global State**: Zustand stores in `src/stores/`:
+  - `useCreateJobDialogStore` — Job creation dialog visibility and context
+  - `useSelectedJobStore` — Currently selected job card (also used by Stream Deck)
+  - `useSelectedCellStore` — Matrix cell selection (supports multi-select for batch ops)
+  - `useShortcutStore` — Global keyboard/Stream Deck shortcut registry with persistence
 - **Realtime**: Supabase realtime subscriptions with connection pooling and health monitoring
+
+#### Key Libraries (`src/lib/`)
+- `token-manager.ts` — JWT token lifecycle, refresh logic, session recovery
+- `unified-subscription-manager.ts` — Centralized realtime subscription management (see Multi-Tab section)
+- `multitab-coordinator.ts` — Leader election and cross-tab cache sync
+- `enhanced-security-config.ts` — Rate limiting, input sanitization, file validation
+- `push.ts` / `push-native.ts` — Web Push and native iOS push notification support
+- `wallboard-api.ts` — Tokenized public wallboard data API
+- `frequencyBands.ts` — RF/wireless frequency reference data
+- `streamdeck/websocket-server.ts` — Stream Deck WebSocket integration
 
 #### 3. Supabase Integration
 - **Client**: Unified client at `src/lib/supabase-client.ts`
@@ -313,14 +327,58 @@ Tour/Festival → Date → Department → Dryhire (optional)
 - Recovery detection in `src/hooks/usePushSubscriptionRecovery.ts`
 - Notifications stored in `notifications` and `push_subscriptions` tables
 
+### Multi-Tab Coordination
+
+**Critical pattern** in `src/lib/multitab-coordinator.ts` — prevents duplicate API calls and syncs state across browser tabs:
+- **Leader election**: Uses Web Locks API (fallback: localStorage) — only leader tab handles realtime subscriptions and refetches
+- **Cache sync**: BroadcastChannel broadcasts query updates to follower tabs (75ms debounce)
+- **Heartbeat**: 3s intervals to detect leader health; automatic failover when leader closes
+- **Impact**: Don't bypass this when adding realtime features — always go through the unified subscription manager
+
+### Unified Subscription Manager
+
+Central realtime manager in `src/lib/unified-subscription-manager.ts` (21.9KB):
+- **Priority-based** subscriptions (high/medium/low)
+- **Route-aware**: Only subscribes to tables needed for the current route (`useEnhancedRouteSubscriptions`)
+- **Stale detection**: 10-minute threshold for subscription refresh
+- **Recovery**: Exponential backoff on failures, auto-resubscribe on network recovery, visibility-based refetch
+- **Snapshot pattern**: Provides connection status, active subscription list, last refresh timestamp for UI
+
+### Chunk Loading Error Recovery
+
+Automatic recovery from code-split loading failures (`ErrorBoundary.tsx` + `main.tsx`):
+- Detects chunk load errors from async imports
+- Tracks reload attempts in sessionStorage
+- Auto-reloads up to `MAX_CHUNK_ERROR_RELOADS` times with 500ms delay
+- In-memory guard prevents infinite loops if sessionStorage unavailable
+
+### Stream Deck & Keyboard Shortcuts
+
+- **Shortcut store**: `src/stores/useShortcutStore.ts` — Zustand registry with categories (navigation, job-card, matrix, global)
+- **Stream Deck**: WebSocket client in `src/lib/streamdeck/websocket-server.ts` connects to local server (`ws://localhost:3001`)
+- **Commands**: execute-shortcut, navigate, get-state, ping — auto-reconnect silently if server absent
+- **Custom keybinds**: Persisted to localStorage, exportable/importable
+
+### Rate Limiting & Input Security
+
+Client-side security config in `src/lib/enhanced-security-config.ts`:
+- **Rate limits**: Flex API (60/min), document uploads (10/min), user creation (5/hour), password reset (3/hour)
+- **Progressive penalties**: 30s → 5min → 30min on repeated violations
+- **Input sanitization**: XSS prevention (strips `<>`, event handlers, `javascript:`, `data:` URIs), SQL injection prevention
+- **File upload validation**: 50MB max, type whitelist (PDF, images, Word, plaintext), double-extension blocking
+
 ### Performance Optimizations
 
 1. **Code Splitting**: All pages lazy-loaded, manual chunks in vite.config.ts
 2. **Query Optimization**: Materialized views (`v_job_staffing_summary`), indexed foreign keys
-3. **Realtime Throttling**: Connection pooling, subscription deduplication
-4. **Image Optimization**: `src/utils/imageOptimization.ts`
-5. **Bundle Optimization**: Separate chunks for pdf-libs, maps-lib, spreadsheet-libs, editor-lib
-6. **Production Mode**: Console/debugger statements dropped via esbuild
+3. **Realtime Throttling**: Connection pooling, subscription deduplication, route-aware subscriptions
+4. **Multi-Tab Dedup**: Leader election prevents duplicate subscriptions across tabs
+5. **Virtual Scrolling**: `useVirtualizedMatrix` and `useVirtualizedDateRange` for large datasets
+6. **Optimistic Updates**: `useOptimisticJobManagement` for immediate UI feedback with rollback
+7. **Image Optimization**: `src/utils/imageOptimization.ts`
+8. **Bundle Optimization**: Separate chunks for pdf-libs, maps-lib, spreadsheet-libs, editor-lib
+9. **Production Mode**: Console/debugger statements dropped via esbuild
+10. **Token Caching**: Auth tokens cached 30 minutes via `OptimizedAuthProvider`
 
 ### Testing
 
@@ -331,6 +389,14 @@ Tour/Festival → Date → Department → Dryhire (optional)
 - **Component Tests**: Use `@testing-library/react` and `@testing-library/jest-dom`
 - **E2E Tests**: Playwright (Chromium) smoke tests via `npm run test:e2e`
 - **Environment**: Node by default, jsdom for components (configured via environmentMatchGlobs)
+
+**Test Utilities** (in `src/test/`):
+- `setup.ts` — DOM matchers, toast mocking, window API polyfills (matchMedia, IntersectionObserver, ResizeObserver)
+- `fixtures.ts` — Shared test fixtures
+- `renderWithProviders.tsx` — Provider wrapper for component tests
+- `mockOptimizedAuth.ts` — Auth context mocking
+- `mockSupabase.ts` — Supabase client mocking
+- `createTestQueryClient.ts` — Query client factory for isolated tests
 
 **Test Commands**:
 ```bash
