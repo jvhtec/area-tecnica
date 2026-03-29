@@ -65,8 +65,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
       .gte("date", formatInTimeZone(start, MADRID_TIMEZONE, "yyyy-MM-dd"))
       .lte("date", formatInTimeZone(end, MADRID_TIMEZONE, "yyyy-MM-dd"))
       .eq("jobs.job_departments.department", department)
-      .in("jobs.job_type", allowedJobTypes)
-      .limit(500),
+      .in("jobs.job_type", allowedJobTypes),
   ]);
 
   const { data: overlapData, error } = overlapRes;
@@ -77,14 +76,35 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
   for (const row of overlapData || []) {
     mergedById.set(row.id, row);
   }
+
+  // Deduplicate typed results by job_id, keeping earliest date/start_time
+  const typedByJobId = new Map<string, any>();
   for (const typed of typedRes.data || []) {
     const job = Array.isArray((typed as any).jobs) ? (typed as any).jobs[0] : (typed as any).jobs;
-    if (job?.id && !mergedById.has(job.id)) {
-      mergedById.set(job.id, job);
+    if (!job?.id) continue;
+
+    const existing = typedByJobId.get(job.id);
+    if (!existing) {
+      typedByJobId.set(job.id, { job, date: typed.date, type: typed.type });
+    } else {
+      // Keep earliest date (or earliest start_time as tiebreaker)
+      if (typed.date < existing.date || (typed.date === existing.date && (job.start_time < existing.job.start_time))) {
+        typedByJobId.set(job.id, { job, date: typed.date, type: typed.type });
+      }
     }
   }
 
-  return Array.from(mergedById.values())
+  // Merge deduplicated typed jobs into mergedById
+  for (const [jobId, typedEntry] of typedByJobId.entries()) {
+    if (!mergedById.has(jobId)) {
+      mergedById.set(jobId, typedEntry.job);
+    }
+  }
+
+  // Apply 500 cap after deduplication
+  const uniqueJobs = Array.from(mergedById.values()).slice(0, 500);
+
+  return uniqueJobs
     .map((j: any) => {
       const assigns = Array.isArray(j.job_assignments) ? j.job_assignments : [];
       return {

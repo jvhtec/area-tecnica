@@ -83,10 +83,13 @@ BEGIN
     ) INTO v_forced_rehearsal;
 
     SELECT EXISTS (
-      SELECT 1 FROM public.job_date_types
-      WHERE job_id = v_timesheet.job_id
-        AND date = v_timesheet.date
-        AND type = 'prep_day'
+      SELECT 1
+      FROM public.job_date_types jdt
+      INNER JOIN public.jobs j ON jdt.job_id = j.id
+      WHERE jdt.job_id = v_timesheet.job_id
+        AND jdt.date = v_timesheet.date
+        AND jdt.type = 'prep_day'
+        AND j.job_type IN ('tourdate', 'festival', 'single', 'ciclo', 'evento')
     ) INTO v_is_prep_day;
   END IF;
 

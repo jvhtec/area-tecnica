@@ -257,7 +257,7 @@ export function TechnicianPayoutCard({
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>Prep days:</span>
+              <span>Días de preparación:</span>
             </div>
             <Badge variant="outline">
               {formatCurrency(prepDaysTotal)}

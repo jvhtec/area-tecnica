@@ -204,7 +204,8 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
       const techExpenses = tourExpenseData.get(quote.technician_id);
       const expensesTotal = techExpenses?.total ?? 0;
-      const totalWithExtrasAndExpenses = baseTotal + extrasTotal + expensesTotal;
+      const prepDaysTotal = prepDaysMap.get(quote.technician_id) || 0;
+      const totalWithExtrasAndExpenses = baseTotal + extrasTotal + expensesTotal + prepDaysTotal;
 
       return {
         job_id: quote.job_id,
@@ -223,7 +224,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
         expenses_breakdown: techExpenses?.breakdown ?? [],
       } satisfies JobPayoutTotals;
     });
-  }, [visibleTourQuotes, tourApprovals, tourTimesheetDays, tourExpenseData]);
+  }, [visibleTourQuotes, tourApprovals, tourTimesheetDays, tourExpenseData, prepDaysMap]);
 
   const payoutTotals = isTourDate ? tourPayoutTotals : standardPayoutTotals;
   const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading);

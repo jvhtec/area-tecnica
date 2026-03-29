@@ -52,6 +52,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const [isVenueBusy, setIsVenueBusy] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [prepDaysCount, setPrepDaysCount] = useState(0);
+  const [prepDaysLoadedSuccessfully, setPrepDaysLoadedSuccessfully] = useState(false);
 
   // Venue-related state
   const [venueName, setVenueName] = useState("");
@@ -112,12 +113,19 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           setVenueData(null);
         }
 
-        const { data: prepDateTypes } = await supabase
+        const { data: prepDateTypes, error: prepLoadError } = await supabase
           .from("job_date_types")
           .select("date")
           .eq("job_id", job.id)
           .eq("type", "prep_day");
-        setPrepDaysCount(prepDateTypes?.length ?? 0);
+
+        if (prepLoadError) {
+          console.error("Error loading prep days:", prepLoadError);
+          setPrepDaysLoadedSuccessfully(false);
+        } else {
+          setPrepDaysCount(prepDateTypes?.length ?? 0);
+          setPrepDaysLoadedSuccessfully(true);
+        }
       }
     };
 
@@ -214,7 +222,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       if (jobError) throw jobError;
 
       const eligibleForPrepDays = ['tourdate', 'festival', 'single', 'ciclo', 'evento'].includes(jobType);
-      if (eligibleForPrepDays) {
+      if (eligibleForPrepDays && prepDaysLoadedSuccessfully) {
         const { error: deletePrepErr } = await supabase
           .from("job_date_types")
           .delete()
@@ -248,7 +256,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             }
           }
         }
-      } else {
+      } else if (!eligibleForPrepDays) {
         // If the job type is not prep-day-eligible, ensure stale prep_day rows are removed.
         const { error: cleanupPrepErr } = await supabase
           .from("job_date_types")
