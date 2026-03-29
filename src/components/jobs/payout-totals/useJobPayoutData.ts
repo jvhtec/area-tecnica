@@ -226,11 +226,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     });
   }, [visibleTourQuotes, tourApprovals, tourTimesheetDays, tourExpenseData, prepDaysMap]);
 
-  const payoutTotals = isTourDate ? tourPayoutTotals : standardPayoutTotals;
-  const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading);
-  const error = jobMetaError ?? (isTourDate ? tourQuotesError : standardError);
-
-  const { data: prepDaysMap = new Map<string, number>() } = useQuery({
+  const { data: prepDaysMap = new Map<string, number>(), isLoading: prepDaysLoading, error: prepDaysError } = useQuery({
     queryKey: ['job-tech-prep-days', jobId],
     enabled: !!jobId,
     queryFn: async () => {
@@ -252,6 +248,10 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     },
     staleTime: 30_000,
   });
+
+  const payoutTotals = isTourDate ? tourPayoutTotals : standardPayoutTotals;
+  const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading) || prepDaysLoading;
+  const error = jobMetaError ?? (isTourDate ? tourQuotesError : standardError) ?? prepDaysError;
 
   const payoutTotalsWithPrep = React.useMemo(
     () =>

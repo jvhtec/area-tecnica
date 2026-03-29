@@ -46,26 +46,31 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
     overlapQuery = overlapQuery.eq("job_departments.department", department);
   }
 
+  let typedQuery = supabase
+    .from("job_date_types")
+    .select(
+      `
+      job_id,
+      date,
+      type,
+      jobs!inner(
+        id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
+        job_departments!inner(department),
+        job_assignments!job_id(technician_id)
+      )
+    `
+    )
+    .gte("date", formatInTimeZone(start, MADRID_TIMEZONE, "yyyy-MM-dd"))
+    .lte("date", formatInTimeZone(end, MADRID_TIMEZONE, "yyyy-MM-dd"))
+    .in("jobs.job_type", allowedJobTypes);
+
+  if (department) {
+    typedQuery = typedQuery.eq("jobs.job_departments.department", department);
+  }
+
   const [overlapRes, typedRes] = await Promise.all([
     overlapQuery.order("start_time", { ascending: true }),
-    supabase
-      .from("job_date_types")
-      .select(
-        `
-        job_id,
-        date,
-        type,
-        jobs!inner(
-          id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
-          job_departments!inner(department),
-          job_assignments!job_id(technician_id)
-        )
-      `
-      )
-      .gte("date", formatInTimeZone(start, MADRID_TIMEZONE, "yyyy-MM-dd"))
-      .lte("date", formatInTimeZone(end, MADRID_TIMEZONE, "yyyy-MM-dd"))
-      .eq("jobs.job_departments.department", department)
-      .in("jobs.job_type", allowedJobTypes),
+    typedQuery,
   ]);
 
   const { data: overlapData, error } = overlapRes;
