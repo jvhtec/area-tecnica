@@ -34,7 +34,7 @@ The timesheet system tracks technician hours per job per date. Timesheets are au
 
 ### Timesheet Fields
 
-```
+```text
 id, job_id, technician_id, date
 start_time, end_time, break_minutes, overtime_hours
 ends_next_day (boolean for overnight shifts)
@@ -83,7 +83,7 @@ When assignments are made (via matrix or tour), `autoCreateTimesheets()` creates
 
 The `compute_timesheet_amount_2025` RPC handles all payout math:
 - **Category-based rates**: Different base rates for tecnico/especialista/responsable
-- **Hour tiers**: Base (0-8h), mid-tier (10-12h), overtime (12h+)
+- **Hour tiers**: Base (0–10.5h), mid-tier (10.5–12.5h, flat +€30), overtime (12.5h+)
 - **Holiday rates**: Madrid public holidays from `public_holidays` table
 - **Overnight shifts**: Handled via `ends_next_day` flag
 - **Rehearsal flat rates**: When `is_rehearsal_flat_rate` is true

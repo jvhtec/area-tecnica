@@ -34,7 +34,7 @@ The public artist form allows festival artists to submit their technical require
 
 ## Token Lifecycle
 
-```
+```text
 1. GENERATE → Create festival_artist_forms row with UUID token, 7-day expiry, 'pending' status
 2. ROTATE → Mark existing pending forms for same artist as 'expired'
 3. DISTRIBUTE → Send link via email/QR code (URL: /festival/artist-form/{token}?lang=es|en)
@@ -59,7 +59,7 @@ The public artist form allows festival artists to submit their technical require
 
 ## Workflow
 
-```
+```text
 1. MANAGEMENT generates token via ArtistFormLinkDialog
    - 7-day expiry
    - Supports email sending with QR code

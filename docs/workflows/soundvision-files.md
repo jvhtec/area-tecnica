@@ -16,11 +16,11 @@ The SoundVision file library manages venue acoustic simulation files (SoundVisio
 | **Access requests** | `src/hooks/useSoundVisionAccessRequest.ts` (6.6KB) |
 | **File reviews** | `src/hooks/useSoundVisionFileReviews.ts` (5.9KB) |
 | **File validation** | `src/utils/soundvisionFileValidation.ts` |
-| **Access guard** | Custom access guard component |
+| **Access guard** | `src/hooks/useOptimizedAuth.tsx` (`hasSoundVisionAccess` property) + `ProtectedRoute` in `src/App.tsx` |
 
 ## Access Control Model
 
-```
+```text
 1. USER visits SoundVision Files page
 2. ACCESS CHECK → user must have approved access or be admin/management
 3. IF NO ACCESS → shows "Request Access" button
@@ -33,7 +33,7 @@ The SoundVision file library manages venue acoustic simulation files (SoundVisio
 ## Workflows
 
 ### File Upload (Admin/Management)
-```
+```text
 1. SELECT files (SoundVision format validated)
 2. UPLOAD to Supabase storage
 3. METADATA saved (file name, size, type, uploader)
@@ -41,7 +41,7 @@ The SoundVision file library manages venue acoustic simulation files (SoundVisio
 ```
 
 ### Access Request
-```
+```text
 1. USER clicks "Request Access"
 2. REQUEST created with user_id, status = 'pending'
 3. ADMIN notified
@@ -50,7 +50,7 @@ The SoundVision file library manages venue acoustic simulation files (SoundVisio
 ```
 
 ### File Review
-```
+```text
 1. REVIEWER opens file details
 2. SUBMITS review (comments, rating)
 3. REVIEW visible to file uploader and admins

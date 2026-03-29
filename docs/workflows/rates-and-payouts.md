@@ -46,7 +46,7 @@ The rates system manages technician compensation: base rates by category, extras
 
 ### Approval Workflow
 
-```
+```text
 1. TOURS/JOBS default to rates_approved = false
 2. MANAGEMENT reviews in RatesApprovalsTable
 3. STATUS CHECKS:
@@ -60,7 +60,7 @@ The rates system manages technician compensation: base rates by category, extras
 
 ### Payout Calculation
 
-```
+```text
 1. FETCH base amounts from v_job_tech_payout_2025 view
    - timesheets_total (from approved timesheets)
    - extras_total (from approved extras)
@@ -73,7 +73,7 @@ The rates system manages technician compensation: base rates by category, extras
 
 ### Payout Override
 
-```
+```text
 1. MANAGER sets override via useJobPayoutOverride
 2. CALLS set_technician_payout_override RPC
 3. STORES in job_technician_payout_overrides
@@ -83,7 +83,7 @@ The rates system manages technician compensation: base rates by category, extras
 
 ### Extras Management
 
-```
+```text
 1. MANAGEMENT configures extras per technician in JobExtrasEditor
 2. TYPES: travel_half, travel_full, day_off (from rate_extras_2025)
 3. QUANTITY and optional amount_override per extra

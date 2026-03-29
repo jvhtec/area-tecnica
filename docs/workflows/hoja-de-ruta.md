@@ -40,7 +40,7 @@ The Hoja de Ruta is a comprehensive event documentation system for capturing all
 
 ## Workflow
 
-```
+```text
 1. SELECT JOB → dropdown with available jobs
 2. AUTO-POPULATE → loads job location, assignments, power requirements
 3. FILL FORM (10 tabs):

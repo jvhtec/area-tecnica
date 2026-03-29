@@ -39,11 +39,11 @@ The activity system logs all significant platform events (job creation, assignme
 `assignment.created`, `assignment.updated`, `assignment.removed`
 
 ### Staffing Events
-`staffing.availability.sent`, `.confirmed`, `.declined`
-`staffing.offer.sent`, `.confirmed`, `.declined`
+`staffing.availability.sent`, `staffing.availability.confirmed`, `staffing.availability.declined`
+`staffing.offer.sent`, `staffing.offer.confirmed`, `staffing.offer.declined`
 
 ### Timesheet Events
-`timesheet.submitted`, `.approved`, `.rejected`
+`timesheet.submitted`, `timesheet.approved`, `timesheet.rejected`
 
 ### Infrastructure Events
 `flex.folders.created`, `flex.crew.updated`, `hoja.updated`
@@ -64,7 +64,7 @@ Each event has a visibility level controlling who sees it:
 
 ## Workflow
 
-```
+```text
 1. EVENT OCCURS → RPC log_activity() inserts row with code, context, visibility, payload
 2. SUPABASE TRIGGER → broadcasts to push function
 3. REALTIME → useActivityRealtime subscribes to activity_log INSERT events

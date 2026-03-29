@@ -641,7 +641,7 @@ Admin-facing activity feed tracking all significant platform events:
 Tokenized public routes allowing artists to submit technical riders without authentication:
 - **Routes**: `/festival/artist-form/*` (public, no auth required)
 - **Edge Functions**: `upload-public-artist-rider`, `delete-public-artist-rider`, `submit-public-artist-form`
-- **Pattern**: Festival generates a unique token URL → artist fills requirements form → data saved to `artist_requirements` table
+- **Pattern**: Festival generates a unique token URL → artist fills requirements form → data saved to `festival_artist_form_submissions` table
 - **Security**: Token-based access, no user session needed
 
 ### Digital Signage (Wallboard)

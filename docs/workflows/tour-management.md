@@ -12,11 +12,11 @@ Tours group multiple job dates under a single entity. Tour-level assignments aut
 |----------|------|
 | **Pages** | `src/pages/Tours.tsx`, `src/pages/TourManagement.tsx` |
 | **Components** | `src/components/tours/` (30+ components) |
-| **Core hooks** | `src/hooks/useMyTours.ts`, `useTourAssignments.ts`, `useTourCreation.ts`, `useTourDocuments.ts` |
+| **Core hooks** | `src/hooks/useMyTours.ts`, `src/hooks/useTourAssignments.ts`, `src/hooks/useTourCreation.ts`, `src/hooks/useTourDocuments.ts` |
 | **Flex hooks** | `src/hooks/useTourDateFlexFolders.ts` |
-| **Rate hooks** | `src/hooks/useTourRatesApproval.ts`, `useTourBaseRates.ts`, `useTourJobRateQuotes.ts` |
-| **Default hooks** | `src/hooks/useTourDefaultSets.ts`, `useTourPowerDefaults.ts`, `useTourWeightDefaults.ts` |
-| **Override hooks** | `src/hooks/useTourDateOverrides.ts`, `useTourOverrideMode.ts` |
+| **Rate hooks** | `src/hooks/useTourRatesApproval.ts`, `src/hooks/useTourBaseRates.ts`, `src/hooks/useTourJobRateQuotes.ts` |
+| **Default hooks** | `src/hooks/useTourDefaultSets.ts`, `src/hooks/useTourPowerDefaults.ts`, `src/hooks/useTourWeightDefaults.ts` |
+| **Override hooks** | `src/hooks/useTourDateOverrides.ts`, `src/hooks/useTourOverrideMode.ts` |
 | **Scheduling** | `src/components/tours/scheduling/` (itinerary builder, travel planner, accommodations, map view) |
 
 ## Database Tables
@@ -38,7 +38,7 @@ Tours group multiple job dates under a single entity. Tour-level assignments aut
 
 ## Tour → Job Relationship
 
-```
+```text
 Tour (1) → Tour Dates (many) → Jobs (1 per date)
 ```
 
@@ -58,7 +58,7 @@ When a technician is assigned to a tour via `tour_assignments`:
 
 ### Tour Creation
 
-```
+```text
 1. CREATE TOUR → name, description, color, departments
 2. ADD DATES → via TourDateManagementDialog
 3. EACH DATE CREATES A JOB → jobs.tour_date_id links back
@@ -67,7 +67,7 @@ When a technician is assigned to a tour via `tour_assignments`:
 
 ### Crew Assignment
 
-```
+```text
 1. OPEN TourAssignmentDialog
 2. SELECT department, role, technician
 3. CREATE tour_assignments record
@@ -77,7 +77,7 @@ When a technician is assigned to a tour via `tour_assignments`:
 
 ### Document Management
 
-```
+```text
 1. UPLOAD via TourDocumentsDialog
 2. STORED in tour-documents bucket
 3. SET visible_to_tech flag (controls technician access)
@@ -86,7 +86,7 @@ When a technician is assigned to a tour via `tour_assignments`:
 
 ### Rates & Defaults
 
-```
+```text
 1. SET tour defaults (base rates from rate_cards_tour_2025)
 2. CONFIGURE power/weight requirements
 3. PER-DATE OVERRIDES via tour_date_*_overrides tables
@@ -96,7 +96,7 @@ When a technician is assigned to a tour via `tour_assignments`:
 
 ### Flex Folder Creation
 
-```
+```text
 1. CLICK "Create Flex Folders" in TourCard
 2. useTourDateFlexFolders creates folders for each date's job
 3. SETS jobs.flex_folders_created = true per date

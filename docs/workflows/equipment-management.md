@@ -44,7 +44,7 @@ Microphones: wired_mics
 
 ### Stock Movement
 
-```
+```text
 1. SELECT equipment from catalog
 2. CHOOSE movement type (addition or subtraction)
 3. ENTER quantity and notes
@@ -55,7 +55,7 @@ Microphones: wired_mics
 
 ### Sub-Rental Request
 
-```
+```text
 1. SET date range (start + end)
 2. ADD line items: [{equipment_id, quantity}, ...]
 3. ADD notes (vendor name, special requests)
@@ -68,7 +68,7 @@ Microphones: wired_mics
 
 ### Equipment Presets
 
-```
+```text
 1. CREATE preset → name, department
 2. ADD items → equipment_id + quantity + subsystem
 3. SAVE as template (reusable) or job-specific

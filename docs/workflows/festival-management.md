@@ -36,7 +36,7 @@ Festival management handles multi-day events with complex artist rosters, techni
 
 ### Artist & Rider Workflow
 
-```
+```text
 1. CREATE FESTIVAL → linked to a job
 2. ADD ARTISTS → name, stage, date, show times
 3. SEND FORM LINKS → tokenized URL (7-day expiry) via email/QR code
@@ -49,7 +49,7 @@ Festival management handles multi-day events with complex artist rosters, techni
 
 ### Gear Setup Workflow
 
-```
+```text
 1. SET GLOBAL GEAR → festival_gear_setups: max stages, consoles, wireless, mics
 2. STAGE OVERRIDES → festival_stage_gear_setups for per-stage differences
 3. COMBINED VIEW → useCombinedGearSetup merges global + stage-specific
@@ -59,7 +59,7 @@ Festival management handles multi-day events with complex artist rosters, techni
 
 ### Shift Scheduling Workflow
 
-```
+```text
 1. CREATE SHIFTS → date, time range, department, stage
 2. ASSIGN TECHNICIANS → via ManageAssignmentsDialog
 3. REALTIME UPDATES → useFestivalShifts hook

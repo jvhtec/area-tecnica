@@ -65,8 +65,8 @@ The Job Assignment Matrix is the primary interface for crew scheduling. It displ
 
 Located in `src/utils/technicianAvailability.ts`:
 
-- **Hard conflicts**: Overlapping job times → blocks assignment
-- **Soft conflicts**: Cautionary flags → allows override with warning
+- **Hard conflicts**: Overlapping job times → prompts confirmation dialog; user can proceed via "Forzar asignación" (force assignment) override in `AssignJobDialog.tsx`
+- **Soft conflicts**: Cautionary flags → shows warning, allows assignment
 - Checks against:
   - Existing timesheets for overlapping dates
   - Unavailability records from `availability_schedules`
@@ -74,7 +74,7 @@ Located in `src/utils/technicianAvailability.ts`:
 
 ## Assignment Workflow
 
-```
+```text
 1. CLICK CELL → opens AssignJobDialog
 2. SELECT JOB → from available jobs for that date
 3. SELECT ROLE → department-specific (FOH/Monitors/Systems for Sound, etc.)
