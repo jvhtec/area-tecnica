@@ -215,18 +215,19 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
       const eligibleForPrepDays = ['tourdate', 'festival', 'single', 'ciclo', 'evento'].includes(jobType);
       if (eligibleForPrepDays) {
+        const { error: deletePrepErr } = await supabase
+          .from("job_date_types")
+          .delete()
+          .eq("job_id", job.id)
+          .eq("type", "prep_day");
+        if (deletePrepErr) throw deletePrepErr;
+
         const localStartDate = startTime?.split('T')?.[0];
         if (localStartDate) {
           const startDateObj = new Date(`${localStartDate}T12:00:00`);
           const targetPrepDates = Array.from({ length: prepDaysCount }, (_, idx) =>
             format(subDays(startDateObj, idx + 1), "yyyy-MM-dd")
           );
-
-          await supabase
-            .from("job_date_types")
-            .delete()
-            .eq("job_id", job.id)
-            .eq("type", "prep_day");
 
           if (targetPrepDates.length > 0) {
             const { error: prepErr } = await supabase
@@ -238,6 +239,14 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             if (prepErr) throw prepErr;
           }
         }
+      } else {
+        // If the job type is not prep-day-eligible, ensure stale prep_day rows are removed.
+        const { error: cleanupPrepErr } = await supabase
+          .from("job_date_types")
+          .delete()
+          .eq("job_id", job.id)
+          .eq("type", "prep_day");
+        if (cleanupPrepErr) throw cleanupPrepErr;
       }
 
       // Update departments
