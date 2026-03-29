@@ -611,6 +611,39 @@ Campaign-based crew assignment engine for matching technicians to jobs:
 - **Ranking factors**: Geographic distance, past reliability score, technician preferences, custom rates
 - **Critical**: Campaign state machine — don't bypass status transitions
 
+### Hoja de Ruta (Route Sheets)
+
+Complex document builder for daily route/logistics sheets:
+- **Page**: `src/pages/HojaDeRuta.tsx`
+- **Hooks**: `useHojaDeRutaForm` (14.4KB form state), `useHojaDeRutaPersistence` (28.9KB data persistence), `useHojaDeRutaImages` (image handling), `useHojaDeRutaTemplates` (template management)
+- **Utils**: `src/utils/hoja-de-ruta/`, `src/utils/hojaDeRutaExport.ts` (20.8KB PDF export)
+- **Workflow**: Create/edit route sheets with stops, images, notes → save as template → export to PDF
+- **Note**: One of the most complex form systems in the app — 4 dedicated hooks totaling 50KB+
+
+### SoundVision File Library
+
+File management system for SoundVision venue files with access control:
+- **Page**: `src/pages/SoundVisionFiles.tsx`
+- **Hooks**: `useSoundVisionFiles` (11KB queries), `useSoundVisionUpload` (upload), `useSoundVisionAccessRequest` (6.6KB access workflow), `useSoundVisionFileReviews` (5.9KB review workflow)
+- **Access Control**: Users request access → admin approves/denies → approved users can download files
+- **Docs**: `docs/soundvision-access-workflow.md`, `docs/soundvision-access-test-cases.md`
+
+### Activity / Audit Logging
+
+Admin-facing activity feed tracking all significant platform events:
+- **Feature module**: `src/features/activity/` — `api.ts`, `catalog.ts` (7.2KB event type catalog), `types.ts`
+- **Realtime**: `src/features/activity/hooks/useActivityRealtime.ts`
+- **Page**: Activity center page for admins
+- **Events tracked**: Job creation/updates, assignments, timesheet submissions, staffing campaigns, equipment movements, etc.
+
+### Public Artist Form
+
+Tokenized public routes allowing artists to submit technical riders without authentication:
+- **Routes**: `/festival/artist-form/*` (public, no auth required)
+- **Edge Functions**: `upload-public-artist-rider`, `delete-public-artist-rider`, `submit-public-artist-form`
+- **Pattern**: Festival generates a unique token URL → artist fills requirements form → data saved to `artist_requirements` table
+- **Security**: Token-based access, no user session needed
+
 ### Digital Signage (Wallboard)
 Real-time wallboard displays for crew schedules, announcements:
 - Public access via token-based URLs

@@ -8,6 +8,21 @@ This folder currently contains a mix of:
 
 This index helps you find what you need without having to remember filenames.
 
+## Workflows (per-subsystem reference docs)
+
+Detailed documentation for each major subsystem — key files, database tables, data flows, and step-by-step workflows.
+
+- **[Hoja de Ruta](workflows/hoja-de-ruta.md)** — Route sheet builder (10-tab form, 13 DB tables, PDF/Excel export)
+- **[Festival Management](workflows/festival-management.md)** — Artists, riders, gear setup, shift scheduling
+- **[Tour Management](workflows/tour-management.md)** — Tour dates, crew sync, rates, Flex folders
+- **[Job Assignment Matrix](workflows/job-assignment-matrix.md)** — Virtualized crew matrix, conflict detection, staffing campaigns
+- **[Timesheet System](workflows/timesheet-system.md)** — Draft → submitted → approved workflow, server-side rate calculation
+- **[Equipment Management](workflows/equipment-management.md)** — Stock tracking, sub-rentals, presets
+- **[Rates & Payouts](workflows/rates-and-payouts.md)** — Rate catalog, approval workflow, payout overrides
+- **[Activity / Audit Logging](workflows/activity-audit-logging.md)** — 30+ event types, realtime toasts, visibility controls
+- **[Public Artist Form](workflows/public-artist-form.md)** — Tokenized public routes for artist rider submission
+- **[SoundVision Files](workflows/soundvision-files.md)** — File library with access request and review workflow
+
 ## Product / workflows
 - **SoundVision access workflow**
   - `SOUNDVISION_ACCESS_CHANGES.md`
