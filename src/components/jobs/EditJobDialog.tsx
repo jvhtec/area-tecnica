@@ -232,11 +232,20 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           if (targetPrepDates.length > 0) {
             const { error: prepErr } = await supabase
               .from("job_date_types")
-              .upsert(
-                targetPrepDates.map((date) => ({ job_id: job.id, date, type: "prep_day" as const })),
-                { onConflict: "job_id,date" }
+              .insert(
+                targetPrepDates.map((date) => ({ job_id: job.id, date, type: "prep_day" as const }))
               );
-            if (prepErr) throw prepErr;
+            if (prepErr) {
+              // Handle unique constraint violations gracefully
+              if (prepErr.code === '23505') {
+                toast({
+                  title: "Error updating prep days",
+                  description: "Some prep day dates conflict with existing entries. Please try different dates or contact support.",
+                  variant: "destructive",
+                });
+              }
+              throw prepErr;
+            }
           }
         }
       } else {
@@ -483,7 +492,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             </div>
             {['tourdate', 'festival', 'single', 'ciclo', 'evento'].includes(jobType) && (
               <div className="space-y-2">
-                <Label htmlFor="prep-days-count">Prep days (15€/hr)</Label>
+                <Label htmlFor="prep-days-count">Días de preparación (15€/h)</Label>
                 <Input
                   id="prep-days-count"
                   type="number"
