@@ -239,8 +239,8 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               // Handle unique constraint violations gracefully
               if (prepErr.code === '23505') {
                 toast({
-                  title: "Error updating prep days",
-                  description: "Some prep day dates conflict with existing entries. Please try different dates or contact support.",
+                  title: "Error al actualizar días de preparación",
+                  description: "Algunas fechas de días de preparación confligen con entradas existentes. Por favor, pruebe con fechas diferentes o contacte soporte.",
                   variant: "destructive",
                 });
               }
