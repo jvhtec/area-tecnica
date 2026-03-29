@@ -236,7 +236,7 @@ The database is extensive with 85+ migrations. Key tables:
 
 **Festival Management**:
 - `festival_artists` - Artist/band information per festival
-- `artist_requirements` - Technical riders and requirements
+- `festival_artist_form_submissions` - Technical riders submitted via public artist form
 - `festival_dates` - Festival schedule and agenda
 - `festival_shifts` - Crew shift assignments
 

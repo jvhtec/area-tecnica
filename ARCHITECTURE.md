@@ -463,7 +463,7 @@ area-tecnica/
 | Table | Purpose |
 |-------|---------|
 | `festival_artists` | Artist/band info per festival |
-| `artist_requirements` | Technical riders (JSONB) |
+| `festival_artist_form_submissions` | Technical riders submitted via public artist form |
 | `festival_shifts` | Crew shift assignments |
 | `festival_gear_setups` | Equipment setup per stage/artist |
 | `festival_dates` | Festival schedule/agenda |
