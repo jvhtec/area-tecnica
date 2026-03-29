@@ -52,6 +52,29 @@ npm run cap:android
 
 **Note**: After making changes to web code, always run `cap:sync` before opening native projects.
 
+### Staging & Testing Commands
+```bash
+# Staging environment (separate Supabase project)
+npm run dev:staging       # Dev server against staging
+npm run build:staging     # Build for staging
+
+# Testing
+npm run test:run          # Single run (CI-friendly)
+npm run test:critical     # 30 critical workflow tests
+npm run test:coverage     # Coverage report
+npm run test:e2e          # Playwright smoke tests (Chromium)
+
+# Linting
+npm run lint:functions    # ESLint on Supabase edge functions (Deno globals)
+```
+
+### Pre-Commit Security
+```bash
+# Check staged files for secrets before committing
+./scripts/check-staged-secrets.sh
+```
+Detects API keys, passwords, and credentials in staged files. Consider setting up as a git pre-commit hook.
+
 ## Critical Build Requirements
 
 ### npm Install
@@ -306,7 +329,60 @@ Tour/Festival → Date → Department → Dryhire (optional)
 - **Setup**: `src/test/setup.ts`
 - **Pattern**: Co-locate tests in `__tests__/` directories or `.test.ts` files
 - **Component Tests**: Use `@testing-library/react` and `@testing-library/jest-dom`
+- **E2E Tests**: Playwright (Chromium) smoke tests via `npm run test:e2e`
 - **Environment**: Node by default, jsdom for components (configured via environmentMatchGlobs)
+
+**Test Commands**:
+```bash
+npm test                # Vitest watch mode (interactive development)
+npm run test:run        # Vitest single run (CI-friendly)
+npm run test:critical   # 30 critical workflow tests (auth, assignments, timesheets, etc.)
+npm run test:coverage   # Coverage report
+npm run test:e2e        # Playwright smoke tests (requires Chromium)
+```
+
+### CI/CD Pipeline (GitHub Actions)
+
+Defined in `.github/workflows/tests.yml`, triggered on PRs to `dev`/`main` or manual dispatch:
+
+| Job | Timeout | What it does |
+|-----|---------|-------------|
+| `lint` | 20 min | ESLint on app code |
+| `test_critical` | 25 min | 30 critical test files (auth, assignments, timesheets) |
+| `test_run` | 25 min | Full Vitest suite |
+| `build` | 25 min | Vite production build + post-build scripts |
+| `e2e_smoke` | 30 min | Playwright Chromium smoke tests |
+
+All jobs use Node 20 and `npm install --legacy-peer-deps`.
+
+### Supabase Edge Functions
+
+62 Deno/TypeScript edge functions in `supabase/functions/`. Key categories:
+
+**Email Services** (11+ functions): `send-corporate-email`, `send-onboarding-email`, `send-staffing-email`, `send-timesheet-reminder`, `send-bug-resolution-email`, `send-expense-notification`, `send-job-payout-email`, `send-password-reset`, `send-tour-availability`, `send-vacation-decision`, `send-warehouse-message`
+
+**Flex Integration**: `create-flex-folders`, `apply-flex-status`, `archive-to-flex`, `sync-flex-crew-for-job`, `manage-flex-crew-assignments`, `persist-flex-elements`, `secure-flex-api`, `fetch-flex-*`
+
+**Staffing Engine**: `staffing-orchestrator` (campaign-based crew matching with ranking, distance, reliability scoring), `staffing-click` (technician response handler), `staffing-sweeper` (cleanup), `notify-staffing-cancellation`
+
+**User Management**: `create-user`, `delete-user`, `import-users`, `update-email-bulk` (never used from client — admin only)
+
+**Document Generation**: `generate-memoria-tecnica`, `generate-lights-memoria-tecnica`, `generate-video-memoria-tecnica`, `generate-sv-report`
+
+**External Services**: `create-whatsapp-group`, `create-transport-request`, `get-google-maps-key`, `get-mapbox-token`, `static-map`, `place-photos`, `place-restaurants`, `image-proxy`, `tech-calendar-ics`
+
+**Wallboard**: `wallboard-auth`, `wallboard-feed`, `wallboard-debug`
+
+**System**: `system-health`, `security-audit`, `background-job-deletion`, `evaluate-achievements`, `push/` (WebSocket push bridge)
+
+**Shared utilities** live in `supabase/functions/_shared/` (CORS headers, Supabase client init, response helpers).
+
+**Edge Function Patterns**:
+- Runtime: Deno (import from `https://esm.sh/` or `jsr:` for deps)
+- Linting: `npm run lint:functions` (separate ESLint config with Deno globals)
+- Deployment: Via Supabase CLI (`npx supabase functions deploy <name>`)
+- Secrets: Managed via `npx supabase secrets set KEY=VALUE`
+- Each function is a directory with `index.ts` entry point
 
 ## Development Patterns
 
@@ -459,6 +535,16 @@ Unified equipment table (`equipment_models`) with categories:
 - QR code generation for references
 - Export to blob for download or preview
 
+### Staffing Orchestrator
+
+Campaign-based crew assignment engine for matching technicians to jobs:
+- **Edge Function**: `supabase/functions/staffing-orchestrator/`
+- **Frontend**: `src/features/staffing/`, `src/components/staffing/`
+- **Database**: `staffing_campaigns` table + related tables (20260112 migrations)
+- **Flow**: Create campaign → rank candidates (distance, reliability, availability) → send invitations → technician clicks accept/decline via `staffing-click` → `staffing-sweeper` cleans up expired campaigns
+- **Ranking factors**: Geographic distance, past reliability score, technician preferences, custom rates
+- **Critical**: Campaign state machine — don't bypass status transitions
+
 ### Digital Signage (Wallboard)
 Real-time wallboard displays for crew schedules, announcements:
 - Public access via token-based URLs
@@ -468,19 +554,47 @@ Real-time wallboard displays for crew schedules, announcements:
 
 ## Environment Variables
 
-Set in Cloudflare Pages (not in code):
-```
-VITE_SUPABASE_URL=https://[project].supabase.co
-VITE_SUPABASE_ANON_KEY=[anon-key]
-```
+### Required Variables (set in Cloudflare Pages, never in code)
 
-Dynamic injection at build time:
+| Variable | Purpose |
+|----------|---------|
+| `VITE_SUPABASE_URL` | Supabase project URL (`https://[project].supabase.co`) |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon/public JWT key |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Fallback alias for anon key (same value) |
+| `VITE_SUPABASE_FUNCTIONS_URL` | Edge functions URL (`https://[project].supabase.co/functions/v1`) |
+| `VITE_VAPID_PUBLIC_KEY` | Web Push VAPID public key (for push notifications) |
+| `VITE_ENABLE_ACTIVITY_PUSH_FALLBACK` | Feature flag: activity push fallback (`true`/`false`) |
+
+### Dynamic (injected at build time by Vite)
+
 ```
-VITE_APP_VERSION        # Auto-set to build timestamp
-VITE_BUILD_TIMESTAMP    # Auto-set to Unix timestamp
+VITE_APP_VERSION        # Auto-set to ISO timestamp
+VITE_BUILD_TIMESTAMP    # Auto-set to Unix timestamp (ms)
 ```
 
 Service worker version injection via `scripts/inject-sw-version.mjs` (runs post-build).
+
+### Local Development
+
+```bash
+cp .env.example .env.local        # Copy template, fill in Supabase creds
+cp .env.staging.example .env.staging.local  # For staging environment
+```
+
+- `.env.local` — default local development
+- `.env.staging.local` — staging Supabase project (`npm run dev:staging`)
+- `.env.prod.local` — point local UI at production (`npm run dev -- --mode prod`)
+
+**Never commit `.env*` files.** All are gitignored.
+
+### Staging Workflow
+
+```bash
+npm run dev:staging     # Dev server against staging Supabase
+npm run build:staging   # Build for staging
+```
+
+For full Cloudflare + Supabase staging setup, see `docs/STAGING_SETUP.md`.
 
 ## Git Workflow
 
@@ -560,10 +674,30 @@ npx supabase start
 
 ## Additional Resources
 
-- **Supabase Project**: Connected via environment variables
+### Companion Documentation (in repo)
+- **ARCHITECTURE.md** — Full system architecture, project structure diagram, all component domains, integrations, security, and glossary
+- **DEVELOPMENT.md** — Local dev setup, lock file strategy, dependency management, environment switching, archive/legacy policy
+- **DEPLOYMENT.md** — Cloudflare Pages setup, environment variables configuration, deployment process, rollback, troubleshooting
+- **SECURITY.md** — Known vulnerabilities, accepted risks, security best practices, incident response plan
+- **CHANGELOG.md** — Release notes and version history
+- **docs/** — 60+ feature docs: push notifications, staging setup, staffing orchestrator, wallboard, SoundVision, audit reports, workflows
+- **docs/README.md** — Documentation index organized by category
+- **.github/GIT_HYGIENE.md** — Branch naming, PR workflow, stale branch cleanup
+
+### External Documentation
 - **UI Components**: [shadcn/ui documentation](https://ui.shadcn.com/)
 - **React Query**: [TanStack Query docs](https://tanstack.com/query/latest)
 - **Capacitor**: [Capacitor docs](https://capacitorjs.com/)
+- **Supabase**: [Supabase docs](https://supabase.com/docs)
+- **Cloudflare Pages**: [Pages docs](https://developers.cloudflare.com/pages/)
+
+## Archive and Legacy Policy
+
+- Use `archive/` for historical planning docs and backup assets — stays in git history, not in active development
+- Use `src/legacy/` for deprecated/superseded app code retained for reference
+- **Do not** add new runtime imports from `archive/` or `src/legacy/`
+- Active sources: `src/`, active docs: `docs/`, active migrations: `supabase/migrations/`
+- Helper scripts go in `scripts/` (SQL helpers in `scripts/sql/`), feature docs in `docs/` subfolders
 
 ## Project-Specific Context
 
@@ -716,3 +850,12 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Tour assignments cascade** -- removing a tour assignment must remove related job assignments and timesheets
 - **Flex folder hierarchy must exist** before creating work elements or crew calls
 - **Don't import lovable-tagger** in vite.config.ts (causes build failures)
+- **Edge functions use Deno runtime** — don't use Node.js APIs or npm imports in `supabase/functions/`; use `https://esm.sh/` or `jsr:` for deps
+- **Lint edge functions separately** — `npm run lint:functions` uses different ESLint config with Deno globals
+- **Never commit .env files** — all dotenv files are gitignored; secrets go in Cloudflare Pages dashboard or Supabase secrets
+- **Staging uses a separate Supabase project** — don't point staging at production; use `.env.staging.local` and `npm run dev:staging`
+- **Staffing campaign state machine** — don't bypass status transitions in the staffing orchestrator flow
+- **CI requires Node 20** — GitHub Actions workflow uses Node 20; match locally for consistency
+- **Playwright needs Chromium** — `npm run test:e2e` requires Playwright browsers installed (`npx playwright install chromium`)
+- **100 SQL migrations exist** — the initial `00000000000000_production_schema.sql` is 10,500+ lines; new migrations use timestamp naming (`YYYYMMDDHHMMSS_description.sql`)
+- **Don't manually edit archive/ or src/legacy/** — these are retained for reference only, no new runtime imports
