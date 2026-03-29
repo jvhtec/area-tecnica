@@ -431,7 +431,7 @@ All jobs use Node 20 and `npm install --legacy-peer-deps`.
 
 **Staffing Engine**: `staffing-orchestrator` (campaign-based crew matching with ranking, distance, reliability scoring), `staffing-click` (technician response handler), `staffing-sweeper` (cleanup), `notify-staffing-cancellation`
 
-**User Management**: `create-user`, `delete-user`, `import-users`, `update-email-bulk` (never used from client — admin only)
+**User Management**: `create-user`, `delete-user`, `import-users`
 
 **Document Generation**: `generate-memoria-tecnica`, `generate-lights-memoria-tecnica`, `generate-video-memoria-tecnica`, `generate-sv-report`
 
@@ -666,7 +666,7 @@ Real-time wallboard displays for crew schedules, announcements:
 
 ### Dynamic (injected at build time by Vite)
 
-```
+```bash
 VITE_APP_VERSION        # Auto-set to ISO timestamp
 VITE_BUILD_TIMESTAMP    # Auto-set to Unix timestamp (ms)
 ```
