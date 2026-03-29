@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
+import { format, subDays } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Department, TECHNICAL_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
@@ -50,6 +51,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [isVenueBusy, setIsVenueBusy] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
+  const [prepDaysCount, setPrepDaysCount] = useState(0);
 
   // Venue-related state
   const [venueName, setVenueName] = useState("");
@@ -109,6 +111,13 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           setVenueAddress("");
           setVenueData(null);
         }
+
+        const { data: prepDateTypes } = await supabase
+          .from("job_date_types")
+          .select("date")
+          .eq("job_id", job.id)
+          .eq("type", "prep_day");
+        setPrepDaysCount(prepDateTypes?.length ?? 0);
       }
     };
 
@@ -203,6 +212,33 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         .eq("id", job.id);
 
       if (jobError) throw jobError;
+
+      const eligibleForPrepDays = ['tourdate', 'festival', 'single', 'ciclo', 'evento'].includes(jobType);
+      if (eligibleForPrepDays) {
+        const localStartDate = startTime?.split('T')?.[0];
+        if (localStartDate) {
+          const startDateObj = new Date(`${localStartDate}T12:00:00`);
+          const targetPrepDates = Array.from({ length: prepDaysCount }, (_, idx) =>
+            format(subDays(startDateObj, idx + 1), "yyyy-MM-dd")
+          );
+
+          await supabase
+            .from("job_date_types")
+            .delete()
+            .eq("job_id", job.id)
+            .eq("type", "prep_day");
+
+          if (targetPrepDates.length > 0) {
+            const { error: prepErr } = await supabase
+              .from("job_date_types")
+              .upsert(
+                targetPrepDates.map((date) => ({ job_id: job.id, date, type: "prep_day" as const })),
+                { onConflict: "job_id,date" }
+              );
+            if (prepErr) throw prepErr;
+          }
+        }
+      }
 
       // Update departments
       const { data: currentDepts, error: currentDeptsError } = await supabase
@@ -436,6 +472,20 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               <Label>Color</Label>
               <SimplifiedJobColorPicker color={color} onChange={setColor} />
             </div>
+            {['tourdate', 'festival', 'single', 'ciclo', 'evento'].includes(jobType) && (
+              <div className="space-y-2">
+                <Label htmlFor="prep-days-count">Prep days (15€/hr)</Label>
+                <Input
+                  id="prep-days-count"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={prepDaysCount}
+                  onChange={(e) => setPrepDaysCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
+                  className={fieldClass}
+                />
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Job Type</Label>
               <Select
