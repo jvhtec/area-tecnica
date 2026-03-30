@@ -64,7 +64,7 @@ export function useJobPayoutTotals(
       return (viewData || []).map((item) => ({
         ...item,
         extras_total_eur: Number(item.extras_total_eur ?? 0),
-        prep_days_total_eur: Number((item as any).prep_days_total_eur ?? 0),
+        prep_days_total_eur: Number(item.prep_days_total_eur ?? 0),
         expenses_total_eur: Number(item.expenses_total_eur ?? 0),
         total_eur: Number(item.total_eur ?? 0),
         extras_breakdown: (item.extras_breakdown ?? {}) as JobPayoutTotals['extras_breakdown'],
@@ -90,7 +90,7 @@ export function useMyJobPayoutTotals() {
       return (data || []).map((item) => ({
         ...item,
         extras_total_eur: Number(item.extras_total_eur ?? 0),
-        prep_days_total_eur: Number((item as any).prep_days_total_eur ?? 0),
+        prep_days_total_eur: Number(item.prep_days_total_eur ?? 0),
         expenses_total_eur: Number(item.expenses_total_eur ?? 0),
         total_eur: Number(item.total_eur ?? 0),
         extras_breakdown: (item.extras_breakdown ?? {}) as JobPayoutTotals['extras_breakdown'],

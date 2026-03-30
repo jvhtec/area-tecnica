@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { fromZonedTime } from 'date-fns-tz';
 import { toast } from 'sonner';
 
 export interface PrepDay {
@@ -46,9 +47,9 @@ export function useCreatePrepDay() {
       const { data: auth } = await supabase.auth.getUser();
       if (!auth.user?.id) throw new Error('Not authenticated');
 
-      // Create the prep day job
-      const startTime = `${date}T08:00:00+02:00`; // Default 8am Madrid
-      const endTime = `${date}T20:00:00+02:00`; // Default 8pm Madrid
+      // Build timezone-aware timestamps for Europe/Madrid (handles DST)
+      const startTime = fromZonedTime(`${date}T08:00:00`, 'Europe/Madrid').toISOString();
+      const endTime = fromZonedTime(`${date}T20:00:00`, 'Europe/Madrid').toISOString();
 
       const { data: prepJob, error: jobError } = await supabase
         .from('jobs')
@@ -87,7 +88,7 @@ export function useCreatePrepDay() {
           .insert(deptInserts);
 
         if (insertDeptError) {
-          console.error('Error copying departments to prep day:', insertDeptError);
+          throw new Error(`Prep day created but failed to copy departments: ${insertDeptError.message}`);
         }
       }
 
@@ -96,6 +97,7 @@ export function useCreatePrepDay() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['prep-days', variables.parentJobId] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', variables.parentJobId] });
       toast.success('Día de preparación creado');
     },
     onError: (error) => {

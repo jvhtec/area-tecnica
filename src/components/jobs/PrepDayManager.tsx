@@ -18,6 +18,7 @@ interface PrepDayManagerProps {
 export function PrepDayManager({ jobId, jobTitle, jobColor }: PrepDayManagerProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data: prepDays = [], isLoading } = usePrepDays(jobId);
   const createPrepDay = useCreatePrepDay();
@@ -43,7 +44,11 @@ export function PrepDayManager({ jobId, jobTitle, jobColor }: PrepDayManagerProp
   };
 
   const handleDeletePrepDay = (prepDayId: string) => {
-    deletePrepDay.mutate({ prepDayId, parentJobId: jobId });
+    setDeletingId(prepDayId);
+    deletePrepDay.mutate(
+      { prepDayId, parentJobId: jobId },
+      { onSettled: () => setDeletingId(null) }
+    );
   };
 
   return (
@@ -122,7 +127,7 @@ export function PrepDayManager({ jobId, jobTitle, jobColor }: PrepDayManagerProp
                   size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive shrink-0"
                   onClick={() => handleDeletePrepDay(prepDay.id)}
-                  disabled={deletePrepDay.isPending}
+                  disabled={deletingId === prepDay.id}
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>

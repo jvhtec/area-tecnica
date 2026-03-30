@@ -139,7 +139,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
     if (!showPrepDayTab && selectedTab === "prep-days") {
       setSelectedTab("info");
     }
-  }, [showTourRatesTab, showExtrasTab, showExpensesTab, canSeeAutoStaffing, selectedTab]);
+  }, [showTourRatesTab, showExtrasTab, showExpensesTab, canSeeAutoStaffing, showPrepDayTab, selectedTab]);
 
   // Reset selectedTab to 'info' when dialog opens OR when job changes
   const [lastOpenState, setLastOpenState] = useState(false);
