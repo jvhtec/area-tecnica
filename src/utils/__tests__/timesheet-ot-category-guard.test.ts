@@ -29,7 +29,11 @@ describe('timesheet OT category regression guard', () => {
         name,
         content: readFileSync(join(migrationsDir, name), 'utf-8'),
       }))
-      .filter((m) => m.content.includes('compute_timesheet_amount_2025'));
+      .filter((m) =>
+        /create\s+(or\s+replace\s+)?function\s+(public\.)?compute_timesheet_amount_2025\b/i.test(
+          m.content
+        )
+      );
 
     expect(functionMigrations.length).toBeGreaterThan(0);
 
