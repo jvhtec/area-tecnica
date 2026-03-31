@@ -152,12 +152,12 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
 };
 
 const ROUTE_QUERY_KEY_OVERRIDES: Record<string, string | string[]> = {
-  jobs: ['optimized-jobs'],
-  job_assignments: ['optimized-jobs'],
-  job_departments: ['optimized-jobs'],
-  job_documents: ['optimized-jobs'],
-  flex_folders: ['optimized-jobs'],
-  locations: ['optimized-jobs'],
+  jobs: ['jobs-data'],
+  job_assignments: ['jobs-data'],
+  job_departments: ['jobs-data'],
+  job_documents: ['jobs-data'],
+  flex_folders: ['jobs-data'],
+  locations: ['jobs-data'],
   job_date_types: ['date-types'],
   messages: ['messages'],
   direct_messages: ['direct_messages'],

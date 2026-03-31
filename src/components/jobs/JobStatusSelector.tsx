@@ -56,7 +56,7 @@ export const JobStatusSelector = ({
 
       // Invalidate and refetch job queries to trigger realtime updates
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs-data'] });
       
       toast({
         title: "Status updated",

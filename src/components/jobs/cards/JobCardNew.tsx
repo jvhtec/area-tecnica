@@ -710,7 +710,7 @@ function JobCardNewFull({
         onDeleteClick(job.id);
 
         await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+        await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
@@ -851,7 +851,7 @@ function JobCardNewFull({
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
+        queryClient.invalidateQueries({ queryKey: ["jobs-data"] }),
         queryClient.invalidateQueries({ queryKey: ["folder-existence", job.id] }),
         queryClient.invalidateQueries({ queryKey: ["folder-existence"] }),
       ]);

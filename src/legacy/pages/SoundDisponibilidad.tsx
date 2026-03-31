@@ -14,7 +14,7 @@ import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAs
 import { SubRentalManager } from '@/components/equipment/SubRentalManager';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
-import { useOptimizedJobs } from '@/hooks/useOptimizedJobs';
+import { useJobsData } from '@/hooks/useJobsData';
 import { useOptimizedTableSubscriptions } from '@/hooks/useOptimizedSubscriptions';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
@@ -30,7 +30,7 @@ export default function SoundDisponibilidad() {
 
   const dayStart = startOfDay(selectedDate);
   const dayEnd = endOfDay(selectedDate);
-  const { data: jobsToday = [] } = useOptimizedJobs('sound' as any, dayStart, dayEnd);
+  const { data: jobsToday = [] } = useJobsData({ department: 'sound', startDate: dayStart, endDate: dayEnd });
 
   const { data: assignedPresets } = useQuery({
     queryKey: ['preset-assignments', 'sound', selectedDate],

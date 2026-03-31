@@ -81,6 +81,10 @@ export const updateQueryClientForRole = (queryClient: QueryClient, isLeader: boo
  * Query key factory for consistent key generation.
  */
 export const createQueryKey = {
+  jobsData: {
+    all: ['jobs-data'] as const,
+    list: (filters: Record<string, unknown>) => [...createQueryKey.jobsData.all, filters] as const,
+  },
   tours: {
     all: ['tours'] as const,
     byUser: (userId: string) => [...createQueryKey.tours.all, 'my', userId] as const,
@@ -126,6 +130,12 @@ export const createQueryKey = {
     /** Current user's profile (role/permissions). */
     currentUser: ['profiles', 'current-user'] as const,
   },
+  messages: {
+    all: ['messages'] as const,
+  },
+  directMessages: {
+    all: ['direct_messages'] as const,
+  },
   payoutOverrides: {
     all: ['payout-overrides'] as const,
     byJobAndTechnician: (jobId?: string | null, technicianId?: string | null) =>
@@ -147,6 +157,13 @@ export const createQueryKey = {
 
 // Optimized invalidation strategies
 export const optimizedInvalidation = {
+  invalidateJobsCaches: (queryClient: QueryClient) => {
+    return optimizedInvalidation.invalidateQueryKeys(queryClient, [
+      createQueryKey.jobsData.all,
+      createQueryKey.jobs.all,
+    ]);
+  },
+
   // Invalidate related queries efficiently
   invalidateJobRelated: (queryClient: QueryClient, jobId: string) => {
     const invalidations = [
@@ -157,26 +174,23 @@ export const optimizedInvalidation = {
       createQueryKey.folders.existence(jobId)
     ];
 
-    invalidations.forEach(key => {
-      queryClient.invalidateQueries({ queryKey: key });
-    });
+    return Promise.all(
+      invalidations.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
+    );
   },
 
   // Batch invalidation for multiple jobs
   batchInvalidateJobs: (queryClient: QueryClient, jobIds: string[]) => {
-    // Use a single invalidation call for job lists
-    queryClient.invalidateQueries({ queryKey: createQueryKey.jobs.lists() });
-    
-    // Invalidate specific job details
-    jobIds.forEach(jobId => {
-      optimizedInvalidation.invalidateJobRelated(queryClient, jobId);
-    });
+    return Promise.all([
+      queryClient.invalidateQueries({ queryKey: createQueryKey.jobs.lists() }),
+      ...jobIds.map((jobId) => optimizedInvalidation.invalidateJobRelated(queryClient, jobId)),
+    ]);
   },
 
   // Batch invalidation for arbitrary query keys
   invalidateQueryKeys: (queryClient: QueryClient, queryKeys: QueryKey[]) => {
-    queryKeys.forEach(queryKey => {
-      queryClient.invalidateQueries({ queryKey });
-    });
+    return Promise.all(
+      queryKeys.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
+    );
   },
 };

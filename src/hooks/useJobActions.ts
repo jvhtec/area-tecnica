@@ -7,6 +7,7 @@ import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
+import { optimizedInvalidation } from "@/lib/react-query";
 
 export const useJobActions = (job: any, userRole: string | null, onDeleteClick?: (jobId: string) => void) => {
   const { toast } = useToast();
@@ -56,8 +57,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
           onDeleteClick(job.id);
         }
         
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+        optimizedInvalidation.invalidateJobsCaches(queryClient);
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
@@ -140,8 +140,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
 
       // Parallelize independent query invalidations
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        Promise.resolve(optimizedInvalidation.invalidateJobsCaches(queryClient)),
         queryClient.invalidateQueries({ queryKey: ["folder-existence"] })
       ]);
 

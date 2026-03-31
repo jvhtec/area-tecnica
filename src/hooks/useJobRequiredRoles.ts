@@ -235,7 +235,7 @@ export function useSaveJobRequirements() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['job-required-roles', result.jobId] })
       queryClient.invalidateQueries({ queryKey: ['job-required-summary', result.jobId] })
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['jobs-data'] })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
 
       void broadcastJobRequirementsUpdate(result.jobId, result)

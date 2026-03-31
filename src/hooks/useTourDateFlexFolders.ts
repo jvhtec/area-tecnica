@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { createQueryKey, optimizedInvalidation } from "@/lib/optimized-react-query";
 import { createAllFoldersForJob } from "@/utils/flex-folders/folders";
 import { toast } from "sonner";
 
@@ -59,8 +60,10 @@ export const useTourDateFlexFolders = (tourId: string) => {
     },
     onSuccess: (data) => {
       toast.success(`Flex folders created successfully for ${new Date(data.tourDate.date).toLocaleDateString()}`);
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
+      optimizedInvalidation.invalidateQueryKeys(queryClient, [
+        createQueryKey.jobsData.all,
+        createQueryKey.jobs.all,
+      ]);
       queryClient.invalidateQueries({ queryKey: ['tour-dates', tourId] });
     },
     onError: (error: any) => {

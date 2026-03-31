@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
-import { useJobsRealtime } from "@/hooks/useJobsRealtime";
+import { useJobsData } from "@/hooks/useJobsData";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
@@ -34,7 +34,7 @@ const Festivals = () => {
     isRefreshing,
     refetch,
     realtimeStatus
-  } = useJobsRealtime();
+  } = useJobsData({ realtime: true });
   
   const [festivalJobs, setFestivalJobs] = useState<any[]>([]);
   const [festivalLogos, setFestivalLogos] = useState<Record<string, string>>({});

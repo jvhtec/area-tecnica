@@ -346,7 +346,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
       toast.success("Assignment added successfully");
       // Invalidate jobs so JobCard lists refresh assignments relation
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
     } catch (error: any) {
       console.error('Error in addAssignment:', error);
@@ -412,7 +412,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
       toast.success("Assignment removed successfully");
       // Invalidate jobs so JobCard lists refresh assignments relation
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
     } catch (error: any) {
       console.error('Error in removeAssignment:', error);

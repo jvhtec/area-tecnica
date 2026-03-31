@@ -7,6 +7,7 @@ import { JobDocument } from '@/components/jobs/cards/JobCardDocuments';
 import { Department } from '@/types/department';
 import { useDeletionState } from './useDeletionState';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
+import { optimizedInvalidation } from '@/lib/optimized-react-query';
 
 export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
   const { toast } = useToast();
@@ -137,9 +138,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      void optimizedInvalidation.invalidateJobsCaches(queryClient);
     }
   });
 
@@ -194,8 +193,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
         });
       } catch {}
 
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      void optimizedInvalidation.invalidateJobsCaches(queryClient);
 
       toast({
         title: "Document uploaded",
@@ -270,8 +268,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     e.stopPropagation();
     if (isJobBeingDeleted) return; // Don't refresh if job is being deleted
     
-    await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-    await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+    await optimizedInvalidation.invalidateJobsCaches(queryClient);
     await queryClient.invalidateQueries({ queryKey: ["sound-tasks", job.id] });
     await queryClient.invalidateQueries({ queryKey: ["sound-personnel", job.id] });
 

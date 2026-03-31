@@ -161,7 +161,7 @@ export const TourAssignmentDialog = ({
       queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['job-details'] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      queryClient.invalidateQueries({ queryKey: ['jobs-data'] });
     },
     onError: (error: any) => {
       toast.error(`Failed to remove assignment: ${error.message}`);
