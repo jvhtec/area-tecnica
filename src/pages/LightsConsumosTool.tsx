@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { FileText, ArrowLeft, Check, ChevronsUpDown, Trash2 } from 'lucide-react';
+import { FileText, ArrowLeft, Check, ChevronsUpDown, Trash2, Save } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +16,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
+import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -135,6 +136,7 @@ interface Table {
   includesHoist?: boolean;
   id?: number | string;
   isDefault?: boolean;
+  defaultTableId?: string;
 }
 
 const LightsConsumosTool: React.FC = () => {
@@ -148,6 +150,7 @@ const LightsConsumosTool: React.FC = () => {
   const tourId = searchParams.get('tourId');
   const tourDateId = searchParams.get('tourDateId');
   const mode = searchParams.get('mode');
+  const isTourDefaults = mode === 'tour-defaults';
 
   const {
     isOverrideMode,
@@ -155,6 +158,13 @@ const LightsConsumosTool: React.FC = () => {
     isLoading: overrideLoading,
     saveOverride
   } = useTourOverrideMode(tourId || undefined, tourDateId || undefined, 'lights');
+
+  const {
+    defaultSets,
+    createSet,
+    createTable: createTourDefaultTable,
+    updateTable: updateTourDefaultTable
+  } = useTourDefaultSets(tourId || '');
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
@@ -181,7 +191,93 @@ const LightsConsumosTool: React.FC = () => {
   });
 
   const [defaultTables, setDefaultTables] = useState<Table[]>([]);
+  const [tourName, setTourName] = useState<string>('');
   const pduOptions = phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE;
+
+  // Load tour name when in tour defaults mode
+  useEffect(() => {
+    if (!tourId || !isTourDefaults) return;
+    supabase.from('tours').select('name').eq('id', tourId).single().then(({ data }) => {
+      if (data) setTourName(data.name);
+    });
+  }, [tourId, isTourDefaults]);
+
+  const getOrCreateLightsSetId = async (): Promise<string> => {
+    const existingSet = defaultSets.find(set => set.department === 'lights');
+    if (existingSet) return existingSet.id;
+    const newSet = await createSet({
+      tour_id: tourId!,
+      name: `${tourName || tourId} Lights Defaults`,
+      department: 'lights',
+      description: 'Lights department power defaults'
+    });
+    return newSet.id;
+  };
+
+  const saveTourDefault = async (table: Table) => {
+    if (!tourId) return;
+    try {
+      const setId = await getOrCreateLightsSetId();
+      const newDefaultTable = await createTourDefaultTable({
+        set_id: setId,
+        table_name: table.name,
+        table_data: { rows: table.rows, safetyMargin, phaseMode, voltage },
+        table_type: 'power',
+        total_value: table.totalWatts || 0,
+        metadata: {
+          current_per_phase: table.currentPerPhase,
+          pdu_type: table.customPduType || table.pduType,
+          custom_pdu_type: table.customPduType,
+          includes_hoist: table.includesHoist || false,
+          safetyMargin,
+          phaseMode,
+          voltage
+        }
+      });
+      setTables(prev => prev.map(t => t.id === table.id ? { ...t, isDefault: true, defaultTableId: newDefaultTable.id } : t));
+      toast({ title: 'Éxito', description: 'Valor por defecto de gira guardado' });
+    } catch (error: any) {
+      console.error('Error saving tour default:', error);
+      toast({ title: 'Error', description: `Error al guardar valor por defecto: ${error?.message || 'unknown error'}`, variant: 'destructive' });
+    }
+  };
+
+  const saveDefaultTables = async () => {
+    const unsaved = tables.filter(t => !t.isDefault && !t.defaultTableId);
+    if (unsaved.length === 0) {
+      toast({ title: 'Sin tablas nuevas', description: 'Todas las tablas ya están guardadas como valores por defecto' });
+      return;
+    }
+    try {
+      const setId = await getOrCreateLightsSetId();
+      for (let i = 0; i < unsaved.length; i++) {
+        const table = unsaved[i];
+        if (i > 0) await new Promise(r => setTimeout(r, 100));
+        const newDefaultTable = await createTourDefaultTable({
+          set_id: setId,
+          table_name: table.name,
+          table_data: { rows: table.rows, safetyMargin, phaseMode, voltage },
+          table_type: 'power',
+          total_value: table.totalWatts || 0,
+          metadata: {
+            current_per_phase: table.currentPerPhase,
+            pdu_type: table.customPduType || table.pduType,
+            custom_pdu_type: table.customPduType,
+            includes_hoist: table.includesHoist || false,
+            safetyMargin,
+            phaseMode,
+            voltage,
+            order_index: i
+          }
+        });
+        setTables(prev => prev.map(t => t.id === table.id ? { ...t, isDefault: true, defaultTableId: newDefaultTable.id } : t));
+      }
+      toast({ title: 'Éxito', description: `${unsaved.length} valor(es) por defecto guardados` });
+    } catch (error: any) {
+      console.error('Error saving default tables:', error);
+      toast({ title: 'Error', description: `Error al guardar valores por defecto: ${error?.message || 'unknown error'}`, variant: 'destructive' });
+    }
+  };
 
   // Load defaults when in override mode
   useEffect(() => {
@@ -480,7 +576,9 @@ const LightsConsumosTool: React.FC = () => {
 
     setTables((prev) => [...prev, newTable]);
 
-    if (selectedJobId) {
+    if (isTourDefaults) {
+      // user can review before saving defaults
+    } else if (selectedJobId) {
       savePowerRequirementTable(newTable);
     }
 
@@ -515,7 +613,7 @@ const LightsConsumosTool: React.FC = () => {
         prev.map((table) => {
           if (table.id === tableId) {
             const updatedTable = { ...table, ...updates };
-            if (selectedJobId) {
+            if (!isTourDefaults && selectedJobId) {
               savePowerRequirementTable(updatedTable);
             }
             return updatedTable;
@@ -652,6 +750,29 @@ const LightsConsumosTool: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {isTourDefaults && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-blue-800">
+                    Modo Valores por Defecto de Gira — Luces
+                  </h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Las tablas que crees aquí se guardarán como valores por defecto para todas las fechas de la gira.
+                  </p>
+                </div>
+                <Button
+                  onClick={saveDefaultTables}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={tables.filter(t => !t.isDefault).length === 0}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Guardar Valores por Defecto
+                </Button>
+              </div>
+            </div>
+          )}
+
           {isOverrideMode && overrideData && (
             <TourOverrideModeHeader
               tourName={overrideData.tourName}
@@ -752,7 +873,7 @@ const LightsConsumosTool: React.FC = () => {
             <p className="mt-2 text-muted-foreground">Puedes ajustar el PF por ítem si el fabricante especifica un valor distinto.</p>
           </div>
 
-          {!isOverrideMode && (
+          {!isOverrideMode && !isTourDefaults && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Seleccionar Trabajo</Label>
               <Select value={selectedJobId} onValueChange={handleJobSelect}>
@@ -979,16 +1100,31 @@ const LightsConsumosTool: React.FC = () => {
                   {isOverrideMode && (
                     <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
                   )}
+                  {isTourDefaults && table.isDefault && (
+                    <Badge variant="outline" className="bg-green-50 text-green-700">Guardado</Badge>
+                  )}
                 </div>
-                {typeof table.id === 'number' && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => removeTable(table.id as number)}
-                  >
-                    Eliminar Tabla
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {isTourDefaults && !table.isDefault && typeof table.id === 'number' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => saveTourDefault(table)}
+                    >
+                      <Save className="h-4 w-4 mr-1" />
+                      Guardar
+                    </Button>
+                  )}
+                  {typeof table.id === 'number' && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => removeTable(table.id as number)}
+                    >
+                      Eliminar Tabla
+                    </Button>
+                  )}
+                </div>
               </div>
 
               {typeof table.id === 'number' && (
