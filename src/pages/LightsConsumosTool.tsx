@@ -13,6 +13,7 @@ import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
@@ -137,6 +138,10 @@ interface Table {
   id?: number | string;
   isDefault?: boolean;
   defaultTableId?: string;
+  // snapshot of settings at generation time, used for persisting tour defaults
+  snapshotSafetyMargin?: number;
+  snapshotPhaseMode?: 'single' | 'three';
+  snapshotVoltage?: number;
 }
 
 const LightsConsumosTool: React.FC = () => {
@@ -191,22 +196,30 @@ const LightsConsumosTool: React.FC = () => {
   });
 
   const [defaultTables, setDefaultTables] = useState<Table[]>([]);
-  const [tourName, setTourName] = useState<string>('');
+  // Pending-promise ref serializes concurrent getOrCreateLightsSetId calls.
+  // resolvedSetIdRef persists the created id across the React Query re-fetch window.
   const pendingSetIdRef = React.useRef<Promise<string> | null>(null);
+  const resolvedSetIdRef = React.useRef<string | null>(null);
   const pduOptions = phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE;
 
-  // Load tour name when in tour defaults mode
-  useEffect(() => {
-    if (!tourId || !isTourDefaults) return;
-    supabase.from('tours').select('name').eq('id', tourId).single().then(({ data }) => {
-      if (data) setTourName(data.name);
-    });
-  }, [tourId, isTourDefaults]);
+  // Load tour name via React Query for caching and error handling
+  const { data: tourName = '' } = useQuery({
+    queryKey: ['tour', tourId, 'name'],
+    queryFn: async () => {
+      const { data } = await supabase.from('tours').select('name').eq('id', tourId!).single();
+      return data?.name || '';
+    },
+    enabled: isTourDefaults && !!tourId,
+  });
 
   // defaultSets is already filtered to 'lights' by useTourDefaultSets
   const getOrCreateLightsSetId = async (): Promise<string> => {
-    if (defaultSets.length > 0) return defaultSets[0].id;
-    // Return the in-flight creation promise to avoid duplicate sets
+    // Prefer live data, then cached resolved id, then in-flight promise
+    if (defaultSets.length > 0) {
+      resolvedSetIdRef.current = defaultSets[0].id;
+      return defaultSets[0].id;
+    }
+    if (resolvedSetIdRef.current) return resolvedSetIdRef.current;
     if (pendingSetIdRef.current) return pendingSetIdRef.current;
     const creation = createSet({
       tour_id: tourId!,
@@ -214,6 +227,7 @@ const LightsConsumosTool: React.FC = () => {
       department: 'lights',
       description: 'Lights department power defaults'
     }).then(set => {
+      resolvedSetIdRef.current = set.id;
       pendingSetIdRef.current = null;
       return set.id;
     }).catch(err => {
@@ -226,12 +240,16 @@ const LightsConsumosTool: React.FC = () => {
 
   const saveTourDefault = async (table: Table) => {
     if (!tourId) return;
+    // Use values snapshotted at generation time, not current component state
+    const sm = table.snapshotSafetyMargin ?? safetyMargin;
+    const pm = table.snapshotPhaseMode ?? phaseMode;
+    const v  = table.snapshotVoltage ?? voltage;
     try {
       const setId = await getOrCreateLightsSetId();
       const newDefaultTable = await createTourDefaultTable({
         set_id: setId,
         table_name: table.name,
-        table_data: { rows: table.rows, safetyMargin, phaseMode, voltage },
+        table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
         table_type: 'power',
         total_value: table.totalWatts || 0,
         metadata: {
@@ -239,12 +257,17 @@ const LightsConsumosTool: React.FC = () => {
           pdu_type: table.customPduType || table.pduType,
           custom_pdu_type: table.customPduType,
           includes_hoist: table.includesHoist || false,
-          safetyMargin,
-          phaseMode,
-          voltage
+          safetyMargin: sm,
+          phaseMode: pm,
+          voltage: v
         }
       });
-      setTables(prev => prev.map(t => t.id === table.id ? { ...t, isDefault: true, defaultTableId: newDefaultTable.id } : t));
+      // Replace local numeric id with server UUID so delete/edit handlers
+      // treat this entry as persisted (typeof id !== 'number')
+      setTables(prev => prev.map(t => t.id === table.id
+        ? { ...t, id: newDefaultTable.id, isDefault: true, defaultTableId: newDefaultTable.id }
+        : t
+      ));
       toast({ title: 'Éxito', description: 'Valor por defecto de gira guardado' });
     } catch (error: any) {
       console.error('Error saving tour default:', error);
@@ -270,11 +293,15 @@ const LightsConsumosTool: React.FC = () => {
     for (let i = 0; i < unsaved.length; i++) {
       const table = unsaved[i];
       if (i > 0) await new Promise(r => setTimeout(r, 100));
+      // Use values snapshotted at generation time, not current component state
+      const sm = table.snapshotSafetyMargin ?? safetyMargin;
+      const pm = table.snapshotPhaseMode ?? phaseMode;
+      const v  = table.snapshotVoltage ?? voltage;
       try {
         const newDefaultTable = await createTourDefaultTable({
           set_id: setId,
           table_name: table.name,
-          table_data: { rows: table.rows, safetyMargin, phaseMode, voltage },
+          table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
           table_type: 'power',
           total_value: table.totalWatts || 0,
           metadata: {
@@ -282,13 +309,17 @@ const LightsConsumosTool: React.FC = () => {
             pdu_type: table.customPduType || table.pduType,
             custom_pdu_type: table.customPduType,
             includes_hoist: table.includesHoist || false,
-            safetyMargin,
-            phaseMode,
-            voltage,
+            safetyMargin: sm,
+            phaseMode: pm,
+            voltage: v,
             order_index: i
           }
         });
-        setTables(prev => prev.map(t => t.id === table.id ? { ...t, isDefault: true, defaultTableId: newDefaultTable.id } : t));
+        // Replace local numeric id with server UUID (see saveTourDefault for rationale)
+        setTables(prev => prev.map(t => t.id === table.id
+          ? { ...t, id: newDefaultTable.id, isDefault: true, defaultTableId: newDefaultTable.id }
+          : t
+        ));
       } catch (error: any) {
         console.error(`Error saving default table "${table.name}":`, error);
         failed.push(table.name);
@@ -601,6 +632,9 @@ const LightsConsumosTool: React.FC = () => {
       customPduType: pduOverride,
       includesHoist,
       id: Date.now(),
+      snapshotSafetyMargin: safetyMargin,
+      snapshotPhaseMode: phaseMode,
+      snapshotVoltage: voltage,
     };
 
     setTables((prev) => [...prev, newTable]);
@@ -1113,7 +1147,7 @@ const LightsConsumosTool: React.FC = () => {
             <Button onClick={resetCurrentTable} variant="destructive">
               Reiniciar
             </Button>
-            {tables.length > 0 && (
+            {tables.length > 0 && !isTourDefaults && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="w-4 h-4" />
                 Exportar y Subir PDF
