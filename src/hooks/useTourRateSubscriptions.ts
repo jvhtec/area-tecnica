@@ -10,6 +10,21 @@ export const useTourRateSubscriptions = () => {
 
   useEffect(() => {
     console.log('Setting up tour rates realtime subscriptions');
+
+    const removeStaleChannel = (channelName: string) => {
+      const topic = `realtime:${channelName}`;
+      supabase
+        .getChannels()
+        .filter((channel) => channel.topic === topic)
+        .forEach((channel) => {
+          supabase.removeChannel(channel);
+        });
+    };
+
+    removeStaleChannel('tour-jobs-changes');
+    removeStaleChannel('job-assignments-changes');
+    removeStaleChannel('house-tech-rates-changes');
+    removeStaleChannel('job-rate-extras-changes');
     
     // Subscribe to job changes (start_time changes affect weekly calculations)
     const jobsChannel = supabase
