@@ -670,21 +670,18 @@ const LightsConsumosTool: React.FC = () => {
   };
 
   const updateTableSettings = (tableId: number | string, updates: Partial<Table>) => {
-    // Only allow updates to regular tables (numeric IDs), not default tables
-    if (typeof tableId === 'number') {
-      setTables((prev) =>
-        prev.map((table) => {
-          if (table.id === tableId) {
-            const updatedTable = { ...table, ...updates };
-            if (!isTourDefaults && selectedJobId) {
-              savePowerRequirementTable(updatedTable);
-            }
-            return updatedTable;
+    setTables((prev) =>
+      prev.map((table) => {
+        if (table.id === tableId) {
+          const updatedTable = { ...table, ...updates };
+          if (!isTourDefaults && selectedJobId) {
+            savePowerRequirementTable(updatedTable);
           }
-          return table;
-        })
-      );
-    }
+          return updatedTable;
+        }
+        return table;
+      })
+    );
   };
 
   const handleExportPDF = async () => {
@@ -1190,7 +1187,7 @@ const LightsConsumosTool: React.FC = () => {
                 </div>
               </div>
 
-              {typeof table.id === 'number' && (
+              {table.id !== undefined && (
                 <div className="p-4 bg-muted/50 space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
@@ -1198,7 +1195,7 @@ const LightsConsumosTool: React.FC = () => {
                         id={`hoist-${table.id}`}
                         checked={table.includesHoist}
                         onCheckedChange={(checked) =>
-                          updateTableSettings(table.id as number, { includesHoist: !!checked })
+                          updateTableSettings(table.id as number | string, { includesHoist: !!checked })
                         }
                       />
                       <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Polipasto (CEE32A 3P+N+G)</Label>
@@ -1216,11 +1213,11 @@ const LightsConsumosTool: React.FC = () => {
                         }
                         onValueChange={(value) => {
                           if (value === 'default') {
-                            updateTableSettings(table.id as number, { customPduType: undefined });
+                            updateTableSettings(table.id as number | string, { customPduType: undefined });
                           } else if (value === 'Custom') {
-                            updateTableSettings(table.id as number, { customPduType: '' });
+                            updateTableSettings(table.id as number | string, { customPduType: '' });
                           } else {
-                            updateTableSettings(table.id as number, { customPduType: value });
+                            updateTableSettings(table.id as number | string, { customPduType: value });
                           }
                         }}
                       >
@@ -1243,7 +1240,7 @@ const LightsConsumosTool: React.FC = () => {
                         placeholder="Ingrese un tipo de PDU personalizado"
                         value={table.customPduType || ''}
                         onChange={(e) =>
-                          updateTableSettings(table.id as number, { customPduType: e.target.value })
+                          updateTableSettings(table.id as number | string, { customPduType: e.target.value })
                         }
                         className="w-[220px]"
                       />
