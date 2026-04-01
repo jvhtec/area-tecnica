@@ -164,7 +164,7 @@ const LightsConsumosTool: React.FC = () => {
     createSet,
     createTable: createTourDefaultTable,
     updateTable: updateTourDefaultTable
-  } = useTourDefaultSets(tourId || '');
+  } = useTourDefaultSets(tourId || '', 'lights');
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
@@ -192,6 +192,7 @@ const LightsConsumosTool: React.FC = () => {
 
   const [defaultTables, setDefaultTables] = useState<Table[]>([]);
   const [tourName, setTourName] = useState<string>('');
+  const pendingSetIdRef = React.useRef<Promise<string> | null>(null);
   const pduOptions = phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE;
 
   // Load tour name when in tour defaults mode
@@ -202,16 +203,25 @@ const LightsConsumosTool: React.FC = () => {
     });
   }, [tourId, isTourDefaults]);
 
+  // defaultSets is already filtered to 'lights' by useTourDefaultSets
   const getOrCreateLightsSetId = async (): Promise<string> => {
-    const existingSet = defaultSets.find(set => set.department === 'lights');
-    if (existingSet) return existingSet.id;
-    const newSet = await createSet({
+    if (defaultSets.length > 0) return defaultSets[0].id;
+    // Return the in-flight creation promise to avoid duplicate sets
+    if (pendingSetIdRef.current) return pendingSetIdRef.current;
+    const creation = createSet({
       tour_id: tourId!,
       name: `${tourName || tourId} Lights Defaults`,
       department: 'lights',
       description: 'Lights department power defaults'
+    }).then(set => {
+      pendingSetIdRef.current = null;
+      return set.id;
+    }).catch(err => {
+      pendingSetIdRef.current = null;
+      throw err;
     });
-    return newSet.id;
+    pendingSetIdRef.current = creation;
+    return creation;
   };
 
   const saveTourDefault = async (table: Table) => {
@@ -248,11 +258,19 @@ const LightsConsumosTool: React.FC = () => {
       toast({ title: 'Sin tablas nuevas', description: 'Todas las tablas ya están guardadas como valores por defecto' });
       return;
     }
+    let setId: string;
     try {
-      const setId = await getOrCreateLightsSetId();
-      for (let i = 0; i < unsaved.length; i++) {
-        const table = unsaved[i];
-        if (i > 0) await new Promise(r => setTimeout(r, 100));
+      setId = await getOrCreateLightsSetId();
+    } catch (error: any) {
+      console.error('Error getting/creating lights set:', error);
+      toast({ title: 'Error', description: `Error al preparar el conjunto de valores: ${error?.message || 'unknown error'}`, variant: 'destructive' });
+      return;
+    }
+    const failed: string[] = [];
+    for (let i = 0; i < unsaved.length; i++) {
+      const table = unsaved[i];
+      if (i > 0) await new Promise(r => setTimeout(r, 100));
+      try {
         const newDefaultTable = await createTourDefaultTable({
           set_id: setId,
           table_name: table.name,
@@ -271,11 +289,22 @@ const LightsConsumosTool: React.FC = () => {
           }
         });
         setTables(prev => prev.map(t => t.id === table.id ? { ...t, isDefault: true, defaultTableId: newDefaultTable.id } : t));
+      } catch (error: any) {
+        console.error(`Error saving default table "${table.name}":`, error);
+        failed.push(table.name);
       }
-      toast({ title: 'Éxito', description: `${unsaved.length} valor(es) por defecto guardados` });
-    } catch (error: any) {
-      console.error('Error saving default tables:', error);
-      toast({ title: 'Error', description: `Error al guardar valores por defecto: ${error?.message || 'unknown error'}`, variant: 'destructive' });
+    }
+    const saved = unsaved.length - failed.length;
+    if (failed.length === 0) {
+      toast({ title: 'Éxito', description: `${saved} valor(es) por defecto guardados` });
+    } else if (saved > 0) {
+      toast({
+        title: 'Completado parcialmente',
+        description: `${saved} guardado(s), ${failed.length} fallido(s): ${failed.join(', ')}`,
+        variant: 'destructive'
+      });
+    } else {
+      toast({ title: 'Error', description: `No se pudo guardar ningún valor por defecto: ${failed.join(', ')}`, variant: 'destructive' });
     }
   };
 
