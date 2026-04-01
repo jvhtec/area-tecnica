@@ -7,15 +7,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { FileText, ArrowLeft, Check, ChevronsUpDown, Trash2 } from 'lucide-react';
+import { FileText, ArrowLeft, Check, ChevronsUpDown, Trash2, Save } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
+import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -135,6 +137,11 @@ interface Table {
   includesHoist?: boolean;
   id?: number | string;
   isDefault?: boolean;
+  defaultTableId?: string;
+  // snapshot of settings at generation time, used for persisting tour defaults
+  snapshotSafetyMargin?: number;
+  snapshotPhaseMode?: 'single' | 'three';
+  snapshotVoltage?: number;
 }
 
 const LightsConsumosTool: React.FC = () => {
@@ -148,6 +155,7 @@ const LightsConsumosTool: React.FC = () => {
   const tourId = searchParams.get('tourId');
   const tourDateId = searchParams.get('tourDateId');
   const mode = searchParams.get('mode');
+  const isTourDefaults = mode === 'tour-defaults';
 
   const {
     isOverrideMode,
@@ -155,6 +163,13 @@ const LightsConsumosTool: React.FC = () => {
     isLoading: overrideLoading,
     saveOverride
   } = useTourOverrideMode(tourId || undefined, tourDateId || undefined, 'lights');
+
+  const {
+    defaultSets,
+    createSet,
+    createTable: createTourDefaultTable,
+    updateTable: updateTourDefaultTable
+  } = useTourDefaultSets(tourId || '', 'lights');
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
@@ -181,7 +196,148 @@ const LightsConsumosTool: React.FC = () => {
   });
 
   const [defaultTables, setDefaultTables] = useState<Table[]>([]);
+  // Pending-promise ref serializes concurrent getOrCreateLightsSetId calls.
+  // resolvedSetIdRef persists the created id across the React Query re-fetch window.
+  const pendingSetIdRef = React.useRef<Promise<string> | null>(null);
+  const resolvedSetIdRef = React.useRef<string | null>(null);
   const pduOptions = phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE;
+
+  // Load tour name via React Query for caching and error handling
+  const { data: tourName = '' } = useQuery({
+    queryKey: ['tour', tourId, 'name'],
+    queryFn: async () => {
+      const { data } = await supabase.from('tours').select('name').eq('id', tourId!).single();
+      return data?.name || '';
+    },
+    enabled: isTourDefaults && !!tourId,
+  });
+
+  // defaultSets is already filtered to 'lights' by useTourDefaultSets
+  const getOrCreateLightsSetId = async (): Promise<string> => {
+    // Prefer live data, then cached resolved id, then in-flight promise
+    if (defaultSets.length > 0) {
+      resolvedSetIdRef.current = defaultSets[0].id;
+      return defaultSets[0].id;
+    }
+    if (resolvedSetIdRef.current) return resolvedSetIdRef.current;
+    if (pendingSetIdRef.current) return pendingSetIdRef.current;
+    const creation = createSet({
+      tour_id: tourId!,
+      name: `${tourName || tourId} Lights Defaults`,
+      department: 'lights',
+      description: 'Lights department power defaults'
+    }).then(set => {
+      resolvedSetIdRef.current = set.id;
+      pendingSetIdRef.current = null;
+      return set.id;
+    }).catch(err => {
+      pendingSetIdRef.current = null;
+      throw err;
+    });
+    pendingSetIdRef.current = creation;
+    return creation;
+  };
+
+  const saveTourDefault = async (table: Table) => {
+    if (!tourId) return;
+    // Use values snapshotted at generation time, not current component state
+    const sm = table.snapshotSafetyMargin ?? safetyMargin;
+    const pm = table.snapshotPhaseMode ?? phaseMode;
+    const v  = table.snapshotVoltage ?? voltage;
+    try {
+      const setId = await getOrCreateLightsSetId();
+      const newDefaultTable = await createTourDefaultTable({
+        set_id: setId,
+        table_name: table.name,
+        table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
+        table_type: 'power',
+        total_value: table.totalWatts || 0,
+        metadata: {
+          current_per_phase: table.currentPerPhase,
+          pdu_type: table.customPduType || table.pduType,
+          custom_pdu_type: table.customPduType,
+          includes_hoist: table.includesHoist || false,
+          safetyMargin: sm,
+          phaseMode: pm,
+          voltage: v
+        }
+      });
+      // Replace local numeric id with server UUID so delete/edit handlers
+      // treat this entry as persisted (typeof id !== 'number')
+      setTables(prev => prev.map(t => t.id === table.id
+        ? { ...t, id: newDefaultTable.id, isDefault: true, defaultTableId: newDefaultTable.id }
+        : t
+      ));
+      toast({ title: 'Éxito', description: 'Valor por defecto de gira guardado' });
+    } catch (error: any) {
+      console.error('Error saving tour default:', error);
+      toast({ title: 'Error', description: `Error al guardar valor por defecto: ${error?.message || 'unknown error'}`, variant: 'destructive' });
+    }
+  };
+
+  const saveDefaultTables = async () => {
+    const unsaved = tables.filter(t => !t.isDefault && !t.defaultTableId);
+    if (unsaved.length === 0) {
+      toast({ title: 'Sin tablas nuevas', description: 'Todas las tablas ya están guardadas como valores por defecto' });
+      return;
+    }
+    let setId: string;
+    try {
+      setId = await getOrCreateLightsSetId();
+    } catch (error: any) {
+      console.error('Error getting/creating lights set:', error);
+      toast({ title: 'Error', description: `Error al preparar el conjunto de valores: ${error?.message || 'unknown error'}`, variant: 'destructive' });
+      return;
+    }
+    const failed: string[] = [];
+    for (let i = 0; i < unsaved.length; i++) {
+      const table = unsaved[i];
+      if (i > 0) await new Promise(r => setTimeout(r, 100));
+      // Use values snapshotted at generation time, not current component state
+      const sm = table.snapshotSafetyMargin ?? safetyMargin;
+      const pm = table.snapshotPhaseMode ?? phaseMode;
+      const v  = table.snapshotVoltage ?? voltage;
+      try {
+        const newDefaultTable = await createTourDefaultTable({
+          set_id: setId,
+          table_name: table.name,
+          table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
+          table_type: 'power',
+          total_value: table.totalWatts || 0,
+          metadata: {
+            current_per_phase: table.currentPerPhase,
+            pdu_type: table.customPduType || table.pduType,
+            custom_pdu_type: table.customPduType,
+            includes_hoist: table.includesHoist || false,
+            safetyMargin: sm,
+            phaseMode: pm,
+            voltage: v,
+            order_index: i
+          }
+        });
+        // Replace local numeric id with server UUID (see saveTourDefault for rationale)
+        setTables(prev => prev.map(t => t.id === table.id
+          ? { ...t, id: newDefaultTable.id, isDefault: true, defaultTableId: newDefaultTable.id }
+          : t
+        ));
+      } catch (error: any) {
+        console.error(`Error saving default table "${table.name}":`, error);
+        failed.push(table.name);
+      }
+    }
+    const saved = unsaved.length - failed.length;
+    if (failed.length === 0) {
+      toast({ title: 'Éxito', description: `${saved} valor(es) por defecto guardados` });
+    } else if (saved > 0) {
+      toast({
+        title: 'Completado parcialmente',
+        description: `${saved} guardado(s), ${failed.length} fallido(s): ${failed.join(', ')}`,
+        variant: 'destructive'
+      });
+    } else {
+      toast({ title: 'Error', description: `No se pudo guardar ningún valor por defecto: ${failed.join(', ')}`, variant: 'destructive' });
+    }
+  };
 
   // Load defaults when in override mode
   useEffect(() => {
@@ -476,11 +632,16 @@ const LightsConsumosTool: React.FC = () => {
       customPduType: pduOverride,
       includesHoist,
       id: Date.now(),
+      snapshotSafetyMargin: safetyMargin,
+      snapshotPhaseMode: phaseMode,
+      snapshotVoltage: voltage,
     };
 
     setTables((prev) => [...prev, newTable]);
 
-    if (selectedJobId) {
+    if (isTourDefaults) {
+      // user can review before saving defaults
+    } else if (selectedJobId) {
       savePowerRequirementTable(newTable);
     }
 
@@ -509,21 +670,18 @@ const LightsConsumosTool: React.FC = () => {
   };
 
   const updateTableSettings = (tableId: number | string, updates: Partial<Table>) => {
-    // Only allow updates to regular tables (numeric IDs), not default tables
-    if (typeof tableId === 'number') {
-      setTables((prev) =>
-        prev.map((table) => {
-          if (table.id === tableId) {
-            const updatedTable = { ...table, ...updates };
-            if (selectedJobId) {
-              savePowerRequirementTable(updatedTable);
-            }
-            return updatedTable;
+    setTables((prev) =>
+      prev.map((table) => {
+        if (table.id === tableId) {
+          const updatedTable = { ...table, ...updates };
+          if (!isTourDefaults && selectedJobId) {
+            savePowerRequirementTable(updatedTable);
           }
-          return table;
-        })
-      );
-    }
+          return updatedTable;
+        }
+        return table;
+      })
+    );
   };
 
   const handleExportPDF = async () => {
@@ -652,6 +810,29 @@ const LightsConsumosTool: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {isTourDefaults && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-blue-800">
+                    Modo Valores por Defecto de Gira — Luces
+                  </h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Las tablas que crees aquí se guardarán como valores por defecto para todas las fechas de la gira.
+                  </p>
+                </div>
+                <Button
+                  onClick={saveDefaultTables}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={tables.filter(t => !t.isDefault).length === 0}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Guardar Valores por Defecto
+                </Button>
+              </div>
+            </div>
+          )}
+
           {isOverrideMode && overrideData && (
             <TourOverrideModeHeader
               tourName={overrideData.tourName}
@@ -752,7 +933,7 @@ const LightsConsumosTool: React.FC = () => {
             <p className="mt-2 text-muted-foreground">Puedes ajustar el PF por ítem si el fabricante especifica un valor distinto.</p>
           </div>
 
-          {!isOverrideMode && (
+          {!isOverrideMode && !isTourDefaults && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Seleccionar Trabajo</Label>
               <Select value={selectedJobId} onValueChange={handleJobSelect}>
@@ -963,7 +1144,7 @@ const LightsConsumosTool: React.FC = () => {
             <Button onClick={resetCurrentTable} variant="destructive">
               Reiniciar
             </Button>
-            {tables.length > 0 && (
+            {tables.length > 0 && !isTourDefaults && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="w-4 h-4" />
                 Exportar y Subir PDF
@@ -979,19 +1160,34 @@ const LightsConsumosTool: React.FC = () => {
                   {isOverrideMode && (
                     <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
                   )}
+                  {isTourDefaults && table.isDefault && (
+                    <Badge variant="outline" className="bg-green-50 text-green-700">Guardado</Badge>
+                  )}
                 </div>
-                {typeof table.id === 'number' && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => removeTable(table.id as number)}
-                  >
-                    Eliminar Tabla
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {isTourDefaults && !table.isDefault && typeof table.id === 'number' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => saveTourDefault(table)}
+                    >
+                      <Save className="h-4 w-4 mr-1" />
+                      Guardar
+                    </Button>
+                  )}
+                  {typeof table.id === 'number' && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => removeTable(table.id as number)}
+                    >
+                      Eliminar Tabla
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              {typeof table.id === 'number' && (
+              {table.id !== undefined && (
                 <div className="p-4 bg-muted/50 space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
@@ -999,7 +1195,7 @@ const LightsConsumosTool: React.FC = () => {
                         id={`hoist-${table.id}`}
                         checked={table.includesHoist}
                         onCheckedChange={(checked) =>
-                          updateTableSettings(table.id as number, { includesHoist: !!checked })
+                          updateTableSettings(table.id as number | string, { includesHoist: !!checked })
                         }
                       />
                       <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Polipasto (CEE32A 3P+N+G)</Label>
@@ -1017,11 +1213,11 @@ const LightsConsumosTool: React.FC = () => {
                         }
                         onValueChange={(value) => {
                           if (value === 'default') {
-                            updateTableSettings(table.id as number, { customPduType: undefined });
+                            updateTableSettings(table.id as number | string, { customPduType: undefined });
                           } else if (value === 'Custom') {
-                            updateTableSettings(table.id as number, { customPduType: '' });
+                            updateTableSettings(table.id as number | string, { customPduType: '' });
                           } else {
-                            updateTableSettings(table.id as number, { customPduType: value });
+                            updateTableSettings(table.id as number | string, { customPduType: value });
                           }
                         }}
                       >
@@ -1044,7 +1240,7 @@ const LightsConsumosTool: React.FC = () => {
                         placeholder="Ingrese un tipo de PDU personalizado"
                         value={table.customPduType || ''}
                         onChange={(e) =>
-                          updateTableSettings(table.id as number, { customPduType: e.target.value })
+                          updateTableSettings(table.id as number | string, { customPduType: e.target.value })
                         }
                         className="w-[220px]"
                       />
