@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
-import { useJobs } from "@/hooks/useJobs";
+import { useJobsData } from "@/hooks/useJobsData";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -57,7 +57,7 @@ const Sound = () => {
   const [showMobileAssignments, setShowMobileAssignments] = useState(false);
 
   const currentDepartment = "sound";
-  const { data: jobs } = useJobs();
+  const { data: jobs } = useJobsData();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();

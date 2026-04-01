@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 
-import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
+import { useJobsData } from "@/hooks/useJobsData";
 import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
@@ -45,7 +45,7 @@ const Lights = () => {
   const monthAnchor = date ?? new Date();
   const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
-  const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment as any, jobsRangeStart, jobsRangeEnd);
+  const { data: jobs, isLoading } = useJobsData({ department: currentDepartment as any, startDate: jobsRangeStart, endDate: jobsRangeEnd });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -128,7 +128,7 @@ const Lights = () => {
           });
           
           // Invalidate queries to refresh the list
-          await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+          await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
         } else {
           throw new Error(result.error || "Unknown deletion error");
         }

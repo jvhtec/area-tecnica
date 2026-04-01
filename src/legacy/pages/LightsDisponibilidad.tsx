@@ -14,7 +14,7 @@ import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAs
 import { SubRentalManager } from '@/components/equipment/SubRentalManager';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
-import { useOptimizedJobs } from '@/hooks/useOptimizedJobs';
+import { useJobsData } from '@/hooks/useJobsData';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
@@ -28,7 +28,7 @@ export default function LightsDisponibilidad() {
 
   const dayStart = startOfDay(selectedDate);
   const dayEnd = endOfDay(selectedDate);
-  const { data: jobsToday = [] } = useOptimizedJobs('lights' as any, dayStart, dayEnd);
+  const { data: jobsToday = [] } = useJobsData({ department: 'lights' as any, startDate: dayStart, endDate: dayEnd });
 
   const { data: assignedPresets } = useQuery({
     queryKey: ['preset-assignments', 'lights', selectedDate],
