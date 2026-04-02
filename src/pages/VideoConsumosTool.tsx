@@ -487,15 +487,19 @@ const VideoConsumosTool: React.FC = () => {
     if (isOverrideMode && overrideData) {
       const powerDefaults = overrideData.defaults
         .filter(table => table.table_type === 'power')
-        .map(table => ({
-          name: `${table.table_name} (Default)`,
-          rows: table.table_data.rows || [],
-          totalWatts: table.total_value,
-          currentPerPhase: table.metadata?.currentPerPhase,
-          pduType: table.metadata?.pduType,
-          id: `default-${table.id}`,
-          isDefault: true
-        }));
+        .map(table => {
+          const w = table.total_value || 0;
+          return {
+            name: `${table.table_name} (Default)`,
+            rows: table.table_data.rows || [],
+            totalWatts: table.total_value,
+            totalVa: pf > 0 ? w / pf : w,
+            currentPerPhase: table.metadata?.currentPerPhase,
+            pduType: table.metadata?.pduType,
+            id: `default-${table.id}`,
+            isDefault: true
+          };
+        });
       
       setDefaultTables(powerDefaults);
     }

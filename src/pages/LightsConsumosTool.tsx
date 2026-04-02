@@ -345,15 +345,21 @@ const LightsConsumosTool: React.FC = () => {
     if (isOverrideMode && overrideData) {
       const powerDefaults = overrideData.defaults
         .filter(table => table.table_type === 'power')
-        .map(table => ({
-          name: `${table.table_name} (Default)`,
-          rows: table.table_data.rows || [],
-          totalWatts: table.total_value,
-          currentPerPhase: table.metadata?.currentPerPhase,
-          pduType: table.metadata?.pduType,
-          id: `default-${table.id}`,
-          isDefault: true
-        }));
+        .map(table => {
+          const w = table.total_value || 0;
+          // For legacy defaults without per-fixture VA, estimate using global PF=0.9 (typical lighting mix)
+          const estimatedVa = w > 0 ? w / 0.9 : 0;
+          return {
+            name: `${table.table_name} (Default)`,
+            rows: table.table_data.rows || [],
+            totalWatts: table.total_value,
+            totalVa: estimatedVa,
+            currentPerPhase: table.metadata?.currentPerPhase,
+            pduType: table.metadata?.pduType,
+            id: `default-${table.id}`,
+            isDefault: true
+          };
+        });
 
       setDefaultTables(powerDefaults);
     }

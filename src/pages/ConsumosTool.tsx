@@ -556,48 +556,60 @@ const ConsumosTool: React.FC = () => {
   // Convert defaults/overrides into display tables
   const newTourDefaultTables = (defaultTables || [])
     .filter(table => table.table_type === 'power')
-    .map(table => ({
-      id: `new-default-${table.id}`,
-      name: table.table_name,
-      rows: table.table_data?.rows || [],
-      totalWatts: table.total_value,
-      adjustedWatts: (table.total_value || 0) * (1 + safetyMargin / 100),
-      currentPerPhase: table.metadata?.current_per_phase || 0,
-      pduType: table.metadata?.pdu_type || '',
-      customPduType: table.metadata?.custom_pdu_type || '',
-      includesHoist: table.metadata?.includes_hoist || false,
-      isDefault: true,
-      defaultTableId: table.id
-    }));
+    .map(table => {
+      const adjW = (table.total_value || 0) * (1 + safetyMargin / 100);
+      return {
+        id: `new-default-${table.id}`,
+        name: table.table_name,
+        rows: table.table_data?.rows || [],
+        totalWatts: table.total_value,
+        adjustedWatts: adjW,
+        totalVa: pf > 0 ? adjW / pf : adjW,
+        currentPerPhase: table.metadata?.current_per_phase || 0,
+        pduType: table.metadata?.pdu_type || '',
+        customPduType: table.metadata?.custom_pdu_type || '',
+        includesHoist: table.metadata?.includes_hoist || false,
+        isDefault: true,
+        defaultTableId: table.id
+      };
+    });
 
-  const legacyTourDefaultTables = legacyTourDefaults.map(def => ({
-    id: `legacy-default-${def.id}`,
-    name: def.table_name,
-    rows: [],
-    totalWatts: def.total_watts,
-    adjustedWatts: (def.total_watts || 0) * (1 + safetyMargin / 100),
-    currentPerPhase: def.current_per_phase,
-    pduType: def.pdu_type,
-    customPduType: def.custom_pdu_type,
-    includesHoist: def.includes_hoist,
-    isDefault: true
-  }));
+  const legacyTourDefaultTables = legacyTourDefaults.map(def => {
+    const adjW = (def.total_watts || 0) * (1 + safetyMargin / 100);
+    return {
+      id: `legacy-default-${def.id}`,
+      name: def.table_name,
+      rows: [],
+      totalWatts: def.total_watts,
+      adjustedWatts: adjW,
+      totalVa: pf > 0 ? adjW / pf : adjW,
+      currentPerPhase: def.current_per_phase,
+      pduType: def.pdu_type,
+      customPduType: def.custom_pdu_type,
+      includesHoist: def.includes_hoist,
+      isDefault: true
+    };
+  });
 
   const tourDefaultTables = newTourDefaultTables.length > 0 ? newTourDefaultTables : legacyTourDefaultTables;
 
-  const tourOverrideTables = powerOverrides.map(override => ({
-    id: `override-${override.id}`,
-    name: override.table_name,
-    rows: override.override_data?.rows || [],
-    totalWatts: override.total_watts,
-    adjustedWatts: (override.total_watts || 0) * (1 + safetyMargin / 100),
-    currentPerPhase: override.current_per_phase,
-    pduType: override.pdu_type,
-    customPduType: override.custom_pdu_type,
-    includesHoist: override.includes_hoist,
-    isOverride: true,
-    overrideId: override.id
-  }));
+  const tourOverrideTables = powerOverrides.map(override => {
+    const adjW = (override.total_watts || 0) * (1 + safetyMargin / 100);
+    return {
+      id: `override-${override.id}`,
+      name: override.table_name,
+      rows: override.override_data?.rows || [],
+      totalWatts: override.total_watts,
+      adjustedWatts: adjW,
+      totalVa: pf > 0 ? adjW / pf : adjW,
+      currentPerPhase: override.current_per_phase,
+      pduType: override.pdu_type,
+      customPduType: override.custom_pdu_type,
+      includesHoist: override.includes_hoist,
+      isOverride: true,
+      overrideId: override.id
+    };
+  });
 
   const getTourInfo = () => {
     if (!selectedJob?.tour_date) return null;
