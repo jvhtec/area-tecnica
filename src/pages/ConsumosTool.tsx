@@ -454,9 +454,14 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
-      const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
-      const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-      const totalSystemKva = tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
+      // Include tour default tables in the export alongside user-created tables
+      const allTables = isTourDefaults || isJobOverrideMode
+        ? [...tourDefaultTables, ...tables]
+        : tables;
+
+      const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
+      const totalSystemKva = allTables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
       const powerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
 
       let logoUrl: string | undefined = undefined;
@@ -478,7 +483,7 @@ const ConsumosTool: React.FC = () => {
 
       const pdfBlob = await exportToPDF(
         headerTitle,
-        tables.map((table) => ({ ...table, toolType: 'consumos' })),
+        allTables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
         headerTitle,
         isTourDefaults ? new Date().toISOString() : (selectedJob?.date || new Date().toISOString()),
