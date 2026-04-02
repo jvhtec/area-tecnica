@@ -454,10 +454,13 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
-      // Include tour default tables in the export alongside user-created tables
-      const allTables = isTourDefaults || isJobOverrideMode
-        ? [...tourDefaultTables, ...tables]
-        : tables;
+      // In override mode, overrides replace defaults — only export overrides + user tables.
+      // In tour-defaults mode (no overrides), export the stored defaults + user tables.
+      const allTables = isJobOverrideMode
+        ? [...tourOverrideTables, ...tables]
+        : isTourDefaults
+          ? [...tourDefaultTables, ...tables]
+          : tables;
 
       const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
       const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
