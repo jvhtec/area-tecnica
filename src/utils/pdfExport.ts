@@ -381,7 +381,7 @@ export const exportToPDF = async (
 
             if (table.includesHoist) {
               doc.setTextColor(80, 80, 80);
-              doc.text(`*Potencia adicional para polipast requerida para ${table.name}: CEE32A 3P+N+G`, 14, yPosition);
+              doc.text(`*Potencia adicional para motor requerida para ${table.name}: CEE32A 3P+N+G`, 14, yPosition);
               yPosition += 7;
             }
             yPosition += 3;
