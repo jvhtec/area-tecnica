@@ -454,12 +454,13 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
-      // In override mode, overrides replace defaults — only export overrides + user tables.
-      // In tour-defaults mode (no overrides), export the stored defaults + user tables.
+      // Override mode: overrides replace defaults for that date
+      // Tour-defaults mode: print stored defaults only
+      // Normal mode: print user-created tables
       const allTables = isJobOverrideMode
-        ? [...tourOverrideTables, ...tables]
+        ? tourOverrideTables
         : isTourDefaults
-          ? [...tourDefaultTables, ...tables]
+          ? tourDefaultTables
           : tables;
 
       const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
