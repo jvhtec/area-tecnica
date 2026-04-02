@@ -566,14 +566,23 @@ const ConsumosTool: React.FC = () => {
   const newTourDefaultTables = (defaultTables || [])
     .filter(table => table.table_type === 'power')
     .map(table => {
-      const adjW = (table.total_value || 0) * (1 + safetyMargin / 100);
+      // Read saved electrical metadata from table.metadata or table.table_data
+      const savedPf = table.metadata?.pf ?? table.table_data?.pf ?? pf;
+      const savedSafetyMargin = table.metadata?.safetyMargin ?? table.table_data?.safetyMargin ?? safetyMargin;
+      const savedPhaseMode = table.metadata?.phaseMode ?? table.table_data?.phaseMode ?? phaseMode;
+      const savedVoltage = table.metadata?.voltage ?? table.table_data?.voltage ?? voltage;
+
+      // Compute electrical values using saved metadata
+      const adjW = (table.total_value || 0) * (1 + savedSafetyMargin / 100);
+      const totalVa = savedPf > 0 ? adjW / savedPf : adjW;
+
       return {
         id: `new-default-${table.id}`,
         name: table.table_name,
         rows: table.table_data?.rows || [],
         totalWatts: table.total_value,
         adjustedWatts: adjW,
-        totalVa: pf > 0 ? adjW / pf : adjW,
+        totalVa: totalVa,
         currentPerPhase: table.metadata?.current_per_phase || 0,
         pduType: table.metadata?.pdu_type || '',
         customPduType: table.metadata?.custom_pdu_type || '',
@@ -584,14 +593,23 @@ const ConsumosTool: React.FC = () => {
     });
 
   const legacyTourDefaultTables = legacyTourDefaults.map(def => {
-    const adjW = (def.total_watts || 0) * (1 + safetyMargin / 100);
+    // Read saved electrical metadata from def.metadata or def (legacy structure)
+    const savedPf = def.metadata?.pf ?? def.pf ?? pf;
+    const savedSafetyMargin = def.metadata?.safetyMargin ?? def.safetyMargin ?? safetyMargin;
+    const savedPhaseMode = def.metadata?.phaseMode ?? def.phaseMode ?? phaseMode;
+    const savedVoltage = def.metadata?.voltage ?? def.voltage ?? voltage;
+
+    // Compute electrical values using saved metadata
+    const adjW = (def.total_watts || 0) * (1 + savedSafetyMargin / 100);
+    const totalVa = savedPf > 0 ? adjW / savedPf : adjW;
+
     return {
       id: `legacy-default-${def.id}`,
       name: def.table_name,
       rows: [],
       totalWatts: def.total_watts,
       adjustedWatts: adjW,
-      totalVa: pf > 0 ? adjW / pf : adjW,
+      totalVa: totalVa,
       currentPerPhase: def.current_per_phase,
       pduType: def.pdu_type,
       customPduType: def.custom_pdu_type,
@@ -603,14 +621,23 @@ const ConsumosTool: React.FC = () => {
   const tourDefaultTables = newTourDefaultTables.length > 0 ? newTourDefaultTables : legacyTourDefaultTables;
 
   const tourOverrideTables = powerOverrides.map(override => {
-    const adjW = (override.total_watts || 0) * (1 + safetyMargin / 100);
+    // Read saved electrical metadata from override.override_data
+    const savedPf = override.override_data?.pf ?? pf;
+    const savedSafetyMargin = override.override_data?.safetyMargin ?? safetyMargin;
+    const savedPhaseMode = override.override_data?.phaseMode ?? phaseMode;
+    const savedVoltage = override.override_data?.voltage ?? voltage;
+
+    // Compute electrical values using saved metadata
+    const adjW = (override.total_watts || 0) * (1 + savedSafetyMargin / 100);
+    const totalVa = savedPf > 0 ? adjW / savedPf : adjW;
+
     return {
       id: `override-${override.id}`,
       name: override.table_name,
       rows: override.override_data?.rows || [],
       totalWatts: override.total_watts,
       adjustedWatts: adjW,
-      totalVa: pf > 0 ? adjW / pf : adjW,
+      totalVa: totalVa,
       currentPerPhase: override.current_per_phase,
       pduType: override.pdu_type,
       customPduType: override.custom_pdu_type,
