@@ -489,11 +489,13 @@ const VideoConsumosTool: React.FC = () => {
         .filter(table => table.table_type === 'power')
         .map(table => {
           const w = table.total_value || 0;
+          const adjW = w * (1 + safetyMargin / 100);
           return {
             name: `${table.table_name} (Default)`,
             rows: table.table_data.rows || [],
             totalWatts: table.total_value,
-            totalVa: pf > 0 ? w / pf : w,
+            adjustedWatts: adjW,
+            totalVa: pf > 0 ? adjW / pf : adjW,
             currentPerPhase: table.metadata?.currentPerPhase,
             pduType: table.metadata?.pduType,
             id: `default-${table.id}`,
