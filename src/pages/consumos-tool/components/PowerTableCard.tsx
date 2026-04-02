@@ -118,6 +118,12 @@ export const PowerTableCard: React.FC<{
             )}
             <tr className="border-t bg-muted/50 font-medium">
               <td colSpan={3} className="px-4 py-3 text-right text-sm">
+                Potencia Aparente:
+              </td>
+              <td className="px-4 py-3 text-sm">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</td>
+            </tr>
+            <tr className="border-t bg-muted/50 font-medium">
+              <td colSpan={3} className="px-4 py-3 text-right text-sm">
                 {phaseMode === "three" ? "Current per Phase:" : "Current:"}
               </td>
               <td className="px-4 py-3 text-sm">{table.currentPerPhase?.toFixed(2)} A</td>

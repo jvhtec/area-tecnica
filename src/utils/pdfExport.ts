@@ -19,6 +19,7 @@ interface ExportTable {
   totalWeight?: number;
   dualMotors?: boolean;
   totalWatts?: number;
+  totalVa?: number;            // apparent power (VA)
   currentPerPhase?: number;   // line current (per-phase if 3φ, single-line if 1φ)
   phaseMode?: 'single' | 'three';
   toolType?: 'pesos' | 'consumos' | 'rigging';
@@ -47,7 +48,7 @@ export const exportToPDF = async (
   jobName: string,
   jobDate: string,
   summaryRows?: SummaryRow[],
-  powerSummary?: { totalSystemWatts: number; totalSystemAmps: number },
+  powerSummary?: { totalSystemWatts: number; totalSystemAmps: number; totalSystemKva?: number },
   safetyMargin?: number,
   customLogoUrl?: string,
   fohSchukoRequired?: boolean
@@ -241,9 +242,9 @@ export const exportToPDF = async (
 
         if (type === 'power') {
           if (table.totalWatts !== undefined) {
-            checkPageBreak(42);
+            checkPageBreak(49);
             doc.setFillColor(245, 245, 250);
-            doc.rect(14, yPosition - 6, pageWidth - 28, 28, 'F');
+            doc.rect(14, yPosition - 6, pageWidth - 28, 35, 'F');
 
             doc.setFontSize(11);
             doc.setTextColor(125, 1, 1);
@@ -253,6 +254,11 @@ export const exportToPDF = async (
             if (safetyMargin !== undefined) {
               const adjusted = (table.totalWatts || 0) * (1 + (safetyMargin || 0) / 100);
               doc.text(`Potencia Ajustada (con ${safetyMargin}%): ${adjusted.toFixed(2)} W`, 14, yPosition);
+              yPosition += 7;
+            }
+
+            if (table.totalVa !== undefined) {
+              doc.text(`Potencia Aparente: ${(table.totalVa / 1000).toFixed(2)} kVA`, 14, yPosition);
               yPosition += 7;
             }
 
@@ -280,7 +286,7 @@ export const exportToPDF = async (
 
       // Summary data
       let generatedSummaryRows: SummaryRow[] = [];
-      let generatedPowerSummary: { totalSystemWatts: number; totalSystemAmps: number } | undefined;
+      let generatedPowerSummary: { totalSystemWatts: number; totalSystemAmps: number; totalSystemKva?: number } | undefined;
 
       if (type === 'weight') {
         generatedSummaryRows = tables.map((table) => ({
@@ -303,7 +309,8 @@ export const exportToPDF = async (
       if (type === 'power') {
         const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
         const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-        generatedPowerSummary = { totalSystemWatts, totalSystemAmps };
+        const totalSystemKva = tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
+        generatedPowerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
       }
 
       const finalSummaryRows = summaryRows && summaryRows.length > 0 ? summaryRows : (riggingSummaryRows.length > 0 ? riggingSummaryRows : generatedSummaryRows);
@@ -381,7 +388,7 @@ export const exportToPDF = async (
           });
 
           if (finalPowerSummary) {
-            checkPageBreak(30);
+            checkPageBreak(37);
             doc.setFontSize(14); doc.setTextColor(125, 1, 1);
             doc.text("Resumen de Potencia Total", 14, yPosition);
             yPosition += 10;
@@ -391,6 +398,10 @@ export const exportToPDF = async (
             if (safetyMargin !== undefined) {
               const adjustedSystem = finalPowerSummary.totalSystemWatts * (1 + (safetyMargin || 0) / 100);
               doc.text(`Potencia Total del Sistema (ajustada): ${adjustedSystem.toFixed(2)} W`, 14, yPosition);
+              yPosition += 7;
+            }
+            if (finalPowerSummary.totalSystemKva !== undefined) {
+              doc.text(`Potencia Aparente Total del Sistema: ${finalPowerSummary.totalSystemKva.toFixed(2)} kVA`, 14, yPosition);
               yPosition += 7;
             }
             doc.text(`Corriente Total del Sistema: ${finalPowerSummary.totalSystemAmps.toFixed(2)} A`, 14, yPosition);

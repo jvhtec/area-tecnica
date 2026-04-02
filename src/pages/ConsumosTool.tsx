@@ -323,12 +323,14 @@ const ConsumosTool: React.FC = () => {
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
     const { currentLine, adjustedWatts } = calculateLineCurrent(totalWatts);
     const pduSuggestion = recommendPDU(currentLine);
+    const totalVa = pf > 0 ? adjustedWatts / pf : adjustedWatts; // apparent power (VA) with safety margin
 
     const newTable: Table = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
       adjustedWatts,
+      totalVa,
       currentPerPhase: currentLine, // keep field name for compatibility
       pduType: pduSuggestion,
       customPduType: '',
@@ -454,7 +456,8 @@ const ConsumosTool: React.FC = () => {
     try {
       const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
       const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-      const powerSummary = { totalSystemWatts, totalSystemAmps };
+      const totalSystemKva = tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
+      const powerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
 
       let logoUrl: string | undefined = undefined;
       try {
@@ -766,6 +769,7 @@ const ConsumosTool: React.FC = () => {
                         <div className="p-4 space-y-2 text-sm">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>Total Watts: <span className="font-medium">{table.totalWatts?.toFixed(2)} W</span></div>
+                            <div>Potencia Aparente: <span className="font-medium">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</span></div>
                             <div>{phaseMode === 'three' ? 'Current per Phase' : 'Current'}: <span className="font-medium">{table.currentPerPhase?.toFixed(2)} A</span></div>
                             <div>PDU Type: <span className="font-medium">{table.customPduType || table.pduType}</span></div>
                             {table.includesHoist && (
@@ -817,6 +821,7 @@ const ConsumosTool: React.FC = () => {
                         <div className="p-4 space-y-2 text-sm">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>Total Watts: <span className="font-medium">{table.totalWatts?.toFixed(2)} W</span></div>
+                            <div>Potencia Aparente: <span className="font-medium">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</span></div>
                             <div>{phaseMode === 'three' ? 'Current per Phase' : 'Current'}: <span className="font-medium">{table.currentPerPhase?.toFixed(2)} A</span></div>
                             <div>PDU Type: <span className="font-medium">{table.customPduType || table.pduType}</span></div>
                             {table.includesHoist && (

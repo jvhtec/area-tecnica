@@ -131,6 +131,7 @@ interface Table {
   rows: TableRow[];
   totalWatts?: number;
   adjustedWatts?: number;
+  totalVa?: number;
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
@@ -608,12 +609,15 @@ const LightsConsumosTool: React.FC = () => {
     });
 
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const totalVa = calculatedRows.reduce((sum, row) => {
+    // Vector sum of apparent power: S = √(P² + Q²)
+    // More accurate than scalar sum Σ(P_i/PF_i) for mixed load types
+    const totalVar = calculatedRows.reduce((sum, row) => {
       const pfValue = Number(row.pf) || getRecommendedPf(row.fixtureType);
-      if (!pfValue) return sum;
-      return sum + (row.totalWatts || 0) / pfValue;
+      if (!pfValue || pfValue >= 1) return sum; // purely resistive loads have no reactive component
+      return sum + (row.totalWatts || 0) * Math.tan(Math.acos(pfValue));
     }, 0);
-    const { currentLine, adjustedWatts } = calculateLineCurrent(totalWatts, totalVa);
+    const totalVa = Math.sqrt(totalWatts * totalWatts + totalVar * totalVar);
+    const { currentLine, adjustedWatts, adjustedVa } = calculateLineCurrent(totalWatts, totalVa);
     const pduSuggestion = recommendPDU(currentLine);
     const pduOverride =
       selectedPduType && selectedPduType !== 'default'
@@ -627,6 +631,7 @@ const LightsConsumosTool: React.FC = () => {
       rows: calculatedRows,
       totalWatts,
       adjustedWatts,
+      totalVa: adjustedVa,
       currentPerPhase: currentLine,
       pduType: pduSuggestion,
       customPduType: pduOverride,
@@ -717,6 +722,10 @@ const LightsConsumosTool: React.FC = () => {
         console.error("Error fetching logo:", logoError);
       }
 
+      const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
+      const totalSystemKva = allTables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
+
       const pdfBlob = await exportToPDF(
         jobToUse.title,
         allTables.map((table) => ({ ...table, toolType: 'consumos', phaseMode })),
@@ -724,7 +733,7 @@ const LightsConsumosTool: React.FC = () => {
         jobToUse.title,
         ('start_time' in jobToUse ? jobToUse.start_time : null) || new Date().toISOString(),
         undefined,
-        undefined,
+        { totalSystemWatts, totalSystemAmps, totalSystemKva },
         safetyMargin,
         logoUrl
       );
@@ -860,6 +869,9 @@ const LightsConsumosTool: React.FC = () => {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="font-medium">Total Watts:</span> {table.totalWatts?.toFixed(2)} W
+                      </div>
+                      <div>
+                        <span className="font-medium">Potencia Aparente:</span> {((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA
                       </div>
                       <div>
                         <span className="font-medium">{phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}</span> {table.currentPerPhase?.toFixed(2)} A
@@ -1287,6 +1299,12 @@ const LightsConsumosTool: React.FC = () => {
                       <td className="px-4 py-3">{table.adjustedWatts?.toFixed(2)} W</td>
                     </tr>
                   )}
+                  <tr className="border-t bg-muted/50 font-medium">
+                    <td colSpan={4} className="px-4 py-3 text-right">
+                      Potencia Aparente:
+                    </td>
+                    <td className="px-4 py-3">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</td>
+                  </tr>
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={4} className="px-4 py-3 text-right">
                       {phaseMode === 'three' ? 'Corriente por Fase:' : 'Corriente:'}

@@ -11,6 +11,7 @@ export interface Table {
   rows: TableRow[];
   totalWatts?: number;
   adjustedWatts?: number;
+  totalVa?: number; // apparent power (VA) — used for kVA display and generator sizing
   currentPerPhase?: number; // kept for compatibility; holds line current (per-phase if 3φ, single-line if 1φ)
   pduType?: string;
   customPduType?: string;
