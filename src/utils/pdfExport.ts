@@ -309,6 +309,8 @@ export const exportToPDF = async (
       if (type === 'power') {
         const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
         const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
+        // Defensive fallback: duplicates the kVA calculation done in each tool's handleExportPDF.
+        // Used when the caller doesn't pass a powerSummary (backward compatibility).
         const totalSystemKva = tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
         generatedPowerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
       }

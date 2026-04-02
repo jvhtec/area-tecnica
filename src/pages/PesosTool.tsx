@@ -29,7 +29,7 @@ const soundComponentDatabase = [
   { id: 17, name: ' MOTOR 1T ', weight: 70 },
   { id: 18, name: ' MOTOR 750Kg ', weight: 60 },
   { id: 19, name: ' MOTOR 500Kg ', weight: 50 },
-  { id: 20, name: ' MOTOR 1T ', weight: 10.4 },
+  { id: 20, name: ' POLIPASTO 1T ', weight: 10.4 },
   { id: 21, name: ' TFS900H ', weight: 102 },
   { id: 22, name: ' TFA600 ', weight: 41 },
   { id: 23, name: ' TFS550H ', weight: 13.4 },
