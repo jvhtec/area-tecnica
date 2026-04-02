@@ -1008,7 +1008,7 @@ const LightsConsumosTool: React.FC = () => {
               checked={includesHoist}
               onCheckedChange={(checked) => setIncludesHoist(checked as boolean)}
             />
-            <Label htmlFor="hoistPower">Requiere Potencia Adicional para Polipasto (CEE32A 3P+N+G)</Label>
+            <Label htmlFor="hoistPower">Requiere Potencia Adicional para Motor (CEE32A 3P+N+G)</Label>
           </div>
 
           <div className="border rounded-lg overflow-x-auto">
@@ -1210,7 +1210,7 @@ const LightsConsumosTool: React.FC = () => {
                           updateTableSettings(table.id as number | string, { includesHoist: !!checked })
                         }
                       />
-                      <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Polipasto (CEE32A 3P+N+G)</Label>
+                      <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Motor (CEE32A 3P+N+G)</Label>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -1329,7 +1329,7 @@ const LightsConsumosTool: React.FC = () => {
               </table>
               {table.includesHoist && (
                 <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
-                  Se requiere potencia adicional para polipasto: CEE32A 3P+N+G
+                  Se requiere potencia adicional para motor: CEE32A 3P+N+G
                 </div>
               )}
             </div>
