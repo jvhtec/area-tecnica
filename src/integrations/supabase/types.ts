@@ -4037,6 +4037,7 @@ export type Database = {
           id: string
           job_type: Database["public"]["Enums"]["job_type"]
           location_id: string | null
+          parent_job_id: string | null
           rates_approved: boolean
           rates_approved_at: string | null
           rates_approved_by: string | null
@@ -4057,6 +4058,7 @@ export type Database = {
           id?: string
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
+          parent_job_id?: string | null
           rates_approved?: boolean
           rates_approved_at?: string | null
           rates_approved_by?: string | null
@@ -4077,6 +4079,7 @@ export type Database = {
           id?: string
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
+          parent_job_id?: string | null
           rates_approved?: boolean
           rates_approved_at?: string | null
           rates_approved_by?: string | null
@@ -4093,6 +4096,13 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_parent_job_id_fkey"
+            columns: ["parent_job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
           {
@@ -8158,6 +8168,7 @@ export type Database = {
           expenses_breakdown: Json | null
           expenses_total_eur: number | null
           job_id: string | null
+          prep_days_total_eur: number | null
           technician_id: string | null
           timesheets_total_eur: number | null
           total_eur: number | null
@@ -8786,7 +8797,7 @@ export type Database = {
       job_extra_type: "travel_half" | "travel_full" | "day_off" | "conduccion"
       job_rate_extras_status: "pending" | "approved" | "rejected"
       job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
-      job_type: "single" | "tour" | "festival" | "ciclo" | "dryhire" | "tourdate" | "evento"
+      job_type: "single" | "tour" | "festival" | "ciclo" | "dryhire" | "tourdate" | "evento" | "prep_day"
       logistics_event_type: "load" | "unload"
       logistics_transport_category:
         | "sonido_madera"

@@ -40,6 +40,7 @@ export interface JobPayoutTotals {
   technician_id: string;
   timesheets_total_eur: number;
   extras_total_eur: number;
+  prep_days_total_eur: number;
   expenses_total_eur: number;
   total_eur: number;
   extras_breakdown: JobExtrasBreakdown;

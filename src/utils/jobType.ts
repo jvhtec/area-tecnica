@@ -7,6 +7,7 @@ export const OPS_JOB_TYPES_WITH_DRYHIRE = [
   "tourdate",
   "dryhire",
   "evento",
+  "prep_day",
 ] as const;
 
 export const OPS_JOB_TYPES_NO_DRYHIRE = [
@@ -15,6 +16,7 @@ export const OPS_JOB_TYPES_NO_DRYHIRE = [
   "ciclo",
   "tourdate",
   "evento",
+  "prep_day",
 ] as const;
 
 export function isFestivalLikeJobType(jobType?: string | null): boolean {
@@ -32,5 +34,6 @@ export function isKnownJobType(jobType?: string | null): jobType is JobType {
     "ciclo",
     "dryhire",
     "evento",
+    "prep_day",
   ].includes(jobType);
 }

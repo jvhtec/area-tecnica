@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { AlertCircle, Clock, CheckCircle, ExternalLink, Send, Receipt } from 'lucide-react';
+import { AlertCircle, Clock, CheckCircle, ExternalLink, Send, Receipt, Wrench } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
@@ -317,6 +317,19 @@ export function TechnicianPayoutCard({
               </div>
             )}
           </>
+        )}
+
+        {/* Prep days breakdown */}
+        {payout.prep_days_total_eur > 0 && (
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <Wrench className="h-4 w-4 text-muted-foreground" />
+              <span>Días de preparación:</span>
+            </div>
+            <Badge variant="outline">
+              {formatCurrency(payout.prep_days_total_eur)}
+            </Badge>
+          </div>
         )}
       </div>
 

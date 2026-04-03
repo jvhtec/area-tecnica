@@ -22,6 +22,7 @@ import { JobDetailsWeatherTab } from "./job-details-dialog/tabs/JobDetailsWeathe
 import { StaffingOrchestratorPanel } from "@/components/matrix/StaffingOrchestratorPanel";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
 import { canManagePayouts } from "@/utils/permissions";
+import { PrepDayManager } from "@/components/jobs/PrepDayManager";
 
 export { enrichTimesheetsWithProfiles } from "./job-details-dialog/enrichTimesheetsWithProfiles";
 
@@ -95,6 +96,9 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
   const canManageExpenses = ["admin", "management", "logistics"].includes(userRole || "");
   const showExpensesTab = !isDryhire && canManageExpenses;
 
+  const isPrepDay = (jobDetails?.job_type || job?.job_type) === "prep_day";
+  const showPrepDayTab = !isDryhire && !isPrepDay && isManager;
+
   // Fetch expenses to check if there are any for highlighting the tab
   const { data: jobExpenses = [] } = useJobExpenses(resolvedJobId);
   const hasExpenses = jobExpenses.length > 0;
@@ -132,7 +136,10 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
     if (!canSeeAutoStaffing && selectedTab === "staffing") {
       setSelectedTab("info");
     }
-  }, [showTourRatesTab, showExtrasTab, showExpensesTab, canSeeAutoStaffing, selectedTab]);
+    if (!showPrepDayTab && selectedTab === "prep-days") {
+      setSelectedTab("info");
+    }
+  }, [showTourRatesTab, showExtrasTab, showExpensesTab, canSeeAutoStaffing, showPrepDayTab, selectedTab]);
 
   // Reset selectedTab to 'info' when dialog opens OR when job changes
   const [lastOpenState, setLastOpenState] = useState(false);
@@ -244,6 +251,11 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
                   Extras
                 </TabsTrigger>
               )}
+              {showPrepDayTab && (
+                <TabsTrigger value="prep-days" className="py-2">
+                  Preparación
+                </TabsTrigger>
+              )}
               {showExpensesTab && (
                 <TabsTrigger value="expenses" className="py-2 relative">
                   Gastos
@@ -315,6 +327,16 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
               {!isDryhire && showExtrasTab && (
                 <TabsContent value="extras" className="space-y-4 min-w-0 overflow-x-hidden">
                   <JobExtrasManagement jobId={resolvedJobId} isManager={isManager} technicianId={isManager ? undefined : user?.id || undefined} />
+                </TabsContent>
+              )}
+
+              {showPrepDayTab && (
+                <TabsContent value="prep-days" className="space-y-4 min-w-0 overflow-x-hidden">
+                  <PrepDayManager
+                    jobId={resolvedJobId}
+                    jobTitle={jobDetails?.title || job?.title || ''}
+                    jobColor={jobDetails?.color || job?.color}
+                  />
                 </TabsContent>
               )}
 
