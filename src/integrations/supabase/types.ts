@@ -8782,7 +8782,7 @@ export type Database = {
       flex_work_order_item_source: "role" | "extra"
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
-      job_date_type: "travel" | "setup" | "rigging" | "show" | "off" | "rehearsal"
+      job_date_type: "travel" | "setup" | "rigging" | "show" | "off" | "rehearsal" | "prep_day"
       job_extra_type: "travel_half" | "travel_full" | "day_off" | "conduccion"
       job_rate_extras_status: "pending" | "approved" | "rejected"
       job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
@@ -9111,7 +9111,7 @@ export const Constants = {
       flex_work_order_item_source: ["role", "extra"],
       form_status: ["pending", "submitted", "expired"],
       global_preset_status: ["available", "unavailable", "tentative"],
-      job_date_type: ["travel", "setup", "rigging", "show", "off", "rehearsal"],
+      job_date_type: ["travel", "setup", "rigging", "show", "off", "rehearsal", "prep_day"],
       job_extra_type: ["travel_half", "travel_full", "day_off", "conduccion"],
       job_rate_extras_status: ["pending", "approved", "rejected"],
       job_status: ["Tentativa", "Confirmado", "Completado", "Cancelado"],

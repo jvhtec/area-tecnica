@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import React, { useMemo, useEffect, useCallback } from 'react';
 import { format, isWithinInterval, isSameDay } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 export interface MatrixJob {
@@ -12,6 +13,7 @@ export interface MatrixJob {
   color?: string | null;
   status: string;
   job_type: string;
+  job_date_types?: Array<{ date: string; type: string }>;
   assigned_count?: number;
   worked_count?: number;
   total_cost_eur?: number;
@@ -464,20 +466,23 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   // Fixed getJobsForDate function with proper typing
   const getJobsForDate = useMemo(() => {
     const jobsByDate = new Map<string, MatrixJob[]>();
-    
+
     dates.forEach(date => {
       const dateJobs = jobs.filter((job: MatrixJob) => {
+        const dateKey = formatInTimeZone(date, 'Europe/Madrid', 'yyyy-MM-dd');
+        const hasTypedDate = Array.isArray(job.job_date_types) && job.job_date_types.some((dt) => dt?.date === dateKey);
+        if (hasTypedDate) return true;
         const jobStart = new Date(job.start_time);
         const jobEnd = new Date(job.end_time);
-        
-        return isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
-               isSameDay(date, jobStart) || 
+
+        return isWithinInterval(date, { start: jobStart, end: jobEnd }) ||
+               isSameDay(date, jobStart) ||
                isSameDay(date, jobEnd);
       });
-      
+
       jobsByDate.set(format(date, 'yyyy-MM-dd'), dateJobs);
     });
-    
+
     return (date: Date): MatrixJob[] => {
       return jobsByDate.get(format(date, 'yyyy-MM-dd')) || [];
     };

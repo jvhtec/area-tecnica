@@ -204,7 +204,8 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
       const techExpenses = tourExpenseData.get(quote.technician_id);
       const expensesTotal = techExpenses?.total ?? 0;
-      const totalWithExtrasAndExpenses = baseTotal + extrasTotal + expensesTotal;
+      const prepDaysTotal = prepDaysMap.get(quote.technician_id) || 0;
+      const totalWithExtrasAndExpenses = baseTotal + extrasTotal + expensesTotal + prepDaysTotal;
 
       return {
         job_id: quote.job_id,
@@ -223,11 +224,43 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
         expenses_breakdown: techExpenses?.breakdown ?? [],
       } satisfies JobPayoutTotals;
     });
-  }, [visibleTourQuotes, tourApprovals, tourTimesheetDays, tourExpenseData]);
+  }, [visibleTourQuotes, tourApprovals, tourTimesheetDays, tourExpenseData, prepDaysMap]);
+
+  const { data: prepDaysMap = new Map<string, number>(), isLoading: prepDaysLoading, error: prepDaysError } = useQuery({
+    queryKey: ['job-tech-prep-days', jobId],
+    enabled: !!jobId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('technician_id, amount_eur, amount_breakdown, approved_by_manager')
+        .eq('job_id', jobId)
+        .eq('is_active', true)
+        .eq('approved_by_manager', true);
+      if (error) throw error;
+      const map = new Map<string, number>();
+      (data || []).forEach((row: any) => {
+        if (!row.technician_id) return;
+        const isPrepDay = Boolean(row.amount_breakdown?.is_prep_day);
+        if (!isPrepDay) return;
+        map.set(row.technician_id, (map.get(row.technician_id) || 0) + Number(row.amount_eur || 0));
+      });
+      return map;
+    },
+    staleTime: 30_000,
+  });
 
   const payoutTotals = isTourDate ? tourPayoutTotals : standardPayoutTotals;
-  const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading);
-  const error = jobMetaError ?? (isTourDate ? tourQuotesError : standardError);
+  const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading) || prepDaysLoading;
+  const error = jobMetaError ?? (isTourDate ? tourQuotesError : standardError) ?? prepDaysError;
+
+  const payoutTotalsWithPrep = React.useMemo(
+    () =>
+      payoutTotals.map((p) => ({
+        ...p,
+        prep_days_total_eur: prepDaysMap.get(p.technician_id) || 0,
+      })),
+    [payoutTotals, prepDaysMap]
+  );
 
   /* ── Flex LPO data ── */
   const { data: lpoRows = [] } = useQuery({
@@ -254,8 +287,8 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   /* ── Profiles ── */
   const techIds = React.useMemo(
-    () => Array.from(new Set(payoutTotals.map((p) => p.technician_id).filter(Boolean))) as string[],
-    [payoutTotals]
+    () => Array.from(new Set(payoutTotalsWithPrep.map((p) => p.technician_id).filter(Boolean))) as string[],
+    [payoutTotalsWithPrep]
   );
   const { data: profiles = [] } = useQuery({
     queryKey: ['profiles-for-job-payout', jobId, techIds],
@@ -349,7 +382,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   /* ── Grand total ── */
   const calculatedGrandTotal = React.useMemo(() => {
-    return payoutTotals.reduce((sum, payout) => {
+    return payoutTotalsWithPrep.reduce((sum, payout) => {
       const override = payoutOverrides.find(o => o.technician_id === payout.technician_id);
 
       let deduction = 0;
@@ -362,7 +395,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
       const effectiveTotal = (override?.override_amount_eur ?? payout.total_eur) - (override ? 0 : deduction);
       return sum + effectiveTotal;
     }, 0);
-  }, [payoutTotals, payoutOverrides, autonomoMap, isTourDate, techDaysMap]);
+  }, [payoutTotalsWithPrep, payoutOverrides, autonomoMap, isTourDate, techDaysMap]);
 
   return {
     jobMeta,
@@ -370,7 +403,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     isLoading,
     error: error as Error | null,
     isClosureLocked,
-    payoutTotals,
+    payoutTotals: payoutTotalsWithPrep,
     visibleTourQuotes,
     tourTimesheetDays,
     profilesWithEmail,
