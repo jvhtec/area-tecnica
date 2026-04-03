@@ -40,6 +40,7 @@ interface Table {
   rows: TableRow[];
   totalWatts?: number;
   adjustedWatts?: number;
+  totalVa?: number;
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
@@ -333,12 +334,14 @@ const VideoConsumosTool: React.FC = () => {
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
     const { adjustedWatts, currentLine } = calculateLineCurrent(totalWatts);
     const pduSuggestion = recommendPDU(currentLine);
+    const totalVa = pf > 0 ? adjustedWatts / pf : adjustedWatts; // apparent power (VA) with safety margin
 
     const newTable = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
       adjustedWatts,
+      totalVa,
       currentPerPhase: currentLine,
       pduType: pduSuggestion,
       customPduType: undefined,
@@ -393,7 +396,8 @@ const VideoConsumosTool: React.FC = () => {
       // Generate power summary for consumos reports
       const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
       const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-      const powerSummary = { totalSystemWatts, totalSystemAmps };
+      const totalSystemKva = allTables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
+      const powerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
 
       let logoUrl: string | undefined = undefined;
       try {
@@ -483,15 +487,21 @@ const VideoConsumosTool: React.FC = () => {
     if (isOverrideMode && overrideData) {
       const powerDefaults = overrideData.defaults
         .filter(table => table.table_type === 'power')
-        .map(table => ({
-          name: `${table.table_name} (Default)`,
-          rows: table.table_data.rows || [],
-          totalWatts: table.total_value,
-          currentPerPhase: table.metadata?.currentPerPhase,
-          pduType: table.metadata?.pduType,
-          id: `default-${table.id}`,
-          isDefault: true
-        }));
+        .map(table => {
+          const w = table.total_value || 0;
+          const adjW = w * (1 + safetyMargin / 100);
+          return {
+            name: `${table.table_name} (Default)`,
+            rows: table.table_data.rows || [],
+            totalWatts: table.total_value,
+            adjustedWatts: adjW,
+            totalVa: pf > 0 ? adjW / pf : adjW,
+            currentPerPhase: table.metadata?.currentPerPhase,
+            pduType: table.metadata?.pduType,
+            id: `default-${table.id}`,
+            isDefault: true
+          };
+        });
       
       setDefaultTables(powerDefaults);
     }
@@ -600,7 +610,10 @@ const VideoConsumosTool: React.FC = () => {
                         <span className="font-medium">Total Watts:</span> {table.totalWatts?.toFixed(2)} W
                       </div>
                       <div>
-                        <span className="font-medium">Current per Phase:</span> {table.currentPerPhase?.toFixed(2)} A
+                        <span className="font-medium">Potencia Aparente:</span> {((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA
+                      </div>
+                      <div>
+                        <span className="font-medium">{phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}</span> {table.currentPerPhase?.toFixed(2)} A
                       </div>
                       <div>
                         <span className="font-medium">PDU Type:</span> {table.pduType}
@@ -874,7 +887,13 @@ const VideoConsumosTool: React.FC = () => {
                   )}
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={3} className="px-4 py-3 text-right">
-                      Current per Phase:
+                      Potencia Aparente:
+                    </td>
+                    <td className="px-4 py-3">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</td>
+                  </tr>
+                  <tr className="border-t bg-muted/50 font-medium">
+                    <td colSpan={3} className="px-4 py-3 text-right">
+                      {phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}
                     </td>
                     <td className="px-4 py-3">{table.currentPerPhase?.toFixed(2)} A</td>
                   </tr>

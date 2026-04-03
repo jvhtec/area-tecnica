@@ -323,12 +323,14 @@ const ConsumosTool: React.FC = () => {
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
     const { currentLine, adjustedWatts } = calculateLineCurrent(totalWatts);
     const pduSuggestion = recommendPDU(currentLine);
+    const totalVa = pf > 0 ? adjustedWatts / pf : adjustedWatts; // apparent power (VA) with safety margin
 
     const newTable: Table = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
       adjustedWatts,
+      totalVa,
       currentPerPhase: currentLine, // keep field name for compatibility
       pduType: pduSuggestion,
       customPduType: '',
@@ -452,9 +454,19 @@ const ConsumosTool: React.FC = () => {
     }
 
     try {
-      const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
-      const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-      const powerSummary = { totalSystemWatts, totalSystemAmps };
+      // Override mode: overrides replace defaults for that date
+      // Tour-defaults mode: print stored defaults only
+      // Normal mode: print user-created tables
+      const allTables = isJobOverrideMode
+        ? tourOverrideTables
+        : isTourDefaults
+          ? tourDefaultTables
+          : tables;
+
+      const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
+      const totalSystemKva = allTables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
+      const powerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
 
       let logoUrl: string | undefined = undefined;
       try {
@@ -475,7 +487,7 @@ const ConsumosTool: React.FC = () => {
 
       const pdfBlob = await exportToPDF(
         headerTitle,
-        tables.map((table) => ({ ...table, toolType: 'consumos' })),
+        allTables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
         headerTitle,
         isTourDefaults ? new Date().toISOString() : (selectedJob?.date || new Date().toISOString()),
@@ -553,48 +565,87 @@ const ConsumosTool: React.FC = () => {
   // Convert defaults/overrides into display tables
   const newTourDefaultTables = (defaultTables || [])
     .filter(table => table.table_type === 'power')
-    .map(table => ({
-      id: `new-default-${table.id}`,
-      name: table.table_name,
-      rows: table.table_data?.rows || [],
-      totalWatts: table.total_value,
-      adjustedWatts: (table.total_value || 0) * (1 + safetyMargin / 100),
-      currentPerPhase: table.metadata?.current_per_phase || 0,
-      pduType: table.metadata?.pdu_type || '',
-      customPduType: table.metadata?.custom_pdu_type || '',
-      includesHoist: table.metadata?.includes_hoist || false,
-      isDefault: true,
-      defaultTableId: table.id
-    }));
+    .map(table => {
+      // Read saved electrical metadata from table.metadata or table.table_data
+      const savedPf = table.metadata?.pf ?? table.table_data?.pf ?? pf;
+      const savedSafetyMargin = table.metadata?.safetyMargin ?? table.table_data?.safetyMargin ?? safetyMargin;
+      const savedPhaseMode = table.metadata?.phaseMode ?? table.table_data?.phaseMode ?? phaseMode;
+      const savedVoltage = table.metadata?.voltage ?? table.table_data?.voltage ?? voltage;
 
-  const legacyTourDefaultTables = legacyTourDefaults.map(def => ({
-    id: `legacy-default-${def.id}`,
-    name: def.table_name,
-    rows: [],
-    totalWatts: def.total_watts,
-    adjustedWatts: (def.total_watts || 0) * (1 + safetyMargin / 100),
-    currentPerPhase: def.current_per_phase,
-    pduType: def.pdu_type,
-    customPduType: def.custom_pdu_type,
-    includesHoist: def.includes_hoist,
-    isDefault: true
-  }));
+      // Compute electrical values using saved metadata
+      const adjW = (table.total_value || 0) * (1 + savedSafetyMargin / 100);
+      const totalVa = savedPf > 0 ? adjW / savedPf : adjW;
+
+      return {
+        id: `new-default-${table.id}`,
+        name: table.table_name,
+        rows: table.table_data?.rows || [],
+        totalWatts: table.total_value,
+        adjustedWatts: adjW,
+        totalVa: totalVa,
+        currentPerPhase: table.metadata?.current_per_phase || 0,
+        pduType: table.metadata?.pdu_type || '',
+        customPduType: table.metadata?.custom_pdu_type || '',
+        includesHoist: table.metadata?.includes_hoist || false,
+        isDefault: true,
+        defaultTableId: table.id
+      };
+    });
+
+  const legacyTourDefaultTables = legacyTourDefaults.map(def => {
+    // Read saved electrical metadata from def.metadata or def (legacy structure)
+    const savedPf = def.metadata?.pf ?? def.pf ?? pf;
+    const savedSafetyMargin = def.metadata?.safetyMargin ?? def.safetyMargin ?? safetyMargin;
+    const savedPhaseMode = def.metadata?.phaseMode ?? def.phaseMode ?? phaseMode;
+    const savedVoltage = def.metadata?.voltage ?? def.voltage ?? voltage;
+
+    // Compute electrical values using saved metadata
+    const adjW = (def.total_watts || 0) * (1 + savedSafetyMargin / 100);
+    const totalVa = savedPf > 0 ? adjW / savedPf : adjW;
+
+    return {
+      id: `legacy-default-${def.id}`,
+      name: def.table_name,
+      rows: [],
+      totalWatts: def.total_watts,
+      adjustedWatts: adjW,
+      totalVa: totalVa,
+      currentPerPhase: def.current_per_phase,
+      pduType: def.pdu_type,
+      customPduType: def.custom_pdu_type,
+      includesHoist: def.includes_hoist,
+      isDefault: true
+    };
+  });
 
   const tourDefaultTables = newTourDefaultTables.length > 0 ? newTourDefaultTables : legacyTourDefaultTables;
 
-  const tourOverrideTables = powerOverrides.map(override => ({
-    id: `override-${override.id}`,
-    name: override.table_name,
-    rows: override.override_data?.rows || [],
-    totalWatts: override.total_watts,
-    adjustedWatts: (override.total_watts || 0) * (1 + safetyMargin / 100),
-    currentPerPhase: override.current_per_phase,
-    pduType: override.pdu_type,
-    customPduType: override.custom_pdu_type,
-    includesHoist: override.includes_hoist,
-    isOverride: true,
-    overrideId: override.id
-  }));
+  const tourOverrideTables = powerOverrides.map(override => {
+    // Read saved electrical metadata from override.override_data
+    const savedPf = override.override_data?.pf ?? pf;
+    const savedSafetyMargin = override.override_data?.safetyMargin ?? safetyMargin;
+    const savedPhaseMode = override.override_data?.phaseMode ?? phaseMode;
+    const savedVoltage = override.override_data?.voltage ?? voltage;
+
+    // Compute electrical values using saved metadata
+    const adjW = (override.total_watts || 0) * (1 + savedSafetyMargin / 100);
+    const totalVa = savedPf > 0 ? adjW / savedPf : adjW;
+
+    return {
+      id: `override-${override.id}`,
+      name: override.table_name,
+      rows: override.override_data?.rows || [],
+      totalWatts: override.total_watts,
+      adjustedWatts: adjW,
+      totalVa: totalVa,
+      currentPerPhase: override.current_per_phase,
+      pduType: override.pdu_type,
+      customPduType: override.custom_pdu_type,
+      includesHoist: override.includes_hoist,
+      isOverride: true,
+      overrideId: override.id
+    };
+  });
 
   const getTourInfo = () => {
     if (!selectedJob?.tour_date) return null;
@@ -766,6 +817,7 @@ const ConsumosTool: React.FC = () => {
                         <div className="p-4 space-y-2 text-sm">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>Total Watts: <span className="font-medium">{table.totalWatts?.toFixed(2)} W</span></div>
+                            <div>Potencia Aparente: <span className="font-medium">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</span></div>
                             <div>{phaseMode === 'three' ? 'Current per Phase' : 'Current'}: <span className="font-medium">{table.currentPerPhase?.toFixed(2)} A</span></div>
                             <div>PDU Type: <span className="font-medium">{table.customPduType || table.pduType}</span></div>
                             {table.includesHoist && (
@@ -817,6 +869,7 @@ const ConsumosTool: React.FC = () => {
                         <div className="p-4 space-y-2 text-sm">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>Total Watts: <span className="font-medium">{table.totalWatts?.toFixed(2)} W</span></div>
+                            <div>Potencia Aparente: <span className="font-medium">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</span></div>
                             <div>{phaseMode === 'three' ? 'Current per Phase' : 'Current'}: <span className="font-medium">{table.currentPerPhase?.toFixed(2)} A</span></div>
                             <div>PDU Type: <span className="font-medium">{table.customPduType || table.pduType}</span></div>
                             {table.includesHoist && (

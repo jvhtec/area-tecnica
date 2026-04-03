@@ -131,6 +131,7 @@ interface Table {
   rows: TableRow[];
   totalWatts?: number;
   adjustedWatts?: number;
+  totalVa?: number;
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
@@ -344,15 +345,23 @@ const LightsConsumosTool: React.FC = () => {
     if (isOverrideMode && overrideData) {
       const powerDefaults = overrideData.defaults
         .filter(table => table.table_type === 'power')
-        .map(table => ({
-          name: `${table.table_name} (Default)`,
-          rows: table.table_data.rows || [],
-          totalWatts: table.total_value,
-          currentPerPhase: table.metadata?.currentPerPhase,
-          pduType: table.metadata?.pduType,
-          id: `default-${table.id}`,
-          isDefault: true
-        }));
+        .map(table => {
+          const w = table.total_value || 0;
+          const adjW = w * (1 + safetyMargin / 100);
+          // For legacy defaults without per-fixture VA, estimate using global PF=0.9 (typical lighting mix)
+          const estimatedVa = adjW > 0 ? adjW / 0.9 : 0;
+          return {
+            name: `${table.table_name} (Default)`,
+            rows: table.table_data.rows || [],
+            totalWatts: table.total_value,
+            adjustedWatts: adjW,
+            totalVa: estimatedVa,
+            currentPerPhase: table.metadata?.currentPerPhase,
+            pduType: table.metadata?.pduType,
+            id: `default-${table.id}`,
+            isDefault: true
+          };
+        });
 
       setDefaultTables(powerDefaults);
     }
@@ -608,12 +617,15 @@ const LightsConsumosTool: React.FC = () => {
     });
 
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const totalVa = calculatedRows.reduce((sum, row) => {
+    // Vector sum of apparent power: S = √(P² + Q²)
+    // More accurate than scalar sum Σ(P_i/PF_i) for mixed load types
+    const totalVar = calculatedRows.reduce((sum, row) => {
       const pfValue = Number(row.pf) || getRecommendedPf(row.fixtureType);
-      if (!pfValue) return sum;
-      return sum + (row.totalWatts || 0) / pfValue;
+      if (!pfValue || pfValue >= 1) return sum; // purely resistive loads have no reactive component
+      return sum + (row.totalWatts || 0) * Math.tan(Math.acos(pfValue));
     }, 0);
-    const { currentLine, adjustedWatts } = calculateLineCurrent(totalWatts, totalVa);
+    const totalVa = Math.sqrt(totalWatts * totalWatts + totalVar * totalVar);
+    const { currentLine, adjustedWatts, adjustedVa } = calculateLineCurrent(totalWatts, totalVa);
     const pduSuggestion = recommendPDU(currentLine);
     const pduOverride =
       selectedPduType && selectedPduType !== 'default'
@@ -627,6 +639,7 @@ const LightsConsumosTool: React.FC = () => {
       rows: calculatedRows,
       totalWatts,
       adjustedWatts,
+      totalVa: adjustedVa,
       currentPerPhase: currentLine,
       pduType: pduSuggestion,
       customPduType: pduOverride,
@@ -717,6 +730,10 @@ const LightsConsumosTool: React.FC = () => {
         console.error("Error fetching logo:", logoError);
       }
 
+      const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
+      const totalSystemKva = allTables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
+
       const pdfBlob = await exportToPDF(
         jobToUse.title,
         allTables.map((table) => ({ ...table, toolType: 'consumos', phaseMode })),
@@ -724,7 +741,7 @@ const LightsConsumosTool: React.FC = () => {
         jobToUse.title,
         ('start_time' in jobToUse ? jobToUse.start_time : null) || new Date().toISOString(),
         undefined,
-        undefined,
+        { totalSystemWatts, totalSystemAmps, totalSystemKva },
         safetyMargin,
         logoUrl
       );
@@ -862,6 +879,9 @@ const LightsConsumosTool: React.FC = () => {
                         <span className="font-medium">Total Watts:</span> {table.totalWatts?.toFixed(2)} W
                       </div>
                       <div>
+                        <span className="font-medium">Potencia Aparente:</span> {((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA
+                      </div>
+                      <div>
                         <span className="font-medium">{phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}</span> {table.currentPerPhase?.toFixed(2)} A
                       </div>
                       <div>
@@ -996,7 +1016,7 @@ const LightsConsumosTool: React.FC = () => {
               checked={includesHoist}
               onCheckedChange={(checked) => setIncludesHoist(checked as boolean)}
             />
-            <Label htmlFor="hoistPower">Requiere Potencia Adicional para Polipasto (CEE32A 3P+N+G)</Label>
+            <Label htmlFor="hoistPower">Requiere Potencia Adicional para Motor (CEE32A 3P+N+G)</Label>
           </div>
 
           <div className="border rounded-lg overflow-x-auto">
@@ -1198,7 +1218,7 @@ const LightsConsumosTool: React.FC = () => {
                           updateTableSettings(table.id as number | string, { includesHoist: !!checked })
                         }
                       />
-                      <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Polipasto (CEE32A 3P+N+G)</Label>
+                      <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Motor (CEE32A 3P+N+G)</Label>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -1289,6 +1309,12 @@ const LightsConsumosTool: React.FC = () => {
                   )}
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={4} className="px-4 py-3 text-right">
+                      Potencia Aparente:
+                    </td>
+                    <td className="px-4 py-3">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</td>
+                  </tr>
+                  <tr className="border-t bg-muted/50 font-medium">
+                    <td colSpan={4} className="px-4 py-3 text-right">
                       {phaseMode === 'three' ? 'Corriente por Fase:' : 'Corriente:'}
                     </td>
                     <td className="px-4 py-3">{table.currentPerPhase?.toFixed(2)} A</td>
@@ -1311,7 +1337,7 @@ const LightsConsumosTool: React.FC = () => {
               </table>
               {table.includesHoist && (
                 <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
-                  Se requiere potencia adicional para polipasto: CEE32A 3P+N+G
+                  Se requiere potencia adicional para motor: CEE32A 3P+N+G
                 </div>
               )}
             </div>
