@@ -62,6 +62,12 @@ const PRIMARY_NAVIGATION_PROFILE_MAP: Record<string, readonly string[]> = {
     "logistics",
     "job-assignment-matrix",
   ],
+  house_tech: [
+    "technician-dashboard",
+    "house-department",
+    "logistics",
+    "technician-profile",
+  ],
 }
 
 interface SelectPrimaryNavigationItemsParams {
@@ -84,9 +90,11 @@ export const selectPrimaryNavigationItems = ({
   const normalizedDepartment = userDepartment?.toLowerCase() ?? null
   const normalizedRole = userRole?.toLowerCase() ?? null
 
+  // Role-specific profiles take precedence so roles like house_tech always get
+  // their curated navbar regardless of which department they belong to.
   const customProfileIds =
-    (normalizedDepartment && PRIMARY_NAVIGATION_PROFILE_MAP[normalizedDepartment]) ||
     (normalizedRole && PRIMARY_NAVIGATION_PROFILE_MAP[normalizedRole]) ||
+    (normalizedDepartment && PRIMARY_NAVIGATION_PROFILE_MAP[normalizedDepartment]) ||
     null
 
   const selected: NavigationItem[] = []
@@ -393,10 +401,12 @@ const Layout = () => {
     return fullscreenParam === "1" || fullscreenParam === "true"
   }, [location.pathname, location.search])
 
-  // Routes that should be full-screen on mobile but have Layout on desktop
-  const mobileFullscreenRoutes = useMemo(() => {
+  // Routes that hide the header on mobile but still show the bottom navbar
+  const mobileHideHeader = useMemo(() => {
     const routes = ["/sound"]
-    return isMobile && routes.some((route) => location.pathname.startsWith(route))
+    return isMobile && routes.some((route) =>
+      location.pathname === route || location.pathname.startsWith(route + "/")
+    )
   }, [isMobile, location.pathname])
 
   const showSidebar = !isMobile || suppressChrome
@@ -404,7 +414,6 @@ const Layout = () => {
   const showMobileNav =
     isMobile &&
     !suppressChrome &&
-    !mobileFullscreenRoutes &&
     Boolean(userRole) &&
     (primaryItems.length > 0 || trayItems.length > 0)
   if (isLoading) {
@@ -471,7 +480,7 @@ const Layout = () => {
           </Sidebar>
         )}
         <div className="flex flex-1 min-w-0 flex-col">
-          {!suppressChrome && !mobileFullscreenRoutes && (
+          {!suppressChrome && !mobileHideHeader && (
             <header className="sticky top-0 z-30 border-b border-border/60 bg-background/95 px-3 pb-2 pt-[max(0.75rem,calc(env(safe-area-inset-top)+0.75rem))] shadow-sm backdrop-blur supports-[backdrop-filter]:backdrop-blur sm:px-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
@@ -508,7 +517,7 @@ const Layout = () => {
           <main
             className={cn(
               "flex-1 min-w-0 w-full overflow-y-auto px-3 pt-4 sm:px-6 sm:pt-6",
-              suppressChrome || mobileFullscreenRoutes
+              suppressChrome
                 ? "pb-6"
                 : isMobile
                   ? "pb-[calc(4.5rem+env(safe-area-inset-bottom))]"
