@@ -90,9 +90,11 @@ export const selectPrimaryNavigationItems = ({
   const normalizedDepartment = userDepartment?.toLowerCase() ?? null
   const normalizedRole = userRole?.toLowerCase() ?? null
 
+  // Role-specific profiles take precedence so roles like house_tech always get
+  // their curated navbar regardless of which department they belong to.
   const customProfileIds =
-    (normalizedDepartment && PRIMARY_NAVIGATION_PROFILE_MAP[normalizedDepartment]) ||
     (normalizedRole && PRIMARY_NAVIGATION_PROFILE_MAP[normalizedRole]) ||
+    (normalizedDepartment && PRIMARY_NAVIGATION_PROFILE_MAP[normalizedDepartment]) ||
     null
 
   const selected: NavigationItem[] = []
