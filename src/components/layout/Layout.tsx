@@ -404,7 +404,9 @@ const Layout = () => {
   // Routes that hide the header on mobile but still show the bottom navbar
   const mobileHideHeader = useMemo(() => {
     const routes = ["/sound"]
-    return isMobile && routes.some((route) => location.pathname.startsWith(route))
+    return isMobile && routes.some((route) =>
+      location.pathname === route || location.pathname.startsWith(route + "/")
+    )
   }, [isMobile, location.pathname])
 
   const showSidebar = !isMobile || suppressChrome
