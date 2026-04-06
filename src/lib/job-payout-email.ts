@@ -2,24 +2,15 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { JobPayoutTotals } from '@/types/jobExtras';
 import { buildJobPayoutPdfFilename } from '@/utils/pdfFileNames';
 import { generateJobPayoutPDF, TimesheetLine } from '@/utils/rates-pdf-export';
+import {
+  prepareJobPayoutData,
+  type JobPayoutDataInput,
+  type JobPayoutDocumentJobDetails,
+  type TechnicianProfileWithEmail,
+} from '@/lib/job-payout-data';
 
-export interface TechnicianProfileWithEmail {
-  id: string;
-  first_name?: string | null;
-  last_name?: string | null;
-  email?: string | null;
-  autonomo?: boolean | null;
-  is_house_tech?: boolean | null;
-}
-
-export interface JobPayoutEmailJobDetails {
-  id: string;
-  title: string;
-  start_time: string;
-  tour_id?: string | null;
-  rates_approved?: boolean | null;
-  invoicing_company?: string | null;
-}
+export type { TechnicianProfileWithEmail } from '@/lib/job-payout-data';
+export type JobPayoutEmailJobDetails = JobPayoutDocumentJobDetails;
 
 // ...
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
@@ -47,14 +38,7 @@ export interface JobPayoutEmailContextResult {
   missingEmails: string[];
 }
 
-export interface JobPayoutEmailInput {
-  jobId: string;
-  supabase: SupabaseClient;
-  payouts?: JobPayoutTotals[];
-  profiles?: TechnicianProfileWithEmail[];
-  lpoMap?: Map<string, string | null>;
-  jobDetails?: JobPayoutEmailJobDetails | null;
-}
+export interface JobPayoutEmailInput extends JobPayoutDataInput {}
 
 async function blobToBase64(blob: Blob): Promise<string> {
   const arrayBuffer = await blob.arrayBuffer();
@@ -94,172 +78,6 @@ function buildTimesheetMap(rows: any[]): Map<string, TimesheetLine[]> {
   return map;
 }
 
-async function fetchJobDetails(
-  client: SupabaseClient,
-  jobId: string,
-  provided?: JobPayoutEmailJobDetails | null
-): Promise<JobPayoutEmailJobDetails> {
-  if (provided) return provided;
-  const { data, error } = await client
-    .from('jobs')
-    .select('id, title, start_time, tour_id, rates_approved, invoicing_company')
-    .eq('id', jobId)
-    .maybeSingle();
-  if (error || !data) {
-    throw error || new Error('Job not found');
-  }
-  return data as JobPayoutEmailJobDetails;
-}
-
-async function fetchPayouts(
-  client: SupabaseClient,
-  jobId: string,
-  provided?: JobPayoutTotals[]
-): Promise<JobPayoutTotals[]> {
-  if (provided && provided.length) return provided;
-  const { data, error } = await client
-    .from('v_job_tech_payout_2025')
-    .select('*')
-    .eq('job_id', jobId);
-  if (error) throw error;
-  return (data || []) as JobPayoutTotals[];
-}
-
-/**
- * Enrich payouts with override metadata (who/when + override amount).
- *
- * Notes:
- * - `v_job_tech_payout_2025` already applies the override to `total_eur`, but does not expose audit fields.
- * - We pull `v_job_tech_payout_2025_base.total_eur` as the "calculated" baseline for context.
- */
-async function attachOverrideMetadata(
-  client: SupabaseClient,
-  jobId: string,
-  payouts: JobPayoutTotals[]
-): Promise<JobPayoutTotals[]> {
-  const techIds = Array.from(new Set(payouts.map((p) => p.technician_id).filter(Boolean)));
-  if (!jobId || techIds.length === 0) return payouts;
-
-  const [{ data: overrides, error: oErr }, { data: baseRows, error: bErr }] = await Promise.all([
-    client
-      .from('job_technician_payout_overrides')
-      .select('technician_id, override_amount_eur, set_by, set_at, updated_at')
-      .eq('job_id', jobId)
-      .in('technician_id', techIds),
-    client
-      .from('v_job_tech_payout_2025_base')
-      .select('technician_id, total_eur')
-      .eq('job_id', jobId)
-      .in('technician_id', techIds),
-  ]);
-
-  if (oErr) throw oErr;
-  if (bErr) throw bErr;
-
-  const baseTotalMap = new Map<string, number>();
-  (baseRows || []).forEach((r: any) => {
-    if (!r?.technician_id) return;
-    baseTotalMap.set(r.technician_id, Number(r.total_eur ?? 0));
-  });
-
-  const overrideByTech = new Map<string, any>();
-  const actorIds = new Set<string>();
-  (overrides || []).forEach((row: any) => {
-    if (!row?.technician_id) return;
-    overrideByTech.set(row.technician_id, row);
-    if (row.set_by) actorIds.add(row.set_by);
-  });
-
-  let actorMap = new Map<string, { name: string; email: string | null }>();
-  if (actorIds.size > 0) {
-    const { data: actors, error: aErr } = await client
-      .from('profiles')
-      .select('id, first_name, last_name, email')
-      .in('id', Array.from(actorIds));
-    if (aErr) throw aErr;
-    actorMap = new Map(
-      (actors || []).map((a: any) => [
-        a.id,
-        {
-          name: `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim() || a.id,
-          email: a.email ?? null,
-        },
-      ])
-    );
-  }
-
-  return payouts.map((p) => {
-    const ov = overrideByTech.get(p.technician_id);
-    if (!ov) return p;
-
-    const actor = ov.set_by ? actorMap.get(ov.set_by) : null;
-    const calculated = baseTotalMap.get(p.technician_id);
-
-    return {
-      ...p,
-      has_override: true,
-      override_amount_eur: Number(ov.override_amount_eur),
-      calculated_total_eur: calculated != null ? calculated : undefined,
-      override_set_at: ov.set_at,
-      override_actor_name: actor?.name,
-      override_actor_email: actor?.email ?? undefined,
-    };
-  });
-}
-
-async function fetchProfiles(
-  client: SupabaseClient,
-  techIds: string[],
-  provided?: TechnicianProfileWithEmail[]
-): Promise<TechnicianProfileWithEmail[]> {
-  if (provided) {
-    const hasEmailField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'email'));
-    const hasAutonomoField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'autonomo'));
-    const hasHouseTechField = provided.every((p) => Object.prototype.hasOwnProperty.call(p, 'is_house_tech'));
-    if (hasEmailField && hasAutonomoField && hasHouseTechField) {
-      return provided;
-    }
-  }
-  if (!techIds.length) return provided || [];
-
-  // Fetch basic profile data (is_house_tech is a function, not a column)
-  const { data, error } = await client
-    .from('profiles')
-    .select('id, first_name, last_name, email, autonomo')
-    .in('id', techIds);
-  if (error) throw error;
-
-  // Fetch house tech status for each profile using the RPC function
-  const profiles = (data || []) as TechnicianProfileWithEmail[];
-  for (const profile of profiles) {
-    try {
-      const { data: isHouseTech } = await client.rpc('is_house_tech', { _profile_id: profile.id });
-      profile.is_house_tech = isHouseTech ?? false;
-    } catch {
-      profile.is_house_tech = false;
-    }
-  }
-
-  return profiles;
-}
-
-async function fetchLpoMap(
-  client: SupabaseClient,
-  jobId: string,
-  technicianIds: string[],
-  provided?: Map<string, string | null>
-): Promise<Map<string, string | null>> {
-  if (provided) return provided;
-  if (!technicianIds.length) return new Map();
-  const { data, error } = await client
-    .from('flex_work_orders')
-    .select('technician_id, lpo_number')
-    .eq('job_id', jobId)
-    .in('technician_id', technicianIds);
-  if (error) throw error;
-  return new Map((data || []).map((row: any) => [row.technician_id, row.lpo_number || null]));
-}
-
 async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<any[]> {
   const { data, error } = await client
     .from('timesheets')
@@ -278,14 +96,8 @@ async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<a
 export async function prepareJobPayoutEmailContext(
   input: JobPayoutEmailInput
 ): Promise<JobPayoutEmailContextResult> {
-  const { jobId, supabase, jobDetails: providedJob, payouts: providedPayouts, profiles: providedProfiles, lpoMap: providedLpoMap } =
-    input;
-  const job = await fetchJobDetails(supabase, jobId, providedJob);
-  const payoutsRaw = await fetchPayouts(supabase, jobId, providedPayouts);
-  const payouts = await attachOverrideMetadata(supabase, jobId, payoutsRaw);
-  const technicianIds = Array.from(new Set(payouts.map((p) => p.technician_id).filter(Boolean)));
-  const profiles = await fetchProfiles(supabase, technicianIds, providedProfiles);
-  const lpoMap = await fetchLpoMap(supabase, jobId, technicianIds, providedLpoMap);
+  const { jobId, supabase } = input;
+  const { job, payouts, profiles, lpoMap } = await prepareJobPayoutData(input);
   const timesheetRows = await fetchTimesheets(supabase, jobId);
   const timesheetMap = buildTimesheetMap(timesheetRows);
 
