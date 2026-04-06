@@ -24,6 +24,12 @@ interface JobAssignment {
   } | null;
 }
 
+interface CustomTravelRate {
+  profile_id: string;
+  travel_half_day_eur: number | null;
+  travel_full_day_eur: number | null;
+}
+
 const cardBase = "bg-card border-border text-card-foreground";
 const surface = "bg-muted/30 border-border";
 const subtle = "text-muted-foreground";
@@ -54,6 +60,22 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
       return data as JobAssignment[];
     },
     enabled: !!jobId,
+  });
+
+  // Fetch custom travel rates for all assigned technicians
+  const techIds = assignments?.map(a => a.technician_id) ?? [];
+  const { data: customTravelRates } = useQuery({
+    queryKey: ['custom-travel-rates', jobId, techIds],
+    queryFn: async () => {
+      if (!techIds.length) return [];
+      const { data, error } = await supabase
+        .from('custom_tech_rates')
+        .select('profile_id, travel_half_day_eur, travel_full_day_eur')
+        .in('profile_id', techIds);
+      if (error) throw error;
+      return (data ?? []) as CustomTravelRate[];
+    },
+    enabled: techIds.length > 0,
   });
 
   // If technicianId is provided (non-manager), restrict payouts to that technician
@@ -132,6 +154,8 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
           ).trim() || 'Unnamed Technician';
           const technicianPayout = payoutTotals?.find(p => p.technician_id === assignment.technician_id);
 
+          const techCustomRates = customTravelRates?.find(r => r.profile_id === assignment.technician_id);
+
           return (
             <div key={assignment.technician_id} className={surface + " rounded-xl p-4 sm:p-5"}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
@@ -158,6 +182,8 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
                   ['admin', 'management'].includes(assignment.profiles?.role || '') &&
                   Boolean(assignment.profiles?.assignable_as_tech)
                 }
+                customTravelHalfRate={techCustomRates?.travel_half_day_eur}
+                customTravelFullRate={techCustomRates?.travel_full_day_eur}
                 showVehicleDisclaimer={technicianPayout?.vehicle_disclaimer || false}
               />
 
