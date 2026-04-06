@@ -10,6 +10,30 @@ const createEqInQuery = (response: unknown) => ({
 });
 
 describe('prepareJobPayoutData', () => {
+  it('treats an explicitly empty payouts override as authoritative', async () => {
+    const supabase = {
+      from: vi.fn(() => {
+        throw new Error('Unexpected query');
+      }),
+      rpc: vi.fn(),
+    };
+
+    const result = await prepareJobPayoutData({
+      jobId: 'job-empty',
+      supabase: supabase as any,
+      jobDetails: {
+        id: 'job-empty',
+        title: 'No payouts',
+        start_time: '2026-04-04T08:00:00.000Z',
+      },
+      payouts: [],
+    });
+
+    expect(result.payouts).toEqual([]);
+    expect(result.profiles).toEqual([]);
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
   it('enriches standard payout rows with override metadata and house-tech status for PDFs', async () => {
     const supabase = {
       from: vi.fn((table: string) => {
@@ -156,6 +180,159 @@ describe('prepareJobPayoutData', () => {
         override_set_at: '2026-04-02T10:15:00.000Z',
       }),
     ]);
+  });
+
+  it('does not short-circuit on partial provided profiles when more technician ids are required', async () => {
+    const rpcCalls: string[] = [];
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'jobs') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: {
+                    id: 'job-3',
+                    title: 'Partial profile cache',
+                    start_time: '2026-04-05T08:00:00.000Z',
+                    end_time: '2026-04-05T18:00:00.000Z',
+                    tour_id: null,
+                    rates_approved: true,
+                    job_type: 'show',
+                    invoicing_company: null,
+                  },
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'v_job_tech_payout_2025') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(async () => ({
+                data: [
+                  {
+                    job_id: 'job-3',
+                    technician_id: 'tech-1',
+                    timesheets_total_eur: 100,
+                    extras_total_eur: 0,
+                    expenses_total_eur: 0,
+                    total_eur: 100,
+                    extras_breakdown: { items: [] },
+                    expenses_breakdown: [],
+                    vehicle_disclaimer: false,
+                  },
+                  {
+                    job_id: 'job-3',
+                    technician_id: 'tech-2',
+                    timesheets_total_eur: 200,
+                    extras_total_eur: 0,
+                    expenses_total_eur: 0,
+                    total_eur: 200,
+                    extras_breakdown: { items: [] },
+                    expenses_breakdown: [],
+                    vehicle_disclaimer: false,
+                  },
+                ],
+                error: null,
+              })),
+            })),
+          };
+        }
+
+        if (table === 'job_technician_payout_overrides') {
+          return createEqInQuery({
+            data: [],
+            error: null,
+          });
+        }
+
+        if (table === 'v_job_tech_payout_2025_base') {
+          return createEqInQuery({
+            data: [],
+            error: null,
+          });
+        }
+
+        if (table === 'profiles') {
+          return {
+            select: vi.fn((columns: string) => ({
+              in: vi.fn(async () => ({
+                data: columns.includes('autonomo')
+                  ? [
+                      {
+                        id: 'tech-1',
+                        first_name: 'Fetched',
+                        last_name: 'One',
+                        email: 'one@example.com',
+                        autonomo: false,
+                      },
+                      {
+                        id: 'tech-2',
+                        first_name: 'Fetched',
+                        last_name: 'Two',
+                        email: 'two@example.com',
+                        autonomo: true,
+                      },
+                    ]
+                  : [],
+                error: null,
+              })),
+            })),
+          };
+        }
+
+        if (table === 'flex_work_orders') {
+          return createEqInQuery({
+            data: [],
+            error: null,
+          });
+        }
+
+        throw new Error(`Unexpected table lookup: ${table}`);
+      }),
+      rpc: vi.fn(async (fn: string, args: { _profile_id: string }) => {
+        if (fn !== 'is_house_tech') {
+          throw new Error(`Unexpected RPC: ${fn}`);
+        }
+
+        rpcCalls.push(args._profile_id);
+        return { data: args._profile_id === 'tech-1', error: null };
+      }),
+    };
+
+    const result = await prepareJobPayoutData({
+      jobId: 'job-3',
+      supabase: supabase as any,
+      profiles: [
+        {
+          id: 'tech-1',
+          first_name: 'Cached',
+          last_name: 'Only',
+          email: 'cached@example.com',
+          autonomo: false,
+          is_house_tech: false,
+        },
+      ],
+    });
+
+    expect(result.profiles).toEqual([
+      expect.objectContaining({
+        id: 'tech-1',
+        first_name: 'Fetched',
+        email: 'one@example.com',
+        is_house_tech: true,
+      }),
+      expect.objectContaining({
+        id: 'tech-2',
+        first_name: 'Fetched',
+        email: 'two@example.com',
+        is_house_tech: false,
+      }),
+    ]);
+    expect(rpcCalls.sort()).toEqual(['tech-1', 'tech-2']);
   });
 
   it('falls back to provided profiles when the profile lookup fails', async () => {

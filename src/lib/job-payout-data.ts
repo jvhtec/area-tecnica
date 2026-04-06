@@ -62,7 +62,7 @@ async function fetchPayouts(
   jobId: string,
   provided?: JobPayoutTotals[]
 ): Promise<JobPayoutTotals[]> {
-  if (provided && provided.length) return provided;
+  if (provided !== undefined) return provided;
 
   const { data, error } = await client
     .from('v_job_tech_payout_2025')
@@ -172,8 +172,10 @@ async function fetchProfiles(
     const hasEmailField = providedProfiles.every((profile) => Object.prototype.hasOwnProperty.call(profile, 'email'));
     const hasAutonomoField = providedProfiles.every((profile) => Object.prototype.hasOwnProperty.call(profile, 'autonomo'));
     const hasHouseTechField = providedProfiles.every((profile) => Object.prototype.hasOwnProperty.call(profile, 'is_house_tech'));
+    const providedProfileIds = new Set(providedProfiles.map((profile) => profile.id));
+    const coversAllTechIds = techIds.every((techId) => providedProfileIds.has(techId));
 
-    if (hasEmailField && hasAutonomoField && hasHouseTechField) {
+    if (hasEmailField && hasAutonomoField && hasHouseTechField && coversAllTechIds) {
       return providedProfiles;
     }
   }
@@ -196,21 +198,27 @@ async function fetchProfiles(
   });
 
   const profiles = (data || []) as TechnicianProfileWithEmail[];
-  for (const profile of profiles) {
-    const mergedProfile: TechnicianProfileWithEmail = {
-      ...profileMap.get(profile.id),
-      ...profile,
-    };
+  const mergedProfiles = await Promise.all(
+    profiles.map(async (profile) => {
+      const mergedProfile: TechnicianProfileWithEmail = {
+        ...profileMap.get(profile.id),
+        ...profile,
+      };
 
-    try {
-      const { data: isHouseTech } = await client.rpc('is_house_tech', { _profile_id: profile.id });
-      mergedProfile.is_house_tech = isHouseTech ?? false;
-    } catch {
-      mergedProfile.is_house_tech = mergedProfile.is_house_tech ?? false;
-    }
+      try {
+        const { data: isHouseTech } = await client.rpc('is_house_tech', { _profile_id: profile.id });
+        mergedProfile.is_house_tech = isHouseTech ?? false;
+      } catch {
+        mergedProfile.is_house_tech = mergedProfile.is_house_tech ?? false;
+      }
 
-    profileMap.set(profile.id, mergedProfile);
-  }
+      return mergedProfile;
+    })
+  );
+
+  mergedProfiles.forEach((profile) => {
+    profileMap.set(profile.id, profile);
+  });
 
   return techIds
     .map((techId) => profileMap.get(techId))
