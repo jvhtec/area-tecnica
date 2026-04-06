@@ -93,7 +93,8 @@ BEGIN
         ),
         'is_house_tech_rate', v_qualifies_for_fixed_travel_rate
           AND jre.extra_type IN ('travel_half', 'travel_full')
-          AND v_custom_travel_half IS NULL AND v_custom_travel_full IS NULL,
+          AND ((jre.extra_type = 'travel_half' AND v_custom_travel_half IS NULL)
+            OR (jre.extra_type = 'travel_full' AND v_custom_travel_full IS NULL)),
         'is_custom_travel_rate',
           (jre.extra_type = 'travel_half' AND v_custom_travel_half IS NOT NULL)
           OR (jre.extra_type = 'travel_full' AND v_custom_travel_full IS NOT NULL)

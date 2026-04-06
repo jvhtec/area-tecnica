@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,9 +64,13 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
   });
 
   // Fetch custom travel rates for all assigned technicians
-  const techIds = assignments?.map(a => a.technician_id) ?? [];
+  const techIds = useMemo(
+    () => (assignments?.map(a => a.technician_id) ?? []).sort(),
+    [assignments]
+  );
+  const techIdsKey = techIds.join(',');
   const { data: customTravelRates } = useQuery({
-    queryKey: ['custom-travel-rates', jobId, techIds],
+    queryKey: ['custom-travel-rates', jobId, techIdsKey],
     queryFn: async () => {
       if (!techIds.length) return [];
       const { data, error } = await supabase
