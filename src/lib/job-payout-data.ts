@@ -167,36 +167,54 @@ async function fetchProfiles(
   techIds: string[],
   provided?: TechnicianProfileWithEmail[]
 ): Promise<TechnicianProfileWithEmail[]> {
-  if (provided) {
-    const hasEmailField = provided.every((profile) => Object.prototype.hasOwnProperty.call(profile, 'email'));
-    const hasAutonomoField = provided.every((profile) => Object.prototype.hasOwnProperty.call(profile, 'autonomo'));
-    const hasHouseTechField = provided.every((profile) => Object.prototype.hasOwnProperty.call(profile, 'is_house_tech'));
+  const providedProfiles = (provided || []).filter((profile) => techIds.includes(profile.id));
+  if (providedProfiles.length > 0) {
+    const hasEmailField = providedProfiles.every((profile) => Object.prototype.hasOwnProperty.call(profile, 'email'));
+    const hasAutonomoField = providedProfiles.every((profile) => Object.prototype.hasOwnProperty.call(profile, 'autonomo'));
+    const hasHouseTechField = providedProfiles.every((profile) => Object.prototype.hasOwnProperty.call(profile, 'is_house_tech'));
 
     if (hasEmailField && hasAutonomoField && hasHouseTechField) {
-      return provided;
+      return providedProfiles;
     }
   }
 
-  if (!techIds.length) return provided || [];
+  if (!techIds.length) return providedProfiles;
 
   const { data, error } = await client
     .from('profiles')
     .select('id, first_name, last_name, email, autonomo')
     .in('id', techIds);
 
-  if (error) throw error;
+  if (error) {
+    console.warn('[prepareJobPayoutData] profile lookup failed; using provided profile fallback', error);
+    return providedProfiles;
+  }
+
+  const profileMap = new Map<string, TechnicianProfileWithEmail>();
+  providedProfiles.forEach((profile) => {
+    profileMap.set(profile.id, { ...profile, is_house_tech: profile.is_house_tech ?? false });
+  });
 
   const profiles = (data || []) as TechnicianProfileWithEmail[];
   for (const profile of profiles) {
+    const mergedProfile: TechnicianProfileWithEmail = {
+      ...profileMap.get(profile.id),
+      ...profile,
+    };
+
     try {
       const { data: isHouseTech } = await client.rpc('is_house_tech', { _profile_id: profile.id });
-      profile.is_house_tech = isHouseTech ?? false;
+      mergedProfile.is_house_tech = isHouseTech ?? false;
     } catch {
-      profile.is_house_tech = false;
+      mergedProfile.is_house_tech = mergedProfile.is_house_tech ?? false;
     }
+
+    profileMap.set(profile.id, mergedProfile);
   }
 
-  return profiles;
+  return techIds
+    .map((techId) => profileMap.get(techId))
+    .filter((profile): profile is TechnicianProfileWithEmail => Boolean(profile));
 }
 
 async function fetchLpoMap(

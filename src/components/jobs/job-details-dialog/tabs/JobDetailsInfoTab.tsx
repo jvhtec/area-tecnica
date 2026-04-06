@@ -645,6 +645,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                           job_type: jobObj.job_type,
                           invoicing_company: jobDetails?.invoicing_company ?? null,
                         },
+                        profiles: Array.from(profileMap.values()),
                         lpoMap,
                       });
 

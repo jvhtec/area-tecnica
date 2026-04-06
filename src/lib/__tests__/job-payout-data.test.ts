@@ -157,4 +157,125 @@ describe('prepareJobPayoutData', () => {
       }),
     ]);
   });
+
+  it('falls back to provided profiles when the profile lookup fails', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === 'jobs') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: {
+                    id: 'job-2',
+                    title: 'Pack Export Job',
+                    start_time: '2026-04-03T08:00:00.000Z',
+                    end_time: '2026-04-03T18:00:00.000Z',
+                    tour_id: null,
+                    rates_approved: true,
+                    job_type: 'show',
+                    invoicing_company: null,
+                  },
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
+        if (table === 'v_job_tech_payout_2025') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(async () => ({
+                data: [
+                  {
+                    job_id: 'job-2',
+                    technician_id: 'tech-2',
+                    timesheets_total_eur: 320,
+                    extras_total_eur: 20,
+                    expenses_total_eur: 0,
+                    total_eur: 340,
+                    extras_breakdown: { items: [] },
+                    expenses_breakdown: [],
+                    vehicle_disclaimer: false,
+                  },
+                ],
+                error: null,
+              })),
+            })),
+          };
+        }
+
+        if (table === 'job_technician_payout_overrides') {
+          return createEqInQuery({
+            data: [],
+            error: null,
+          });
+        }
+
+        if (table === 'v_job_tech_payout_2025_base') {
+          return createEqInQuery({
+            data: [],
+            error: null,
+          });
+        }
+
+        if (table === 'profiles') {
+          return {
+            select: vi.fn((columns: string) => ({
+              in: vi.fn(async () => ({
+                data: columns.includes('autonomo') ? null : [],
+                error: columns.includes('autonomo') ? new Error('profiles unavailable') : null,
+              })),
+            })),
+          };
+        }
+
+        if (table === 'flex_work_orders') {
+          return createEqInQuery({
+            data: [],
+            error: null,
+          });
+        }
+
+        throw new Error(`Unexpected table lookup: ${table}`);
+      }),
+      rpc: vi.fn(async () => ({ data: false, error: null })),
+    };
+
+    try {
+      const result = await prepareJobPayoutData({
+        jobId: 'job-2',
+        supabase: supabase as any,
+        profiles: [
+          {
+            id: 'tech-2',
+            first_name: 'Fallback',
+            last_name: 'Tech',
+            autonomo: false,
+          },
+        ],
+      });
+
+      expect(result.payouts).toEqual([
+        expect.objectContaining({
+          technician_id: 'tech-2',
+          total_eur: 340,
+        }),
+      ]);
+      expect(result.profiles).toEqual([
+        expect.objectContaining({
+          id: 'tech-2',
+          first_name: 'Fallback',
+          last_name: 'Tech',
+          autonomo: false,
+        }),
+      ]);
+      expect(warnSpy).toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
 });
