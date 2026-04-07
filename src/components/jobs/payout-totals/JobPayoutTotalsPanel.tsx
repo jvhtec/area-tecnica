@@ -69,6 +69,11 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     [data.profilesWithEmail, displayedTechIds]
   );
 
+  const filteredPayoutOverrides = React.useMemo(
+    () => data.payoutOverrides.filter(o => displayedTechIds.has(o.technician_id)),
+    [data.payoutOverrides, displayedTechIds]
+  );
+
   /* ── Grand total for filtered view ── */
   const filteredCalculatedGrandTotal = React.useMemo(() => {
     return displayedPayouts.reduce((sum, payout) => {
@@ -254,7 +259,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         <PayoutGrandTotal
           payoutTotals={displayedPayouts}
           calculatedGrandTotal={filteredCalculatedGrandTotal}
-          payoutOverrides={data.payoutOverrides}
+          payoutOverrides={filteredPayoutOverrides}
           isCicloJob={isCicloJob}
         />
       </CardContent>
