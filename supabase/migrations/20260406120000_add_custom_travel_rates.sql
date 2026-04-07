@@ -47,6 +47,10 @@ BEGIN
 
   -- Calculate extras from job_rate_extras joined with rate_extras_2025 for unit prices
   -- Priority: custom rate > house tech fixed rate > catalog rate
+  -- NOTE: The rate-resolution CASE is repeated in three positions (total SUM,
+  -- unit_eur field, amount_eur field) because PostgreSQL aggregate expressions
+  -- cannot reference sibling columns within the same jsonb_build_object call.
+  -- A LATERAL subquery would add join complexity for no runtime benefit.
   SELECT jsonb_build_object(
     'total_eur', COALESCE(SUM(
       COALESCE(
