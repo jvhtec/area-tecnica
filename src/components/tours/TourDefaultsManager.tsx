@@ -19,6 +19,7 @@ const computeTotalVa = (watts: number, metadata: any, department?: string): numb
 };
 import { useTourWeightDefaults } from "@/hooks/useTourWeightDefaults";
 import { useTourDefaultSets, TourDefaultTable } from "@/hooks/useTourDefaultSets";
+import { buildNormalizedTourPowerTables } from "@/utils/tourPowerTables";
 
 interface TourDefaultsManagerProps {
   open: boolean;
@@ -251,6 +252,50 @@ export const TourDefaultsManager = ({
         console.error('Error fetching tour logo:', error);
       }
 
+      if (type === 'power') {
+        const { tables, safetyMargin } = buildNormalizedTourPowerTables({
+          department: department as 'sound' | 'lights' | 'video',
+          defaultTables: relevantDefaults.filter(isNewFormatTable),
+          legacyDefaults: relevantDefaults.filter(isLegacyPowerDefault),
+        });
+
+        const powerSummary = {
+          totalSystemWatts: tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0),
+          totalSystemAmps: tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0),
+          totalSystemKva:
+            tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) /
+            1000,
+        };
+
+        const pdfBlob = await exportToPDF(
+          `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,
+          tables,
+          type,
+          tour.name,
+          new Date().toLocaleDateString('en-GB'),
+          undefined,
+          powerSummary,
+          safetyMargin,
+          logoUrl
+        );
+
+        const fileName = `${tour.name} - ${department} ${type} defaults.pdf`;
+        const url = window.URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        toast({
+          title: 'Éxito',
+          description: 'PDF exportado exitosamente',
+        });
+        return;
+      }
+
       // Sort defaults by order_index if available, then by created_at
       const sortedDefaults = [...relevantDefaults].sort((a, b) => {
         if (isNewFormatTable(a) && isNewFormatTable(b)) {
@@ -414,6 +459,51 @@ export const TourDefaultsManager = ({
       .select('*')
       .eq('tour_date_id', tourDate.id)
       .eq('department', department);
+
+    if (type === 'power') {
+      const { tables, safetyMargin } = buildNormalizedTourPowerTables({
+        department: department as 'sound' | 'lights' | 'video',
+        overrides: (overrides || []) as any[],
+        defaultTables: defaultsData.filter(isNewFormatTable),
+        legacyDefaults: defaultsData.filter(isLegacyPowerDefault),
+      });
+
+      if (tables.length === 0) return;
+
+      const powerSummary = {
+        totalSystemWatts: tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0),
+        totalSystemAmps: tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0),
+        totalSystemKva:
+          tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) /
+          1000,
+      };
+
+      const locationName = (tourDate.locations as any)?.name || 'Unknown Location';
+      const dateStr = tourDate.date;
+
+      const pdfBlob = await exportToPDF(
+        `${tour.name} - ${locationName} - ${department.toUpperCase()} ${type.toUpperCase()}`,
+        tables,
+        type,
+        `${tour.name} - ${locationName}`,
+        dateStr,
+        undefined,
+        powerSummary,
+        safetyMargin,
+        logoUrl
+      );
+
+      const fileName = `${tour.name} - ${dateStr} - ${locationName} - ${department} ${type}.pdf`;
+      const url = window.URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      return;
+    }
 
     let combinedTables;
     let safetyMargin = 0;
