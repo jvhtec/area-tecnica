@@ -91,13 +91,14 @@ BEGIN
             END
           )
         ),
-        'is_house_tech_rate', v_qualifies_for_fixed_travel_rate
+        'is_house_tech_rate', jre.amount_override_eur IS NULL
+          AND v_qualifies_for_fixed_travel_rate
           AND jre.extra_type IN ('travel_half', 'travel_full')
           AND ((jre.extra_type = 'travel_half' AND v_custom_travel_half IS NULL)
             OR (jre.extra_type = 'travel_full' AND v_custom_travel_full IS NULL)),
-        'is_custom_travel_rate',
-          (jre.extra_type = 'travel_half' AND v_custom_travel_half IS NOT NULL)
-          OR (jre.extra_type = 'travel_full' AND v_custom_travel_full IS NOT NULL)
+        'is_custom_travel_rate', jre.amount_override_eur IS NULL
+          AND ((jre.extra_type = 'travel_half' AND v_custom_travel_half IS NOT NULL)
+          OR (jre.extra_type = 'travel_full' AND v_custom_travel_full IS NOT NULL))
       )
       ORDER BY jre.updated_at
     ) FILTER (WHERE jre.status = 'approved'), '[]'::jsonb)

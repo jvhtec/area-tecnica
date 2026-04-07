@@ -69,7 +69,7 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
     [assignments]
   );
   const techIdsKey = techIds.join(',');
-  const { data: customTravelRates } = useQuery({
+  const { data: customTravelRates, isLoading: customTravelRatesLoading } = useQuery({
     queryKey: ['custom-travel-rates', jobId, techIdsKey],
     queryFn: async () => {
       if (!techIds.length) return [];
@@ -86,7 +86,7 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
   // If technicianId is provided (non-manager), restrict payouts to that technician
   const { data: payoutTotals, isLoading: payoutLoading } = useJobPayoutTotals(jobId, technicianId);
 
-  if (assignmentsLoading || payoutLoading) {
+  if (assignmentsLoading || payoutLoading || customTravelRatesLoading) {
     return (
       <Card className={cardBase}>
         <CardHeader>
