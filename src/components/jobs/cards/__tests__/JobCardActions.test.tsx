@@ -203,27 +203,13 @@ vi.mock('@/utils/pdf/technicalPowerSummaryPack', () => ({
   generateTechnicalPowerSummaryPack: generateTechnicalPowerSummaryPackMock,
 }));
 
-vi.mock('@/utils/powerSummaryData', () => ({
-  getTechnicalPowerSummaryAvailability: (summary: any, requiredDepartments?: string[]) => {
-    const departments =
-      Array.isArray(requiredDepartments) && requiredDepartments.length > 0
-        ? requiredDepartments
-        : ['sound', 'lights', 'video'];
-    const availableDepartments = departments.filter(
-      (department) => (summary?.departments?.[department]?.rows?.length || 0) > 0
-    );
-
-    return {
-      ready: availableDepartments.length === departments.length,
-      requiredDepartments: departments,
-      availableDepartments,
-      missingDepartments: departments.filter(
-        (department) => !availableDepartments.includes(department)
-      ),
-    };
-  },
-  loadTechnicalPowerSummaryData: loadTechnicalPowerSummaryDataMock,
-}));
+vi.mock('@/utils/powerSummaryData', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/powerSummaryData')>();
+  return {
+    ...actual,
+    loadTechnicalPowerSummaryData: loadTechnicalPowerSummaryDataMock,
+  };
+});
 
 vi.mock('@/utils/pdf/logoUtils', () => ({
   fetchJobLogo: fetchJobLogoMock,

@@ -8,19 +8,13 @@ import { FileText, Weight, Calculator, Trash2, Download, Calendar } from "lucide
 import { exportToPDF } from "@/utils/pdfExport";
 import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { supabase } from "@/lib/supabase";
+import type { Database } from "@/integrations/supabase/types";
 import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
-
-// Compute apparent power (VA) from watts and power factor.
-// Uses PF from stored metadata when available, otherwise defaults by department.
-const computeTotalVa = (watts: number, metadata: any, department?: string): number => {
-  if (!watts) return 0;
-  const pf = metadata?.pf || (department === 'sound' ? 0.95 : department === 'video' ? 0.9 : 0.9);
-  return watts / pf;
-};
 import { useTourWeightDefaults } from "@/hooks/useTourWeightDefaults";
 import { useTourDefaultSets, TourDefaultTable } from "@/hooks/useTourDefaultSets";
-import { buildNormalizedTourPowerTables } from "@/utils/tourPowerTables";
+import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tourPowerTables";
 import { getDepartmentLabel } from "@/types/department";
+import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
 
 interface TourDefaultsManagerProps {
   open: boolean;
@@ -29,6 +23,24 @@ interface TourDefaultsManagerProps {
 }
 
 const UNKNOWN_LOCATION_LABEL = 'Ubicación desconocida';
+
+type TourDatePowerOverrideRow =
+  Database['public']['Tables']['tour_date_power_overrides']['Row'];
+type TourDateWeightOverrideRow =
+  Database['public']['Tables']['tour_date_weight_overrides']['Row'];
+
+const isTechnicalPowerDepartment = (
+  department: string
+): department is TechnicalPowerDepartment =>
+  department === 'sound' || department === 'lights' || department === 'video';
+
+const computeTotalVa = (watts: number, metadata: unknown, department?: string): number => {
+  if (!department || !isTechnicalPowerDepartment(department)) {
+    return watts;
+  }
+
+  return computePowerTotalVa(watts, metadata, department);
+};
 
 const getPdfTypeLabel = (type: 'power' | 'weight') =>
   type === 'power' ? 'potencia' : 'peso';
@@ -514,7 +526,7 @@ export const TourDefaultsManager = ({
     if (type === 'power') {
       const { tables, safetyMargin } = buildNormalizedTourPowerTables({
         department: department as 'sound' | 'lights' | 'video',
-        overrides: (overrides || []) as any[],
+        overrides: (overrides || []) as TourDatePowerOverrideRow[],
         defaultTables: defaultsData.filter(isNewFormatTable),
         legacyDefaults: defaultsData.filter(isLegacyPowerDefault),
       });
@@ -564,26 +576,26 @@ export const TourDefaultsManager = ({
 
     let combinedTables;
     let safetyMargin = 0;
+    const typedWeightOverrides = (overrides || []) as TourDateWeightOverrideRow[];
 
     // If overrides exist, use overrides, otherwise use defaults
-    if (overrides && overrides.length > 0) {
-      combinedTables = overrides.map((override: any) => {
-        const watts = type === 'power' ? (override.total_watts || 0) : undefined;
+    if (typedWeightOverrides.length > 0) {
+      combinedTables = typedWeightOverrides.map((override) => {
         return {
           name: override.table_name || override.item_name || 'Override',
           rows: override.override_data?.rows || [],
-          totalWeight: type === 'weight' ? (override.weight_kg || 0) * (override.quantity || 1) : undefined,
-          totalWatts: watts,
-          totalVa: watts ? computeTotalVa(watts, override.override_data, department) : undefined,
-          currentPerPhase: type === 'power' ? override.current_per_phase : undefined,
-          pduType: type === 'power' ? (override.custom_pdu_type || override.pdu_type) : undefined,
-          customPduType: type === 'power' ? override.custom_pdu_type : undefined,
-          includesHoist: type === 'power' ? (override.includes_hoist || false) : undefined,
-          toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+          totalWeight: (override.weight_kg || 0) * (override.quantity || 1),
+          totalWatts: undefined,
+          totalVa: undefined,
+          currentPerPhase: undefined,
+          pduType: undefined,
+          customPduType: undefined,
+          includesHoist: undefined,
+          toolType: 'pesos' as const,
           id: Date.now() + Math.random()
         };
       });
-      safetyMargin = overrides[0]?.override_data?.safetyMargin || 0;
+      safetyMargin = typedWeightOverrides[0]?.override_data?.safetyMargin || 0;
     } else {
       // Sort defaults by order_index if available, then by created_at
       const sortedDefaults = [...defaultsData].sort((a, b) => {
@@ -776,7 +788,7 @@ export const TourDefaultsManager = ({
                       </p>
                       {table.metadata?.current_per_phase && (
                         <p className="text-xs text-muted-foreground">
-                          {table.metadata.current_per_phase.toFixed(2)} A per phase
+                          {table.metadata.current_per_phase.toFixed(2)} A por fase
                         </p>
                       )}
                     </div>
@@ -807,7 +819,7 @@ export const TourDefaultsManager = ({
                   </p>
                   {getCurrentPerPhase(table) && (
                     <p className="text-xs text-muted-foreground">
-                      {getCurrentPerPhase(table)!.toFixed(2)} A per phase
+                      {getCurrentPerPhase(table)!.toFixed(2)} A por fase
                     </p>
                   )}
                 </div>
@@ -960,7 +972,7 @@ export const TourDefaultsManager = ({
                       {new Date(tourDate.date).toLocaleDateString('en-GB')}
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      {(tourDate.locations as any)?.name || 'Unknown Location'}
+                      {(tourDate.locations as any)?.name || UNKNOWN_LOCATION_LABEL}
                     </p>
                   </div>
                 </div>

@@ -67,7 +67,6 @@ export const computePowerTotalVa = (
       ? candidatePf
       : DEFAULT_POWER_FACTOR[department];
 
-  if (!storedPf) return watts;
   return watts / storedPf;
 };
 
