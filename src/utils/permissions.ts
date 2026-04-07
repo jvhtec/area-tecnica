@@ -2,7 +2,7 @@ export type UserRole = string | null | undefined;
 export type UserDepartment = string | null | undefined;
 
 const ADMINISTRATIVE_DEPARTMENT_KEYS = new Set(['administrative', 'administracion']);
-const PAYOUT_MANAGEMENT_DEPARTMENT_KEYS = new Set(['sound', 'lights', ...ADMINISTRATIVE_DEPARTMENT_KEYS]);
+const PAYOUT_MANAGEMENT_DEPARTMENT_KEYS = new Set(['sound', 'lights', 'production', ...ADMINISTRATIVE_DEPARTMENT_KEYS]);
 
 export const normalizeDepartmentKey = (value?: UserDepartment): string =>
   value

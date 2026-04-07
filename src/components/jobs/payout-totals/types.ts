@@ -54,6 +54,8 @@ export interface JobPayoutData {
   getTechOverride: (techId: string) => JobPayoutOverride | undefined;
   calculatedGrandTotal: number;
   isManager: boolean;
+  isAdminOrAdministrative: boolean;
+  userDepartment: string | null | undefined;
   rehearsalDateSet: Set<string>;
   jobTimesheetDates: string[];
   allDatesMarked: boolean;

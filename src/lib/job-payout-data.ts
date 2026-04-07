@@ -8,6 +8,7 @@ export interface TechnicianProfileWithEmail {
   email?: string | null;
   autonomo?: boolean | null;
   is_house_tech?: boolean | null;
+  department?: string | null;
 }
 
 export interface JobPayoutDocumentJobDetails {

@@ -1,6 +1,10 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Euro } from 'lucide-react';
+import { Euro, Search } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { TECHNICAL_DEPARTMENTS, DEPARTMENT_LABELS } from '@/types/department';
+import { normalizeDepartmentKey } from '@/utils/permissions';
 import { PayoutEmailPreview } from '@/components/jobs/PayoutEmailPreview';
 import { useJobPayoutData } from './useJobPayoutData';
 import { usePayoutActions } from './usePayoutActions';
@@ -8,7 +12,7 @@ import { PayoutPanelHeader } from './PayoutPanelHeader';
 import { RehearsalDateToggles } from './RehearsalDateToggles';
 import { TechnicianPayoutCard } from './TechnicianPayoutCard';
 import { PayoutGrandTotal } from './PayoutGrandTotal';
-import { cardBase, subtleText } from './types';
+import { cardBase, subtleText, NON_AUTONOMO_DEDUCTION_EUR } from './types';
 import type { JobPayoutTotalsPanelProps } from './types';
 
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
@@ -29,6 +33,49 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     getTechName: data.getTechName,
     getTechOverride: data.getTechOverride,
   });
+
+  /* ── Filter state (admin/administrative only) ── */
+  const [filterDepartment, setFilterDepartment] = React.useState<string>('all');
+  const [filterName, setFilterName] = React.useState<string>('');
+
+  /* ── Filtered payout list ── */
+  const displayedPayouts = React.useMemo(() => {
+    let list = data.payoutTotals;
+    if (!data.isAdminOrAdministrative) {
+      // Dept managers: auto-filter to their own department only
+      const normalizedUserDept = normalizeDepartmentKey(data.userDepartment);
+      list = list.filter(p => {
+        const techDept = normalizeDepartmentKey(data.profileMap.get(p.technician_id)?.department);
+        return techDept === normalizedUserDept;
+      });
+    } else {
+      // Admin/Administrative: apply UI-driven filters
+      if (filterDepartment !== 'all') {
+        list = list.filter(p =>
+          normalizeDepartmentKey(data.profileMap.get(p.technician_id)?.department) === normalizeDepartmentKey(filterDepartment)
+        );
+      }
+      if (filterName.trim()) {
+        const needle = filterName.trim().toLowerCase();
+        list = list.filter(p => data.getTechName(p.technician_id).toLowerCase().includes(needle));
+      }
+    }
+    return list;
+  }, [data.payoutTotals, data.isAdminOrAdministrative, data.userDepartment, data.profileMap, data.getTechName, filterDepartment, filterName]);
+
+  /* ── Grand total for filtered view ── */
+  const filteredCalculatedGrandTotal = React.useMemo(() => {
+    return displayedPayouts.reduce((sum, payout) => {
+      const override = data.getTechOverride(payout.technician_id);
+      let deduction = 0;
+      const isNonAutonomo = data.autonomoMap.get(payout.technician_id) === false;
+      if (isNonAutonomo && !override && !data.isTourDate) {
+        const days = data.techDaysMap.get(payout.technician_id) || (payout.timesheets_total_eur > 0 ? 1 : 0);
+        deduction = days * NON_AUTONOMO_DEDUCTION_EUR;
+      }
+      return sum + ((override?.override_amount_eur ?? payout.total_eur) - (override ? 0 : deduction));
+    }, 0);
+  }, [displayedPayouts, data.getTechOverride, data.autonomoMap, data.isTourDate, data.techDaysMap]);
 
   /* ── Loading state ── */
   if (data.isLoading) {
@@ -113,7 +160,40 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
       </CardHeader>
 
       <CardContent className="space-y-4 w-full overflow-hidden">
-        {data.payoutTotals.map((payout) => (
+        {/* Filter bar — admin/administrative only */}
+        {data.isAdminOrAdministrative && (
+          <div className="flex flex-col sm:flex-row gap-2 pb-2 border-b border-border">
+            <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+              <SelectTrigger className="w-full sm:w-44 h-8 text-xs">
+                <SelectValue placeholder="Todos los departamentos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los departamentos</SelectItem>
+                {TECHNICAL_DEPARTMENTS.map(dept => (
+                  <SelectItem key={dept} value={dept}>{DEPARTMENT_LABELS[dept]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+              <Input
+                className="pl-7 h-8 text-xs"
+                placeholder="Buscar técnico..."
+                value={filterName}
+                onChange={e => setFilterName(e.target.value)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Zero-filter match feedback */}
+        {displayedPayouts.length === 0 && data.payoutTotals.length > 0 && (
+          <div className="text-sm text-muted-foreground py-4 text-center">
+            No hay técnicos que coincidan con el filtro seleccionado.
+          </div>
+        )}
+
+        {displayedPayouts.map((payout) => (
           <TechnicianPayoutCard
             key={payout.technician_id}
             payout={payout}
@@ -149,8 +229,8 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
         ))}
 
         <PayoutGrandTotal
-          payoutTotals={data.payoutTotals}
-          calculatedGrandTotal={data.calculatedGrandTotal}
+          payoutTotals={displayedPayouts}
+          calculatedGrandTotal={filteredCalculatedGrandTotal}
           payoutOverrides={data.payoutOverrides}
           isCicloJob={isCicloJob}
         />

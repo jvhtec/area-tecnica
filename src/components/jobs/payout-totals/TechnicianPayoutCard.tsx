@@ -222,15 +222,12 @@ export function TechnicianPayoutCard({
             disabled={
               sendingByTech[techId] ||
               (!isTourDate && !payout.payout_approved) ||
-              !profile?.email ||
-              isClosureLocked
+              !profile?.email
             }
             title={
-              isClosureLocked
-                ? 'Periodo de cierre finalizado'
-                : (!isTourDate && !payout.payout_approved
-                  ? 'Aprueba el pago para habilitar el envío'
-                  : (profile?.email ? 'Enviar sólo a este técnico' : 'Sin correo configurado'))
+              !isTourDate && !payout.payout_approved
+                ? 'Aprueba el pago para habilitar el envío'
+                : (profile?.email ? 'Enviar sólo a este técnico' : 'Sin correo configurado')
             }
             className={controlButton}
           >
