@@ -45,74 +45,59 @@ BEGIN
   FROM public.custom_tech_rates
   WHERE profile_id = _technician_id;
 
-  -- Calculate extras from job_rate_extras joined with rate_extras_2025 for unit prices
-  -- Priority: custom rate > house tech fixed rate > catalog rate
-  -- NOTE: The rate-resolution CASE is repeated in three positions (total SUM,
-  -- unit_eur field, amount_eur field) because PostgreSQL aggregate expressions
-  -- cannot reference sibling columns within the same jsonb_build_object call.
-  -- A LATERAL subquery would add join complexity for no runtime benefit.
+  -- Calculate extras from job_rate_extras joined with rate_extras_2025 for unit prices.
+  -- Resolve the travel rate once per row so the priority logic stays centralized.
+  WITH resolved_extras AS (
+    SELECT
+      jre.extra_type,
+      jre.quantity,
+      jre.amount_override_eur,
+      jre.updated_at,
+      CASE
+        WHEN jre.extra_type = 'travel_half' AND v_custom_travel_half IS NOT NULL
+        THEN v_custom_travel_half
+        WHEN jre.extra_type = 'travel_full' AND v_custom_travel_full IS NOT NULL
+        THEN v_custom_travel_full
+        WHEN v_qualifies_for_fixed_travel_rate AND jre.extra_type IN ('travel_half', 'travel_full')
+        THEN v_fixed_travel_rate
+        ELSE re.amount_eur
+      END AS unit_eur
+    FROM job_rate_extras jre
+    LEFT JOIN rate_extras_2025 re ON re.extra_type = jre.extra_type
+    WHERE jre.job_id = _job_id
+      AND jre.technician_id = _technician_id
+      AND jre.status = 'approved'
+  )
   SELECT jsonb_build_object(
     'total_eur', COALESCE(SUM(
       COALESCE(
-        jre.amount_override_eur,
-        jre.quantity * (
-          CASE
-            WHEN jre.extra_type = 'travel_half' AND v_custom_travel_half IS NOT NULL
-            THEN v_custom_travel_half
-            WHEN jre.extra_type = 'travel_full' AND v_custom_travel_full IS NOT NULL
-            THEN v_custom_travel_full
-            WHEN v_qualifies_for_fixed_travel_rate AND jre.extra_type IN ('travel_half', 'travel_full')
-            THEN v_fixed_travel_rate
-            ELSE re.amount_eur
-          END
-        )
+        resolved_extras.amount_override_eur,
+        resolved_extras.quantity * resolved_extras.unit_eur
       )
     ), 0),
     'items', COALESCE(jsonb_agg(
       jsonb_build_object(
-        'extra_type', jre.extra_type,
-        'quantity', jre.quantity,
-        'unit_eur', CASE
-          WHEN jre.extra_type = 'travel_half' AND v_custom_travel_half IS NOT NULL
-          THEN v_custom_travel_half
-          WHEN jre.extra_type = 'travel_full' AND v_custom_travel_full IS NOT NULL
-          THEN v_custom_travel_full
-          WHEN v_qualifies_for_fixed_travel_rate AND jre.extra_type IN ('travel_half', 'travel_full')
-          THEN v_fixed_travel_rate
-          ELSE re.amount_eur
-        END,
+        'extra_type', resolved_extras.extra_type,
+        'quantity', resolved_extras.quantity,
+        'unit_eur', resolved_extras.unit_eur,
         'amount_eur', COALESCE(
-          jre.amount_override_eur,
-          jre.quantity * (
-            CASE
-              WHEN jre.extra_type = 'travel_half' AND v_custom_travel_half IS NOT NULL
-              THEN v_custom_travel_half
-              WHEN jre.extra_type = 'travel_full' AND v_custom_travel_full IS NOT NULL
-              THEN v_custom_travel_full
-              WHEN v_qualifies_for_fixed_travel_rate AND jre.extra_type IN ('travel_half', 'travel_full')
-              THEN v_fixed_travel_rate
-              ELSE re.amount_eur
-            END
-          )
+          resolved_extras.amount_override_eur,
+          resolved_extras.quantity * resolved_extras.unit_eur
         ),
-        'is_house_tech_rate', jre.amount_override_eur IS NULL
+        'is_house_tech_rate', resolved_extras.amount_override_eur IS NULL
           AND v_qualifies_for_fixed_travel_rate
-          AND jre.extra_type IN ('travel_half', 'travel_full')
-          AND ((jre.extra_type = 'travel_half' AND v_custom_travel_half IS NULL)
-            OR (jre.extra_type = 'travel_full' AND v_custom_travel_full IS NULL)),
-        'is_custom_travel_rate', jre.amount_override_eur IS NULL
-          AND ((jre.extra_type = 'travel_half' AND v_custom_travel_half IS NOT NULL)
-          OR (jre.extra_type = 'travel_full' AND v_custom_travel_full IS NOT NULL))
+          AND resolved_extras.extra_type IN ('travel_half', 'travel_full')
+          AND ((resolved_extras.extra_type = 'travel_half' AND v_custom_travel_half IS NULL)
+            OR (resolved_extras.extra_type = 'travel_full' AND v_custom_travel_full IS NULL)),
+        'is_custom_travel_rate', resolved_extras.amount_override_eur IS NULL
+          AND ((resolved_extras.extra_type = 'travel_half' AND v_custom_travel_half IS NOT NULL)
+          OR (resolved_extras.extra_type = 'travel_full' AND v_custom_travel_full IS NOT NULL))
       )
-      ORDER BY jre.updated_at
-    ) FILTER (WHERE jre.status = 'approved'), '[]'::jsonb)
+      ORDER BY resolved_extras.updated_at
+    ), '[]'::jsonb)
   )
   INTO v_result
-  FROM job_rate_extras jre
-  LEFT JOIN rate_extras_2025 re ON re.extra_type = jre.extra_type
-  WHERE jre.job_id = _job_id
-    AND jre.technician_id = _technician_id
-    AND jre.status = 'approved';
+  FROM resolved_extras;
 
   RETURN COALESCE(v_result, '{"total_eur": 0, "items": []}'::jsonb);
 END;
