@@ -8,23 +8,69 @@ import { FileText, Weight, Calculator, Trash2, Download, Calendar } from "lucide
 import { exportToPDF } from "@/utils/pdfExport";
 import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { supabase } from "@/lib/supabase";
+import type { Database } from "@/integrations/supabase/types";
 import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
-
-// Compute apparent power (VA) from watts and power factor.
-// Uses PF from stored metadata when available, otherwise defaults by department.
-const computeTotalVa = (watts: number, metadata: any, department?: string): number => {
-  if (!watts) return 0;
-  const pf = metadata?.pf || (department === 'sound' ? 0.95 : department === 'video' ? 0.9 : 0.9);
-  return watts / pf;
-};
 import { useTourWeightDefaults } from "@/hooks/useTourWeightDefaults";
 import { useTourDefaultSets, TourDefaultTable } from "@/hooks/useTourDefaultSets";
+import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tourPowerTables";
+import { getDepartmentLabel } from "@/types/department";
+import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
 
 interface TourDefaultsManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tour: any;
 }
+
+const UNKNOWN_LOCATION_LABEL = 'Ubicación desconocida';
+
+type TourDatePowerOverrideRow =
+  Database['public']['Tables']['tour_date_power_overrides']['Row'];
+type TourDateWeightOverrideRow =
+  Database['public']['Tables']['tour_date_weight_overrides']['Row'];
+
+const isTechnicalPowerDepartment = (
+  department: string
+): department is TechnicalPowerDepartment =>
+  department === 'sound' || department === 'lights' || department === 'video';
+
+const computeTotalVa = (watts: number, metadata: unknown, department?: string): number => {
+  if (!department || !isTechnicalPowerDepartment(department)) {
+    return watts;
+  }
+
+  return computePowerTotalVa(watts, metadata, department);
+};
+
+const getPdfTypeLabel = (type: 'power' | 'weight') =>
+  type === 'power' ? 'potencia' : 'peso';
+
+const getDefaultsPdfTitle = (
+  tourName: string,
+  department: string,
+  type: 'power' | 'weight'
+) => `${tourName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)} predeterminados`;
+
+const getDefaultsPdfFilename = (
+  tourName: string,
+  department: string,
+  type: 'power' | 'weight'
+) => `${tourName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)} predeterminados.pdf`;
+
+const getTourDatePdfTitle = (
+  tourName: string,
+  locationName: string,
+  department: string,
+  type: 'power' | 'weight'
+) => `${tourName} - ${locationName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)}`;
+
+const getTourDatePdfFilename = (
+  tourName: string,
+  dateStr: string,
+  locationName: string,
+  department: string,
+  type: 'power' | 'weight'
+) => `${tourName} - ${dateStr} - ${locationName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)}.pdf`;
 
 // Legacy types for backward compatibility
 interface TourPowerDefault {
@@ -251,6 +297,50 @@ export const TourDefaultsManager = ({
         console.error('Error fetching tour logo:', error);
       }
 
+      if (type === 'power') {
+        const { tables, safetyMargin } = buildNormalizedTourPowerTables({
+          department: department as 'sound' | 'lights' | 'video',
+          defaultTables: relevantDefaults.filter(isNewFormatTable),
+          legacyDefaults: relevantDefaults.filter(isLegacyPowerDefault),
+        });
+
+        const powerSummary = {
+          totalSystemWatts: tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0),
+          totalSystemAmps: tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0),
+          totalSystemKva:
+            tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) /
+            1000,
+        };
+
+        const pdfBlob = await exportToPDF(
+          getDefaultsPdfTitle(tour.name, department, type),
+          tables,
+          type,
+          tour.name,
+          new Date().toLocaleDateString('en-GB'),
+          undefined,
+          powerSummary,
+          safetyMargin,
+          logoUrl
+        );
+
+        const fileName = getDefaultsPdfFilename(tour.name, department, type);
+        const url = window.URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        toast({
+          title: 'Éxito',
+          description: 'PDF exportado exitosamente',
+        });
+        return;
+      }
+
       // Sort defaults by order_index if available, then by created_at
       const sortedDefaults = [...relevantDefaults].sort((a, b) => {
         if (isNewFormatTable(a) && isNewFormatTable(b)) {
@@ -330,7 +420,7 @@ export const TourDefaultsManager = ({
       })();
 
       const pdfBlob = await exportToPDF(
-        `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,
+        getDefaultsPdfTitle(tour.name, department, type),
         tables,
         type,
         tour.name,
@@ -341,7 +431,7 @@ export const TourDefaultsManager = ({
         logoUrl
       );
 
-      const fileName = `${tour.name} - ${department} ${type} defaults.pdf`;
+      const fileName = getDefaultsPdfFilename(tour.name, department, type);
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -385,13 +475,16 @@ export const TourDefaultsManager = ({
       }
 
       // Export one PDF per tour date
+      let exportedCount = 0;
       for (const tourDate of tourDates) {
-        await exportTourDatePDF(tourDate, department, type, logoUrl);
+        if (await exportTourDatePDF(tourDate, department, type, logoUrl)) {
+          exportedCount += 1;
+        }
       }
 
       toast({
         title: 'Éxito',
-        description: `Se exportaron ${tourDates.length} PDFs para todas las fechas de gira`,
+        description: `Se exportaron ${exportedCount} PDFs para las fechas de gira`,
       });
     } catch (error) {
       console.error('Error exporting bulk tour date PDFs:', error);
@@ -403,40 +496,106 @@ export const TourDefaultsManager = ({
     }
   };
 
-  const exportTourDatePDF = async (tourDate: any, department: string, type: 'power' | 'weight', logoUrl?: string) => {
+  const exportTourDatePDF = async (
+    tourDate: any,
+    department: string,
+    type: 'power' | 'weight',
+    logoUrl?: string
+  ): Promise<boolean> => {
     // Get defaults for this department and type
     const defaultsData = getDepartmentDefaults(department, type);
 
     // Check for any overrides for this tour date
     const overrideTable = type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';
-    const { data: overrides } = await supabase
+    const { data: overrides, error: overridesError } = await supabase
       .from(overrideTable)
       .select('*')
       .eq('tour_date_id', tourDate.id)
       .eq('department', department);
 
+    if (overridesError) {
+      console.error('Error fetching tour date overrides:', overridesError);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar las anulaciones de la fecha de gira.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    if (type === 'power') {
+      const { tables, safetyMargin } = buildNormalizedTourPowerTables({
+        department: department as 'sound' | 'lights' | 'video',
+        overrides: (overrides || []) as TourDatePowerOverrideRow[],
+        defaultTables: defaultsData.filter(isNewFormatTable),
+        legacyDefaults: defaultsData.filter(isLegacyPowerDefault),
+      });
+
+      if (tables.length === 0) return false;
+
+      const powerSummary = {
+        totalSystemWatts: tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0),
+        totalSystemAmps: tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0),
+        totalSystemKva:
+          tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) /
+          1000,
+      };
+
+      const locationName = (tourDate.locations as any)?.name || UNKNOWN_LOCATION_LABEL;
+      const dateStr = tourDate.date;
+
+      const pdfBlob = await exportToPDF(
+        getTourDatePdfTitle(tour.name, locationName, department, type),
+        tables,
+        type,
+        `${tour.name} - ${locationName}`,
+        dateStr,
+        undefined,
+        powerSummary,
+        safetyMargin,
+        logoUrl
+      );
+
+      const fileName = getTourDatePdfFilename(
+        tour.name,
+        dateStr,
+        locationName,
+        department,
+        type
+      );
+      const url = window.URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      return true;
+    }
+
     let combinedTables;
     let safetyMargin = 0;
+    const typedWeightOverrides = (overrides || []) as TourDateWeightOverrideRow[];
 
     // If overrides exist, use overrides, otherwise use defaults
-    if (overrides && overrides.length > 0) {
-      combinedTables = overrides.map((override: any) => {
-        const watts = type === 'power' ? (override.total_watts || 0) : undefined;
+    if (typedWeightOverrides.length > 0) {
+      combinedTables = typedWeightOverrides.map((override) => {
         return {
           name: override.table_name || override.item_name || 'Override',
           rows: override.override_data?.rows || [],
-          totalWeight: type === 'weight' ? (override.weight_kg || 0) * (override.quantity || 1) : undefined,
-          totalWatts: watts,
-          totalVa: watts ? computeTotalVa(watts, override.override_data, department) : undefined,
-          currentPerPhase: type === 'power' ? override.current_per_phase : undefined,
-          pduType: type === 'power' ? (override.custom_pdu_type || override.pdu_type) : undefined,
-          customPduType: type === 'power' ? override.custom_pdu_type : undefined,
-          includesHoist: type === 'power' ? (override.includes_hoist || false) : undefined,
-          toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+          totalWeight: (override.weight_kg || 0) * (override.quantity || 1),
+          totalWatts: undefined,
+          totalVa: undefined,
+          currentPerPhase: undefined,
+          pduType: undefined,
+          customPduType: undefined,
+          includesHoist: undefined,
+          toolType: 'pesos' as const,
           id: Date.now() + Math.random()
         };
       });
-      safetyMargin = overrides[0]?.override_data?.safetyMargin || 0;
+      safetyMargin = typedWeightOverrides[0]?.override_data?.safetyMargin || 0;
     } else {
       // Sort defaults by order_index if available, then by created_at
       const sortedDefaults = [...defaultsData].sort((a, b) => {
@@ -495,7 +654,7 @@ export const TourDefaultsManager = ({
       });
     }
 
-    if (combinedTables.length === 0) return;
+    if (combinedTables.length === 0) return false;
 
     // Calculate power summary for power exports
     let powerSummary;
@@ -506,11 +665,11 @@ export const TourDefaultsManager = ({
       powerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
     }
 
-    const locationName = (tourDate.locations as any)?.name || 'Unknown Location';
+    const locationName = (tourDate.locations as any)?.name || UNKNOWN_LOCATION_LABEL;
     const dateStr = tourDate.date; // Pass ISO string directly for proper parsing
 
     const pdfBlob = await exportToPDF(
-      `${tour.name} - ${locationName} - ${department.toUpperCase()} ${type.toUpperCase()}`,
+      getTourDatePdfTitle(tour.name, locationName, department, type),
       combinedTables,
       type,
       `${tour.name} - ${locationName}`, // Include location in jobName for header
@@ -521,7 +680,13 @@ export const TourDefaultsManager = ({
       logoUrl
     );
 
-    const fileName = `${tour.name} - ${dateStr} - ${locationName} - ${department} ${type}.pdf`;
+    const fileName = getTourDatePdfFilename(
+      tour.name,
+      dateStr,
+      locationName,
+      department,
+      type
+    );
     const url = window.URL.createObjectURL(pdfBlob);
     const a = document.createElement('a');
     a.href = url;
@@ -530,6 +695,7 @@ export const TourDefaultsManager = ({
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+    return true;
   };
 
   const renderDepartmentDefaults = (department: string) => {
@@ -622,7 +788,7 @@ export const TourDefaultsManager = ({
                       </p>
                       {table.metadata?.current_per_phase && (
                         <p className="text-xs text-muted-foreground">
-                          {table.metadata.current_per_phase.toFixed(2)} A per phase
+                          {table.metadata.current_per_phase.toFixed(2)} A por fase
                         </p>
                       )}
                     </div>
@@ -653,7 +819,7 @@ export const TourDefaultsManager = ({
                   </p>
                   {getCurrentPerPhase(table) && (
                     <p className="text-xs text-muted-foreground">
-                      {getCurrentPerPhase(table)!.toFixed(2)} A per phase
+                      {getCurrentPerPhase(table)!.toFixed(2)} A por fase
                     </p>
                   )}
                 </div>
@@ -806,7 +972,7 @@ export const TourDefaultsManager = ({
                       {new Date(tourDate.date).toLocaleDateString('en-GB')}
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      {(tourDate.locations as any)?.name || 'Unknown Location'}
+                      {(tourDate.locations as any)?.name || UNKNOWN_LOCATION_LABEL}
                     </p>
                   </div>
                 </div>
