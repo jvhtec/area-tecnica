@@ -8,7 +8,7 @@ import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
-import { canManagePayouts } from '@/utils/permissions';
+import { canManagePayouts, isAdministrativeDepartment } from '@/utils/permissions';
 import type { JobPayoutTotals, JobExpenseBreakdownItem } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { FLEX_UI_BASE_URL } from '@/utils/flexUrlResolver';
@@ -20,6 +20,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   /* ── Auth ── */
   const { userRole, userDepartment } = useOptimizedAuth();
   const isManager = canManagePayouts(userRole, userDepartment);
+  const isAdminOrAdministrative = userRole === 'admin' || isAdministrativeDepartment(userDepartment);
 
   /* ── Job metadata ── */
   const {
@@ -263,7 +264,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, autonomo')
+        .select('id, first_name, last_name, email, autonomo, department')
         .in('id', techIds);
       if (error) throw error;
       return (data || []) as TechnicianProfileWithEmail[];
@@ -387,6 +388,8 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     getTechOverride,
     calculatedGrandTotal,
     isManager,
+    isAdminOrAdministrative,
+    userDepartment,
     rehearsalDateSet,
     jobTimesheetDates,
     allDatesMarked,
