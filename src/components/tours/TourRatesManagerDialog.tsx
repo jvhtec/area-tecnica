@@ -142,15 +142,18 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
       const { data, error } = await supabase
         .from('custom_tech_rates')
-        .select('profile_id, base_day_eur')
+        .select('profile_id, base_day_eur, travel_half_day_eur, travel_full_day_eur')
         .in('profile_id', techIds);
       if (error) throw error;
-      return data as Array<{ profile_id: string; base_day_eur: number }>;
+      return data as Array<{ profile_id: string; base_day_eur: number; travel_half_day_eur: number | null; travel_full_day_eur: number | null }>;
     },
     enabled: open && !!quotes.length,
   });
 
   const houseRateMap = useMemo(() => Object.fromEntries(houseRates.map(r => [r.profile_id, r.base_day_eur])), [houseRates]);
+  const customTravelRateMap = useMemo(() => Object.fromEntries(
+    houseRates.map(r => [r.profile_id, { travel_half_day_eur: r.travel_half_day_eur, travel_full_day_eur: r.travel_full_day_eur }])
+  ), [houseRates]);
 
   // Fixers
   const queryClient = useQueryClient();
@@ -690,6 +693,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                           isManager={true}
                           isHouseTech={Boolean(q.is_house_tech)}
                           isAssignableManagement={isAssignableManagement(q.technician_id)}
+                          customTravelHalfRate={customTravelRateMap[q.technician_id]?.travel_half_day_eur}
+                          customTravelFullRate={customTravelRateMap[q.technician_id]?.travel_full_day_eur}
                           showVehicleDisclaimer={Boolean(q.vehicle_disclaimer)}
                           vehicleDisclaimerText={q.vehicle_disclaimer_text}
                         />
