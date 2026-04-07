@@ -495,11 +495,21 @@ export const TourDefaultsManager = ({
 
     // Check for any overrides for this tour date
     const overrideTable = type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';
-    const { data: overrides } = await supabase
+    const { data: overrides, error: overridesError } = await supabase
       .from(overrideTable)
       .select('*')
       .eq('tour_date_id', tourDate.id)
       .eq('department', department);
+
+    if (overridesError) {
+      console.error('Error fetching tour date overrides:', overridesError);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron cargar las anulaciones de la fecha de gira.',
+        variant: 'destructive',
+      });
+      return false;
+    }
 
     if (type === 'power') {
       const { tables, safetyMargin } = buildNormalizedTourPowerTables({

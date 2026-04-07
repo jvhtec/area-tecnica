@@ -283,6 +283,16 @@ describe('JobCardActions', () => {
     technicalPowerSummaryQueryState.isError = false;
     technicalPowerSummaryQueryState.error = null;
     useQueryMock.mockImplementation((options: any) => {
+      if (!options?.enabled) {
+        return {
+          data: undefined,
+          isLoading: false,
+          isError: false,
+          error: null,
+          refetch: vi.fn(),
+        };
+      }
+
       const queryKey = Array.isArray(options?.queryKey) ? options.queryKey : [];
 
       if (queryKey.includes('technical-power-job-departments')) {

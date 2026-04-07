@@ -58,9 +58,14 @@ export const computePowerTotalVa = (
 ): number => {
   if (!watts) return 0;
 
+  const candidatePf = getNumber(isRecord(metadata) ? metadata.pf : undefined);
   const storedPf =
-    getNumber(isRecord(metadata) ? metadata.pf : undefined) ??
-    DEFAULT_POWER_FACTOR[department];
+    candidatePf !== undefined &&
+    Number.isFinite(candidatePf) &&
+    candidatePf > 0 &&
+    candidatePf <= 1
+      ? candidatePf
+      : DEFAULT_POWER_FACTOR[department];
 
   if (!storedPf) return watts;
   return watts / storedPf;
