@@ -18,23 +18,8 @@ import type { JobPayoutTotalsPanelProps } from './types';
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
   const data = useJobPayoutData(jobId, technicianId);
   const isCicloJob = data.jobMeta?.job_type === 'ciclo';
-  const actions = usePayoutActions({
-    jobId,
-    technicianId,
-    isTourDate: data.isTourDate,
-    jobMeta: data.jobMeta,
-    standardPayoutTotals: data.standardPayoutTotals,
-    visibleTourQuotes: data.visibleTourQuotes,
-    tourTimesheetDays: data.tourTimesheetDays,
-    payoutTotals: data.payoutTotals,
-    profilesWithEmail: data.profilesWithEmail,
-    profileMap: data.profileMap,
-    lpoMap: data.lpoMap,
-    getTechName: data.getTechName,
-    getTechOverride: data.getTechOverride,
-  });
 
-  /* ── Filter state (admin/administrative only) ── */
+  /* ── Filter state (admin/administrative only — must come before usePayoutActions) ── */
   const [filterDepartment, setFilterDepartment] = React.useState<string>('all');
   const [filterName, setFilterName] = React.useState<string>('');
 
@@ -63,6 +48,27 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     return list;
   }, [data.payoutTotals, data.isAdminOrAdministrative, data.userDepartment, data.profileMap, data.getTechName, filterDepartment, filterName]);
 
+  /* ── Scope bulk-action inputs to the filtered set ── */
+  const displayedTechIds = React.useMemo(
+    () => new Set(displayedPayouts.map(p => p.technician_id)),
+    [displayedPayouts]
+  );
+
+  const filteredStandardPayoutTotals = React.useMemo(
+    () => data.standardPayoutTotals.filter(p => displayedTechIds.has(p.technician_id)),
+    [data.standardPayoutTotals, displayedTechIds]
+  );
+
+  const filteredVisibleTourQuotes = React.useMemo(
+    () => data.visibleTourQuotes.filter(q => displayedTechIds.has(q.technician_id)),
+    [data.visibleTourQuotes, displayedTechIds]
+  );
+
+  const filteredProfilesWithEmail = React.useMemo(
+    () => data.profilesWithEmail.filter(p => displayedTechIds.has(p.id)),
+    [data.profilesWithEmail, displayedTechIds]
+  );
+
   /* ── Grand total for filtered view ── */
   const filteredCalculatedGrandTotal = React.useMemo(() => {
     return displayedPayouts.reduce((sum, payout) => {
@@ -76,6 +82,23 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
       return sum + ((override?.override_amount_eur ?? payout.total_eur) - (override ? 0 : deduction));
     }, 0);
   }, [displayedPayouts, data.getTechOverride, data.autonomoMap, data.isTourDate, data.techDaysMap]);
+
+  /* ── Bulk actions receive only the visible, department-scoped collections ── */
+  const actions = usePayoutActions({
+    jobId,
+    technicianId,
+    isTourDate: data.isTourDate,
+    jobMeta: data.jobMeta,
+    standardPayoutTotals: filteredStandardPayoutTotals,
+    visibleTourQuotes: filteredVisibleTourQuotes,
+    tourTimesheetDays: data.tourTimesheetDays,
+    payoutTotals: displayedPayouts,
+    profilesWithEmail: filteredProfilesWithEmail,
+    profileMap: data.profileMap,
+    lpoMap: data.lpoMap,
+    getTechName: data.getTechName,
+    getTechOverride: data.getTechOverride,
+  });
 
   /* ── Loading state ── */
   if (data.isLoading) {
