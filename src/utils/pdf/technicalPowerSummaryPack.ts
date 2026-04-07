@@ -1,3 +1,6 @@
+import parseISO from 'date-fns/parseISO';
+import { formatInTimeZone } from 'date-fns-tz';
+
 import { buildReadableFilename } from '@/utils/fileName';
 import { getDepartmentLabel } from '@/types/department';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
@@ -23,6 +26,7 @@ const CORPORATE_RED = [125, 1, 1] as const;
 const HEADER_HEIGHT = 40;
 const CONTENT_START_Y = 68;
 const FOOTER_SPACE = 28;
+const MADRID_TIMEZONE = 'Europe/Madrid';
 
 const loadImage = (src?: string): Promise<HTMLImageElement | null> =>
   new Promise((resolve) => {
@@ -38,16 +42,23 @@ const loadImage = (src?: string): Promise<HTMLImageElement | null> =>
     image.src = src;
   });
 
-const formatDisplayDate = (value?: string | null, fallback = new Date()) => {
-  if (!value) return fallback.toLocaleDateString('en-GB');
+const parseDateValue = (value?: string | null, fallback = new Date()) => {
+  if (!value) return fallback;
 
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    return fallback.toLocaleDateString('en-GB');
+  const parsedIso = parseISO(value);
+  if (!Number.isNaN(parsedIso.getTime())) {
+    return parsedIso;
   }
 
-  return parsed.toLocaleDateString('en-GB');
+  const parsedDate = new Date(value);
+  return Number.isNaN(parsedDate.getTime()) ? fallback : parsedDate;
 };
+
+const formatMadridDate = (value: Date) =>
+  formatInTimeZone(value, MADRID_TIMEZONE, 'dd/MM/yyyy');
+
+const formatDisplayDate = (value?: string | null, fallback = new Date()) =>
+  formatMadridDate(parseDateValue(value, fallback));
 
 const formatWatts = (value: number) => `${value.toFixed(2)} W`;
 const formatAmps = (value: number) => `${value.toFixed(2)} A`;
@@ -214,7 +225,7 @@ export const generateTechnicalPowerSummaryPack = async ({
 
   const doc = new jsPDF();
   const displayDate = formatDisplayDate(jobDate, generatedAt);
-  const createdDate = generatedAt.toLocaleDateString('en-GB');
+  const createdDate = formatMadridDate(generatedAt);
   const departmentsToInclude = (
     normalizeTechnicalPowerDepartments(includedDepartments || []).length > 0
       ? normalizeTechnicalPowerDepartments(includedDepartments || [])

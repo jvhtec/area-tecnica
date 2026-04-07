@@ -20,12 +20,45 @@ const computeTotalVa = (watts: number, metadata: any, department?: string): numb
 import { useTourWeightDefaults } from "@/hooks/useTourWeightDefaults";
 import { useTourDefaultSets, TourDefaultTable } from "@/hooks/useTourDefaultSets";
 import { buildNormalizedTourPowerTables } from "@/utils/tourPowerTables";
+import { getDepartmentLabel } from "@/types/department";
 
 interface TourDefaultsManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   tour: any;
 }
+
+const UNKNOWN_LOCATION_LABEL = 'Ubicación desconocida';
+
+const getPdfTypeLabel = (type: 'power' | 'weight') =>
+  type === 'power' ? 'potencia' : 'peso';
+
+const getDefaultsPdfTitle = (
+  tourName: string,
+  department: string,
+  type: 'power' | 'weight'
+) => `${tourName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)} predeterminados`;
+
+const getDefaultsPdfFilename = (
+  tourName: string,
+  department: string,
+  type: 'power' | 'weight'
+) => `${tourName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)} predeterminados.pdf`;
+
+const getTourDatePdfTitle = (
+  tourName: string,
+  locationName: string,
+  department: string,
+  type: 'power' | 'weight'
+) => `${tourName} - ${locationName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)}`;
+
+const getTourDatePdfFilename = (
+  tourName: string,
+  dateStr: string,
+  locationName: string,
+  department: string,
+  type: 'power' | 'weight'
+) => `${tourName} - ${dateStr} - ${locationName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)}.pdf`;
 
 // Legacy types for backward compatibility
 interface TourPowerDefault {
@@ -268,7 +301,7 @@ export const TourDefaultsManager = ({
         };
 
         const pdfBlob = await exportToPDF(
-          `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,
+          getDefaultsPdfTitle(tour.name, department, type),
           tables,
           type,
           tour.name,
@@ -279,7 +312,7 @@ export const TourDefaultsManager = ({
           logoUrl
         );
 
-        const fileName = `${tour.name} - ${department} ${type} defaults.pdf`;
+        const fileName = getDefaultsPdfFilename(tour.name, department, type);
         const url = window.URL.createObjectURL(pdfBlob);
         const a = document.createElement('a');
         a.href = url;
@@ -375,7 +408,7 @@ export const TourDefaultsManager = ({
       })();
 
       const pdfBlob = await exportToPDF(
-        `${tour.name} - ${department.toUpperCase()} ${type.toUpperCase()} Defaults`,
+        getDefaultsPdfTitle(tour.name, department, type),
         tables,
         type,
         tour.name,
@@ -386,7 +419,7 @@ export const TourDefaultsManager = ({
         logoUrl
       );
 
-      const fileName = `${tour.name} - ${department} ${type} defaults.pdf`;
+      const fileName = getDefaultsPdfFilename(tour.name, department, type);
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -430,13 +463,16 @@ export const TourDefaultsManager = ({
       }
 
       // Export one PDF per tour date
+      let exportedCount = 0;
       for (const tourDate of tourDates) {
-        await exportTourDatePDF(tourDate, department, type, logoUrl);
+        if (await exportTourDatePDF(tourDate, department, type, logoUrl)) {
+          exportedCount += 1;
+        }
       }
 
       toast({
         title: 'Éxito',
-        description: `Se exportaron ${tourDates.length} PDFs para todas las fechas de gira`,
+        description: `Se exportaron ${exportedCount} PDFs para las fechas de gira`,
       });
     } catch (error) {
       console.error('Error exporting bulk tour date PDFs:', error);
@@ -448,7 +484,12 @@ export const TourDefaultsManager = ({
     }
   };
 
-  const exportTourDatePDF = async (tourDate: any, department: string, type: 'power' | 'weight', logoUrl?: string) => {
+  const exportTourDatePDF = async (
+    tourDate: any,
+    department: string,
+    type: 'power' | 'weight',
+    logoUrl?: string
+  ): Promise<boolean> => {
     // Get defaults for this department and type
     const defaultsData = getDepartmentDefaults(department, type);
 
@@ -468,7 +509,7 @@ export const TourDefaultsManager = ({
         legacyDefaults: defaultsData.filter(isLegacyPowerDefault),
       });
 
-      if (tables.length === 0) return;
+      if (tables.length === 0) return false;
 
       const powerSummary = {
         totalSystemWatts: tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0),
@@ -478,11 +519,11 @@ export const TourDefaultsManager = ({
           1000,
       };
 
-      const locationName = (tourDate.locations as any)?.name || 'Unknown Location';
+      const locationName = (tourDate.locations as any)?.name || UNKNOWN_LOCATION_LABEL;
       const dateStr = tourDate.date;
 
       const pdfBlob = await exportToPDF(
-        `${tour.name} - ${locationName} - ${department.toUpperCase()} ${type.toUpperCase()}`,
+        getTourDatePdfTitle(tour.name, locationName, department, type),
         tables,
         type,
         `${tour.name} - ${locationName}`,
@@ -493,7 +534,13 @@ export const TourDefaultsManager = ({
         logoUrl
       );
 
-      const fileName = `${tour.name} - ${dateStr} - ${locationName} - ${department} ${type}.pdf`;
+      const fileName = getTourDatePdfFilename(
+        tour.name,
+        dateStr,
+        locationName,
+        department,
+        type
+      );
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -502,7 +549,7 @@ export const TourDefaultsManager = ({
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-      return;
+      return true;
     }
 
     let combinedTables;
@@ -585,7 +632,7 @@ export const TourDefaultsManager = ({
       });
     }
 
-    if (combinedTables.length === 0) return;
+    if (combinedTables.length === 0) return false;
 
     // Calculate power summary for power exports
     let powerSummary;
@@ -596,11 +643,11 @@ export const TourDefaultsManager = ({
       powerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
     }
 
-    const locationName = (tourDate.locations as any)?.name || 'Unknown Location';
+    const locationName = (tourDate.locations as any)?.name || UNKNOWN_LOCATION_LABEL;
     const dateStr = tourDate.date; // Pass ISO string directly for proper parsing
 
     const pdfBlob = await exportToPDF(
-      `${tour.name} - ${locationName} - ${department.toUpperCase()} ${type.toUpperCase()}`,
+      getTourDatePdfTitle(tour.name, locationName, department, type),
       combinedTables,
       type,
       `${tour.name} - ${locationName}`, // Include location in jobName for header
@@ -611,7 +658,13 @@ export const TourDefaultsManager = ({
       logoUrl
     );
 
-    const fileName = `${tour.name} - ${dateStr} - ${locationName} - ${department} ${type}.pdf`;
+    const fileName = getTourDatePdfFilename(
+      tour.name,
+      dateStr,
+      locationName,
+      department,
+      type
+    );
     const url = window.URL.createObjectURL(pdfBlob);
     const a = document.createElement('a');
     a.href = url;
@@ -620,6 +673,7 @@ export const TourDefaultsManager = ({
     a.click();
     window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
+    return true;
   };
 
   const renderDepartmentDefaults = (department: string) => {

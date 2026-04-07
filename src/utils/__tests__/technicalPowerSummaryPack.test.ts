@@ -139,4 +139,56 @@ describe('technicalPowerSummaryPack', () => {
       })
     );
   });
+
+  it('formats job and created dates in Europe/Madrid', async () => {
+    await generateTechnicalPowerSummaryPack({
+      jobTitle: 'Festival Test',
+      jobDate: '2026-04-06T22:30:00.000Z',
+      generatedAt: new Date('2026-04-06T22:30:00.000Z'),
+      summary: {
+        departments: {
+          sound: {
+            department: 'sound',
+            rows: [],
+            safetyMargin: null,
+            totalWatts: 0,
+            totalAmps: 0,
+            totalKva: 0,
+          },
+          lights: {
+            department: 'lights',
+            rows: [],
+            safetyMargin: null,
+            totalWatts: 0,
+            totalAmps: 0,
+            totalKva: 0,
+          },
+          video: {
+            department: 'video',
+            rows: [],
+            safetyMargin: null,
+            totalWatts: 0,
+            totalAmps: 0,
+            totalKva: 0,
+          },
+        },
+        totalSystemWatts: 0,
+        totalSystemAmps: 0,
+        totalSystemKva: 0,
+      },
+    });
+
+    expect(docMock.text).toHaveBeenCalledWith(
+      'Fecha del trabajo: 07/04/2026',
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Object)
+    );
+    expect(docMock.text).toHaveBeenCalledWith(
+      'Creado: 07/04/2026',
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Object)
+    );
+  });
 });

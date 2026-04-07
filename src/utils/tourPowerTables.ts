@@ -186,9 +186,7 @@ export const buildNormalizedTourPowerTables = ({
   }
 
   if (defaultTables.length > 0) {
-    const sortedDefaults = sortTourPowerDefaultTables(
-      defaultTables.filter((table) => table.table_type === 'power')
-    );
+    const sortedDefaults = sortTourPowerDefaultTables(defaultTables);
 
     return {
       tables: sortedDefaults.map((table) => normalizeTourDefaultPowerTable(table, department)),

@@ -530,6 +530,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
   const isFestivalLike = isFestivalLikeJobType(job?.job_type);
   const allowedJobType = ['single', 'festival', 'ciclo', 'tourdate'].includes(job?.job_type);
+  const technicalPowerSummaryTitle = React.useMemo(
+    () => job.title || job.name || job.job_name || 'Trabajo',
+    [job.job_name, job.name, job.title]
+  );
   const technicalPowerSummaryJob = React.useMemo(() => ({
     id: job.id,
     job_type: job.job_type,
@@ -607,6 +611,8 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   );
   const hasAvailableTechnicalPowerDepartments =
     technicalPowerSummaryStatus.availableDepartments.length > 0;
+  const canRetryTechnicalPowerPack =
+    isTechnicalPowerDepartmentsError || isTechnicalPowerSummaryPreviewError;
 
   const navigateToCalculator = (e: React.MouseEvent, type: 'pesos' | 'consumos') => {
     e.stopPropagation();
@@ -755,7 +761,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       }
 
       const pdfBlob = await generateTechnicalPowerSummaryPack({
-        jobTitle: job.title,
+        jobTitle: technicalPowerSummaryTitle,
         jobDate: job.start_time || job.date || null,
         jobLocation: resolveJobLocation(),
         logoUrl,
@@ -763,7 +769,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
         summary,
       });
 
-      downloadPdfBlob(pdfBlob, buildTechnicalPowerSummaryPackFilename(job.title));
+      downloadPdfBlob(pdfBlob, buildTechnicalPowerSummaryPackFilename(technicalPowerSummaryTitle));
 
       const missingLabels = summaryStatus.missingDepartments
         .map((department) => getDepartmentLabel(department))
@@ -791,10 +797,12 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     isGeneratingTechnicalPowerPack,
     job.date,
     job.id,
+    job.job_name,
+    job.name,
     job.start_time,
-    job.title,
     resolveJobLocation,
     technicalPowerSummaryJob,
+    technicalPowerSummaryTitle,
     toast,
   ]);
 
@@ -1407,11 +1415,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                   disabled={
                     isGeneratingTechnicalPowerPack ||
                     isTechnicalPowerDepartmentsLoading ||
-                    isTechnicalPowerDepartmentsError ||
-                    !hasRequiredTechnicalPowerDepartments ||
                     isTechnicalPowerSummaryPreviewLoading ||
-                    isTechnicalPowerSummaryPreviewError ||
-                    !hasAvailableTechnicalPowerDepartments
+                    (!canRetryTechnicalPowerPack &&
+                      (!hasRequiredTechnicalPowerDepartments ||
+                        !hasAvailableTechnicalPowerDepartments))
                   }
                   onClick={handleGenerateTechnicalPowerPack}
                 >

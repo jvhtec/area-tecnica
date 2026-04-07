@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { JobCardActions } from '../JobCardActions';
+import { buildTechnicalPowerSummaryPackFilename } from '@/utils/pdf/technicalPowerSummaryPack';
 import type { FlatElementNode } from '@/utils/flex-folders';
 import * as resolveFlexUrl from '@/utils/flex-folders/resolveFlexUrl';
 import * as useFlexUuidModule from '@/hooks/useFlexUuid';
@@ -852,6 +853,41 @@ describe('JobCardActions', () => {
       });
     });
 
+    it('should keep the technical power summary button enabled when department preview loading fails so users can retry', async () => {
+      const user = userEvent.setup();
+      jobDepartmentsQueryState.data = [];
+      jobDepartmentsQueryState.isError = true;
+
+      render(<JobCardActions {...defaultProps} />);
+
+      const powerSummaryButton = screen.getByRole('button', { name: /Resumen Potencia/i });
+      expect(powerSummaryButton).not.toBeDisabled();
+
+      await user.hover(powerSummaryButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('tooltip')).toHaveTextContent(/No se pudieron comprobar los departamentos tecnicos/i);
+      });
+    });
+
+    it('should keep the technical power summary button enabled when summary preview fails so users can retry', async () => {
+      const user = userEvent.setup();
+      jobDepartmentsQueryState.data = ['sound'];
+      technicalPowerSummaryQueryState.data = undefined;
+      technicalPowerSummaryQueryState.isError = true;
+
+      render(<JobCardActions {...defaultProps} />);
+
+      const powerSummaryButton = screen.getByRole('button', { name: /Resumen Potencia/i });
+      expect(powerSummaryButton).not.toBeDisabled();
+
+      await user.hover(powerSummaryButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('tooltip')).toHaveTextContent(/No se pudieron comprobar las tablas de potencia/i);
+      });
+    });
+
     it('should generate the technical power summary pack when all department tables are ready', async () => {
       const user = userEvent.setup();
       const props = {
@@ -885,6 +921,32 @@ describe('JobCardActions', () => {
         })
       );
       expect(fetchJobLogoMock).toHaveBeenCalledWith('test-job-id');
+    });
+
+    it('should use the fallback job title for the PDF title and filename when title is missing', async () => {
+      const user = userEvent.setup();
+      const props = {
+        ...defaultProps,
+        job: {
+          ...defaultProps.job,
+          title: null,
+          name: 'Fallback Job',
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      await user.click(screen.getByRole('button', { name: /Resumen Potencia/i }));
+
+      await waitFor(() => {
+        expect(generateTechnicalPowerSummaryPackMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            jobTitle: 'Fallback Job',
+          })
+        );
+      });
+
+      expect(vi.mocked(buildTechnicalPowerSummaryPackFilename)).toHaveBeenCalledWith('Fallback Job');
     });
 
     it('should generate the technical power summary pack with only available departments when some are missing', async () => {

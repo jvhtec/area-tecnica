@@ -253,6 +253,40 @@ describe('powerSummaryData', () => {
     expect(summary.totalSystemWatts).toBe(4300);
   });
 
+  it('treats legacy tour defaults with a null department as sound defaults', async () => {
+    const supabase = createMockSupabase({
+      tour_date_power_overrides: [],
+      tour_power_defaults: [
+        {
+          id: 'legacy-sound',
+          tour_id: 'tour-1',
+          department: null,
+          table_name: 'Legacy FoH',
+          total_watts: 1200,
+          current_per_phase: 5,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          includes_hoist: false,
+        },
+      ],
+      tour_default_sets: [],
+      tour_default_tables: [],
+    });
+
+    const summary = await loadTechnicalPowerSummaryData({
+      job: {
+        id: 'job-tour',
+        job_type: 'tourdate',
+        tour_id: 'tour-1',
+        tour_date_id: 'tour-date-1',
+      },
+      supabase,
+    });
+
+    expect(summary.departments.sound.rows[0].name).toBe('Legacy FoH');
+    expect(summary.departments.sound.rows[0].source).toBe('legacy-tour-default');
+  });
+
   it('uses job-specific tourdate tables before tour defaults when they exist', async () => {
     const supabase = createMockSupabase({
       power_requirement_tables: [

@@ -14,6 +14,12 @@ const normalizeValue = (value: string | null | undefined) =>
     .toLowerCase()
     .replace(/\\/g, '/');
 
+const parseUploadedAtTimestamp = (value: string | null) => {
+  if (!value) return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export const getTechnicalPowerDepartmentFromDocument = (
   document: PowerReportDocument
 ): TechnicalPowerDepartment | null => {
@@ -53,8 +59,8 @@ export const getTechnicalPowerReportStatus = <
     if (!department) continue;
 
     const current = latestDocsByDepartment[department];
-    const currentTimestamp = current?.uploaded_at ? Date.parse(current.uploaded_at) : 0;
-    const nextTimestamp = document.uploaded_at ? Date.parse(document.uploaded_at) : 0;
+    const currentTimestamp = parseUploadedAtTimestamp(current?.uploaded_at ?? null);
+    const nextTimestamp = parseUploadedAtTimestamp(document.uploaded_at);
 
     if (!current || nextTimestamp >= currentTimestamp) {
       latestDocsByDepartment[department] = document;

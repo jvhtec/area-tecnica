@@ -64,6 +64,25 @@ describe('powerReportReadiness', () => {
     expect(status.latestDocsByDepartment.sound?.id).toBe('sound-new');
   });
 
+  it('treats malformed upload timestamps as the oldest value', () => {
+    const status = getTechnicalPowerReportStatus([
+      {
+        id: 'sound-invalid-date',
+        file_name: 'Sound_Power_Report_-_Show.pdf',
+        file_path: 'calculators/consumos/job-1/Sound_Power_Report_-_Show.pdf',
+        uploaded_at: 'not-a-date',
+      },
+      {
+        id: 'sound-valid-date',
+        file_name: 'Sound_Power_Report_-_Show_v2.pdf',
+        file_path: 'calculators/consumos/job-1/Sound_Power_Report_-_Show_v2.pdf',
+        uploaded_at: '2026-04-07T11:00:00.000Z',
+      },
+    ]);
+
+    expect(status.latestDocsByDepartment.sound?.id).toBe('sound-valid-date');
+  });
+
   it('reports missing departments when the pack is not ready', () => {
     const status = getTechnicalPowerReportStatus([
       {

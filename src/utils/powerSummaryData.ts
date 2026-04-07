@@ -121,6 +121,11 @@ const mapNormalizedTourPowerTable = (
   source: table.source,
 });
 
+const isMatchingLegacyPowerDefaultDepartment = (
+  department: TechnicalPowerDepartment,
+  rowDepartment: string | null
+) => rowDepartment === department || (rowDepartment === null && department === 'sound');
+
 const loadStandardJobPowerData = async ({
   jobId,
   supabase,
@@ -200,7 +205,6 @@ const loadTourdateReferenceData = async ({
           .from('tour_power_defaults')
           .select('*')
           .eq('tour_id', resolvedTourId)
-          .in('department', [...TECHNICAL_POWER_DEPARTMENTS])
       : Promise.resolve({ data: [] as TourPowerDefaultRow[], error: null }),
     resolvedTourId
       ? supabase
@@ -269,7 +273,7 @@ const loadTourdatePowerData = async ({
       ) as TourDefaultTableRow[];
 
       const departmentLegacyDefaults = legacyDefaults.filter(
-        (row) => row.department === department
+        (row) => isMatchingLegacyPowerDefaultDepartment(department, row.department)
       ) as TourPowerDefaultRow[];
 
       if (departmentOverrides.length > 0) {
