@@ -169,6 +169,12 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           isSendingEmails={actions.isSendingEmails}
           isLoadingPreview={actions.isLoadingPreview}
           hasPayouts={data.payoutTotals.length > 0}
+          visibleCount={displayedPayouts.length}
+          approvedCount={
+            data.isTourDate
+              ? filteredVisibleTourQuotes.length
+              : filteredStandardPayoutTotals.filter(p => p.payout_approved).length
+          }
           onExport={actions.handleExport}
           onPreview={actions.handlePreviewEmails}
           onSendEmails={actions.handleSendEmails}
