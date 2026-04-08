@@ -15,6 +15,7 @@ import { useTourDefaultSets, TourDefaultTable } from "@/hooks/useTourDefaultSets
 import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tourPowerTables";
 import { getDepartmentLabel } from "@/types/department";
 import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
+import { getResolvedPowerPosition } from "@/utils/powerPositions";
 
 interface TourDefaultsManagerProps {
   open: boolean;
@@ -81,6 +82,8 @@ interface TourPowerDefault {
   current_per_phase?: number;
   pdu_type?: string;
   custom_pdu_type?: string;
+  position?: string | null;
+  custom_position?: string | null;
   includes_hoist?: boolean;
   department?: string;
 }
@@ -366,6 +369,8 @@ export const TourDefaultsManager = ({
             currentPerPhase: type === 'power' ? defaultItem.metadata?.current_per_phase : undefined,
             pduType: type === 'power' ? (defaultItem.metadata?.custom_pdu_type || defaultItem.metadata?.pdu_type) : undefined,
             customPduType: type === 'power' ? defaultItem.metadata?.custom_pdu_type : undefined,
+            position: type === 'power' ? defaultItem.metadata?.position : undefined,
+            customPosition: type === 'power' ? defaultItem.metadata?.custom_position : undefined,
             includesHoist: type === 'power' ? (defaultItem.metadata?.includes_hoist || false) : undefined,
             dualMotors: type === 'weight' ? (defaultItem.metadata?.dualMotors || false) : undefined,
             riggingPoint: type === 'weight' ? defaultItem.metadata?.riggingPoint : undefined,
@@ -391,6 +396,8 @@ export const TourDefaultsManager = ({
             currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
             pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.custom_pdu_type || defaultItem.pdu_type) : undefined,
             customPduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.custom_pdu_type : undefined,
+            position: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.position : undefined,
+            customPosition: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.custom_position : undefined,
             includesHoist: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.includes_hoist || false) : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
@@ -621,6 +628,8 @@ export const TourDefaultsManager = ({
             currentPerPhase: type === 'power' ? defaultItem.metadata?.current_per_phase : undefined,
             pduType: type === 'power' ? (defaultItem.metadata?.custom_pdu_type || defaultItem.metadata?.pdu_type) : undefined,
             customPduType: type === 'power' ? defaultItem.metadata?.custom_pdu_type : undefined,
+            position: type === 'power' ? defaultItem.metadata?.position : undefined,
+            customPosition: type === 'power' ? defaultItem.metadata?.custom_position : undefined,
             includesHoist: type === 'power' ? (defaultItem.metadata?.includes_hoist || false) : undefined,
             dualMotors: type === 'weight' ? (defaultItem.metadata?.dualMotors || false) : undefined,
             riggingPoint: type === 'weight' ? defaultItem.metadata?.riggingPoint : undefined,
@@ -646,6 +655,8 @@ export const TourDefaultsManager = ({
             currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
             pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.custom_pdu_type || defaultItem.pdu_type) : undefined,
             customPduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.custom_pdu_type : undefined,
+            position: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.position : undefined,
+            customPosition: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.custom_position : undefined,
             includesHoist: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.includes_hoist || false) : undefined,
             toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
             id: Date.now() + Math.random()
@@ -791,6 +802,11 @@ export const TourDefaultsManager = ({
                           {table.metadata.current_per_phase.toFixed(2)} A por fase
                         </p>
                       )}
+                      {getResolvedPowerPosition(table.metadata?.position, table.metadata?.custom_position) && (
+                        <p className="text-xs text-muted-foreground">
+                          Posición: {getResolvedPowerPosition(table.metadata?.position, table.metadata?.custom_position)}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -822,6 +838,12 @@ export const TourDefaultsManager = ({
                       {getCurrentPerPhase(table)!.toFixed(2)} A por fase
                     </p>
                   )}
+                  {isLegacyPowerDefault(table) &&
+                    getResolvedPowerPosition(table.position, table.custom_position) && (
+                      <p className="text-xs text-muted-foreground">
+                        Posición: {getResolvedPowerPosition(table.position, table.custom_position)}
+                      </p>
+                    )}
                 </div>
               ))}
             </div>

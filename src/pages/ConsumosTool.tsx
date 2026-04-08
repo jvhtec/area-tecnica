@@ -18,6 +18,13 @@ import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeade
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import type { Table, TableRow } from './consumos-tool/types';
 import { PowerTableCard } from './consumos-tool/components/PowerTableCard';
+import {
+  CUSTOM_POWER_POSITION_VALUE,
+  getPowerPositionCustomValue,
+  getPowerPositionSelectValue,
+  NO_POWER_POSITION_VALUE,
+  POWER_POSITION_PRESETS,
+} from '@/utils/powerPositions';
 
 const soundComponentDatabase = [
   { id: 1, name: 'LA12X', watts: 2000 },
@@ -90,6 +97,8 @@ const ConsumosTool: React.FC = () => {
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
+    position: undefined,
+    customPosition: undefined,
   });
 
   // Preselect job from query param and fetch details if not in the list
@@ -216,6 +225,9 @@ const ConsumosTool: React.FC = () => {
           current_per_phase: table.currentPerPhase || 0,
           pdu_type: table.customPduType || table.pduType || '',
           custom_pdu_type: table.customPduType,
+          position: table.position || null,
+          custom_position: table.customPosition || null,
+          table_data: { rows: table.rows },
           includes_hoist: table.includesHoist || false
         });
 
@@ -244,6 +256,8 @@ const ConsumosTool: React.FC = () => {
           current_per_phase: table.currentPerPhase,
           pdu_type: table.customPduType || table.pduType,
           custom_pdu_type: table.customPduType,
+          position: table.position,
+          custom_position: table.customPosition,
           includes_hoist: table.includesHoist || false,
           safetyMargin,
           pf,
@@ -274,6 +288,8 @@ const ConsumosTool: React.FC = () => {
         current_per_phase: table.currentPerPhase || 0,
         pdu_type: table.customPduType || table.pduType || '',
         custom_pdu_type: table.customPduType,
+        position: table.position || null,
+        custom_position: table.customPosition || null,
         includes_hoist: table.includesHoist || false,
         department: 'sound',
         override_data: { rows: table.rows, safetyMargin, pf, phaseMode, voltage }
@@ -299,9 +315,19 @@ const ConsumosTool: React.FC = () => {
     setTableName(override.table_name);
     setEditingOverride(override.id);
     if (override.override_data?.rows) {
-      setCurrentTable({ name: override.table_name, rows: override.override_data.rows });
+      setCurrentTable({
+        name: override.table_name,
+        rows: override.override_data.rows,
+        position: override.position || undefined,
+        customPosition: override.custom_position || undefined,
+      });
     } else {
-      setCurrentTable({ name: override.table_name, rows: [{ quantity: '1', componentId: '', watts: override.total_watts.toString() }] });
+      setCurrentTable({
+        name: override.table_name,
+        rows: [{ quantity: '1', componentId: '', watts: override.total_watts.toString() }],
+        position: override.position || undefined,
+        customPosition: override.custom_position || undefined,
+      });
     }
   };
 
@@ -334,6 +360,8 @@ const ConsumosTool: React.FC = () => {
       currentPerPhase: currentLine, // keep field name for compatibility
       pduType: pduSuggestion,
       customPduType: '',
+      position: currentTable.position,
+      customPosition: currentTable.customPosition,
       includesHoist: false,
       id: Date.now(),
       isDefault: false,
@@ -354,7 +382,12 @@ const ConsumosTool: React.FC = () => {
   };
 
   const resetCurrentTable = () => {
-    setCurrentTable({ name: '', rows: [{ quantity: '', componentId: '', watts: '' }] });
+    setCurrentTable({
+      name: '',
+      rows: [{ quantity: '', componentId: '', watts: '' }],
+      position: undefined,
+      customPosition: undefined,
+    });
     setTableName('');
     setEditingOverride(null);
   };
@@ -385,6 +418,8 @@ const ConsumosTool: React.FC = () => {
             current_per_phase: table.currentPerPhase,
             pdu_type: table.customPduType || table.pduType,
             custom_pdu_type: table.customPduType,
+            position: table.position,
+            custom_position: table.customPosition,
             includes_hoist: table.includesHoist || false,
             safetyMargin,
             pf,
@@ -417,6 +452,8 @@ const ConsumosTool: React.FC = () => {
                   current_per_phase: updatedTable.currentPerPhase,
                   pdu_type: updatedTable.customPduType || updatedTable.pduType,
                   custom_pdu_type: updatedTable.customPduType,
+                  position: updatedTable.position,
+                  custom_position: updatedTable.customPosition,
                   includes_hoist: updatedTable.includesHoist || false,
                   safetyMargin,
                   pf,
@@ -433,6 +470,8 @@ const ConsumosTool: React.FC = () => {
                 current_per_phase: updatedTable.currentPerPhase || 0,
                 pdu_type: updatedTable.customPduType || updatedTable.pduType || '',
                 custom_pdu_type: updatedTable.customPduType,
+                position: updatedTable.position || null,
+                custom_position: updatedTable.customPosition || null,
                 includes_hoist: updatedTable.includesHoist || false,
                 override_data: { rows: updatedTable.rows, safetyMargin, pf, phaseMode, voltage }
               }
@@ -586,6 +625,8 @@ const ConsumosTool: React.FC = () => {
         currentPerPhase: table.metadata?.current_per_phase || 0,
         pduType: table.metadata?.pdu_type || '',
         customPduType: table.metadata?.custom_pdu_type || '',
+        position: table.metadata?.position || undefined,
+        customPosition: table.metadata?.custom_position || undefined,
         includesHoist: table.metadata?.includes_hoist || false,
         isDefault: true,
         defaultTableId: table.id
@@ -613,6 +654,8 @@ const ConsumosTool: React.FC = () => {
       currentPerPhase: def.current_per_phase,
       pduType: def.pdu_type,
       customPduType: def.custom_pdu_type,
+      position: def.position,
+      customPosition: def.custom_position,
       includesHoist: def.includes_hoist,
       isDefault: true
     };
@@ -641,6 +684,8 @@ const ConsumosTool: React.FC = () => {
       currentPerPhase: override.current_per_phase,
       pduType: override.pdu_type,
       customPduType: override.custom_pdu_type,
+      position: override.position,
+      customPosition: override.custom_position,
       includesHoist: override.includes_hoist,
       isOverride: true,
       overrideId: override.id
@@ -848,6 +893,8 @@ const ConsumosTool: React.FC = () => {
                                 id: table.overrideId,
                                 table_name: table.name,
                                 total_watts: table.totalWatts,
+                                position: table.position,
+                                custom_position: table.customPosition,
                                 override_data: { rows: table.rows }
                               })}
                               className="gap-2"
@@ -872,6 +919,7 @@ const ConsumosTool: React.FC = () => {
                             <div>Potencia Aparente: <span className="font-medium">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</span></div>
                             <div>{phaseMode === 'three' ? 'Current per Phase' : 'Current'}: <span className="font-medium">{table.currentPerPhase?.toFixed(2)} A</span></div>
                             <div>PDU Type: <span className="font-medium">{table.customPduType || table.pduType}</span></div>
+                            <div>Position: <span className="font-medium">{table.customPosition || table.position || 'N/A'}</span></div>
                             {table.includesHoist && (
                               <div className="col-span-1 sm:col-span-2 text-orange-700">✓ Includes additional hoist power (CEE32A 3P+N+G)</div>
                             )}
@@ -892,6 +940,55 @@ const ConsumosTool: React.FC = () => {
                     onChange={(e) => setTableName(e.target.value)}
                     placeholder={isTourDefaults ? "Enter default name" : "Enter table name"}
                   />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Position</Label>
+                    <Select
+                      value={getPowerPositionSelectValue(currentTable.position, currentTable.customPosition)}
+                      onValueChange={(value) =>
+                        setCurrentTable((prev) => ({
+                          ...prev,
+                          position:
+                            value === NO_POWER_POSITION_VALUE || value === CUSTOM_POWER_POSITION_VALUE
+                              ? undefined
+                              : value,
+                          customPosition:
+                            value === CUSTOM_POWER_POSITION_VALUE ? prev.customPosition || '' : undefined,
+                        }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="No position" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NO_POWER_POSITION_VALUE}>No position</SelectItem>
+                        {POWER_POSITION_PRESETS.map((position) => (
+                          <SelectItem key={position} value={position}>
+                            {position}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Custom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {getPowerPositionSelectValue(currentTable.position, currentTable.customPosition) === CUSTOM_POWER_POSITION_VALUE && (
+                    <div className="space-y-2">
+                      <Label>Custom Position</Label>
+                      <Input
+                        value={getPowerPositionCustomValue(currentTable.position, currentTable.customPosition)}
+                        onChange={(e) =>
+                          setCurrentTable((prev) => ({
+                            ...prev,
+                            position: undefined,
+                            customPosition: e.target.value,
+                          }))
+                        }
+                        placeholder="Enter custom position"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="border rounded-lg overflow-hidden">

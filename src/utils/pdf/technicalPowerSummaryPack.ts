@@ -155,11 +155,12 @@ const departmentTableBody = (department: DepartmentPowerSummaryData) =>
     ? department.rows.map((row) => [
         row.name,
         row.pduLabel || 'N/A',
+        row.positionLabel || 'N/A',
         formatWatts(row.totalWatts),
         formatAmps(row.currentPerPhase),
         row.notes || '',
       ])
-    : [['Sin datos guardados', '-', formatWatts(0), formatAmps(0), '']];
+    : [['Sin datos guardados', '-', '-', formatWatts(0), formatAmps(0), '']];
 
 const drawTotalsBox = ({
   doc,
@@ -314,7 +315,7 @@ export const generateTechnicalPowerSummaryPack = async ({
 
     autoTable(doc, {
       startY: CONTENT_START_Y,
-      head: [['Nombre Cuadro', 'PDU', 'Potencia', 'Corriente', 'Notas']],
+      head: [['Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
       body: departmentTableBody(department),
       theme: 'grid',
       styles: {

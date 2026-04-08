@@ -22,6 +22,8 @@ export interface NormalizedTourPowerTable {
   currentPerPhase: number;
   pduType: string;
   customPduType?: string;
+  position?: string;
+  customPosition?: string;
   includesHoist: boolean;
   toolType: 'consumos';
   source: 'tour-default' | 'tour-override' | 'legacy-tour-default';
@@ -110,6 +112,8 @@ export const normalizeTourDefaultPowerTable = (
   const metadata = isRecord(table.metadata) ? table.metadata : {};
   const pduType = String(getMetadataValue(metadata, 'pdu_type', ''));
   const customPduType = String(getMetadataValue(metadata, 'custom_pdu_type', ''));
+  const position = String(getMetadataValue(metadata, 'position', ''));
+  const customPosition = String(getMetadataValue(metadata, 'custom_position', ''));
 
   return {
     id: table.id,
@@ -120,6 +124,8 @@ export const normalizeTourDefaultPowerTable = (
     currentPerPhase: getNumber(metadata.current_per_phase) ?? 0,
     pduType,
     customPduType: customPduType || undefined,
+    position: position || undefined,
+    customPosition: customPosition || undefined,
     includesHoist: getBoolean(metadata.includes_hoist) ?? false,
     toolType: 'consumos',
     source: 'tour-default',
@@ -145,6 +151,8 @@ export const normalizeLegacyTourPowerDefault = (
   currentPerPhase: table.current_per_phase || 0,
   pduType: table.pdu_type || '',
   customPduType: table.custom_pdu_type || undefined,
+  position: table.position || undefined,
+  customPosition: table.custom_position || undefined,
   includesHoist: table.includes_hoist || false,
   toolType: 'consumos',
   source: 'legacy-tour-default',
@@ -166,6 +174,8 @@ export const normalizeTourPowerOverride = (
   currentPerPhase: override.current_per_phase || 0,
   pduType: override.pdu_type || '',
   customPduType: override.custom_pdu_type || undefined,
+  position: override.position || undefined,
+  customPosition: override.custom_position || undefined,
   includesHoist: override.includes_hoist || false,
   toolType: 'consumos',
   source: 'tour-override',
