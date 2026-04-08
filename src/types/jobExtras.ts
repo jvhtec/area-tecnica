@@ -48,6 +48,7 @@ export interface JobPayoutTotals {
   vehicle_disclaimer: boolean;
   vehicle_disclaimer_text?: string;
   payout_approved?: boolean;
+  prep_days_total_eur?: number;
 
   // Manual payout override metadata (enriched client-side / for exports)
   has_override?: boolean;

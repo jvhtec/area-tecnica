@@ -21,33 +21,95 @@ export type MatrixJob = {
   color?: string | null;
   status: string;
   job_type: string;
+  job_date_types?: Array<{ date: string; type: string }>;
   _assigned_count?: number;
 };
 
 export async function fetchJobsForWindow(start: Date, end: Date, department: string) {
   const windowRange = `[${start.toISOString()},${end.toISOString()}]`;
-  let query = supabase
+  const allowedJobTypes = ["single", "festival", "ciclo", "tourdate", "evento"];
+
+  let overlapQuery = supabase
     .from("jobs")
     .select(
       `
-      id, title, start_time, end_time, color, status, job_type,
+      id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
       job_departments!inner(department),
       job_assignments!job_id(technician_id)
     `
     )
     .filter("time_range", "ov", windowRange)
-    .in("job_type", ["single", "festival", "ciclo", "tourdate", "evento"])
+    .in("job_type", allowedJobTypes)
     .limit(500);
 
   if (department) {
-    query = query.eq("job_departments.department", department);
+    overlapQuery = overlapQuery.eq("job_departments.department", department);
   }
 
-  const { data, error } = await query.order("start_time", { ascending: true });
+  let typedQuery = supabase
+    .from("job_date_types")
+    .select(
+      `
+      job_id,
+      date,
+      type,
+      jobs!inner(
+        id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
+        job_departments!inner(department),
+        job_assignments!job_id(technician_id)
+      )
+    `
+    )
+    .gte("date", formatInTimeZone(start, MADRID_TIMEZONE, "yyyy-MM-dd"))
+    .lte("date", formatInTimeZone(end, MADRID_TIMEZONE, "yyyy-MM-dd"))
+    .in("jobs.job_type", allowedJobTypes);
 
+  if (department) {
+    typedQuery = typedQuery.eq("jobs.job_departments.department", department);
+  }
+
+  const [overlapRes, typedRes] = await Promise.all([
+    overlapQuery.order("start_time", { ascending: true }),
+    typedQuery,
+  ]);
+
+  const { data: overlapData, error } = overlapRes;
   if (error) throw error;
+  if (typedRes.error) throw typedRes.error;
 
-  return (data || [])
+  const mergedById = new Map<string, any>();
+  for (const row of overlapData || []) {
+    mergedById.set(row.id, row);
+  }
+
+  // Deduplicate typed results by job_id, keeping earliest date/start_time
+  const typedByJobId = new Map<string, any>();
+  for (const typed of typedRes.data || []) {
+    const job = Array.isArray((typed as any).jobs) ? (typed as any).jobs[0] : (typed as any).jobs;
+    if (!job?.id) continue;
+
+    const existing = typedByJobId.get(job.id);
+    if (!existing) {
+      typedByJobId.set(job.id, { job, date: typed.date, type: typed.type });
+    } else {
+      // Keep earliest date (or earliest start_time as tiebreaker)
+      if (typed.date < existing.date || (typed.date === existing.date && (job.start_time < existing.job.start_time))) {
+        typedByJobId.set(job.id, { job, date: typed.date, type: typed.type });
+      }
+    }
+  }
+
+  // Merge deduplicated typed jobs into mergedById
+  for (const [jobId, typedEntry] of typedByJobId.entries()) {
+    if (!mergedById.has(jobId)) {
+      mergedById.set(jobId, typedEntry.job);
+    }
+  }
+
+  // Apply 500 cap after deduplication
+  const uniqueJobs = Array.from(mergedById.values()).slice(0, 500);
+
+  return uniqueJobs
     .map((j: any) => {
       const assigns = Array.isArray(j.job_assignments) ? j.job_assignments : [];
       return {
@@ -58,6 +120,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
         color: j.color,
         status: j.status,
         job_type: j.job_type,
+        job_date_types: Array.isArray(j.job_date_types) ? j.job_date_types : [],
         _assigned_count: assigns.length as number,
       } as MatrixJob;
     })
