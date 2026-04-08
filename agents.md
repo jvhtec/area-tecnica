@@ -1,117 +1,98 @@
-# Area Tecnica - Technical Management System
+# AGENTS.md — Area Tecnica (Sector Pro)
 
-## Stack
-React 18 + TypeScript, Vite 6, Supabase, Tailwind + shadcn/ui, React Query
+This file provides working guidance for coding agents operating in this repository.
 
-## Critical Rules
-- **Work on `dev` branch only. Never touch `main`.**
-- Use `npm install --legacy-peer-deps` always
-- Never add lovable-tagger or Lovable packages
-- Maintain database compatibility with existing Supabase schema
+## Project Identity
 
-## Project Structure
-```
-src/
-├── components/     # UI components (inventory, wireless configs)
-├── integrations/   # Supabase client
-├── types/          # TypeScript definitions
-└── pages/         # Routes
-```
+- **Product**: Area Tecnica (Sector Pro)
+- **Type**: Mobile-first PWA for live-event technical operations
+- **Primary stack**: React 18 + TypeScript + Vite 6 + Supabase + Tailwind + shadcn/ui + TanStack Query + Zustand
+- **Deployment**:
+  - `main` → production (`sector-pro.work`)
+  - `dev` → preview environments
 
-## Current Features
-- Microphone inventory management
-- Wireless system configuration
-- Equipment tracking with database-driven dropdowns
-- Job assignment matrix
+## Non-Negotiable Rules
 
-## Environment
+1. **Branch discipline**
+   - Work from `dev` unless explicitly instructed otherwise.
+   - Never commit directly to `main`.
+
+2. **Dependency install**
+   - Always run:
+     ```bash
+     npm install --legacy-peer-deps
+     ```
+   - Do **not** add `package-lock.json`.
+
+3. **Build/dependency constraints**
+   - Keep `date-fns` at `^3.6.0` unless a planned migration is approved.
+   - Keep Vite major version aligned with current config/build pipeline.
+   - Do not add or re-introduce `lovable-tagger`.
+
+4. **Supabase compatibility**
+   - Preserve compatibility with existing schema and RLS behavior.
+   - Prefer additive, backward-compatible database changes.
+
+## Source-of-Truth Architecture
+
+Follow the repository architecture documented in `ARCHITECTURE.md`.
+
+### Top-level areas
+
+- `src/components/` — feature/domain UI (festival, tours, jobs, matrix, equipment, logistics, messages, timesheet, sound, lights, video, etc.)
+- `src/pages/` — route-level, lazy-loaded pages
+- `src/features/` — co-located feature logic modules (activity, staffing, timesheets, rates, lights)
+- `src/hooks/` — reusable and feature hooks (including auth/push)
+- `src/lib/` — core platform libraries (query config, Supabase wrappers, push, shortcuts, streamdeck, flex)
+- `src/stores/` — Zustand global state
+- `src/integrations/supabase/` — Supabase client + generated DB types
+- `src/utils/` — domain utilities (PDF, weather, role routing, hoja de ruta, flex folders, etc.)
+- `supabase/` — migrations, seed, and Edge Functions
+- `tests/` — integration/e2e coverage
+
+### Architectural patterns to preserve
+
+- **Auth/role flow** centered around optimized auth hooks/providers and role-based routing.
+- **Data layer** uses TanStack Query for server state; avoid ad-hoc fetch state where query patterns exist.
+- **Global UI/app state** belongs in existing Zustand stores when cross-component/global.
+- **Realtime** should use centralized connection/subscription abstractions instead of one-off channel wiring.
+- **Feature organization** should remain domain-based (festival/tours/jobs/etc.) with co-located types/hooks/utils when practical.
+
+## Coding & Change Guidelines
+
+- Use `@/` imports (configured alias) instead of deep relative paths when possible.
+- Reuse established shadcn/ui primitives from `src/components/ui/`.
+- Keep components focused; extract hooks/utilities rather than growing monolith files.
+- Preserve lazy-loading boundaries in routes/pages.
+- Respect existing TypeScript typing patterns; avoid `any` unless justified.
+- Keep changes minimal, targeted, and consistent with adjacent code.
+
+## Validation Checklist (Before Commit)
+
+Run relevant checks for touched areas:
+
 ```bash
-npm run dev              # localhost:8080
-VITE_SUPABASE_URL        # In Cloudflare
-VITE_SUPABASE_ANON_KEY   # In Cloudflare
+npm run lint
+npm run test:run
+npm run build
 ```
 
-## Deploy
-Push to `dev` → preview URL  
-Merge to `main` → sector-pro.work
+If changes affect Supabase functions, also run:
 
-## Patterns
-- Use @ imports: `@/components/...`
-- Supabase client: `@/integrations/supabase/client`
-- shadcn/ui for new components
-- React Query for data fetching
-- date-fns for dates (v3.6.0)
-
-## Workflow
 ```bash
-git checkout dev
-# make changes
-git commit -m "feat: description"
-git push origin dev
-# Create PR → merge to main when approved
+npm run lint:functions
 ```
 
-## Database
-Supabase backend. Preserve existing schema when adding features.
-Local Supabase CLI: TODO setup with `supabase start`
+If changes affect mobile runtime behavior, ensure Capacitor sync path remains valid:
 
-## Build Flags & Gotchas
-
-### npm Install
-**Always use:** `npm install --legacy-peer-deps`
-- Required due to peer dependency conflicts (vite 6, date-fns 3, vitest)
-- No package-lock.json in repo (intentional - prevents Cloudflare npm ci issues)
-
-### Dependency Constraints
-- date-fns: **Must stay at ^3.6.0** (react-day-picker compatibility)
-- vite: ^6.3.3 (vitest has peer conflicts - ignore warnings)
-- Never upgrade these without testing build
-
-### Cloudflare Build
-Build command in Cloudflare Pages:
-```
-npm install --legacy-peer-deps && npm run build
-```
-Output: `dist/`
-**Do not** change build command or add package-lock.json to repo
-
-### vite.config.ts
-- No lovable-tagger imports
-- base: '/' (required for asset paths)
-- componentTagger removed from plugins
-
-### Common Build Failures
-- "ERESOLVE unable to resolve" → forgot --legacy-peer-deps
-- "MIME type text/html" → clear Cloudflare cache, retry deploy
-- "Cannot find lovable-tagger" → check vite.config.ts imports
-- package-lock sync errors → delete package-lock.json from repo
-
-### Local Dev
-If dependencies get corrupted:
 ```bash
-sudo rm -rf node_modules
-npm install --legacy-peer-deps
-```
+npm run cap:sync
 ```
 
----
+## Operational Notes
 
-**And for .cursorrules:**
-```
-# Area Tecnica - Audio/Video Equipment Management
-
-Work on `dev` branch. Never commit to `main`.
-Stack: React+TS, Vite, Supabase, Tailwind+shadcn
-Install: `npm install --legacy-peer-deps`
-Import: Use @ alias (`@/components/...`)
-Deploy: Push dev → preview, merge main → sector-pro.work
-
-Current focus: Microphone inventory, wireless configs, database-driven UI
-Maintain existing Supabase schema compatibility.
-
-## Build Warnings
-- Always: `npm install --legacy-peer-deps`
-- No package-lock.json in repo (intentional)
-- date-fns locked at v3.6.0 (don't upgrade)
-- vite.config.ts: no lovable-tagger imports
-- Cloudflare build: npm install --legacy-peer-deps && npm run build
+- Keep Cloudflare build compatibility:
+  - Install: `npm install --legacy-peer-deps`
+  - Build: `npm run build`
+- Do not change build pipeline assumptions unless task explicitly requires it.
+- If architecture/docs diverge from code, align new work with actual code and update docs.
