@@ -177,10 +177,14 @@ export const generateTourDaySheet = async (
   // Load hoja de ruta for this date
   try {
     const { data: hojaDeRuta, error } = await supabase
-      .from('hoja_de_ruta')
+      .from('hoja_de_ruta' as any)
       .select('*')
       .eq('tour_date_id', tourDate.id)
       .maybeSingle();
+
+    if (error) {
+      console.warn('Error loading hoja de ruta:', error);
+    }
 
     if (hojaDeRuta && hojaDeRuta.program_schedule_json) {
       // Schedule Section
@@ -189,11 +193,13 @@ export const generateTourDaySheet = async (
       pdf.text('Programa del Día', 10, currentY);
       currentY += 10;
 
-      const schedule = hojaDeRuta.program_schedule_json;
+      const schedule = Array.isArray(hojaDeRuta.program_schedule_json) 
+        ? hojaDeRuta.program_schedule_json 
+        : [];
 
       // Process all program days
       for (const day of schedule) {
-        if (day.rows && day.rows.length > 0) {
+        if (day && day.rows && Array.isArray(day.rows) && day.rows.length > 0) {
           if (day.label) {
             pdf.setFontSize(12);
             pdf.setFont(undefined, 'bold');
@@ -246,13 +252,15 @@ export const generateTourDaySheet = async (
       .eq('tour_date_id', tourDate.id)
       .maybeSingle();
 
-    if (jobQuery.data?.id && tourDate.location?.address) {
+    const locationAddress = tourDate.location?.formatted_address || tourDate.location?.address;
+    
+    if (jobQuery.data?.id && locationAddress) {
       try {
         const weatherData = await getWeatherForJob(
           jobQuery.data.id,
           tourDate.date,
           tourDate.date,
-          tourDate.location.address
+          locationAddress
         );
 
         if (weatherData && weatherData.length > 0) {
@@ -592,11 +600,15 @@ export const generateTourBook = async (
 
     // Load and add schedule if available
     try {
-      const { data: hojaDeRuta } = await supabase
-        .from('hoja_de_ruta')
+      const { data: hojaDeRuta, error: hojaError } = await supabase
+        .from('hoja_de_ruta' as any)
         .select('program_schedule_json')
         .eq('tour_date_id', tourDate.id)
         .maybeSingle();
+
+      if (hojaError) {
+        console.warn(`Error loading hoja de ruta for day ${i + 1}:`, hojaError);
+      }
 
       if (hojaDeRuta && hojaDeRuta.program_schedule_json) {
         pdf.setFontSize(12);
@@ -604,10 +616,12 @@ export const generateTourBook = async (
         pdf.text('Programa', 10, currentY);
         currentY += 8;
 
-        const schedule = hojaDeRuta.program_schedule_json;
+        const schedule = Array.isArray(hojaDeRuta.program_schedule_json) 
+          ? hojaDeRuta.program_schedule_json 
+          : [];
 
         for (const day of schedule) {
-          if (day.rows && day.rows.length > 0) {
+          if (day && day.rows && Array.isArray(day.rows) && day.rows.length > 0) {
             const scheduleData = day.rows.map((row: any) => [
               row.time || '',
               row.item || '',
