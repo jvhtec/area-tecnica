@@ -5,6 +5,7 @@ import {
   buildNormalizedTourPowerTables,
   computePowerTotalVa,
 } from '@/utils/tourPowerTables';
+import { getResolvedPowerPosition } from '@/utils/powerPositions';
 import {
   TECHNICAL_POWER_DEPARTMENTS,
   type CombinedTechnicalPowerSummaryData,
@@ -70,6 +71,7 @@ const mapPowerRequirementTable = (
 ): DepartmentPowerSummaryRow => ({
   name: row.table_name || 'Unnamed',
   pduLabel: row.custom_pdu_type || row.pdu_type || 'N/A',
+  positionLabel: getResolvedPowerPosition(row.position, row.custom_position) || 'N/A',
   totalWatts: row.total_watts || 0,
   currentPerPhase: row.current_per_phase || 0,
   totalVa: computePowerTotalVa(row.total_watts || 0, null, department),
@@ -114,6 +116,7 @@ const mapNormalizedTourPowerTable = (
 ): DepartmentPowerSummaryRow => ({
   name: table.name,
   pduLabel: table.customPduType || table.pduType || 'N/A',
+  positionLabel: getResolvedPowerPosition(table.position, table.customPosition) || 'N/A',
   totalWatts: table.totalWatts || 0,
   currentPerPhase: table.currentPerPhase || 0,
   totalVa: table.totalVa || 0,

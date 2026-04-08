@@ -41,6 +41,7 @@ export type DepartmentPowerSummarySource =
 export interface DepartmentPowerSummaryRow {
   name: string;
   pduLabel: string;
+  positionLabel: string;
   totalWatts: number;
   currentPerPhase: number;
   totalVa: number;
