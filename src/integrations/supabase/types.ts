@@ -4776,36 +4776,45 @@ export type Database = {
         Row: {
           created_at: string | null
           current_per_phase: number
+          custom_position: string | null
           custom_pdu_type: string | null
           department: string | null
           id: string
           includes_hoist: boolean | null
           job_id: string | null
           pdu_type: string
+          position: string | null
+          table_data: Json
           table_name: string
           total_watts: number
         }
         Insert: {
           created_at?: string | null
           current_per_phase: number
+          custom_position?: string | null
           custom_pdu_type?: string | null
           department?: string | null
           id?: string
           includes_hoist?: boolean | null
           job_id?: string | null
           pdu_type: string
+          position?: string | null
+          table_data?: Json
           table_name: string
           total_watts: number
         }
         Update: {
           created_at?: string | null
           current_per_phase?: number
+          custom_position?: string | null
           custom_pdu_type?: string | null
           department?: string | null
           id?: string
           includes_hoist?: boolean | null
           job_id?: string | null
           pdu_type?: string
+          position?: string | null
+          table_data?: Json
           table_name?: string
           total_watts?: number
         }
@@ -5050,6 +5059,7 @@ export type Database = {
           time_span: string | null
           timezone: string | null
           tours_expanded: boolean | null
+          warehouse_duty_exempt: boolean
           waha_endpoint: string | null
         }
         Insert: {
@@ -5083,6 +5093,7 @@ export type Database = {
           time_span?: string | null
           timezone?: string | null
           tours_expanded?: boolean | null
+          warehouse_duty_exempt?: boolean
           waha_endpoint?: string | null
         }
         Update: {
@@ -5116,6 +5127,7 @@ export type Database = {
           time_span?: string | null
           timezone?: string | null
           tours_expanded?: boolean | null
+          warehouse_duty_exempt?: boolean
           waha_endpoint?: string | null
         }
         Relationships: []
@@ -6649,6 +6661,7 @@ export type Database = {
         Row: {
           created_at: string | null
           current_per_phase: number
+          custom_position: string | null
           custom_pdu_type: string | null
           default_table_id: string | null
           department: string | null
@@ -6656,6 +6669,7 @@ export type Database = {
           includes_hoist: boolean | null
           override_data: Json | null
           pdu_type: string
+          position: string | null
           table_name: string
           total_watts: number
           tour_date_id: string
@@ -6664,6 +6678,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           current_per_phase: number
+          custom_position?: string | null
           custom_pdu_type?: string | null
           default_table_id?: string | null
           department?: string | null
@@ -6671,6 +6686,7 @@ export type Database = {
           includes_hoist?: boolean | null
           override_data?: Json | null
           pdu_type: string
+          position?: string | null
           table_name: string
           total_watts: number
           tour_date_id: string
@@ -6679,6 +6695,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           current_per_phase?: number
+          custom_position?: string | null
           custom_pdu_type?: string | null
           default_table_id?: string | null
           department?: string | null
@@ -6686,6 +6703,7 @@ export type Database = {
           includes_hoist?: boolean | null
           override_data?: Json | null
           pdu_type?: string
+          position?: string | null
           table_name?: string
           total_watts?: number
           tour_date_id?: string
@@ -6990,11 +7008,13 @@ export type Database = {
         Row: {
           created_at: string | null
           current_per_phase: number
+          custom_position: string | null
           custom_pdu_type: string | null
           department: string | null
           id: string
           includes_hoist: boolean | null
           pdu_type: string
+          position: string | null
           table_name: string
           total_watts: number
           tour_id: string
@@ -7003,11 +7023,13 @@ export type Database = {
         Insert: {
           created_at?: string | null
           current_per_phase: number
+          custom_position?: string | null
           custom_pdu_type?: string | null
           department?: string | null
           id?: string
           includes_hoist?: boolean | null
           pdu_type: string
+          position?: string | null
           table_name: string
           total_watts: number
           tour_id: string
@@ -7016,11 +7038,13 @@ export type Database = {
         Update: {
           created_at?: string | null
           current_per_phase?: number
+          custom_position?: string | null
           custom_pdu_type?: string | null
           department?: string | null
           id?: string
           includes_hoist?: boolean | null
           pdu_type?: string
+          position?: string | null
           table_name?: string
           total_watts?: number
           tour_id?: string
@@ -8780,7 +8804,7 @@ export type Database = {
       form_status: "pending" | "submitted" | "expired"
       global_preset_status: "available" | "unavailable" | "tentative"
       job_date_type: "travel" | "setup" | "rigging" | "show" | "off" | "rehearsal"
-      job_extra_type: "travel_half" | "travel_full" | "day_off"
+      job_extra_type: "travel_half" | "travel_full" | "day_off" | "conduccion"
       job_rate_extras_status: "pending" | "approved" | "rejected"
       job_status: "Tentativa" | "Confirmado" | "Completado" | "Cancelado"
       job_type: "single" | "tour" | "festival" | "ciclo" | "dryhire" | "tourdate" | "evento"
@@ -9109,7 +9133,7 @@ export const Constants = {
       form_status: ["pending", "submitted", "expired"],
       global_preset_status: ["available", "unavailable", "tentative"],
       job_date_type: ["travel", "setup", "rigging", "show", "off", "rehearsal"],
-      job_extra_type: ["travel_half", "travel_full", "day_off"],
+      job_extra_type: ["travel_half", "travel_full", "day_off", "conduccion"],
       job_rate_extras_status: ["pending", "approved", "rejected"],
       job_status: ["Tentativa", "Confirmado", "Completado", "Cancelado"],
       job_type: ["single", "tour", "festival", "ciclo", "dryhire", "tourdate", "evento"],

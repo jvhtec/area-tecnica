@@ -29,6 +29,7 @@ The application supports two pay-processing paths: **regular jobs** (single-day 
 3. **Extras Management**
    - Management configures extras per technician via `JobExtrasManagement`, which wraps the `JobExtrasEditor`. Editors read and write directly to `job_rate_extras` with hard limits per extra type; technicians have read-only visibility. 【F:src/components/jobs/JobExtrasManagement.tsx†L25-L156】【F:src/components/jobs/JobExtrasEditor.tsx†L140-L215】【F:src/hooks/useJobExtras.ts†L6-L27】
    - Extras rely on the shared catalog managed in the Rates Center (travel half/full, day off). Amounts are immediately effective—there is no separate approval state for extras. 【F:src/components/jobs/JobExtrasEditor.tsx†L60-L109】【F:src/pages/RatesCenterPage.tsx†L31-L86】
+   - Travel day rates follow a priority chain: (1) per-technician custom rate from `custom_tech_rates.travel_half_day_eur` / `travel_full_day_eur`, (2) house tech / assignable management fixed €20 rate, (3) catalog default from `rate_extras_2025`. Custom travel rates are configured per-technician in Settings > Users > Edit User Profile > "Tarifas internas" section (management/admin only).
 
 4. **Job Approval & Visibility**
    - A management toggle (`rates_approved`) on each job governs when technicians can view totals and extras. Until it is set true, technicians see a “pending approval” notice in job totals, even if timesheets were approved. 【F:src/components/jobs/JobDetailsDialog.tsx†L398-L444】【F:src/components/timesheet/MyJobTotal.tsx†L70-L90】

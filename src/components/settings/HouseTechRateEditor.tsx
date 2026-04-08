@@ -38,6 +38,9 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
   const [overtimeHourTecnicoEur, setOvertimeHourTecnicoEur] = useState<string>('');
   const [overtimeHourEspecialistaEur, setOvertimeHourEspecialistaEur] = useState<string>('');
   const [overtimeHourResponsableEur, setOvertimeHourResponsableEur] = useState<string>('');
+  const [travelHalfDayEur, setTravelHalfDayEur] = useState<string>('');
+  const [travelFullDayEur, setTravelFullDayEur] = useState<string>('');
+
 
   const RATE_CATEGORIES = ['tecnico', 'especialista', 'responsable'] as const;
   type RateCategory = (typeof RATE_CATEGORIES)[number];
@@ -86,6 +89,8 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
       setOvertimeHourTecnicoEur(currentRate.overtime_hour_eur?.toString() || '');
       setOvertimeHourEspecialistaEur(currentRate.overtime_hour_especialista_eur?.toString() || '');
       setOvertimeHourResponsableEur(currentRate.overtime_hour_responsable_eur?.toString() || '');
+      setTravelHalfDayEur(currentRate.travel_half_day_eur?.toString() || '');
+      setTravelFullDayEur(currentRate.travel_full_day_eur?.toString() || '');
     }
   }, [currentRate]);
 
@@ -106,6 +111,8 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
       overtime_hour_eur: overtimeHourTecnicoEur ? parseFloat(overtimeHourTecnicoEur) : null,
       overtime_hour_especialista_eur: overtimeHourEspecialistaEur ? parseFloat(overtimeHourEspecialistaEur) : null,
       overtime_hour_responsable_eur: overtimeHourResponsableEur ? parseFloat(overtimeHourResponsableEur) : null,
+      travel_half_day_eur: travelHalfDayEur ? parseFloat(travelHalfDayEur) : null,
+      travel_full_day_eur: travelFullDayEur ? parseFloat(travelFullDayEur) : null,
     });
 
     // Log the activity
@@ -340,6 +347,40 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
             />
             <p className="text-xs text-muted-foreground">
               Si está vacía, para house tech se aplica: OT responsable → (si OT técnico = 15, usar 20) → OT técnico.
+            </p>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label htmlFor="travel-half-day">Tarifa media dieta de viaje (€)</Label>
+            <Input
+              id="travel-half-day"
+              type="number"
+              step="0.01"
+              min="0"
+              value={travelHalfDayEur}
+              onChange={(e) => setTravelHalfDayEur(e.target.value)}
+              placeholder="Dejar vacío para usar tarifa por defecto"
+            />
+            <p className="text-xs text-muted-foreground">
+              Tarifa personalizada para medio día de viaje. Si está vacía, se usa la tarifa por defecto (€20 para plantilla, tarifa de catálogo para freelancers).
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="travel-full-day">Tarifa dieta de viaje completa (€)</Label>
+            <Input
+              id="travel-full-day"
+              type="number"
+              step="0.01"
+              min="0"
+              value={travelFullDayEur}
+              onChange={(e) => setTravelFullDayEur(e.target.value)}
+              placeholder="Dejar vacío para usar tarifa por defecto"
+            />
+            <p className="text-xs text-muted-foreground">
+              Tarifa personalizada para día completo de viaje. Si está vacía, se usa la tarifa por defecto (€20 para plantilla, tarifa de catálogo para freelancers).
             </p>
           </div>
         </div>

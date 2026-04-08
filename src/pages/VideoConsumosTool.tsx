@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,13 @@ import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { Badge } from '@/components/ui/badge';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
+import {
+  CUSTOM_POWER_POSITION_VALUE,
+  getPowerPositionCustomValue,
+  getPowerPositionSelectValue,
+  NO_POWER_POSITION_VALUE,
+  POWER_POSITION_PRESETS,
+} from '@/utils/powerPositions';
 
 const videoComponentDatabase = [
   { id: 1, name: 'Pantalla Central', watts: 700 },
@@ -26,12 +33,14 @@ const videoComponentDatabase = [
 const SQRT3 = Math.sqrt(3);
 const PDU_TYPES_THREE = ['CEE16A 3P+N+G', 'CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE125A 3P+N+G', 'Powerlock 400A 3P+N+G'];
 const PDU_TYPES_SINGLE = ['Schuko 16A', 'CEE32A 1P+N+G', 'CEE63A 1P+N+G'];
+const TABLE_SETTINGS_SAVE_DEBOUNCE_MS = 300;
 
 interface TableRow {
   quantity: string;
   componentId: string;
   watts: string;
   componentName?: string;
+  lineName?: string;
   totalWatts?: number;
 }
 
@@ -40,9 +49,12 @@ interface Table {
   rows: TableRow[];
   totalWatts?: number;
   adjustedWatts?: number;
+  totalVa?: number;
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
+  position?: string;
+  customPosition?: string;
   id?: number | string;
   includesHoist?: boolean;
   isDefault?: boolean;
@@ -89,12 +101,23 @@ const VideoConsumosTool: React.FC = () => {
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
     rows: [{ quantity: '', componentId: '', watts: '' }],
+    position: undefined,
+    customPosition: undefined,
   });
+  const pendingTableSaveTimeoutsRef = useRef<Record<string, number>>({});
 
   // Auto-adjust voltage based on supply type
   useEffect(() => {
     setVoltage(phaseMode === 'single' ? 230 : 400);
   }, [phaseMode]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(pendingTableSaveTimeoutsRef.current).forEach((timeoutId) => {
+        window.clearTimeout(timeoutId);
+      });
+    };
+  }, []);
 
   // Preselect job from query param and fetch details if not in the list
   useEffect(() => {
@@ -163,6 +186,9 @@ const VideoConsumosTool: React.FC = () => {
           current_per_phase: table.currentPerPhase,
           pdu_type: table.customPduType || table.pduType,
           custom_pdu_type: table.customPduType,
+          includes_hoist: table.includesHoist || false,
+          position: table.position,
+          custom_position: table.customPosition,
           safetyMargin,
           pf,
           phaseMode,
@@ -261,6 +287,8 @@ const VideoConsumosTool: React.FC = () => {
         current_per_phase: table.currentPerPhase || 0,
         pdu_type: table.customPduType || table.pduType || '',
         custom_pdu_type: table.customPduType,
+        position: table.position || null,
+        custom_position: table.customPosition || null,
         includes_hoist: table.includesHoist || false,
         override_data: {
           rows: table.rows,
@@ -288,6 +316,9 @@ const VideoConsumosTool: React.FC = () => {
           current_per_phase: table.currentPerPhase || 0,
           pdu_type: table.customPduType || table.pduType || '',
           custom_pdu_type: table.customPduType,
+          position: table.position || null,
+          custom_position: table.customPosition || null,
+          table_data: { rows: table.rows },
           includes_hoist: table.includesHoist || false
         });
 
@@ -333,15 +364,19 @@ const VideoConsumosTool: React.FC = () => {
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
     const { adjustedWatts, currentLine } = calculateLineCurrent(totalWatts);
     const pduSuggestion = recommendPDU(currentLine);
+    const totalVa = pf > 0 ? adjustedWatts / pf : adjustedWatts; // apparent power (VA) with safety margin
 
     const newTable = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
       adjustedWatts,
+      totalVa,
       currentPerPhase: currentLine,
       pduType: pduSuggestion,
       customPduType: undefined,
+      position: currentTable.position,
+      customPosition: currentTable.customPosition,
       includesHoist: false,
       id: Date.now(),
     };
@@ -359,7 +394,12 @@ const VideoConsumosTool: React.FC = () => {
   };
 
   const resetCurrentTable = () => {
-    setCurrentTable({ name: '', rows: [{ quantity: '', componentId: '', watts: '' }] });
+    setCurrentTable({
+      name: '',
+      rows: [{ quantity: '', componentId: '', watts: '' }],
+      position: undefined,
+      customPosition: undefined,
+    });
     setTableName('');
   };
 
@@ -368,6 +408,41 @@ const VideoConsumosTool: React.FC = () => {
     if (typeof tableId === 'number') {
       setTables((prev) => prev.filter((table) => table.id !== tableId));
     }
+  };
+
+  const scheduleTableSettingsSave = (table: Table) => {
+    if (isTourDefaults || !selectedJobId || table.id === undefined) {
+      return;
+    }
+
+    const timeoutKey = String(table.id);
+    const existingTimeout = pendingTableSaveTimeoutsRef.current[timeoutKey];
+    if (existingTimeout) {
+      window.clearTimeout(existingTimeout);
+    }
+
+    pendingTableSaveTimeoutsRef.current[timeoutKey] = window.setTimeout(() => {
+      delete pendingTableSaveTimeoutsRef.current[timeoutKey];
+
+      void savePowerRequirementTable(table).catch((error) => {
+        console.error('Error saving table settings:', error);
+      });
+    }, TABLE_SETTINGS_SAVE_DEBOUNCE_MS);
+  };
+
+  const updateTableSettings = (tableId: number | string, updates: Partial<Table>) => {
+    const existingTable = tables.find((table) => table.id === tableId);
+    if (!existingTable) {
+      return;
+    }
+
+    const updatedTable = { ...existingTable, ...updates };
+
+    setTables((prev) =>
+      prev.map((table) => (table.id === tableId ? updatedTable : table))
+    );
+
+    scheduleTableSettingsSave(updatedTable);
   };
 
   const handleExportPDF = async () => {
@@ -393,7 +468,8 @@ const VideoConsumosTool: React.FC = () => {
       // Generate power summary for consumos reports
       const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
       const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-      const powerSummary = { totalSystemWatts, totalSystemAmps };
+      const totalSystemKva = allTables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
+      const powerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
 
       let logoUrl: string | undefined = undefined;
       try {
@@ -483,15 +559,25 @@ const VideoConsumosTool: React.FC = () => {
     if (isOverrideMode && overrideData) {
       const powerDefaults = overrideData.defaults
         .filter(table => table.table_type === 'power')
-        .map(table => ({
-          name: `${table.table_name} (Default)`,
-          rows: table.table_data.rows || [],
-          totalWatts: table.total_value,
-          currentPerPhase: table.metadata?.currentPerPhase,
-          pduType: table.metadata?.pduType,
-          id: `default-${table.id}`,
-          isDefault: true
-        }));
+        .map(table => {
+          const w = table.total_value || 0;
+          const adjW = w * (1 + safetyMargin / 100);
+          return {
+            name: `${table.table_name} (Default)`,
+            rows: table.table_data.rows || [],
+            totalWatts: table.total_value,
+            adjustedWatts: adjW,
+            totalVa: pf > 0 ? adjW / pf : adjW,
+            currentPerPhase: table.metadata?.current_per_phase,
+            pduType: table.metadata?.pdu_type,
+            customPduType: table.metadata?.custom_pdu_type,
+            includesHoist: table.metadata?.includes_hoist || false,
+            position: table.metadata?.position,
+            customPosition: table.metadata?.custom_position,
+            id: `default-${table.id}`,
+            isDefault: true
+          };
+        });
       
       setDefaultTables(powerDefaults);
     }
@@ -600,10 +686,16 @@ const VideoConsumosTool: React.FC = () => {
                         <span className="font-medium">Total Watts:</span> {table.totalWatts?.toFixed(2)} W
                       </div>
                       <div>
-                        <span className="font-medium">Current per Phase:</span> {table.currentPerPhase?.toFixed(2)} A
+                        <span className="font-medium">Potencia Aparente:</span> {((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA
                       </div>
                       <div>
-                        <span className="font-medium">PDU Type:</span> {table.pduType}
+                        <span className="font-medium">{phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}</span> {table.currentPerPhase?.toFixed(2)} A
+                      </div>
+                      <div>
+                        <span className="font-medium">PDU Type:</span> {table.customPduType || table.pduType}
+                      </div>
+                      <div>
+                        <span className="font-medium">Position:</span> {table.customPosition || table.position || 'N/A'}
                       </div>
                     </div>
                   </div>
@@ -697,6 +789,55 @@ const VideoConsumosTool: React.FC = () => {
             />
           </div>
 
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Position</Label>
+              <Select
+                value={getPowerPositionSelectValue(currentTable.position, currentTable.customPosition)}
+                onValueChange={(value) =>
+                  setCurrentTable((prev) => ({
+                    ...prev,
+                    position:
+                      value === NO_POWER_POSITION_VALUE || value === CUSTOM_POWER_POSITION_VALUE
+                        ? undefined
+                        : value,
+                    customPosition:
+                      value === CUSTOM_POWER_POSITION_VALUE ? prev.customPosition || '' : undefined,
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="No position" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_POWER_POSITION_VALUE}>No position</SelectItem>
+                  {POWER_POSITION_PRESETS.map((position) => (
+                    <SelectItem key={position} value={position}>
+                      {position}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Custom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {getPowerPositionSelectValue(currentTable.position, currentTable.customPosition) === CUSTOM_POWER_POSITION_VALUE && (
+              <div className="space-y-2">
+                <Label>Custom Position</Label>
+                <Input
+                  value={getPowerPositionCustomValue(currentTable.position, currentTable.customPosition)}
+                  onChange={(e) =>
+                    setCurrentTable((prev) => ({
+                      ...prev,
+                      position: undefined,
+                      customPosition: e.target.value,
+                    }))
+                  }
+                  placeholder="Enter custom position"
+                />
+              </div>
+            )}
+          </div>
+
           
 
           <div className="border rounded-lg overflow-x-auto">
@@ -704,6 +845,7 @@ const VideoConsumosTool: React.FC = () => {
               <thead className="bg-muted">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                  <th className="px-4 py-3 text-left font-medium">Name</th>
                   <th className="px-4 py-3 text-left font-medium">Component</th>
                   <th className="px-4 py-3 text-left font-medium">Watts (per unit)</th>
                   <th className="w-12 px-4 py-3 text-left font-medium">&nbsp;</th>
@@ -718,6 +860,14 @@ const VideoConsumosTool: React.FC = () => {
                         value={row.quantity}
                         onChange={(e) => updateInput(index, 'quantity', e.target.value)}
                         min="0"
+                        className="w-full"
+                      />
+                    </td>
+                    <td className="p-4">
+                      <Input
+                        value={row.lineName || ''}
+                        onChange={(e) => updateInput(index, 'lineName', e.target.value)}
+                        placeholder="Optional line name"
                         className="w-full"
                       />
                     </td>
@@ -802,7 +952,7 @@ const VideoConsumosTool: React.FC = () => {
                       id={`hoist-${table.id}`}
                       checked={table.includesHoist}
                       onCheckedChange={(checked) => {
-                        setTables(prev => prev.map(t => t.id === table.id ? { ...t, includesHoist: !!checked } : t));
+                        updateTableSettings(table.id as number | string, { includesHoist: !!checked });
                       }}
                     />
                     <Label htmlFor={`hoist-${table.id}`}>Requires additional hoist power (CEE32A 3P+N+G)</Label>
@@ -812,12 +962,15 @@ const VideoConsumosTool: React.FC = () => {
                     <Select
                       value={table.customPduType ? ((phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE).includes(table.customPduType) ? table.customPduType : 'custom') : 'default'}
                       onValueChange={(value) => {
-                        setTables(prev => prev.map(t => {
-                          if (t.id !== table.id) return t;
-                          if (value === 'default') return { ...t, customPduType: undefined };
-                          if (value === 'custom') return { ...t, customPduType: '' };
-                          return { ...t, customPduType: value };
-                        }));
+                        if (value === 'default') {
+                          updateTableSettings(table.id as number | string, { customPduType: undefined });
+                          return;
+                        }
+                        if (value === 'custom') {
+                          updateTableSettings(table.id as number | string, { customPduType: '' });
+                          return;
+                        }
+                        updateTableSettings(table.id as number | string, { customPduType: value });
                       }}
                     >
                       <SelectTrigger className="w-[220px]"><SelectValue placeholder="Use recommended PDU type" /></SelectTrigger>
@@ -833,7 +986,43 @@ const VideoConsumosTool: React.FC = () => {
                       <Input
                         placeholder="Enter custom PDU type"
                         value={table.customPduType || ''}
-                        onChange={(e) => setTables(prev => prev.map(t => t.id === table.id ? { ...t, customPduType: e.target.value } : t))}
+                        onChange={(e) => updateTableSettings(table.id as number | string, { customPduType: e.target.value })}
+                        className="w-[220px]"
+                      />
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Label>Position:</Label>
+                      <Select
+                        value={getPowerPositionSelectValue(table.position, table.customPosition)}
+                        onValueChange={(value) => {
+                          if (value === NO_POWER_POSITION_VALUE) {
+                            updateTableSettings(table.id as number | string, { position: undefined, customPosition: undefined });
+                            return;
+                          }
+                          if (value === CUSTOM_POWER_POSITION_VALUE) {
+                            updateTableSettings(table.id as number | string, { position: undefined, customPosition: '' });
+                            return;
+                          }
+                          updateTableSettings(table.id as number | string, { position: value, customPosition: undefined });
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px]"><SelectValue placeholder="No position" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_POWER_POSITION_VALUE}>No position</SelectItem>
+                          {POWER_POSITION_PRESETS.map((position) => (
+                            <SelectItem key={position} value={position}>{position}</SelectItem>
+                          ))}
+                          <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Custom</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {getPowerPositionSelectValue(table.position, table.customPosition) === CUSTOM_POWER_POSITION_VALUE && (
+                      <Input
+                        placeholder="Enter custom position"
+                        value={getPowerPositionCustomValue(table.position, table.customPosition)}
+                        onChange={(e) =>
+                          updateTableSettings(table.id as number | string, { position: undefined, customPosition: e.target.value })
+                        }
                         className="w-[220px]"
                       />
                     )}
@@ -844,6 +1033,7 @@ const VideoConsumosTool: React.FC = () => {
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="px-4 py-3 text-left font-medium">Quantity</th>
+                    <th className="px-4 py-3 text-left font-medium">Name</th>
                     <th className="px-4 py-3 text-left font-medium">Component</th>
                     <th className="px-4 py-3 text-left font-medium">Watts (per unit)</th>
                     <th className="px-4 py-3 text-left font-medium">Total Watts</th>
@@ -853,42 +1043,57 @@ const VideoConsumosTool: React.FC = () => {
                   {table.rows.map((row, index) => (
                     <tr key={index} className="border-t">
                       <td className="px-4 py-3">{row.quantity}</td>
+                      <td className="px-4 py-3">{row.lineName || 'N/A'}</td>
                       <td className="px-4 py-3">{row.componentName}</td>
                       <td className="px-4 py-3">{row.watts}</td>
                       <td className="px-4 py-3">{row.totalWatts?.toFixed(2)}</td>
                     </tr>
                   ))}
                   <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
+                    <td colSpan={4} className="px-4 py-3 text-right">
                       Total Watts:
                     </td>
                     <td className="px-4 py-3">{table.totalWatts?.toFixed(2)} W</td>
                   </tr>
                   {safetyMargin > 0 && (
                     <tr className="border-t bg-muted/50 font-medium">
-                      <td colSpan={3} className="px-4 py-3 text-right">
+                      <td colSpan={4} className="px-4 py-3 text-right">
                         Adjusted Watts ({safetyMargin}% safety margin):
                       </td>
                       <td className="px-4 py-3">{table.adjustedWatts?.toFixed(2)} W</td>
                     </tr>
                   )}
                   <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
-                      Current per Phase:
+                    <td colSpan={4} className="px-4 py-3 text-right">
+                      Potencia Aparente:
+                    </td>
+                    <td className="px-4 py-3">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</td>
+                  </tr>
+                  <tr className="border-t bg-muted/50 font-medium">
+                    <td colSpan={4} className="px-4 py-3 text-right">
+                      {phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}
                     </td>
                     <td className="px-4 py-3">{table.currentPerPhase?.toFixed(2)} A</td>
                   </tr>
                   <tr className="border-t bg-muted/50 font-medium">
-                    <td colSpan={3} className="px-4 py-3 text-right">
+                    <td colSpan={4} className="px-4 py-3 text-right">
                       PDU Type:
                     </td>
                     <td className="px-4 py-3">
                       {table.customPduType || table.pduType}
                     </td>
                   </tr>
+                  <tr className="border-t bg-muted/50 font-medium">
+                    <td colSpan={4} className="px-4 py-3 text-right">
+                      Position:
+                    </td>
+                    <td className="px-4 py-3">
+                      {table.customPosition || table.position || 'N/A'}
+                    </td>
+                  </tr>
                   {table.includesHoist && (
                     <tr className="border-t bg-muted/50 font-medium">
-                      <td colSpan={4} className="px-4 py-3">
+                      <td colSpan={5} className="px-4 py-3">
                         Additional Hoist Power Required: CEE32A 3P+N+G
                       </td>
                     </tr>

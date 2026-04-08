@@ -167,6 +167,7 @@ export const createUserProfile = (overrides: Record<string, unknown> = {}) => ({
   department: "sound",
   phone: "+34123456789",
   assignable_as_tech: false,
+  warehouse_duty_exempt: false,
   soundvision_access_enabled: false,
   autonomo: true,
   ...overrides,

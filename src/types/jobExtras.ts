@@ -1,4 +1,4 @@
-export type JobExtraType = 'travel_half' | 'travel_full' | 'day_off';
+export type JobExtraType = 'travel_half' | 'travel_full' | 'day_off' | 'conduccion';
 
 export interface JobExtra {
   job_id: string;
@@ -17,6 +17,7 @@ export interface JobExtraItem {
   unit_eur: number;
   amount_eur: number;
   is_house_tech_rate?: boolean;
+  is_custom_travel_rate?: boolean;
 }
 
 export interface JobExtrasBreakdown {
@@ -60,13 +61,15 @@ export interface JobPayoutTotals {
 export const EXTRA_TYPE_LABELS: Record<JobExtraType, string> = {
   travel_half: 'Half Travel Day',
   travel_full: 'Full Travel Day',
-  day_off: 'Day Off'
+  day_off: 'Day Off',
+  conduccion: 'Conducción'
 };
 
 export const EXTRA_TYPE_LIMITS: Record<JobExtraType, number> = {
   travel_half: 2,
   travel_full: 1,
-  day_off: 1
+  day_off: 1,
+  conduccion: 1
 };
 
 /** IRPF deduction per day for non-autónomo (cuenta ajena) workers. */

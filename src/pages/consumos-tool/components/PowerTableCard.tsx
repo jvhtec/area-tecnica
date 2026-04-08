@@ -5,6 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Table } from "../types";
+import {
+  CUSTOM_POWER_POSITION_VALUE,
+  getPowerPositionCustomValue,
+  getPowerPositionSelectValue,
+  getResolvedPowerPosition,
+  NO_POWER_POSITION_VALUE,
+  POWER_POSITION_PRESETS,
+} from "@/utils/powerPositions";
 
 export const PowerTableCard: React.FC<{
   table: Table;
@@ -80,6 +88,42 @@ export const PowerTableCard: React.FC<{
               />
             )}
           </div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+            <Label className="text-sm whitespace-nowrap">Position:</Label>
+            <Select
+              value={getPowerPositionSelectValue(table.position, table.customPosition)}
+              onValueChange={(value) => {
+                if (value === NO_POWER_POSITION_VALUE) {
+                  onUpdateSettings({ position: undefined, customPosition: undefined });
+                } else if (value === CUSTOM_POWER_POSITION_VALUE) {
+                  onUpdateSettings({ position: undefined, customPosition: "" });
+                } else {
+                  onUpdateSettings({ position: value, customPosition: undefined });
+                }
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="No position" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_POWER_POSITION_VALUE}>No position</SelectItem>
+                {POWER_POSITION_PRESETS.map((position) => (
+                  <SelectItem key={position} value={position}>
+                    {position}
+                  </SelectItem>
+                ))}
+                <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Custom</SelectItem>
+              </SelectContent>
+            </Select>
+            {getPowerPositionSelectValue(table.position, table.customPosition) === CUSTOM_POWER_POSITION_VALUE && (
+              <Input
+                placeholder="Enter custom position"
+                value={getPowerPositionCustomValue(table.position, table.customPosition)}
+                onChange={(e) => onUpdateSettings({ position: undefined, customPosition: e.target.value })}
+                className="w-full sm:w-[180px]"
+              />
+            )}
+          </div>
         </div>
       </div>
 
@@ -118,6 +162,12 @@ export const PowerTableCard: React.FC<{
             )}
             <tr className="border-t bg-muted/50 font-medium">
               <td colSpan={3} className="px-4 py-3 text-right text-sm">
+                Potencia Aparente:
+              </td>
+              <td className="px-4 py-3 text-sm">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</td>
+            </tr>
+            <tr className="border-t bg-muted/50 font-medium">
+              <td colSpan={3} className="px-4 py-3 text-right text-sm">
                 {phaseMode === "three" ? "Current per Phase:" : "Current:"}
               </td>
               <td className="px-4 py-3 text-sm">{table.currentPerPhase?.toFixed(2)} A</td>
@@ -127,6 +177,12 @@ export const PowerTableCard: React.FC<{
                 PDU Type:
               </td>
               <td className="px-4 py-3 text-sm">{table.customPduType || table.pduType}</td>
+            </tr>
+            <tr className="border-t bg-muted/50 font-medium">
+              <td colSpan={3} className="px-4 py-3 text-right text-sm">
+                Position:
+              </td>
+              <td className="px-4 py-3 text-sm">{getResolvedPowerPosition(table.position, table.customPosition) || "N/A"}</td>
             </tr>
             {table.includesHoist && (
               <tr className="border-t bg-muted/50 font-medium">
@@ -141,4 +197,3 @@ export const PowerTableCard: React.FC<{
     </div>
   );
 };
-

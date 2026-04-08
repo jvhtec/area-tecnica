@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,6 +23,12 @@ interface JobAssignment {
     role?: string | null;
     assignable_as_tech?: boolean | null;
   } | null;
+}
+
+interface CustomTravelRate {
+  profile_id: string;
+  travel_half_day_eur: number | null;
+  travel_full_day_eur: number | null;
 }
 
 const cardBase = "bg-card border-border text-card-foreground";
@@ -56,10 +63,30 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
     enabled: !!jobId,
   });
 
+  // Fetch custom travel rates for all assigned technicians
+  const techIds = useMemo(
+    () => (assignments?.map(a => a.technician_id) ?? []).sort(),
+    [assignments]
+  );
+  const techIdsKey = techIds.join(',');
+  const { data: customTravelRates, isLoading: customTravelRatesLoading } = useQuery({
+    queryKey: ['custom-travel-rates', jobId, techIdsKey],
+    queryFn: async () => {
+      if (!techIds.length) return [];
+      const { data, error } = await supabase
+        .from('custom_tech_rates')
+        .select('profile_id, travel_half_day_eur, travel_full_day_eur')
+        .in('profile_id', techIds);
+      if (error) throw error;
+      return (data ?? []) as CustomTravelRate[];
+    },
+    enabled: techIds.length > 0,
+  });
+
   // If technicianId is provided (non-manager), restrict payouts to that technician
   const { data: payoutTotals, isLoading: payoutLoading } = useJobPayoutTotals(jobId, technicianId);
 
-  if (assignmentsLoading || payoutLoading) {
+  if (assignmentsLoading || payoutLoading || customTravelRatesLoading) {
     return (
       <Card className={cardBase}>
         <CardHeader>
@@ -132,6 +159,8 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
           ).trim() || 'Unnamed Technician';
           const technicianPayout = payoutTotals?.find(p => p.technician_id === assignment.technician_id);
 
+          const techCustomRates = customTravelRates?.find(r => r.profile_id === assignment.technician_id);
+
           return (
             <div key={assignment.technician_id} className={surface + " rounded-xl p-4 sm:p-5"}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
@@ -158,6 +187,8 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
                   ['admin', 'management'].includes(assignment.profiles?.role || '') &&
                   Boolean(assignment.profiles?.assignable_as_tech)
                 }
+                customTravelHalfRate={techCustomRates?.travel_half_day_eur}
+                customTravelFullRate={techCustomRates?.travel_full_day_eur}
                 showVehicleDisclaimer={technicianPayout?.vehicle_disclaimer || false}
               />
 

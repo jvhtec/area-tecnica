@@ -84,8 +84,7 @@ export class ProgramSection {
       const lineHeight = 6;
       const scheduleLines = eventData.schedule!
         .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter(Boolean);
+        .flatMap((line) => this.pdfDoc.splitText(line.trimEnd(), 160));
 
       for (const line of scheduleLines) {
         yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);

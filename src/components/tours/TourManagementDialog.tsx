@@ -67,6 +67,26 @@ export const TourManagementDialog = ({
     onOpenChange(false);
   };
 
+  const handleLightsPowerDefaults = () => {
+    const params = new URLSearchParams({
+      tourId: tour.id,
+      mode: tourDateId ? 'override' : 'tour-defaults'
+    });
+    if (tourDateId) params.append('tourDateId', tourDateId);
+    navigate(`/lights-consumos-tool?${params.toString()}`);
+    onOpenChange(false);
+  };
+
+  const handleLightsWeightDefaults = () => {
+    const params = new URLSearchParams({
+      tourId: tour.id,
+      mode: tourDateId ? 'override' : 'tour-defaults'
+    });
+    if (tourDateId) params.append('tourDateId', tourDateId);
+    navigate(`/lights-pesos-tool?${params.toString()}`);
+    onOpenChange(false);
+  };
+
   const handleManageDefaults = () => {
     setDefaultsManagerOpen(true);
   };
@@ -271,23 +291,45 @@ export const TourManagementDialog = ({
                   <Settings className="h-4 w-4" />
                   Gestionar Todos los Valores y Exportar PDFs
                 </Button>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    variant="outline"
-                    onClick={handlePowerDefaults}
-                    className="flex items-center gap-2"
-                  >
-                    <Calculator className="h-4 w-4" />
-                    {tourDateId ? 'Anular Potencia' : 'Configurar Valores de Potencia'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleWeightDefaults}
-                    className="flex items-center gap-2"
-                  >
-                    <Weight className="h-4 w-4" />
-                    {tourDateId ? 'Anular Peso' : 'Configurar Valores de Peso'}
-                  </Button>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium">Sonido</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={handlePowerDefaults}
+                      className="flex items-center gap-2"
+                    >
+                      <Calculator className="h-4 w-4" />
+                      {tourDateId ? 'Anular Potencia' : 'Potencia Sonido'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleWeightDefaults}
+                      className="flex items-center gap-2"
+                    >
+                      <Weight className="h-4 w-4" />
+                      {tourDateId ? 'Anular Peso' : 'Peso Sonido'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground font-medium">Luces</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={handleLightsPowerDefaults}
+                      className="flex items-center gap-2"
+                    >
+                      <Calculator className="h-4 w-4" />
+                      {tourDateId ? 'Anular Potencia Luces' : 'Potencia Luces'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleLightsWeightDefaults}
+                      className="flex items-center gap-2"
+                    >
+                      <Weight className="h-4 w-4" />
+                      {tourDateId ? 'Anular Peso Luces' : 'Peso Luces'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>

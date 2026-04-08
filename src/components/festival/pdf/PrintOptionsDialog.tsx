@@ -777,7 +777,7 @@ export const PrintOptionsDialog = ({
       if (error) throw error;
 
       const filteredArtists = artists?.filter(artist => 
-        artist.mic_kit === 'festival' &&
+        (artist.mic_kit === 'festival' || artist.mic_kit === 'mixed') &&
         artist.wired_mics &&
         Array.isArray(artist.wired_mics) &&
         artist.wired_mics.length > 0

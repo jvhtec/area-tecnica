@@ -154,7 +154,6 @@ export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
 
       const requestBody = {
         input: trimmedQuery,
-        maxResultCount: 6,
         languageCode: 'es',
         regionCode: 'ES',
       };

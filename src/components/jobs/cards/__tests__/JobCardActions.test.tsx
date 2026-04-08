@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { JobCardActions } from '../JobCardActions';
+import { buildTechnicalPowerSummaryPackFilename } from '@/utils/pdf/technicalPowerSummaryPack';
 import type { FlatElementNode } from '@/utils/flex-folders';
 import * as resolveFlexUrl from '@/utils/flex-folders/resolveFlexUrl';
 import * as useFlexUuidModule from '@/hooks/useFlexUuid';
@@ -12,17 +13,125 @@ const {
   openFlexElementMock,
   getElementTreeMock,
   MOCK_PRESUPUESTO_DRYHIRE_ID,
+  toastMock,
+  supabaseFromMock,
+  generateTechnicalPowerSummaryPackMock,
+  loadTechnicalPowerSummaryDataMock,
+  fetchJobLogoMock,
+  useQueryMock,
+  jobDepartmentsQueryState,
+  technicalPowerSummaryQueryState,
 } = vi.hoisted(() => ({
   FlexElementSelectorDialogMock: vi.fn(() => null),
   openFlexElementMock: vi.fn(),
   getElementTreeMock: vi.fn(),
   MOCK_PRESUPUESTO_DRYHIRE_ID: 'mock-presupuesto-dryhire',
+  toastMock: vi.fn(),
+  supabaseFromMock: vi.fn(),
+  generateTechnicalPowerSummaryPackMock: vi.fn(),
+  loadTechnicalPowerSummaryDataMock: vi.fn(),
+  fetchJobLogoMock: vi.fn(),
+  useQueryMock: vi.fn(),
+  jobDepartmentsQueryState: {
+    data: ['sound', 'lights', 'video'] as any,
+    isLoading: false,
+    isError: false,
+    error: null as any,
+  },
+  technicalPowerSummaryQueryState: {
+    data: undefined as any,
+    isLoading: false,
+    isError: false,
+    error: null as any,
+  },
 }));
+
+const createSupabaseBuilder = (response: { data: any; error: any }) => {
+  const filters: Array<{ type: 'eq' | 'in'; column: string; value: any }> = [];
+  const applyFilters = () => {
+    if (!Array.isArray(response.data)) {
+      return response.data;
+    }
+
+    return response.data.filter((row) =>
+      filters.every((filter) => {
+        if (filter.type === 'eq') {
+          return row?.[filter.column] === filter.value;
+        }
+
+        return filter.value.includes(row?.[filter.column]);
+      })
+    );
+  };
+  const builder: any = {};
+  builder.select = vi.fn(() => builder);
+  builder.eq = vi.fn((column: string, value: any) => {
+    filters.push({ type: 'eq', column, value });
+    return builder;
+  });
+  builder.in = vi.fn((column: string, value: any[]) => {
+    filters.push({ type: 'in', column, value });
+    return builder;
+  });
+  builder.single = vi.fn(() => builder);
+  builder.maybeSingle = vi.fn(() => builder);
+  builder.order = vi.fn(() => builder);
+  builder.then = (resolve: (value: any) => void, reject?: (error: any) => void) =>
+    Promise.resolve({ data: applyFilters(), error: response.error }).then(resolve, reject);
+  return builder;
+};
+
+const createTechnicalPowerSummary = (missingDepartments: string[] = []) => ({
+  departments: {
+    sound: {
+      department: 'sound',
+      rows: missingDepartments.includes('sound')
+        ? []
+        : [{ name: 'FoH', pduLabel: '32A', positionLabel: 'FOH', totalWatts: 1000, currentPerPhase: 4, totalVa: 1052, notes: '', source: 'job' }],
+      safetyMargin: null,
+      totalWatts: missingDepartments.includes('sound') ? 0 : 1000,
+      totalAmps: missingDepartments.includes('sound') ? 0 : 4,
+      totalKva: missingDepartments.includes('sound') ? 0 : 1.05,
+    },
+    lights: {
+      department: 'lights',
+      rows: missingDepartments.includes('lights')
+        ? []
+        : [{ name: 'Dimmers', pduLabel: '63A', positionLabel: 'USL', totalWatts: 2000, currentPerPhase: 8, totalVa: 2222, notes: '', source: 'job' }],
+      safetyMargin: null,
+      totalWatts: missingDepartments.includes('lights') ? 0 : 2000,
+      totalAmps: missingDepartments.includes('lights') ? 0 : 8,
+      totalKva: missingDepartments.includes('lights') ? 0 : 2.22,
+    },
+    video: {
+      department: 'video',
+      rows: missingDepartments.includes('video')
+        ? []
+        : [{ name: 'LED', pduLabel: '32A', positionLabel: 'DSR', totalWatts: 1500, currentPerPhase: 6, totalVa: 1667, notes: '', source: 'job' }],
+      safetyMargin: null,
+      totalWatts: missingDepartments.includes('video') ? 0 : 1500,
+      totalAmps: missingDepartments.includes('video') ? 0 : 6,
+      totalKva: missingDepartments.includes('video') ? 0 : 1.67,
+    },
+  },
+  totalSystemWatts:
+    (missingDepartments.includes('sound') ? 0 : 1000) +
+    (missingDepartments.includes('lights') ? 0 : 2000) +
+    (missingDepartments.includes('video') ? 0 : 1500),
+  totalSystemAmps:
+    (missingDepartments.includes('sound') ? 0 : 4) +
+    (missingDepartments.includes('lights') ? 0 : 8) +
+    (missingDepartments.includes('video') ? 0 : 6),
+  totalSystemKva:
+    (missingDepartments.includes('sound') ? 0 : 1.05) +
+    (missingDepartments.includes('lights') ? 0 : 2.22) +
+    (missingDepartments.includes('video') ? 0 : 1.67),
+});
 
 // Mock modules
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({
-    toast: vi.fn(),
+    toast: toastMock,
   }),
 }));
 
@@ -42,15 +151,7 @@ vi.mock('@/hooks/useOptimizedAuth', () => ({
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          in: vi.fn(() => ({
-            single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-          })),
-        })),
-      })),
-    })),
+    from: supabaseFromMock,
     auth: {
       getUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: null })),
     },
@@ -64,13 +165,7 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>();
   return {
     ...actual,
-    useQuery: () => ({
-      data: undefined,
-      isLoading: false,
-      isError: false,
-      error: null,
-      refetch: vi.fn(),
-    }),
+    useQuery: useQueryMock,
   };
 });
 
@@ -101,8 +196,26 @@ vi.mock('@/hooks/useFlexUuid', () => ({
   useFlexUuid: vi.fn(),
 }));
 
+vi.mock('@/utils/pdf/technicalPowerSummaryPack', () => ({
+  buildTechnicalPowerSummaryPackFilename: vi.fn((jobTitle?: string | null) =>
+    `Resumen Potencia Tecnica - ${jobTitle || 'Trabajo'}.pdf`
+  ),
+  generateTechnicalPowerSummaryPack: generateTechnicalPowerSummaryPackMock,
+}));
+
+vi.mock('@/utils/powerSummaryData', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/powerSummaryData')>();
+  return {
+    ...actual,
+    loadTechnicalPowerSummaryData: loadTechnicalPowerSummaryDataMock,
+  };
+});
+
+vi.mock('@/utils/pdf/logoUtils', () => ({
+  fetchJobLogo: fetchJobLogoMock,
+}));
+
 describe('JobCardActions', () => {
-  const mockToast = vi.fn();
   const defaultProps = {
     job: {
       id: 'test-job-id',
@@ -131,6 +244,85 @@ describe('JobCardActions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    supabaseFromMock.mockImplementation((table: string) => {
+      if (table === 'job_departments') {
+        return createSupabaseBuilder({
+          data: (jobDepartmentsQueryState.data || []).map((department: string) => ({
+            job_id: 'test-job-id',
+            department,
+          })),
+          error: null,
+        });
+      }
+
+      return createSupabaseBuilder({ data: [], error: null });
+    });
+    generateTechnicalPowerSummaryPackMock.mockResolvedValue(
+      new Blob(['pdf'], { type: 'application/pdf' })
+    );
+    jobDepartmentsQueryState.data = ['sound', 'lights', 'video'];
+    jobDepartmentsQueryState.isLoading = false;
+    jobDepartmentsQueryState.isError = false;
+    jobDepartmentsQueryState.error = null;
+    technicalPowerSummaryQueryState.data = createTechnicalPowerSummary();
+    technicalPowerSummaryQueryState.isLoading = false;
+    technicalPowerSummaryQueryState.isError = false;
+    technicalPowerSummaryQueryState.error = null;
+    useQueryMock.mockImplementation((options: any) => {
+      if (!options?.enabled) {
+        return {
+          data: undefined,
+          isLoading: false,
+          isError: false,
+          error: null,
+          refetch: vi.fn(),
+        };
+      }
+
+      const queryKey = Array.isArray(options?.queryKey) ? options.queryKey : [];
+
+      if (queryKey.includes('technical-power-job-departments')) {
+        return {
+          data: jobDepartmentsQueryState.data,
+          isLoading: jobDepartmentsQueryState.isLoading,
+          isError: jobDepartmentsQueryState.isError,
+          error: jobDepartmentsQueryState.error,
+          refetch: vi.fn(),
+        };
+      }
+
+      if (queryKey.includes('technical-power-summary')) {
+        return {
+          data: technicalPowerSummaryQueryState.data,
+          isLoading: technicalPowerSummaryQueryState.isLoading,
+          isError: technicalPowerSummaryQueryState.isError,
+          error: technicalPowerSummaryQueryState.error,
+          refetch: vi.fn(),
+        };
+      }
+
+      return {
+        data: undefined,
+        isLoading: false,
+        isError: false,
+        error: null,
+        refetch: vi.fn(),
+      };
+    });
+    loadTechnicalPowerSummaryDataMock.mockResolvedValue(createTechnicalPowerSummary());
+    fetchJobLogoMock.mockResolvedValue(undefined);
+    Object.defineProperty(window.URL, 'createObjectURL', {
+      writable: true,
+      value: vi.fn(() => 'blob:mock'),
+    });
+    Object.defineProperty(window.URL, 'revokeObjectURL', {
+      writable: true,
+      value: vi.fn(),
+    });
+    Object.defineProperty(HTMLAnchorElement.prototype, 'click', {
+      writable: true,
+      value: vi.fn(),
+    });
     // Mock useFlexUuid hook
     vi.spyOn(useFlexUuidModule, 'useFlexUuid').mockReturnValue({
       flexUuid: null,
@@ -597,6 +789,185 @@ describe('JobCardActions', () => {
         btn => btn.querySelector('svg')?.getAttribute('class')?.includes('lucide-trash')
       );
       expect(deleteButton).toBeTruthy();
+    });
+
+    it('should render the technical power summary button for project management managers', () => {
+      render(<JobCardActions {...defaultProps} />);
+
+      expect(screen.getByRole('button', { name: /Resumen Potencia/i })).toBeTruthy();
+    });
+
+    it('should enable the technical power summary button when all department tables exist even without uploaded reports', () => {
+      render(<JobCardActions {...defaultProps} />);
+
+      expect(screen.getByRole('button', { name: /Resumen Potencia/i })).not.toBeDisabled();
+    });
+
+    it('should enable the technical power summary button when an uninvolved department has no tables', () => {
+      jobDepartmentsQueryState.data = ['sound', 'lights'];
+      technicalPowerSummaryQueryState.data = createTechnicalPowerSummary(['video']);
+
+      render(<JobCardActions {...defaultProps} />);
+
+      expect(screen.getByRole('button', { name: /Resumen Potencia/i })).not.toBeDisabled();
+    });
+
+    it('should keep the technical power summary button enabled and warn when a department table is missing', async () => {
+      const user = userEvent.setup();
+      jobDepartmentsQueryState.data = ['sound', 'lights'];
+      technicalPowerSummaryQueryState.data = createTechnicalPowerSummary(['lights']);
+
+      render(<JobCardActions {...defaultProps} />);
+
+      const powerSummaryButton = screen.getByRole('button', { name: /Resumen Potencia/i });
+      expect(powerSummaryButton).not.toBeDisabled();
+
+      await user.hover(powerSummaryButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('tooltip')).toHaveTextContent(/departamentos disponibles/i);
+        expect(screen.getByRole('tooltip')).toHaveTextContent(/Iluminación/i);
+        expect(screen.getByRole('tooltip')).toHaveTextContent(/Pueden faltar en el PDF/i);
+      });
+    });
+
+    it('should disable the technical power summary button when no department has printable data', async () => {
+      const user = userEvent.setup();
+      jobDepartmentsQueryState.data = ['sound', 'lights'];
+      technicalPowerSummaryQueryState.data = createTechnicalPowerSummary(['sound', 'lights', 'video']);
+
+      render(<JobCardActions {...defaultProps} />);
+
+      const powerSummaryButton = screen.getByRole('button', { name: /Resumen Potencia/i });
+      expect(powerSummaryButton).toBeDisabled();
+
+      const tooltipTrigger = powerSummaryButton.parentElement as HTMLElement;
+      await user.hover(tooltipTrigger);
+
+      await waitFor(() => {
+        expect(screen.getByRole('tooltip')).toHaveTextContent(/No hay tablas de potencia disponibles para imprimir/i);
+      });
+    });
+
+    it('should keep the technical power summary button enabled when department preview loading fails so users can retry', async () => {
+      const user = userEvent.setup();
+      jobDepartmentsQueryState.data = [];
+      jobDepartmentsQueryState.isError = true;
+
+      render(<JobCardActions {...defaultProps} />);
+
+      const powerSummaryButton = screen.getByRole('button', { name: /Resumen Potencia/i });
+      expect(powerSummaryButton).not.toBeDisabled();
+
+      await user.hover(powerSummaryButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('tooltip')).toHaveTextContent(/No se pudieron comprobar los departamentos tecnicos/i);
+      });
+    });
+
+    it('should keep the technical power summary button enabled when summary preview fails so users can retry', async () => {
+      const user = userEvent.setup();
+      jobDepartmentsQueryState.data = ['sound'];
+      technicalPowerSummaryQueryState.data = undefined;
+      technicalPowerSummaryQueryState.isError = true;
+
+      render(<JobCardActions {...defaultProps} />);
+
+      const powerSummaryButton = screen.getByRole('button', { name: /Resumen Potencia/i });
+      expect(powerSummaryButton).not.toBeDisabled();
+
+      await user.hover(powerSummaryButton);
+
+      await waitFor(() => {
+        expect(screen.getByRole('tooltip')).toHaveTextContent(/No se pudieron comprobar las tablas de potencia/i);
+      });
+    });
+
+    it('should generate the technical power summary pack when all department tables are ready', async () => {
+      const user = userEvent.setup();
+      const props = {
+        ...defaultProps,
+        job: {
+          ...defaultProps.job,
+          start_time: '2026-04-08T08:00:00.000Z',
+          location_data: { name: 'Arena', formatted_address: 'Madrid' },
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      await user.click(screen.getByRole('button', { name: /Resumen Potencia/i }));
+
+      await waitFor(() => {
+        expect(loadTechnicalPowerSummaryDataMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            job: expect.objectContaining({
+              id: 'test-job-id',
+              job_type: 'single',
+            }),
+          })
+        );
+      });
+
+      expect(generateTechnicalPowerSummaryPackMock).toHaveBeenCalled();
+      expect(generateTechnicalPowerSummaryPackMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          includedDepartments: ['sound', 'lights', 'video'],
+        })
+      );
+      expect(fetchJobLogoMock).toHaveBeenCalledWith('test-job-id');
+    });
+
+    it('should use the fallback job title for the PDF title and filename when title is missing', async () => {
+      const user = userEvent.setup();
+      const props = {
+        ...defaultProps,
+        job: {
+          ...defaultProps.job,
+          title: null,
+          name: 'Fallback Job',
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      await user.click(screen.getByRole('button', { name: /Resumen Potencia/i }));
+
+      await waitFor(() => {
+        expect(generateTechnicalPowerSummaryPackMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            jobTitle: 'Fallback Job',
+          })
+        );
+      });
+
+      expect(vi.mocked(buildTechnicalPowerSummaryPackFilename)).toHaveBeenCalledWith('Fallback Job');
+    });
+
+    it('should generate the technical power summary pack with only available departments when some are missing', async () => {
+      const user = userEvent.setup();
+      technicalPowerSummaryQueryState.data = createTechnicalPowerSummary(['lights']);
+      loadTechnicalPowerSummaryDataMock.mockResolvedValue(createTechnicalPowerSummary(['lights']));
+
+      render(<JobCardActions {...defaultProps} />);
+
+      await user.click(screen.getByRole('button', { name: /Resumen Potencia/i }));
+
+      await waitFor(() => {
+        expect(generateTechnicalPowerSummaryPackMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            includedDepartments: ['sound', 'video'],
+          })
+        );
+      });
+
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          title: 'Resumen generado parcialmente',
+          description: expect.stringMatching(/No incluye: Iluminación/i),
+        })
+      );
     });
   });
 

@@ -880,7 +880,7 @@ export const calculateEquipmentNeeds = (
     }
 
     // Microphones (only festival-provided)
-    if (artist.wired_mics && artist.mic_kit === 'festival') {
+    if (artist.wired_mics && (artist.mic_kit === 'festival' || artist.mic_kit === 'mixed')) {
       artist.wired_mics.forEach(mic => {
         stageReq.microphones[mic.model] = (stageReq.microphones[mic.model] || 0) + mic.quantity;
       });

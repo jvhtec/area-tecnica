@@ -52,6 +52,29 @@ npm run cap:android
 
 **Note**: After making changes to web code, always run `cap:sync` before opening native projects.
 
+### Staging & Testing Commands
+```bash
+# Staging environment (separate Supabase project)
+npm run dev:staging       # Dev server against staging
+npm run build:staging     # Build for staging
+
+# Testing
+npm run test:run          # Single run (CI-friendly)
+npm run test:critical     # 30 critical workflow tests
+npm run test:coverage     # Coverage report
+npm run test:e2e          # Playwright smoke tests (Chromium)
+
+# Linting
+npm run lint:functions    # ESLint on Supabase edge functions (Deno globals)
+```
+
+### Pre-Commit Security
+```bash
+# Check staged files for secrets before committing
+./scripts/check-staged-secrets.sh
+```
+Detects API keys, passwords, and credentials in staged files. Consider setting up as a git pre-commit hook.
+
 ## Critical Build Requirements
 
 ### npm Install
@@ -139,8 +162,22 @@ src/
   - Query key factories in `src/lib/optimized-react-query.ts`
   - Standardized invalidation via `optimizedInvalidation()`
   - Entity-based query options via `createEntityQueryOptions()`
-- **Global State**: Zustand stores in `src/stores/` for UI state (dialogs, selections)
+- **Global State**: Zustand stores in `src/stores/`:
+  - `useCreateJobDialogStore` — Job creation dialog visibility and context
+  - `useSelectedJobStore` — Currently selected job card (also used by Stream Deck)
+  - `useSelectedCellStore` — Matrix cell selection (supports multi-select for batch ops)
+  - `useShortcutStore` — Global keyboard/Stream Deck shortcut registry with persistence
 - **Realtime**: Supabase realtime subscriptions with connection pooling and health monitoring
+
+#### Key Libraries (`src/lib/`)
+- `token-manager.ts` — JWT token lifecycle, refresh logic, session recovery
+- `unified-subscription-manager.ts` — Centralized realtime subscription management (see Multi-Tab section)
+- `multitab-coordinator.ts` — Leader election and cross-tab cache sync
+- `enhanced-security-config.ts` — Rate limiting, input sanitization, file validation
+- `push.ts` / `push-native.ts` — Web Push and native iOS push notification support
+- `wallboard-api.ts` — Tokenized public wallboard data API
+- `frequencyBands.ts` — RF/wireless frequency reference data
+- `streamdeck/websocket-server.ts` — Stream Deck WebSocket integration
 
 #### 3. Supabase Integration
 - **Client**: Unified client at `src/lib/supabase-client.ts`
@@ -199,7 +236,7 @@ The database is extensive with 85+ migrations. Key tables:
 
 **Festival Management**:
 - `festival_artists` - Artist/band information per festival
-- `artist_requirements` - Technical riders and requirements
+- `festival_artist_form_submissions` - Technical riders submitted via public artist form
 - `festival_dates` - Festival schedule and agenda
 - `festival_shifts` - Crew shift assignments
 
@@ -290,14 +327,58 @@ Tour/Festival → Date → Department → Dryhire (optional)
 - Recovery detection in `src/hooks/usePushSubscriptionRecovery.ts`
 - Notifications stored in `notifications` and `push_subscriptions` tables
 
+### Multi-Tab Coordination
+
+**Critical pattern** in `src/lib/multitab-coordinator.ts` — prevents duplicate API calls and syncs state across browser tabs:
+- **Leader election**: Uses Web Locks API (fallback: localStorage) — only leader tab handles realtime subscriptions and refetches
+- **Cache sync**: BroadcastChannel broadcasts query updates to follower tabs (75ms debounce)
+- **Heartbeat**: 3s intervals to detect leader health; automatic failover when leader closes
+- **Impact**: Don't bypass this when adding realtime features — always go through the unified subscription manager
+
+### Unified Subscription Manager
+
+Central realtime manager in `src/lib/unified-subscription-manager.ts` (21.9KB):
+- **Priority-based** subscriptions (high/medium/low)
+- **Route-aware**: Only subscribes to tables needed for the current route (`useEnhancedRouteSubscriptions`)
+- **Stale detection**: 10-minute threshold for subscription refresh
+- **Recovery**: Exponential backoff on failures, auto-resubscribe on network recovery, visibility-based refetch
+- **Snapshot pattern**: Provides connection status, active subscription list, last refresh timestamp for UI
+
+### Chunk Loading Error Recovery
+
+Automatic recovery from code-split loading failures (`ErrorBoundary.tsx` + `main.tsx`):
+- Detects chunk load errors from async imports
+- Tracks reload attempts in sessionStorage
+- Auto-reloads up to `MAX_CHUNK_ERROR_RELOADS` times with 500ms delay
+- In-memory guard prevents infinite loops if sessionStorage unavailable
+
+### Stream Deck & Keyboard Shortcuts
+
+- **Shortcut store**: `src/stores/useShortcutStore.ts` — Zustand registry with categories (navigation, job-card, matrix, global)
+- **Stream Deck**: WebSocket client in `src/lib/streamdeck/websocket-server.ts` connects to local server (`ws://localhost:3001`)
+- **Commands**: execute-shortcut, navigate, get-state, ping — auto-reconnect silently if server absent
+- **Custom keybinds**: Persisted to localStorage, exportable/importable
+
+### Rate Limiting & Input Security
+
+Client-side security config in `src/lib/enhanced-security-config.ts`:
+- **Rate limits**: Flex API (60/min), document uploads (10/min), user creation (5/hour), password reset (3/hour)
+- **Progressive penalties**: 30s → 5min → 30min on repeated violations
+- **Input sanitization**: XSS prevention (strips `<>`, event handlers, `javascript:`, `data:` URIs), SQL injection prevention
+- **File upload validation**: 50MB max, type whitelist (PDF, images, Word, plaintext), double-extension blocking
+
 ### Performance Optimizations
 
 1. **Code Splitting**: All pages lazy-loaded, manual chunks in vite.config.ts
 2. **Query Optimization**: Materialized views (`v_job_staffing_summary`), indexed foreign keys
-3. **Realtime Throttling**: Connection pooling, subscription deduplication
-4. **Image Optimization**: `src/utils/imageOptimization.ts`
-5. **Bundle Optimization**: Separate chunks for pdf-libs, maps-lib, spreadsheet-libs, editor-lib
-6. **Production Mode**: Console/debugger statements dropped via esbuild
+3. **Realtime Throttling**: Connection pooling, subscription deduplication, route-aware subscriptions
+4. **Multi-Tab Dedup**: Leader election prevents duplicate subscriptions across tabs
+5. **Virtual Scrolling**: `useVirtualizedMatrix` and `useVirtualizedDateRange` for large datasets
+6. **Optimistic Updates**: `useOptimisticJobManagement` for immediate UI feedback with rollback
+7. **Image Optimization**: `src/utils/imageOptimization.ts`
+8. **Bundle Optimization**: Separate chunks for pdf-libs, maps-lib, spreadsheet-libs, editor-lib
+9. **Production Mode**: Console/debugger statements dropped via esbuild
+10. **Token Caching**: Auth tokens cached 30 minutes via `OptimizedAuthProvider`
 
 ### Testing
 
@@ -306,7 +387,68 @@ Tour/Festival → Date → Department → Dryhire (optional)
 - **Setup**: `src/test/setup.ts`
 - **Pattern**: Co-locate tests in `__tests__/` directories or `.test.ts` files
 - **Component Tests**: Use `@testing-library/react` and `@testing-library/jest-dom`
+- **E2E Tests**: Playwright (Chromium) smoke tests via `npm run test:e2e`
 - **Environment**: Node by default, jsdom for components (configured via environmentMatchGlobs)
+
+**Test Utilities** (in `src/test/`):
+- `setup.ts` — DOM matchers, toast mocking, window API polyfills (matchMedia, IntersectionObserver, ResizeObserver)
+- `fixtures.ts` — Shared test fixtures
+- `renderWithProviders.tsx` — Provider wrapper for component tests
+- `mockOptimizedAuth.ts` — Auth context mocking
+- `mockSupabase.ts` — Supabase client mocking
+- `createTestQueryClient.ts` — Query client factory for isolated tests
+
+**Test Commands**:
+```bash
+npm test                # Vitest watch mode (interactive development)
+npm run test:run        # Vitest single run (CI-friendly)
+npm run test:critical   # 30 critical workflow tests (auth, assignments, timesheets, etc.)
+npm run test:coverage   # Coverage report
+npm run test:e2e        # Playwright smoke tests (requires Chromium)
+```
+
+### CI/CD Pipeline (GitHub Actions)
+
+Defined in `.github/workflows/tests.yml`, triggered on PRs to `dev`/`main` or manual dispatch:
+
+| Job | Timeout | What it does |
+|-----|---------|-------------|
+| `lint` | 20 min | ESLint on app code |
+| `test_critical` | 25 min | 30 critical test files (auth, assignments, timesheets) |
+| `test_run` | 25 min | Full Vitest suite |
+| `build` | 25 min | Vite production build + post-build scripts |
+| `e2e_smoke` | 30 min | Playwright Chromium smoke tests |
+
+All jobs use Node 20 and `npm install --legacy-peer-deps`.
+
+### Supabase Edge Functions
+
+62 Deno/TypeScript edge functions in `supabase/functions/`. Key categories:
+
+**Email Services** (11+ functions): `send-corporate-email`, `send-onboarding-email`, `send-staffing-email`, `send-timesheet-reminder`, `send-bug-resolution-email`, `send-expense-notification`, `send-job-payout-email`, `send-password-reset`, `send-tour-availability`, `send-vacation-decision`, `send-warehouse-message`
+
+**Flex Integration**: `create-flex-folders`, `apply-flex-status`, `archive-to-flex`, `sync-flex-crew-for-job`, `manage-flex-crew-assignments`, `persist-flex-elements`, `secure-flex-api`, `fetch-flex-*`
+
+**Staffing Engine**: `staffing-orchestrator` (campaign-based crew matching with ranking, distance, reliability scoring), `staffing-click` (technician response handler), `staffing-sweeper` (cleanup), `notify-staffing-cancellation`
+
+**User Management**: `create-user`, `delete-user`, `import-users`
+
+**Document Generation**: `generate-memoria-tecnica`, `generate-lights-memoria-tecnica`, `generate-video-memoria-tecnica`, `generate-sv-report`
+
+**External Services**: `create-whatsapp-group`, `create-transport-request`, `get-google-maps-key`, `get-mapbox-token`, `static-map`, `place-photos`, `place-restaurants`, `image-proxy`, `tech-calendar-ics`
+
+**Wallboard**: `wallboard-auth`, `wallboard-feed`, `wallboard-debug`
+
+**System**: `system-health`, `security-audit`, `background-job-deletion`, `evaluate-achievements`, `push/` (WebSocket push bridge)
+
+**Shared utilities** live in `supabase/functions/_shared/` (CORS headers, Supabase client init, response helpers).
+
+**Edge Function Patterns**:
+- Runtime: Deno (import from `https://esm.sh/` or `jsr:` for deps)
+- Linting: `npm run lint:functions` (separate ESLint config with Deno globals)
+- Deployment: Via Supabase CLI (`npx supabase functions deploy <name>`)
+- Secrets: Managed via `npx supabase secrets set KEY=VALUE`
+- Each function is a directory with `index.ts` entry point
 
 ## Development Patterns
 
@@ -459,6 +601,49 @@ Unified equipment table (`equipment_models`) with categories:
 - QR code generation for references
 - Export to blob for download or preview
 
+### Staffing Orchestrator
+
+Campaign-based crew assignment engine for matching technicians to jobs:
+- **Edge Function**: `supabase/functions/staffing-orchestrator/`
+- **Frontend**: `src/features/staffing/`, `src/components/staffing/`
+- **Database**: `staffing_campaigns` table + related tables (20260112 migrations)
+- **Flow**: Create campaign → rank candidates (distance, reliability, availability) → send invitations → technician clicks accept/decline via `staffing-click` → `staffing-sweeper` cleans up expired campaigns
+- **Ranking factors**: Geographic distance, past reliability score, technician preferences, custom rates
+- **Critical**: Campaign state machine — don't bypass status transitions
+
+### Hoja de Ruta (Route Sheets)
+
+Complex document builder for daily route/logistics sheets:
+- **Page**: `src/pages/HojaDeRuta.tsx`
+- **Hooks**: `useHojaDeRutaForm` (14.4KB form state), `useHojaDeRutaPersistence` (28.9KB data persistence), `useHojaDeRutaImages` (image handling), `useHojaDeRutaTemplates` (template management)
+- **Utils**: `src/utils/hoja-de-ruta/`, `src/utils/hojaDeRutaExport.ts` (20.8KB PDF export)
+- **Workflow**: Create/edit route sheets with stops, images, notes → save as template → export to PDF
+- **Note**: One of the most complex form systems in the app — 4 dedicated hooks totaling 50KB+
+
+### SoundVision File Library
+
+File management system for SoundVision venue files with access control:
+- **Page**: `src/pages/SoundVisionFiles.tsx`
+- **Hooks**: `useSoundVisionFiles` (11KB queries), `useSoundVisionUpload` (upload), `useSoundVisionAccessRequest` (6.6KB access workflow), `useSoundVisionFileReviews` (5.9KB review workflow)
+- **Access Control**: Users request access → admin approves/denies → approved users can download files
+- **Docs**: `docs/soundvision-access-workflow.md`, `docs/soundvision-access-test-cases.md`
+
+### Activity / Audit Logging
+
+Admin-facing activity feed tracking all significant platform events:
+- **Feature module**: `src/features/activity/` — `api.ts`, `catalog.ts` (7.2KB event type catalog), `types.ts`
+- **Realtime**: `src/features/activity/hooks/useActivityRealtime.ts`
+- **Page**: Activity center page for admins
+- **Events tracked**: Job creation/updates, assignments, timesheet submissions, staffing campaigns, equipment movements, etc.
+
+### Public Artist Form
+
+Tokenized public routes allowing artists to submit technical riders without authentication:
+- **Routes**: `/festival/artist-form/*` (public, no auth required)
+- **Edge Functions**: `upload-public-artist-rider`, `delete-public-artist-rider`, `submit-public-artist-form`
+- **Pattern**: Festival generates a unique token URL → artist fills requirements form → data saved to `festival_artist_form_submissions` table
+- **Security**: Token-based access, no user session needed
+
 ### Digital Signage (Wallboard)
 Real-time wallboard displays for crew schedules, announcements:
 - Public access via token-based URLs
@@ -468,19 +653,47 @@ Real-time wallboard displays for crew schedules, announcements:
 
 ## Environment Variables
 
-Set in Cloudflare Pages (not in code):
-```
-VITE_SUPABASE_URL=https://[project].supabase.co
-VITE_SUPABASE_ANON_KEY=[anon-key]
+### Required Variables (set in Cloudflare Pages, never in code)
+
+| Variable | Purpose |
+|----------|---------|
+| `VITE_SUPABASE_URL` | Supabase project URL (`https://[project].supabase.co`) |
+| `VITE_SUPABASE_ANON_KEY` | Supabase anon/public JWT key |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Fallback alias for anon key (same value) |
+| `VITE_SUPABASE_FUNCTIONS_URL` | Edge functions URL (`https://[project].supabase.co/functions/v1`) |
+| `VITE_VAPID_PUBLIC_KEY` | Web Push VAPID public key (for push notifications) |
+| `VITE_ENABLE_ACTIVITY_PUSH_FALLBACK` | Feature flag: activity push fallback (`true`/`false`) |
+
+### Dynamic (injected at build time by Vite)
+
+```bash
+VITE_APP_VERSION        # Auto-set to ISO timestamp
+VITE_BUILD_TIMESTAMP    # Auto-set to Unix timestamp (ms)
 ```
 
-Dynamic injection at build time:
-```
-VITE_APP_VERSION        # Auto-set to build timestamp
-VITE_BUILD_TIMESTAMP    # Auto-set to Unix timestamp
+Service worker version injection via `scripts/inject-sw-version.mjs` (runs post-build).
+
+### Local Development
+
+```bash
+cp .env.example .env.local        # Copy template, fill in Supabase creds
+cp .env.staging.example .env.staging.local  # For staging environment
 ```
 
-Service worker version injection via `scripts/inject-sw-version.sh` (runs post-build).
+- `.env.local` — default local development
+- `.env.staging.local` — staging Supabase project (`npm run dev:staging`)
+- `.env.prod.local` — point local UI at production (`npm run dev -- --mode prod`)
+
+**Never commit `.env*` files.** All are gitignored.
+
+### Staging Workflow
+
+```bash
+npm run dev:staging     # Dev server against staging Supabase
+npm run build:staging   # Build for staging
+```
+
+For full Cloudflare + Supabase staging setup, see `docs/STAGING_SETUP.md`.
 
 ## Git Workflow
 
@@ -560,10 +773,30 @@ npx supabase start
 
 ## Additional Resources
 
-- **Supabase Project**: Connected via environment variables
+### Companion Documentation (in repo)
+- **ARCHITECTURE.md** — Full system architecture, project structure diagram, all component domains, integrations, security, and glossary
+- **DEVELOPMENT.md** — Local dev setup, lock file strategy, dependency management, environment switching, archive/legacy policy
+- **DEPLOYMENT.md** — Cloudflare Pages setup, environment variables configuration, deployment process, rollback, troubleshooting
+- **SECURITY.md** — Known vulnerabilities, accepted risks, security best practices, incident response plan
+- **CHANGELOG.md** — Release notes and version history
+- **docs/** — 60+ feature docs: push notifications, staging setup, staffing orchestrator, wallboard, SoundVision, audit reports, workflows
+- **docs/README.md** — Documentation index organized by category
+- **.github/GIT_HYGIENE.md** — Branch naming, PR workflow, stale branch cleanup
+
+### External Documentation
 - **UI Components**: [shadcn/ui documentation](https://ui.shadcn.com/)
 - **React Query**: [TanStack Query docs](https://tanstack.com/query/latest)
 - **Capacitor**: [Capacitor docs](https://capacitorjs.com/)
+- **Supabase**: [Supabase docs](https://supabase.com/docs)
+- **Cloudflare Pages**: [Pages docs](https://developers.cloudflare.com/pages/)
+
+## Archive and Legacy Policy
+
+- Use `archive/` for historical planning docs and backup assets — stays in git history, not in active development
+- Use `src/legacy/` for deprecated/superseded app code retained for reference
+- **Do not** add new runtime imports from `archive/` or `src/legacy/`
+- Active sources: `src/`, active docs: `docs/`, active migrations: `supabase/migrations/`
+- Helper scripts go in `scripts/` (SQL helpers in `scripts/sql/`), feature docs in `docs/` subfolders
 
 ## Project-Specific Context
 
@@ -716,3 +949,12 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **Tour assignments cascade** -- removing a tour assignment must remove related job assignments and timesheets
 - **Flex folder hierarchy must exist** before creating work elements or crew calls
 - **Don't import lovable-tagger** in vite.config.ts (causes build failures)
+- **Edge functions use Deno runtime** — don't use Node.js APIs or npm imports in `supabase/functions/`; use `https://esm.sh/` or `jsr:` for deps
+- **Lint edge functions separately** — `npm run lint:functions` uses different ESLint config with Deno globals
+- **Never commit .env files** — all dotenv files are gitignored; secrets go in Cloudflare Pages dashboard or Supabase secrets
+- **Staging uses a separate Supabase project** — don't point staging at production; use `.env.staging.local` and `npm run dev:staging`
+- **Staffing campaign state machine** — don't bypass status transitions in the staffing orchestrator flow
+- **CI requires Node 20** — GitHub Actions workflow uses Node 20; match locally for consistency
+- **Playwright needs Chromium** — `npm run test:e2e` requires Playwright browsers installed (`npx playwright install chromium`)
+- **100 SQL migrations exist** — the initial `00000000000000_production_schema.sql` is 10,500+ lines; new migrations use timestamp naming (`YYYYMMDDHHMMSS_description.sql`)
+- **Don't manually edit archive/ or src/legacy/** — these are retained for reference only, no new runtime imports

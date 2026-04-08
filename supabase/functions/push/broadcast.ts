@@ -15,8 +15,8 @@ import {
   getManagementUserIds,
   getProfileDisplayName,
   getSoundDepartmentUserIds,
-  getTechnicianDepartment,
   getTimesheetSubmittingTechDepartment,
+  lookupTechnicianDepartment,
   getTourName,
   normalizeDepartmentRolesPayload,
   resolveSoundVisionVenueName,
@@ -51,6 +51,50 @@ const loadNativeTokens = async (
   return data ?? [];
 };
 
+/**
+ * Resolve department-scoped management + admin IDs for a technician.
+ * Warns when the technician has no department set (notifications will still
+ * be sent to cross-department admins, but department managers are skipped).
+ */
+const getScopedManagementIds = async (
+  client: ReturnType<typeof createClient>,
+  technicianId: string | undefined,
+  context?: string,
+): Promise<string[]> => {
+  let techDepartment: string | null = null;
+
+  if (technicianId) {
+    const result = await lookupTechnicianDepartment(client, technicianId);
+    techDepartment = result.department;
+
+    // Only warn when the lookup succeeded but the technician genuinely has no department.
+    // Query errors are already logged by lookupTechnicianDepartment itself.
+    if (!result.error && !techDepartment) {
+      console.warn(
+        `[push/broadcast] Technician ${technicianId} has no department set` +
+          (context ? ` (context: ${context})` : '') +
+          ' — department-scoped management recipients will be empty',
+      );
+    }
+  }
+
+  const deptMgmt = techDepartment
+    ? await getManagementByDepartmentUserIds(client, techDepartment)
+    : [];
+  const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
+  return [...new Set([...deptMgmt, ...relevantAdmins])];
+};
+
+/**
+ * Broadcasts a push notification for a given event to the correct audience, constructs localized title/body and metadata, applies routing overrides, and sends both web and native push notifications.
+ *
+ * @param userId - ID of the actor that triggered the event; included for actor self-delivery
+ * @param body - Event payload (e.g., `type`, `job_id`/`doc_id`, `tour_id`, `recipient_id`, `changes`, file/tour/task fields, staffing info, etc.) used to determine message text, URL, recipients, and metadata
+ * @returns An object describing the outcome:
+ * - `'sent'` with `{ results, count }` when notifications were dispatched (results contains per-endpoint/token delivery info),
+ * - `'skipped'` with a `reason` when no recipients or subscriptions were found,
+ * - or an error object when loading subscriptions/tokens fails.
+ */
 export async function handleBroadcast(
   client: ReturnType<typeof createClient>,
   userId: string,
@@ -385,72 +429,38 @@ export async function handleBroadcast(
   } else if (type === 'staffing.availability.sent') {
     title = 'Solicitud de disponibilidad enviada';
     text = `${actor} envió solicitud a ${recipName || 'técnico'} (${ch}).`;
-    // Department-aware: scope to technician's department, not job's department
-    // This ensures lights managers only get notifications for lights techs, etc.
-    const techDepartment = await getTechnicianDepartment(client, body.recipient_id);
-    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
-    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
-    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
+    addNaturalRecipients(await getScopedManagementIds(client, body.recipient_id, 'staffing.availability.sent'));
     addRecipients([body.recipient_id]);
   } else if (type === 'staffing.offer.sent') {
     title = 'Oferta enviada';
     text = `${actor} envió oferta a ${recipName || 'técnico'} (${ch}).`;
-    // Department-aware: scope to technician's department, not job's department
-    const techDepartment = await getTechnicianDepartment(client, body.recipient_id);
-    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
-    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
-    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
+    addNaturalRecipients(await getScopedManagementIds(client, body.recipient_id, 'staffing.offer.sent'));
     addRecipients([body.recipient_id]);
   } else if (type === 'staffing.availability.confirmed') {
     title = 'Disponibilidad confirmada';
     text = `${recipName || 'Técnico'} confirmó disponibilidad para "${jobTitle || 'Trabajo'}".`;
-    // Department-aware: scope to technician's department, not job's department
-    const techDepartment = await getTechnicianDepartment(client, body.recipient_id);
-    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
-    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
-    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
+    addNaturalRecipients(await getScopedManagementIds(client, body.recipient_id, 'staffing.availability.confirmed'));
   } else if (type === 'staffing.availability.declined') {
     title = 'Disponibilidad rechazada';
     text = `${recipName || 'Técnico'} rechazó disponibilidad para "${jobTitle || 'Trabajo'}".`;
-    // Department-aware: scope to technician's department, not job's department
-    const techDepartment = await getTechnicianDepartment(client, body.recipient_id);
-    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
-    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
-    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
+    addNaturalRecipients(await getScopedManagementIds(client, body.recipient_id, 'staffing.availability.declined'));
   } else if (type === 'staffing.offer.confirmed') {
     title = 'Oferta aceptada';
     text = `${recipName || 'Técnico'} aceptó oferta para "${jobTitle || 'Trabajo'}".`;
-    // Department-aware: scope to technician's department, not job's department
-    const techDepartment = await getTechnicianDepartment(client, body.recipient_id);
-    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
-    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
-    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
-    // No need to notify all participants here; keep it to management
+    addNaturalRecipients(await getScopedManagementIds(client, body.recipient_id, 'staffing.offer.confirmed'));
   } else if (type === 'staffing.offer.declined') {
     title = 'Oferta rechazada';
     text = `${recipName || 'Técnico'} rechazó oferta para "${jobTitle || 'Trabajo'}".`;
-    // Department-aware: scope to technician's department, not job's department
-    const techDepartment = await getTechnicianDepartment(client, body.recipient_id);
-    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
-    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
-    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
+    addNaturalRecipients(await getScopedManagementIds(client, body.recipient_id, 'staffing.offer.declined'));
   } else if (type === 'staffing.availability.cancelled') {
     title = 'Disponibilidad cancelada';
     text = `Solicitud de disponibilidad cancelada para "${jobTitle || 'Trabajo'}".`;
-    // Department-aware: scope to technician's department, not job's department
-    const techDepartment = await getTechnicianDepartment(client, body.recipient_id);
-    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
-    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
-    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
+    addNaturalRecipients(await getScopedManagementIds(client, body.recipient_id, 'staffing.availability.cancelled'));
     addRecipients([body.recipient_id]);
   } else if (type === 'staffing.offer.cancelled') {
     title = 'Oferta cancelada';
     text = `Oferta cancelada para "${jobTitle || 'Trabajo'}".`;
-    // Department-aware: scope to technician's department, not job's department
-    const techDepartment = await getTechnicianDepartment(client, body.recipient_id);
-    const deptMgmt = techDepartment ? await getManagementByDepartmentUserIds(client, techDepartment) : [];
-    const relevantAdmins = await getAdminUserIdsForStaffingNotifications(client, techDepartment);
-    addNaturalRecipients([...deptMgmt, ...relevantAdmins]);
+    addNaturalRecipients(await getScopedManagementIds(client, body.recipient_id, 'staffing.offer.cancelled'));
     addRecipients([body.recipient_id]);
   } else if (type === 'job.status.confirmed') {
     title = 'Trabajo confirmado';
@@ -575,6 +585,9 @@ export async function handleBroadcast(
     }
 
     // 2. Send notification to management (using tech's name)
+    // Department-aware: scope management notifications to technician's department
+    const scopedMgmtIds = await getScopedManagementIds(client, assignedTechId, `job.assignment.direct job=${jobId}`);
+
     const mgmtTitle = 'Asignación directa';
     let mgmtText = '';
     if (assignedTechName) {
@@ -591,31 +604,33 @@ export async function handleBroadcast(
       }
     }
 
-    const { data: mgmtSubs } = await client
-      .from('push_subscriptions')
-      .select('endpoint, p256dh, auth, user_id')
-      .in('user_id', Array.from(mgmt));
+    if (scopedMgmtIds.length > 0) {
+      const { data: mgmtSubs } = await client
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth, user_id')
+        .in('user_id', scopedMgmtIds);
 
-    const mgmtTokens = await loadNativeTokens(client, Array.from(mgmt));
+      const mgmtTokens = await loadNativeTokens(client, scopedMgmtIds);
 
-    if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
-      mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
-      const mgmtPayload: PushPayload = {
-        title: mgmtTitle,
-        body: mgmtText,
-        url,
-        type,
-        meta: baseMeta,
-      };
+      if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
+        mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
+        const mgmtPayload: PushPayload = {
+          title: mgmtTitle,
+          body: mgmtText,
+          url,
+          type,
+          meta: baseMeta,
+        };
 
-      await Promise.all([
-        ...(mgmtSubs || []).map(async (sub: any) => {
-          await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
-        }),
-        ...mgmtTokens.map(async (tokenRow) => {
-          await sendNativePushNotification(client, tokenRow.device_token, mgmtPayload);
-        }),
-      ]);
+        await Promise.all([
+          ...(mgmtSubs || []).map(async (sub: any) => {
+            await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
+          }),
+          ...mgmtTokens.map(async (tokenRow) => {
+            await sendNativePushNotification(client, tokenRow.device_token, mgmtPayload);
+          }),
+        ]);
+      }
     }
 
     // Return early since we've already sent the notifications
@@ -675,43 +690,48 @@ export async function handleBroadcast(
     }
 
     // Notify management
+    // Department-aware: scope management notifications to technician's department
+    const scopedMgmtIds = await getScopedManagementIds(client, removedTechId, `assignment.removed job=${jobId}`);
+
     const mgmtTitle = 'Asignación eliminada';
     const mgmtText = singleDayFlag && formattedTargetDate
       ? `${actor} ha eliminado a ${removedTechName} de "${jobTitle || 'Trabajo'}" para ${formattedTargetDate}.`
       : `${actor} ha eliminado a ${removedTechName} de "${jobTitle || 'Trabajo'}".`;
 
-    const { data: mgmtSubs } = await client
-      .from('push_subscriptions')
-      .select('endpoint, p256dh, auth, user_id')
-      .in('user_id', Array.from(mgmt));
+    if (scopedMgmtIds.length > 0) {
+      const { data: mgmtSubs } = await client
+        .from('push_subscriptions')
+        .select('endpoint, p256dh, auth, user_id')
+        .in('user_id', scopedMgmtIds);
 
-    const mgmtTokens = await loadNativeTokens(client, Array.from(mgmt));
+      const mgmtTokens = await loadNativeTokens(client, scopedMgmtIds);
 
-    if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
-      mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
-      const mgmtPayload: PushPayload = {
-        title: mgmtTitle,
-        body: mgmtText,
-        url,
-        type,
-        meta: {
-          jobId: jobId,
-          tourId,
-          tourName: tourName ?? undefined,
-          actor,
-          recipient: removedTechName,
-          ...metaExtras,
-        },
-      };
+      if ((mgmtSubs && mgmtSubs.length > 0) || mgmtTokens.length > 0) {
+        mgmtSubsCount = (mgmtSubs?.length || 0) + mgmtTokens.length;
+        const mgmtPayload: PushPayload = {
+          title: mgmtTitle,
+          body: mgmtText,
+          url,
+          type,
+          meta: {
+            jobId: jobId,
+            tourId,
+            tourName: tourName ?? undefined,
+            actor,
+            recipient: removedTechName,
+            ...metaExtras,
+          },
+        };
 
-      await Promise.all([
-        ...(mgmtSubs || []).map(async (sub: any) => {
-          await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
-        }),
-        ...mgmtTokens.map(async (tokenRow) => {
-          await sendNativePushNotification(client, tokenRow.device_token, mgmtPayload);
-        }),
-      ]);
+        await Promise.all([
+          ...(mgmtSubs || []).map(async (sub: any) => {
+            await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, mgmtPayload);
+          }),
+          ...mgmtTokens.map(async (tokenRow) => {
+            await sendNativePushNotification(client, tokenRow.device_token, mgmtPayload);
+          }),
+        ]);
+      }
     }
 
     console.log('🚫 Assignment removal notification sent');
