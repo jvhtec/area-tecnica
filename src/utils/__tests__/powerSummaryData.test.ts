@@ -54,6 +54,8 @@ describe('powerSummaryData', () => {
           current_per_phase: 4,
           pdu_type: '32A',
           custom_pdu_type: null,
+          position: 'FOH',
+          custom_position: null,
           includes_hoist: false,
         },
         {
@@ -65,6 +67,8 @@ describe('powerSummaryData', () => {
           current_per_phase: 8,
           pdu_type: '63A',
           custom_pdu_type: 'Custom 63A',
+          position: null,
+          custom_position: 'Custom Left',
           includes_hoist: true,
         },
         {
@@ -76,6 +80,8 @@ describe('powerSummaryData', () => {
           current_per_phase: 6,
           pdu_type: '32A',
           custom_pdu_type: null,
+          position: 'DSR',
+          custom_position: null,
           includes_hoist: false,
         },
       ],
@@ -87,6 +93,8 @@ describe('powerSummaryData', () => {
     });
 
     expect(summary.departments.sound.totalWatts).toBe(1000);
+    expect(summary.departments.sound.rows[0].positionLabel).toBe('FOH');
+    expect(summary.departments.lights.rows[0].positionLabel).toBe('Custom Left');
     expect(summary.departments.lights.rows[0].notes).toContain('CEE32A');
     expect(summary.totalSystemWatts).toBe(4500);
     expect(summary.totalSystemAmps).toBe(18);
@@ -144,6 +152,8 @@ describe('powerSummaryData', () => {
           current_per_phase: 7,
           pdu_type: '32A',
           custom_pdu_type: null,
+          position: 'USL',
+          custom_position: null,
           includes_hoist: false,
           override_data: { rows: [], safetyMargin: 15, pf: 0.95 },
         },
@@ -181,6 +191,7 @@ describe('powerSummaryData', () => {
     });
 
     expect(summary.departments.sound.rows[0].name).toBe('Override FoH');
+    expect(summary.departments.sound.rows[0].positionLabel).toBe('USL');
     expect(summary.departments.sound.safetyMargin).toBe(15);
     expect(summary.departments.sound.rows[0].source).toBe('tour-override');
   });
@@ -198,6 +209,8 @@ describe('powerSummaryData', () => {
           current_per_phase: 3,
           pdu_type: '16A',
           custom_pdu_type: null,
+          position: null,
+          custom_position: 'Video Custom',
           includes_hoist: false,
         },
       ],
@@ -220,7 +233,7 @@ describe('powerSummaryData', () => {
           table_name: 'Default FoH',
           table_type: 'power',
           total_value: 1200,
-          metadata: { current_per_phase: 5, pdu_type: '32A', safetyMargin: 20, pf: 0.95 },
+          metadata: { current_per_phase: 5, pdu_type: '32A', position: 'FOH', safetyMargin: 20, pf: 0.95 },
           table_data: { rows: [{ quantity: '1' }] },
           created_at: '2026-04-07T08:00:00.000Z',
         },
@@ -248,7 +261,9 @@ describe('powerSummaryData', () => {
     });
 
     expect(summary.departments.sound.rows[0].source).toBe('tour-default');
+    expect(summary.departments.sound.rows[0].positionLabel).toBe('FOH');
     expect(summary.departments.sound.safetyMargin).toBe(20);
+    expect(summary.departments.video.rows[0].positionLabel).toBe('Video Custom');
     expect(summary.departments.video.rows[0].source).toBe('legacy-tour-default');
     expect(summary.totalSystemWatts).toBe(4300);
   });
@@ -266,6 +281,8 @@ describe('powerSummaryData', () => {
           current_per_phase: 5,
           pdu_type: '32A',
           custom_pdu_type: null,
+          position: 'CSR',
+          custom_position: null,
           includes_hoist: false,
         },
       ],
@@ -284,6 +301,7 @@ describe('powerSummaryData', () => {
     });
 
     expect(summary.departments.sound.rows[0].name).toBe('Legacy FoH');
+    expect(summary.departments.sound.rows[0].positionLabel).toBe('CSR');
     expect(summary.departments.sound.rows[0].source).toBe('legacy-tour-default');
   });
 

@@ -87,7 +87,7 @@ const createTechnicalPowerSummary = (missingDepartments: string[] = []) => ({
       department: 'sound',
       rows: missingDepartments.includes('sound')
         ? []
-        : [{ name: 'FoH', pduLabel: '32A', totalWatts: 1000, currentPerPhase: 4, totalVa: 1052, notes: '', source: 'job' }],
+        : [{ name: 'FoH', pduLabel: '32A', positionLabel: 'FOH', totalWatts: 1000, currentPerPhase: 4, totalVa: 1052, notes: '', source: 'job' }],
       safetyMargin: null,
       totalWatts: missingDepartments.includes('sound') ? 0 : 1000,
       totalAmps: missingDepartments.includes('sound') ? 0 : 4,
@@ -97,7 +97,7 @@ const createTechnicalPowerSummary = (missingDepartments: string[] = []) => ({
       department: 'lights',
       rows: missingDepartments.includes('lights')
         ? []
-        : [{ name: 'Dimmers', pduLabel: '63A', totalWatts: 2000, currentPerPhase: 8, totalVa: 2222, notes: '', source: 'job' }],
+        : [{ name: 'Dimmers', pduLabel: '63A', positionLabel: 'USL', totalWatts: 2000, currentPerPhase: 8, totalVa: 2222, notes: '', source: 'job' }],
       safetyMargin: null,
       totalWatts: missingDepartments.includes('lights') ? 0 : 2000,
       totalAmps: missingDepartments.includes('lights') ? 0 : 8,
@@ -107,7 +107,7 @@ const createTechnicalPowerSummary = (missingDepartments: string[] = []) => ({
       department: 'video',
       rows: missingDepartments.includes('video')
         ? []
-        : [{ name: 'LED', pduLabel: '32A', totalWatts: 1500, currentPerPhase: 6, totalVa: 1667, notes: '', source: 'job' }],
+        : [{ name: 'LED', pduLabel: '32A', positionLabel: 'DSR', totalWatts: 1500, currentPerPhase: 6, totalVa: 1667, notes: '', source: 'job' }],
       safetyMargin: null,
       totalWatts: missingDepartments.includes('video') ? 0 : 1500,
       totalAmps: missingDepartments.includes('video') ? 0 : 6,

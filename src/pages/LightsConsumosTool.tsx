@@ -20,6 +20,13 @@ import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeade
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import {
+  CUSTOM_POWER_POSITION_VALUE,
+  getPowerPositionCustomValue,
+  getPowerPositionSelectValue,
+  NO_POWER_POSITION_VALUE,
+  POWER_POSITION_PRESETS,
+} from '@/utils/powerPositions';
 
 type FixtureType = 'incandescent' | 'discharge' | 'led' | 'led-pro';
 
@@ -135,6 +142,8 @@ interface Table {
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
+  position?: string;
+  customPosition?: string;
   includesHoist?: boolean;
   id?: number | string;
   isDefault?: boolean;
@@ -180,6 +189,8 @@ const LightsConsumosTool: React.FC = () => {
   const [includesHoist, setIncludesHoist] = useState(false);
   const [selectedPduType, setSelectedPduType] = useState<string>('default');
   const [customPduType, setCustomPduType] = useState<string>('');
+  const [selectedPosition, setSelectedPosition] = useState<string>(NO_POWER_POSITION_VALUE);
+  const [customPosition, setCustomPosition] = useState<string>('');
   const [phaseMode, setPhaseMode] = useState<'single' | 'three'>('three');
   const [voltage, setVoltage] = useState<number>(400);
   const [componentSearches, setComponentSearches] = useState<Record<number, string>>({});
@@ -257,6 +268,8 @@ const LightsConsumosTool: React.FC = () => {
           current_per_phase: table.currentPerPhase,
           pdu_type: table.customPduType || table.pduType,
           custom_pdu_type: table.customPduType,
+          position: table.position,
+          custom_position: table.customPosition,
           includes_hoist: table.includesHoist || false,
           safetyMargin: sm,
           phaseMode: pm,
@@ -309,6 +322,8 @@ const LightsConsumosTool: React.FC = () => {
             current_per_phase: table.currentPerPhase,
             pdu_type: table.customPduType || table.pduType,
             custom_pdu_type: table.customPduType,
+            position: table.position,
+            custom_position: table.customPosition,
             includes_hoist: table.includesHoist || false,
             safetyMargin: sm,
             phaseMode: pm,
@@ -356,8 +371,11 @@ const LightsConsumosTool: React.FC = () => {
             totalWatts: table.total_value,
             adjustedWatts: adjW,
             totalVa: estimatedVa,
-            currentPerPhase: table.metadata?.currentPerPhase,
-            pduType: table.metadata?.pduType,
+            currentPerPhase: table.metadata?.current_per_phase,
+            pduType: table.metadata?.pdu_type,
+            customPduType: table.metadata?.custom_pdu_type,
+            position: table.metadata?.position,
+            customPosition: table.metadata?.custom_position,
             id: `default-${table.id}`,
             isDefault: true
           };
@@ -541,6 +559,8 @@ const LightsConsumosTool: React.FC = () => {
         current_per_phase: table.currentPerPhase || 0,
         pdu_type: table.customPduType || table.pduType || '',
         custom_pdu_type: table.customPduType,
+        position: table.position || null,
+        custom_position: table.customPosition || null,
         includes_hoist: table.includesHoist || false,
         override_data: {
           rows: table.rows
@@ -571,6 +591,9 @@ const LightsConsumosTool: React.FC = () => {
           pdu_type: table.customPduType || table.pduType || '',
           includes_hoist: table.includesHoist || false,
           custom_pdu_type: table.customPduType,
+          position: table.position || null,
+          custom_position: table.customPosition || null,
+          table_data: { rows: table.rows },
         });
 
       if (error) throw error;
@@ -633,6 +656,14 @@ const LightsConsumosTool: React.FC = () => {
           ? customPduType
           : selectedPduType
         : undefined;
+    const resolvedPosition =
+      selectedPosition === CUSTOM_POWER_POSITION_VALUE
+        ? undefined
+        : selectedPosition === NO_POWER_POSITION_VALUE
+          ? undefined
+          : selectedPosition;
+    const resolvedCustomPosition =
+      selectedPosition === CUSTOM_POWER_POSITION_VALUE ? customPosition : undefined;
 
     const newTable: Table = {
       name: tableName,
@@ -643,6 +674,8 @@ const LightsConsumosTool: React.FC = () => {
       currentPerPhase: currentLine,
       pduType: pduSuggestion,
       customPduType: pduOverride,
+      position: resolvedPosition,
+      customPosition: resolvedCustomPosition,
       includesHoist,
       id: Date.now(),
       snapshotSafetyMargin: safetyMargin,
@@ -673,6 +706,8 @@ const LightsConsumosTool: React.FC = () => {
       }],
     });
     setTableName('');
+    setSelectedPosition(NO_POWER_POSITION_VALUE);
+    setCustomPosition('');
   };
 
   const removeTable = (tableId: number | string) => {
@@ -687,7 +722,29 @@ const LightsConsumosTool: React.FC = () => {
       prev.map((table) => {
         if (table.id === tableId) {
           const updatedTable = { ...table, ...updates };
-          if (!isTourDefaults && selectedJobId) {
+          if (isTourDefaults && updatedTable.defaultTableId) {
+            const sm = updatedTable.snapshotSafetyMargin ?? safetyMargin;
+            const pm = updatedTable.snapshotPhaseMode ?? phaseMode;
+            const v = updatedTable.snapshotVoltage ?? voltage;
+            updateTourDefaultTable({
+              tableId: updatedTable.defaultTableId,
+              updates: {
+                table_data: { rows: updatedTable.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
+                total_value: updatedTable.totalWatts || 0,
+                metadata: {
+                  current_per_phase: updatedTable.currentPerPhase,
+                  pdu_type: updatedTable.customPduType || updatedTable.pduType,
+                  custom_pdu_type: updatedTable.customPduType,
+                  position: updatedTable.position,
+                  custom_position: updatedTable.customPosition,
+                  includes_hoist: updatedTable.includesHoist || false,
+                  safetyMargin: sm,
+                  phaseMode: pm,
+                  voltage: v,
+                },
+              },
+            });
+          } else if (!isTourDefaults && selectedJobId) {
             savePowerRequirementTable(updatedTable);
           }
           return updatedTable;
@@ -887,6 +944,9 @@ const LightsConsumosTool: React.FC = () => {
                       <div>
                         <span className="font-medium">PDU Type:</span> {table.customPduType || table.pduType}
                       </div>
+                      <div>
+                        <span className="font-medium">Position:</span> {table.customPosition || table.position || 'N/A'}
+                      </div>
                       {table.includesHoist && (
                         <div className="col-span-2 text-gray-600 italic">
                           Includes hoist power requirement
@@ -1006,6 +1066,35 @@ const LightsConsumosTool: React.FC = () => {
                 value={customPduType}
                 onChange={(e) => setCustomPduType(e.target.value)}
                 placeholder="Ingrese un tipo de PDU personalizado"
+              />
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Posición</Label>
+            <Select value={selectedPosition} onValueChange={setSelectedPosition}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sin posición" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_POWER_POSITION_VALUE}>Sin posición</SelectItem>
+                {POWER_POSITION_PRESETS.map((position) => (
+                  <SelectItem key={position} value={position}>
+                    {position}
+                  </SelectItem>
+                ))}
+                <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Personalizada</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedPosition === CUSTOM_POWER_POSITION_VALUE && (
+            <div className="space-y-2">
+              <Label>Posición Personalizada</Label>
+              <Input
+                value={customPosition}
+                onChange={(e) => setCustomPosition(e.target.value)}
+                placeholder="Ingrese una posición personalizada"
               />
             </div>
           )}
@@ -1265,6 +1354,44 @@ const LightsConsumosTool: React.FC = () => {
                         className="w-[220px]"
                       />
                     )}
+                    <div className="flex items-center gap-2">
+                      <Label>Posición:</Label>
+                      <Select
+                        value={getPowerPositionSelectValue(table.position, table.customPosition)}
+                        onValueChange={(value) => {
+                          if (value === NO_POWER_POSITION_VALUE) {
+                            updateTableSettings(table.id as number | string, { position: undefined, customPosition: undefined });
+                          } else if (value === CUSTOM_POWER_POSITION_VALUE) {
+                            updateTableSettings(table.id as number | string, { position: undefined, customPosition: '' });
+                          } else {
+                            updateTableSettings(table.id as number | string, { position: value, customPosition: undefined });
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Sin posición" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_POWER_POSITION_VALUE}>Sin posición</SelectItem>
+                          {POWER_POSITION_PRESETS.map((position) => (
+                            <SelectItem key={position} value={position}>
+                              {position}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Personalizada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {getPowerPositionSelectValue(table.position, table.customPosition) === CUSTOM_POWER_POSITION_VALUE && (
+                      <Input
+                        placeholder="Ingrese una posición personalizada"
+                        value={getPowerPositionCustomValue(table.position, table.customPosition)}
+                        onChange={(e) =>
+                          updateTableSettings(table.id as number | string, { position: undefined, customPosition: e.target.value })
+                        }
+                        className="w-[220px]"
+                      />
+                    )}
                   </div>
                 </div>
               )}
@@ -1324,6 +1451,12 @@ const LightsConsumosTool: React.FC = () => {
                       PDU Sugerido:
                     </td>
                     <td className="px-4 py-3">{table.pduType}</td>
+                  </tr>
+                  <tr className="border-t bg-muted/50 font-medium">
+                    <td colSpan={4} className="px-4 py-3 text-right">
+                      Posición:
+                    </td>
+                    <td className="px-4 py-3">{table.customPosition || table.position || 'N/A'}</td>
                   </tr>
                   {table.customPduType && (
                     <tr className="border-t bg-muted/50 font-medium text-primary">

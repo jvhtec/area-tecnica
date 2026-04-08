@@ -1,7 +1,9 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { getResolvedPowerPosition } from '@/utils/powerPositions';
 
 interface ExportTableRow {
   quantity?: string;
+  lineName?: string;
   componentName?: string;
   weight?: string;
   watts?: string;
@@ -25,6 +27,8 @@ interface ExportTable {
   toolType?: 'pesos' | 'consumos' | 'rigging';
   pduType?: string;
   customPduType?: string;
+  position?: string;
+  customPosition?: string;
   includesHoist?: boolean;
   riggingPoint?: string;
   // rigging summary fields
@@ -208,14 +212,29 @@ export const exportToPDF = async (
         doc.text(displayName, 14, yPosition);
         yPosition += 10;
 
-        const tableRows = table.rows.map((row) => [
-          row.quantity,
-          row.componentName || '',
-          type === 'weight' ? row.weight || '' : row.watts || '',
-          type === 'weight'
-            ? row.totalWeight !== undefined ? row.totalWeight.toFixed(2) : ''
-            : row.totalWatts !== undefined ? row.totalWatts.toFixed(2) : ''
-        ]);
+        const hasLineNames = type === 'power' && table.rows.some((row) => row.lineName?.trim());
+        const tableRows = table.rows.map((row) => {
+          const baseCells = [
+            row.quantity,
+            row.componentName || '',
+            type === 'weight' ? row.weight || '' : row.watts || '',
+            type === 'weight'
+              ? row.totalWeight !== undefined ? row.totalWeight.toFixed(2) : ''
+              : row.totalWatts !== undefined ? row.totalWatts.toFixed(2) : '',
+          ];
+
+          if (!hasLineNames) {
+            return baseCells;
+          }
+
+          return [
+            row.quantity,
+            row.lineName || '',
+            row.componentName || '',
+            row.watts || '',
+            row.totalWatts !== undefined ? row.totalWatts.toFixed(2) : '',
+          ];
+        });
 
         if (type === 'weight' && table.totalWeight !== undefined) {
           tableRows.push(['', 'Peso Total', '', table.totalWeight.toFixed(2)]);
@@ -224,6 +243,8 @@ export const exportToPDF = async (
         const headers =
           type === 'weight'
             ? [['Cantidad', 'Componente', 'Peso (por unidad)', 'Peso Total']]
+            : hasLineNames
+              ? [['Cantidad', 'Nombre', 'Componente', 'Vatios (por unidad)', 'Vatios Totales']]
             : [['Cantidad', 'Componente', 'Vatios (por unidad)', 'Vatios Totales']];
 
         autoTable(doc, {
@@ -241,10 +262,11 @@ export const exportToPDF = async (
         yPosition = (doc as any).lastAutoTable.finalY + 10;
 
         if (type === 'power') {
+          const positionLabel = getResolvedPowerPosition(table.position, table.customPosition);
           if (table.totalWatts !== undefined) {
-            checkPageBreak(49);
+            checkPageBreak(positionLabel ? 56 : 49);
             doc.setFillColor(245, 245, 250);
-            doc.rect(14, yPosition - 6, pageWidth - 28, 35, 'F');
+            doc.rect(14, yPosition - 6, pageWidth - 28, positionLabel ? 42 : 35, 'F');
 
             doc.setFontSize(11);
             doc.setTextColor(125, 1, 1);
@@ -265,7 +287,14 @@ export const exportToPDF = async (
             if (table.currentPerPhase !== undefined) {
               const currentLabel = table.phaseMode === 'three' ? 'Corriente por Fase' : 'Corriente';
               doc.text(`${currentLabel}: ${table.currentPerPhase.toFixed(2)} A`, 14, yPosition);
+              yPosition += 7;
+            }
+
+            if (positionLabel) {
+              doc.text(`Posición: ${positionLabel}`, 14, yPosition);
               yPosition += 10;
+            } else {
+              yPosition += 3;
             }
           }
 
@@ -370,7 +399,8 @@ export const exportToPDF = async (
           }
 
           tables.forEach((table) => {
-            checkPageBreak(30);
+            const positionLabel = getResolvedPowerPosition(table.position, table.customPosition) || 'N/A';
+            checkPageBreak(37);
             doc.setFontSize(12); doc.setTextColor(0, 0, 0);
             const pduText = table.customPduType ? table.customPduType : table.pduType;
             doc.text(`${table.name} - PDU: ${pduText || 'N/A'}`, 14, yPosition);
@@ -379,6 +409,8 @@ export const exportToPDF = async (
             const adjusted = safetyMargin !== undefined ? (table.totalWatts || 0) * (1 + (safetyMargin || 0) / 100) : (table.totalWatts || 0);
             doc.setFontSize(10); doc.setTextColor(60, 60, 60);
             doc.text(`Potencia (ajustada): ${adjusted.toFixed(2)} W — Corriente: ${(table.currentPerPhase || 0).toFixed(2)} A`, 14, yPosition);
+            yPosition += 7;
+            doc.text(`Posición: ${positionLabel}`, 14, yPosition);
             yPosition += 7;
 
             if (table.includesHoist) {

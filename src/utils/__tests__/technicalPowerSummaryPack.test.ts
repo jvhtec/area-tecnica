@@ -88,6 +88,7 @@ describe('technicalPowerSummaryPack', () => {
               {
                 name: 'FoH',
                 pduLabel: '32A',
+                positionLabel: 'FOH',
                 totalWatts: 1000,
                 currentPerPhase: 4,
                 totalVa: 1052,
@@ -135,7 +136,7 @@ describe('technicalPowerSummaryPack', () => {
     expect(autoTableMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        head: [['Nombre Cuadro', 'PDU', 'Potencia', 'Corriente', 'Notas']],
+        head: [['Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
       })
     );
   });
