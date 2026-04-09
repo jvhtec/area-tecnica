@@ -36,7 +36,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
     `
     )
     .filter("time_range", "ov", windowRange)
-    .in("job_type", ["single", "festival", "ciclo", "tourdate", "evento"])
+    .in("job_type", ["single", "festival", "ciclo", "tourdate", "evento", "prep_day"])
     .limit(500);
 
   if (department) {

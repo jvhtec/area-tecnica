@@ -212,6 +212,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
         technician_id: quote.technician_id,
         timesheets_total_eur: baseTotal,
         extras_total_eur: extrasTotal,
+        prep_days_total_eur: 0,
         total_eur: totalWithExtrasAndExpenses,
         extras_breakdown: {
           items: extrasBreakdown.items ?? [],

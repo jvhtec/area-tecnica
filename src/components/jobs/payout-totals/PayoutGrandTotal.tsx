@@ -20,6 +20,7 @@ export function PayoutGrandTotal({
   if (payoutTotals.length <= 1) return null;
 
   const totalExpenses = payoutTotals.reduce((sum, payout) => sum + (payout.expenses_total_eur || 0), 0);
+  const totalPrepDays = payoutTotals.reduce((sum, payout) => sum + (payout.prep_days_total_eur || 0), 0);
   const overrideLabel = isCicloJob
     ? payoutOverrides.length > 1 ? 'pagos fijos' : 'pago fijo'
     : payoutOverrides.length > 1 ? 'anulaciones' : 'anulación';
@@ -63,6 +64,12 @@ export function PayoutGrandTotal({
             )}
           </span>
         </div>
+        {totalPrepDays > 0 && (
+          <div className="flex justify-between">
+            <span>Total días de prep:</span>
+            <span>{formatCurrency(totalPrepDays)}</span>
+          </div>
+        )}
         {totalExpenses > 0 && (
           <div className="flex justify-between">
             <span>Total gastos:</span>
