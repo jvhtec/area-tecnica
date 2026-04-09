@@ -15,7 +15,7 @@ import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAs
 import { SubRentalDialog } from '@/components/equipment/SubRentalDialog';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
-import { useOptimizedJobs } from '@/hooks/useOptimizedJobs';
+import { useJobsData } from '@/hooks/useJobsData';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { MobileAvailabilityView } from '@/components/disponibilidad/MobileAvailabilityView';
@@ -77,7 +77,7 @@ export default function Disponibilidad() {
   // Jobs happening on the selected date for this department
   const dayStart = startOfDay(selectedDate);
   const dayEnd = endOfDay(selectedDate);
-  const { data: jobsToday = [] } = useOptimizedJobs(department as any, dayStart, dayEnd);
+  const { data: jobsToday = [] } = useJobsData({ department: department as any, startDate: dayStart, endDate: dayEnd });
 
   const { data: assignedPresets } = useQuery({
     queryKey: ['preset-assignments', department, selectedDate],
