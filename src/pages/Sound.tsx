@@ -25,19 +25,14 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useTechnicianTheme } from "@/hooks/useTechnicianTheme";
 import { SoundVisionAccessRequestDialog } from "@/components/soundvision/SoundVisionAccessRequestDialog";
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
-import { MobileNavBar } from "@/components/layout/MobileNavBar";
-import { buildNavigationItems } from "@/components/layout/SidebarNavigation";
-import { supabase } from "@/integrations/supabase/client";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDetailsModal";
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
-import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
 import { isJobOnDate } from "@/utils/timezoneUtils";
 
 const Sound = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [presetJobType, setPresetJobType] = useState<JobType | undefined>(undefined);
@@ -62,56 +57,7 @@ const Sound = () => {
   const queryClient = useQueryClient();
   const { userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();
 
-  // Generate navigation items for mobile nav bar
-  const navigationItems = useMemo(() => {
-    return buildNavigationItems({
-      userRole,
-      userDepartment,
-      hasSoundVisionAccess,
-    });
-  }, [userRole, userDepartment, hasSoundVisionAccess]);
-
-  const sortedMobileItems = useMemo(() => {
-    if (navigationItems.length <= 1) {
-      return navigationItems;
-    }
-    return [...navigationItems].sort(
-      (a, b) => (a.mobilePriority ?? 99) - (b.mobilePriority ?? 99),
-    );
-  }, [navigationItems]);
-
-  const primaryItems = useMemo(
-    () =>
-      selectPrimaryNavigationItems({
-        items: sortedMobileItems,
-        userDepartment,
-        userRole,
-      }),
-    [sortedMobileItems, userDepartment, userRole],
-  );
-
-  const trayItems = useMemo(() => {
-    if (!sortedMobileItems.length) {
-      return [];
-    }
-    const used = new Set(primaryItems.map((item) => item.id));
-    return sortedMobileItems.filter((item) => !used.has(item.id));
-  }, [sortedMobileItems, primaryItems]);
-
   const { theme: mobileTheme, isDark } = useTechnicianTheme();
-
-  const handleSignOut = async () => {
-    if (isLoggingOut) return;
-    setIsLoggingOut(true);
-    try {
-      await supabase.auth.signOut();
-      navigate('/auth');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
 
   // Comprehensive tools array with dialogs and routes (no Festivals)
   const allTools = [
@@ -232,7 +178,7 @@ const Sound = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Mobile View - Full Screen Hub */}
       {isMobile && (
-        <div className="px-4 pt-safe pb-24 space-y-4" style={{ paddingTop: 'max(env(safe-area-inset-top), 1rem)' }}>
+        <div className="px-4 pt-safe space-y-4" style={{ paddingTop: 'max(env(safe-area-inset-top), 1rem)' }}>
           <DepartmentMobileHub
             department={currentDepartment}
             title="Departamento de sonido"
@@ -257,12 +203,6 @@ const Sound = () => {
               setShowMobileAssignments(true);
             }}
             onStaffClick={() => navigate('/personal')}
-          />
-          <MobileNavBar
-            primaryItems={primaryItems}
-            trayItems={trayItems}
-            onSignOut={handleSignOut}
-            isLoggingOut={isLoggingOut}
           />
         </div>
       )}
