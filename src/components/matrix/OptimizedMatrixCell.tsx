@@ -8,6 +8,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, MessageCircle, Loader2 } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { formatInTimeZone } from 'date-fns-tz';
 import { cn } from '@/lib/utils';
 import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { supabase } from '@/lib/supabase';
@@ -413,19 +415,14 @@ export const OptimizedMatrixCell = memo(({
     if (!iso) return null;
     const parsed = new Date(iso);
     if (Number.isNaN(parsed.getTime())) return null;
-    return new Intl.DateTimeFormat('es-ES', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(parsed);
+    return formatInTimeZone(parsed, 'Europe/Madrid', 'd MMM yyyy, HH:mm', { locale: es });
   };
   const assignmentStatusLabel = (status?: string | null) => {
-    if (status === 'confirmed') return 'Confirmado';
-    if (status === 'declined') return 'Rechazado';
-    if (status === 'invited') return 'Invitado';
-    return status || 'Pendiente';
+    const normalizedStatus = status?.trim().toLowerCase();
+    if (normalizedStatus === 'confirmed') return 'Confirmado';
+    if (normalizedStatus === 'declined') return 'Rechazado';
+    if (normalizedStatus === 'invited') return 'Invitado';
+    return 'Pendiente';
   };
   const availabilityStatusLabel = (status?: string | null) => {
     if (status === 'requested' || status === 'pending') return 'Solicitada';

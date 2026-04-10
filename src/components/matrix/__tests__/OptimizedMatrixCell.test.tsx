@@ -556,8 +556,32 @@ describe('OptimizedMatrixCell', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText(/Asignado por: Manager Name/i).length).toBeGreaterThan(0);
-      expect(screen.getAllByText(/Fecha:/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Fecha: 10 abr 2026, 16:30/i).length).toBeGreaterThan(0);
     });
+  });
+
+  it('normalizes unknown or English assignment statuses to Spanish pending in the tooltip', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <OptimizedMatrixCell
+        technician={mockTechnician}
+        date={mockDate}
+        assignment={{ ...mockAssignment, status: 'Pending' }}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+      />
+    );
+
+    await user.hover(getCellElement());
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Estado: Pendiente/i).length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/Estado: Pending/i)).not.toBeInTheDocument();
   });
 
   it('renders staffing tooltip metadata and degrades gracefully when sender is missing', async () => {
