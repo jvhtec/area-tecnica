@@ -281,27 +281,27 @@ export const useJobsData = (options: JobsDataOptions = {}): UseJobsDataResult =>
     })
   );
 
-  const jobsRealtimeStatus = useOptimizedRealtime('jobs', queryKey as string[], {
+  const jobsRealtimeStatus = useOptimizedRealtime('jobs', queryKey, {
     enabled: realtime && queryEnabled,
     priority: 'high',
   });
 
-  const jobAssignmentsRealtimeStatus = useOptimizedRealtime('job_assignments', queryKey as string[], {
+  const jobAssignmentsRealtimeStatus = useOptimizedRealtime('job_assignments', queryKey, {
     enabled: realtime && queryEnabled,
     priority: 'high',
   });
 
-  const jobDepartmentsRealtimeStatus = useOptimizedRealtime('job_departments', queryKey as string[], {
+  const jobDepartmentsRealtimeStatus = useOptimizedRealtime('job_departments', queryKey, {
     enabled: realtime && queryEnabled,
     priority: 'high',
   });
 
-  const profilesRealtimeStatus = useOptimizedRealtime('profiles', queryKey as string[], {
+  const profilesRealtimeStatus = useOptimizedRealtime('profiles', queryKey, {
     enabled: realtime && queryEnabled,
     priority: 'medium',
   });
 
-  const timesheetsRealtimeStatus = useOptimizedRealtime('timesheets', queryKey as string[], {
+  const timesheetsRealtimeStatus = useOptimizedRealtime('timesheets', queryKey, {
     enabled: realtime && queryEnabled,
     priority: 'high',
   });

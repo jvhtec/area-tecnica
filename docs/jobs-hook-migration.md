@@ -68,6 +68,6 @@ const { data } = useJobsData();
 
 When swapping legacy jobs hooks over to `useJobsData`, update the related cache namespace too.
 
-- Replace `["optimized-jobs"]` and old `["jobs"]`-only invalidations when they were targeting the removed hooks.
+- Replace the removed legacy jobs cache namespace and old `["jobs"]`-only invalidations when they were targeting the removed hooks.
 - Update `useTabVisibility(...)`, route-level query key overrides, and realtime subscription wiring to point at the canonical `["jobs-data"]` namespace.
 - Keep `["jobs"]` invalidations only for screens that still maintain the legacy list cache alongside `useJobsData`.

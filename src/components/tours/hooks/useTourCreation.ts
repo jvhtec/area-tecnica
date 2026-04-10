@@ -5,6 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTourDates } from "./useTourDates";
 import { useTourDepartments } from "./useTourDepartments";
 import { useTourCreationMutation } from "./useTourCreationMutation";
+import { createQueryKey } from "@/lib/optimized-react-query";
 
 export const useTourCreation = (
   currentDepartment: Department,
@@ -37,7 +38,7 @@ export const useTourCreation = (
     if (!title.trim()) {
       toast({
         title: "Error",
-        description: "Please enter a title for the tour",
+        description: "Por favor, introduce un titulo para la gira",
         variant: "destructive",
       });
       return;
@@ -56,13 +57,13 @@ export const useTourCreation = (
       });
       console.log("Tour created successfully");
 
-      await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
+      await queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
 
       toast({
-        title: "Success",
-        description: "Tour created successfully",
+        title: "Exito",
+        description: "Gira creada correctamente",
       });
 
       onSuccess();
@@ -77,7 +78,7 @@ export const useTourCreation = (
       console.error("Error creating tour:", error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create tour",
+        description: error.message || "No se pudo crear la gira",
         variant: "destructive",
       });
     }

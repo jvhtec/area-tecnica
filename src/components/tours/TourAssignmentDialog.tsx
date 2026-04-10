@@ -15,6 +15,7 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 import { TourRequirementsDialog } from '@/components/tours/TourRequirementsDialog';
 import { RequestTourAvailabilityDialog } from '@/components/tours/RequestTourAvailabilityDialog';
+import { createQueryKey } from "@/lib/optimized-react-query";
 
 interface TourAssignment {
   id: string;
@@ -161,7 +162,7 @@ export const TourAssignmentDialog = ({
       queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['job-details'] });
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['jobs-data'] });
+      queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all });
     },
     onError: (error: any) => {
       toast.error(`Failed to remove assignment: ${error.message}`);

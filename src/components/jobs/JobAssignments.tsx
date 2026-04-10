@@ -11,7 +11,7 @@ import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useEffect, useState } from "react";
 import { labelForCode } from '@/utils/roles';
 import { format } from "date-fns";
-import { optimizedInvalidation } from "@/lib/react-query";
+import { createQueryKey, optimizedInvalidation } from "@/lib/react-query";
 
 interface JobAssignmentsProps {
   jobId: string;
@@ -71,7 +71,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
       // Refresh both assignments and jobs data
       optimizedInvalidation.invalidateQueryKeys(queryClient, [
         ["job-assignments", jobId],
-        ["jobs-data"],
+        createQueryKey.jobsData.all,
         ["jobs"],
         ["available-technicians"],
       ]);

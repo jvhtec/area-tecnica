@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { QueryKey, useQueryClient } from '@tanstack/react-query';
 import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 
 interface UseOptimizedRealtimeOptions {
@@ -20,7 +20,7 @@ interface RealtimeStatus {
  */
 export function useOptimizedRealtime(
   table: string,
-  queryKey: string | string[],
+  queryKey: QueryKey,
   options: UseOptimizedRealtimeOptions = {}
 ) {
   const {

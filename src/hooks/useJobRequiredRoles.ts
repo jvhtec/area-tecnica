@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { createQueryKey } from '@/lib/optimized-react-query'
 import { supabase } from '@/lib/supabase'
 
 export interface JobRequiredRoleRow {
@@ -235,7 +236,7 @@ export function useSaveJobRequirements() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['job-required-roles', result.jobId] })
       queryClient.invalidateQueries({ queryKey: ['job-required-summary', result.jobId] })
-      queryClient.invalidateQueries({ queryKey: ['jobs-data'] })
+      queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all })
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
 
       void broadcastJobRequirementsUpdate(result.jobId, result)

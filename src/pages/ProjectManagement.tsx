@@ -72,9 +72,9 @@ const ProjectManagement = () => {
   // Force subscription to required tables
   useEffect(() => {
     forceSubscribe([
-      { table: 'jobs', queryKey: ['jobs-data'], priority: 'high' },
-      { table: 'job_assignments', queryKey: ['jobs-data'], priority: 'medium' },
-      { table: 'job_departments', queryKey: ['jobs-data'], priority: 'medium' }
+      { table: 'jobs', queryKey: createQueryKey.jobsData.all, priority: 'high' },
+      { table: 'job_assignments', queryKey: createQueryKey.jobsData.all, priority: 'medium' },
+      { table: 'job_departments', queryKey: createQueryKey.jobsData.all, priority: 'medium' }
     ]);
   }, [forceSubscribe]);
 

@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "@/lib/enhanced-supabase-client";
-import { useQueryClient } from "@tanstack/react-query";
+import { QueryKey, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
 type SubscriptionOptions = {
@@ -10,7 +10,7 @@ type SubscriptionOptions = {
   schema?: string;
   event?: "INSERT" | "UPDATE" | "DELETE" | "*";
   filter?: string;
-  queryKey: string | string[];
+  queryKey: QueryKey | string;
 };
 
 /**

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { QueryKey } from '@tanstack/react-query';
 import { useMultiTableSubscription } from '@/hooks/useSubscription';
 import { createQueryKey } from '@/lib/optimized-react-query';
 
@@ -15,7 +16,7 @@ export const useMobileRealtimeSubscriptions = (options: {
   /** Include job departments table */
   includeDepartments?: boolean;
   /** Custom query key for invalidation */
-  queryKey?: string | string[];
+  queryKey?: QueryKey | string;
   /** Priority level for subscriptions */
   priority?: 'high' | 'medium' | 'low';
 }) => {

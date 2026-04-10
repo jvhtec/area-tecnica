@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import { QueryKey } from '@tanstack/react-query';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { getRealtimeConnectionStatus } from '@/lib/supabase-client';
 import { forceRefreshSubscriptions } from '@/lib/enhanced-supabase-client';
@@ -12,7 +13,7 @@ import { forceRefreshSubscriptions } from '@/lib/enhanced-supabase-client';
  */
 export function useTableSubscription(
   tableName: string,
-  queryKey: string | string[]
+  queryKey: QueryKey | string
 ) {
   const { 
     connectionStatus: globalConnectionStatus, 
@@ -81,7 +82,7 @@ export function useTableSubscription(
 export function useMultiTableSubscription(
   tables: Array<{ 
     table: string, 
-    queryKey: string | string[]
+    queryKey: QueryKey | string
   }>
 ) {
   const { 
@@ -151,7 +152,7 @@ export function useMultiTableSubscription(
 export function useRowSubscription(
   tableName: string,
   rowId: string,
-  queryKey: string | string[]
+  queryKey: QueryKey | string
 ) {
   // Use the base hook but could be enhanced with row-specific logic
   return useTableSubscription(tableName, queryKey);

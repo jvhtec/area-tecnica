@@ -2,12 +2,13 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
-import { useQueryClient } from '@tanstack/react-query';
+import { QueryKey, useQueryClient } from '@tanstack/react-query';
 import { UnifiedSubscriptionManager } from '@/lib/unified-subscription-manager';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { createQueryKey } from '@/lib/optimized-react-query';
 
 // Define subscription requirements for each route
 export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
@@ -151,19 +152,19 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
   ],
 };
 
-const ROUTE_QUERY_KEY_OVERRIDES: Record<string, string | string[]> = {
-  jobs: ['jobs-data'],
-  job_assignments: ['jobs-data'],
-  job_departments: ['jobs-data'],
-  job_documents: ['jobs-data'],
-  flex_folders: ['jobs-data'],
-  locations: ['jobs-data'],
+const ROUTE_QUERY_KEY_OVERRIDES: Record<string, QueryKey> = {
+  jobs: createQueryKey.jobsData.all,
+  job_assignments: createQueryKey.jobsData.all,
+  job_departments: createQueryKey.jobsData.all,
+  job_documents: createQueryKey.jobsData.all,
+  flex_folders: createQueryKey.jobsData.all,
+  locations: createQueryKey.jobsData.all,
   job_date_types: ['date-types'],
   messages: ['messages'],
   direct_messages: ['direct_messages'],
 };
 
-const getRouteQueryKeyForTable = (table: string): string | string[] =>
+const getRouteQueryKeyForTable = (table: string): QueryKey =>
   ROUTE_QUERY_KEY_OVERRIDES[table] ?? [table];
 
 // Default tables that should be monitored on all routes

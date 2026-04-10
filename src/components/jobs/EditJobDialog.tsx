@@ -29,6 +29,7 @@ import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
 import { syncFlexElementsForJobDateChange } from "@/utils/flex-folders/syncDateChange";
+import { createQueryKey } from "@/lib/react-query";
 
 interface EditJobDialogProps {
   open: boolean;
@@ -320,7 +321,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       });
 
       // Refresh jobs and Hoja de Ruta that depends on the job location
-      queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
+      queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
       queryClient.invalidateQueries({ queryKey: ["hoja-de-ruta", job.id] });
       onOpenChange(false);

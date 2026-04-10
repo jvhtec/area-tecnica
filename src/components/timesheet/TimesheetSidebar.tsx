@@ -6,6 +6,7 @@ import { Clock, ChevronLeft, ChevronRight, Calendar, MapPin } from "lucide-react
 import { useJobsData } from "@/hooks/useJobsData";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { addDays, endOfDay, format, startOfDay, subDays } from "date-fns";
+import { toZonedTime } from "date-fns-tz";
 import { es } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
 
@@ -17,7 +18,7 @@ interface TimesheetSidebarProps {
 const JOBS_PER_PAGE = 5;
 
 export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => {
-  const rangeAnchor = new Date();
+  const rangeAnchor = toZonedTime(new Date(), "Europe/Madrid");
   const rangeStart = startOfDay(subDays(rangeAnchor, 120));
   const rangeEnd = endOfDay(addDays(rangeAnchor, 180));
   const { data: allJobs = [], isLoading } = useJobsData({

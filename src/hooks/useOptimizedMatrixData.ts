@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import React, { useMemo, useEffect, useCallback } from 'react';
 import { format, isWithinInterval, isSameDay } from 'date-fns';
+import { createQueryKey } from '@/lib/optimized-react-query';
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 export interface MatrixJob {
@@ -508,7 +509,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] }),
       queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] }),
       queryClient.invalidateQueries({ queryKey: ['job-assignments'] }),
-      queryClient.invalidateQueries({ queryKey: ['jobs-data'] })
+      queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all })
     ]);
     console.log('Assignment queries invalidated');
   }, [queryClient]);

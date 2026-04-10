@@ -211,7 +211,7 @@ const Sound = () => {
           title: "Job deleted",
           description: result.details || "The job has been removed and cleanup is running in background."
         });
-        optimizedInvalidation.invalidateJobsCaches(queryClient);
+        await optimizedInvalidation.invalidateJobsCaches(queryClient);
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }

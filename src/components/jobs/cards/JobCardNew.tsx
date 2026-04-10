@@ -27,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreateFoldersOptions } from "@/utils/flex-folders";
 import { isFestivalLikeJobType } from "@/utils/jobType";
+import { createQueryKey } from "@/lib/optimized-react-query";
 
 export interface JobCardNewProps {
   job: any;
@@ -710,7 +711,7 @@ function JobCardNewFull({
         onDeleteClick(job.id);
 
         await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-        await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
+        await queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
@@ -851,7 +852,7 @@ function JobCardNewFull({
 
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs-data"] }),
+        queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all }),
         queryClient.invalidateQueries({ queryKey: ["folder-existence", job.id] }),
         queryClient.invalidateQueries({ queryKey: ["folder-existence"] }),
       ]);

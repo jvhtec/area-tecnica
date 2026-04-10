@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { InvoicingCompany } from "@/types/job";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
+import { createQueryKey } from "@/lib/optimized-react-query";
 
 export const useTourManagement = (tour: any, onClose: () => void) => {
   const { toast } = useToast();
@@ -51,7 +52,7 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
       }
 
       await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
+      await queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       
       toast({ title: "Color updated successfully" });
@@ -159,7 +160,7 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
 
       await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
       await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
+      await queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       
       toast({ title: "Invoicing company updated successfully" });
@@ -274,7 +275,7 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
       console.log("Tour deletion completed successfully");
       await queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] });
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs-data"] });
+      await queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       onClose();
       toast({ title: "Tour deleted successfully" });
