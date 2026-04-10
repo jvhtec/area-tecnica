@@ -13,7 +13,7 @@ The assignment matrix tooltip now includes actor + timestamp audit details for:
 ## Data flow summary
 
 1. `send-staffing-email` stores `requested_by` on every `staffing_requests` insert.
-2. `useOptimizedMatrixData` now selects `assigned_by` from `job_assignments`.
+2. `useOptimizedMatrixData` now selects `assigned_by` and `assigned_at` from `job_assignments`.
 3. `useStaffingMatrixStatuses` now selects and propagates `requested_by` and `created_at` for the latest availability/offer status shown per cell/date.
 4. `OptimizedAssignmentMatrix` resolves actor IDs into display names from `profiles`.
 5. `OptimizedMatrixCell` displays:

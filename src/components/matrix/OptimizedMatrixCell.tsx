@@ -411,6 +411,7 @@ export const OptimizedMatrixCell = memo(({
   const statusBadgesPosClass = mobile ? 'absolute top-1 right-1' : 'absolute bottom-1 left-1';
   const actionButtonsPosClass = mobile ? 'absolute bottom-1 left-1' : 'absolute top-1 right-1';
   const actionBtnSize = mobile ? 'h-8 w-8' : 'h-5 w-5';
+  const normalizeStatus = (status?: string | null) => status?.trim().toLowerCase() ?? null;
   const formatDateTimeEs = (iso?: string | null) => {
     if (!iso) return null;
     const parsed = new Date(iso);
@@ -418,22 +419,24 @@ export const OptimizedMatrixCell = memo(({
     return formatInTimeZone(parsed, 'Europe/Madrid', 'd MMM yyyy, HH:mm', { locale: es });
   };
   const assignmentStatusLabel = (status?: string | null) => {
-    const normalizedStatus = status?.trim().toLowerCase();
+    const normalizedStatus = normalizeStatus(status);
     if (normalizedStatus === 'confirmed') return 'Confirmado';
     if (normalizedStatus === 'declined') return 'Rechazado';
     if (normalizedStatus === 'invited') return 'Invitado';
     return 'Pendiente';
   };
   const availabilityStatusLabel = (status?: string | null) => {
-    if (status === 'requested' || status === 'pending') return 'Solicitada';
-    if (status === 'confirmed') return 'Confirmada';
-    if (status === 'declined') return 'Rechazada';
+    const normalizedStatus = normalizeStatus(status);
+    if (normalizedStatus === 'requested' || normalizedStatus === 'pending') return 'Solicitada';
+    if (normalizedStatus === 'confirmed') return 'Confirmada';
+    if (normalizedStatus === 'declined') return 'Rechazada';
     return null;
   };
   const offerStatusLabel = (status?: string | null) => {
-    if (status === 'sent' || status === 'pending') return 'Enviada';
-    if (status === 'confirmed') return 'Confirmada';
-    if (status === 'declined') return 'Rechazada';
+    const normalizedStatus = normalizeStatus(status);
+    if (normalizedStatus === 'sent' || normalizedStatus === 'pending') return 'Enviada';
+    if (normalizedStatus === 'confirmed') return 'Confirmada';
+    if (normalizedStatus === 'declined') return 'Rechazada';
     return null;
   };
   return (
@@ -484,7 +487,7 @@ export const OptimizedMatrixCell = memo(({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
+                      const targetJobId = jobId || assignment?.job_id || staffingStatusByDate?.availability_job_id;
                       if (targetJobId) {
                         setPendingRetry({ jobId: targetJobId });
                       } else {
@@ -509,9 +512,9 @@ export const OptimizedMatrixCell = memo(({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id || null;
+                      const targetJobId = jobId || assignment?.job_id || staffingStatusByDate?.availability_job_id || null;
                       // Include all pending job IDs to cancel all requests for this date
-                      const allJobIds = (staffingStatusByDate as any)?.pending_availability_job_ids || (targetJobId ? [targetJobId] : []);
+                      const allJobIds = staffingStatusByDate?.pending_availability_job_ids || (targetJobId ? [targetJobId] : []);
                       setPendingCancel({ phase: 'availability', jobId: targetJobId, allJobIds });
                     }}
                     title="Cancelar solicitud de disponibilidad"
@@ -528,7 +531,7 @@ export const OptimizedMatrixCell = memo(({
                     onClick={(e) => {
                       e.stopPropagation();
                       // Determine job for offer; then open offer-details to choose role
-                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id;
+                      const targetJobId = jobId || assignment?.job_id || staffingStatusByDate?.offer_job_id;
                       if (targetJobId) {
                         onClick('offer-details', targetJobId);
                       } else {
@@ -554,9 +557,9 @@ export const OptimizedMatrixCell = memo(({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id || null;
+                      const targetJobId = jobId || assignment?.job_id || staffingStatusByDate?.offer_job_id || null;
                       // Include all pending job IDs to cancel all requests for this date
-                      const allJobIds = (staffingStatusByDate as any)?.pending_offer_job_ids || (targetJobId ? [targetJobId] : []);
+                      const allJobIds = staffingStatusByDate?.pending_offer_job_ids || (targetJobId ? [targetJobId] : []);
                       setPendingCancel({ phase: 'offer', jobId: targetJobId, allJobIds });
                     }}
                     title="Cancelar oferta"
@@ -970,36 +973,36 @@ export const OptimizedMatrixCell = memo(({
           )}
           {!hasAssignment && !isUnavailable && staffingStatusByDate && (
             <div className="text-xs space-y-2 pt-1">
-              {availabilityStatusLabel((staffingStatusByDate as any).availability_status) && (
+              {availabilityStatusLabel(staffingStatusByDate.availability_status) && (
                 <div>
                   <div className="text-yellow-700">
-                    Disponibilidad: {availabilityStatusLabel((staffingStatusByDate as any).availability_status)}
+                    Disponibilidad: {availabilityStatusLabel(staffingStatusByDate.availability_status)}
                   </div>
-                  {(staffingStatusByDate as any).availability_requested_by && profileNamesMap.has((staffingStatusByDate as any).availability_requested_by) && (
+                  {staffingStatusByDate.availability_requested_by && profileNamesMap.has(staffingStatusByDate.availability_requested_by) && (
                     <div className="text-muted-foreground">
-                      Enviado por: {profileNamesMap.get((staffingStatusByDate as any).availability_requested_by)}
+                      Enviado por: {profileNamesMap.get(staffingStatusByDate.availability_requested_by)}
                     </div>
                   )}
-                  {(staffingStatusByDate as any).availability_created_at && formatDateTimeEs((staffingStatusByDate as any).availability_created_at) && (
+                  {staffingStatusByDate.availability_created_at && formatDateTimeEs(staffingStatusByDate.availability_created_at) && (
                     <div className="text-muted-foreground">
-                      Fecha: {formatDateTimeEs((staffingStatusByDate as any).availability_created_at)}
+                      Fecha: {formatDateTimeEs(staffingStatusByDate.availability_created_at)}
                     </div>
                   )}
                 </div>
               )}
-              {offerStatusLabel((staffingStatusByDate as any).offer_status) && (
+              {offerStatusLabel(staffingStatusByDate.offer_status) && (
                 <div>
                   <div className="text-blue-700">
-                    Oferta: {offerStatusLabel((staffingStatusByDate as any).offer_status)}
+                    Oferta: {offerStatusLabel(staffingStatusByDate.offer_status)}
                   </div>
-                  {(staffingStatusByDate as any).offer_requested_by && profileNamesMap.has((staffingStatusByDate as any).offer_requested_by) && (
+                  {staffingStatusByDate.offer_requested_by && profileNamesMap.has(staffingStatusByDate.offer_requested_by) && (
                     <div className="text-muted-foreground">
-                      Enviado por: {profileNamesMap.get((staffingStatusByDate as any).offer_requested_by)}
+                      Enviado por: {profileNamesMap.get(staffingStatusByDate.offer_requested_by)}
                     </div>
                   )}
-                  {(staffingStatusByDate as any).offer_created_at && formatDateTimeEs((staffingStatusByDate as any).offer_created_at) && (
+                  {staffingStatusByDate.offer_created_at && formatDateTimeEs(staffingStatusByDate.offer_created_at) && (
                     <div className="text-muted-foreground">
-                      Fecha: {formatDateTimeEs((staffingStatusByDate as any).offer_created_at)}
+                      Fecha: {formatDateTimeEs(staffingStatusByDate.offer_created_at)}
                     </div>
                   )}
                 </div>

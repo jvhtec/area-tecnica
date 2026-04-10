@@ -587,10 +587,10 @@ describe('OptimizedMatrixCell', () => {
   it('renders staffing tooltip metadata and degrades gracefully when sender is missing', async () => {
     const user = userEvent.setup();
     const staffingStatus = {
-      availability_status: 'requested',
+      availability_status: ' Requested ',
       availability_requested_by: null,
       availability_created_at: '2026-04-08T09:15:00.000Z',
-      offer_status: 'sent',
+      offer_status: ' SENT ',
       offer_requested_by: 'manager-2',
       offer_created_at: '2026-04-09T11:00:00.000Z',
     };
