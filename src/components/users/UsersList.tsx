@@ -23,6 +23,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { createQueryKey } from "@/lib/react-query";
 
 interface UsersListProps {
   searchQuery?: string;
@@ -44,7 +45,7 @@ export const UsersList = ({
   departmentFilter = "",
   isManagementUser = false,
 }: UsersListProps) => {
-  useTabVisibility(['profiles']);
+  useTabVisibility([createQueryKey.profiles.all]);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [groupBy, setGroupBy] = useState<'department' | 'role' | null>(null);

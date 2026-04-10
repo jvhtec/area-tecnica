@@ -11,6 +11,7 @@ import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useEffect, useState } from "react";
 import { labelForCode } from '@/utils/roles';
 import { format } from "date-fns";
+import { createQueryKey, optimizedInvalidation } from "@/lib/react-query";
 
 interface JobAssignmentsProps {
   jobId: string;
@@ -68,11 +69,11 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
       if (error) throw error;
 
       // Refresh both assignments and jobs data
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["job-assignments", jobId] }),
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["available-technicians"] })
+      optimizedInvalidation.invalidateQueryKeys(queryClient, [
+        ["job-assignments", jobId],
+        createQueryKey.jobsData.all,
+        ["jobs"],
+        ["available-technicians"],
       ]);
 
       toast.success("Assignment deleted successfully");

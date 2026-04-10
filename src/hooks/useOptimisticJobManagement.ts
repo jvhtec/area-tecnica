@@ -8,6 +8,7 @@ import { useCallback } from "react";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
 import { trackError } from "@/lib/errorTracking";
+import { createQueryKey, optimizedInvalidation } from "@/lib/react-query";
 
 export const useOptimisticJobManagement = (
   selectedDepartment: Department,
@@ -172,8 +173,10 @@ export const useOptimisticJobManagement = (
         });
       } else {
         // Restore job in cache if deletion failed
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        optimizedInvalidation.invalidateQueryKeys(queryClient, [
+          createQueryKey.jobsData.all,
+          ["jobs", selectedDepartment, startDate, endDate],
+        ]);
         throw new Error(result.error || "Unknown deletion error");
       }
     } catch (error: any) {
@@ -190,8 +193,10 @@ export const useOptimisticJobManagement = (
       });
       
       // Restore the cache by refetching
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      optimizedInvalidation.invalidateQueryKeys(queryClient, [
+        createQueryKey.jobsData.all,
+        ["jobs", selectedDepartment, startDate, endDate],
+      ]);
       throw error;
     }
   };

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 
-import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
+import { useJobsData } from "@/hooks/useJobsData";
 import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -18,6 +18,7 @@ import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
+import { createQueryKey, optimizedInvalidation } from "@/lib/react-query";
 
 const Operaciones = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
@@ -34,11 +35,11 @@ const Operaciones = () => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  useTabVisibility(['optimized-jobs']);
+  useTabVisibility([createQueryKey.jobsData.all]);
   const monthAnchor = date ?? new Date();
   const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
-  const { data: jobs = [], isLoading } = useOptimizedJobs(currentDepartment as any, jobsRangeStart, jobsRangeEnd);
+  const { data: jobs = [], isLoading } = useJobsData({ department: currentDepartment as any, startDate: jobsRangeStart, endDate: jobsRangeEnd });
 
   // Keyboard shortcut: Cmd/Ctrl+N to open (disable plain 'c')
   useEffect(() => {
@@ -113,8 +114,7 @@ const Operaciones = () => {
         });
 
         // Invalidate queries to refresh the list
-        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        optimizedInvalidation.invalidateJobsCaches(queryClient);
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }

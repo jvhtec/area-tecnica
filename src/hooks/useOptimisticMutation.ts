@@ -1,5 +1,5 @@
 
-import { useMutation, useQueryClient, UseMutationOptions } from '@tanstack/react-query';
+import { QueryKey, useMutation, useQueryClient, UseMutationOptions } from '@tanstack/react-query';
 
 type MutationContext = {
   previousData: any;
@@ -18,7 +18,7 @@ export function useOptimisticMutation<
 >(
   mutationFn: (variables: TVariables) => Promise<TData>,
   options: {
-    queryKey: string | string[];
+    queryKey: QueryKey | string;
     optimisticUpdate?: (variables: TVariables, oldData: any) => any;
     onSuccess?: (data: TData, variables: TVariables, context: MutationContext) => void;
     onError?: (error: TError, variables: TVariables, context: MutationContext) => void;

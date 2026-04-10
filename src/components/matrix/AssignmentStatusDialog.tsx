@@ -17,6 +17,7 @@ import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { labelForCode } from '@/utils/roles';
+import { optimizedInvalidation } from '@/lib/react-query';
 
 interface AssignmentStatusDialogProps {
   open: boolean;
@@ -171,8 +172,7 @@ export const AssignmentStatusDialog = ({
       queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['job-assignments', variables.jobId] });
       queryClient.invalidateQueries({ queryKey: ['job-details', variables.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      optimizedInvalidation.invalidateJobsCaches(queryClient);
 
       // Send push notification for confirmations
       if (variables.actionType === 'confirm') {

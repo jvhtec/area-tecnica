@@ -15,6 +15,7 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { createQueryKey } from "@/lib/optimized-react-query";
 
 interface TourManagementDialogProps {
   open: boolean;
@@ -150,7 +151,7 @@ export const TourManagementDialog = ({
       await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
       await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      await queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all });
 
       toast({
         title: "Éxito",

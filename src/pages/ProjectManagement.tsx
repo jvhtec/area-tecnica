@@ -12,7 +12,7 @@ import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
 import { StatusFilter } from "@/components/project-management/StatusFilter";
 import { JobTypeFilter } from "@/components/project-management/JobTypeFilter";
 import { Input } from "@/components/ui/input";
-import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
+import { useJobsData } from "@/hooks/useJobsData";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { autoCompleteJobs } from "@/utils/jobStatusUtils";
@@ -22,6 +22,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { cn } from "@/lib/utils";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useCreateJobDialogStore } from "@/stores/useCreateJobDialogStore";
+import { createQueryKey } from "@/lib/react-query";
 
 const ProjectManagement = () => {
   const navigate = useNavigate();
@@ -66,14 +67,14 @@ const ProjectManagement = () => {
   }, [authLoading, userDepartment]);
 
   // Use custom hook to keep the "jobs" tab active/visible.
-  useTabVisibility(["optimized-jobs"]);
+  useTabVisibility([createQueryKey.jobsData.all]);
   
   // Force subscription to required tables
   useEffect(() => {
     forceSubscribe([
-      { table: 'jobs', queryKey: ['optimized-jobs'], priority: 'high' },
-      { table: 'job_assignments', queryKey: ['optimized-jobs'], priority: 'medium' },
-      { table: 'job_departments', queryKey: ['optimized-jobs'], priority: 'medium' }
+      { table: 'jobs', queryKey: createQueryKey.jobsData.all, priority: 'high' },
+      { table: 'job_assignments', queryKey: createQueryKey.jobsData.all, priority: 'medium' },
+      { table: 'job_departments', queryKey: createQueryKey.jobsData.all, priority: 'medium' }
     ]);
   }, [forceSubscribe]);
 
@@ -87,13 +88,13 @@ const ProjectManagement = () => {
   const isSearching = debouncedQuery.trim().length > 0;
 
   // Use optimized jobs hook with built-in filtering and caching
-  const { data: optimizedJobs = [], isLoading: jobsLoading, error: jobsError } = useOptimizedJobs(
-    selectedDepartment,
-    isSearching ? undefined : startDate,
-    isSearching ? undefined : endDate,
-    true, // include dryhire jobs in project management
-    { refetchOnMount: "always" }
-  );
+  const { data: optimizedJobs = [], isLoading: jobsLoading, error: jobsError } = useJobsData({
+    department: selectedDepartment,
+    startDate: isSearching ? undefined : startDate,
+    endDate: isSearching ? undefined : endDate,
+    includeDryhire: true,
+    refetchOnMount: "always",
+  });
 
   // Check user permissions early
   const canCreateItems = ['admin', 'management', 'logistics'].includes(userRole || '');

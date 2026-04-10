@@ -1,6 +1,6 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
+import { useJobsData } from "@/hooks/useJobsData";
 import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { optimizedInvalidation } from "@/lib/react-query";
 
 const DashboardMobileHub = lazy(() =>
   import("@/components/dashboard/DashboardMobileHub").then((m) => ({ default: m.DashboardMobileHub }))
@@ -92,7 +93,7 @@ const Dashboard = () => {
   const monthAnchor = date ?? new Date();
   const jobsRangeStart = subDays(startOfMonth(monthAnchor), 7);
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
-  const { data: jobs = [], isLoading } = useOptimizedJobs(undefined, jobsRangeStart, jobsRangeEnd);
+  const { data: jobs = [], isLoading } = useJobsData({ startDate: jobsRangeStart, endDate: jobsRangeEnd });
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -178,7 +179,7 @@ const Dashboard = () => {
         });
 
         // Invalidate queries to refresh the list
-        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+        optimizedInvalidation.invalidateJobsCaches(queryClient);
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }

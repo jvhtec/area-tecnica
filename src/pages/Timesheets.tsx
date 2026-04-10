@@ -5,7 +5,7 @@ import { Clock, Download, FileText } from "lucide-react";
 import { TimesheetView } from "@/components/timesheet/TimesheetView";
 import { TimesheetReminderSettings } from "@/components/timesheet/TimesheetReminderSettings";
 import { downloadTimesheetPDF } from "@/utils/timesheet-pdf";
-import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
+import { useJobsData } from "@/hooks/useJobsData";
 import { useTimesheets } from "@/hooks/useTimesheets";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -20,7 +20,7 @@ export default function Timesheets() {
   const [selectedJobId, setSelectedJobId] = useState<string>(jobIdFromUrl || "");
   const { toast } = useToast();
   const { user, userRole } = useOptimizedAuth();
-  const { data: jobs = [], isLoading: jobsLoading } = useOptimizedJobs();
+  const { data: jobs = [], isLoading: jobsLoading } = useJobsData();
   const { timesheets } = useTimesheets(selectedJobId || "", { userRole });
 
   const canManage = userRole === 'admin' || userRole === 'management';

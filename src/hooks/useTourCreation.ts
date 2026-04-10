@@ -4,6 +4,7 @@ import { InvoicingCompany } from "@/types/job";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
+import { optimizedInvalidation } from "@/lib/react-query";
 
 export const useTourCreation = (
   currentDepartment: Department,
@@ -90,8 +91,7 @@ export const useTourCreation = (
       await createTour();
       console.log("Tour created successfully");
 
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      optimizedInvalidation.invalidateJobsCaches(queryClient);
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
 
       toast({

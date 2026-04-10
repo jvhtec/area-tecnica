@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
-import { useJobs } from "@/hooks/useJobs";
+import { useJobsData } from "@/hooks/useJobsData";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +33,7 @@ import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDeta
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
 import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
 import { isJobOnDate } from "@/utils/timezoneUtils";
+import { optimizedInvalidation } from "@/lib/react-query";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -57,7 +58,7 @@ const Sound = () => {
   const [showMobileAssignments, setShowMobileAssignments] = useState(false);
 
   const currentDepartment = "sound";
-  const { data: jobs } = useJobs();
+  const { data: jobs } = useJobsData({ department: currentDepartment });
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();
@@ -156,18 +157,14 @@ const Sound = () => {
 
   const departmentJobs = useMemo(() => {
     if (!jobs) return [];
-    return jobs.filter(job => {
-      if (job.job_type === 'tour') return false;
-
-      const isInDepartment = job.job_departments?.some(dept =>
-        dept.department === currentDepartment
-      );
+    return jobs.filter((job) => {
       if (job.tour_date_id) {
-        return isInDepartment && job.tour_date;
+        return Boolean(job.tour_date);
       }
-      return isInDepartment;
+      if (job.job_type === 'tour') return false;
+      return true;
     });
-  }, [jobs, currentDepartment]);
+  }, [jobs]);
 
   const selectedDateJobs = useMemo(() => {
     if (!date) return [];
@@ -214,7 +211,7 @@ const Sound = () => {
           title: "Job deleted",
           description: result.details || "The job has been removed and cleanup is running in background."
         });
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        await optimizedInvalidation.invalidateJobsCaches(queryClient);
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }

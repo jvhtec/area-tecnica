@@ -6,21 +6,23 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PresetManagementDialog } from '@/components/equipment/PresetManagementDialog';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToast } from '@/hooks/use-toast';
 import { endOfDay, format, startOfDay } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
 import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
 import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAssignment';
 import { SubRentalDialog } from '@/components/equipment/SubRentalDialog';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
-import { useOptimizedJobs } from '@/hooks/useOptimizedJobs';
+import { useJobsData } from '@/hooks/useJobsData';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { MobileAvailabilityView } from '@/components/disponibilidad/MobileAvailabilityView';
 
 type DisponibilidadDepartment = 'sound' | 'lights';
+const TIMEZONE = 'Europe/Madrid';
 
 const DEPARTMENT_LABELS: Record<DisponibilidadDepartment, string> = {
   sound: 'Sonido',
@@ -56,33 +58,21 @@ export default function Disponibilidad() {
       ? (normalizedDepartment as DisponibilidadDepartment)
       : null;
 
-  if (isManagement && !hasManagementDepartmentAccess) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-        <h1 className="text-2xl font-semibold mb-4">Acceso restringido</h1>
-        <p className="text-muted-foreground max-w-xl">
-          Esta sección solo está disponible para los departamentos de Sonido y Luces.
-          Solicita acceso a uno de estos departamentos para continuar.
-        </p>
-      </div>
-    );
-  }
-
-  if (!department) {
-    return null;
-  }
-
-  const departmentLabel = DEPARTMENT_LABELS[department];
-
-  // Jobs happening on the selected date for this department
-  const dayStart = startOfDay(selectedDate);
-  const dayEnd = endOfDay(selectedDate);
-  const { data: jobsToday = [] } = useOptimizedJobs(department as any, dayStart, dayEnd);
+  const zonedSelectedDate = toZonedTime(selectedDate, TIMEZONE);
+  const dayStart = startOfDay(zonedSelectedDate);
+  const dayEnd = endOfDay(zonedSelectedDate);
+  const selectedDateKey = format(zonedSelectedDate, 'yyyy-MM-dd');
+  const { data: jobsToday = [] } = useJobsData({
+    department: department ?? undefined,
+    startDate: dayStart,
+    endDate: dayEnd,
+    enabled: !!department,
+  });
 
   const { data: assignedPresets } = useQuery({
-    queryKey: ['preset-assignments', department, selectedDate],
+    queryKey: ['preset-assignments', department, selectedDateKey],
     queryFn: async () => {
-      if (!selectedDate) return null;
+      if (!department) return null;
 
       const { data, error } = await supabase
         .from('day_preset_assignments')
@@ -102,7 +92,7 @@ export default function Disponibilidad() {
           )
         `)
         .eq('preset.department', department)
-        .eq('date', format(selectedDate, 'yyyy-MM-dd'))
+        .eq('date', selectedDateKey)
         .order('order', { ascending: true });
 
       if (error) {
@@ -116,8 +106,26 @@ export default function Disponibilidad() {
 
       return data;
     },
-    enabled: !!selectedDate
+    enabled: !!department
   });
+
+  if (isManagement && !hasManagementDepartmentAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+        <h1 className="text-2xl font-semibold mb-4">Acceso restringido</h1>
+        <p className="text-muted-foreground max-w-xl">
+          Esta sección solo está disponible para los departamentos de Sonido y Luces.
+          Solicita acceso a uno de estos departamentos para continuar.
+        </p>
+      </div>
+    );
+  }
+
+  if (!department) {
+    return null;
+  }
+
+  const departmentLabel = DEPARTMENT_LABELS[department];
 
   // Prefetch tiny logos for the jobs referenced by the presets
   const jobIds = useMemo(() => {

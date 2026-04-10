@@ -867,7 +867,7 @@ Based on the [Tech Debt Audit (2026-02-01)](/.claude/notes/2026-02-01-tech-debt-
 | Fire-and-forget DB operations | Critical | 4 | Silent delete failures in stock/logistics |
 | Direct Supabase calls bypassing hooks | High | 60 files | Should use custom hooks for consistency |
 | Unsafe date handling (no timezone) | High | 68 files | `new Date()` without `Europe/Madrid` |
-| Duplicate job query hooks | High | 3 hooks | `useJobs`, `useOptimizedJobs`, `useJobsRealtime` |
+| Duplicate job query hooks | Resolved (2026-03-20) | 0 active hooks | Consolidated into `useJobsData` with normalized query keys and realtime support |
 | `as any` type casts | Medium | 463 | Scattered across components and utilities |
 | Files exceeding 300 lines | Medium | 208 | Top file: 1,401 lines (`flex-folders/folders.ts`) |
 | Inconsistent toast patterns | Medium | 2 systems | `useToast` (73 files) vs. `sonner` (37 files) |
@@ -883,7 +883,7 @@ Based on the [Tech Debt Audit (2026-02-01)](/.claude/notes/2026-02-01-tech-debt-
 **Sprint Targets**:
 1. Centralized `usePermissions()` hook (replace 114 inline role checks)
 2. `createMutationWithToast()` helper (reduce 623 toast boilerplate instances)
-3. Consolidate job query hooks into single optimized hook
+3. ✅ Consolidate job query hooks into single canonical hook (`useJobsData`)
 4. Standardize on one toast library (sonner recommended)
 
 **Architectural**:

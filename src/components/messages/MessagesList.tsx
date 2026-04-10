@@ -5,6 +5,7 @@ import { MessageCard } from "./MessageCard";
 import { useMessagesQuery } from "./hooks/useMessagesQuery";
 import { useMessageOperations } from "./hooks/useMessageOperations";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
+import { createQueryKey } from "@/lib/react-query";
 
 interface MessagesListProps {
   theme?: {
@@ -31,7 +32,7 @@ export const MessagesList = ({ theme, isDark = false }: MessagesListProps) => {
   const { toast } = useToast();
 
   // Add tab visibility hook to refresh messages when tab becomes visible
-  useTabVisibility(['messages', 'direct_messages']);
+  useTabVisibility([createQueryKey.messages.all, createQueryKey.directMessages.all]);
 
   useEffect(() => {
     const fetchUserProfile = async () => {

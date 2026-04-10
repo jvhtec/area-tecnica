@@ -2,7 +2,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Filter, CalendarIcon } from "lucide-react";
-import { useJobsRealtime } from "@/hooks/useJobsRealtime";
+import { useJobsData } from "@/hooks/useJobsData";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
 import { JobCardNew } from "@/components/jobs/cards/JobCardNew";
 import { useMemo, useState } from "react";
@@ -35,7 +35,7 @@ export function RealTimeJobsList({
   onDeleteClick,
   userRole
 }: RealTimeJobsListProps) {
-  const { jobs, isLoading, isRefreshing, refetch, realtimeStatus } = useJobsRealtime();
+  const { jobs, isLoading, isRefreshing, refetch } = useJobsData({ realtime: true });
   const [timeFilter, setTimeFilter] = useState<"upcoming" | "past" | "all">("upcoming");
 
   const { jobs: displayedJobs, total: totalMatchingJobs } = useMemo(() => {

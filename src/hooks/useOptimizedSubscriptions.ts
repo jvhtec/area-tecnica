@@ -1,3 +1,4 @@
+import { QueryKey } from '@tanstack/react-query';
 import { useEffect, useCallback } from 'react';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { createQueryKey } from '@/lib/optimized-react-query';
@@ -8,7 +9,7 @@ import { createQueryKey } from '@/lib/optimized-react-query';
 export const useOptimizedTableSubscriptions = (
   tables: Array<{
     table: string;
-    queryKey?: string | string[];
+    queryKey?: QueryKey | string;
     filter?: any;
     priority?: 'high' | 'medium' | 'low';
   }>

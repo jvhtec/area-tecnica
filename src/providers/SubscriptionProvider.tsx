@@ -6,11 +6,13 @@ import React, {
   useMemo,
   useSyncExternalStore,
 } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { QueryKey, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { TokenManager } from "@/lib/token-manager";
 import { UnifiedSubscriptionManager, type SubscriptionSnapshot } from "@/lib/unified-subscription-manager";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+
+type SubscriptionQueryKey = QueryKey | string;
 
 interface SubscriptionContextType {
   connectionStatus: "connected" | "disconnected" | "connecting";
@@ -18,11 +20,11 @@ interface SubscriptionContextType {
   subscriptionCount: number;
   subscriptionsByTable: Record<string, string[]>;
   refreshSubscriptions: () => void;
-  invalidateQueries: (queryKey?: string | string[]) => void;
+  invalidateQueries: (queryKey?: SubscriptionQueryKey) => void;
   lastRefreshTime: number;
   forceRefresh: (tables?: string[]) => void;
   forceSubscribe: (
-    tables: Array<{ table: string; queryKey: string | string[]; priority?: "high" | "medium" | "low" }>,
+    tables: Array<{ table: string; queryKey: SubscriptionQueryKey; priority?: "high" | "medium" | "low" }>,
   ) => void;
 }
 
@@ -121,7 +123,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   }, [isAdmin, manager]);
 
   const invalidateQueries = useCallback(
-    (queryKey?: string | string[]) => {
+    (queryKey?: SubscriptionQueryKey) => {
       if (queryKey) {
         const key = Array.isArray(queryKey) ? queryKey : [queryKey];
         queryClient.invalidateQueries({ queryKey: key });
@@ -155,7 +157,7 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   );
 
   const forceSubscribe = useCallback(
-    (tables: Array<{ table: string; queryKey: string | string[]; priority?: "high" | "medium" | "low" }>) => {
+    (tables: Array<{ table: string; queryKey: SubscriptionQueryKey; priority?: "high" | "medium" | "low" }>) => {
       if (!tables || tables.length === 0) return;
       const names = tables.map((t) => t.table).join(", ");
       console.log(`Ensuring subscriptions for tables: ${names}`);
@@ -180,4 +182,3 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 }
-

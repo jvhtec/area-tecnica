@@ -11,13 +11,13 @@ import { renderWithProviders } from "@/test/renderWithProviders";
 const {
   useOptimizedAuthMock,
   toastMock,
-  useOptimizedJobsMock,
+  useJobsDataMock,
   useIsMobileMock,
   fetchJobLogoMock,
 } = vi.hoisted(() => ({
   useOptimizedAuthMock: vi.fn(),
   toastMock: vi.fn(),
-  useOptimizedJobsMock: vi.fn(),
+  useJobsDataMock: vi.fn(),
   useIsMobileMock: vi.fn(),
   fetchJobLogoMock: vi.fn(),
 }));
@@ -30,8 +30,8 @@ vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: toastMock }),
 }));
 
-vi.mock("@/hooks/useOptimizedJobs", () => ({
-  useOptimizedJobs: (...args: any[]) => useOptimizedJobsMock(...args),
+vi.mock("@/hooks/useJobsData", () => ({
+  useJobsData: (...args: any[]) => useJobsDataMock(...args),
 }));
 
 vi.mock("@/hooks/use-mobile", () => ({
@@ -82,7 +82,7 @@ describe("Disponibilidad", () => {
     resetMockSupabase();
     useIsMobileMock.mockReturnValue(false);
     fetchJobLogoMock.mockResolvedValue("https://example.com/logo.png");
-    useOptimizedJobsMock.mockReturnValue({ data: [] });
+    useJobsDataMock.mockReturnValue({ data: [] });
     useOptimizedAuthMock.mockReturnValue(
       createRouteShellAuthState("management", {
         userDepartment: "sound",
@@ -132,8 +132,8 @@ describe("Disponibilidad", () => {
         userDepartment: "sound",
       }),
     );
-    useOptimizedJobsMock.mockImplementation((department: string) => ({
-      data: department === "lights"
+    useJobsDataMock.mockImplementation((options?: { department?: string }) => ({
+      data: options?.department === "lights"
         ? [{ id: "job-lights", title: "Lights Job", location: { name: "Arena" } }]
         : [{ id: "job-sound", title: "Sound Job", location: { name: "Sala 1" } }],
     }));
@@ -151,7 +151,7 @@ describe("Disponibilidad", () => {
   });
 
   it("falls back to assigned presets when there are no jobs for the selected date", async () => {
-    useOptimizedJobsMock.mockReturnValue({ data: [] });
+    useJobsDataMock.mockReturnValue({ data: [] });
     configurePresetQuery({
       data: [
         {

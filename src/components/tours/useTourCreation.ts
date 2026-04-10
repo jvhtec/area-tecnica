@@ -6,6 +6,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useTourDates } from "./hooks/useTourDates";
 import { useTourDepartments } from "./hooks/useTourDepartments";
 import { useTourCreationMutation } from "./hooks/useTourCreationMutation";
+import { optimizedInvalidation } from "@/lib/react-query";
 
 export const useTourCreation = (
   currentDepartment: Department,
@@ -67,8 +68,7 @@ export const useTourCreation = (
       });
       console.log("Tour created successfully");
 
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      optimizedInvalidation.invalidateJobsCaches(queryClient);
       await queryClient.invalidateQueries({ queryKey: ["tours"] });
 
       toast({

@@ -11,6 +11,7 @@ import { JobStatusBadge } from "./JobStatusBadge";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import { createQueryKey } from "@/lib/optimized-react-query";
 
 type JobStatus = "Tentativa" | "Confirmado" | "Completado" | "Cancelado";
 
@@ -56,7 +57,7 @@ export const JobStatusSelector = ({
 
       // Invalidate and refetch job queries to trigger realtime updates
       queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all });
       
       toast({
         title: "Status updated",

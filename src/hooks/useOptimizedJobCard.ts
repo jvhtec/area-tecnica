@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { createQueryKey } from '@/lib/optimized-react-query';
+import { createQueryKey, optimizedInvalidation } from '@/lib/optimized-react-query';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
 
@@ -398,7 +398,7 @@ export const useOptimizedJobCard = (
       void refreshAssignments();
 
       // Invalidate broader queries so the card and list re-fetch
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      optimizedInvalidation.invalidateQueryKeys(queryClient, [createQueryKey.jobsData.all]);
     } catch (err) {
       console.error('Refresh error:', err);
     }

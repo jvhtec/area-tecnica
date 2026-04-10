@@ -1,4 +1,4 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryKey } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 
 export type SubscriptionSnapshot = {
@@ -19,7 +19,7 @@ type SubscriptionPriority = 'high' | 'medium' | 'low';
 
 type SubscriptionOptions = {
   table: string;
-  queryKey: string | string[];
+  queryKey: QueryKey;
   filter?: RealtimeSubscriptionFilter;
   priority: SubscriptionPriority;
 };
@@ -111,11 +111,11 @@ export class UnifiedSubscriptionManager {
     });
   }
 
-  private normalizeQueryKey(queryKey: string | string[]) {
-    return Array.isArray(queryKey) ? queryKey : [queryKey];
+  private normalizeQueryKey(queryKey: QueryKey): QueryKey {
+    return queryKey;
   }
 
-  private getSubscriptionKey(table: string, queryKey: string | string[], filter?: RealtimeSubscriptionFilter) {
+  private getSubscriptionKey(table: string, queryKey: QueryKey, filter?: RealtimeSubscriptionFilter) {
     const normalizedQueryKey = this.normalizeQueryKey(queryKey);
     const normalizedFilter = {
       event: filter?.event ?? '*',
@@ -196,7 +196,7 @@ export class UnifiedSubscriptionManager {
     }
   }
 
-  private scheduleInvalidation(queryKey: string | string[], priority: 'high' | 'medium' | 'low') {
+  private scheduleInvalidation(queryKey: QueryKey, priority: 'high' | 'medium' | 'low') {
     const normalizedQueryKey = this.normalizeQueryKey(queryKey);
     const key = JSON.stringify(normalizedQueryKey);
 
@@ -236,7 +236,7 @@ export class UnifiedSubscriptionManager {
 
     queryKeysToInvalidate.forEach((serialized) => {
       try {
-        const parsed = JSON.parse(serialized) as string[];
+        const parsed = JSON.parse(serialized) as QueryKey;
         this.queryClient.invalidateQueries({ queryKey: parsed });
       } catch (error) {
         console.warn('[UnifiedSubscriptionManager] Failed to invalidate stale queryKey', error);
@@ -337,7 +337,7 @@ export class UnifiedSubscriptionManager {
    */
   public subscribeToTable(
     table: string, 
-    queryKey: string | string[], 
+    queryKey: QueryKey,
     filter?: RealtimeSubscriptionFilter,
     priority: SubscriptionPriority = 'medium'
   ) {
@@ -468,7 +468,7 @@ export class UnifiedSubscriptionManager {
   public subscribeToTables(
     tableConfigs: Array<{
       table: string, 
-      queryKey: string | string[],
+      queryKey: QueryKey,
       filter?: RealtimeSubscriptionFilter,
       priority?: SubscriptionPriority
     }>
@@ -599,7 +599,7 @@ export class UnifiedSubscriptionManager {
   /**
    * Get subscription status for a specific table
    */
-  public getSubscriptionStatus(table: string, queryKey: string | string[]): { isConnected: boolean, lastActivity: number } {
+  public getSubscriptionStatus(table: string, queryKey: QueryKey): { isConnected: boolean, lastActivity: number } {
     const subscriptionKey = this.getSubscriptionKey(table, queryKey);
     
     const isConnected = this.subscriptions.has(subscriptionKey) && this.connectionStatus === 'connected';
@@ -647,7 +647,7 @@ export class UnifiedSubscriptionManager {
       // Fall back to invalidating by table name when we can't determine it.
       const keysForTable = Array.from(this.subscriptions.values())
         .filter((sub) => sub.options?.table === table)
-        .map((sub) => JSON.stringify(this.normalizeQueryKey(sub.options?.queryKey ?? table)));
+        .map((sub) => JSON.stringify(this.normalizeQueryKey(sub.options?.queryKey ?? [table])));
       if (keysForTable.length) {
         keysForTable.forEach((k) => {
           try {

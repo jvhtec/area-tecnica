@@ -22,6 +22,7 @@ import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { canManagePayouts } from '@/utils/permissions';
+import { createQueryKey } from '@/lib/optimized-react-query';
 
 interface EnhancedJobDetailsModalProps {
     theme: {
@@ -182,7 +183,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
         queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
         queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
-        queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+        queryClient.invalidateQueries({ queryKey: createQueryKey.jobsData.all });
         queryClient.invalidateQueries({ queryKey: ['jobs'] });
     };
 

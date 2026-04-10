@@ -34,6 +34,7 @@ import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { TECHNICAL_DEPARTMENTS } from "@/types/department";
 import { syncFlexElementsForTourDateChange } from "@/utils/flex-folders/syncDateChange";
 import { DateType, getDateTypeMeta, isSingleDayDateType } from "@/constants/dateTypes";
+import { optimizedInvalidation } from "@/lib/react-query";
 
 interface TourDateObject {
   id: string;
@@ -263,8 +264,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
         queryClient.invalidateQueries({ queryKey: ["tours"] }),
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        Promise.resolve(optimizedInvalidation.invalidateJobsCaches(queryClient)),
         queryClient.invalidateQueries({ queryKey: ["job-assignments"] }),
         queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
       ]);
@@ -463,8 +463,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
         queryClient.invalidateQueries({ queryKey: ["tours"] }),
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        Promise.resolve(optimizedInvalidation.invalidateJobsCaches(queryClient)),
       ]);
 
       // Only show success toast if flex sync didn't have warnings or errors
@@ -676,8 +675,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
         queryClient.invalidateQueries({ queryKey: ["tours"] }),
         queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] }),
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        Promise.resolve(optimizedInvalidation.invalidateJobsCaches(queryClient)),
         queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
       ]);
 
