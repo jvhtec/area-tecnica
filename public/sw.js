@@ -384,6 +384,10 @@ self.addEventListener('message', (event) => {
         .then(() => {
           event.source?.postMessage({ source: 'sw', type: 'caches-cleared', ts: Date.now() })
         })
+        .catch((e) => {
+          console.error('[sw] Failed to clear caches:', e)
+          event.source?.postMessage({ source: 'sw', type: 'caches-clear-error', error: String(e), ts: Date.now() })
+        })
     )
   }
 })
