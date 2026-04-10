@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  buildLegacyStaffingActionUrl,
+  buildPathStaffingActionUrl,
+  buildWhatsAppStaffingMessage,
+  normalizeStaffingConfirmBase,
+} from "./messageUtils.ts";
 
 // Inlined from roles.ts for dashboard deployment compatibility
 const CODE_TO_LABEL: Record<string, string> = {
@@ -47,14 +53,17 @@ function labelForRoleCode(value?: string | null): string | null {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const TOKEN_SECRET = Deno.env.get("STAFFING_TOKEN_SECRET")!;
-// Compute confirmation base URL using the functions domain so GET is allowed
-const __RAW_CONFIRM_BASE = Deno.env.get("PUBLIC_CONFIRM_BASE");
+// Compute confirmation base URL using the functions domain so GET is allowed.
+// WhatsApp uses a branded path when PUBLIC_STAFFING_CONFIRM_BASE is configured.
+const __RAW_CONFIRM_BASE = Deno.env.get("PUBLIC_STAFFING_CONFIRM_BASE");
 const __PROJECT_REF = (() => {
   try { return new URL(SUPABASE_URL).host.split('.')[0]; } catch { return ''; }
 })();
 const __FUNCTIONS_HOST = __PROJECT_REF ? `https://${__PROJECT_REF}.functions.supabase.co` : '';
 const __DEFAULT_CONFIRM_BASE = __FUNCTIONS_HOST ? `${__FUNCTIONS_HOST}/staffing-click` : `${SUPABASE_URL}/functions/v1/staffing-click`;
-const CONFIRM_BASE = (__RAW_CONFIRM_BASE && /staffing-click(\b|[/?#])/i.test(__RAW_CONFIRM_BASE)) ? __RAW_CONFIRM_BASE : __DEFAULT_CONFIRM_BASE;
+const STAFFING_CONFIRM_BASE = __RAW_CONFIRM_BASE
+  ? normalizeStaffingConfirmBase(__RAW_CONFIRM_BASE)
+  : __DEFAULT_CONFIRM_BASE;
 const BREVO_KEY = Deno.env.get("BREVO_API_KEY")!;
 const BREVO_FROM = Deno.env.get("BREVO_FROM")!;
 // Optional branding
@@ -203,15 +212,14 @@ serve(async (req) => {
     console.log('🔧 CHECKING ENV VARIABLES:', {
       DAILY_CAP: { value: DAILY_CAP, exists: !!DAILY_CAP },
       TOKEN_SECRET: { exists: !!TOKEN_SECRET, length: TOKEN_SECRET?.length },
-      CONFIRM_BASE: { exists: !!CONFIRM_BASE, value: CONFIRM_BASE },
+      STAFFING_CONFIRM_BASE: { configured: !!__RAW_CONFIRM_BASE, value: STAFFING_CONFIRM_BASE },
       BREVO_KEY: desiredChannel === 'email' ? { exists: !!BREVO_KEY, length: BREVO_KEY?.length } : { skipped: true },
       BREVO_FROM: desiredChannel === 'email' ? { exists: !!BREVO_FROM, value: BREVO_FROM } : { skipped: true }
     });
 
-    if (!TOKEN_SECRET || !CONFIRM_BASE || (desiredChannel === 'email' && (!BREVO_KEY || !BREVO_FROM))) {
+    if (!TOKEN_SECRET || (desiredChannel === 'email' && (!BREVO_KEY || !BREVO_FROM))) {
       const missingEnvs = [];
       if (!TOKEN_SECRET) missingEnvs.push('STAFFING_TOKEN_SECRET');
-      if (!CONFIRM_BASE) missingEnvs.push('PUBLIC_CONFIRM_BASE');
       if (desiredChannel === 'email') {
         if (!BREVO_KEY) missingEnvs.push('BREVO_API_KEY');
         if (!BREVO_FROM) missingEnvs.push('BREVO_FROM');
@@ -751,8 +759,34 @@ serve(async (req) => {
 
       // Step 5: Build content (email or whatsapp)
       console.log('📧 BUILDING EMAIL CONTENT...');
-      const confirmUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=confirm&exp=${encodeURIComponent(exp)}&t=${token}&c=${encodeURIComponent(desiredChannel)}`;
-      const declineUrl = `${CONFIRM_BASE}?rid=${encodeURIComponent(insertedId)}&a=decline&exp=${encodeURIComponent(exp)}&t=${token}&c=${encodeURIComponent(desiredChannel)}`;
+      const emailConfirmUrl = buildLegacyStaffingActionUrl({
+        base: __DEFAULT_CONFIRM_BASE,
+        rid: insertedId,
+        action: 'confirm',
+        exp,
+        token,
+        channel: desiredChannel,
+      });
+      const emailDeclineUrl = buildLegacyStaffingActionUrl({
+        base: __DEFAULT_CONFIRM_BASE,
+        rid: insertedId,
+        action: 'decline',
+        exp,
+        token,
+        channel: desiredChannel,
+      });
+      const whatsappConfirmUrl = buildPathStaffingActionUrl(
+        STAFFING_CONFIRM_BASE,
+        'confirm',
+        insertedId,
+        token,
+      );
+      const whatsappDeclineUrl = buildPathStaffingActionUrl(
+        STAFFING_CONFIRM_BASE,
+        'decline',
+        insertedId,
+        token,
+      );
 
       const roleLabel = labelForRoleCode(role) || null;
       const subject = phase === "availability"
@@ -861,10 +895,10 @@ serve(async (req) => {
                     <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;">
                       <tr>
                         <td align="left" style="padding:8px 0;">
-                          <a href="${confirmUrl}" style="display:inline-block;background:#10b981;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600;">${primaryCta}</a>
+                          <a href="${emailConfirmUrl}" style="display:inline-block;background:#10b981;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600;">${primaryCta}</a>
                         </td>
                         <td align="right" style="padding:8px 0;">
-                          <a href="${declineUrl}" style="display:inline-block;background:#ef4444;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600;">${secondaryCta}</a>
+                          <a href="${emailDeclineUrl}" style="display:inline-block;background:#ef4444;color:#ffffff;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600;">${secondaryCta}</a>
                         </td>
                       </tr>
                     </table>
@@ -889,45 +923,30 @@ serve(async (req) => {
       </html>`;
 
       // Step 6: Deliver via chosen channel
-      console.log('🔗 CONFIRM LINKS:', { confirmUrl, declineUrl });
+      console.log('🔗 CONFIRM LINKS:', {
+        emailConfirmUrl,
+        emailDeclineUrl,
+        whatsappConfirmUrl,
+        whatsappDeclineUrl,
+      });
       if (desiredChannel === 'whatsapp') {
-        // Build WhatsApp text (plain)
-        const lines: string[] = [];
-        lines.push(`Hola ${fullName || ''},`);
-        if (phase === 'availability') {
-          lines.push(`¿Tendrías disponibilidad para ${datePhrasing}?`);
-          lines.push('');
-          lines.push('ATENCIÓN: Este email SOLO confirma disponibilidad, no te cierra el evento.');
-          lines.push('Si confirmas, recibirás un segundo email con la oferta de trabajo detallada.');
-        } else {
-          lines.push(`Tienes una oferta para ${job.title}.`);
-          if (roleLabel) lines.push(`Puesto: ${roleLabel}`);
-        }
-        lines.push('');
-        lines.push('Detalles del trabajo:');
-        if (normalizedDates.length > 1) {
-          lines.push('- Fechas seleccionadas:');
-          normalizedDates.forEach(d => lines.push(`  • ${fmtDate(`${d}T00:00:00Z`)}`));
-        } else if (isSingleDayRequest && targetDateLabel) {
-          lines.push(`- Fecha: ${targetDateLabel}`);
-        } else {
-          lines.push(`- Fechas: ${startDate}${job.end_time ? ` — ${endDate}` : ''}`);
-        }
-        lines.push(`- Horario: ${callTime}`);
-        lines.push(`- Ubicación: ${loc}`);
-        if (roleLabel) lines.push(`- Rol: ${roleLabel}`);
-        if (phase === 'offer' && (message ?? '').trim()) {
-          lines.push('');
-          lines.push((message as string).trim());
-        }
-        lines.push('');
-        if (tourPdfSignedUrl) {
-          lines.push(`Calendario del tour (PDF): ${tourPdfSignedUrl}`);
-          lines.push('');
-        }
-        lines.push(`Confirmar: ${confirmUrl}`);
-        lines.push(`No estoy disponible: ${declineUrl}`);
-        const text = lines.join('\n');
+        const text = buildWhatsAppStaffingMessage({
+          phase,
+          fullName,
+          jobTitle: job.title,
+          roleLabel,
+          note: phase === 'offer' ? message : null,
+          normalizedDates: normalizedDates.map((d) => fmtDate(`${d}T00:00:00Z`)),
+          isSingleDayRequest,
+          targetDateLabel,
+          startDate,
+          endDate,
+          callTime,
+          location: loc,
+          tourPdfSignedUrl,
+          confirmUrl: whatsappConfirmUrl,
+          declineUrl: whatsappDeclineUrl,
+        });
 
         // WAHA config - use actor's endpoint
         const normalizeBase = (s: string) => {
