@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { detectConflictForAssignment, type AssignmentCoverage, type JobTimeInfo } from "./conflictUtils.ts";
+import { parseStaffingClickRequest } from "./requestUtils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -25,17 +26,22 @@ serve(async (req) => {
 
   try {
     const url = new URL(req.url);
+    const parsedRequest = parseStaffingClickRequest(url);
     console.log('🔗 PARSED URL:', {
       pathname: url.pathname,
-      searchParams: Object.fromEntries(url.searchParams.entries())
+      searchParams: Object.fromEntries(url.searchParams.entries()),
+      parsedRequest,
     });
-    const rid = url.searchParams.get("rid");
-    const action = url.searchParams.get("a"); // 'confirm' | 'decline'
-    const exp = url.searchParams.get("exp");
-    const t = url.searchParams.get("t");
-    const c = (url.searchParams.get('c') || '').toLowerCase(); // optional channel hint: 'email'|'wa'|'whatsapp'
+    const { rid, action, exp, token: t, channelHint: c, urlStyle } = parsedRequest;
     
-    console.log('✅ STEP 1: Parameters parsed', { rid, action, exp: exp?.substring(0, 20), t: t?.substring(0, 20), channel: c });
+    console.log('✅ STEP 1: Parameters parsed', {
+      rid,
+      action,
+      exp: exp?.substring(0, 20),
+      t: t?.substring(0, 20),
+      channel: c,
+      urlStyle,
+    });
     
     // For link preview HEAD requests, avoid rendering/html to reduce plaintext in previews
     if (req.method === 'HEAD') {
@@ -43,7 +49,7 @@ serve(async (req) => {
       return new Response(null, { status: 204 });
     }
 
-    if (!rid || !action || !exp || !t) {
+    if (!rid || !action || !t || (urlStyle === 'legacy' && !exp)) {
       console.log('❌ STEP 2 FAILED: Missing parameters');
       return await redirectResponse({
         title: 'Enlace inválido',
@@ -53,26 +59,13 @@ serve(async (req) => {
       });
     }
     console.log('✅ STEP 2: All required parameters present');
-    
-    const expTime = new Date(exp).getTime();
-    const nowTime = Date.now();
-    if (expTime < nowTime) {
-      console.log('❌ STEP 3 FAILED: Link expired', { expTime, nowTime, diff: nowTime - expTime });
-      return await redirectResponse({
-        title: 'Enlace caducado',
-        status: 'warning',
-        heading: 'Enlace caducado',
-        message: 'Este enlace ha caducado. Contacta con tu responsable para solicitar uno nuevo.'
-      });
-    }
-    console.log('✅ STEP 3: Link not expired', { expTime, nowTime });
 
-    console.log('🔍 STEP 4: Querying database for staffing request', { rid });
+    console.log('🔍 STEP 3: Querying database for staffing request', { rid, urlStyle });
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
     const { data: row, error: dbError } = await supabase.from("staffing_requests").select("*").eq("id", rid).maybeSingle();
     
     if (dbError) {
-      console.error('❌ STEP 4 FAILED: Database error', dbError);
+      console.error('❌ STEP 3 FAILED: Database error', dbError);
       return await redirectResponse({
         title: 'Error de base de datos',
         status: 'error',
@@ -82,7 +75,7 @@ serve(async (req) => {
     }
     
     if (!row) {
-      console.log('❌ STEP 4 FAILED: Request not found in database', { rid });
+      console.log('❌ STEP 3 FAILED: Request not found in database', { rid });
       return await redirectResponse({
         title: 'No encontrado',
         status: 'error',
@@ -90,15 +83,39 @@ serve(async (req) => {
         message: 'No hemos podido localizar esta solicitud.'
       });
     }
-    console.log('✅ STEP 4: Request found', { rid, phase: row.phase, status: row.status });
+    console.log('✅ STEP 3: Request found', { rid, phase: row.phase, status: row.status });
+
+    const effectiveExp = exp || row.token_expires_at || null;
+    if (!effectiveExp) {
+      console.log('❌ STEP 4 FAILED: Missing effective expiry', { rid, urlStyle, token_expires_at: row.token_expires_at });
+      return await redirectResponse({
+        title: 'Enlace inválido',
+        status: 'error',
+        heading: 'Enlace inválido',
+        message: 'No se pudo validar este enlace. Solicita uno nuevo.'
+      });
+    }
+
+    const expTime = new Date(effectiveExp).getTime();
+    const nowTime = Date.now();
+    if (Number.isNaN(expTime) || expTime < nowTime) {
+      console.log('❌ STEP 4 FAILED: Link expired', { expTime, nowTime, diff: nowTime - expTime, urlStyle });
+      return await redirectResponse({
+        title: 'Enlace caducado',
+        status: 'warning',
+        heading: 'Enlace caducado',
+        message: 'Este enlace ha caducado. Contacta con tu responsable para solicitar uno nuevo.'
+      });
+    }
+    console.log('✅ STEP 4: Link not expired', { expTime, nowTime, urlStyle });
 
     // Recompute expected token hash (HMAC over rid:phase:exp)
-    console.log('🔐 STEP 5: Starting token validation');
+    console.log('🔐 STEP 5: Starting token validation', { effectiveExp: effectiveExp.substring(0, 20), urlStyle });
     try {
       const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(TOKEN_SECRET),
         { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
       const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key,
-        new TextEncoder().encode(`${rid}:${row.phase}:${exp}`)));
+        new TextEncoder().encode(`${rid}:${row.phase}:${effectiveExp}`)));
       const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", sig));
       const token_hash_expected = Array.from(digest).map(x=>x.toString(16).padStart(2,'0')).join('');
 
@@ -118,7 +135,7 @@ serve(async (req) => {
         title: 'Token inválido',
         status: 'error',
         heading: 'Token inválido',
-        message: 'Este enlace no es válido. Utiliza el enlace original de tu correo.'
+        message: 'Este enlace no es válido. Utiliza el enlace original que recibiste.'
       });
       }
       console.log('✅ STEP 5: Token validated successfully');
