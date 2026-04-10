@@ -54,7 +54,19 @@ interface OptimizedMatrixCellProps {
   allowMarkUnavailable?: boolean;
   declinedJobIdsSet?: Set<string>;
   staffingStatusProvided?: { availability_status: any; offer_status: any } | null;
-  staffingStatusByDateProvided?: { availability_status: any; offer_status: any; availability_job_id?: string | null; offer_job_id?: string | null } | null;
+  staffingStatusByDateProvided?: {
+    availability_status: any;
+    offer_status: any;
+    availability_job_id?: string | null;
+    offer_job_id?: string | null;
+    availability_requested_by?: string | null;
+    availability_created_at?: string | null;
+    offer_requested_by?: string | null;
+    offer_created_at?: string | null;
+    pending_availability_job_ids?: string[];
+    pending_offer_job_ids?: string[];
+  } | null;
+  profileNamesMap?: Map<string, string>;
   isFridge?: boolean;
   mobile?: boolean;
 }
@@ -78,6 +90,7 @@ export const OptimizedMatrixCell = memo(({
   declinedJobIdsSet = new Set<string>(),
   staffingStatusProvided = null,
   staffingStatusByDateProvided = null,
+  profileNamesMap = new Map<string, string>(),
   isFridge = false,
   mobile = false
 }: OptimizedMatrixCellProps) => {
@@ -396,6 +409,36 @@ export const OptimizedMatrixCell = memo(({
   const statusBadgesPosClass = mobile ? 'absolute top-1 right-1' : 'absolute bottom-1 left-1';
   const actionButtonsPosClass = mobile ? 'absolute bottom-1 left-1' : 'absolute top-1 right-1';
   const actionBtnSize = mobile ? 'h-8 w-8' : 'h-5 w-5';
+  const formatDateTimeEs = (iso?: string | null) => {
+    if (!iso) return null;
+    const parsed = new Date(iso);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return new Intl.DateTimeFormat('es-ES', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(parsed);
+  };
+  const assignmentStatusLabel = (status?: string | null) => {
+    if (status === 'confirmed') return 'Confirmado';
+    if (status === 'declined') return 'Rechazado';
+    if (status === 'invited') return 'Invitado';
+    return status || 'Pendiente';
+  };
+  const availabilityStatusLabel = (status?: string | null) => {
+    if (status === 'requested' || status === 'pending') return 'Solicitada';
+    if (status === 'confirmed') return 'Confirmada';
+    if (status === 'declined') return 'Rechazada';
+    return null;
+  };
+  const offerStatusLabel = (status?: string | null) => {
+    if (status === 'sent' || status === 'pending') return 'Enviada';
+    if (status === 'confirmed') return 'Confirmada';
+    if (status === 'declined') return 'Rechazada';
+    return null;
+  };
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -914,8 +957,56 @@ export const OptimizedMatrixCell = memo(({
                 </div>
               )}
               <div className={`capitalize ${assignment.status === 'confirmed' ? 'text-green-600' : assignment.status === 'declined' ? 'text-red-600' : 'text-yellow-600'}`}>
-                {assignment.status}
+                Estado: {assignmentStatusLabel(assignment.status)}
               </div>
+              {assignment.assigned_by && profileNamesMap.has(assignment.assigned_by) && (
+                <div className="text-muted-foreground">
+                  Asignado por: {profileNamesMap.get(assignment.assigned_by)}
+                </div>
+              )}
+              {assignment.assigned_at && formatDateTimeEs(assignment.assigned_at) && (
+                <div className="text-muted-foreground">
+                  Fecha: {formatDateTimeEs(assignment.assigned_at)}
+                </div>
+              )}
+            </div>
+          )}
+          {!hasAssignment && !isUnavailable && staffingStatusByDate && (
+            <div className="text-xs space-y-2 pt-1">
+              {availabilityStatusLabel((staffingStatusByDate as any).availability_status) && (
+                <div>
+                  <div className="text-yellow-700">
+                    Disponibilidad: {availabilityStatusLabel((staffingStatusByDate as any).availability_status)}
+                  </div>
+                  {(staffingStatusByDate as any).availability_requested_by && profileNamesMap.has((staffingStatusByDate as any).availability_requested_by) && (
+                    <div className="text-muted-foreground">
+                      Enviado por: {profileNamesMap.get((staffingStatusByDate as any).availability_requested_by)}
+                    </div>
+                  )}
+                  {(staffingStatusByDate as any).availability_created_at && formatDateTimeEs((staffingStatusByDate as any).availability_created_at) && (
+                    <div className="text-muted-foreground">
+                      Fecha: {formatDateTimeEs((staffingStatusByDate as any).availability_created_at)}
+                    </div>
+                  )}
+                </div>
+              )}
+              {offerStatusLabel((staffingStatusByDate as any).offer_status) && (
+                <div>
+                  <div className="text-blue-700">
+                    Oferta: {offerStatusLabel((staffingStatusByDate as any).offer_status)}
+                  </div>
+                  {(staffingStatusByDate as any).offer_requested_by && profileNamesMap.has((staffingStatusByDate as any).offer_requested_by) && (
+                    <div className="text-muted-foreground">
+                      Enviado por: {profileNamesMap.get((staffingStatusByDate as any).offer_requested_by)}
+                    </div>
+                  )}
+                  {(staffingStatusByDate as any).offer_created_at && formatDateTimeEs((staffingStatusByDate as any).offer_created_at) && (
+                    <div className="text-muted-foreground">
+                      Fecha: {formatDateTimeEs((staffingStatusByDate as any).offer_created_at)}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {isUnavailable && !hasAssignment && (

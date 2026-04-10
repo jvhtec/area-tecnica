@@ -1125,6 +1125,41 @@ export const OptimizedAssignmentMatrix = ({
   // This avoids re-fetching when scrolling horizontally, making badges render immediately.
   const allJobsLite = useMemo(() => jobs.map(j => ({ id: j.id, start_time: j.start_time, end_time: j.end_time })), [jobs]);
   const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, allJobsLite, dates);
+  const actorIdsForTooltip = useMemo(() => {
+    const ids = new Set<string>();
+    allAssignments.forEach((assignment: any) => {
+      if (assignment?.assigned_by) ids.add(assignment.assigned_by);
+    });
+    staffingMaps?.byDate?.forEach((status: any) => {
+      if (status?.availability_requested_by) ids.add(status.availability_requested_by);
+      if (status?.offer_requested_by) ids.add(status.offer_requested_by);
+    });
+    return Array.from(ids);
+  }, [allAssignments, staffingMaps]);
+
+  const { data: profileNamesMap = new Map<string, string>() } = useQuery({
+    queryKey: ['matrix-tooltip-profile-names', [...actorIdsForTooltip].sort().join(',')],
+    queryFn: async () => {
+      if (!actorIdsForTooltip.length) return new Map<string, string>();
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, nickname')
+        .in('id', actorIdsForTooltip);
+      if (error) {
+        console.warn('Failed loading tooltip profile names', error);
+        return new Map<string, string>();
+      }
+      const map = new Map<string, string>();
+      (data || []).forEach((profile: any) => {
+        const fullName = [profile.first_name, profile.nickname, profile.last_name].filter(Boolean).join(' ').trim();
+        if (profile.id) map.set(profile.id, fullName || 'Usuario');
+      });
+      return map;
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    enabled: actorIdsForTooltip.length > 0,
+  });
 
   const getCurrentTechnician = useCallback(() => {
     if (!cellAction?.technicianId) return null;
@@ -1243,6 +1278,7 @@ export const OptimizedAssignmentMatrix = ({
     handleDateHeadersScroll, handleTechnicianScroll, handleMainScroll, cycleTechSort, getSortLabel,
     isManagementUser, setCreateUserOpen, createUserOpen, qc, setSortJobId,
     getJobsForDate, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,
+    profileNamesMap,
     handleCellSelect, handleCellClick, handleCellPrefetch, handleOptimisticUpdate, incrementCellRender,
     declinedJobsByTech, cellAction, currentTechnician, closeDialogs,
     handleJobSelected, handleStaffingActionSelected, forcedStaffingAction, forcedStaffingChannel,

@@ -574,6 +574,7 @@ serve(async (req) => {
             profile_id,
             phase,
             status: 'pending',
+            requested_by: actorId,
             token_hash,
             token_expires_at: exp,
             single_day: true,
@@ -650,6 +651,7 @@ serve(async (req) => {
           profile_id,
           phase,
           status: 'pending',
+          requested_by: actorId,
           token_hash, // placeholder; not used for click on these rows
           token_expires_at: exp,
           single_day: true,
@@ -693,6 +695,7 @@ serve(async (req) => {
           profile_id,
           phase,
           status: "pending",
+          requested_by: actorId,
           token_hash,
           token_expires_at: exp,
           single_day: isSingleDayRequest,
