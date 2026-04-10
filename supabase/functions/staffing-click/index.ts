@@ -414,6 +414,7 @@ serve(async (req) => {
               job_id: row.job_id,
               technician_id: row.profile_id,
               status: 'confirmed',
+              assigned_by: row.requested_by ?? null,
               assigned_at: new Date().toISOString(),
               assignment_source: 'staffing',
               response_time: new Date().toISOString(),

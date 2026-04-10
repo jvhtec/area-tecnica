@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
-import { format, isSameDay, isWithinInterval } from 'date-fns'
+import { format } from 'date-fns'
 
 type Status = 'confirmed' | 'declined' | 'expired' | 'requested' | 'sent' | null
 
@@ -18,10 +18,56 @@ interface ByJobStatus {
 interface ByDateStatus extends ByJobStatus {
   availability_job_id?: string | null
   offer_job_id?: string | null
+  availability_requested_by?: string | null
+  availability_created_at?: string | null
+  offer_requested_by?: string | null
+  offer_created_at?: string | null
   // Arrays of ALL job IDs with pending requests for this date (for bulk cancel)
   pending_availability_job_ids?: string[]
   pending_offer_job_ids?: string[]
 }
+
+interface StaffingRequestRow {
+  job_id: string
+  profile_id: string
+  phase: 'availability' | 'offer'
+  status: string | null
+  updated_at: string | null
+  single_day: boolean
+  target_date: string | Date | null
+  created_at: string | null
+  requested_by: string | null
+}
+
+interface LatestByPhaseAccumulator {
+  availability_status: Status
+  offer_status: Status
+  availability_updated_at: number
+  offer_updated_at: number
+  availability_job_id: string | null
+  offer_job_id: string | null
+  availability_requested_by: string | null
+  availability_created_at: string | null
+  offer_requested_by: string | null
+  offer_created_at: string | null
+  pending_availability_job_ids: string[]
+  pending_offer_job_ids: string[]
+}
+
+const createLatestByPhaseAccumulator = (): LatestByPhaseAccumulator => ({
+  availability_status: null,
+  offer_status: null,
+  availability_updated_at: 0,
+  offer_updated_at: 0,
+  availability_job_id: null,
+  offer_job_id: null,
+  availability_requested_by: null,
+  availability_created_at: null,
+  offer_requested_by: null,
+  offer_created_at: null,
+  pending_availability_job_ids: [],
+  pending_offer_job_ids: []
+})
 
 export function useStaffingMatrixStatuses(
   technicianIds: string[],
@@ -95,7 +141,7 @@ export function useStaffingMatrixStatuses(
       }
 
       // 2) Date-based statuses derived from staffing_requests across visible jobs
-      const reqRows: any[] = []
+      const reqRows: StaffingRequestRow[] = []
       try {
         const techBatches = chunk(technicianIds, 20)
         const jobBatches = chunk(jobIds, 20)
@@ -105,7 +151,7 @@ export function useStaffingMatrixStatuses(
             promises.push(
               Promise.resolve(supabase
                 .from('staffing_requests')
-                .select('job_id, profile_id, phase, status, updated_at, single_day, target_date')
+                .select('job_id, profile_id, phase, status, updated_at, single_day, target_date, created_at, requested_by')
                 .in('profile_id', tb)
                 .in('job_id', jb))
             )
@@ -132,7 +178,7 @@ export function useStaffingMatrixStatuses(
       })
 
       // Group requests by technician for faster lookups
-      const byTech = new Map<string, any[]>()
+      const byTech = new Map<string, StaffingRequestRow[]>()
       ;(reqRows || []).forEach(r => {
         const arr = byTech.get(r.profile_id) || []
         arr.push(r)
@@ -173,7 +219,8 @@ export function useStaffingMatrixStatuses(
           if (!matchingRequests.length) return
 
           // Reduce to latest per phase, and collect ALL non-expired job IDs for bulk cancel
-          const latest = matchingRequests.reduce((acc: any, r: any) => {
+          const initialAcc = createLatestByPhaseAccumulator()
+          const latest = matchingRequests.reduce((acc, r) => {
             const t = r.updated_at ? new Date(r.updated_at).getTime() : 0
             if (r.phase === 'availability') {
               // Collect ALL non-expired job IDs for this phase (to ensure complete cell clearing)
@@ -186,6 +233,8 @@ export function useStaffingMatrixStatuses(
                 acc.availability_status = mapped
                 acc.availability_updated_at = t
                 acc.availability_job_id = r.job_id
+                acc.availability_requested_by = r.requested_by ?? null
+                acc.availability_created_at = r.created_at ?? null
               }
             } else if (r.phase === 'offer') {
               // Collect ALL non-expired job IDs for this phase (to ensure complete cell clearing)
@@ -198,10 +247,12 @@ export function useStaffingMatrixStatuses(
                 acc.offer_status = mapped
                 acc.offer_updated_at = t
                 acc.offer_job_id = r.job_id
+                acc.offer_requested_by = r.requested_by ?? null
+                acc.offer_created_at = r.created_at ?? null
               }
             }
             return acc
-          }, { availability_status: null, offer_status: null, availability_updated_at: 0, offer_updated_at: 0, availability_job_id: null, offer_job_id: null, pending_availability_job_ids: [] as string[], pending_offer_job_ids: [] as string[] })
+          }, initialAcc)
 
           // Only set an entry if there's a non-null status for either phase
           if (latest.availability_status || latest.offer_status) {
@@ -210,6 +261,10 @@ export function useStaffingMatrixStatuses(
               offer_status: latest.offer_status as Status,
               availability_job_id: latest.availability_job_id,
               offer_job_id: latest.offer_job_id,
+              availability_requested_by: latest.availability_requested_by,
+              availability_created_at: latest.availability_created_at,
+              offer_requested_by: latest.offer_requested_by,
+              offer_created_at: latest.offer_created_at,
               pending_availability_job_ids: latest.pending_availability_job_ids,
               pending_offer_job_ids: latest.pending_offer_job_ids
             })

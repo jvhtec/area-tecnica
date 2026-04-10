@@ -8,6 +8,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, MessageCircle, Loader2 } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { formatInTimeZone } from 'date-fns-tz';
 import { cn } from '@/lib/utils';
 import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
 import { supabase } from '@/lib/supabase';
@@ -54,10 +56,57 @@ interface OptimizedMatrixCellProps {
   allowMarkUnavailable?: boolean;
   declinedJobIdsSet?: Set<string>;
   staffingStatusProvided?: { availability_status: any; offer_status: any } | null;
-  staffingStatusByDateProvided?: { availability_status: any; offer_status: any; availability_job_id?: string | null; offer_job_id?: string | null } | null;
+  staffingStatusByDateProvided?: {
+    availability_status: any;
+    offer_status: any;
+    availability_job_id?: string | null;
+    offer_job_id?: string | null;
+    availability_requested_by?: string | null;
+    availability_created_at?: string | null;
+    offer_requested_by?: string | null;
+    offer_created_at?: string | null;
+    pending_availability_job_ids?: string[];
+    pending_offer_job_ids?: string[];
+  } | null;
+  profileNamesMap?: Map<string, string>;
   isFridge?: boolean;
   mobile?: boolean;
 }
+
+const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
+
+const normalizeStatus = (status?: string | null) => status?.trim().toLowerCase() ?? null;
+
+const formatDateTimeEs = (iso?: string | null) => {
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return formatInTimeZone(parsed, 'Europe/Madrid', 'd MMM yyyy, HH:mm', { locale: es });
+};
+
+const assignmentStatusLabel = (status?: string | null) => {
+  const normalizedStatus = normalizeStatus(status);
+  if (normalizedStatus === 'confirmed') return 'Confirmado';
+  if (normalizedStatus === 'declined') return 'Rechazado';
+  if (normalizedStatus === 'invited') return 'Invitado';
+  return 'Pendiente';
+};
+
+const availabilityStatusLabel = (status?: string | null) => {
+  const normalizedStatus = normalizeStatus(status);
+  if (normalizedStatus === 'requested' || normalizedStatus === 'pending') return 'Solicitada';
+  if (normalizedStatus === 'confirmed') return 'Confirmada';
+  if (normalizedStatus === 'declined') return 'Rechazada';
+  return null;
+};
+
+const offerStatusLabel = (status?: string | null) => {
+  const normalizedStatus = normalizeStatus(status);
+  if (normalizedStatus === 'sent' || normalizedStatus === 'pending') return 'Enviada';
+  if (normalizedStatus === 'confirmed') return 'Confirmada';
+  if (normalizedStatus === 'declined') return 'Rechazada';
+  return null;
+};
 
 export const OptimizedMatrixCell = memo(({
   technician,
@@ -78,6 +127,7 @@ export const OptimizedMatrixCell = memo(({
   declinedJobIdsSet = new Set<string>(),
   staffingStatusProvided = null,
   staffingStatusByDateProvided = null,
+  profileNamesMap = EMPTY_PROFILE_NAMES_MAP,
   isFridge = false,
   mobile = false
 }: OptimizedMatrixCellProps) => {
@@ -444,7 +494,7 @@ export const OptimizedMatrixCell = memo(({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id;
+                      const targetJobId = jobId || assignment?.job_id || staffingStatusByDate?.availability_job_id;
                       if (targetJobId) {
                         setPendingRetry({ jobId: targetJobId });
                       } else {
@@ -469,9 +519,9 @@ export const OptimizedMatrixCell = memo(({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.availability_job_id || null;
+                      const targetJobId = jobId || assignment?.job_id || staffingStatusByDate?.availability_job_id || null;
                       // Include all pending job IDs to cancel all requests for this date
-                      const allJobIds = (staffingStatusByDate as any)?.pending_availability_job_ids || (targetJobId ? [targetJobId] : []);
+                      const allJobIds = staffingStatusByDate?.pending_availability_job_ids || (targetJobId ? [targetJobId] : []);
                       setPendingCancel({ phase: 'availability', jobId: targetJobId, allJobIds });
                     }}
                     title="Cancelar solicitud de disponibilidad"
@@ -488,7 +538,7 @@ export const OptimizedMatrixCell = memo(({
                     onClick={(e) => {
                       e.stopPropagation();
                       // Determine job for offer; then open offer-details to choose role
-                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id;
+                      const targetJobId = jobId || assignment?.job_id || staffingStatusByDate?.offer_job_id;
                       if (targetJobId) {
                         onClick('offer-details', targetJobId);
                       } else {
@@ -514,9 +564,9 @@ export const OptimizedMatrixCell = memo(({
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      const targetJobId = jobId || assignment?.job_id || (staffingStatusByDate as any)?.offer_job_id || null;
+                      const targetJobId = jobId || assignment?.job_id || staffingStatusByDate?.offer_job_id || null;
                       // Include all pending job IDs to cancel all requests for this date
-                      const allJobIds = (staffingStatusByDate as any)?.pending_offer_job_ids || (targetJobId ? [targetJobId] : []);
+                      const allJobIds = staffingStatusByDate?.pending_offer_job_ids || (targetJobId ? [targetJobId] : []);
                       setPendingCancel({ phase: 'offer', jobId: targetJobId, allJobIds });
                     }}
                     title="Cancelar oferta"
@@ -914,8 +964,56 @@ export const OptimizedMatrixCell = memo(({
                 </div>
               )}
               <div className={`capitalize ${assignment.status === 'confirmed' ? 'text-green-600' : assignment.status === 'declined' ? 'text-red-600' : 'text-yellow-600'}`}>
-                {assignment.status}
+                Estado: {assignmentStatusLabel(assignment.status)}
               </div>
+              {assignment.assigned_by && profileNamesMap.has(assignment.assigned_by) && (
+                <div className="text-muted-foreground">
+                  Asignado por: {profileNamesMap.get(assignment.assigned_by)}
+                </div>
+              )}
+              {assignment.assigned_at && formatDateTimeEs(assignment.assigned_at) && (
+                <div className="text-muted-foreground">
+                  Fecha: {formatDateTimeEs(assignment.assigned_at)}
+                </div>
+              )}
+            </div>
+          )}
+          {!hasAssignment && !isUnavailable && staffingStatusByDate && (
+            <div className="text-xs space-y-2 pt-1">
+              {availabilityStatusLabel(staffingStatusByDate.availability_status) && (
+                <div>
+                  <div className="text-yellow-700">
+                    Disponibilidad: {availabilityStatusLabel(staffingStatusByDate.availability_status)}
+                  </div>
+                  {staffingStatusByDate.availability_requested_by && profileNamesMap.has(staffingStatusByDate.availability_requested_by) && (
+                    <div className="text-muted-foreground">
+                      Enviado por: {profileNamesMap.get(staffingStatusByDate.availability_requested_by)}
+                    </div>
+                  )}
+                  {staffingStatusByDate.availability_created_at && formatDateTimeEs(staffingStatusByDate.availability_created_at) && (
+                    <div className="text-muted-foreground">
+                      Fecha: {formatDateTimeEs(staffingStatusByDate.availability_created_at)}
+                    </div>
+                  )}
+                </div>
+              )}
+              {offerStatusLabel(staffingStatusByDate.offer_status) && (
+                <div>
+                  <div className="text-blue-700">
+                    Oferta: {offerStatusLabel(staffingStatusByDate.offer_status)}
+                  </div>
+                  {staffingStatusByDate.offer_requested_by && profileNamesMap.has(staffingStatusByDate.offer_requested_by) && (
+                    <div className="text-muted-foreground">
+                      Enviado por: {profileNamesMap.get(staffingStatusByDate.offer_requested_by)}
+                    </div>
+                  )}
+                  {staffingStatusByDate.offer_created_at && formatDateTimeEs(staffingStatusByDate.offer_created_at) && (
+                    <div className="text-muted-foreground">
+                      Fecha: {formatDateTimeEs(staffingStatusByDate.offer_created_at)}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           {isUnavailable && !hasAssignment && (

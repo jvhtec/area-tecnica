@@ -552,6 +552,7 @@ serve(async (req) => {
           const upd = await supabase
             .from('staffing_requests')
             .update({
+              requested_by: actorId,
               token_hash,
               token_expires_at: exp,
               updated_at: new Date().toISOString(),
@@ -574,6 +575,7 @@ serve(async (req) => {
             profile_id,
             phase,
             status: 'pending',
+            requested_by: actorId,
             token_hash,
             token_expires_at: exp,
             single_day: true,
@@ -622,6 +624,7 @@ serve(async (req) => {
               const upd = await supabase
                 .from('staffing_requests')
                 .update({
+                  requested_by: actorId,
                   token_hash,
                   token_expires_at: exp,
                   updated_at: new Date().toISOString(),
@@ -650,6 +653,7 @@ serve(async (req) => {
           profile_id,
           phase,
           status: 'pending',
+          requested_by: actorId,
           token_hash, // placeholder; not used for click on these rows
           token_expires_at: exp,
           single_day: true,
@@ -672,7 +676,7 @@ serve(async (req) => {
         try {
           const cohesion = await supabase
             .from('staffing_requests')
-            .update({ batch_id: batchId, updated_at: new Date().toISOString() })
+            .update({ requested_by: actorId, batch_id: batchId, updated_at: new Date().toISOString() })
             .eq('job_id', job_id)
             .eq('profile_id', profile_id)
             .eq('phase', phase)
@@ -693,6 +697,7 @@ serve(async (req) => {
           profile_id,
           phase,
           status: "pending",
+          requested_by: actorId,
           token_hash,
           token_expires_at: exp,
           single_day: isSingleDayRequest,
@@ -705,6 +710,7 @@ serve(async (req) => {
           let updater = supabase
             .from("staffing_requests")
             .update({
+              requested_by: actorId,
               token_hash,
               token_expires_at: exp,
               updated_at: new Date().toISOString(),

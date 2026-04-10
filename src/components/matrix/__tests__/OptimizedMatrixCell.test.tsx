@@ -528,4 +528,94 @@ describe('OptimizedMatrixCell', () => {
     const cell = getCellElement();
     expect(cell).toBeInTheDocument();
   });
+
+  it('renders assignment tooltip metadata when assigned_by and assigned_at are present', async () => {
+    const user = userEvent.setup();
+    const assignmentWithMeta = {
+      ...mockAssignment,
+      assigned_by: 'manager-1',
+      assigned_at: '2026-04-10T14:30:00.000Z',
+    };
+    const profileNamesMap = new Map<string, string>([['manager-1', 'Manager Name']]);
+
+    render(
+      <OptimizedMatrixCell
+        technician={mockTechnician}
+        date={mockDate}
+        assignment={assignmentWithMeta}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+        profileNamesMap={profileNamesMap}
+      />
+    );
+
+    await user.hover(getCellElement());
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Asignado por: Manager Name/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Fecha: 10 abr 2026, 16:30/i).length).toBeGreaterThan(0);
+    });
+  });
+
+  it('normalizes unknown or English assignment statuses to Spanish pending in the tooltip', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <OptimizedMatrixCell
+        technician={mockTechnician}
+        date={mockDate}
+        assignment={{ ...mockAssignment, status: 'Pending' }}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+      />
+    );
+
+    await user.hover(getCellElement());
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Estado: Pendiente/i).length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/Estado: Pending/i)).not.toBeInTheDocument();
+  });
+
+  it('renders staffing tooltip metadata and degrades gracefully when sender is missing', async () => {
+    const user = userEvent.setup();
+    const staffingStatus = {
+      availability_status: ' Requested ',
+      availability_requested_by: null,
+      availability_created_at: '2026-04-08T09:15:00.000Z',
+      offer_status: ' SENT ',
+      offer_requested_by: 'manager-2',
+      offer_created_at: '2026-04-09T11:00:00.000Z',
+    };
+
+    render(
+      <OptimizedMatrixCell
+        technician={mockTechnician}
+        date={mockDate}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+        staffingStatusByDateProvided={staffingStatus}
+        profileNamesMap={new Map([['manager-2', 'Second Manager']])}
+      />
+    );
+
+    await user.hover(getCellElement());
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Disponibilidad: Solicitada/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Oferta: Enviada/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Enviado por: Second Manager/i).length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/Enviado por:\s*null/i)).not.toBeInTheDocument();
+  });
 });
