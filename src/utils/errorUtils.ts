@@ -11,6 +11,7 @@ export const CHUNK_FAILURE_PATTERNS = [
   /Failed to fetch dynamically imported module/i,
   /Importing a module script failed/i,
   /error loading dynamically imported module/i,
+  /Failed to load module script/i,
 ];
 
 /**
