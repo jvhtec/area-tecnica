@@ -13,6 +13,16 @@ declare global {
 }
 
 const handleChunkLoadError = () => {
+  // Ask the service worker to wipe all caches before we reload so the browser
+  // fetches every asset fresh and won't re-encounter the stale-shell mismatch.
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' })
+    }
+  } catch {
+    // ignore — reload will still happen
+  }
+
   try {
     const count = parseInt(sessionStorage.getItem(CHUNK_ERROR_RELOAD_KEY) || '0', 10);
 

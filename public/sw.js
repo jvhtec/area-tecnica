@@ -107,43 +107,35 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Stale-while-revalidate strategy for HTML/navigation requests, with timeout.
-  // This avoids hangs on poor networks while still keeping HTML fresh.
+  // Network-first strategy for HTML/navigation requests.
+  // Serving stale HTML can cause chunk hash mismatches after a new deploy, so we
+  // always attempt the network first and only fall back to cache when offline.
   if (request.mode === 'navigate' || request.destination === 'document' || url.pathname.endsWith('.html')) {
     event.respondWith(
       (async () => {
         const cache = await caches.open(RUNTIME_CACHE)
-        const cached = await cache.match(request)
 
-        const networkFetch = self.fetchWithTimeout(request, HTML_TIMEOUT_MS)
-          .then((response) => {
-            if (response && response.ok) {
-              cache.put(request, response.clone()).catch((e) => {
-                console.warn('[sw] Failed to cache HTML response:', e)
-              })
-            }
-            return response
+        try {
+          const response = await self.fetchWithTimeout(request, HTML_TIMEOUT_MS)
+          if (response && response.ok) {
+            cache.put(request, response.clone()).catch((e) => {
+              console.warn('[sw] Failed to cache HTML response:', e)
+            })
+          }
+          return response
+        } catch {
+          // Network timed out or failed — serve cached shell to stay usable offline
+          const cached = await cache.match(request)
+          if (cached) return cached
+
+          return caches.match('/').then((shell) => {
+            return shell || new Response('Offline', {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: { 'Content-Type': 'text/plain' }
+            })
           })
-          .catch(() => null)
-
-        if (cached) {
-          event.waitUntil(networkFetch)
-          return cached
         }
-
-        const networkResponse = await networkFetch
-        if (networkResponse) {
-          return networkResponse
-        }
-
-        // Offline fallback: serve cached app shell if available
-        return caches.match('/').then((shell) => {
-          return shell || new Response('Offline', {
-            status: 503,
-            statusText: 'Service Unavailable',
-            headers: { 'Content-Type': 'text/plain' }
-          })
-        })
       })()
     )
     return
@@ -163,6 +155,19 @@ self.addEventListener('fetch', (event) => {
           // Only cache successful responses
           if (!response || response.status !== 200 || response.type !== 'basic') {
             return response
+          }
+
+          // Detect stale SPA fallback: Cloudflare returned HTML for a JS/CSS/font asset.
+          // This happens when a chunk hash no longer exists on the CDN after a deploy.
+          // Return a 404 so the browser rejects the module load and triggers auto-reload.
+          const contentType = response.headers.get('content-type') || ''
+          const isAssetPath =
+            url.pathname.startsWith('/assets/') ||
+            url.pathname.endsWith('.js') ||
+            url.pathname.endsWith('.css')
+          if (isAssetPath && contentType.includes('text/html')) {
+            console.warn('[sw] HTML response intercepted for asset:', url.pathname, '— stale SPA fallback detected')
+            return new Response(null, { status: 404, statusText: 'Stale Asset' })
           }
 
           // Clone the response to cache it
@@ -370,5 +375,15 @@ self.addEventListener('message', (event) => {
     )
   } else if (type === 'sw:ping') {
     event.source?.postMessage({ source: 'sw', type: 'sw:pong', ts: Date.now() })
+  } else if (type === 'CLEAR_CACHES') {
+    // Called by the app when a chunk load error is detected so the next reload
+    // fetches all assets fresh from the network.
+    event.waitUntil(
+      caches.keys()
+        .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+        .then(() => {
+          event.source?.postMessage({ source: 'sw', type: 'caches-cleared', ts: Date.now() })
+        })
+    )
   }
 })
