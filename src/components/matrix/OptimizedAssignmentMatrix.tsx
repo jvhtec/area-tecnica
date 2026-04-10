@@ -15,11 +15,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { throttle } from '@/utils/throttle';
 import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
 import { useDragScroll } from '@/hooks/useDragScroll';
+import { formatUserName } from '@/utils/userName';
 
 import { OptimizedAssignmentMatrixView } from './optimized-assignment-matrix/OptimizedAssignmentMatrixView';
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps, TechSortMethod } from './optimized-assignment-matrix/types';
 
 // Drag scroll hook is used on mainScrollRef below for desktop users
+
+const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
 
 export const OptimizedAssignmentMatrix = ({
   technicians,
@@ -1137,23 +1140,31 @@ export const OptimizedAssignmentMatrix = ({
     return Array.from(ids);
   }, [allAssignments, staffingMaps]);
 
-  const { data: profileNamesMap = new Map<string, string>() } = useQuery({
+  const { data: profileNamesMap = EMPTY_PROFILE_NAMES_MAP } = useQuery({
     queryKey: ['matrix-tooltip-profile-names', [...actorIdsForTooltip].sort().join(',')],
     queryFn: async () => {
-      if (!actorIdsForTooltip.length) return new Map<string, string>();
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, nickname')
-        .in('id', actorIdsForTooltip);
-      if (error) {
-        console.warn('Failed loading tooltip profile names', error);
-        return new Map<string, string>();
-      }
+      if (!actorIdsForTooltip.length) return EMPTY_PROFILE_NAMES_MAP;
+      const chunk = <T,>(arr: T[], size: number) => {
+        const out: T[][] = [];
+        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+        return out;
+      };
+      const batches = chunk(actorIdsForTooltip, 50);
       const map = new Map<string, string>();
-      (data || []).forEach((profile: any) => {
-        const fullName = [profile.first_name, profile.nickname, profile.last_name].filter(Boolean).join(' ').trim();
-        if (profile.id) map.set(profile.id, fullName || 'Usuario');
-      });
+      for (const batch of batches) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, nickname')
+          .in('id', batch);
+        if (error) {
+          console.warn('Failed loading tooltip profile names', error);
+          continue;
+        }
+        (data || []).forEach((profile: any) => {
+          const fullName = formatUserName(profile.first_name, profile.nickname, profile.last_name) || 'Usuario';
+          if (profile.id) map.set(profile.id, fullName);
+        });
+      }
       return map;
     },
     staleTime: 5 * 60 * 1000,

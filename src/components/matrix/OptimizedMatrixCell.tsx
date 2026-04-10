@@ -73,6 +73,41 @@ interface OptimizedMatrixCellProps {
   mobile?: boolean;
 }
 
+const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
+
+const normalizeStatus = (status?: string | null) => status?.trim().toLowerCase() ?? null;
+
+const formatDateTimeEs = (iso?: string | null) => {
+  if (!iso) return null;
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return formatInTimeZone(parsed, 'Europe/Madrid', 'd MMM yyyy, HH:mm', { locale: es });
+};
+
+const assignmentStatusLabel = (status?: string | null) => {
+  const normalizedStatus = normalizeStatus(status);
+  if (normalizedStatus === 'confirmed') return 'Confirmado';
+  if (normalizedStatus === 'declined') return 'Rechazado';
+  if (normalizedStatus === 'invited') return 'Invitado';
+  return 'Pendiente';
+};
+
+const availabilityStatusLabel = (status?: string | null) => {
+  const normalizedStatus = normalizeStatus(status);
+  if (normalizedStatus === 'requested' || normalizedStatus === 'pending') return 'Solicitada';
+  if (normalizedStatus === 'confirmed') return 'Confirmada';
+  if (normalizedStatus === 'declined') return 'Rechazada';
+  return null;
+};
+
+const offerStatusLabel = (status?: string | null) => {
+  const normalizedStatus = normalizeStatus(status);
+  if (normalizedStatus === 'sent' || normalizedStatus === 'pending') return 'Enviada';
+  if (normalizedStatus === 'confirmed') return 'Confirmada';
+  if (normalizedStatus === 'declined') return 'Rechazada';
+  return null;
+};
+
 export const OptimizedMatrixCell = memo(({
   technician,
   date,
@@ -92,7 +127,7 @@ export const OptimizedMatrixCell = memo(({
   declinedJobIdsSet = new Set<string>(),
   staffingStatusProvided = null,
   staffingStatusByDateProvided = null,
-  profileNamesMap = new Map<string, string>(),
+  profileNamesMap = EMPTY_PROFILE_NAMES_MAP,
   isFridge = false,
   mobile = false
 }: OptimizedMatrixCellProps) => {
@@ -411,34 +446,6 @@ export const OptimizedMatrixCell = memo(({
   const statusBadgesPosClass = mobile ? 'absolute top-1 right-1' : 'absolute bottom-1 left-1';
   const actionButtonsPosClass = mobile ? 'absolute bottom-1 left-1' : 'absolute top-1 right-1';
   const actionBtnSize = mobile ? 'h-8 w-8' : 'h-5 w-5';
-  const normalizeStatus = (status?: string | null) => status?.trim().toLowerCase() ?? null;
-  const formatDateTimeEs = (iso?: string | null) => {
-    if (!iso) return null;
-    const parsed = new Date(iso);
-    if (Number.isNaN(parsed.getTime())) return null;
-    return formatInTimeZone(parsed, 'Europe/Madrid', 'd MMM yyyy, HH:mm', { locale: es });
-  };
-  const assignmentStatusLabel = (status?: string | null) => {
-    const normalizedStatus = normalizeStatus(status);
-    if (normalizedStatus === 'confirmed') return 'Confirmado';
-    if (normalizedStatus === 'declined') return 'Rechazado';
-    if (normalizedStatus === 'invited') return 'Invitado';
-    return 'Pendiente';
-  };
-  const availabilityStatusLabel = (status?: string | null) => {
-    const normalizedStatus = normalizeStatus(status);
-    if (normalizedStatus === 'requested' || normalizedStatus === 'pending') return 'Solicitada';
-    if (normalizedStatus === 'confirmed') return 'Confirmada';
-    if (normalizedStatus === 'declined') return 'Rechazada';
-    return null;
-  };
-  const offerStatusLabel = (status?: string | null) => {
-    const normalizedStatus = normalizeStatus(status);
-    if (normalizedStatus === 'sent' || normalizedStatus === 'pending') return 'Enviada';
-    if (normalizedStatus === 'confirmed') return 'Confirmada';
-    if (normalizedStatus === 'declined') return 'Rechazada';
-    return null;
-  };
   return (
     <Tooltip>
       <TooltipTrigger asChild>
