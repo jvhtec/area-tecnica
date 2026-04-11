@@ -31,5 +31,8 @@ describe('tour job quote schedule-range regression guard', () => {
     expect(codeOnly).toMatch(/schedule_start := COALESCE\(\s*job_date_type_start,\s*tour_date_start,\s*job_start_date,\s*tour_date_legacy_date/i);
     expect(codeOnly).toMatch(/schedule_end := COALESCE\(\s*job_date_type_end,\s*tour_date_end,\s*job_end_date,\s*tour_date_start,\s*tour_date_legacy_date,\s*job_start_date/i);
     expect(codeOnly).toMatch(/COUNT\(\*\)::int,\s*COUNT\(\*\) FILTER/i);
+    expect(codeOnly).toMatch(/has_override := COALESCE\(has_override,\s*FALSE\)/i);
+    expect(codeOnly).toMatch(/SELECT COALESCE\(\s*EXISTS\s*\(/i);
+    expect(codeOnly).toMatch(/team_member := COALESCE\(team_member,\s*FALSE\)/i);
   });
 });

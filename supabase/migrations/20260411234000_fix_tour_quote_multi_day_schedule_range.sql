@@ -152,16 +152,23 @@ BEGIN
     INTO has_override
     FROM public.job_assignments ja
     WHERE ja.job_id = _job_id AND ja.technician_id = _tech_id;
+
+    has_override := COALESCE(has_override, FALSE);
   END IF;
 
   IF tour_group IS NOT NULL THEN
-    SELECT EXISTS (
-      SELECT 1
-      FROM public.tour_assignments ta
-      WHERE ta.tour_id = tour_group
-        AND ta.technician_id = _tech_id
-    ) OR has_override
+    SELECT COALESCE(
+      EXISTS (
+        SELECT 1
+        FROM public.tour_assignments ta
+        WHERE ta.tour_id = tour_group
+          AND ta.technician_id = _tech_id
+      ) OR has_override,
+      FALSE
+    )
     INTO team_member;
+
+    team_member := COALESCE(team_member, FALSE);
   END IF;
 
   SELECT iso_year, iso_week INTO y, w
