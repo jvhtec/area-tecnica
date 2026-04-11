@@ -62,10 +62,6 @@ export function useSetTechnicianDateRateMode() {
 
         if (error) throw error;
       } else {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
         const { error } = await supabase
           .from('job_technician_rate_mode_dates')
           .upsert(
@@ -74,8 +70,6 @@ export function useSetTechnicianDateRateMode() {
               technician_id: technicianId,
               date,
               use_rehearsal_rate: mode === 'rehearsal',
-              updated_at: new Date().toISOString(),
-              updated_by: user?.id ?? null,
             },
             { onConflict: 'job_id,technician_id,date' },
           );

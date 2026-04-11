@@ -57,6 +57,25 @@ GRANT ALL ON TABLE public.job_technician_rate_mode_dates TO service_role;
 COMMENT ON TABLE public.job_technician_rate_mode_dates IS
   'Admin-only per-technician per-date pricing exceptions for tour jobs. Rows override job_rehearsal_dates for the specific technician/date; missing rows inherit the job-wide setting.';
 
+CREATE OR REPLACE FUNCTION public.tg_job_technician_rate_mode_dates_touch()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $function$
+BEGIN
+  NEW.updated_at := now();
+  NEW.updated_by := COALESCE(auth.uid(), NEW.updated_by, OLD.updated_by);
+  RETURN NEW;
+END;
+$function$;
+
+DROP TRIGGER IF EXISTS trg_job_technician_rate_mode_dates_touch ON public.job_technician_rate_mode_dates;
+
+CREATE TRIGGER trg_job_technician_rate_mode_dates_touch
+  BEFORE UPDATE ON public.job_technician_rate_mode_dates
+  FOR EACH ROW
+  EXECUTE FUNCTION public.tg_job_technician_rate_mode_dates_touch();
+
 CREATE OR REPLACE FUNCTION public.compute_timesheet_amount_2025(
   _timesheet_id uuid,
   _persist boolean DEFAULT false
