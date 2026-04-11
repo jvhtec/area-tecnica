@@ -779,7 +779,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                       {editingTourDate && editingTourDate.id === dateObj.id && !readOnly ? (
                         <div className="flex flex-col gap-3">
                           <div className="space-y-2">
-                            <Label htmlFor={`edit-tour-date-type-${dateObj.id}`}>Type</Label>
+                            <Label htmlFor={`edit-tour-date-type-${dateObj.id}`}>Tipo</Label>
                             <Select
                               value={editTourDateType}
                               onValueChange={(value) => {
@@ -791,7 +791,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                               }}
                             >
                               <SelectTrigger id={`edit-tour-date-type-${dateObj.id}`}>
-                                <SelectValue placeholder="Select date type" />
+                                <SelectValue placeholder="Seleccione tipo de fecha" />
                               </SelectTrigger>
                               <SelectContent>
                                 {TOUR_DATE_TYPE_OPTIONS.map((option) => {

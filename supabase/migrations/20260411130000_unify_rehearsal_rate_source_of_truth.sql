@@ -4,18 +4,40 @@
 
 INSERT INTO public.job_rehearsal_dates (job_id, date)
 SELECT
-  j.id,
-  scheduled_date::date
-FROM public.jobs j
-JOIN public.tour_dates td
-  ON td.id = j.tour_date_id
-CROSS JOIN LATERAL generate_series(
-  COALESCE(td.start_date, td.date),
-  COALESCE(td.end_date, td.start_date, td.date),
-  INTERVAL '1 day'
-) AS scheduled_date
-WHERE j.job_type = 'tourdate'
-  AND td.tour_date_type = 'rehearsal'
+  seeded.job_id,
+  seeded.date
+FROM (
+  SELECT
+    j.id AS job_id,
+    scheduled_date::date AS date
+  FROM public.jobs j
+  JOIN public.tour_dates td
+    ON td.id = j.tour_date_id
+  CROSS JOIN LATERAL generate_series(
+    COALESCE(td.start_date, td.date),
+    COALESCE(td.end_date, td.start_date, td.date),
+    INTERVAL '1 day'
+  ) AS scheduled_date
+  WHERE j.job_type = 'tourdate'
+    AND td.tour_date_type = 'rehearsal'
+
+  UNION
+
+  -- Historical rehearsal pricing was also driven by tour_date_type, even when
+  -- persisted timesheet dates drifted outside the scheduled tour-date range.
+  -- Seed those dates too so existing payouts do not silently change on deploy.
+  SELECT
+    t.job_id,
+    t.date
+  FROM public.timesheets t
+  JOIN public.jobs j
+    ON j.id = t.job_id
+  JOIN public.tour_dates td
+    ON td.id = j.tour_date_id
+  WHERE j.job_type = 'tourdate'
+    AND td.tour_date_type = 'rehearsal'
+    AND t.date IS NOT NULL
+) AS seeded
 ON CONFLICT (job_id, date) DO NOTHING;
 
 CREATE OR REPLACE FUNCTION public.compute_timesheet_amount_2025(

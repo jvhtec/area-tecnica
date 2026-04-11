@@ -98,7 +98,7 @@ export const TourDateListItem: React.FC<TourDateListItemProps> = ({
           />
           <Select value={editingTourDateType} onValueChange={setEditingTourDateType}>
             <SelectTrigger>
-              <SelectValue placeholder="Select date type" />
+              <SelectValue placeholder="Seleccione tipo de fecha" />
             </SelectTrigger>
             <SelectContent>
               {TOUR_DATE_TYPE_OPTIONS.map((option) => (

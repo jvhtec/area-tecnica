@@ -154,7 +154,7 @@ describe("TourDateManagementDialog", () => {
     );
 
     await user.click(screen.getByRole("combobox"));
-    await user.click(screen.getByRole("option", { name: /rehearsal/i }));
+    await user.click(screen.getByRole("option", { name: /ensayo/i }));
     await user.type(screen.getByLabelText(/^location$/i), "Madrid Arena");
     await user.type(screen.getByLabelText(/start date/i), "2026-04-10");
     await user.type(screen.getByLabelText(/end date/i), "2026-04-12");
@@ -235,7 +235,7 @@ describe("TourDateManagementDialog", () => {
     await user.click(screen.getByTitle("Edit Date"));
 
     await user.click(screen.getAllByRole("combobox")[0]);
-    await user.click(screen.getByRole("option", { name: /^show$/i }));
+    await user.click(screen.getByRole("option", { name: /^concierto$/i }));
 
     await user.click(screen.getByRole("button", { name: /^save$/i }));
 
