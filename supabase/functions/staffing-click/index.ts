@@ -152,9 +152,20 @@ serve(async (req) => {
     // Check if already responded
     console.log('🔍 STEP 6: Checking current status', { currentStatus: row.status });
     if (row.status !== 'pending') {
-      const statusText = row.status === 'confirmed' ? 'confirmado' : 'rechazado';
       const phase = row.phase === 'offer' ? 'la oferta' : 'la disponibilidad';
       console.log('⚠️ STEP 6: Already responded', { status: row.status, phase: row.phase });
+
+      if (row.status === 'expired') {
+        return await redirectResponse({
+          title: 'Enlace caducado',
+          status: 'warning',
+          heading: 'Solicitud caducada',
+          message: `Esta solicitud para ${phase} ya no está activa.`,
+          submessage: 'Contacta con tu responsable si necesitas un enlace nuevo.'
+        });
+      }
+
+      const statusText = row.status === 'confirmed' ? 'confirmado' : 'rechazado';
       return await redirectResponse({
         title: 'Respuesta registrada',
         status: 'warning',
@@ -628,10 +639,11 @@ serve(async (req) => {
 async function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
   // Prefer redirect if an explicit result page URL is configured and reachable.
   const configuredBase = Deno.env.get('PUBLIC_CONFIRM_RESULT_URL') || Deno.env.get('PUBLIC_RESULT_PAGE_URL') || '';
-  const defaultBase = 'https://sector-pro.work/temp_error.html';
+  const defaultBase = 'https://sector-pro.work/staffing-response';
   const baseUrl = configuredBase || defaultBase;
 
   const params = new URLSearchParams({
+    title: opts.title,
     status: opts.status,
     heading: opts.heading,
     message: opts.message,
