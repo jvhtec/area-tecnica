@@ -5,6 +5,8 @@ import { join } from 'path';
 describe('timesheet OT category regression guard', () => {
   const migrationsDir = join(__dirname, '..', '..', '..', 'supabase', 'migrations');
   const targetMigrationName = '20260303130950_house_tech_overtime_by_category.sql';
+  const computeTimesheetAmountDefinitionPattern =
+    /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:"?public"?\.)?"?compute_timesheet_amount_2025"?\s*\(/i;
   const migrationFiles = readdirSync(migrationsDir)
     .filter((f) => f.endsWith('.sql'))
     .sort();
@@ -29,7 +31,7 @@ describe('timesheet OT category regression guard', () => {
         name,
         content: readFileSync(join(migrationsDir, name), 'utf-8'),
       }))
-      .filter((m) => m.content.includes('compute_timesheet_amount_2025'));
+      .filter((m) => computeTimesheetAmountDefinitionPattern.test(m.content));
 
     expect(functionMigrations.length).toBeGreaterThan(0);
 
