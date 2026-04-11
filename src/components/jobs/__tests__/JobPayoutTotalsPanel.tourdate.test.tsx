@@ -193,4 +193,21 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
 
     expect(screen.getByText(/heredar \(ensayo\)/i)).toBeInTheDocument();
   });
+
+  it("does not crash when legacy payout data omits technician/date rate-mode handlers", () => {
+    useJobPayoutDataMock.mockReturnValue({
+      ...buildPayoutData(),
+      isAdmin: true,
+      isManager: true,
+      jobTimesheetDates: ["2026-04-10"],
+      rehearsalDateSet: new Set(["2026-04-10"]),
+      getTechRateModeDateSelection: undefined,
+      setTechnicianRateModeMutation: undefined,
+    });
+
+    renderWithProviders(<JobPayoutTotalsPanel jobId="job-tour-1" />);
+
+    expect(screen.queryByText(/tarifa por técnico y fecha/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Ana Lopez")).toBeInTheDocument();
+  });
 });
