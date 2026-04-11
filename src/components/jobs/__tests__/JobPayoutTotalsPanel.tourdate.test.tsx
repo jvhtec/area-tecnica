@@ -1,5 +1,6 @@
 import React from "react";
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { formatCurrency } from "@/lib/utils";
@@ -171,7 +172,9 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     expect(screen.queryByText(/tarifa por técnico y fecha/i)).not.toBeInTheDocument();
   });
 
-  it("shows the technician/date rate-mode section to admins only", () => {
+  it("shows the technician/date rate-mode section to admins only", async () => {
+    const user = userEvent.setup();
+
     useJobPayoutDataMock.mockReturnValue({
       ...buildPayoutData(),
       isAdmin: true,
@@ -185,6 +188,10 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     renderWithProviders(<JobPayoutTotalsPanel jobId="job-tour-1" />);
 
     expect(screen.getByText(/tarifa por técnico y fecha/i)).toBeInTheDocument();
+    expect(screen.queryByText(/heredar \(ensayo\)/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /tarifa por técnico y fecha/i }));
+
     expect(screen.getByText(/heredar \(ensayo\)/i)).toBeInTheDocument();
   });
 });

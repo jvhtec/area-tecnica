@@ -6,8 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { AlertCircle, Clock, CheckCircle, ExternalLink, Send, Receipt } from 'lucide-react';
+import { AlertCircle, ChevronDown, Clock, CheckCircle, ExternalLink, Send, Receipt } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
@@ -136,6 +137,24 @@ export function TechnicianPayoutCard({
   const approvedDays = techDaysMap.get(techId) || 0;
   const showDaysWarning = !isTourDate && totalDays > 1 && approvedDays < totalDays;
   const showAdminRateModeSection = isTourDate && isAdmin && jobTimesheetDates.length > 0;
+  const activeRateModeOverrideCount = React.useMemo(() => {
+    return jobTimesheetDates.reduce((count, dateStr) => {
+      return count + (getTechRateModeDateSelection(techId, dateStr) === 'inherit' ? 0 : 1);
+    }, 0);
+  }, [getTechRateModeDateSelection, jobTimesheetDates, techId]);
+  const [isAdminRateModeOpen, setIsAdminRateModeOpen] = React.useState(activeRateModeOverrideCount > 0);
+
+  React.useEffect(() => {
+    if (activeRateModeOverrideCount > 0) {
+      setIsAdminRateModeOpen(true);
+    }
+  }, [activeRateModeOverrideCount]);
+
+  const rateModeSummaryLabel = activeRateModeOverrideCount === 0
+    ? 'Sin excepciones'
+    : activeRateModeOverrideCount === 1
+      ? '1 excepción'
+      : `${activeRateModeOverrideCount} excepciones`;
 
   return (
     <div
@@ -354,14 +373,37 @@ export function TechnicianPayoutCard({
       {showAdminRateModeSection && (
         <>
           <Separator className="border-border" />
-          <div className="space-y-2">
-            <div>
-              <div className="text-sm font-medium">Tarifa por técnico y fecha</div>
-              <div className="text-xs text-muted-foreground">
-                Hereda la tarifa global de ensayo salvo cuando fijes una excepción para este técnico.
-              </div>
-            </div>
-            <div className="space-y-2">
+          <Collapsible
+            open={isAdminRateModeOpen}
+            onOpenChange={setIsAdminRateModeOpen}
+            className="space-y-2"
+          >
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-start justify-between gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-left transition-colors hover:bg-muted/40"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">Tarifa por técnico y fecha</div>
+                  <div className="text-xs text-muted-foreground">
+                    Hereda la tarifa global de ensayo salvo cuando fijes una excepción para este técnico.
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge variant={activeRateModeOverrideCount > 0 ? 'default' : 'secondary'} className="text-[10px]">
+                    {rateModeSummaryLabel}
+                  </Badge>
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 text-muted-foreground transition-transform',
+                      isAdminRateModeOpen && 'rotate-180',
+                    )}
+                  />
+                </div>
+              </button>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent className="space-y-2">
               {jobTimesheetDates.map((dateStr) => {
                 const selectedMode = getTechRateModeDateSelection(techId, dateStr);
                 const inheritsRehearsal = rehearsalDateSet.has(dateStr);
@@ -406,11 +448,11 @@ export function TechnicianPayoutCard({
                   </div>
                 );
               })}
-            </div>
+            </CollapsibleContent>
             {setTechnicianRateModeMutation.isPending && (
               <div className="text-xs text-muted-foreground animate-pulse">Actualizando tarifa calculada…</div>
             )}
-          </div>
+          </Collapsible>
         </>
       )}
 
