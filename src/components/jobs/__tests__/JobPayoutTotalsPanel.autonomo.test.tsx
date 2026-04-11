@@ -87,11 +87,16 @@ describe("JobPayoutTotalsPanel autonomo badge", () => {
       getTechOverride: () => undefined,
       calculatedGrandTotal: 100,
       isManager: true,
+      isAdmin: false,
+      isAdminOrAdministrative: false,
+      userDepartment: null,
       rehearsalDateSet: new Set(),
       jobTimesheetDates: [],
       allDatesMarked: false,
       toggleDateRehearsalMutation: { mutate: vi.fn(), isPending: false },
       toggleAllDatesRehearsalMutation: { mutate: vi.fn(), isPending: false },
+      getTechRateModeDateSelection: () => "inherit",
+      setTechnicianRateModeMutation: { mutate: vi.fn(), isPending: false },
       standardPayoutTotals: [],
     });
 

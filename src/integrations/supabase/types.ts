@@ -3803,6 +3803,103 @@ export type Database = {
           },
         ]
       }
+      job_technician_rate_mode_dates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date: string
+          job_id: string
+          technician_id: string
+          updated_at: string
+          updated_by: string | null
+          use_rehearsal_rate: boolean
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date: string
+          job_id: string
+          technician_id: string
+          updated_at?: string
+          updated_by?: string | null
+          use_rehearsal_rate: boolean
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          job_id?: string
+          technician_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          use_rehearsal_rate?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_technician_rate_mode_dates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_technician_rate_mode_dates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_technician_rate_mode_dates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_technician_rate_mode_dates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_staffing_summary"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_technician_rate_mode_dates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "v_job_tech_payout_2025"
+            referencedColumns: ["job_id"]
+          },
+          {
+            foreignKeyName: "job_technician_rate_mode_dates_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_technician_rate_mode_dates_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_technician_rate_mode_dates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "job_technician_rate_mode_dates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_required_roles: {
         Row: {
           created_at: string

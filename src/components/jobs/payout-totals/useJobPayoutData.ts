@@ -6,6 +6,7 @@ import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import { useJobTechnicianPayoutOverrides } from '@/hooks/useJobPayoutOverride';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
+import { useJobTechnicianRateModeDates, useSetTechnicianDateRateMode } from '@/hooks/useTechnicianRateModeDates';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { canManagePayouts, isAdministrativeDepartment } from '@/utils/permissions';
@@ -20,6 +21,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   /* ── Auth ── */
   const { userRole, userDepartment } = useOptimizedAuth();
   const isManager = canManagePayouts(userRole, userDepartment);
+  const isAdmin = userRole === 'admin';
   const isAdminOrAdministrative = userRole === 'admin' || isAdministrativeDepartment(userDepartment);
 
   /* ── Job metadata ── */
@@ -322,21 +324,18 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
       if (scheduledError) throw scheduledError;
 
-      const scheduledDates = Array.from(
-        new Set((scheduledRows || []).map((row) => row.date).filter(Boolean))
-      ) as string[];
-
-      if (scheduledDates.length > 0) {
-        return scheduledDates.sort();
-      }
-
-      const { data, error } = await supabase
+      const { data: timesheetRows, error } = await supabase
         .from('timesheets')
         .select('date')
         .eq('job_id', jobId)
         .eq('is_active', true);
       if (error) throw error;
-      const uniqueDates = Array.from(new Set((data || []).map(t => t.date).filter(Boolean))) as string[];
+
+      const uniqueDates = Array.from(new Set([
+        ...(scheduledRows || []).map((row) => row.date).filter(Boolean),
+        ...(timesheetRows || []).map((row) => row.date).filter(Boolean),
+      ])) as string[];
+
       return uniqueDates.sort();
     },
     staleTime: 60_000,
@@ -346,6 +345,33 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     () => jobTimesheetDates.length > 0 && jobTimesheetDates.every(date => rehearsalDateSet.has(date)),
     [jobTimesheetDates, rehearsalDateSet]
   );
+
+  /* ── Admin-only technician/date rate-mode exceptions ── */
+  const { data: technicianRateModeDates = [] } = useJobTechnicianRateModeDates(jobId, {
+    enabled: isAdmin && isTourDate && !jobMetaLoading,
+  });
+  const setTechnicianRateModeMutation = useSetTechnicianDateRateMode();
+
+  const technicianRateModeMap = React.useMemo(() => {
+    const map = new Map<string, Map<string, 'rehearsal' | 'standard'>>();
+
+    technicianRateModeDates.forEach((row) => {
+      if (!map.has(row.technician_id)) {
+        map.set(row.technician_id, new Map());
+      }
+
+      map.get(row.technician_id)!.set(
+        row.date,
+        row.use_rehearsal_rate ? 'rehearsal' : 'standard',
+      );
+    });
+
+    return map;
+  }, [technicianRateModeDates]);
+
+  const getTechRateModeDateSelection = React.useCallback((techId: string, date: string) => {
+    return technicianRateModeMap.get(techId)?.get(date) ?? 'inherit';
+  }, [technicianRateModeMap]);
 
   /* ── Grand total ── */
   const calculatedGrandTotal = React.useMemo(() => {
@@ -386,6 +412,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     getTechOverride,
     calculatedGrandTotal,
     isManager,
+    isAdmin,
     isAdminOrAdministrative,
     userDepartment,
     rehearsalDateSet,
@@ -393,6 +420,8 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     allDatesMarked,
     toggleDateRehearsalMutation,
     toggleAllDatesRehearsalMutation,
+    getTechRateModeDateSelection,
+    setTechnicianRateModeMutation,
     standardPayoutTotals,
   };
 }

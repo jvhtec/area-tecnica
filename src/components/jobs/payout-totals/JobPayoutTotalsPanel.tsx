@@ -234,6 +234,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             isTourDate={data.isTourDate}
             isCicloJob={isCicloJob}
             isManager={data.isManager}
+            isAdmin={data.isAdmin}
             profileMap={data.profileMap}
             autonomoMap={data.autonomoMap}
             getTechName={data.getTechName}
@@ -242,10 +243,14 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             buildFinDocUrl={data.buildFinDocUrl}
             techDaysMap={data.techDaysMap}
             techTotalDaysMap={data.techTotalDaysMap}
+            jobTimesheetDates={data.jobTimesheetDates}
+            rehearsalDateSet={data.rehearsalDateSet}
             missingEmailTechIds={actions.missingEmailTechIds}
             sendingByTech={actions.sendingByTech}
             isClosureLocked={data.isClosureLocked}
             getTechOverride={data.getTechOverride}
+            getTechRateModeDateSelection={data.getTechRateModeDateSelection}
+            setTechnicianRateModeMutation={data.setTechnicianRateModeMutation}
             overrideActorMap={data.overrideActorMap}
             editingTechId={actions.editingTechId}
             editingAmount={actions.editingAmount}

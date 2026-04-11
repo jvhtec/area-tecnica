@@ -1,12 +1,17 @@
 import React from 'react';
+import { parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, Clock, CheckCircle, ExternalLink, Send, Receipt } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
+import type { TechnicianDateRateMode } from '@/hooks/useTechnicianRateModeDates';
 import type { JobPayoutTotals } from '@/types/jobExtras';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { surface, controlButton, NON_AUTONOMO_DEDUCTION_EUR } from './types';
@@ -25,6 +30,7 @@ interface TechnicianPayoutCardProps {
   isTourDate: boolean;
   isCicloJob?: boolean;
   isManager: boolean;
+  isAdmin: boolean;
   profileMap: Map<string, TechnicianProfileWithEmail>;
   autonomoMap: Map<string, boolean | null>;
   getTechName: (id: string) => string;
@@ -33,11 +39,18 @@ interface TechnicianPayoutCardProps {
   buildFinDocUrl: (elementId: string | null | undefined) => string | null;
   techDaysMap: Map<string, number>;
   techTotalDaysMap: Map<string, number>;
+  jobTimesheetDates: string[];
+  rehearsalDateSet: Set<string>;
   missingEmailTechIds: string[];
   sendingByTech: Record<string, boolean>;
   isClosureLocked: boolean;
   /* Override */
   getTechOverride: (techId: string) => JobPayoutOverride | undefined;
+  getTechRateModeDateSelection: (techId: string, date: string) => TechnicianDateRateMode;
+  setTechnicianRateModeMutation: {
+    mutate: (args: { jobId: string; technicianId: string; date: string; mode: TechnicianDateRateMode }) => void;
+    isPending: boolean;
+  };
   overrideActorMap: Map<string, { name: string; email: string | null }>;
   editingTechId: string | null;
   editingAmount: string;
@@ -60,6 +73,7 @@ export function TechnicianPayoutCard({
   isTourDate,
   isCicloJob = false,
   isManager,
+  isAdmin,
   profileMap,
   autonomoMap,
   getTechName,
@@ -68,10 +82,14 @@ export function TechnicianPayoutCard({
   buildFinDocUrl,
   techDaysMap,
   techTotalDaysMap,
+  jobTimesheetDates,
+  rehearsalDateSet,
   missingEmailTechIds,
   sendingByTech,
   isClosureLocked,
   getTechOverride,
+  getTechRateModeDateSelection,
+  setTechnicianRateModeMutation,
   overrideActorMap,
   editingTechId,
   editingAmount,
@@ -117,6 +135,7 @@ export function TechnicianPayoutCard({
   const totalDays = techTotalDaysMap.get(techId) || 0;
   const approvedDays = techDaysMap.get(techId) || 0;
   const showDaysWarning = !isTourDate && totalDays > 1 && approvedDays < totalDays;
+  const showAdminRateModeSection = isTourDate && isAdmin && jobTimesheetDates.length > 0;
 
   return (
     <div
@@ -328,6 +347,69 @@ export function TechnicianPayoutCard({
                 ? 'Puede aplicarse compensación de combustible/conducción al usar vehículo propio. Coordina con RR. HH. por cada trabajo.'
                 : payout.vehicle_disclaimer_text}
             </span>
+          </div>
+        </>
+      )}
+
+      {showAdminRateModeSection && (
+        <>
+          <Separator className="border-border" />
+          <div className="space-y-2">
+            <div>
+              <div className="text-sm font-medium">Tarifa por técnico y fecha</div>
+              <div className="text-xs text-muted-foreground">
+                Hereda la tarifa global de ensayo salvo cuando fijes una excepción para este técnico.
+              </div>
+            </div>
+            <div className="space-y-2">
+              {jobTimesheetDates.map((dateStr) => {
+                const selectedMode = getTechRateModeDateSelection(techId, dateStr);
+                const inheritsRehearsal = rehearsalDateSet.has(dateStr);
+                const inheritedLabel = inheritsRehearsal ? 'Ensayo' : 'Estándar';
+                const dateLabel = formatInTimeZone(parseISO(dateStr), 'Europe/Madrid', 'EEE d MMM', {
+                  locale: es,
+                });
+
+                return (
+                  <div
+                    key={`${techId}-${dateStr}`}
+                    className="flex flex-col gap-2 rounded-md border border-border/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium capitalize">{dateLabel}</div>
+                      <div className="text-xs text-muted-foreground">Tarifa global: {inheritedLabel}</div>
+                    </div>
+
+                    <Select
+                      value={selectedMode}
+                      onValueChange={(nextMode) => {
+                        const mode = nextMode as TechnicianDateRateMode;
+                        if (mode === selectedMode) return;
+                        setTechnicianRateModeMutation.mutate({
+                          jobId,
+                          technicianId: techId,
+                          date: dateStr,
+                          mode,
+                        });
+                      }}
+                      disabled={setTechnicianRateModeMutation.isPending}
+                    >
+                      <SelectTrigger className="h-8 w-full text-xs sm:w-[220px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inherit">Heredar ({inheritedLabel})</SelectItem>
+                        <SelectItem value="rehearsal">Forzar ensayo</SelectItem>
+                        <SelectItem value="standard">Forzar estándar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
+            </div>
+            {setTechnicianRateModeMutation.isPending && (
+              <div className="text-xs text-muted-foreground animate-pulse">Actualizando tarifa calculada…</div>
+            )}
           </div>
         </>
       )}
