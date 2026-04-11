@@ -639,10 +639,11 @@ serve(async (req) => {
 async function redirectResponse(opts: { title: string, status: 'success'|'warning'|'error'|'neutral', heading: string, message: string, submessage?: string }) {
   // Prefer redirect if an explicit result page URL is configured and reachable.
   const configuredBase = Deno.env.get('PUBLIC_CONFIRM_RESULT_URL') || Deno.env.get('PUBLIC_RESULT_PAGE_URL') || '';
-  const defaultBase = 'https://sector-pro.work/temp_error.html';
+  const defaultBase = 'https://sector-pro.work/staffing-response';
   const baseUrl = configuredBase || defaultBase;
 
   const params = new URLSearchParams({
+    title: opts.title,
     status: opts.status,
     heading: opts.heading,
     message: opts.message,
