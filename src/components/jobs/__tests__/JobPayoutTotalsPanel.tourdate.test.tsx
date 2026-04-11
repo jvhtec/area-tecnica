@@ -64,7 +64,6 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
       },
     ],
     visibleTourQuotes: [],
-    tourTimesheetDays: new Map([["tech-1", 1]]),
     profilesWithEmail: [
       {
         id: "tech-1",

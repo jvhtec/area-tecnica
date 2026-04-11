@@ -53,7 +53,6 @@ describe("JobPayoutTotalsPanel autonomo badge", () => {
         },
       ],
       visibleTourQuotes: [],
-      tourTimesheetDays: new Map(),
       profilesWithEmail: [
         {
           id: "tech-1",
