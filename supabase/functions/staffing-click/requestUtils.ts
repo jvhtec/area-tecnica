@@ -35,7 +35,13 @@ export function parseStaffingClickRequest(input: URL | string): ParsedStaffingCl
 
   const segments = url.pathname.split("/").filter(Boolean);
   const markerIndex = segments.lastIndexOf("staffing-click");
-  if (markerIndex === -1) {
+  const pathSegments =
+    markerIndex === -1
+      ? segments.slice(0, 3)
+      : segments.slice(markerIndex + 1, markerIndex + 4);
+  const [pathAction, rid, token] = pathSegments;
+
+  if (!isStaffingClickAction(pathAction) || !rid || !token) {
     return {
       action: null,
       rid: null,
@@ -46,11 +52,10 @@ export function parseStaffingClickRequest(input: URL | string): ParsedStaffingCl
     };
   }
 
-  const [pathAction, rid, token] = segments.slice(markerIndex + 1, markerIndex + 4);
   return {
-    action: isStaffingClickAction(pathAction) ? pathAction : null,
-    rid: rid || null,
-    token: token || null,
+    action: pathAction,
+    rid,
+    token,
     exp: null,
     channelHint,
     urlStyle: "path",

@@ -32,4 +32,19 @@ describe("parseStaffingClickRequest", () => {
       urlStyle: "path",
     });
   });
+
+  it("parses the stripped runtime path format used by the edge handler", () => {
+    const parsed = parseStaffingClickRequest(
+      "https://project.functions.supabase.co/confirm/request-3/token-3",
+    );
+
+    expect(parsed).toEqual({
+      action: "confirm",
+      rid: "request-3",
+      token: "token-3",
+      exp: null,
+      channelHint: "",
+      urlStyle: "path",
+    });
+  });
 });

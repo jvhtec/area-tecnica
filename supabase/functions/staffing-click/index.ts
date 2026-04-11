@@ -152,9 +152,20 @@ serve(async (req) => {
     // Check if already responded
     console.log('🔍 STEP 6: Checking current status', { currentStatus: row.status });
     if (row.status !== 'pending') {
-      const statusText = row.status === 'confirmed' ? 'confirmado' : 'rechazado';
       const phase = row.phase === 'offer' ? 'la oferta' : 'la disponibilidad';
       console.log('⚠️ STEP 6: Already responded', { status: row.status, phase: row.phase });
+
+      if (row.status === 'expired') {
+        return await redirectResponse({
+          title: 'Enlace caducado',
+          status: 'warning',
+          heading: 'Solicitud caducada',
+          message: `Esta solicitud para ${phase} ya no está activa.`,
+          submessage: 'Contacta con tu responsable si necesitas un enlace nuevo.'
+        });
+      }
+
+      const statusText = row.status === 'confirmed' ? 'confirmado' : 'rechazado';
       return await redirectResponse({
         title: 'Respuesta registrada',
         status: 'warning',
