@@ -124,7 +124,20 @@ self.addEventListener('fetch', (event) => {
           }
           return response
         } catch {
-          // Network timed out or failed — serve cached shell to stay usable offline
+          // Network timed out — attempt one untimed fetch to get fresh HTML
+          // Only fall back to cache if that also fails
+          try {
+            const untimedResponse = await fetch(request)
+            if (untimedResponse && untimedResponse.ok) {
+              cache.put(request, untimedResponse.clone()).catch((e) => {
+                console.warn('[sw] Failed to cache HTML response from untimed fetch:', e)
+              })
+              return untimedResponse
+            }
+          } catch {
+            // Untimed fetch also failed — serve cached shell to stay usable offline
+          }
+
           const cached = await cache.match(request)
           if (cached) return cached
 
@@ -382,11 +395,11 @@ self.addEventListener('message', (event) => {
       caches.keys()
         .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
         .then(() => {
-          event.source?.postMessage({ source: 'sw', type: 'caches-cleared', ts: Date.now() })
+          event.source?.postMessage({ source: 'sw', type: 'CLEAR_CACHES_DONE', ts: Date.now() })
         })
         .catch((e) => {
           console.error('[sw] Failed to clear caches:', e)
-          event.source?.postMessage({ source: 'sw', type: 'caches-clear-error', error: String(e), ts: Date.now() })
+          event.source?.postMessage({ source: 'sw', type: 'CLEAR_CACHES_ERROR', error: String(e), ts: Date.now() })
         })
     )
   }
