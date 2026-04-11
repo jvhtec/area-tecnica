@@ -96,7 +96,6 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
     jobMeta: data.jobMeta,
     standardPayoutTotals: filteredStandardPayoutTotals,
     visibleTourQuotes: filteredVisibleTourQuotes,
-    tourTimesheetDays: data.tourTimesheetDays,
     payoutTotals: displayedPayouts,
     profilesWithEmail: filteredProfilesWithEmail,
     profileMap: data.profileMap,

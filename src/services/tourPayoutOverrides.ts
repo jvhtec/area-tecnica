@@ -7,9 +7,8 @@ import type { TourJobRateQuote } from '@/types/tourRates';
  *
  * This helper merges overrides into TourJobRateQuote objects so PDFs/emails/UI can reflect the exception.
  *
- * Note: we DO NOT overwrite `total_eur` / `total_with_extras_eur` here because tour-date quotes can be
- * treated as per-day rates in some flows (multi-day rehearsals). Consumers should use
- * `override_amount_eur` when `has_override` is true.
+ * Note: we DO NOT overwrite `total_eur` / `total_with_extras_eur` here.
+ * Consumers should use `override_amount_eur` when `has_override` is true.
  */
 export async function attachPayoutOverridesToTourQuotes(
   jobId: string,

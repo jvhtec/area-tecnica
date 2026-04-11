@@ -39,7 +39,6 @@ export interface JobPayoutData {
   isClosureLocked: boolean;
   payoutTotals: JobPayoutTotals[];
   visibleTourQuotes: TourJobRateQuote[];
-  tourTimesheetDays: Map<string, number>;
   profilesWithEmail: TechnicianProfileWithEmail[];
   profileMap: Map<string, TechnicianProfileWithEmail>;
   autonomoMap: Map<string, boolean | null>;

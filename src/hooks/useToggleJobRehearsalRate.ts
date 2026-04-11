@@ -47,7 +47,10 @@ const invalidateRehearsalRateQueries = (queryClient: QueryClient, jobId: string)
     ['job-rehearsal-dates', jobId],
     ['job-tech-payout', jobId],
     ['job-tech-days', jobId],
-    ['manager-job-quotes', jobId],
+    ['manager-job-quotes'],
+    ['tour-job-rate-quotes'],
+    ['tour-job-rate-quotes-manager'],
+    ['technician-tour-rate-quotes'],
     ['timesheets'],
     ['job-tech-payout', jobId, 'tour-timesheet-data'],
   ]);
