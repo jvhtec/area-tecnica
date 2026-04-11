@@ -28,6 +28,12 @@ export interface TourJobRateQuote {
   breakdown: {
     error?: string;
     autonomo_discount_eur?: number;
+    scheduled_days?: number;
+    rehearsal_days?: number;
+    standard_days?: number;
+    rehearsal_rate_eur?: number;
+    standard_day_rate_eur?: number;
+    forced_rehearsal_rate?: boolean;
     [key: string]: any;
   };
   // Payout override fields (when manual override is set)

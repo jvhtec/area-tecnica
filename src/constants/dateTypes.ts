@@ -158,4 +158,7 @@ export function isKeyFestivalDateType(value?: string | null): boolean {
 }
 
 export const DATE_TYPE_OPTIONS = DATE_TYPE_ORDER.map((type) => DATE_TYPE_META[type]);
-export const TOUR_DATE_TYPE_OPTIONS = TOUR_DATE_TYPE_ORDER.map((type) => DATE_TYPE_META[type]);
+export const TOUR_DATE_TYPE_OPTIONS = TOUR_DATE_TYPE_ORDER.map((type) => ({
+  ...DATE_TYPE_META[type],
+  label: DATE_TYPE_META[type].labelEs,
+}));

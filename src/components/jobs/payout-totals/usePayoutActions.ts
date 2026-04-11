@@ -12,7 +12,7 @@ import {
   type JobPayoutEmailContextResult,
   type TechnicianProfileWithEmail,
 } from '@/lib/job-payout-email';
-import { sendTourJobEmails, prepareTourJobEmailContext, adjustRehearsalQuotesForMultiDay } from '@/lib/tour-payout-email';
+import { sendTourJobEmails, prepareTourJobEmailContext } from '@/lib/tour-payout-email';
 import { generateJobPayoutPDF, generateRateQuotePDF, type TechnicianProfile } from '@/utils/rates-pdf-export';
 import type { JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
@@ -25,7 +25,6 @@ interface UsePayoutActionsArgs {
   jobMeta: JobMetadata | null | undefined;
   standardPayoutTotals: JobPayoutTotals[];
   visibleTourQuotes: TourJobRateQuote[];
-  tourTimesheetDays: Map<string, number>;
   payoutTotals: JobPayoutTotals[];
   profilesWithEmail: TechnicianProfileWithEmail[];
   profileMap: Map<string, TechnicianProfileWithEmail>;
@@ -41,7 +40,6 @@ export function usePayoutActions({
   jobMeta,
   standardPayoutTotals,
   visibleTourQuotes,
-  tourTimesheetDays,
   payoutTotals,
   profilesWithEmail,
   profileMap,
@@ -136,9 +134,8 @@ export function usePayoutActions({
       if (visibleTourQuotes.length === 0 || !jobMeta) return;
       setIsExporting(true);
       try {
-        const adjustedQuotes = adjustRehearsalQuotesForMultiDay(visibleTourQuotes, tourTimesheetDays);
         await generateRateQuotePDF(
-          adjustedQuotes,
+          visibleTourQuotes,
           {
             id: jobMeta.id,
             title: jobMeta.title,
@@ -186,7 +183,6 @@ export function usePayoutActions({
     lpoMap,
     standardPayoutTotals,
     prepareStandardContext,
-    tourTimesheetDays,
   ]);
 
   /* ── Bulk email send ── */

@@ -2,6 +2,7 @@ import type { JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import type { TechnicianProfileWithEmail, JobPayoutEmailContextResult } from '@/lib/job-payout-email';
 import type { JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
+import type { TechnicianDateRateMode } from '@/hooks/useTechnicianRateModeDates';
 
 export { NON_AUTONOMO_DEDUCTION_EUR } from '@/types/jobExtras';
 
@@ -39,7 +40,6 @@ export interface JobPayoutData {
   isClosureLocked: boolean;
   payoutTotals: JobPayoutTotals[];
   visibleTourQuotes: TourJobRateQuote[];
-  tourTimesheetDays: Map<string, number>;
   profilesWithEmail: TechnicianProfileWithEmail[];
   profileMap: Map<string, TechnicianProfileWithEmail>;
   autonomoMap: Map<string, boolean | null>;
@@ -54,6 +54,7 @@ export interface JobPayoutData {
   getTechOverride: (techId: string) => JobPayoutOverride | undefined;
   calculatedGrandTotal: number;
   isManager: boolean;
+  isAdmin: boolean;
   isAdminOrAdministrative: boolean;
   userDepartment: string | null | undefined;
   rehearsalDateSet: Set<string>;
@@ -61,6 +62,11 @@ export interface JobPayoutData {
   allDatesMarked: boolean;
   toggleDateRehearsalMutation: { mutate: (args: { jobId: string; date: string; enabled: boolean }) => void; isPending: boolean };
   toggleAllDatesRehearsalMutation: { mutate: (args: { jobId: string; dates: string[]; enabled: boolean }) => void; isPending: boolean };
+  getTechRateModeDateSelection: (techId: string, date: string) => TechnicianDateRateMode;
+  setTechnicianRateModeMutation: {
+    mutate: (args: { jobId: string; technicianId: string; date: string; mode: TechnicianDateRateMode }) => void;
+    isPending: boolean;
+  };
   standardPayoutTotals: JobPayoutTotals[];
 }
 

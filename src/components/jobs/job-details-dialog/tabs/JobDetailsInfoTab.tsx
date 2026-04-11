@@ -20,7 +20,6 @@ import { generateTimesheetPDF } from "@/utils/timesheet-pdf";
 import { generateJobPayoutPDF, generateRateQuotePDF } from "@/utils/rates-pdf-export";
 import { sendJobPayoutEmails } from "@/lib/job-payout-email";
 import { prepareJobPayoutData } from "@/lib/job-payout-data";
-import { adjustRehearsalQuotesForMultiDay } from "@/lib/tour-payout-email";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import { JobPayoutTotalsPanel } from "@/components/jobs/JobPayoutTotalsPanel";
 import { useJobApprovalStatus } from "@/hooks/useJobApprovalStatus";
@@ -605,18 +604,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       }
 
                       const payoutProfiles = Array.from(profileMap.values());
-                      const techDates = new Map<string, Set<string>>();
-                      (timesheets || []).forEach((row: any) => {
-                        if (!row?.technician_id || !row?.date) return;
-                        if (!techDates.has(row.technician_id)) techDates.set(row.technician_id, new Set());
-                        techDates.get(row.technician_id)!.add(row.date);
-                      });
-                      const daysCounts = new Map<string, number>();
-                      techDates.forEach((dates, techId) => daysCounts.set(techId, dates.size));
-                      const adjustedQuotes = adjustRehearsalQuotesForMultiDay(quotes as any, daysCounts);
                       const quotesWithOverrides = await attachPayoutOverridesToTourQuotes(
                         resolvedJobId,
-                        adjustedQuotes as any
+                        quotes as any
                       );
                       const quoteBlob = (await generateRateQuotePDF(
                         quotesWithOverrides as any,
