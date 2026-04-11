@@ -180,7 +180,9 @@
     const heading = urlParams.get('heading') || 'Respuesta registrada';
     const message = urlParams.get('message') || 'Tu respuesta ha sido procesada.';
     const submessage = urlParams.get('submessage') || 'Puedes cerrar esta pestaña.';
-    const status = urlParams.get('status') || 'neutral';
+    const allowedStatuses = ['neutral', 'success', 'warning', 'error'];
+    const requestedStatus = urlParams.get('status') || 'neutral';
+    const normalizedStatus = allowedStatuses.includes(requestedStatus) ? requestedStatus : 'neutral';
 
     document.getElementById('page-title').textContent = `${title} | ${baseTitle}`;
     document.title = `${title} | ${baseTitle}`;
@@ -189,9 +191,9 @@
     document.getElementById('submessage').textContent = submessage;
 
     const iconElement = document.getElementById('status-icon');
-    iconElement.className = `icon ${status}`;
+    iconElement.className = `icon ${normalizedStatus}`;
 
-    switch (status) {
+    switch (normalizedStatus) {
       case 'success':
         iconElement.textContent = '✓';
         break;
