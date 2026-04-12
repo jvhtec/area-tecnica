@@ -81,6 +81,7 @@ describe("JobPayoutTotalsPanel autonomo badge", () => {
       buildFinDocUrl: () => null,
       techDaysMap: new Map([["tech-1", 1]]),
       techTotalDaysMap: new Map([["tech-1", 1]]),
+      technicianTimesheetDatesMap: new Map(),
       payoutOverrides: [],
       overrideActorMap: new Map(),
       getTechOverride: () => undefined,

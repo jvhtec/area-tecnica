@@ -49,6 +49,7 @@ export interface JobPayoutData {
   buildFinDocUrl: (elementId: string | null | undefined) => string | null;
   techDaysMap: Map<string, number>;
   techTotalDaysMap: Map<string, number>;
+  technicianTimesheetDatesMap: Map<string, string[]>;
   payoutOverrides: JobPayoutOverride[];
   overrideActorMap: Map<string, { name: string; email: string | null }>;
   getTechOverride: (techId: string) => JobPayoutOverride | undefined;

@@ -243,7 +243,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             buildFinDocUrl={data.buildFinDocUrl}
             techDaysMap={data.techDaysMap}
             techTotalDaysMap={data.techTotalDaysMap}
-            jobTimesheetDates={data.jobTimesheetDates}
+            technicianTimesheetDates={data.technicianTimesheetDatesMap.get(payout.technician_id) ?? []}
             rehearsalDateSet={data.rehearsalDateSet}
             missingEmailTechIds={actions.missingEmailTechIds}
             sendingByTech={actions.sendingByTech}

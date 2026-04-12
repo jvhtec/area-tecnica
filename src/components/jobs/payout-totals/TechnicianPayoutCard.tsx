@@ -40,7 +40,7 @@ interface TechnicianPayoutCardProps {
   buildFinDocUrl: (elementId: string | null | undefined) => string | null;
   techDaysMap: Map<string, number>;
   techTotalDaysMap: Map<string, number>;
-  jobTimesheetDates: string[];
+  technicianTimesheetDates: string[];
   rehearsalDateSet: Set<string>;
   missingEmailTechIds: string[];
   sendingByTech: Record<string, boolean>;
@@ -83,7 +83,7 @@ export function TechnicianPayoutCard({
   buildFinDocUrl,
   techDaysMap,
   techTotalDaysMap,
-  jobTimesheetDates,
+  technicianTimesheetDates,
   rehearsalDateSet,
   missingEmailTechIds,
   sendingByTech,
@@ -144,12 +144,12 @@ export function TechnicianPayoutCard({
     }
     return 'inherit' as TechnicianDateRateMode;
   }, [getTechRateModeDateSelection, techId]);
-  const showAdminRateModeSection = isTourDate && canViewTechnicianRateModePanel && jobTimesheetDates.length > 0;
+  const showAdminRateModeSection = isTourDate && canViewTechnicianRateModePanel && technicianTimesheetDates.length > 0;
   const activeRateModeOverrideCount = React.useMemo(() => {
-    return jobTimesheetDates.reduce((count, dateStr) => {
+    return technicianTimesheetDates.reduce((count, dateStr) => {
       return count + (safeGetTechRateModeDateSelection(dateStr) === 'inherit' ? 0 : 1);
     }, 0);
-  }, [jobTimesheetDates, safeGetTechRateModeDateSelection]);
+  }, [technicianTimesheetDates, safeGetTechRateModeDateSelection]);
   const [isAdminRateModeOpen, setIsAdminRateModeOpen] = React.useState(activeRateModeOverrideCount > 0);
 
   React.useEffect(() => {
@@ -412,7 +412,7 @@ export function TechnicianPayoutCard({
             </CollapsibleTrigger>
 
             <CollapsibleContent className="space-y-2">
-              {jobTimesheetDates.map((dateStr) => {
+              {technicianTimesheetDates.map((dateStr) => {
                 const selectedMode = safeGetTechRateModeDateSelection(dateStr);
                 const inheritsRehearsal = rehearsalDateSet.has(dateStr);
                 const inheritedLabel = inheritsRehearsal ? 'Ensayo' : 'Estándar';
