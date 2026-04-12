@@ -14,6 +14,7 @@ import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
 import type { TechnicianDateRateMode } from '@/hooks/useTechnicianRateModeDates';
 import type { JobPayoutTotals } from '@/types/jobExtras';
+import type { TourJobRateQuote } from '@/types/tourRates';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { surface, controlButton, NON_AUTONOMO_DEDUCTION_EUR } from './types';
 
@@ -27,6 +28,7 @@ const categoryLabels: Record<string, string> = {
 
 interface TechnicianPayoutCardProps {
   payout: JobPayoutTotals;
+  tourQuote?: TourJobRateQuote;
   jobId: string;
   isTourDate: boolean;
   isCicloJob?: boolean;
@@ -70,6 +72,7 @@ interface TechnicianPayoutCardProps {
 
 export function TechnicianPayoutCard({
   payout,
+  tourQuote,
   jobId,
   isTourDate,
   isCicloJob = false,
@@ -163,6 +166,28 @@ export function TechnicianPayoutCard({
     : activeRateModeOverrideCount === 1
       ? '1 excepción'
       : `${activeRateModeOverrideCount} excepciones`;
+
+  const quoteBreakdown = tourQuote?.breakdown ?? null;
+  const rehearsalDays = Number(quoteBreakdown?.rehearsal_days ?? 0);
+  const standardDays = Number(quoteBreakdown?.standard_days ?? 0);
+  const rehearsalDayRate = Number(quoteBreakdown?.rehearsal_rate_eur ?? 0);
+  const standardDayRate = Number(quoteBreakdown?.standard_day_rate_eur ?? 0);
+  const multipliedStandardDays = Number(quoteBreakdown?.multiplied_standard_days ?? 0);
+  const standardMultiplierBonus = Number(quoteBreakdown?.standard_multiplier_bonus_eur ?? 0);
+  const multiplierFactor = Number(
+    quoteBreakdown?.per_job_multiplier
+      ?? tourQuote?.per_job_multiplier
+      ?? tourQuote?.multiplier
+      ?? 1,
+  );
+  const showTourRateBreakdown =
+    isTourDate && !!tourQuote && (rehearsalDays > 0 || standardDays > 0 || standardMultiplierBonus > 0);
+  const multiplierFactorLabel = multiplierFactor.toLocaleString('es-ES', {
+    minimumFractionDigits: Number.isInteger(multiplierFactor) ? 0 : 1,
+    maximumFractionDigits: 3,
+  });
+  const multiplierDaysLabel =
+    multipliedStandardDays === 1 ? '1 día' : `${multipliedStandardDays} días`;
 
   return (
     <div
@@ -300,6 +325,33 @@ export function TechnicianPayoutCard({
             <span>
               Solo {approvedDays} de {totalDays} partes aprobados — el total puede no reflejar todos los días asignados
             </span>
+          </div>
+        )}
+
+        {showTourRateBreakdown && (
+          <div className="ml-6 space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+            {rehearsalDays > 0 && (
+              <div className="flex justify-between gap-3 text-xs text-muted-foreground">
+                <span>Ensayo: {rehearsalDays} x {formatCurrency(rehearsalDayRate)}</span>
+                <span>{formatCurrency(rehearsalDays * rehearsalDayRate)}</span>
+              </div>
+            )}
+
+            {standardDays > 0 && (
+              <div className="flex justify-between gap-3 text-xs text-muted-foreground">
+                <span>Estándar: {standardDays} x {formatCurrency(standardDayRate)}</span>
+                <span>{formatCurrency(standardDays * standardDayRate)}</span>
+              </div>
+            )}
+
+            {standardMultiplierBonus > 0 && (
+              <div className="flex justify-between gap-3 text-xs text-muted-foreground">
+                <span>
+                  Multiplicador gira: {multiplierDaysLabel} con factor {multiplierFactorLabel}x
+                </span>
+                <span>+{formatCurrency(standardMultiplierBonus)}</span>
+              </div>
+            )}
           </div>
         )}
 

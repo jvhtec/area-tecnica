@@ -54,6 +54,7 @@ interface JobExpensesPanelProps {
   jobTitle?: string;
   technicians: TechnicianOption[];
   canManage: boolean;
+  visibleTechnicianIds?: string[];
 }
 
 interface ExpenseRow {
@@ -161,9 +162,14 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
   jobTitle,
   technicians,
   canManage,
+  visibleTechnicianIds,
 }) => {
   const queryClient = useQueryClient();
   const technicianMap = React.useMemo(() => new Map(technicians.map((tech) => [tech.id, tech.name])), [technicians]);
+  const visibleTechnicianIdSet = React.useMemo(
+    () => new Set(visibleTechnicianIds ?? technicians.map((tech) => tech.id)),
+    [technicians, visibleTechnicianIds]
+  );
 
   const {
     data: expenseCategories = [],
@@ -288,6 +294,16 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
     [technicianMap]
   );
 
+  const visibleExpenses = React.useMemo(
+    () => expenses.filter((expense) => visibleTechnicianIdSet.has(expense.technician_id)),
+    [expenses, visibleTechnicianIdSet]
+  );
+
+  const visiblePermissions = React.useMemo(
+    () => permissions.filter((permission) => visibleTechnicianIdSet.has(permission.technician_id)),
+    [permissions, visibleTechnicianIdSet]
+  );
+
   const groupedByStatus = React.useMemo(() => {
     const initial = STATUS_ORDER.reduce<Record<ExpenseStatus, Map<string, ExpenseRow[]>>>(
       (acc, status) => {
@@ -302,7 +318,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
       }
     );
 
-    expenses.forEach((expense) => {
+    visibleExpenses.forEach((expense) => {
       const status = expense.status ?? 'draft';
       const group = initial[status];
       const list = group.get(expense.technician_id) ?? [];
@@ -311,10 +327,10 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
     });
 
     return initial;
-  }, [expenses]);
+  }, [visibleExpenses]);
 
   const aggregatedTotals = React.useMemo(() => {
-    return expenses.reduce(
+    return visibleExpenses.reduce(
       (acc, expense) => {
         acc.count += 1;
         acc.amount += expense.amount_eur;
@@ -329,7 +345,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
       },
       { count: 0, amount: 0, pendingCount: 0, pendingAmount: 0, approvedAmount: 0 }
     );
-  }, [expenses]);
+  }, [visibleExpenses]);
 
   const resetPermissionForm = React.useCallback(() => {
     setPermissionForm({
@@ -635,11 +651,11 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
 
             <div className="space-y-3">
               <h4 className="font-semibold text-sm">Permisos actuales</h4>
-              {permissions.length === 0 ? (
+              {visiblePermissions.length === 0 ? (
                 <p className="text-xs text-muted-foreground">Todavía no hay permisos configurados para este trabajo.</p>
               ) : (
                 <div className="space-y-2">
-                  {permissions.map((permission) => (
+                  {visiblePermissions.map((permission) => (
                     <div
                       key={permission.id}
                       className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 p-3 rounded-lg border border-border bg-muted/30"

@@ -13,6 +13,7 @@ interface JobExtrasManagementProps {
   jobId: string;
   isManager?: boolean;
   technicianId?: string; // when provided (non-manager), restrict view to this tech
+  visibleTechnicianIds?: string[];
 }
 
 interface JobAssignment {
@@ -36,9 +37,19 @@ const surface = "bg-muted/30 border-border";
 const subtle = "text-muted-foreground";
 const pill = "bg-primary/5 border-primary/10 text-primary dark:text-primary-foreground";
 
-export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: JobExtrasManagementProps) => {
+export const JobExtrasManagement = ({
+  jobId,
+  isManager = false,
+  technicianId,
+  visibleTechnicianIds,
+}: JobExtrasManagementProps) => {
+  const visibleTechnicianIdSet = useMemo(
+    () => new Set(visibleTechnicianIds ?? []),
+    [visibleTechnicianIds]
+  );
+
   const { data: assignments, isLoading: assignmentsLoading } = useQuery({
-    queryKey: ['job-assignments', jobId],
+    queryKey: ['job-assignments', jobId, technicianId, visibleTechnicianIds?.join(',') ?? 'all'],
     queryFn: async () => {
       let query = supabase
         .from('job_assignments')
@@ -54,6 +65,8 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
         .eq('job_id', jobId);
       if (technicianId && !isManager) {
         query = query.eq('technician_id', technicianId);
+      } else if (isManager && visibleTechnicianIds && visibleTechnicianIds.length > 0) {
+        query = query.in('technician_id', visibleTechnicianIds);
       }
       const { data, error } = await query;
 
@@ -64,9 +77,18 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
   });
 
   // Fetch custom travel rates for all assigned technicians
+  const visibleAssignments = useMemo(
+    () => (assignments ?? []).filter((assignment) => {
+      if (technicianId) return assignment.technician_id === technicianId;
+      if (!visibleTechnicianIds) return true;
+      return visibleTechnicianIdSet.has(assignment.technician_id);
+    }),
+    [assignments, technicianId, visibleTechnicianIds, visibleTechnicianIdSet]
+  );
+
   const techIds = useMemo(
-    () => (assignments?.map(a => a.technician_id) ?? []).sort(),
-    [assignments]
+    () => visibleAssignments.map((assignment) => assignment.technician_id).sort(),
+    [visibleAssignments]
   );
   const techIdsKey = techIds.join(',');
   const { data: customTravelRates, isLoading: customTravelRatesLoading } = useQuery({
@@ -104,9 +126,6 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
     );
   }
 
-  // When not manager and technicianId provided, filter assignments to that technician only
-  const visibleAssignments = assignments?.filter(a => !technicianId || a.technician_id === technicianId) || [];
-
   if (assignmentsLoading || payoutLoading) {
     // covered above, but keep logic order consistent
   }
@@ -129,7 +148,12 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
     );
   }
 
-  const totalExtrasAmount = (isManager ? (payoutTotals?.reduce((sum, payout) => sum + (payout.extras_total_eur || 0), 0) || 0) : (payoutTotals?.[0]?.extras_total_eur || 0));
+  const visiblePayoutTotals = (payoutTotals ?? []).filter((payout) =>
+    visibleAssignments.some((assignment) => assignment.technician_id === payout.technician_id)
+  );
+  const totalExtrasAmount = isManager
+    ? visiblePayoutTotals.reduce((sum, payout) => sum + (payout.extras_total_eur || 0), 0)
+    : (visiblePayoutTotals[0]?.extras_total_eur || 0);
 
   return (
     <Card className={cardBase}>
@@ -192,7 +216,7 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
                 showVehicleDisclaimer={technicianPayout?.vehicle_disclaimer || false}
               />
 
-              {index < assignments.length - 1 && <Separator className="mt-4 sm:mt-6" />}
+              {index < visibleAssignments.length - 1 && <Separator className="mt-4 sm:mt-6" />}
             </div>
           );
         })}
