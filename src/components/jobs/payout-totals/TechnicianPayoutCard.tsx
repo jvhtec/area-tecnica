@@ -175,7 +175,10 @@ export function TechnicianPayoutCard({
   const multipliedStandardDays = Number(quoteBreakdown?.multiplied_standard_days ?? 0);
   const standardMultiplierBonus = Number(quoteBreakdown?.standard_multiplier_bonus_eur ?? 0);
   const multiplierFactor = Number(
-    quoteBreakdown?.per_job_multiplier ?? tourQuote?.per_job_multiplier ?? 1,
+    quoteBreakdown?.per_job_multiplier
+      ?? tourQuote?.per_job_multiplier
+      ?? tourQuote?.multiplier
+      ?? 1,
   );
   const showTourRateBreakdown =
     isTourDate && !!tourQuote && (rehearsalDays > 0 || standardDays > 0 || standardMultiplierBonus > 0);

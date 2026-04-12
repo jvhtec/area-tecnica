@@ -22,6 +22,7 @@ import { JobDetailsWeatherTab } from "./job-details-dialog/tabs/JobDetailsWeathe
 import { StaffingOrchestratorPanel } from "@/components/matrix/StaffingOrchestratorPanel";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
 import { canManagePayouts } from "@/utils/permissions";
+import { getVisibleFinancialTechnicianIds } from "@/components/jobs/financialViewerScope";
 
 export { enrichTimesheetsWithProfiles } from "./job-details-dialog/enrichTimesheetsWithProfiles";
 
@@ -118,6 +119,23 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name: name || id }));
   }, [jobDetails?.job_assignments, jobDetails?.timesheets]);
+
+  const visibleFinancialTechnicianIds = useMemo(() => {
+    const assignmentTechnicians = (jobDetails?.job_assignments ?? [])
+      .map((assignment: any) => ({
+        id: assignment.technician_id as string,
+        department: assignment.profiles?.department as string | null | undefined,
+      }))
+      .filter((assignment: { id?: string }) => Boolean(assignment.id));
+
+    return getVisibleFinancialTechnicianIds(assignmentTechnicians, userRole, userDepartment);
+  }, [jobDetails?.job_assignments, userDepartment, userRole]);
+
+  const visibleExpenseTechnicianOptions = useMemo(() => {
+    if (!visibleFinancialTechnicianIds) return expenseTechnicianOptions;
+    const visibleTechnicianIdSet = new Set(visibleFinancialTechnicianIds);
+    return expenseTechnicianOptions.filter((technician) => visibleTechnicianIdSet.has(technician.id));
+  }, [expenseTechnicianOptions, visibleFinancialTechnicianIds]);
 
   useEffect(() => {
     if (!showTourRatesTab && selectedTab === "tour-rates") {
@@ -314,7 +332,12 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
               {!isDryhire && showExtrasTab && (
                 <TabsContent value="extras" className="space-y-4 min-w-0 overflow-x-hidden">
-                  <JobExtrasManagement jobId={resolvedJobId} isManager={isManager} technicianId={isManager ? undefined : user?.id || undefined} />
+                  <JobExtrasManagement
+                    jobId={resolvedJobId}
+                    isManager={isManager}
+                    technicianId={isManager ? undefined : user?.id || undefined}
+                    visibleTechnicianIds={visibleFinancialTechnicianIds ?? undefined}
+                  />
                 </TabsContent>
               )}
 
@@ -323,8 +346,9 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
                   <JobExpensesPanel
                     jobId={resolvedJobId || job.id}
                     jobTitle={jobDetails?.title || job?.title}
-                    technicians={expenseTechnicianOptions}
+                    technicians={visibleExpenseTechnicianOptions}
                     canManage={canManageExpenses}
+                    visibleTechnicianIds={visibleFinancialTechnicianIds ?? undefined}
                   />
                 </TabsContent>
               )}

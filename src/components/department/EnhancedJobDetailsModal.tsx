@@ -22,6 +22,7 @@ import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { canManagePayouts } from '@/utils/permissions';
+import { getVisibleFinancialTechnicianIds } from '@/components/jobs/financialViewerScope';
 
 interface EnhancedJobDetailsModalProps {
     theme: {
@@ -52,6 +53,7 @@ interface StaffAssignment {
         first_name: string;
         last_name: string;
         email?: string;
+        department?: string | null;
     } | null;
 }
 
@@ -107,7 +109,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
           sound_role,
           lights_role,
           video_role,
-          technician:profiles(id, first_name, last_name, email)
+          technician:profiles(id, first_name, last_name, email, department)
         `)
                 .eq('job_id', job.id)
                 .eq('status', 'confirmed');
@@ -175,6 +177,17 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
             setActiveTab('Info');
         }
     }, [resolvedJobId]);
+
+    const visibleFinancialTechnicianIds = React.useMemo(() => {
+        const technicians = (staffAssignments as StaffAssignment[])
+            .map((assignment) => ({
+                id: assignment.technician?.id ?? '',
+                department: assignment.technician?.department ?? null,
+            }))
+            .filter((assignment) => Boolean(assignment.id));
+
+        return getVisibleFinancialTechnicianIds(technicians, userRole, userDepartment);
+    }, [staffAssignments, userDepartment, userRole]);
 
     const invalidateJobQueries = () => {
         if (!resolvedJobId) return;
@@ -895,7 +908,11 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                             </div>
 
                             <div className={`${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 w-full min-w-0 overflow-hidden`}>
-                                <JobExtrasManagement jobId={resolvedJobId} />
+                                <JobExtrasManagement
+                                    jobId={resolvedJobId}
+                                    isManager={isManager}
+                                    visibleTechnicianIds={visibleFinancialTechnicianIds ?? undefined}
+                                />
                             </div>
                         </div>
                     )}
