@@ -136,7 +136,7 @@ export function TechnicianPayoutCard({
   const totalDays = techTotalDaysMap.get(techId) || 0;
   const approvedDays = techDaysMap.get(techId) || 0;
   const showDaysWarning = !isTourDate && totalDays > 1 && approvedDays < totalDays;
-  const canManageTechRateModes =
+  const hasRateModeHandlers =
     typeof getTechRateModeDateSelection === 'function' && !!setTechnicianRateModeMutation;
   const safeGetTechRateModeDateSelection = React.useCallback((date: string) => {
     if (typeof getTechRateModeDateSelection === 'function') {
@@ -144,7 +144,7 @@ export function TechnicianPayoutCard({
     }
     return 'inherit' as TechnicianDateRateMode;
   }, [getTechRateModeDateSelection, techId]);
-  const showAdminRateModeSection = isTourDate && isAdmin && canManageTechRateModes && jobTimesheetDates.length > 0;
+  const showAdminRateModeSection = isTourDate && isAdmin && jobTimesheetDates.length > 0;
   const activeRateModeOverrideCount = React.useMemo(() => {
     return jobTimesheetDates.reduce((count, dateStr) => {
       return count + (safeGetTechRateModeDateSelection(dateStr) === 'inherit' ? 0 : 1);
@@ -443,7 +443,7 @@ export function TechnicianPayoutCard({
                           mode,
                         });
                       }}
-                      disabled={setTechnicianRateModeMutation?.isPending ?? false}
+                      disabled={!hasRateModeHandlers || (setTechnicianRateModeMutation?.isPending ?? false)}
                     >
                       <SelectTrigger className="h-8 w-full text-xs sm:w-[220px]">
                         <SelectValue />
@@ -460,6 +460,11 @@ export function TechnicianPayoutCard({
             </CollapsibleContent>
             {setTechnicianRateModeMutation?.isPending && (
               <div className="text-xs text-muted-foreground animate-pulse">Actualizando tarifa calculada…</div>
+            )}
+            {!hasRateModeHandlers && (
+              <div className="text-xs text-muted-foreground">
+                La edición de excepciones no está disponible en esta carga. Recarga la vista para sincronizar los controles.
+              </div>
             )}
           </Collapsible>
         </>

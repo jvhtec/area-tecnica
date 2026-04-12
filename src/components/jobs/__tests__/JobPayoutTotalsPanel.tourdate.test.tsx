@@ -194,7 +194,7 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     expect(screen.getByText(/heredar \(ensayo\)/i)).toBeInTheDocument();
   });
 
-  it("does not crash when legacy payout data omits technician/date rate-mode handlers", () => {
+  it("keeps the admin panel visible when legacy payout data omits technician/date rate-mode handlers", () => {
     useJobPayoutDataMock.mockReturnValue({
       ...buildPayoutData(),
       isAdmin: true,
@@ -207,7 +207,7 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
 
     renderWithProviders(<JobPayoutTotalsPanel jobId="job-tour-1" />);
 
-    expect(screen.queryByText(/tarifa por técnico y fecha/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/tarifa por técnico y fecha/i)).toBeInTheDocument();
     expect(screen.getByText("Ana Lopez")).toBeInTheDocument();
   });
 });
