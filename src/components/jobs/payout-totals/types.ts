@@ -55,6 +55,7 @@ export interface JobPayoutData {
   calculatedGrandTotal: number;
   isManager: boolean;
   isAdmin: boolean;
+  canViewTechnicianRateModePanel: boolean;
   isAdminOrAdministrative: boolean;
   userDepartment: string | null | undefined;
   rehearsalDateSet: Set<string>;

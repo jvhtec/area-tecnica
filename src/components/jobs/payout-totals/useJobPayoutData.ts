@@ -347,10 +347,16 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   );
 
   /* ── Admin-only technician/date rate-mode exceptions ── */
-  const { data: technicianRateModeDates = [] } = useJobTechnicianRateModeDates(jobId, {
-    enabled: isAdmin && isTourDate && !jobMetaLoading,
+  const shouldProbeTechnicianRateModes =
+    !!jobId && isTourDate && !jobMetaLoading && (isManager || isAdminOrAdministrative);
+  const {
+    data: technicianRateModeDates = [],
+    error: technicianRateModeError,
+  } = useJobTechnicianRateModeDates(jobId, {
+    enabled: shouldProbeTechnicianRateModes,
   });
   const setTechnicianRateModeMutation = useSetTechnicianDateRateMode();
+  const canViewTechnicianRateModePanel = shouldProbeTechnicianRateModes && !technicianRateModeError;
 
   const technicianRateModeMap = React.useMemo(() => {
     const map = new Map<string, Map<string, 'rehearsal' | 'standard'>>();
@@ -413,6 +419,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     calculatedGrandTotal,
     isManager,
     isAdmin,
+    canViewTechnicianRateModePanel,
     isAdminOrAdministrative,
     userDepartment,
     rehearsalDateSet,

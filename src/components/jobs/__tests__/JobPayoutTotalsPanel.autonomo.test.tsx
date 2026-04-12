@@ -87,6 +87,7 @@ describe("JobPayoutTotalsPanel autonomo badge", () => {
       calculatedGrandTotal: 100,
       isManager: true,
       isAdmin: false,
+      canViewTechnicianRateModePanel: false,
       isAdminOrAdministrative: false,
       userDepartment: null,
       rehearsalDateSet: new Set(),

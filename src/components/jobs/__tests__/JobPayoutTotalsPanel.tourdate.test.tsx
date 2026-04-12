@@ -98,6 +98,7 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     calculatedGrandTotal: 175,
     isManager: true,
     isAdmin: false,
+    canViewTechnicianRateModePanel: false,
     isAdminOrAdministrative: false,
     userDepartment: null,
     rehearsalDateSet: new Set<string>(),
@@ -161,6 +162,7 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     useJobPayoutDataMock.mockReturnValue({
       ...buildPayoutData(),
       isAdmin: false,
+      canViewTechnicianRateModePanel: false,
       isManager: true,
       jobTimesheetDates: ["2026-04-10"],
       rehearsalDateSet: new Set(["2026-04-10"]),
@@ -177,6 +179,7 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     useJobPayoutDataMock.mockReturnValue({
       ...buildPayoutData(),
       isAdmin: true,
+      canViewTechnicianRateModePanel: true,
       isManager: true,
       jobTimesheetDates: ["2026-04-10"],
       rehearsalDateSet: new Set(["2026-04-10"]),
@@ -198,6 +201,7 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     useJobPayoutDataMock.mockReturnValue({
       ...buildPayoutData(),
       isAdmin: true,
+      canViewTechnicianRateModePanel: true,
       isManager: true,
       jobTimesheetDates: ["2026-04-10"],
       rehearsalDateSet: new Set(["2026-04-10"]),

@@ -31,7 +31,7 @@ interface TechnicianPayoutCardProps {
   isTourDate: boolean;
   isCicloJob?: boolean;
   isManager: boolean;
-  isAdmin: boolean;
+  canViewTechnicianRateModePanel: boolean;
   profileMap: Map<string, TechnicianProfileWithEmail>;
   autonomoMap: Map<string, boolean | null>;
   getTechName: (id: string) => string;
@@ -74,7 +74,7 @@ export function TechnicianPayoutCard({
   isTourDate,
   isCicloJob = false,
   isManager,
-  isAdmin,
+  canViewTechnicianRateModePanel,
   profileMap,
   autonomoMap,
   getTechName,
@@ -144,7 +144,7 @@ export function TechnicianPayoutCard({
     }
     return 'inherit' as TechnicianDateRateMode;
   }, [getTechRateModeDateSelection, techId]);
-  const showAdminRateModeSection = isTourDate && isAdmin && jobTimesheetDates.length > 0;
+  const showAdminRateModeSection = isTourDate && canViewTechnicianRateModePanel && jobTimesheetDates.length > 0;
   const activeRateModeOverrideCount = React.useMemo(() => {
     return jobTimesheetDates.reduce((count, dateStr) => {
       return count + (safeGetTechRateModeDateSelection(dateStr) === 'inherit' ? 0 : 1);

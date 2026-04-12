@@ -234,7 +234,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             isTourDate={data.isTourDate}
             isCicloJob={isCicloJob}
             isManager={data.isManager}
-            isAdmin={data.isAdmin}
+            canViewTechnicianRateModePanel={data.canViewTechnicianRateModePanel}
             profileMap={data.profileMap}
             autonomoMap={data.autonomoMap}
             getTechName={data.getTechName}
