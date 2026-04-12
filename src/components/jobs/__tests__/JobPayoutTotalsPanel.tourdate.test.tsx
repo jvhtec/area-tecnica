@@ -239,4 +239,58 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     expect(screen.getByText(/vie 10 abr/i)).toBeInTheDocument();
     expect(screen.queryByText(/jue 9 abr/i)).not.toBeInTheDocument();
   });
+
+  it("shows the multiplier breakdown from the tour quote when a standard-rate bonus applies", () => {
+    useJobPayoutDataMock.mockReturnValue({
+      ...buildPayoutData(),
+      payoutTotals: [
+        {
+          technician_id: "tech-1",
+          job_id: "job-tour-1",
+          timesheets_total_eur: 1200,
+          extras_total_eur: 0,
+          total_eur: 1200,
+          payout_approved: true,
+          extras_breakdown: { items: [], total_eur: 0 },
+          vehicle_disclaimer: false,
+          vehicle_disclaimer_text: null,
+          expenses_total_eur: 0,
+          expenses_breakdown: [],
+        },
+      ],
+      visibleTourQuotes: [
+        {
+          job_id: "job-tour-1",
+          technician_id: "tech-1",
+          start_time: "2026-04-08T08:00:00Z",
+          end_time: "2026-04-15T23:59:00Z",
+          job_type: "tourdate",
+          tour_id: "tour-1",
+          title: "Tour Date",
+          is_house_tech: false,
+          is_tour_team_member: true,
+          category: "responsable",
+          base_day_eur: 1200,
+          week_count: 1,
+          multiplier: 1.5,
+          per_job_multiplier: 1.5,
+          iso_year: 2026,
+          iso_week: 15,
+          total_eur: 1200,
+          breakdown: {
+            standard_days: 2,
+            standard_day_rate_eur: 480,
+            multiplied_standard_days: 1,
+            standard_multiplier_bonus_eur: 240,
+          },
+        },
+      ],
+    });
+
+    renderWithProviders(<JobPayoutTotalsPanel jobId="job-tour-1" />);
+
+    expect(screen.getByText(/estándar: 2 x/i)).toBeInTheDocument();
+    expect(screen.getByText(/multiplicador gira: 1 día con factor 1,5x/i)).toBeInTheDocument();
+    expect(screen.getByText(/\+240/)).toBeInTheDocument();
+  });
 });

@@ -33,6 +33,8 @@ export interface TourJobRateQuote {
     standard_days?: number;
     rehearsal_rate_eur?: number;
     standard_day_rate_eur?: number;
+    multiplied_standard_days?: number;
+    standard_multiplier_bonus_eur?: number;
     forced_rehearsal_rate?: boolean;
     [key: string]: any;
   };

@@ -14,6 +14,7 @@ import { TechnicianPayoutCard } from './TechnicianPayoutCard';
 import { PayoutGrandTotal } from './PayoutGrandTotal';
 import { cardBase, subtleText, NON_AUTONOMO_DEDUCTION_EUR } from './types';
 import type { JobPayoutTotalsPanelProps } from './types';
+import type { TourJobRateQuote } from '@/types/tourRates';
 
 export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPanelProps) {
   const data = useJobPayoutData(jobId, technicianId);
@@ -72,6 +73,11 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
   const filteredPayoutOverrides = React.useMemo(
     () => data.payoutOverrides.filter(o => displayedTechIds.has(o.technician_id)),
     [data.payoutOverrides, displayedTechIds]
+  );
+
+  const visibleTourQuoteMap = React.useMemo(
+    () => new Map(data.visibleTourQuotes.map((quote) => [quote.technician_id, quote] as const)),
+    [data.visibleTourQuotes]
   );
 
   /* ── Grand total for filtered view ── */
@@ -230,6 +236,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
           <TechnicianPayoutCard
             key={payout.technician_id}
             payout={payout}
+            tourQuote={visibleTourQuoteMap.get(payout.technician_id) as TourJobRateQuote | undefined}
             jobId={jobId}
             isTourDate={data.isTourDate}
             isCicloJob={isCicloJob}
