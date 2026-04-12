@@ -193,7 +193,7 @@ BEGIN
   END IF;
 
   IF tour_group IS NOT NULL THEN
-    SELECT COALESCE(ja.use_tour_multipliers, FALSE)
+    SELECT COALESCE(bool_or(ja.use_tour_multipliers), FALSE)
     INTO has_override
     FROM public.job_assignments ja
     WHERE ja.job_id = _job_id AND ja.technician_id = _tech_id;
@@ -277,7 +277,9 @@ BEGIN
       END
     INTO cat
     FROM public.job_assignments
-    WHERE job_id = _job_id AND technician_id = _tech_id;
+    WHERE job_id = _job_id AND technician_id = _tech_id
+    ORDER BY assigned_at DESC
+    LIMIT 1;
 
     IF cat IS NULL THEN
       SELECT default_timesheet_category INTO cat
