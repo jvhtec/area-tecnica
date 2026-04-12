@@ -31,7 +31,7 @@ interface TechnicianPayoutCardProps {
   isTourDate: boolean;
   isCicloJob?: boolean;
   isManager: boolean;
-  isAdmin: boolean;
+  canViewTechnicianRateModePanel: boolean;
   profileMap: Map<string, TechnicianProfileWithEmail>;
   autonomoMap: Map<string, boolean | null>;
   getTechName: (id: string) => string;
@@ -40,15 +40,15 @@ interface TechnicianPayoutCardProps {
   buildFinDocUrl: (elementId: string | null | undefined) => string | null;
   techDaysMap: Map<string, number>;
   techTotalDaysMap: Map<string, number>;
-  jobTimesheetDates: string[];
+  technicianTimesheetDates: string[];
   rehearsalDateSet: Set<string>;
   missingEmailTechIds: string[];
   sendingByTech: Record<string, boolean>;
   isClosureLocked: boolean;
   /* Override */
   getTechOverride: (techId: string) => JobPayoutOverride | undefined;
-  getTechRateModeDateSelection: (techId: string, date: string) => TechnicianDateRateMode;
-  setTechnicianRateModeMutation: {
+  getTechRateModeDateSelection?: (techId: string, date: string) => TechnicianDateRateMode;
+  setTechnicianRateModeMutation?: {
     mutate: (args: { jobId: string; technicianId: string; date: string; mode: TechnicianDateRateMode }) => void;
     isPending: boolean;
   };
@@ -74,7 +74,7 @@ export function TechnicianPayoutCard({
   isTourDate,
   isCicloJob = false,
   isManager,
-  isAdmin,
+  canViewTechnicianRateModePanel,
   profileMap,
   autonomoMap,
   getTechName,
@@ -83,7 +83,7 @@ export function TechnicianPayoutCard({
   buildFinDocUrl,
   techDaysMap,
   techTotalDaysMap,
-  jobTimesheetDates,
+  technicianTimesheetDates,
   rehearsalDateSet,
   missingEmailTechIds,
   sendingByTech,
@@ -136,12 +136,20 @@ export function TechnicianPayoutCard({
   const totalDays = techTotalDaysMap.get(techId) || 0;
   const approvedDays = techDaysMap.get(techId) || 0;
   const showDaysWarning = !isTourDate && totalDays > 1 && approvedDays < totalDays;
-  const showAdminRateModeSection = isTourDate && isAdmin && jobTimesheetDates.length > 0;
+  const hasRateModeHandlers =
+    typeof getTechRateModeDateSelection === 'function' && !!setTechnicianRateModeMutation;
+  const safeGetTechRateModeDateSelection = React.useCallback((date: string) => {
+    if (typeof getTechRateModeDateSelection === 'function') {
+      return getTechRateModeDateSelection(techId, date);
+    }
+    return 'inherit' as TechnicianDateRateMode;
+  }, [getTechRateModeDateSelection, techId]);
+  const showAdminRateModeSection = isTourDate && canViewTechnicianRateModePanel && technicianTimesheetDates.length > 0;
   const activeRateModeOverrideCount = React.useMemo(() => {
-    return jobTimesheetDates.reduce((count, dateStr) => {
-      return count + (getTechRateModeDateSelection(techId, dateStr) === 'inherit' ? 0 : 1);
+    return technicianTimesheetDates.reduce((count, dateStr) => {
+      return count + (safeGetTechRateModeDateSelection(dateStr) === 'inherit' ? 0 : 1);
     }, 0);
-  }, [getTechRateModeDateSelection, jobTimesheetDates, techId]);
+  }, [technicianTimesheetDates, safeGetTechRateModeDateSelection]);
   const [isAdminRateModeOpen, setIsAdminRateModeOpen] = React.useState(activeRateModeOverrideCount > 0);
 
   React.useEffect(() => {
@@ -404,8 +412,8 @@ export function TechnicianPayoutCard({
             </CollapsibleTrigger>
 
             <CollapsibleContent className="space-y-2">
-              {jobTimesheetDates.map((dateStr) => {
-                const selectedMode = getTechRateModeDateSelection(techId, dateStr);
+              {technicianTimesheetDates.map((dateStr) => {
+                const selectedMode = safeGetTechRateModeDateSelection(dateStr);
                 const inheritsRehearsal = rehearsalDateSet.has(dateStr);
                 const inheritedLabel = inheritsRehearsal ? 'Ensayo' : 'Estándar';
                 const dateLabel = formatInTimeZone(parseISO(dateStr), 'Europe/Madrid', 'EEE d MMM', {
@@ -427,6 +435,7 @@ export function TechnicianPayoutCard({
                       onValueChange={(nextMode) => {
                         const mode = nextMode as TechnicianDateRateMode;
                         if (mode === selectedMode) return;
+                        if (!setTechnicianRateModeMutation) return;
                         setTechnicianRateModeMutation.mutate({
                           jobId,
                           technicianId: techId,
@@ -434,7 +443,7 @@ export function TechnicianPayoutCard({
                           mode,
                         });
                       }}
-                      disabled={setTechnicianRateModeMutation.isPending}
+                      disabled={!hasRateModeHandlers || (setTechnicianRateModeMutation?.isPending ?? false)}
                     >
                       <SelectTrigger className="h-8 w-full text-xs sm:w-[220px]">
                         <SelectValue />
@@ -449,8 +458,13 @@ export function TechnicianPayoutCard({
                 );
               })}
             </CollapsibleContent>
-            {setTechnicianRateModeMutation.isPending && (
+            {setTechnicianRateModeMutation?.isPending && (
               <div className="text-xs text-muted-foreground animate-pulse">Actualizando tarifa calculada…</div>
+            )}
+            {!hasRateModeHandlers && (
+              <div className="text-xs text-muted-foreground">
+                La edición de excepciones no está disponible en esta carga. Recarga la vista para sincronizar los controles.
+              </div>
             )}
           </Collapsible>
         </>

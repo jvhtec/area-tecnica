@@ -234,7 +234,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             isTourDate={data.isTourDate}
             isCicloJob={isCicloJob}
             isManager={data.isManager}
-            isAdmin={data.isAdmin}
+            canViewTechnicianRateModePanel={data.canViewTechnicianRateModePanel}
             profileMap={data.profileMap}
             autonomoMap={data.autonomoMap}
             getTechName={data.getTechName}
@@ -243,7 +243,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             buildFinDocUrl={data.buildFinDocUrl}
             techDaysMap={data.techDaysMap}
             techTotalDaysMap={data.techTotalDaysMap}
-            jobTimesheetDates={data.jobTimesheetDates}
+            technicianTimesheetDates={data.technicianTimesheetDatesMap.get(payout.technician_id) ?? []}
             rehearsalDateSet={data.rehearsalDateSet}
             missingEmailTechIds={actions.missingEmailTechIds}
             sendingByTech={actions.sendingByTech}

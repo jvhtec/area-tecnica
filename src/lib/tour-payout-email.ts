@@ -48,6 +48,14 @@ export interface TourJobEmailInput {
   profiles: (TechnicianProfile & { email?: string | null })[];
 }
 
+// Backward-compatible no-op for stale dev/HMR imports. Multi-day rehearsal math
+// is now computed server-side in compute_tour_job_rate_quote_2025.
+export function adjustRehearsalQuotesForMultiDay(
+  quotes: TourJobRateQuote[],
+): TourJobRateQuote[] {
+  return quotes;
+}
+
 async function blobToBase64(blob: Blob): Promise<string> {
   const arrayBuffer = await blob.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);

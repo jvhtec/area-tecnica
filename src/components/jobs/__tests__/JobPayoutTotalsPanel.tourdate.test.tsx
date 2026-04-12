@@ -92,12 +92,14 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     buildFinDocUrl: () => null,
     techDaysMap: new Map(),
     techTotalDaysMap: new Map(),
+    technicianTimesheetDatesMap: new Map<string, string[]>(),
     payoutOverrides: [],
     overrideActorMap: new Map(),
     getTechOverride: () => undefined,
     calculatedGrandTotal: 175,
     isManager: true,
     isAdmin: false,
+    canViewTechnicianRateModePanel: false,
     isAdminOrAdministrative: false,
     userDepartment: null,
     rehearsalDateSet: new Set<string>(),
@@ -161,8 +163,9 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     useJobPayoutDataMock.mockReturnValue({
       ...buildPayoutData(),
       isAdmin: false,
+      canViewTechnicianRateModePanel: false,
       isManager: true,
-      jobTimesheetDates: ["2026-04-10"],
+      technicianTimesheetDatesMap: new Map([["tech-1", ["2026-04-10"]]]),
       rehearsalDateSet: new Set(["2026-04-10"]),
     });
 
@@ -177,8 +180,9 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     useJobPayoutDataMock.mockReturnValue({
       ...buildPayoutData(),
       isAdmin: true,
+      canViewTechnicianRateModePanel: true,
       isManager: true,
-      jobTimesheetDates: ["2026-04-10"],
+      technicianTimesheetDatesMap: new Map([["tech-1", ["2026-04-10"]]]),
       rehearsalDateSet: new Set(["2026-04-10"]),
       getTechRateModeDateSelection: () => "inherit",
       setTechnicianRateModeMutation: { mutate: vi.fn(), isPending: false },
@@ -192,5 +196,47 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     await user.click(screen.getByRole("button", { name: /tarifa por técnico y fecha/i }));
 
     expect(screen.getByText(/heredar \(ensayo\)/i)).toBeInTheDocument();
+  });
+
+  it("keeps the admin panel visible when legacy payout data omits technician/date rate-mode handlers", () => {
+    useJobPayoutDataMock.mockReturnValue({
+      ...buildPayoutData(),
+      isAdmin: true,
+      canViewTechnicianRateModePanel: true,
+      isManager: true,
+      technicianTimesheetDatesMap: new Map([["tech-1", ["2026-04-10"]]]),
+      rehearsalDateSet: new Set(["2026-04-10"]),
+      getTechRateModeDateSelection: undefined,
+      setTechnicianRateModeMutation: undefined,
+    });
+
+    renderWithProviders(<JobPayoutTotalsPanel jobId="job-tour-1" />);
+
+    expect(screen.getByText(/tarifa por técnico y fecha/i)).toBeInTheDocument();
+    expect(screen.getByText("Ana Lopez")).toBeInTheDocument();
+  });
+
+  it("renders only the technician active dates inside the admin exception panel", async () => {
+    const user = userEvent.setup();
+
+    useJobPayoutDataMock.mockReturnValue({
+      ...buildPayoutData(),
+      isAdmin: true,
+      canViewTechnicianRateModePanel: true,
+      isManager: true,
+      jobTimesheetDates: ["2026-04-08", "2026-04-09", "2026-04-10"],
+      technicianTimesheetDatesMap: new Map([["tech-1", ["2026-04-08", "2026-04-10"]]]),
+      rehearsalDateSet: new Set(["2026-04-08", "2026-04-09", "2026-04-10"]),
+      getTechRateModeDateSelection: () => "inherit",
+      setTechnicianRateModeMutation: { mutate: vi.fn(), isPending: false },
+    });
+
+    renderWithProviders(<JobPayoutTotalsPanel jobId="job-tour-1" />);
+
+    await user.click(screen.getByRole("button", { name: /tarifa por técnico y fecha/i }));
+
+    expect(screen.getByText(/mié 8 abr/i)).toBeInTheDocument();
+    expect(screen.getByText(/vie 10 abr/i)).toBeInTheDocument();
+    expect(screen.queryByText(/jue 9 abr/i)).not.toBeInTheDocument();
   });
 });

@@ -100,6 +100,34 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     staleTime: 30 * 1000,
   });
 
+  const { data: technicianTimesheetDatesMap = new Map<string, string[]>() } = useQuery({
+    queryKey: ['job-tech-timesheet-dates', jobId],
+    enabled: !!jobId && isTourDate && !jobMetaLoading,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('technician_id, date')
+        .eq('job_id', jobId)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      const byTech = new Map<string, Set<string>>();
+      (data || []).forEach((row) => {
+        if (!row.technician_id || !row.date) return;
+        if (!byTech.has(row.technician_id)) {
+          byTech.set(row.technician_id, new Set());
+        }
+        byTech.get(row.technician_id)!.add(row.date);
+      });
+
+      return new Map(
+        Array.from(byTech.entries()).map(([techId, dates]) => [techId, Array.from(dates).sort()]),
+      );
+    },
+    staleTime: 30_000,
+  });
+
   /* ── Standard tech days (approved + total) ── */
   const { data: techDaysMaps = { approved: new Map<string, number>(), total: new Map<string, number>() } } = useQuery({
     queryKey: ['job-tech-days', jobId],
@@ -347,10 +375,16 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   );
 
   /* ── Admin-only technician/date rate-mode exceptions ── */
-  const { data: technicianRateModeDates = [] } = useJobTechnicianRateModeDates(jobId, {
-    enabled: isAdmin && isTourDate && !jobMetaLoading,
+  const shouldProbeTechnicianRateModes =
+    !!jobId && isTourDate && !jobMetaLoading && (isManager || isAdminOrAdministrative);
+  const {
+    data: technicianRateModeDates = [],
+    error: technicianRateModeError,
+  } = useJobTechnicianRateModeDates(jobId, {
+    enabled: shouldProbeTechnicianRateModes,
   });
   const setTechnicianRateModeMutation = useSetTechnicianDateRateMode();
+  const canViewTechnicianRateModePanel = shouldProbeTechnicianRateModes && !technicianRateModeError;
 
   const technicianRateModeMap = React.useMemo(() => {
     const map = new Map<string, Map<string, 'rehearsal' | 'standard'>>();
@@ -407,12 +441,14 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     buildFinDocUrl,
     techDaysMap,
     techTotalDaysMap,
+    technicianTimesheetDatesMap,
     payoutOverrides,
     overrideActorMap,
     getTechOverride,
     calculatedGrandTotal,
     isManager,
     isAdmin,
+    canViewTechnicianRateModePanel,
     isAdminOrAdministrative,
     userDepartment,
     rehearsalDateSet,
