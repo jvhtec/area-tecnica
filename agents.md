@@ -33,6 +33,10 @@ This file provides working guidance for coding agents operating in this reposito
    - Preserve compatibility with existing schema and RLS behavior.
    - Prefer additive, backward-compatible database changes.
 
+5. **Documentation**
+   - Always update documentation at the end of each turn.
+   - Always update changelog.md at the end of each session.
+
 ## Source-of-Truth Architecture
 
 Follow the repository architecture documented in `ARCHITECTURE.md`.

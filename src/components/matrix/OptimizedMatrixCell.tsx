@@ -446,10 +446,12 @@ export const OptimizedMatrixCell = memo(({
   const statusBadgesPosClass = mobile ? 'absolute top-1 right-1' : 'absolute bottom-1 left-1';
   const actionButtonsPosClass = mobile ? 'absolute bottom-1 left-1' : 'absolute top-1 right-1';
   const actionBtnSize = mobile ? 'h-8 w-8' : 'h-5 w-5';
+  const dateKey = format(date, 'yyyy-MM-dd');
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <div
+          data-testid={`matrix-cell-${technician.id}-${dateKey}`}
           className={cn(
             'border-r border-b cursor-pointer transition-colors duration-150',
             'flex flex-col justify-between p-1 text-xs relative',

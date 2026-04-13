@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-04-13
+- Fix assignment matrix conflict review so unavailability-only dates are kept in single, multi, and full coverage warnings.
+- Restore available-technician cache invalidation for cross-job `job_assignments` changes, including in-place updates.
+- Normalize matrix day keys in `Europe/Madrid`, deduplicate repeated day entries, and localize assignment-dialog dates to Spanish.
+- Document the assignment lifecycle and add targeted unit/component coverage plus Playwright lifecycle coverage for create, reassign, and remove flows.
+
 ## 2026-01-11
 - Standardize mobile layout spacing/width for key routes (sound, expenses, announcements, activity, feedback) and align layout container sizing.
 - Remove deprecated Excel Tool and Labor PO Form routes/components and clean related docs/links.
