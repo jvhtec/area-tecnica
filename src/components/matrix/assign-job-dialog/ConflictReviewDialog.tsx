@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import type { ConflictWarningPayload } from './conflictUtils';
 
 interface ConflictReviewDialogProps {
@@ -31,7 +32,7 @@ export const ConflictReviewDialog = ({
   const formatJobRange = (start?: string | null, end?: string | null) => {
     if (!start || !end) return null;
     try {
-      return `${format(new Date(start), 'PPP')} – ${format(new Date(end), 'PPP')}`;
+      return `${format(new Date(start), 'PPP', { locale: es })} – ${format(new Date(end), 'PPP', { locale: es })}`;
     } catch {
       return null;
     }
@@ -40,7 +41,7 @@ export const ConflictReviewDialog = ({
   const formatDateLabel = (iso?: string) => {
     if (!iso) return null;
     try {
-      return format(new Date(`${iso}T00:00:00`), 'PPP');
+      return format(new Date(`${iso}T00:00:00`), 'PPP', { locale: es });
     } catch {
       return null;
     }

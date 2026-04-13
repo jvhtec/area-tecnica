@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -201,7 +202,7 @@ export const AssignJobDialog = ({
     return t >= selectedJobMeta.start && t <= selectedJobMeta.end;
   };
 
-  const targetJobRange = selectedJob ? `${format(new Date(selectedJob.start_time), 'PPP')} – ${format(new Date(selectedJob.end_time), 'PPP')}` : null;
+  const targetJobRange = selectedJob ? `${format(new Date(selectedJob.start_time), 'PPP', { locale: es })} – ${format(new Date(selectedJob.end_time), 'PPP', { locale: es })}` : null;
 
   return (
     <>
@@ -211,7 +212,7 @@ export const AssignJobDialog = ({
             <DialogTitle>{isReassignment ? 'Reasignar Trabajo' : 'Asignar Trabajo'}</DialogTitle>
             <DialogDescription>
               {isReassignment ? 'Reasignar a' : 'Asignar a'} {technician?.first_name} {technician?.last_name} a un trabajo el{' '}
-              {format(date, 'EEEE, d MMMM, yyyy')}
+              {format(date, 'EEEE, d MMMM, yyyy', { locale: es })}
             </DialogDescription>
           </DialogHeader>
 
@@ -254,7 +255,7 @@ export const AssignJobDialog = ({
                               <div className="font-medium">{job.title}</div>
                               <div className="text-xs text-muted-foreground flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}
+                                {format(new Date(job.start_time), 'HH:mm', { locale: es })} - {format(new Date(job.end_time), 'HH:mm', { locale: es })}
                               </div>
                             </div>
                           </div>
@@ -314,7 +315,7 @@ export const AssignJobDialog = ({
                 <div className="text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {format(new Date(selectedJob.start_time), 'HH:mm')} - {format(new Date(selectedJob.end_time), 'HH:mm')}
+                    {format(new Date(selectedJob.start_time), 'HH:mm', { locale: es })} - {format(new Date(selectedJob.end_time), 'HH:mm', { locale: es })}
                   </div>
                 </div>
                 {selectedRole && (
@@ -329,7 +330,7 @@ export const AssignJobDialog = ({
                 )}
                 {coverageMode === 'single' && (
                   <div className="text-xs text-muted-foreground mt-1">
-                    Cobertura de un solo día para {singleDate ? format(singleDate, 'PPP') : format(date, 'PPP')}
+                    Cobertura de un solo día para {singleDate ? format(singleDate, 'PPP', { locale: es }) : format(date, 'PPP', { locale: es })}
                   </div>
                 )}
                 {coverageMode === 'multi' && (

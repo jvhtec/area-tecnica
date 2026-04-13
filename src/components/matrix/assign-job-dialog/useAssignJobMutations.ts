@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format, startOfDay } from 'date-fns';
+import { addDays, format, startOfDay } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
@@ -51,6 +51,11 @@ export const useAssignJobMutations = ({
 }: UseAssignJobMutationsProps) => {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const computeResponseTime = (existingRow: any, baseStatus: 'confirmed' | 'invited', baseResponseTime: string | null) => {
+    if (baseStatus === 'confirmed') return baseResponseTime;
+    if (existingRow?.status === 'confirmed') return existingRow?.response_time ?? null;
+    return null;
+  };
 
   const attemptAssign = async (skipConflictCheck = false) => {
     if (!selectedJobId || !selectedRole || !technician) {
@@ -178,7 +183,7 @@ export const useAssignJobMutations = ({
           assigned_by: basePayload.assigned_by,
           assigned_at: basePayload.assigned_at,
           status: existingRow.status === 'confirmed' && basePayload.status !== 'confirmed' ? 'confirmed' : basePayload.status,
-          response_time: basePayload.status === 'confirmed' ? basePayload.response_time : existingRow.status === 'confirmed' ? (existingRow as any).response_time ?? null : null,
+          response_time: computeResponseTime(existingRow, basePayload.status, basePayload.response_time),
           single_day: desiredSingleDay,
           assignment_date: desiredAssignmentDate,
           assignment_source: basePayload.assignment_source,
@@ -259,8 +264,10 @@ export const useAssignJobMutations = ({
             const endDate = startOfDay(new Date(jobData.end_time));
             const dates: string[] = [];
 
-            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-              dates.push(format(d, 'yyyy-MM-dd'));
+            let i = 0;
+            while (addDays(startDate, i) <= endDate) {
+              dates.push(format(addDays(startDate, i), 'yyyy-MM-dd'));
+              i += 1;
             }
             return dates;
           }

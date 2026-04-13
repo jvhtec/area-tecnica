@@ -5,6 +5,7 @@ import { Calendar as CalendarPicker } from '@/components/ui/calendar';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar as CalendarIcon, CalendarDays, CalendarRange } from 'lucide-react';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface CoverageModeSelectorProps {
   coverageMode: 'full' | 'single' | 'multi';
@@ -104,7 +105,7 @@ export const CoverageModeSelector = ({
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start text-left font-normal">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {singleDate ? format(singleDate, 'PPP') : <span>Elige una fecha</span>}
+                    {singleDate ? format(singleDate, 'PPP', { locale: es }) : <span>Elige una fecha</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">

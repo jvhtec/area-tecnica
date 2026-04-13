@@ -82,10 +82,9 @@ export function useAvailableTechnicians({
           event: 'INSERT',
           schema: 'public',
           table: 'job_assignments',
-          filter: `job_id=eq.${jobId}`,
         },
         (payload) => {
-          console.log('Job assignment inserted for this job, refreshing available technicians:', payload);
+          console.log('Job assignment inserted, refreshing available technicians:', payload);
           queryClient.invalidateQueries({
             queryKey,
           });
@@ -97,10 +96,23 @@ export function useAvailableTechnicians({
           event: 'DELETE',
           schema: 'public',
           table: 'job_assignments',
-          filter: `job_id=eq.${jobId}`,
         },
         (payload) => {
-          console.log('Job assignment removed for this job, refreshing available technicians:', payload);
+          console.log('Job assignment removed, refreshing available technicians:', payload);
+          queryClient.invalidateQueries({
+            queryKey,
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'job_assignments',
+        },
+        (payload) => {
+          console.log('Job assignment updated, refreshing available technicians:', payload);
           queryClient.invalidateQueries({
             queryKey,
           });

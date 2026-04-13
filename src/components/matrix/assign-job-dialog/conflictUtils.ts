@@ -30,19 +30,18 @@ export const getConflictWarning = async ({
 
   if (coverageMode === 'multi') {
     const uniqueKeys = Array.from(new Set((multiDates || []).map((d) => format(d, 'yyyy-MM-dd'))));
-    const perDateConflicts: Array<{ targetDate: string; result: ConflictCheckResult }> = [];
-
-    for (const key of uniqueKeys) {
-      const result = await checkTimeConflictEnhanced(technicianId, selectedJobId, {
-        targetDateIso: key,
-        singleDayOnly: true,
-        includePending: true,
-      });
-
-      if (result.hasHardConflict || result.hasSoftConflict) {
-        perDateConflicts.push({ targetDate: key, result });
-      }
-    }
+    const results = await Promise.all(uniqueKeys.map((key) => checkTimeConflictEnhanced(technicianId, selectedJobId, {
+      targetDateIso: key,
+      singleDayOnly: true,
+      includePending: true,
+    })));
+    const perDateConflicts: Array<{ targetDate: string; result: ConflictCheckResult }> = results
+      .map((result, idx) => ({ targetDate: uniqueKeys[idx], result }))
+      .filter(({ result }) => (
+        result.hasHardConflict ||
+        result.hasSoftConflict ||
+        result.unavailabilityConflicts.length > 0
+      ));
 
     if (perDateConflicts.length === 0) return null;
 
@@ -65,8 +64,7 @@ export const getConflictWarning = async ({
       singleDayOnly: true,
       includePending: true,
     });
-
-    return result.hasHardConflict || result.hasSoftConflict
+    return result.hasHardConflict || result.hasSoftConflict || result.unavailabilityConflicts.length > 0
       ? { result, targetDate: assignmentDate, mode: 'single' }
       : null;
   }
@@ -75,7 +73,7 @@ export const getConflictWarning = async ({
     includePending: true,
   });
 
-  return result.hasHardConflict || result.hasSoftConflict
+  return result.hasHardConflict || result.hasSoftConflict || result.unavailabilityConflicts.length > 0
     ? { result, mode: 'full' }
     : null;
 };
