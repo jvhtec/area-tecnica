@@ -30,6 +30,14 @@ type TimesheetRow = {
   category?: string | null;
 };
 
+const noConflictResult = {
+  hasHardConflict: false,
+  hasSoftConflict: false,
+  hardConflicts: [],
+  softConflicts: [],
+  unavailabilityConflicts: [],
+};
+
 const MADRID_TZ = "Europe/Madrid";
 
 function madridDateKey(offsetDays = 0) {
@@ -170,6 +178,45 @@ test.describe("assignment matrix direct assignment lifecycle", () => {
             return filterTimesheets(timesheets, url);
           }
 
+          if (method === "POST") {
+            const rows = asArray(body) as Partial<TimesheetRow>[];
+            rows.forEach((row) => {
+              const date = String(row.date);
+              const existing = timesheets.find((timesheet) =>
+                timesheet.job_id === row.job_id &&
+                timesheet.technician_id === row.technician_id &&
+                timesheet.date === date,
+              );
+
+              if (existing) {
+                Object.assign(existing, row, { is_active: true });
+                return;
+              }
+
+              timesheets.push({
+                id: `timesheet-${timesheets.length + 1}`,
+                job_id: String(row.job_id),
+                technician_id: String(row.technician_id),
+                date,
+                is_active: row.is_active ?? true,
+                status: String(row.status ?? "draft"),
+                category: row.category ?? null,
+              });
+            });
+            return null;
+          }
+
+          if (method === "DELETE") {
+            const matchingRows = filterTimesheets(timesheets, url);
+            const matchingIds = new Set(matchingRows.map((row) => row.id));
+            for (let index = timesheets.length - 1; index >= 0; index -= 1) {
+              if (matchingIds.has(timesheets[index]!.id)) {
+                timesheets.splice(index, 1);
+              }
+            }
+            return matchingRows.map((row) => ({ id: row.id }));
+          }
+
           if (method === "PATCH") {
             const updates = (body ?? {}) as Partial<TimesheetRow>;
             const matchingRows = filterTimesheets(timesheets, url);
@@ -196,6 +243,7 @@ test.describe("assignment matrix direct assignment lifecycle", () => {
         ],
         get_job_staffing_summary: [],
         get_assignment_matrix_staffing: [],
+        check_technician_conflicts: noConflictResult,
         toggle_timesheet_day: ({ body }) => {
           const payload = body as Record<string, string | boolean>;
           const date = String(payload.p_date);
@@ -380,6 +428,45 @@ test.describe("assignment matrix direct assignment lifecycle", () => {
             return filterTimesheets(timesheets, url);
           }
 
+          if (method === "POST") {
+            const rows = asArray(body) as Partial<TimesheetRow>[];
+            rows.forEach((row) => {
+              const date = String(row.date);
+              const existing = timesheets.find((timesheet) =>
+                timesheet.job_id === row.job_id &&
+                timesheet.technician_id === row.technician_id &&
+                timesheet.date === date,
+              );
+
+              if (existing) {
+                Object.assign(existing, row, { is_active: true });
+                return;
+              }
+
+              timesheets.push({
+                id: `timesheet-${timesheets.length + 1}`,
+                job_id: String(row.job_id),
+                technician_id: String(row.technician_id),
+                date,
+                is_active: row.is_active ?? true,
+                status: String(row.status ?? "draft"),
+                category: row.category ?? null,
+              });
+            });
+            return null;
+          }
+
+          if (method === "DELETE") {
+            const matchingRows = filterTimesheets(timesheets, url);
+            const matchingIds = new Set(matchingRows.map((row) => row.id));
+            for (let index = timesheets.length - 1; index >= 0; index -= 1) {
+              if (matchingIds.has(timesheets[index]!.id)) {
+                timesheets.splice(index, 1);
+              }
+            }
+            return matchingRows.map((row) => ({ id: row.id }));
+          }
+
           if (method === "PATCH") {
             const updates = (body ?? {}) as Partial<TimesheetRow>;
             const matchingRows = filterTimesheets(timesheets, url);
@@ -406,6 +493,7 @@ test.describe("assignment matrix direct assignment lifecycle", () => {
         ],
         get_job_staffing_summary: [],
         get_assignment_matrix_staffing: [],
+        check_technician_conflicts: noConflictResult,
         toggle_timesheet_day: ({ body }) => {
           const payload = body as Record<string, string | boolean>;
           const date = String(payload.p_date);
@@ -478,7 +566,7 @@ test.describe("assignment matrix direct assignment lifecycle", () => {
     await expect(targetCell).not.toContainText("Old Job");
     await expect
       .poll(() => calls.rpcCalls.map((call) => call.name))
-      .toEqual(expect.arrayContaining(["remove_assignment_with_timesheets", "toggle_timesheet_day"]));
+      .toEqual(expect.arrayContaining(["remove_assignment_with_timesheets", "check_technician_conflicts"]));
   });
 
   test("removes an assignment from the reassignment dialog", async ({ page }) => {
