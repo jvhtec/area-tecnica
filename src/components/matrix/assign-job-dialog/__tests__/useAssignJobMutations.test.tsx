@@ -53,7 +53,7 @@ vi.mock('@/services/syncTimesheetCategories', () => ({
   syncTimesheetCategoriesForAssignment: syncTimesheetCategoriesMock,
 }));
 
-vi.mock('../conflictUtils', () => ({
+vi.mock('@/components/matrix/assign-job-dialog/conflictUtils', () => ({
   getConflictWarning: getConflictWarningMock,
 }));
 
@@ -67,21 +67,27 @@ vi.mock('sonner', () => ({
 
 type SetupOptions = {
   existingRow?: Record<string, unknown> | null;
+  existingRowError?: { message: string } | null;
   verifyRows?: Array<{ job_id: string }>;
   freshTimesheets?: Array<{ date: string }>;
   jobData?: { start_time: string; end_time: string } | null;
+  jobDataError?: { message: string } | null;
+  insertError?: { code?: string; message: string } | null;
 };
 
 const setupSupabase = ({
   existingRow = null,
+  existingRowError = null,
   verifyRows = [{ job_id: 'job-1' }],
   freshTimesheets = [],
   jobData = {
     start_time: '2026-04-14T08:00:00.000Z',
     end_time: '2026-04-16T18:00:00.000Z',
   },
+  jobDataError = null,
+  insertError = null,
 }: SetupOptions = {}) => {
-  const insertMock = vi.fn().mockResolvedValue({ error: null });
+  const insertMock = vi.fn().mockResolvedValue({ error: insertError });
   const updateMock = vi.fn(() => createMockQueryBuilder({ data: null, error: null }));
   const deleteMock = vi.fn(() => createMockQueryBuilder({ data: null, error: null }));
 
@@ -92,7 +98,14 @@ const setupSupabase = ({
           if (columns === 'job_id, technician_id, single_day, assignment_date, status') {
             return createMockQueryBuilder({
               data: existingRow,
-              error: null,
+              error: existingRowError,
+            });
+          }
+
+          if (columns === 'job_id, technician_id, single_day, assignment_date, status, response_time') {
+            return createMockQueryBuilder({
+              data: existingRow,
+              error: existingRowError,
             });
           }
 
@@ -128,7 +141,7 @@ const setupSupabase = ({
       return {
         select: vi.fn(() => createMockQueryBuilder({
           data: jobData,
-          error: null,
+          error: jobDataError,
         })),
       };
     }
@@ -242,6 +255,90 @@ describe('useAssignJobMutations', () => {
     }));
     expect(toastFn.success).toHaveBeenCalledWith(expect.stringContaining('Asignado Pat Jones a Madrid Arena'));
     expect(props.onClose).toHaveBeenCalled();
+  });
+
+  it('shows a user-facing error if conflict lookup fails before assignment starts', async () => {
+    setupSupabase();
+    getConflictWarningMock.mockRejectedValueOnce(new Error('Fallo al comprobar conflictos'));
+    const props = baseProps();
+
+    const { result } = renderHook(() => useAssignJobMutations(props));
+
+    await act(async () => {
+      await result.current.attemptAssign();
+    });
+
+    expect(toastFn.error).toHaveBeenCalledWith('Fallo al comprobar conflictos');
+    expect(result.current.isAssigning).toBe(false);
+  });
+
+  it('does not unlock the UI when the timeout fires before the write settles', async () => {
+    const deferred = Promise.withResolvers<{ error: null }>();
+    setupSupabase();
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'job_assignments') {
+        return {
+          select: vi.fn((columns: string) => {
+            if (columns === 'job_id, technician_id, single_day, assignment_date, status, response_time') {
+              return createMockQueryBuilder({ data: null, error: null });
+            }
+            if (columns === 'job_id') {
+              return createMockQueryBuilder({ data: [{ job_id: 'job-1' }], error: null });
+            }
+            return createMockQueryBuilder({ data: null, error: null });
+          }),
+          insert: vi.fn().mockReturnValue(deferred.promise),
+          update: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
+          delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
+        };
+      }
+
+      if (table === 'timesheets') {
+        return {
+          select: vi.fn(() => createMockQueryBuilder({ data: [], error: null })),
+          delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
+        };
+      }
+
+      if (table === 'jobs') {
+        return {
+          select: vi.fn(() => createMockQueryBuilder({
+            data: {
+              start_time: '2026-04-14T08:00:00.000Z',
+              end_time: '2026-04-16T18:00:00.000Z',
+            },
+            error: null,
+          })),
+        };
+      }
+
+      return {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+      };
+    });
+
+    const { result } = renderHook(() => useAssignJobMutations(baseProps()));
+
+    let attemptPromise: Promise<void>;
+    await act(async () => {
+      attemptPromise = result.current.attemptAssign();
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
+
+    expect(toastFn.error).toHaveBeenCalledWith('La asignación está tardando más de lo esperado. Espera a que termine antes de reintentar.');
+    expect(result.current.isAssigning).toBe(true);
+
+    await act(async () => {
+      deferred.resolve({ error: null });
+      await attemptPromise!;
+    });
+
+    expect(result.current.isAssigning).toBe(false);
   });
 
   it('adds only missing dates when extending the same job in multi-day add mode', async () => {
@@ -375,6 +472,50 @@ describe('useAssignJobMutations', () => {
       single_day: true,
       assignment_date: '2026-04-15',
     }));
+  });
+
+  it('aborts when checking the existing assignment row fails', async () => {
+    setupSupabase({
+      existingRowError: { message: 'boom existing row' },
+    });
+
+    const { result } = renderHook(() => useAssignJobMutations(baseProps()));
+
+    await act(async () => {
+      await result.current.attemptAssign();
+    });
+
+    expect(toastFn.error).toHaveBeenCalledWith('Error al asignar el trabajo: No se pudo comprobar la asignación existente: boom existing row');
+  });
+
+  it('aborts when loading full-span job coverage fails', async () => {
+    setupSupabase({
+      jobDataError: { message: 'boom job data' },
+    });
+
+    const { result } = renderHook(() => useAssignJobMutations(baseProps()));
+
+    await act(async () => {
+      await result.current.attemptAssign();
+    });
+
+    expect(toastFn.error).toHaveBeenCalledWith('Error al asignar el trabajo: No se pudo cargar la cobertura del trabajo: boom job data');
+  });
+
+  it('localizes the success status text to Spanish', async () => {
+    setupSupabase();
+    const props = {
+      ...baseProps(),
+      assignAsConfirmed: true,
+    };
+
+    const { result } = renderHook(() => useAssignJobMutations(props));
+
+    await act(async () => {
+      await result.current.attemptAssign();
+    });
+
+    expect(toastFn.success).toHaveBeenCalledWith('Asignado Pat Jones a Madrid Arena (confirmado)');
   });
 
   it('removes an assignment and dispatches the success flow', async () => {

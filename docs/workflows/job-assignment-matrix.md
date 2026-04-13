@@ -107,6 +107,14 @@ Located in `src/utils/technicianAvailability.ts`:
 - `useMemoizedMatrix` normalizes matrix day keys in `Europe/Madrid` and deduplicates repeated date entries before sorting and bucketing jobs/assignments.
 - User-facing assignment dialog dates are formatted in Spanish locale for the dialog body, conflict review, and coverage selector.
 
+## Matrix Core Architecture
+
+- Shared hot-path utilities live in `src/components/matrix/optimized-assignment-matrix/matrixCore.ts` and provide the canonical Madrid day-key helpers, chunking helpers, matrix query-key factory, and scoped invalidation helpers for assignments, availability, and jobs/staffing.
+- `OptimizedAssignmentMatrix.tsx` now acts as an orchestrator instead of owning every behavior directly. Viewport logic moved into `useMatrixViewportController`, sorting/medal logic moved into `useMatrixSortingController`, and dialog/action routing moved into `useMatrixInteractionController`.
+- `OptimizedAssignmentMatrixView` now consumes grouped `viewport`, `data`, `actions`, `dialogs`, and `sorting` state; the old flat prop shape remains as a compatibility shim for tests during the transition.
+- `OptimizedMatrixCell` still owns mutation side effects, but its render path is split into memoized status badges, staffing action buttons, assignment content, unavailable content, and dialog sections so unrelated UI branches do not stay inline in the main cell body.
+- `usePerformanceMonitor` is now opt-in diagnostics only. Normal matrix rendering no longer runs timer-driven memory polling or unconditional console logging.
+
 ## Test Coverage
 
 - Unit/component coverage:
@@ -115,10 +123,15 @@ Located in `src/utils/technicianAvailability.ts`:
   - `src/components/matrix/assign-job-dialog/__tests__/conflictUtils.test.ts`
   - `src/hooks/__tests__/useAvailableTechnicians.test.tsx`
   - `src/hooks/__tests__/useMemoizedMatrix.test.tsx`
+  - `src/components/matrix/optimized-assignment-matrix/__tests__/matrixCore.test.ts`
+  - `src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixViewportController.test.tsx`
+  - `src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixSortingController.test.tsx`
+  - `src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixInteractionController.test.tsx`
+  - `src/components/matrix/__tests__/OptimizedMatrixCell.test.tsx` render-stability assertion for identical-prop rerenders
 - Playwright coverage:
   - `tests/e2e/assignments-matrix.spec.ts`
 - Recommended commands:
-  - `npm run test:run -- src/components/matrix/__tests__/AssignJobDialog.test.tsx src/components/matrix/assign-job-dialog/__tests__/useAssignJobMutations.test.tsx src/components/matrix/assign-job-dialog/__tests__/conflictUtils.test.ts src/hooks/__tests__/useAvailableTechnicians.test.tsx src/hooks/__tests__/useMemoizedMatrix.test.tsx`
+  - `npm run test:run -- src/components/matrix/__tests__/AssignJobDialog.test.tsx src/components/matrix/__tests__/OptimizedAssignmentMatrix.test.tsx src/components/matrix/__tests__/OptimizedMatrixCell.test.tsx src/components/matrix/optimized-assignment-matrix/__tests__/OptimizedAssignmentMatrixView.test.tsx src/components/matrix/optimized-assignment-matrix/__tests__/matrixCore.test.ts src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixViewportController.test.tsx src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixSortingController.test.tsx src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixInteractionController.test.tsx src/components/matrix/assign-job-dialog/__tests__/useAssignJobMutations.test.tsx src/components/matrix/assign-job-dialog/__tests__/conflictUtils.test.ts src/hooks/__tests__/useAvailableTechnicians.test.tsx src/hooks/__tests__/useMemoizedMatrix.test.tsx src/hooks/__tests__/useOptimizedMatrixData.test.ts`
   - `npm run test:e2e -- tests/e2e/assignments-matrix.spec.ts`
 ```
 

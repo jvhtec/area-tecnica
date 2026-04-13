@@ -430,6 +430,46 @@ describe('OptimizedMatrixCell', () => {
     expect(onRenderMock).toHaveBeenCalled();
   });
 
+  it('stays render-stable when rerendered with identical props', () => {
+    const onRenderMock = vi.fn();
+    const onSelectMock = vi.fn();
+    const onClickMock = vi.fn();
+
+    const view = rtlRender(
+      <TooltipProvider delayDuration={0}>
+        <OptimizedMatrixCell
+          technician={mockTechnician}
+          date={mockDate}
+          width={160}
+          height={60}
+          isSelected={false}
+          onSelect={onSelectMock}
+          onClick={onClickMock}
+          onRender={onRenderMock}
+        />
+      </TooltipProvider>
+    );
+
+    expect(onRenderMock).toHaveBeenCalledTimes(1);
+
+    view.rerender(
+      <TooltipProvider delayDuration={0}>
+        <OptimizedMatrixCell
+          technician={mockTechnician}
+          date={mockDate}
+          width={160}
+          height={60}
+          isSelected={false}
+          onSelect={onSelectMock}
+          onClick={onClickMock}
+          onRender={onRenderMock}
+        />
+      </TooltipProvider>
+    );
+
+    expect(onRenderMock).toHaveBeenCalledTimes(1);
+  });
+
   it('displays single day assignment date', () => {
     const singleDayAssignment = {
       ...mockAssignment,

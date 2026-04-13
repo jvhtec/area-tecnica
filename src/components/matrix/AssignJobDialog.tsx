@@ -17,16 +17,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar as CalendarIcon, Clock } from 'lucide-react';
-import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
-import { CoverageModeSelector } from './assign-job-dialog/CoverageModeSelector';
-import { ConflictReviewDialog } from './assign-job-dialog/ConflictReviewDialog';
-import { type ConflictWarningPayload } from './assign-job-dialog/conflictUtils';
-import { useAssignJobMutations } from './assign-job-dialog/useAssignJobMutations';
+import { formatInJobTimezone } from '@/utils/timezoneUtils';
+import { CoverageModeSelector } from '@/components/matrix/assign-job-dialog/CoverageModeSelector';
+import { ConflictReviewDialog } from '@/components/matrix/assign-job-dialog/ConflictReviewDialog';
+import { type ConflictWarningPayload } from '@/components/matrix/assign-job-dialog/conflictUtils';
+import { useAssignJobMutations } from '@/components/matrix/assign-job-dialog/useAssignJobMutations';
 
 interface AssignJobDialogProps {
   open: boolean;
@@ -97,7 +97,10 @@ export const AssignJobDialog = ({
   // but timesheets for (job_id, technician_id) already exist. We treat that as "modifying the same job".
   const isModifyingSameJobByContext = isReassignment && existingAssignment?.job_id === selectedJobId;
   // IMPORTANT: use local yyyy-MM-dd, not toISOString (which is UTC)
-  const assignmentDate = React.useMemo(() => format((singleDate ?? date), 'yyyy-MM-dd'), [date, singleDate]);
+  const assignmentDate = React.useMemo(
+    () => formatInJobTimezone(singleDate ?? date, 'yyyy-MM-dd'),
+    [date, singleDate]
+  );
 
   // Fetch existing timesheets for this job+technician.
   // This is needed even when existingAssignment is undefined (adding a new day to an existing job).
@@ -202,7 +205,9 @@ export const AssignJobDialog = ({
     return t >= selectedJobMeta.start && t <= selectedJobMeta.end;
   };
 
-  const targetJobRange = selectedJob ? `${format(new Date(selectedJob.start_time), 'PPP', { locale: es })} – ${format(new Date(selectedJob.end_time), 'PPP', { locale: es })}` : null;
+  const targetJobRange = selectedJob
+    ? `${formatInJobTimezone(selectedJob.start_time, 'PPP', 'Europe/Madrid', { locale: es })} – ${formatInJobTimezone(selectedJob.end_time, 'PPP', 'Europe/Madrid', { locale: es })}`
+    : null;
 
   return (
     <>
@@ -212,7 +217,7 @@ export const AssignJobDialog = ({
             <DialogTitle>{isReassignment ? 'Reasignar Trabajo' : 'Asignar Trabajo'}</DialogTitle>
             <DialogDescription>
               {isReassignment ? 'Reasignar a' : 'Asignar a'} {technician?.first_name} {technician?.last_name} a un trabajo el{' '}
-              {format(date, 'EEEE, d MMMM, yyyy', { locale: es })}
+              {formatInJobTimezone(date, 'EEEE, d MMMM, yyyy', 'Europe/Madrid', { locale: es })}
             </DialogDescription>
           </DialogHeader>
 
@@ -255,7 +260,7 @@ export const AssignJobDialog = ({
                               <div className="font-medium">{job.title}</div>
                               <div className="text-xs text-muted-foreground flex items-center gap-1">
                                 <Clock className="h-3 w-3" />
-                                {format(new Date(job.start_time), 'HH:mm', { locale: es })} - {format(new Date(job.end_time), 'HH:mm', { locale: es })}
+                                {formatInJobTimezone(job.start_time, 'HH:mm', 'Europe/Madrid', { locale: es })} - {formatInJobTimezone(job.end_time, 'HH:mm', 'Europe/Madrid', { locale: es })}
                               </div>
                             </div>
                           </div>
@@ -315,7 +320,7 @@ export const AssignJobDialog = ({
                 <div className="text-sm text-muted-foreground">
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {format(new Date(selectedJob.start_time), 'HH:mm', { locale: es })} - {format(new Date(selectedJob.end_time), 'HH:mm', { locale: es })}
+                    {formatInJobTimezone(selectedJob.start_time, 'HH:mm', 'Europe/Madrid', { locale: es })} - {formatInJobTimezone(selectedJob.end_time, 'HH:mm', 'Europe/Madrid', { locale: es })}
                   </div>
                 </div>
                 {selectedRole && (
@@ -330,7 +335,9 @@ export const AssignJobDialog = ({
                 )}
                 {coverageMode === 'single' && (
                   <div className="text-xs text-muted-foreground mt-1">
-                    Cobertura de un solo día para {singleDate ? format(singleDate, 'PPP', { locale: es }) : format(date, 'PPP', { locale: es })}
+                    Cobertura de un solo día para {singleDate
+                      ? formatInJobTimezone(singleDate, 'PPP', 'Europe/Madrid', { locale: es })
+                      : formatInJobTimezone(date, 'PPP', 'Europe/Madrid', { locale: es })}
                   </div>
                 )}
                 {coverageMode === 'multi' && (

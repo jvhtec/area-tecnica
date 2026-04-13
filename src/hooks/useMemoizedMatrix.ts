@@ -1,9 +1,11 @@
 import { useCallback, useMemo } from 'react';
-import { formatInTimeZone } from 'date-fns-tz';
+import {
+  formatMatrixDateKey,
+  toMatrixDayTimestamp,
+} from '@/components/matrix/optimized-assignment-matrix/matrixCore';
 
-const MADRID_TZ = 'Europe/Madrid';
-const formatDateKeyMadrid = (date: Date) => formatInTimeZone(date, MADRID_TZ, 'yyyy-MM-dd');
-const dateKeyToComparableTs = (dateKey: string) => Date.parse(`${dateKey}T00:00:00Z`);
+const formatDateKeyMadrid = (date: Date) => formatMatrixDateKey(date);
+const dateKeyToComparableTs = (dateKey: string) => toMatrixDayTimestamp(dateKey);
 
 interface Assignment {
   job_id: string;

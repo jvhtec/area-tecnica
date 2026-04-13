@@ -5,6 +5,7 @@
 - Restore available-technician cache invalidation for cross-job `job_assignments` changes, including in-place updates.
 - Normalize matrix day keys in `Europe/Madrid`, deduplicate repeated day entries, and localize assignment-dialog dates to Spanish.
 - Document the assignment lifecycle and add targeted unit/component coverage plus Playwright lifecycle coverage for create, reassign, and remove flows.
+- Refactor the matrix core into shared query/date helpers plus dedicated viewport, sorting, and interaction controllers; split `OptimizedMatrixCell` into memoized status/action/content/dialog sections; add controller/query helper tests and render-stability coverage.
 
 ## 2026-01-11
 - Standardize mobile layout spacing/width for key routes (sound, expenses, announcements, activity, feedback) and align layout container sizing.

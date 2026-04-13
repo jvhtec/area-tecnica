@@ -1,6 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
-import { format } from 'date-fns'
+import {
+  chunkArray,
+  formatMatrixDateKey,
+  matrixDebug,
+  matrixQueryKeys,
+} from '@/components/matrix/optimized-assignment-matrix/matrixCore'
 
 type Status = 'confirmed' | 'declined' | 'expired' | 'requested' | 'sent' | null
 
@@ -75,7 +80,7 @@ export function useStaffingMatrixStatuses(
   dates: Date[]
 ) {
   return useQuery({
-    queryKey: ['staffing-matrix', technicianIds, jobs.map(j => j.id), dates[0]?.toISOString(), dates[dates.length - 1]?.toISOString()],
+    queryKey: matrixQueryKeys.staffingMatrix(technicianIds, jobs, dates),
     queryFn: async () => {
       if (!technicianIds.length || !jobs.length || !dates.length) {
         return { byJob: new Map<string, ByJobStatus>(), byDate: new Map<string, ByDateStatus>() }
@@ -83,17 +88,11 @@ export function useStaffingMatrixStatuses(
 
       const jobIds = jobs.map(j => j.id)
 
-      const chunk = <T,>(arr: T[], size: number) => {
-        const out: T[][] = []
-        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
-        return out
-      }
-
       // 1) Job-based statuses from aggregated view
       const mapByJob = new Map<string, ByJobStatus>()
       try {
-        const techBatches = chunk(technicianIds, 20)
-        const jobBatches = chunk(jobIds, 20)
+        const techBatches = chunkArray(technicianIds, 20)
+        const jobBatches = chunkArray(jobIds, 20)
         const promises: Promise<any>[] = []
         for (const tb of techBatches) {
           for (const jb of jobBatches) {
@@ -108,7 +107,7 @@ export function useStaffingMatrixStatuses(
         const results = await Promise.all(promises)
         results.forEach(res => {
           if (res.error) {
-            console.warn('Staffing matrix byJob error (batch):', res.error)
+            matrixDebug('Staffing matrix byJob error (batch)', res.error)
             return
           }
           (res.data || []).forEach((r: any) => {
@@ -137,14 +136,14 @@ export function useStaffingMatrixStatuses(
           })
         })
       } catch (e) {
-        console.warn('Staffing matrix byJob batch error:', e)
+        matrixDebug('Staffing matrix byJob batch error', e)
       }
 
       // 2) Date-based statuses derived from staffing_requests across visible jobs
       const reqRows: StaffingRequestRow[] = []
       try {
-        const techBatches = chunk(technicianIds, 20)
-        const jobBatches = chunk(jobIds, 20)
+        const techBatches = chunkArray(technicianIds, 20)
+        const jobBatches = chunkArray(jobIds, 20)
         const promises: Promise<any>[] = []
         for (const tb of techBatches) {
           for (const jb of jobBatches) {
@@ -160,13 +159,13 @@ export function useStaffingMatrixStatuses(
         const results = await Promise.all(promises)
         results.forEach(res => {
           if (res.error) {
-            console.warn('Staffing matrix requests error (batch):', res.error)
+            matrixDebug('Staffing matrix requests error (batch)', res.error)
             return
           }
           if (res.data?.length) reqRows.push(...res.data)
         })
       } catch (e) {
-        console.warn('Staffing matrix requests batch error:', e)
+        matrixDebug('Staffing matrix requests batch error', e)
       }
 
       // Build job lookup with parsed dates for overlap check
@@ -190,14 +189,14 @@ export function useStaffingMatrixStatuses(
       technicianIds.forEach(tid => {
         const reqs = byTech.get(tid) || []
         dates.forEach(d => {
-          const dStr = format(d, 'yyyy-MM-dd')
+          const dStr = formatMatrixDateKey(d)
           // Filter requests based on type:
           // - Single-day requests: exact target_date match (prevents following job reschedules)
           // - Full-span requests: show on all dates within the job's date range
           const matchingRequests = reqs.filter(r => {
             // Single-day requests with target_date: exact match only
             if (r.single_day && r.target_date) {
-              const rDate = typeof r.target_date === 'string' ? r.target_date : format(r.target_date, 'yyyy-MM-dd')
+              const rDate = typeof r.target_date === 'string' ? r.target_date : formatMatrixDateKey(r.target_date)
               return rDate === dStr
             }
 

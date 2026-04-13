@@ -6,7 +6,7 @@ import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignmen
 import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
-import { getConflictWarning, type ConflictWarningPayload } from './conflictUtils';
+import { getConflictWarning, type ConflictWarningPayload } from '@/components/matrix/assign-job-dialog/conflictUtils';
 
 interface UseAssignJobMutationsProps {
   selectedJobId: string;
@@ -80,15 +80,22 @@ export const useAssignJobMutations = ({
     }
 
     if (!skipConflictCheck) {
-      const conflict = await getConflictWarning({
-        selectedJobId,
-        coverageMode,
-        technicianId,
-        assignmentDate,
-        multiDates,
-      });
-      if (conflict) {
-        setConflictWarning(conflict);
+      try {
+        const conflict = await getConflictWarning({
+          selectedJobId,
+          coverageMode,
+          technicianId,
+          assignmentDate,
+          multiDates,
+        });
+        if (conflict) {
+          setConflictWarning(conflict);
+          return;
+        }
+      } catch (error) {
+        setIsAssigning(false);
+        const message = error instanceof Error ? error.message : 'No se pudo comprobar los conflictos de agenda';
+        toast.error(message);
         return;
       }
     }
@@ -96,10 +103,11 @@ export const useAssignJobMutations = ({
     setIsAssigning(true);
     console.log('Starting assignment:', { selectedJobId, selectedRole, technicianId, isReassignment });
 
+    let didTimeout = false;
     const timeoutId = window.setTimeout(() => {
+      didTimeout = true;
       console.error('Assignment timeout after 10 seconds');
-      setIsAssigning(false);
-      toast.error('La asignación expiró - por favor intenta de nuevo');
+      toast.error('La asignación está tardando más de lo esperado. Espera a que termine antes de reintentar.');
     }, 10000);
 
     try {
@@ -161,12 +169,15 @@ export const useAssignJobMutations = ({
         assignment_source: 'direct' as const,
       } as const;
 
-      const { data: existingRow } = await supabase
+      const { data: existingRow, error: existingRowError } = await supabase
         .from('job_assignments')
-        .select('job_id, technician_id, single_day, assignment_date, status')
+        .select('job_id, technician_id, single_day, assignment_date, status, response_time')
         .eq('job_id', selectedJobId)
         .eq('technician_id', technicianId)
         .maybeSingle();
+      if (existingRowError) {
+        throw new Error(`No se pudo comprobar la asignación existente: ${existingRowError.message}`);
+      }
 
       const desiredSingleDay = coverageMode !== 'full';
       const desiredAssignmentDate = coverageMode === 'single'
@@ -253,11 +264,14 @@ export const useAssignJobMutations = ({
           return [assignmentDate];
         }
         if (coverageMode === 'full') {
-          const { data: jobData } = await supabase
+          const { data: jobData, error: jobDataError } = await supabase
             .from('jobs')
             .select('start_time, end_time')
             .eq('id', selectedJobId)
             .single();
+          if (jobDataError) {
+            throw new Error(`No se pudo cargar la cobertura del trabajo: ${jobDataError.message}`);
+          }
 
           if (jobData) {
             const startDate = startOfDay(new Date(jobData.start_time));
@@ -439,7 +453,7 @@ export const useAssignJobMutations = ({
         console.error('Error with Flex crew assignments:', flexError);
       }
 
-      const statusText = assignAsConfirmed ? 'confirmed' : 'invited';
+      const statusText = assignAsConfirmed ? 'confirmado' : 'invitado';
       console.log('Assignment completed successfully');
       window.clearTimeout(timeoutId);
       toast.success(
@@ -473,6 +487,10 @@ export const useAssignJobMutations = ({
     } catch (error: any) {
       window.clearTimeout(timeoutId);
       console.error('Error assigning job:', error);
+
+      if (didTimeout) {
+        return;
+      }
 
       if (error.code === '23505') {
         toast.error('Este técnico ya está asignado a este trabajo');

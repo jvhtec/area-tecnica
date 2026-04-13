@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 
 interface PerformanceMetrics {
   renderTime: number;
@@ -7,7 +7,15 @@ interface PerformanceMetrics {
   memoryUsage?: number;
 }
 
+interface PerformanceWithMemory extends Performance {
+  memory?: {
+    usedJSHeapSize: number;
+  };
+}
+
 export const usePerformanceMonitor = (componentName: string) => {
+  const diagnosticsEnabled = import.meta.env.DEV && import.meta.env.VITE_DEBUG_MATRIX === 'true';
+  void componentName;
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
     renderTime: 0,
     queryTime: 0,
@@ -25,10 +33,11 @@ export const usePerformanceMonitor = (componentName: string) => {
   const endRenderTimer = useCallback(() => {
     if (renderStartRef.current) {
       const renderTime = performance.now() - renderStartRef.current;
-      setMetrics(prev => ({ ...prev, renderTime }));
-      console.log(`${componentName} render time: ${renderTime.toFixed(2)}ms`);
+      if (diagnosticsEnabled) {
+        setMetrics(prev => ({ ...prev, renderTime }));
+      }
     }
-  }, [componentName]);
+  }, [diagnosticsEnabled]);
 
   const startQueryTimer = useCallback(() => {
     queryStartRef.current = performance.now();
@@ -37,33 +46,27 @@ export const usePerformanceMonitor = (componentName: string) => {
   const endQueryTimer = useCallback(() => {
     if (queryStartRef.current) {
       const queryTime = performance.now() - queryStartRef.current;
-      setMetrics(prev => ({ ...prev, queryTime }));
-      console.log(`${componentName} query time: ${queryTime.toFixed(2)}ms`);
+      if (diagnosticsEnabled) {
+        setMetrics(prev => ({ ...prev, queryTime }));
+      }
     }
-  }, [componentName]);
+  }, [diagnosticsEnabled]);
 
   const incrementCellRender = useCallback(() => {
     cellRenderCountRef.current += 1;
-    if (cellRenderCountRef.current % 5000 === 0) { // Reduced logging frequency
+    if (diagnosticsEnabled && cellRenderCountRef.current % 5000 === 0) {
       setMetrics(prev => ({ ...prev, cellRenderCount: cellRenderCountRef.current }));
-      console.log(`${componentName} cells rendered: ${cellRenderCountRef.current}`);
     }
-  }, [componentName]);
+  }, [diagnosticsEnabled]);
 
   const measureMemoryUsage = useCallback(() => {
-    if ('memory' in performance) {
-      const memory = (performance as any).memory;
+    const performanceWithMemory = performance as PerformanceWithMemory;
+    if (diagnosticsEnabled && performanceWithMemory.memory) {
+      const memory = performanceWithMemory.memory;
       const memoryUsage = memory.usedJSHeapSize / 1024 / 1024; // MB
       setMetrics(prev => ({ ...prev, memoryUsage }));
-      console.log(`${componentName} memory usage: ${memoryUsage.toFixed(2)}MB`);
     }
-  }, [componentName]);
-
-  // Auto-measure memory every 5 seconds
-  useEffect(() => {
-    const interval = setInterval(measureMemoryUsage, 5000);
-    return () => clearInterval(interval);
-  }, [measureMemoryUsage]);
+  }, [diagnosticsEnabled]);
 
   return {
     metrics,

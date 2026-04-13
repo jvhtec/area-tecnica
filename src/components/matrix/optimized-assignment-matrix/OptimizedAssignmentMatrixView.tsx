@@ -18,161 +18,205 @@ import { AssignJobDialog } from "../AssignJobDialog";
 import { AssignmentStatusDialog } from "../AssignmentStatusDialog";
 import { MarkUnavailableDialog } from "../MarkUnavailableDialog";
 import { OfferDetailsDialog } from "../OfferDetailsDialog";
+import type {
+  GroupedOptimizedAssignmentMatrixViewProps,
+  LegacyOptimizedAssignmentMatrixViewProps,
+  MatrixActionsState,
+  MatrixDataState,
+  MatrixDialogsState,
+  MatrixSortingState,
+  MatrixViewportState,
+  OptimizedAssignmentMatrixViewProps,
+} from "./types";
 
-export interface OptimizedAssignmentMatrixViewProps {
-  isFetching: boolean;
-  isInitialLoading: boolean;
-  TECHNICIAN_WIDTH: number;
-  HEADER_HEIGHT: number;
-  CELL_WIDTH: number;
-  CELL_HEIGHT: number;
-  matrixWidth: number;
-  matrixHeight: number;
-  dateHeadersRef: React.RefObject<HTMLDivElement>;
-  technicianScrollRef: React.RefObject<HTMLDivElement>;
-  mainScrollRef: React.RefObject<HTMLDivElement>;
-  visibleCols: { start: number; end: number };
-  visibleRows: { start: number; end: number };
-  dates: Date[];
-  technicians: any[];
-  orderedTechnicians: any[];
-  fridgeSet?: Set<string>;
-  allowDirectAssign: boolean;
-  allowMarkUnavailable?: boolean;
-  mobile: boolean;
-  canNavLeft: boolean;
-  canNavRight: boolean;
-  handleMobileNav: (dir: "left" | "right") => void;
-  handleDateHeadersScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-  handleTechnicianScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-  handleMainScroll: (e: React.UIEvent<HTMLDivElement>) => void;
-  cycleTechSort: () => void;
-  getSortLabel: () => string;
-  isManagementUser: boolean;
-  setCreateUserOpen: (open: boolean) => void;
-  createUserOpen: boolean;
-  qc: any;
-  setSortJobId: React.Dispatch<React.SetStateAction<string | null>>;
-  getJobsForDate: (date: Date) => any[];
-  getAssignmentForCell: (technicianId: string, date: Date) => any;
-  getAvailabilityForCell: (technicianId: string, date: Date) => any;
-  selectedCells: Set<string>;
-  staffingMaps: any;
-  profileNamesMap: Map<string, string>;
-  handleCellSelect: (technicianId: string, date: Date, selected: boolean) => void;
-  handleCellClick: (technicianId: string, date: Date, action: any, selectedJobId?: string) => void;
-  handleCellPrefetch: (technicianId: string) => void;
-  handleOptimisticUpdate: (technicianId: string, jobId: string, status: any) => void;
-  incrementCellRender: () => void;
-  declinedJobsByTech: Map<string, Set<string>>;
-  cellAction: any;
-  currentTechnician: any | null;
-  closeDialogs: () => void;
-  handleJobSelected: (jobId: string) => void;
-  handleStaffingActionSelected: (jobId: string, action: 'availability' | 'offer', options?: { singleDay?: boolean }) => void;
-  forcedStaffingAction: any;
-  forcedStaffingChannel: any;
-  jobs: any[];
-  offerChannel: "email" | "whatsapp";
-  toast: any;
-  sendStaffingEmail: any;
-  checkTimeConflictEnhanced: any;
-  availabilityDialog: any;
-  setAvailabilityDialog: (value: any) => void;
-  availabilityCoverage: "full" | "single" | "multi";
-  setAvailabilityCoverage: (value: "full" | "single" | "multi") => void;
-  availabilitySingleDate: Date | null;
-  setAvailabilitySingleDate: (value: Date | null) => void;
-  availabilityMultiDates: Date[];
-  setAvailabilityMultiDates: (value: Date[]) => void;
-  availabilitySending: boolean;
-  setAvailabilitySending: (value: boolean) => void;
-  handleEmailError: (error: any, payload: any) => void;
-  conflictDialog: any;
-  setConflictDialog: (value: any) => void;
-  // TODO: isGlobalCellSelected is intended for future Stream Deck integration
-  // Will be used to highlight/indicate selected cells for external control
-  isGlobalCellSelected: (technicianId: string, date: Date) => boolean;
-  techMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
-  techLastYearMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
-}
+const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
+
+const normalizeViewProps = (
+  props: OptimizedAssignmentMatrixViewProps,
+): GroupedOptimizedAssignmentMatrixViewProps => {
+  if ("data" in props) {
+    return props;
+  }
+
+  const legacy = props as LegacyOptimizedAssignmentMatrixViewProps;
+  const viewport: MatrixViewportState = {
+    TECHNICIAN_WIDTH: legacy.TECHNICIAN_WIDTH,
+    HEADER_HEIGHT: legacy.HEADER_HEIGHT,
+    CELL_WIDTH: legacy.CELL_WIDTH,
+    CELL_HEIGHT: legacy.CELL_HEIGHT,
+    matrixWidth: legacy.matrixWidth,
+    matrixHeight: legacy.matrixHeight,
+    dateHeadersRef: legacy.dateHeadersRef,
+    technicianScrollRef: legacy.technicianScrollRef,
+    mainScrollRef: legacy.mainScrollRef,
+    visibleCols: legacy.visibleCols,
+    visibleRows: legacy.visibleRows,
+    canNavLeft: legacy.canNavLeft,
+    canNavRight: legacy.canNavRight,
+    handleMobileNav: legacy.handleMobileNav,
+    handleDateHeadersScroll: legacy.handleDateHeadersScroll,
+    handleTechnicianScroll: legacy.handleTechnicianScroll,
+    handleMainScroll: legacy.handleMainScroll,
+  };
+  const data: MatrixDataState = {
+    isFetching: legacy.isFetching,
+    isInitialLoading: legacy.isInitialLoading,
+    dates: legacy.dates,
+    technicians: legacy.technicians,
+    orderedTechnicians: legacy.orderedTechnicians,
+    jobs: legacy.jobs,
+    fridgeSet: legacy.fridgeSet,
+    allowDirectAssign: legacy.allowDirectAssign,
+    allowMarkUnavailable: legacy.allowMarkUnavailable,
+    mobile: legacy.mobile,
+    selectedCells: legacy.selectedCells,
+    staffingMaps: legacy.staffingMaps,
+    profileNamesMap: legacy.profileNamesMap ?? EMPTY_PROFILE_NAMES_MAP,
+    declinedJobsByTech: legacy.declinedJobsByTech,
+    getJobsForDate: legacy.getJobsForDate,
+    getAssignmentForCell: legacy.getAssignmentForCell,
+    getAvailabilityForCell: legacy.getAvailabilityForCell,
+  };
+  const actions: MatrixActionsState = {
+    handleCellSelect: legacy.handleCellSelect,
+    handleCellClick: legacy.handleCellClick,
+    handleCellPrefetch: legacy.handleCellPrefetch,
+    handleOptimisticUpdate: legacy.handleOptimisticUpdate,
+    incrementCellRender: legacy.incrementCellRender,
+    handleUserCreated:
+      legacy.handleUserCreated ??
+      (() => {
+        if (legacy.qc) {
+          void legacy.qc.invalidateQueries({ queryKey: ["optimized-matrix-technicians"] });
+        }
+      }),
+  };
+  const dialogs: MatrixDialogsState = {
+    cellAction: legacy.cellAction,
+    currentTechnician: legacy.currentTechnician,
+    closeDialogs: legacy.closeDialogs,
+    handleJobSelected: legacy.handleJobSelected,
+    handleStaffingActionSelected: legacy.handleStaffingActionSelected,
+    forcedStaffingAction: legacy.forcedStaffingAction,
+    forcedStaffingChannel: legacy.forcedStaffingChannel,
+    availabilityDialog: legacy.availabilityDialog,
+    setAvailabilityDialog: legacy.setAvailabilityDialog,
+    availabilityCoverage: legacy.availabilityCoverage,
+    setAvailabilityCoverage: legacy.setAvailabilityCoverage,
+    availabilitySingleDate: legacy.availabilitySingleDate,
+    setAvailabilitySingleDate: legacy.setAvailabilitySingleDate,
+    availabilityMultiDates: legacy.availabilityMultiDates,
+    setAvailabilityMultiDates: legacy.setAvailabilityMultiDates,
+    availabilitySending: legacy.availabilitySending,
+    setAvailabilitySending: legacy.setAvailabilitySending,
+    conflictDialog: legacy.conflictDialog,
+    setConflictDialog: legacy.setConflictDialog,
+    handleEmailError: legacy.handleEmailError,
+    offerChannel: legacy.offerChannel,
+    toast: legacy.toast,
+    sendStaffingEmail: legacy.sendStaffingEmail,
+    checkTimeConflictEnhanced: legacy.checkTimeConflictEnhanced,
+  };
+  const sorting: MatrixSortingState = {
+    isManagementUser: legacy.isManagementUser,
+    cycleTechSort: legacy.cycleTechSort,
+    getSortLabel: legacy.getSortLabel,
+    setSortJobId: legacy.setSortJobId,
+    createUserOpen: legacy.createUserOpen,
+    setCreateUserOpen: legacy.setCreateUserOpen,
+    techMedalRankings: legacy.techMedalRankings,
+    techLastYearMedalRankings: legacy.techLastYearMedalRankings,
+  };
+
+  return { viewport, data, actions, dialogs, sorting };
+};
 
 export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixViewProps> = ({
-  isFetching,
-  isInitialLoading,
-  TECHNICIAN_WIDTH,
-  HEADER_HEIGHT,
-  CELL_WIDTH,
-  CELL_HEIGHT,
-  matrixWidth,
-  matrixHeight,
-  dateHeadersRef,
-  technicianScrollRef,
-  mainScrollRef,
-  visibleCols,
-  visibleRows,
-  dates,
-  technicians,
-  orderedTechnicians,
-  fridgeSet,
-  allowDirectAssign,
-  allowMarkUnavailable = false,
-  mobile,
-  canNavLeft,
-  canNavRight,
-  handleMobileNav,
-  handleDateHeadersScroll,
-  handleTechnicianScroll,
-  handleMainScroll,
-  cycleTechSort,
-  getSortLabel,
-  isManagementUser,
-  setCreateUserOpen,
-  createUserOpen,
-  qc,
-  setSortJobId,
-  getJobsForDate,
-  getAssignmentForCell,
-  getAvailabilityForCell,
-  selectedCells,
-  staffingMaps,
-  profileNamesMap,
-  handleCellSelect,
-  handleCellClick,
-  handleCellPrefetch,
-  handleOptimisticUpdate,
-  incrementCellRender,
-  declinedJobsByTech,
-  cellAction,
-  currentTechnician,
-  closeDialogs,
-  handleJobSelected,
-  handleStaffingActionSelected,
-  forcedStaffingAction,
-  forcedStaffingChannel,
-  jobs,
-  offerChannel,
-  toast,
-  sendStaffingEmail,
-  checkTimeConflictEnhanced,
-  availabilityDialog,
-  setAvailabilityDialog,
-  availabilityCoverage,
-  setAvailabilityCoverage,
-  availabilitySingleDate,
-  setAvailabilitySingleDate,
-  availabilityMultiDates,
-  setAvailabilityMultiDates,
-  availabilitySending,
-  setAvailabilitySending,
-  handleEmailError,
-  conflictDialog,
-  setConflictDialog,
-  isGlobalCellSelected: _isGlobalCellSelected,
-  techMedalRankings,
-  techLastYearMedalRankings,
+  ...props
 }: OptimizedAssignmentMatrixViewProps) => {
-  void _isGlobalCellSelected;
+  const { viewport, data, actions, dialogs, sorting } = normalizeViewProps(props);
+  const {
+    isFetching,
+    isInitialLoading,
+    dates,
+    technicians,
+    orderedTechnicians,
+    jobs,
+    fridgeSet,
+    allowDirectAssign,
+    allowMarkUnavailable = false,
+    mobile,
+    selectedCells,
+    staffingMaps,
+    profileNamesMap,
+    declinedJobsByTech,
+    getJobsForDate,
+    getAssignmentForCell,
+    getAvailabilityForCell,
+  } = data;
+  const {
+    TECHNICIAN_WIDTH,
+    HEADER_HEIGHT,
+    CELL_WIDTH,
+    CELL_HEIGHT,
+    matrixWidth,
+    matrixHeight,
+    dateHeadersRef,
+    technicianScrollRef,
+    mainScrollRef,
+    visibleCols,
+    visibleRows,
+    canNavLeft,
+    canNavRight,
+    handleMobileNav,
+    handleDateHeadersScroll,
+    handleTechnicianScroll,
+    handleMainScroll,
+  } = viewport;
+  const {
+    handleCellSelect,
+    handleCellClick,
+    handleCellPrefetch,
+    handleOptimisticUpdate,
+    incrementCellRender,
+    handleUserCreated,
+  } = actions;
+  const {
+    cellAction,
+    currentTechnician,
+    closeDialogs,
+    handleJobSelected,
+    handleStaffingActionSelected,
+    forcedStaffingAction,
+    forcedStaffingChannel,
+    availabilityDialog,
+    setAvailabilityDialog,
+    availabilityCoverage,
+    setAvailabilityCoverage,
+    availabilitySingleDate,
+    setAvailabilitySingleDate,
+    availabilityMultiDates,
+    setAvailabilityMultiDates,
+    availabilitySending,
+    setAvailabilitySending,
+    handleEmailError,
+    conflictDialog,
+    setConflictDialog,
+    offerChannel,
+    toast,
+    sendStaffingEmail,
+    checkTimeConflictEnhanced,
+  } = dialogs;
+  const {
+    cycleTechSort,
+    getSortLabel,
+    isManagementUser,
+    setCreateUserOpen,
+    createUserOpen,
+    setSortJobId,
+    techMedalRankings,
+    techLastYearMedalRankings,
+  } = sorting;
 
   return (
     <div className="matrix-layout relative">
@@ -305,7 +349,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                 technician={technician}
                 height={CELL_HEIGHT}
                 isFridge={fridgeSet?.has(technician.id) || false}
-                // @ts-ignore – optional prop for compact rendering
+                // @ts-expect-error compact is supported by the current row implementation but not typed yet
                 compact={mobile}
                 medalRank={techMedalRankings.get(technician.id)}
                 lastYearMedalRank={techLastYearMedalRankings.get(technician.id)}
@@ -745,7 +789,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
           open={createUserOpen}
           onOpenChange={(open) => {
             if (!open) {
-              qc.invalidateQueries({ queryKey: ["optimized-matrix-technicians"] });
+              handleUserCreated();
             }
             setCreateUserOpen(open);
           }}
