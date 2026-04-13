@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { format, isWithinInterval, isSameDay } from 'date-fns';
+import { useCallback, useMemo } from 'react';
+import { format } from 'date-fns';
 
 interface Assignment {
   job_id: string;
@@ -37,6 +37,44 @@ export const useMemoizedMatrix = (
   jobs: Job[],
   dates: Date[]
 ) => {
+  const normalizedDateEntries = useMemo(() => {
+    const entries = dates.map((date) => {
+      const normalized = new Date(date);
+      normalized.setHours(0, 0, 0, 0);
+      return {
+        date,
+        key: format(normalized, 'yyyy-MM-dd'),
+        ts: normalized.getTime(),
+      };
+    });
+    entries.sort((a, b) => a.ts - b.ts);
+    return entries;
+  }, [dates]);
+
+  const dateTimestamps = useMemo(() => normalizedDateEntries.map((entry) => entry.ts), [normalizedDateEntries]);
+
+  const findLowerBound = useCallback((target: number) => {
+    let left = 0;
+    let right = dateTimestamps.length;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (dateTimestamps[mid] < target) left = mid + 1;
+      else right = mid;
+    }
+    return left;
+  }, [dateTimestamps]);
+
+  const findUpperBound = useCallback((target: number) => {
+    let left = 0;
+    let right = dateTimestamps.length;
+    while (left < right) {
+      const mid = Math.floor((left + right) / 2);
+      if (dateTimestamps[mid] <= target) left = mid + 1;
+      else right = mid;
+    }
+    return left - 1;
+  }, [dateTimestamps]);
+
   // Pre-compute assignment lookups
   const assignmentLookup = useMemo(() => {
     const lookup = new Map<string, Assignment>();
@@ -46,19 +84,23 @@ export const useMemoizedMatrix = (
       
       const jobStart = new Date(assignment.job.start_time);
       const jobEnd = new Date(assignment.job.end_time);
-      
-      dates.forEach(date => {
-        if (isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
-            isSameDay(date, jobStart) || 
-            isSameDay(date, jobEnd)) {
-          const key = `${assignment.technician_id}:${format(date, 'yyyy-MM-dd')}`;
-          lookup.set(key, assignment);
-        }
-      });
+      jobStart.setHours(0, 0, 0, 0);
+      jobEnd.setHours(0, 0, 0, 0);
+
+      const startIdx = findLowerBound(jobStart.getTime());
+      const endIdx = findUpperBound(jobEnd.getTime());
+      if (startIdx > endIdx || startIdx >= normalizedDateEntries.length || endIdx < 0) return;
+
+      for (let idx = startIdx; idx <= endIdx; idx += 1) {
+        const dateKey = normalizedDateEntries[idx]?.key;
+        if (!dateKey) continue;
+        const key = `${assignment.technician_id}:${dateKey}`;
+        lookup.set(key, assignment);
+      }
     });
     
     return lookup;
-  }, [assignments, dates]);
+  }, [assignments, findLowerBound, findUpperBound, normalizedDateEntries]);
 
   // Pre-compute availability lookups
   const availabilityLookup = useMemo(() => {
@@ -75,23 +117,28 @@ export const useMemoizedMatrix = (
   // Pre-compute jobs by date
   const jobsByDate = useMemo(() => {
     const lookup = new Map<string, Job[]>();
-    
-    dates.forEach(date => {
-      const dateKey = format(date, 'yyyy-MM-dd');
-      const dateJobs = jobs.filter(job => {
-        const jobStart = new Date(job.start_time);
-        const jobEnd = new Date(job.end_time);
-        
-        return isWithinInterval(date, { start: jobStart, end: jobEnd }) || 
-               isSameDay(date, jobStart) || 
-               isSameDay(date, jobEnd);
-      });
-      
-      lookup.set(dateKey, dateJobs);
+    normalizedDateEntries.forEach(({ key }) => lookup.set(key, []));
+
+    jobs.forEach((job) => {
+      const jobStart = new Date(job.start_time);
+      const jobEnd = new Date(job.end_time);
+      jobStart.setHours(0, 0, 0, 0);
+      jobEnd.setHours(0, 0, 0, 0);
+
+      const startIdx = findLowerBound(jobStart.getTime());
+      const endIdx = findUpperBound(jobEnd.getTime());
+      if (startIdx > endIdx || startIdx >= normalizedDateEntries.length || endIdx < 0) return;
+
+      for (let idx = startIdx; idx <= endIdx; idx += 1) {
+        const dateKey = normalizedDateEntries[idx]?.key;
+        if (!dateKey) continue;
+        const bucket = lookup.get(dateKey);
+        if (bucket) bucket.push(job);
+      }
     });
     
     return lookup;
-  }, [jobs, dates]);
+  }, [jobs, findLowerBound, findUpperBound, normalizedDateEntries]);
 
   // Optimized getter functions
   const getAssignment = useMemo(() => 

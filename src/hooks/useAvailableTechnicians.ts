@@ -73,35 +73,51 @@ export function useAvailableTechnicians({
 
     console.log(`Setting up real-time subscription for available technicians (${department}, job: ${jobId})`);
 
+    const queryKey = ["available-technicians", department, jobId, jobStartTime, jobEndTime, assignmentDate ?? null] as const;
     const channel = supabase
       .channel('technician-availability-updates')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
-          table: 'job_assignments'
+          table: 'job_assignments',
+          filter: `job_id=eq.${jobId}`,
         },
         (payload) => {
-          console.log('Job assignment changed, refreshing available technicians:', payload);
-          // Invalidate and refetch the available technicians query
+          console.log('Job assignment inserted for this job, refreshing available technicians:', payload);
           queryClient.invalidateQueries({
-            queryKey: ["available-technicians", department, jobId, jobStartTime, jobEndTime]
+            queryKey,
           });
         }
       )
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'DELETE',
           schema: 'public',
-          table: 'jobs'
+          table: 'job_assignments',
+          filter: `job_id=eq.${jobId}`,
         },
         (payload) => {
-          console.log('Job changed, refreshing available technicians:', payload);
-          // Invalidate and refetch when job dates might have changed
+          console.log('Job assignment removed for this job, refreshing available technicians:', payload);
           queryClient.invalidateQueries({
-            queryKey: ["available-technicians"]
+            queryKey,
+          });
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'jobs',
+          filter: `id=eq.${jobId}`,
+        },
+        (payload) => {
+          console.log('Current job changed, refreshing available technicians:', payload);
+          queryClient.invalidateQueries({
+            queryKey,
           });
         }
       )
