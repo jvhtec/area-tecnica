@@ -9,7 +9,6 @@ import type {
   MatrixTechnician,
   MatrixTimesheetAssignment,
   MatrixSortingState,
-  MatrixJob,
   TechSortMethod,
 } from "./types";
 
@@ -20,8 +19,6 @@ interface TechCountData {
 
 interface UseMatrixSortingControllerArgs {
   technicians: MatrixTechnician[];
-  jobs: MatrixJob[];
-  dates: Date[];
   allAssignments: MatrixTimesheetAssignment[];
   mobile: boolean;
   isManagementUser: boolean;
@@ -36,8 +33,6 @@ const EMPTY_COUNTS: TechCountData = {
 
 export function useMatrixSortingController({
   technicians,
-  jobs,
-  dates,
   allAssignments,
   mobile,
   isManagementUser,
@@ -390,10 +385,6 @@ export function useMatrixSortingController({
         return "";
     }
   }, [mobile, techSortMethod]);
-
-  void jobs;
-  void dates;
-
   return {
     orderedTechnicians,
     isManagementUser,

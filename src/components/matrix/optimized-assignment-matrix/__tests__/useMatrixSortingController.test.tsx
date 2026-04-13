@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -71,8 +72,6 @@ describe('useMatrixSortingController', () => {
     const { result } = renderHook(() =>
       useMatrixSortingController({
         technicians,
-        jobs: [],
-        dates: [new Date('2025-03-01T00:00:00Z')],
         allAssignments: [],
         mobile: false,
         isManagementUser: true,
@@ -88,8 +87,6 @@ describe('useMatrixSortingController', () => {
     const { result } = renderHook(() =>
       useMatrixSortingController({
         technicians: [],
-        jobs: [],
-        dates: [],
         allAssignments: [],
         mobile: false,
         isManagementUser: false,

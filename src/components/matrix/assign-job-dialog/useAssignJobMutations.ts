@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { addDays, format, startOfDay } from 'date-fns';
+import type { TablesInsert } from '@/integrations/supabase/types';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
@@ -56,6 +57,66 @@ export const useAssignJobMutations = ({
     if (existingRow?.status === 'confirmed') return existingRow?.response_time ?? null;
     return null;
   };
+  const syncCoverageTimesheets = async (
+    desiredDates: string[],
+    existingDatesForSelectedJob: string[],
+  ) => {
+    const uniqueDates = Array.from(new Set(desiredDates));
+    if (uniqueDates.length === 0) {
+      throw new Error('Selecciona al menos una fecha de cobertura');
+    }
+
+    const upsertRows = uniqueDates.map((dateIso) => ({
+      job_id: selectedJobId,
+      technician_id: technicianId,
+      date: dateIso,
+      status: 'draft',
+      source: 'assignment-dialog',
+      is_active: true,
+    })) as Array<TablesInsert<'timesheets'> & { is_active: boolean }>;
+
+    const { error: upsertError } = await supabase
+      .from('timesheets')
+      .upsert(upsertRows, { onConflict: 'job_id,technician_id,date' });
+
+    if (upsertError) {
+      throw new Error(`No se pudieron actualizar las hojas de hora: ${upsertError.message}`);
+    }
+
+    const datesToRemove = existingDatesForSelectedJob.filter((dateIso) => !uniqueDates.includes(dateIso));
+    if (datesToRemove.length === 0) {
+      return;
+    }
+
+    const removeResults = await Promise.allSettled(
+      datesToRemove.map((dateIso) =>
+        supabase
+          .from('timesheets')
+          .delete()
+          .eq('job_id', selectedJobId)
+          .eq('technician_id', technicianId)
+          .eq('date', dateIso),
+      ),
+    );
+
+    const removeFailures = removeResults
+      .map((result, index) => ({ result, date: datesToRemove[index] }))
+      .filter(({ result }) => result.status === 'rejected');
+
+    if (removeFailures.length > 0) {
+      const failedDates = removeFailures.map(({ date }) => date).join(', ');
+      throw new Error(`No se pudieron limpiar las hojas de hora antiguas: ${failedDates}`);
+    }
+
+    const deleteErrors = removeResults
+      .filter((result): result is PromiseFulfilledResult<{ error?: { message?: string } | null }> => result.status === 'fulfilled')
+      .map((result) => result.value?.error)
+      .filter((error): error is { message?: string } => Boolean(error));
+
+    if (deleteErrors.length > 0) {
+      throw new Error(`No se pudieron limpiar las hojas de hora antiguas: ${deleteErrors[0].message ?? 'error desconocido'}`);
+    }
+  };
 
   const attemptAssign = async (skipConflictCheck = false) => {
     if (!selectedJobId || !selectedRole || !technician) {
@@ -93,7 +154,6 @@ export const useAssignJobMutations = ({
           return;
         }
       } catch (error) {
-        setIsAssigning(false);
         const message = error instanceof Error ? error.message : 'No se pudo comprobar los conflictos de agenda';
         toast.error(message);
         return;
@@ -276,6 +336,15 @@ export const useAssignJobMutations = ({
           if (jobData) {
             const startDate = startOfDay(new Date(jobData.start_time));
             const endDate = startOfDay(new Date(jobData.end_time));
+
+            if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+              throw new Error('El trabajo no tiene fechas válidas para calcular la cobertura');
+            }
+
+            if (endDate < startDate) {
+              throw new Error('El rango de fechas del trabajo no es válido para generar la cobertura');
+            }
+
             const dates: string[] = [];
 
             let i = 0;
@@ -288,6 +357,14 @@ export const useAssignJobMutations = ({
         }
         return [];
       })();
+
+      if (coverageDates.length === 0) {
+        throw new Error(
+          coverageMode === 'full'
+            ? 'El trabajo no tiene un rango de fechas válido para generar hojas de hora'
+            : 'Selecciona al menos una fecha de cobertura',
+        );
+      }
 
       if (isModifyingSelectedJob) {
         if (modificationMode === 'add') {
@@ -359,37 +436,23 @@ export const useAssignJobMutations = ({
           }
         }
       } else {
-        console.log('Different job or new assignment - replacing all timesheets');
-        const { error: deleteError } = await supabase
+        console.log('Different job or new assignment - synchronizing timesheets without destructive delete-first');
+        const { data: freshTimesheets, error: freshTimesheetsError } = await supabase
           .from('timesheets')
-          .delete()
+          .select('date')
           .eq('job_id', selectedJobId)
-          .eq('technician_id', technicianId);
+          .eq('technician_id', technicianId)
+          .eq('is_active', true);
 
-        if (deleteError) {
-          console.error('Error deleting existing timesheets:', deleteError);
-          throw new Error(`No se pudieron eliminar las hojas de hora existentes: ${deleteError.message}`);
+        if (freshTimesheetsError) {
+          console.error('Error loading existing timesheets before sync:', freshTimesheetsError);
+          throw new Error(`No se pudieron cargar las hojas de hora existentes: ${freshTimesheetsError.message}`);
         }
 
-        const results = await Promise.allSettled(coverageDates.map((dateIso) =>
-          toggleTimesheetDay({
-            jobId: selectedJobId,
-            technicianId,
-            dateIso,
-            present: true,
-            source: 'assignment-dialog'
-          })
-        ));
-
-        const failures = results
-          .map((result, idx) => ({ result, date: coverageDates[idx] }))
-          .filter(({ result }) => result.status === 'rejected');
-
-        if (failures.length > 0) {
-          console.error('Some timesheets failed to create:', failures);
-          const failedDates = failures.map(({ date }) => date).join(', ');
-          throw new Error(`Error al crear hojas de hora para las fechas: ${failedDates}`);
-        }
+        await syncCoverageTimesheets(
+          coverageDates,
+          freshTimesheets?.map((timesheet) => timesheet.date) || [],
+        );
       }
 
       const verifyQuery = supabase
@@ -474,7 +537,8 @@ export const useAssignJobMutations = ({
             single_day: coverageMode !== 'full'
           }
         });
-      } catch (_) {
+      } catch {
+        // Push failures are non-blocking for the assignment flow.
       }
 
       window.dispatchEvent(new CustomEvent('assignment-updated', {

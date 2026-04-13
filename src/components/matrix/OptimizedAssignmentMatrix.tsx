@@ -54,7 +54,7 @@ export const OptimizedAssignmentMatrix = ({
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { mutate: sendStaffingEmail } = useSendStaffingEmail();
-  const { startRenderTimer, endRenderTimer, incrementCellRender } = usePerformanceMonitor("AssignmentMatrix");
+  const { startRenderTimer, endRenderTimer, incrementCellRender } = usePerformanceMonitor();
 
   useStaffingRealtime();
 
@@ -104,8 +104,6 @@ export const OptimizedAssignmentMatrix = ({
 
   const sorting = useMatrixSortingController({
     technicians,
-    jobs,
-    dates,
     allAssignments,
     mobile,
     isManagementUser,
@@ -286,6 +284,10 @@ export const OptimizedAssignmentMatrix = ({
     checkTimeConflictEnhanced: interaction.checkTimeConflictEnhanced,
   };
 
+  // Deprecated compatibility bridge for callers/tests still depending on
+  // LegacyOptimizedAssignmentMatrixViewProps. Remove after the grouped view
+  // migration is complete; update call sites that still rely on the flattened
+  // OptimizedAssignmentMatrixViewProps shape before deleting this spread path.
   const legacyViewProps: LegacyOptimizedAssignmentMatrixViewProps = {
     isFetching,
     isInitialLoading,

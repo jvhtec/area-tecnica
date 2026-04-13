@@ -73,6 +73,8 @@ type SetupOptions = {
   jobData?: { start_time: string; end_time: string } | null;
   jobDataError?: { message: string } | null;
   insertError?: { code?: string; message: string } | null;
+  timesheetUpsertError?: { message: string } | null;
+  timesheetDeleteError?: { message: string } | null;
 };
 
 const setupSupabase = ({
@@ -86,10 +88,14 @@ const setupSupabase = ({
   },
   jobDataError = null,
   insertError = null,
+  timesheetUpsertError = null,
+  timesheetDeleteError = null,
 }: SetupOptions = {}) => {
   const insertMock = vi.fn().mockResolvedValue({ error: insertError });
   const updateMock = vi.fn(() => createMockQueryBuilder({ data: null, error: null }));
   const deleteMock = vi.fn(() => createMockQueryBuilder({ data: null, error: null }));
+  const timesheetUpsertMock = vi.fn(() => createMockQueryBuilder({ data: null, error: timesheetUpsertError }));
+  const timesheetDeleteMock = vi.fn(() => createMockQueryBuilder({ data: null, error: timesheetDeleteError }));
 
   fromMock.mockImplementation((table: string) => {
     if (table === 'job_assignments') {
@@ -133,7 +139,8 @@ const setupSupabase = ({
           data: freshTimesheets,
           error: null,
         })),
-        delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
+        upsert: timesheetUpsertMock,
+        delete: timesheetDeleteMock,
       };
     }
 
@@ -153,7 +160,18 @@ const setupSupabase = ({
     };
   });
 
-  return { insertMock, updateMock, deleteMock };
+  return { insertMock, updateMock, deleteMock, timesheetUpsertMock, timesheetDeleteMock };
+};
+
+const createDeferred = <T,>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+
+  return { promise, resolve, reject };
 };
 
 const baseProps = () => ({
@@ -205,8 +223,8 @@ describe('useAssignJobMutations', () => {
     vi.useRealTimers();
   });
 
-  it('creates a full-span assignment and toggles one timesheet per job day', async () => {
-    const { insertMock } = setupSupabase();
+  it('creates a full-span assignment and synchronizes one timesheet per job day', async () => {
+    const { insertMock, timesheetUpsertMock, timesheetDeleteMock } = setupSupabase();
     const props = baseProps();
 
     const { result } = renderHook(() => useAssignJobMutations(props));
@@ -228,10 +246,13 @@ describe('useAssignJobMutations', () => {
       status: 'invited',
       assignment_source: 'direct',
     }));
-    expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(3);
-    expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(1, expect.objectContaining({ dateIso: '2026-04-14', present: true }));
-    expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(2, expect.objectContaining({ dateIso: '2026-04-15', present: true }));
-    expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(3, expect.objectContaining({ dateIso: '2026-04-16', present: true }));
+    expect(timesheetUpsertMock).toHaveBeenCalledWith([
+      expect.objectContaining({ job_id: 'job-1', technician_id: 'tech-1', date: '2026-04-14', source: 'assignment-dialog', status: 'draft', is_active: true }),
+      expect.objectContaining({ job_id: 'job-1', technician_id: 'tech-1', date: '2026-04-15', source: 'assignment-dialog', status: 'draft', is_active: true }),
+      expect.objectContaining({ job_id: 'job-1', technician_id: 'tech-1', date: '2026-04-16', source: 'assignment-dialog', status: 'draft', is_active: true }),
+    ], { onConflict: 'job_id,technician_id,date' });
+    expect(timesheetDeleteMock).not.toHaveBeenCalled();
+    expect(toggleTimesheetDayMock).not.toHaveBeenCalled();
     expect(syncTimesheetCategoriesMock).toHaveBeenCalledWith(expect.objectContaining({
       jobId: 'job-1',
       technicianId: 'tech-1',
@@ -273,7 +294,7 @@ describe('useAssignJobMutations', () => {
   });
 
   it('does not unlock the UI when the timeout fires before the write settles', async () => {
-    const deferred = Promise.withResolvers<{ error: null }>();
+    const deferred = createDeferred<{ error: null }>();
     setupSupabase();
     fromMock.mockImplementation((table: string) => {
       if (table === 'job_assignments') {
@@ -296,6 +317,7 @@ describe('useAssignJobMutations', () => {
       if (table === 'timesheets') {
         return {
           select: vi.fn(() => createMockQueryBuilder({ data: [], error: null })),
+          upsert: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
           delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
         };
       }
@@ -500,6 +522,25 @@ describe('useAssignJobMutations', () => {
     });
 
     expect(toastFn.error).toHaveBeenCalledWith('Error al asignar el trabajo: No se pudo cargar la cobertura del trabajo: boom job data');
+  });
+
+  it('aborts when the full-span job range is invalid', async () => {
+    setupSupabase({
+      jobData: {
+        start_time: '2026-04-16T08:00:00.000Z',
+        end_time: '2026-04-14T18:00:00.000Z',
+      },
+    });
+
+    const { result } = renderHook(() => useAssignJobMutations(baseProps()));
+
+    await act(async () => {
+      await result.current.attemptAssign();
+    });
+
+    expect(toastFn.error).toHaveBeenCalledWith(
+      'Error al asignar el trabajo: El rango de fechas del trabajo no es válido para generar la cobertura',
+    );
   });
 
   it('localizes the success status text to Spanish', async () => {

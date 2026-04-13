@@ -18,6 +18,7 @@ import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
 import { pickTextColor, rgbaFromHex } from '@/utils/color';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
+import { formatMatrixDateKey } from '@/components/matrix/optimized-assignment-matrix/matrixCore';
 
 interface TimesheetDateRow {
   date: string;
@@ -995,7 +996,7 @@ export const OptimizedMatrixCell = memo(({
 
   // Skip noisy debug logs in production
 
-  const dateKey = format(date, 'yyyy-MM-dd');
+  const dateKey = formatMatrixDateKey(date);
   return (
     <Tooltip>
       <TooltipTrigger asChild>

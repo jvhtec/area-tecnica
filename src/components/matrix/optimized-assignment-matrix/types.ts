@@ -294,6 +294,10 @@ export interface GroupedOptimizedAssignmentMatrixViewProps {
   sorting: MatrixSortingState;
 }
 
+/**
+ * @deprecated Backward-compatibility shape for legacy matrix view consumers.
+ * Prefer GroupedOptimizedAssignmentMatrixViewProps for all new code.
+ */
 export interface LegacyOptimizedAssignmentMatrixViewProps {
   isFetching: boolean;
   isInitialLoading: boolean;
@@ -371,6 +375,7 @@ export interface LegacyOptimizedAssignmentMatrixViewProps {
   techLastYearMedalRankings: Map<string, "gold" | "silver" | "bronze">;
 }
 
+// TODO(matrix-view-migration): remove LegacyOptimizedAssignmentMatrixViewProps once all consumers use the grouped shape.
 export type OptimizedAssignmentMatrixViewProps =
   | GroupedOptimizedAssignmentMatrixViewProps
   | LegacyOptimizedAssignmentMatrixViewProps;

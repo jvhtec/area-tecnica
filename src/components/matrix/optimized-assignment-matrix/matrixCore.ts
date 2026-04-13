@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { formatInTimeZone } from "date-fns-tz";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 import type { MatrixJobLite } from "@/features/staffing/hooks/useStaffingMatrixStatuses";
 
@@ -20,6 +20,10 @@ export function chunkArray<T>(items: T[], size: number): T[][] {
 
 export function formatMatrixDateKey(date: Date): string {
   return formatInTimeZone(date, MATRIX_TIMEZONE, "yyyy-MM-dd");
+}
+
+export function parseMatrixDateKey(dateKey: string): Date {
+  return fromZonedTime(`${dateKey}T00:00:00`, MATRIX_TIMEZONE);
 }
 
 export function toMatrixDayTimestamp(dateKey: string): number {
@@ -48,8 +52,12 @@ export const matrixQueryKeys = {
   techniciansPrefix: ["optimized-matrix-technicians"] as const,
   jobsPrefix: ["optimized-matrix-jobs"] as const,
   assignmentsPrefix: ["optimized-matrix-assignments"] as const,
+  legacyMatrixAssignmentsPrefix: ["matrix-assignments"] as const,
+  legacyJobAssignmentsPrefix: ["job-assignments"] as const,
   availabilityPrefix: ["optimized-matrix-availability"] as const,
   staffingPrefix: ["staffing-matrix"] as const,
+  legacyStaffingPrefix: ["staffing"] as const,
+  staffingByDatePrefix: ["staffing-by-date"] as const,
   sortJobStatusesPrefix: ["matrix-sort-job-statuses"] as const,
   technicians: (department: string) => ["optimized-matrix-technicians", department] as const,
   jobs: (startDateKey: string, endDateKey: string, department: string) =>
@@ -78,8 +86,8 @@ export const matrixQueryKeys = {
 export async function invalidateMatrixAssignmentQueries(queryClient: QueryClient) {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: matrixQueryKeys.assignmentsPrefix }),
-    queryClient.invalidateQueries({ queryKey: ["matrix-assignments"] }),
-    queryClient.invalidateQueries({ queryKey: ["job-assignments"] }),
+    queryClient.invalidateQueries({ queryKey: matrixQueryKeys.legacyMatrixAssignmentsPrefix }),
+    queryClient.invalidateQueries({ queryKey: matrixQueryKeys.legacyJobAssignmentsPrefix }),
   ]);
 }
 
@@ -93,6 +101,8 @@ export async function invalidateMatrixJobsAndStaffingQueries(queryClient: QueryC
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: matrixQueryKeys.jobsPrefix }),
     queryClient.invalidateQueries({ queryKey: matrixQueryKeys.staffingPrefix }),
+    queryClient.invalidateQueries({ queryKey: matrixQueryKeys.legacyStaffingPrefix }),
+    queryClient.invalidateQueries({ queryKey: matrixQueryKeys.staffingByDatePrefix }),
     queryClient.invalidateQueries({ queryKey: matrixQueryKeys.sortJobStatusesPrefix }),
     queryClient.invalidateQueries({ queryKey: ["jobs"] }),
     queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),

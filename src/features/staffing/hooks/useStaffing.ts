@@ -141,16 +141,15 @@ export function useCancelStaffingRequest() {
   return useMutation({
     mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer' }) => {
       // First, check what records exist for this combination
-      const { data: existingRecords } = await supabase
+      const { data: _existingRecords } = await supabase
         .from('staffing_requests')
         .select('id, status, single_day, target_date')
         .eq('job_id', payload.job_id)
         .eq('profile_id', payload.profile_id)
         .eq('phase', payload.phase)
-      void existingRecords
 
       // Cancel ALL non-expired records (not just pending) to ensure cell clears
-      const { data, error, count } = await supabase
+      const { data, error, count: _count } = await supabase
         .from('staffing_requests')
         .update({ status: 'expired' })
         .eq('job_id', payload.job_id)
@@ -158,7 +157,6 @@ export function useCancelStaffingRequest() {
         .eq('phase', payload.phase)
         .neq('status', 'expired') // Cancel any non-expired status
         .select('id')
-      void count
 
       if (error) throw error
 

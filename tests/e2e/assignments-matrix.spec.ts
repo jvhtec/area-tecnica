@@ -253,16 +253,16 @@ test.describe("assignment matrix direct assignment lifecycle", () => {
 
     await expect(page.getByRole("dialog")).toContainText("Asignar Trabajo");
     await page.getByRole("combobox").click();
-    await page.getByRole("option", { name: /foh/i }).click();
+    await page.getByRole("option", { name: "FOH — Responsable" }).click();
     await page.getByRole("button", { name: /asignar trabajo/i }).click();
 
-    await expect(targetCell).toContainText("Create Flow Job");
     await expect.poll(() => assignments.length).toBe(1);
     await expect.poll(() => timesheets.length).toBe(1);
+    await expect(targetCell).toContainText("Create Flow Job");
     await expect(assignments[0]).toMatchObject({
       job_id: "job-create-1",
       technician_id: "tech-1",
-      sound_role: "foh",
+      sound_role: "SND-FOH-R",
       single_day: false,
       assignment_date: null,
       status: "invited",
@@ -300,7 +300,7 @@ test.describe("assignment matrix direct assignment lifecycle", () => {
       {
         job_id: "job-old",
         technician_id: "tech-1",
-        sound_role: "foh",
+        sound_role: "SND-FOH-R",
         lights_role: null,
         video_role: null,
         single_day: true,
@@ -472,10 +472,10 @@ test.describe("assignment matrix direct assignment lifecycle", () => {
     await page.getByRole("option", { name: /new job/i }).click();
     await page.getByRole("button", { name: /reasignar trabajo/i }).click();
 
-    await expect(targetCell).toContainText("New Job");
-    await expect(targetCell).not.toContainText("Old Job");
     await expect.poll(() => assignments.map((assignment) => assignment.job_id)).toEqual(["job-new"]);
     await expect.poll(() => timesheets.map((row) => row.job_id)).toEqual(["job-new"]);
+    await expect(targetCell).toContainText("New Job");
+    await expect(targetCell).not.toContainText("Old Job");
     await expect
       .poll(() => calls.rpcCalls.map((call) => call.name))
       .toEqual(expect.arrayContaining(["remove_assignment_with_timesheets", "toggle_timesheet_day"]));
@@ -499,7 +499,7 @@ test.describe("assignment matrix direct assignment lifecycle", () => {
       {
         job_id: "job-remove-1",
         technician_id: "tech-1",
-        sound_role: "foh",
+        sound_role: "SND-FOH-R",
         lights_role: null,
         video_role: null,
         single_day: false,

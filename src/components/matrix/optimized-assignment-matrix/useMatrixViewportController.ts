@@ -4,6 +4,7 @@ import { isSameDay } from "date-fns";
 import { useDragScroll } from "@/hooks/useDragScroll";
 import { throttle } from "@/utils/throttle";
 
+import { formatMatrixDateKey } from "./matrixCore";
 import type { MatrixViewportState } from "./types";
 
 interface UseMatrixViewportControllerArgs {
@@ -38,6 +39,9 @@ export function useMatrixViewportController({
   const mainScrollRef = useRef<HTMLDivElement>(null);
 
   const syncInProgressRef = useRef(false);
+  const syncScheduledRef = useRef(false);
+  const syncAnimationFrameRef = useRef<number | null>(null);
+  const pendingSyncRef = useRef<{ left: number; top: number; source: "main" | "dateHeaders" | "technician" } | null>(null);
   const lastKnownScrollRef = useRef({ left: 0, top: 0 });
   const autoScrolledRef = useRef(false);
   const hasHandledFirstScrollRef = useRef(false);
@@ -64,23 +68,38 @@ export function useMatrixViewportController({
   const overscanCols = mobile ? 4 : 6;
 
   const syncScrollPositions = useCallback((scrollLeft: number, scrollTop: number, source: "main" | "dateHeaders" | "technician") => {
-    if (syncInProgressRef.current) return;
+    pendingSyncRef.current = { left: scrollLeft, top: scrollTop, source };
+    if (syncInProgressRef.current || syncScheduledRef.current) return;
 
     syncInProgressRef.current = true;
-    requestAnimationFrame(() => {
+    syncScheduledRef.current = true;
+    syncAnimationFrameRef.current = requestAnimationFrame(() => {
+      const pendingSync = pendingSyncRef.current;
+      if (!pendingSync) {
+        syncAnimationFrameRef.current = null;
+        syncScheduledRef.current = false;
+        syncInProgressRef.current = false;
+        return;
+      }
+
       try {
-        if (source !== "dateHeaders" && dateHeadersRef.current) {
-          dateHeadersRef.current.scrollLeft = scrollLeft;
+        if (pendingSync.source !== "dateHeaders" && dateHeadersRef.current) {
+          dateHeadersRef.current.scrollLeft = pendingSync.left;
         }
-        if (source !== "main" && mainScrollRef.current) {
-          mainScrollRef.current.scrollLeft = scrollLeft;
-          mainScrollRef.current.scrollTop = scrollTop;
+        if (pendingSync.source !== "main" && mainScrollRef.current) {
+          mainScrollRef.current.scrollLeft = pendingSync.left;
+          mainScrollRef.current.scrollTop = pendingSync.top;
         }
-        if (source !== "technician" && technicianScrollRef.current) {
-          technicianScrollRef.current.scrollTop = scrollTop;
+        if (pendingSync.source !== "technician" && technicianScrollRef.current) {
+          technicianScrollRef.current.scrollTop = pendingSync.top;
         }
       } finally {
-        syncInProgressRef.current = false;
+        void Promise.resolve().then(() => {
+          pendingSyncRef.current = null;
+          syncAnimationFrameRef.current = null;
+          syncScheduledRef.current = false;
+          syncInProgressRef.current = false;
+        });
       }
     });
   }, []);
@@ -219,6 +238,10 @@ export function useMatrixViewportController({
       if ("cancel" in handleDateHeadersScroll && typeof handleDateHeadersScroll.cancel === "function") {
         handleDateHeadersScroll.cancel();
       }
+      if (syncAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(syncAnimationFrameRef.current);
+      }
+      pendingSyncRef.current = null;
     };
   }, [handleDateHeadersScroll]);
 
@@ -262,7 +285,6 @@ export function useMatrixViewportController({
 
   useEffect(() => {
     updateVisibleWindow();
-    hasHandledFirstScrollRef.current = false;
   }, [technicianCount, dates.length, updateVisibleWindow]);
 
   useEffect(() => {
@@ -281,8 +303,8 @@ export function useMatrixViewportController({
     let targetLeft = lastLeft;
 
     if (previousDates?.length) {
-      const previousFirstIso = previousDates[0]?.toISOString();
-      const nextIndex = dates.findIndex((date) => date.toISOString() === previousFirstIso);
+      const previousFirstKey = formatMatrixDateKey(previousDates[0]!);
+      const nextIndex = dates.findIndex((date) => formatMatrixDateKey(date) === previousFirstKey);
       if (nextIndex > 0) {
         targetLeft = lastLeft + nextIndex * cellWidth;
       }

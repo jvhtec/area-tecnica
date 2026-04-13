@@ -6,7 +6,7 @@ import { useSelectedCellStore } from "@/stores/useSelectedCellStore";
 import { supabase } from "@/lib/supabase";
 import { ConflictError } from "@/features/staffing/hooks/useStaffing";
 
-import { buildMatrixCellKey } from "./matrixCore";
+import { buildMatrixCellKey, parseMatrixDateKey } from "./matrixCore";
 import type {
   CellAction,
   MatrixAvailability,
@@ -413,7 +413,7 @@ export function useMatrixInteractionController({
     const selectedDatesForTechnician = Array.from(selectedCells)
       .filter((cellKey) => cellKey.startsWith(`${availabilityDialog.profileId}-`))
       .map((cellKey) => cellKey.slice(availabilityDialog.profileId.length + 1))
-      .map((dateKey) => new Date(`${dateKey}T00:00:00`))
+      .map((dateKey) => parseMatrixDateKey(dateKey))
       .filter((date) => !Number.isNaN(date.getTime()))
       .sort((left, right) => left.getTime() - right.getTime());
 
@@ -424,7 +424,7 @@ export function useMatrixInteractionController({
       return;
     }
 
-    const clickedDate = availabilityDialog.dateIso ? new Date(`${availabilityDialog.dateIso}T00:00:00`) : null;
+    const clickedDate = availabilityDialog.dateIso ? parseMatrixDateKey(availabilityDialog.dateIso) : null;
     setAvailabilitySingleDate(clickedDate);
     setAvailabilityMultiDates(clickedDate ? [clickedDate] : []);
   }, [availabilityDialog, selectedCells]);

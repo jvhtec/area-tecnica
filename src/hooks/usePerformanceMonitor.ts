@@ -13,9 +13,8 @@ interface PerformanceWithMemory extends Performance {
   };
 }
 
-export const usePerformanceMonitor = (componentName: string) => {
+export const usePerformanceMonitor = () => {
   const diagnosticsEnabled = import.meta.env.DEV && import.meta.env.VITE_DEBUG_MATRIX === 'true';
-  void componentName;
   const [metrics, setMetrics] = useState<PerformanceMetrics>({
     renderTime: 0,
     queryTime: 0,
@@ -27,15 +26,19 @@ export const usePerformanceMonitor = (componentName: string) => {
   const cellRenderCountRef = useRef<number>(0);
 
   const startRenderTimer = useCallback(() => {
+    if (!diagnosticsEnabled) {
+      return;
+    }
     renderStartRef.current = performance.now();
-  }, []);
+  }, [diagnosticsEnabled]);
 
   const endRenderTimer = useCallback(() => {
+    if (!diagnosticsEnabled) {
+      return;
+    }
     if (renderStartRef.current) {
       const renderTime = performance.now() - renderStartRef.current;
-      if (diagnosticsEnabled) {
-        setMetrics(prev => ({ ...prev, renderTime }));
-      }
+      setMetrics(prev => ({ ...prev, renderTime }));
     }
   }, [diagnosticsEnabled]);
 
