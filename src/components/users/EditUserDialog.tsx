@@ -30,6 +30,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const [warehouseDutyExempt, setWarehouseDutyExempt] = useState<boolean>(!!user?.warehouse_duty_exempt);
   const [soundvisionAccessEnabled, setSoundvisionAccessEnabled] = useState<boolean>(!!user?.soundvision_access_enabled);
   const [isAutonomo, setIsAutonomo] = useState<boolean>(user?.autonomo !== false);
+  const [canViewFinancials, setCanViewFinancials] = useState<boolean>(!!user?.can_view_financials);
   const [selectedRole, setSelectedRole] = useState<string>(user?.role || "technician");
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ['admin', 'management'].includes(userRole || '');
@@ -48,6 +49,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     const forceSoundvisionForHouseTech = user?.department === 'sound' && user?.role === 'house_tech';
     setSoundvisionAccessEnabled(forceSoundvisionForHouseTech ? true : !!user?.soundvision_access_enabled);
     setSelectedRole(user?.role || "technician");
+    setCanViewFinancials(!!user?.can_view_financials);
     setFlexResourceId(user?.flex_resource_id || "");
     setFlexUrl("");
     setIsAutonomo(user?.autonomo !== false);
@@ -105,6 +107,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
       warehouse_duty_exempt: warehouseDutyExempt,
       flex_resource_id: (formData.get('flex_resource_id') as string || flexResourceId || '').trim() || null,
       soundvision_access_enabled: forceSoundvisionAccess ? true : soundvisionAccessEnabled,
+      can_view_financials: canViewFinancials,
       autonomo: isAutonomo,
     };
 
@@ -188,6 +191,21 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
                 </span>
               </div>
             </div>
+            {isManagementUser && (
+              <div className="space-y-2">
+                <Label htmlFor="canViewFinancials">Puede ver datos financieros</Label>
+                <div className="flex items-center gap-3">
+                  <Checkbox
+                    id="canViewFinancials"
+                    checked={canViewFinancials}
+                    onCheckedChange={(v) => setCanViewFinancials(!!v)}
+                  />
+                  <span className="text-sm text-muted-foreground">
+                    Permitir a este usuario ver información financiera: pagos, tarifas, gastos y totales de trabajo.
+                  </span>
+                </div>
+              </div>
+            )}
             {isManagementUser && (isSoundTechnician || isSoundHouseTech) && (
               <div className="space-y-2">
                 <Label htmlFor="soundvisionAccess">SoundVision Access</Label>

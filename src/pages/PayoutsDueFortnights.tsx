@@ -563,7 +563,7 @@ async function fetchFortnightPayoutsDue({
 export default function PayoutsDueFortnights() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user, userRole, userDepartment } = useOptimizedAuth();
+  const { user, userRole, userDepartment, canViewFinancials } = useOptimizedAuth();
   const todayInput = formatDateInputValue(new Date());
   const defaultToInput = useMemo(
     () => formatDateInputValue(addDays(new Date(), LOOKAHEAD_DAYS)),
@@ -580,7 +580,7 @@ export default function PayoutsDueFortnights() {
 
   const queryFromInput = fromDateFilter || todayInput;
   const queryToInput = toDateFilter || defaultToInput;
-  const canManageInvoice = canManagePayouts(userRole, userDepartment);
+  const canManageInvoice = canManagePayouts(userRole, userDepartment, canViewFinancials);
 
   const {
     data,

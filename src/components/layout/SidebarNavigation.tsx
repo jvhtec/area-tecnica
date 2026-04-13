@@ -38,6 +38,7 @@ export interface NavigationContext {
   userDepartment?: string | null
   hasSoundVisionAccess: boolean
   assignableAsTech?: boolean
+  canViewFinancials?: boolean
 }
 
 export interface SidebarNavigationProps extends NavigationContext {
@@ -182,7 +183,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
      mobilePriority: 10,
      mobileSlot: "secondary",
      getPath: () => "/management/rates",
-     isVisible: ({ userRole }) => userRole === "management",
+     isVisible: ({ userRole, canViewFinancials }) => (userRole === "management" || userRole === "admin") && Boolean(canViewFinancials),
    },
    {
      id: "management-payouts-due",
@@ -192,7 +193,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
      mobilePriority: 9,
      mobileSlot: "secondary",
      getPath: () => "/management/payouts-due",
-     isVisible: ({ userRole, userDepartment }) => canManagePayouts(userRole, userDepartment),
+     isVisible: ({ userRole, userDepartment, canViewFinancials }) => canManagePayouts(userRole, userDepartment, canViewFinancials),
    },
    {
      id: "expenses",
@@ -202,8 +203,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
      mobilePriority: 9,
      mobileSlot: "secondary",
      getPath: () => "/gastos",
-     isVisible: ({ userRole }) =>
-       userRole === "admin" || userRole === "management" || userRole === "logistics",
+     isVisible: ({ canViewFinancials }) => Boolean(canViewFinancials),
    },
    {
     id: "management-department",

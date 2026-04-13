@@ -187,13 +187,13 @@ const DisponibilidadAccessGuard = () => {
 };
 
 const PayoutsDueAccessGuard = () => {
-  const { userRole, userDepartment, isLoading } = useOptimizedAuth();
+  const { userRole, userDepartment, canViewFinancials, isLoading } = useOptimizedAuth();
 
   if (isLoading) {
     return null;
   }
 
-  if (!canManagePayouts(userRole, userDepartment)) {
+  if (!canManagePayouts(userRole, userDepartment, canViewFinancials)) {
     return <Navigate to="/dashboard" replace />;
   }
 

@@ -60,7 +60,7 @@ const Sound = () => {
   const { data: jobs } = useJobs();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();
+  const { userRole, hasSoundVisionAccess, userDepartment, canViewFinancials } = useOptimizedAuth();
 
   // Generate navigation items for mobile nav bar
   const navigationItems = useMemo(() => {
@@ -514,6 +514,7 @@ const Sound = () => {
           }}
           userRole={userRole}
           userDepartment={userDepartment}
+          canViewFinancials={canViewFinancials}
           department={currentDepartment}
         />
       )}

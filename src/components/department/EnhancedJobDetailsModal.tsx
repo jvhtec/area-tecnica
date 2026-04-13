@@ -39,6 +39,7 @@ interface EnhancedJobDetailsModalProps {
     onClose: () => void;
     userRole?: string | null;
     userDepartment?: string | null;
+    canViewFinancials?: boolean;
     department?: string;
 }
 
@@ -57,7 +58,7 @@ interface StaffAssignment {
     } | null;
 }
 
-export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole, userDepartment, department = 'sound' }: EnhancedJobDetailsModalProps) => {
+export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole, userDepartment, canViewFinancials, department = 'sound' }: EnhancedJobDetailsModalProps) => {
     const [activeTab, setActiveTab] = useState<TabId>('Info');
     const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
     const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
@@ -67,7 +68,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     const queryClient = useQueryClient();
 
     const isManager = ['admin', 'management'].includes(userRole || '');
-    const canManageJobPayouts = canManagePayouts(userRole, userDepartment);
+    const canManageJobPayouts = canManagePayouts(userRole, userDepartment, canViewFinancials);
     const isHouseTech = userRole === 'house_tech';
 
     // Fetch full job details with location
@@ -186,8 +187,8 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
             }))
             .filter((assignment) => Boolean(assignment.id));
 
-        return getVisibleFinancialTechnicianIds(technicians, userRole, userDepartment);
-    }, [staffAssignments, userDepartment, userRole]);
+        return getVisibleFinancialTechnicianIds(technicians, userRole, userDepartment, canViewFinancials);
+    }, [staffAssignments, userDepartment, userRole, canViewFinancials]);
 
     const invalidateJobQueries = () => {
         if (!resolvedJobId) return;

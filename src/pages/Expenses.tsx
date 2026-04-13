@@ -77,8 +77,6 @@ interface OptionItem {
   label: string;
 }
 
-const ALLOWED_ROLES = ['admin', 'management', 'logistics'];
-
 const statusOptions: Array<{ value: ExpenseStatus | 'all'; label: string }> = [
   { value: 'all', label: 'Todos' },
   { value: 'submitted', label: 'Pendientes' },
@@ -88,7 +86,7 @@ const statusOptions: Array<{ value: ExpenseStatus | 'all'; label: string }> = [
 ];
 
 const ExpensesPage: React.FC = () => {
-  const { userRole, isLoading } = useOptimizedAuth();
+  const { userRole, canViewFinancials, isLoading } = useOptimizedAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -103,7 +101,7 @@ const ExpensesPage: React.FC = () => {
   const [viewReceiptState, setViewReceiptState] = React.useState<{ expenseId: string; loading: boolean } | null>(null);
   const [deleteDialog, setDeleteDialog] = React.useState<{ expenseId: string; technicianName: string; amount: number } | null>(null);
 
-  const canAccess = userRole ? ALLOWED_ROLES.includes(userRole) : false;
+  const canAccess = canViewFinancials;
   const canDeleteExpenses = userRole === 'admin' || userRole === 'management';
 
   React.useEffect(() => {

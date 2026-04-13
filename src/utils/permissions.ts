@@ -14,8 +14,8 @@ export const normalizeDepartmentKey = (value?: UserDepartment): string =>
 export const isAdministrativeDepartment = (department?: UserDepartment): boolean =>
   ADMINISTRATIVE_DEPARTMENT_KEYS.has(normalizeDepartmentKey(department));
 
-export const canManagePayouts = (role: UserRole, department?: UserDepartment): boolean =>
-  role === 'admin' || (role === 'management' && PAYOUT_MANAGEMENT_DEPARTMENT_KEYS.has(normalizeDepartmentKey(department)));
+export const canManagePayouts = (role: UserRole, department?: UserDepartment, canViewFinancials?: boolean): boolean =>
+  role === 'admin' || Boolean(canViewFinancials);
 
 export const isTechnicianRole = (role: UserRole) => role === 'technician' || role === 'house_tech';
 

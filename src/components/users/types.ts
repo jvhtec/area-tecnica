@@ -20,4 +20,5 @@ export type Profile = {
   soundvision_access_enabled?: boolean | null;
   autonomo?: boolean | null;
   bg_color?: string | null;
+  can_view_financials?: boolean | null;
 };

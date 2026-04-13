@@ -19,8 +19,8 @@ const FIN_DOC_VIEW_ID = '8238f39c-f42e-11e0-a8de-00e08175e43e';
 
 export function useJobPayoutData(jobId: string, technicianId?: string): JobPayoutData {
   /* ── Auth ── */
-  const { userRole, userDepartment } = useOptimizedAuth();
-  const isManager = canManagePayouts(userRole, userDepartment);
+  const { userRole, userDepartment, canViewFinancials } = useOptimizedAuth();
+  const isManager = canManagePayouts(userRole, userDepartment, canViewFinancials);
   const isAdmin = userRole === 'admin';
   const isAdminOrAdministrative = userRole === 'admin' || isAdministrativeDepartment(userDepartment);
 

@@ -35,9 +35,9 @@ interface JobDetailsDialogProps {
 
 const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOpenChange, job, department = "sound" }) => {
   const [selectedTab, setSelectedTab] = useState("info");
-  const { userRole, user, userDepartment } = useOptimizedAuth();
+  const { userRole, user, userDepartment, canViewFinancials } = useOptimizedAuth();
   const isManager = ["admin", "management"].includes(userRole || "");
-  const canManagePayoutsForUser = canManagePayouts(userRole, userDepartment);
+  const canManagePayoutsForUser = canManagePayouts(userRole, userDepartment, canViewFinancials);
   const isTechnicianRole = ["technician", "house_tech"].includes(userRole || "");
   const isHouseTech = userRole === "house_tech";
   const canSeeAutoStaffing = ["admin", "management", "logistics"].includes(userRole || "");
@@ -93,7 +93,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
   const canSeeRateTabs = (isManager || jobRatesApproved) && !isHouseTech;
   const showTourRatesTab = !isDryhire && jobDetails?.job_type === "tourdate" && canSeeRateTabs;
 
-  const canManageExpenses = ["admin", "management", "logistics"].includes(userRole || "");
+  const canManageExpenses = canViewFinancials;
   const showExpensesTab = !isDryhire && canManageExpenses;
 
   // Fetch expenses to check if there are any for highlighting the tab
@@ -128,8 +128,8 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
       }))
       .filter((assignment: { id?: string }) => Boolean(assignment.id));
 
-    return getVisibleFinancialTechnicianIds(assignmentTechnicians, userRole, userDepartment);
-  }, [jobDetails?.job_assignments, userDepartment, userRole]);
+    return getVisibleFinancialTechnicianIds(assignmentTechnicians, userRole, userDepartment, canViewFinancials);
+  }, [jobDetails?.job_assignments, userDepartment, userRole, canViewFinancials]);
 
   const visibleExpenseTechnicianOptions = useMemo(() => {
     if (!visibleFinancialTechnicianIds) return expenseTechnicianOptions;
