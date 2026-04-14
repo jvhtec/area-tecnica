@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { startOfYear } from "date-fns";
+import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 
 import { supabase } from "@/integrations/supabase/client";
 
-import { chunkArray, matrixQueryKeys } from "./matrixCore";
+import { chunkArray, MATRIX_DATE_KEY_FORMAT, MATRIX_TIMEZONE, matrixQueryKeys } from "./matrixCore";
 import type {
   MatrixStaffingByJobStatus,
   MatrixTechnician,
@@ -49,6 +51,7 @@ export function useMatrixSortingController({
 
       const map = new Map<string, MatrixStaffingByJobStatus>();
       const batches = chunkArray(technicianIds, 30);
+      const errors: Array<{ profileIds: string[]; error: unknown }> = [];
 
       for (const batch of batches) {
         const { data, error } = await supabase
@@ -56,7 +59,10 @@ export function useMatrixSortingController({
           .eq("job_id", sortJobId)
           .in("profile_id", batch);
 
-        if (error) continue;
+        if (error) {
+          errors.push({ profileIds: batch, error });
+          continue;
+        }
 
         (data || []).forEach((row: {
           profile_id: string;
@@ -81,6 +87,10 @@ export function useMatrixSortingController({
             offer_status: offer as MatrixStaffingByJobStatus["offer_status"],
           });
         });
+      }
+
+      if (errors.length) {
+        console.error("[matrix] Failed to load some sortJobStatuses batches", errors);
       }
 
       return map;
@@ -116,7 +126,12 @@ export function useMatrixSortingController({
   const { data: techConfirmedCounts = EMPTY_COUNTS } = useQuery({
     queryKey: matrixQueryKeys.techConfirmedCounts(),
     queryFn: async () => {
-      const currentYearStart = new Date(new Date().getFullYear(), 0, 1).toISOString().split("T")[0];
+      const madridNow = toZonedTime(new Date(), MATRIX_TIMEZONE);
+      const currentYearStart = formatInTimeZone(
+        startOfYear(madridNow),
+        MATRIX_TIMEZONE,
+        MATRIX_DATE_KEY_FORMAT,
+      );
       const { data: timesheets, error } = await supabase
         .from("timesheets")
         .select("technician_id")

@@ -46,6 +46,8 @@ describe('matrixCore', () => {
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: matrixQueryKeys.assignmentsPrefix });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: matrixQueryKeys.availabilityPrefix });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: matrixQueryKeys.jobsPrefix });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: matrixQueryKeys.legacyJobsPrefix });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: matrixQueryKeys.optimizedJobsPrefix });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: matrixQueryKeys.staffingPrefix });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: matrixQueryKeys.sortJobStatusesPrefix });
   });

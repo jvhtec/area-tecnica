@@ -47,6 +47,7 @@ interface UseMatrixInteractionControllerArgs {
   getAssignmentForCell: (technicianId: string, date: Date) => MatrixTimesheetAssignment | undefined;
   getAvailabilityForCell: (technicianId: string, date: Date) => MatrixAvailability | undefined;
   invalidateAssignmentQueries: () => Promise<void>;
+  invalidateAvailabilityQueries?: () => Promise<void>;
   prefetchTechnicianData: (technicianId: string) => Promise<void>;
   updateAssignmentOptimistically: (technicianId: string, jobId: string, status: string) => void;
   toast: MatrixDialogsState["toast"];
@@ -76,6 +77,7 @@ export function useMatrixInteractionController({
   getAssignmentForCell,
   getAvailabilityForCell,
   invalidateAssignmentQueries,
+  invalidateAvailabilityQueries,
   prefetchTechnicianData,
   updateAssignmentOptimistically,
   toast,
@@ -177,9 +179,32 @@ export function useMatrixInteractionController({
         });
       }
 
-      window.dispatchEvent(new CustomEvent("assignment-updated"));
+      try {
+        await Promise.all([
+          invalidateAssignmentQueries(),
+          invalidateAvailabilityQueries?.() ?? Promise.resolve(),
+        ]);
+      } catch (error) {
+        console.error("[matrix] Failed to invalidate availability caches", error);
+        toast({
+          title: "Aviso de sincronización",
+          description: "La disponibilidad se guardó, pero no se pudo refrescar la caché local.",
+          variant: "destructive",
+        });
+      }
+
+      try {
+        window.dispatchEvent(new CustomEvent("assignment-updated"));
+      } catch (error) {
+        console.error("[matrix] Failed to dispatch assignment-updated", error);
+        toast({
+          title: "Aviso de sincronización",
+          description: "La disponibilidad se guardó, pero no se pudo notificar la actualización local.",
+          variant: "destructive",
+        });
+      }
     },
-    [getAvailabilityForCell, toast],
+    [getAvailabilityForCell, invalidateAssignmentQueries, invalidateAvailabilityQueries, toast],
   );
 
   const handleCellClick = useCallback(

@@ -71,6 +71,7 @@ export const OptimizedAssignmentMatrix = ({
     prefetchTechnicianData,
     updateAssignmentOptimistically,
     invalidateAssignmentQueries,
+    invalidateAvailabilityQueries,
     isInitialLoading,
     isFetching,
   } = useOptimizedMatrixData({ technicians, dates, jobs });
@@ -94,6 +95,7 @@ export const OptimizedAssignmentMatrix = ({
     getAssignmentForCell,
     getAvailabilityForCell,
     invalidateAssignmentQueries,
+    invalidateAvailabilityQueries,
     prefetchTechnicianData,
     updateAssignmentOptimistically,
     toast,

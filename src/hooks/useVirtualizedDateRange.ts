@@ -67,15 +67,15 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
     const startDate = addWeeks(dateState.centerDate, -dateState.weeksBefore);
     const endDate = addWeeks(dateState.centerDate, dateState.weeksAfter);
     
-    const dates = [];
+    const generatedDates = [];
     let currentDate = startDate;
     
     while (currentDate <= endDate) {
-      dates.push(new Date(currentDate));
+      generatedDates.push(new Date(currentDate));
       currentDate = addDays(currentDate, 1);
     }
     
-    return dates;
+    return generatedDates;
   }, [dateState]);
 
   const dateRange = dates ?? generatedDateRange;
@@ -86,7 +86,10 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
     [dateKeyFormat, timezone],
   );
 
-  const todayKey = providedTodayKey ?? formatInTimeZone(new Date(), timezone, dateKeyFormat);
+  const todayKey = useMemo(
+    () => providedTodayKey ?? formatInTimeZone(new Date(), timezone, dateKeyFormat),
+    [dateKeyFormat, providedTodayKey, timezone],
+  );
 
   // Get today's index in the current range
   const todayIndex = useMemo(() => {

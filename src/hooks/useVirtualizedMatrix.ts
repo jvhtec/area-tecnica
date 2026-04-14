@@ -82,13 +82,12 @@ export const useVirtualizedMatrix = ({
     resolvedOverscan,
   ]);
 
-  const visibleRows = useMemo(
-    () => ({ start: visibleRange.startRow, end: visibleRange.endRow }),
-    [visibleRange.endRow, visibleRange.startRow],
-  );
-  const visibleCols = useMemo(
-    () => ({ start: visibleRange.startCol, end: visibleRange.endCol }),
-    [visibleRange.endCol, visibleRange.startCol],
+  const visibleWindow = useMemo(
+    () => ({
+      rows: { start: visibleRange.startRow, end: visibleRange.endRow },
+      cols: { start: visibleRange.startCol, end: visibleRange.endCol },
+    }),
+    [visibleRange.endCol, visibleRange.endRow, visibleRange.startCol, visibleRange.startRow],
   );
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -100,16 +99,15 @@ export const useVirtualizedMatrix = ({
   // Calculate total dimensions
   const totalHeight = totalRows * rowHeight;
   const totalWidth = totalCols * colWidth;
-  const viewport = {
-    width: containerWidth,
-    height: containerHeight,
-    scrollLeft: effectiveScrollLeft,
-    scrollTop: effectiveScrollTop,
-  };
-  const window = {
-    rows: visibleRows,
-    cols: visibleCols,
-  };
+  const viewport = useMemo(
+    () => ({
+      width: containerWidth,
+      height: containerHeight,
+      scrollLeft: effectiveScrollLeft,
+      scrollTop: effectiveScrollTop,
+    }),
+    [containerHeight, containerWidth, effectiveScrollLeft, effectiveScrollTop],
+  );
 
   // Scroll to specific position
   const scrollToPosition = useCallback((left: number, top: number) => {
@@ -128,10 +126,10 @@ export const useVirtualizedMatrix = ({
 
   return {
     visibleRange,
-    visibleRows,
-    visibleCols,
+    visibleRows: visibleWindow.rows,
+    visibleCols: visibleWindow.cols,
     viewport,
-    window,
+    window: visibleWindow,
     overscan: resolvedOverscan,
     scrollLeft,
     scrollTop,

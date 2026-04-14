@@ -52,6 +52,8 @@ export function matrixDebug(message: string, payload?: unknown) {
 export const matrixQueryKeys = {
   techniciansPrefix: ["optimized-matrix-technicians"] as const,
   jobsPrefix: ["optimized-matrix-jobs"] as const,
+  legacyJobsPrefix: ["jobs"] as const,
+  optimizedJobsPrefix: ["optimized-jobs"] as const,
   assignmentsPrefix: ["optimized-matrix-assignments"] as const,
   legacyMatrixAssignmentsPrefix: ["matrix-assignments"] as const,
   legacyJobAssignmentsPrefix: ["job-assignments"] as const,
@@ -72,7 +74,7 @@ export const matrixQueryKeys = {
       "staffing-matrix",
       technicianIds,
       jobs.map((job) => job.id),
-      dates[0] ? formatMatrixDateKey(dates[0]) : null,
+      dates.length ? formatMatrixDateKey(dates[0]!) : null,
       dates.length ? formatMatrixDateKey(dates[dates.length - 1]!) : null,
     ] as const,
   sortJobStatuses: (sortJobId: string | null, technicianIds: string[]) =>
@@ -105,7 +107,7 @@ export async function invalidateMatrixJobsAndStaffingQueries(queryClient: QueryC
     queryClient.invalidateQueries({ queryKey: matrixQueryKeys.legacyStaffingPrefix }),
     queryClient.invalidateQueries({ queryKey: matrixQueryKeys.staffingByDatePrefix }),
     queryClient.invalidateQueries({ queryKey: matrixQueryKeys.sortJobStatusesPrefix }),
-    queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-    queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
+    queryClient.invalidateQueries({ queryKey: matrixQueryKeys.legacyJobsPrefix }),
+    queryClient.invalidateQueries({ queryKey: matrixQueryKeys.optimizedJobsPrefix }),
   ]);
 }

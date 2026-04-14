@@ -477,6 +477,10 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     await invalidateMatrixAssignmentQueries(queryClient);
   }, [queryClient]);
 
+  const invalidateAvailabilityQueries = useCallback(async () => {
+    await invalidateMatrixAvailabilityQueries(queryClient);
+  }, [queryClient]);
+
   // Realtime subscription for job_assignments table
   useEffect(() => {
     const channel = supabase
@@ -535,5 +539,6 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     prefetchTechnicianData,
     updateAssignmentOptimistically,
     invalidateAssignmentQueries,
+    invalidateAvailabilityQueries,
   };
 };

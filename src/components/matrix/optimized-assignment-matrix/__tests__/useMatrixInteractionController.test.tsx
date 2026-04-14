@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -188,6 +189,11 @@ describe('useMatrixInteractionController', () => {
 
     act(() => {
       result.current.handleCellClick('tech-1', new Date('2025-03-01T00:00:00Z'), 'availability-email');
+    });
+
+    expect(result.current.cellAction).toMatchObject({
+      type: 'select-job-for-staffing',
+      technicianId: 'tech-1',
     });
 
     await act(async () => {
