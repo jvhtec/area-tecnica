@@ -27,7 +27,7 @@ export function parseMatrixDateKey(dateKey: string): Date {
 }
 
 export function toMatrixDayTimestamp(dateKey: string): number {
-  return Date.parse(`${dateKey}T00:00:00Z`);
+  return fromZonedTime(`${dateKey}T00:00:00`, MATRIX_TIMEZONE).getTime();
 }
 
 export function buildMatrixCellKey(technicianId: string, dateOrKey: Date | string): string {

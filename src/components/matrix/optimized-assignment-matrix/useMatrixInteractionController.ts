@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 
 import { useSelectedCellStore } from "@/stores/useSelectedCellStore";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { ConflictError } from "@/features/staffing/hooks/useStaffing";
 
-import { buildMatrixCellKey, parseMatrixDateKey } from "./matrixCore";
+import { buildMatrixCellKey, parseMatrixDateKey } from "@/components/matrix/optimized-assignment-matrix/matrixCore";
 import type {
   CellAction,
   MatrixAvailability,
@@ -18,7 +17,7 @@ import type {
   MatrixTimesheetAssignment,
   StaffingChannel,
   StaffingIntentPhase,
-} from "./types";
+} from "@/components/matrix/optimized-assignment-matrix/types";
 
 interface UseMatrixInteractionControllerArgs {
   technicians: MatrixTechnician[];
@@ -176,7 +175,9 @@ export function useMatrixInteractionController({
           action === "confirm" ||
           action === "offer-details" ||
           action === "offer-details-wa" ||
-          action === "availability-wa")
+          action === "offer-details-email" ||
+          action === "availability-wa" ||
+          action === "availability-email")
       ) {
         toast({
           title: "En la nevera",
@@ -206,7 +207,7 @@ export function useMatrixInteractionController({
             open: true,
             jobId: targetJobId,
             profileId: technicianId,
-            dateIso: format(date, "yyyy-MM-dd"),
+            dateIso: formatInTimeZone(date, "Europe/Madrid", "yyyy-MM-dd"),
             singleDay: true,
             channel: "whatsapp",
           });
@@ -230,7 +231,7 @@ export function useMatrixInteractionController({
             open: true,
             jobId: targetJobId,
             profileId: technicianId,
-            dateIso: format(date, "yyyy-MM-dd"),
+            dateIso: formatInTimeZone(date, "Europe/Madrid", "yyyy-MM-dd"),
             singleDay: true,
             channel: "email",
           });
@@ -338,31 +339,40 @@ export function useMatrixInteractionController({
       }
 
       void (async () => {
-        const result = await checkTimeConflictEnhanced(cellAction.technicianId, jobId, {
-          targetDateIso: format(cellAction.date, "yyyy-MM-dd"),
-          singleDayOnly: Boolean(options?.singleDay),
-          includePending: true,
-        });
+        try {
+          const result = await checkTimeConflictEnhanced(cellAction.technicianId, jobId, {
+            targetDateIso: formatInTimeZone(cellAction.date, "Europe/Madrid", "yyyy-MM-dd"),
+            singleDayOnly: Boolean(options?.singleDay),
+            includePending: true,
+          });
 
-        if (result.hasHardConflict) {
-          const conflict = result.hardConflicts[0];
+          if (result.hasHardConflict) {
+            const conflict = result.hardConflicts[0];
+            toast({
+              title: "Conflicto de horarios",
+              description: `Ya tiene confirmado: ${conflict.title} (${new Date(conflict.start_time || "").toLocaleString()} - ${new Date(conflict.end_time || "").toLocaleString()})`,
+              variant: "destructive",
+            });
+            return;
+          }
+
+          const defaultChannel = cellAction.intendedChannel || availabilityPreferredChannel || "email";
+          setAvailabilityDialog({
+            open: true,
+            jobId,
+            profileId: cellAction.technicianId,
+            dateIso: formatInTimeZone(cellAction.date, "Europe/Madrid", "yyyy-MM-dd"),
+            singleDay: Boolean(options?.singleDay),
+            channel: defaultChannel,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Error al verificar conflictos de horario";
           toast({
-            title: "Conflicto de horarios",
-            description: `Ya tiene confirmado: ${conflict.title} (${new Date(conflict.start_time || "").toLocaleString()} - ${new Date(conflict.end_time || "").toLocaleString()})`,
+            title: "Error",
+            description: message,
             variant: "destructive",
           });
-          return;
         }
-
-        const defaultChannel = cellAction.intendedChannel || availabilityPreferredChannel || "email";
-        setAvailabilityDialog({
-          open: true,
-          jobId,
-          profileId: cellAction.technicianId,
-          dateIso: format(cellAction.date, "yyyy-MM-dd"),
-          singleDay: Boolean(options?.singleDay),
-          channel: defaultChannel,
-        });
       })();
     },
     [availabilityPreferredChannel, cellAction, checkTimeConflictEnhanced, declinedJobsByTech, offerPreferredChannel, toast],

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isSameDay } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 import { useDragScroll } from "@/hooks/useDragScroll";
 import { throttle } from "@/utils/throttle";
 
-import { formatMatrixDateKey } from "./matrixCore";
-import type { MatrixViewportState } from "./types";
+import { formatMatrixDateKey } from "@/components/matrix/optimized-assignment-matrix/matrixCore";
+import type { MatrixViewportState } from "@/components/matrix/optimized-assignment-matrix/types";
 
 interface UseMatrixViewportControllerArgs {
   dates: Date[];
@@ -249,7 +249,8 @@ export function useMatrixViewportController({
     const container = mainScrollRef.current;
     if (!container || dates.length === 0) return false;
 
-    const todayIndex = dates.findIndex((date) => isSameDay(date, new Date()));
+    const todayKey = formatInTimeZone(new Date(), "Europe/Madrid", "yyyy-MM-dd");
+    const todayIndex = dates.findIndex((date) => formatMatrixDateKey(date) === todayKey);
     if (todayIndex === -1 || container.clientWidth === 0) return false;
 
     let scrollPosition = todayIndex * cellWidth - container.clientWidth / 2 + cellWidth / 2;
