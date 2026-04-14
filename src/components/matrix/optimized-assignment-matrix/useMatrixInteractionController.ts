@@ -97,7 +97,12 @@ export function useMatrixInteractionController({
   const [availabilityMultiDates, setAvailabilityMultiDates] = useState<Date[]>([]);
   const [conflictDialog, setConflictDialog] = useState<MatrixConflictDialogState | null>(null);
 
-  const { selectCell, clearSelection: clearGlobalSelection, isCellSelected: isGlobalCellSelected } = useSelectedCellStore();
+  const {
+    selectCell,
+    clearSelection: clearGlobalSelection,
+    clearMultiSelection: clearGlobalMultiSelection,
+    isCellSelected: isGlobalCellSelected,
+  } = useSelectedCellStore();
 
   const forcedStaffingAction = useMemo<StaffingIntentPhase | undefined>(() => {
     if (cellAction?.type !== "select-job-for-staffing") return undefined;
@@ -124,8 +129,12 @@ export function useMatrixInteractionController({
     setSelectedCells(new Set());
     setAvailabilityPreferredChannel(null);
     setOfferPreferredChannel(null);
+    setAvailabilityDialog(null);
+    setConflictDialog(null);
+    clearGlobalSelection();
+    clearGlobalMultiSelection();
     void invalidateAssignmentQueries();
-  }, [invalidateAssignmentQueries]);
+  }, [clearGlobalMultiSelection, clearGlobalSelection, invalidateAssignmentQueries]);
 
   const currentTechnician = useMemo(() => {
     if (!cellAction?.technicianId) return null;

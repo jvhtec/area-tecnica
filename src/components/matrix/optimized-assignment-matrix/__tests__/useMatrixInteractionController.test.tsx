@@ -4,7 +4,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useMatrixInteractionController } from '../useMatrixInteractionController';
 
-const { useSelectedCellStoreMock } = vi.hoisted(() => ({
+const { clearMultiSelectionMock, clearSelectionMock, useSelectedCellStoreMock } = vi.hoisted(() => ({
+  clearMultiSelectionMock: vi.fn(),
+  clearSelectionMock: vi.fn(),
   useSelectedCellStoreMock: vi.fn(),
 }));
 
@@ -23,7 +25,8 @@ describe('useMatrixInteractionController', () => {
     vi.clearAllMocks();
     useSelectedCellStoreMock.mockReturnValue({
       selectCell: vi.fn(),
-      clearSelection: vi.fn(),
+      clearSelection: clearSelectionMock,
+      clearMultiSelection: clearMultiSelectionMock,
       isCellSelected: vi.fn().mockReturnValue(false),
     });
   });
@@ -81,6 +84,14 @@ describe('useMatrixInteractionController', () => {
       profileId: 'tech-1',
       channel: 'email',
     });
+
+    act(() => {
+      result.current.closeDialogs();
+    });
+
+    expect(result.current.availabilityDialog).toBeNull();
+    expect(clearSelectionMock).toHaveBeenCalled();
+    expect(clearMultiSelectionMock).toHaveBeenCalled();
   });
 
   it('creates job-selection state for staffing when no assignment exists', () => {

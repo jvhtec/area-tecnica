@@ -18,7 +18,7 @@ import type {
   MatrixTechnician,
   MatrixTimesheetAssignment,
 } from '@/components/matrix/optimized-assignment-matrix/types';
-import { useMemoizedMatrix } from './useMemoizedMatrix';
+import { useMemoizedMatrix } from '@/hooks/useMemoizedMatrix';
 
 interface OptimizedMatrixDataProps {
   technicians: MatrixTechnician[];
@@ -74,6 +74,44 @@ interface MatrixHookError {
   message?: string;
 }
 
+interface RealtimeChangePayload {
+  new?: Record<string, unknown>;
+  old?: Record<string, unknown>;
+}
+
+const TIMESHEET_PAGE_SIZE = 2000;
+
+const getPayloadRecords = (payload: RealtimeChangePayload): Record<string, unknown>[] => {
+  return [payload.new, payload.old].filter(
+    (record): record is Record<string, unknown> => Boolean(record && Object.keys(record).length)
+  );
+};
+
+const getStringField = (record: Record<string, unknown>, field: string): string | null => {
+  const value = record[field];
+  return typeof value === 'string' && value.length > 0 ? value : null;
+};
+
+const dateKeyFromUnknown = (value: unknown): string | null => {
+  if (value instanceof Date) return formatMatrixDateKey(value);
+  if (typeof value !== 'string' || !value.length) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return formatMatrixDateKey(parsed);
+};
+
+const dateRangeOverlaps = (
+  leftStartKey: string | null,
+  leftEndKey: string | null,
+  rightStartKey: string,
+  rightEndKey: string
+) => {
+  if (!leftStartKey || !leftEndKey) return false;
+  return leftStartKey <= rightEndKey && leftEndKey >= rightStartKey;
+};
+
 export const fetchMatrixTimesheetAssignments = async ({
   jobIds,
   technicianIds,
@@ -89,20 +127,39 @@ export const fetchMatrixTimesheetAssignments = async ({
   const batchSize = 50;
   const promises: Array<Promise<{ data: unknown[] | null; error: { message?: string } | null }>> = [];
 
+  const fetchTimesheetBatch = async (
+    jobBatch: string[]
+  ): Promise<{ data: unknown[] | null; error: { message?: string } | null }> => {
+    const rows: unknown[] = [];
+
+    for (let from = 0; ; from += TIMESHEET_PAGE_SIZE) {
+      let query = supabase
+        .from('timesheets')
+        .select('job_id, technician_id, date, is_schedule_only, source')
+        .eq('is_active', true)
+        .in('job_id', jobBatch)
+        .in('technician_id', technicianIds)
+        .order('date', { ascending: true });
+
+      if (startIso) query = query.gte('date', startIso);
+      if (endIso) query = query.lte('date', endIso);
+
+      const { data, error } = await query.range(from, from + TIMESHEET_PAGE_SIZE - 1);
+
+      if (error) {
+        return { data: rows, error };
+      }
+
+      const page = data || [];
+      rows.push(...page);
+      if (page.length < TIMESHEET_PAGE_SIZE) {
+        return { data: rows, error: null };
+      }
+    }
+  };
+
   for (const jobBatch of chunkArray(jobIds, batchSize)) {
-    let query = supabase
-      .from('timesheets')
-      .select('job_id, technician_id, date, is_schedule_only, source')
-      .eq('is_active', true)
-      .in('job_id', jobBatch)
-      .in('technician_id', technicianIds)
-      .order('date', { ascending: true })
-      .limit(2000);
-
-    if (startIso) query = query.gte('date', startIso);
-    if (endIso) query = query.lte('date', endIso);
-
-    promises.push(query);
+    promises.push(fetchTimesheetBatch(jobBatch));
   }
 
   // Leverage materialized view for staffing status/cost rollups per job
@@ -211,6 +268,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     return map;
   }, [jobs]);
   const technicianIds = useMemo(() => technicians.map(t => t.id), [technicians]);
+  const jobIdSet = useMemo(() => new Set(jobIds), [jobIds]);
+  const technicianIdSet = useMemo(() => new Set(technicianIds), [technicianIds]);
   const dateRange = useMemo(() => ({
     start: dates[0],
     end: dates[dates.length - 1]
@@ -218,6 +277,18 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   const startDateKey = dateRange.start ? formatMatrixDateKey(dateRange.start) : null;
   const endDateKey = dateRange.end ? formatMatrixDateKey(dateRange.end) : null;
   const technicianBatches = useMemo(() => chunkArray(technicianIds, 100), [technicianIds]);
+  const assignmentQueryKey = useMemo(
+    () => startDateKey && endDateKey
+      ? matrixQueryKeys.assignments(jobIds, technicianIds, startDateKey, endDateKey)
+      : matrixQueryKeys.assignments([], [], '', ''),
+    [endDateKey, jobIds, startDateKey, technicianIds]
+  );
+  const availabilityQueryKey = useMemo(
+    () => startDateKey && endDateKey
+      ? matrixQueryKeys.availability(technicianIds, startDateKey, endDateKey)
+      : matrixQueryKeys.availability([], '', ''),
+    [endDateKey, startDateKey, technicianIds]
+  );
 
   // Much more optimized assignments query - only fetch what's actually needed
   const {
@@ -225,9 +296,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     isLoading: assignmentsInitialLoading,
     isFetching: assignmentsFetching,
   } = useQuery({
-    queryKey: startDateKey && endDateKey
-      ? matrixQueryKeys.assignments(jobIds, technicianIds, startDateKey, endDateKey)
-      : matrixQueryKeys.assignments([], [], '', ''),
+    queryKey: assignmentQueryKey,
     queryFn: async (): Promise<MatrixTimesheetAssignment[]> => {
       if (jobIds.length === 0 || technicianIds.length === 0) return [];
 
@@ -262,9 +331,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     isLoading: availabilityInitialLoading,
     isFetching: availabilityFetching,
   } = useQuery({
-    queryKey: startDateKey && endDateKey
-      ? matrixQueryKeys.availability(technicianIds, startDateKey, endDateKey)
-      : matrixQueryKeys.availability([], '', ''),
+    queryKey: availabilityQueryKey,
     queryFn: async (): Promise<MatrixAvailability[]> => {
       if (technicianIds.length === 0 || !dateRange.start || !dateRange.end) return [] as Array<{ user_id: string; date: string; status: string; notes?: string }>;
 
@@ -408,25 +475,99 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     getJobsForDate,
   } = useMemoizedMatrix(allAssignments, availabilityData, jobs, dates);
 
+  const invalidateCurrentAssignmentQuery = useCallback(async () => {
+    if (!startDateKey || !endDateKey) return;
+    await queryClient.invalidateQueries({ queryKey: assignmentQueryKey, exact: true });
+  }, [assignmentQueryKey, endDateKey, queryClient, startDateKey]);
+
+  const invalidateCurrentAvailabilityQuery = useCallback(async () => {
+    if (!startDateKey || !endDateKey) return;
+    await queryClient.invalidateQueries({ queryKey: availabilityQueryKey, exact: true });
+  }, [availabilityQueryKey, endDateKey, queryClient, startDateKey]);
+
+  const dateKeyInCurrentWindow = useCallback(
+    (dateKey: string | null) => {
+      if (!dateKey || !startDateKey || !endDateKey) return false;
+      return dateKey >= startDateKey && dateKey <= endDateKey;
+    },
+    [endDateKey, startDateKey]
+  );
+
+  const availabilityPayloadImpactsCurrentWindow = useCallback(
+    (
+      payload: RealtimeChangePayload,
+      technicianField: 'user_id' | 'technician_id',
+      startField: 'date' | 'start_date',
+      endField: 'date' | 'end_date' = startField
+    ) => {
+      if (!startDateKey || !endDateKey) return false;
+
+      return getPayloadRecords(payload).some((record) => {
+        const technicianId = getStringField(record, technicianField);
+        if (!technicianId || !technicianIdSet.has(technicianId)) return false;
+
+        const payloadStartKey = dateKeyFromUnknown(record[startField]);
+        const payloadEndKey = dateKeyFromUnknown(record[endField]) ?? payloadStartKey;
+        return dateRangeOverlaps(payloadStartKey, payloadEndKey, startDateKey, endDateKey);
+      });
+    },
+    [endDateKey, startDateKey, technicianIdSet]
+  );
+
+  const assignmentPayloadImpactsCurrentJobs = useCallback(
+    (payload: RealtimeChangePayload) => {
+      return getPayloadRecords(payload).some((record) => {
+        const jobId = getStringField(record, 'job_id');
+        const technicianId = getStringField(record, 'technician_id');
+        return Boolean(jobId && technicianId && jobIdSet.has(jobId) && technicianIdSet.has(technicianId));
+      });
+    },
+    [jobIdSet, technicianIdSet]
+  );
+
+  const timesheetPayloadImpactsCurrentWindow = useCallback(
+    (payload: RealtimeChangePayload) => {
+      return getPayloadRecords(payload).some((record) => {
+        const jobId = getStringField(record, 'job_id');
+        const technicianId = getStringField(record, 'technician_id');
+        const dateKey = dateKeyFromUnknown(record.date);
+        return Boolean(
+          jobId &&
+          technicianId &&
+          jobIdSet.has(jobId) &&
+          technicianIdSet.has(technicianId) &&
+          dateKeyInCurrentWindow(dateKey)
+        );
+      });
+    },
+    [dateKeyInCurrentWindow, jobIdSet, technicianIdSet]
+  );
+
   // Realtime invalidation for availability changes
   useEffect(() => {
     if (!technicianIds.length) return;
     const ch2 = supabase
       .channel('rt-availability-schedules')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, () => {
-        void invalidateMatrixAvailabilityQueries(queryClient);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, (payload) => {
+        if (availabilityPayloadImpactsCurrentWindow(payload as RealtimeChangePayload, 'user_id', 'date')) {
+          void invalidateCurrentAvailabilityQuery();
+        }
       })
       .subscribe();
     const ch3 = supabase
       .channel('rt-technician-availability')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_availability' }, () => {
-        void invalidateMatrixAvailabilityQueries(queryClient);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_availability' }, (payload) => {
+        if (availabilityPayloadImpactsCurrentWindow(payload as RealtimeChangePayload, 'technician_id', 'date')) {
+          void invalidateCurrentAvailabilityQuery();
+        }
       })
       .subscribe();
     const ch4 = supabase
       .channel('rt-vacation-requests')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'vacation_requests' }, () => {
-        void invalidateMatrixAvailabilityQueries(queryClient);
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'vacation_requests' }, (payload) => {
+        if (availabilityPayloadImpactsCurrentWindow(payload as RealtimeChangePayload, 'technician_id', 'start_date', 'end_date')) {
+          void invalidateCurrentAvailabilityQuery();
+        }
       })
       .subscribe();
     return () => {
@@ -434,7 +575,11 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       void supabase.removeChannel(ch3);
       void supabase.removeChannel(ch4);
     };
-  }, [queryClient, technicianIds.length]);
+  }, [
+    availabilityPayloadImpactsCurrentWindow,
+    invalidateCurrentAvailabilityQuery,
+    technicianIds.length,
+  ]);
 
   // Preload technician data for dialogs
   const prefetchTechnicianData = async (technicianId: string) => {
@@ -492,8 +637,10 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           schema: 'public',
           table: 'job_assignments'
         },
-        () => {
-          void invalidateAssignmentQueries();
+        (payload) => {
+          if (assignmentPayloadImpactsCurrentJobs(payload as RealtimeChangePayload)) {
+            void invalidateCurrentAssignmentQuery();
+          }
         }
       )
       .subscribe();
@@ -501,7 +648,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [invalidateAssignmentQueries]);
+  }, [assignmentPayloadImpactsCurrentJobs, invalidateCurrentAssignmentQuery]);
 
   // Realtime subscription for per-day timesheets updates
   useEffect(() => {
@@ -514,8 +661,10 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           schema: 'public',
           table: 'timesheets',
         },
-        () => {
-          void invalidateAssignmentQueries();
+        (payload) => {
+          if (timesheetPayloadImpactsCurrentWindow(payload as RealtimeChangePayload)) {
+            void invalidateCurrentAssignmentQuery();
+          }
         }
       )
       .subscribe();
@@ -523,7 +672,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [invalidateAssignmentQueries]);
+  }, [invalidateCurrentAssignmentQuery, timesheetPayloadImpactsCurrentWindow]);
 
   const isInitialLoading = assignmentsInitialLoading || availabilityInitialLoading;
   const isFetching = assignmentsFetching || availabilityFetching;

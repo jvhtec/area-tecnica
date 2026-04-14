@@ -12,11 +12,15 @@ import { useStaffingMatrixStatuses } from "@/features/staffing/hooks/useStaffing
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { formatUserName } from "@/utils/userName";
 
-import { OptimizedAssignmentMatrixView } from "./optimized-assignment-matrix/OptimizedAssignmentMatrixView";
-import { chunkArray, invalidateMatrixJobsAndStaffingQueries, matrixQueryKeys } from "./optimized-assignment-matrix/matrixCore";
-import { useMatrixViewportController } from "./optimized-assignment-matrix/useMatrixViewportController";
-import { useMatrixSortingController } from "./optimized-assignment-matrix/useMatrixSortingController";
-import { useMatrixInteractionController } from "./optimized-assignment-matrix/useMatrixInteractionController";
+import { OptimizedAssignmentMatrixView } from "@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView";
+import {
+  chunkArray,
+  invalidateMatrixJobsAndStaffingQueries,
+  matrixQueryKeys,
+} from "@/components/matrix/optimized-assignment-matrix/matrixCore";
+import { useMatrixViewportController } from "@/components/matrix/optimized-assignment-matrix/useMatrixViewportController";
+import { useMatrixSortingController } from "@/components/matrix/optimized-assignment-matrix/useMatrixSortingController";
+import { useMatrixInteractionController } from "@/components/matrix/optimized-assignment-matrix/useMatrixInteractionController";
 import type {
   MatrixActionsState,
   MatrixDataState,
@@ -25,7 +29,7 @@ import type {
   LegacyOptimizedAssignmentMatrixViewProps,
   OptimizedAssignmentMatrixExtendedProps,
   OptimizedAssignmentMatrixViewProps,
-} from "./optimized-assignment-matrix/types";
+} from "@/components/matrix/optimized-assignment-matrix/types";
 
 const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
 const EMPTY_STAFFING_MAPS: MatrixStaffingMaps = {
@@ -48,6 +52,8 @@ export const OptimizedAssignmentMatrix = ({
   technicianWidth,
   headerHeight,
   mobile = false,
+  hideStaffingEmailButtons = false,
+  hideStaffingWhatsappButtons = false,
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const { userRole } = useOptimizedAuth();
   const isManagementUser = ["admin", "management"].includes(userRole || "");
@@ -241,6 +247,8 @@ export const OptimizedAssignmentMatrix = ({
     allowDirectAssign,
     allowMarkUnavailable,
     mobile,
+    hideStaffingEmailButtons,
+    hideStaffingWhatsappButtons,
     selectedCells: interaction.selectedCells,
     staffingMaps,
     profileNamesMap,
@@ -311,6 +319,8 @@ export const OptimizedAssignmentMatrix = ({
     allowDirectAssign,
     allowMarkUnavailable,
     mobile,
+    hideStaffingEmailButtons,
+    hideStaffingWhatsappButtons,
     canNavLeft: viewport.canNavLeft,
     canNavRight: viewport.canNavRight,
     handleMobileNav: viewport.handleMobileNav,

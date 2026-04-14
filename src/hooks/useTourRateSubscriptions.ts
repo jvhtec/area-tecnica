@@ -2,8 +2,6 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-let tourRateSubscriptionInstance = 0;
-
 /**
  * Hook for managing realtime subscriptions to tour rate related tables
  */
@@ -12,8 +10,7 @@ export const useTourRateSubscriptions = () => {
   const instanceIdRef = useRef<string>();
 
   if (!instanceIdRef.current) {
-    tourRateSubscriptionInstance += 1;
-    instanceIdRef.current = String(tourRateSubscriptionInstance);
+    instanceIdRef.current = Math.random().toString(36).slice(2, 10);
   }
 
   useEffect(() => {

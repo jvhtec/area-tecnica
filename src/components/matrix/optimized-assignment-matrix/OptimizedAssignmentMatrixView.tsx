@@ -69,6 +69,8 @@ const normalizeViewProps = (
     allowDirectAssign: legacy.allowDirectAssign,
     allowMarkUnavailable: legacy.allowMarkUnavailable,
     mobile: legacy.mobile,
+    hideStaffingEmailButtons: legacy.hideStaffingEmailButtons ?? false,
+    hideStaffingWhatsappButtons: legacy.hideStaffingWhatsappButtons ?? false,
     selectedCells: legacy.selectedCells,
     staffingMaps: legacy.staffingMaps,
     profileNamesMap: legacy.profileNamesMap ?? EMPTY_PROFILE_NAMES_MAP,
@@ -146,6 +148,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
     allowDirectAssign,
     allowMarkUnavailable = false,
     mobile,
+    hideStaffingEmailButtons,
+    hideStaffingWhatsappButtons,
     selectedCells,
     staffingMaps,
     profileNamesMap,
@@ -431,6 +435,8 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             profileNamesMap={profileNamesMap}
                             isFridge={fridgeSet?.has(technician.id) || false}
                             mobile={mobile}
+                            hideStaffingEmailButtons={hideStaffingEmailButtons}
+                            hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
                           />
                         </div>
                       );

@@ -80,6 +80,16 @@ const createLatestByPhaseAccumulator = (): LatestByPhaseAccumulator => ({
   pending_offer_job_ids: []
 })
 
+const normalizeDateLikeToMatrixKey = (value: string | Date | null | undefined): string | null => {
+  if (!value) return null
+  if (value instanceof Date) return formatMatrixDateKey(value)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return formatMatrixDateKey(parsed)
+}
+
 export function useStaffingMatrixStatuses(
   technicianIds: string[],
   jobs: MatrixJobLite[],
@@ -152,12 +162,14 @@ export function useStaffingMatrixStatuses(
         matrixDebug('Staffing matrix requests error', e)
       }
 
-      // Build job lookup with parsed dates for overlap check
-      const jobLookup = new Map<string, { id: string, start: Date, end: Date }>()
+      // Build job lookup with Madrid-normalized date keys for overlap checks.
+      const jobLookup = new Map<string, { id: string, startKey: string, endKey: string }>()
       jobs.forEach(j => {
-        const start = j.start_time ? new Date(j.start_time) : new Date()
-        const end = j.end_time ? new Date(j.end_time) : new Date()
-        jobLookup.set(j.id, { id: j.id, start, end })
+        const startKey = normalizeDateLikeToMatrixKey(j.start_time)
+        const endKey = normalizeDateLikeToMatrixKey(j.end_time)
+        if (startKey && endKey) {
+          jobLookup.set(j.id, { id: j.id, startKey, endKey })
+        }
       })
 
       // Group requests by technician for faster lookups
@@ -180,21 +192,14 @@ export function useStaffingMatrixStatuses(
           const matchingRequests = reqs.filter(r => {
             // Single-day requests with target_date: exact match only
             if (r.single_day && r.target_date) {
-              const rDate = typeof r.target_date === 'string' ? r.target_date : formatMatrixDateKey(r.target_date)
-              return rDate === dStr
+              return normalizeDateLikeToMatrixKey(r.target_date) === dStr
             }
 
             // Full-span requests (no target_date): show on all job dates
             if (!r.single_day) {
               const job = jobLookup.get(r.job_id)
               if (!job) return false
-              const cellDate = new Date(d)
-              cellDate.setHours(0, 0, 0, 0)
-              const start = new Date(job.start)
-              start.setHours(0, 0, 0, 0)
-              const end = new Date(job.end)
-              end.setHours(0, 0, 0, 0)
-              return cellDate >= start && cellDate <= end
+              return dStr >= job.startKey && dStr <= job.endKey
             }
 
             return false

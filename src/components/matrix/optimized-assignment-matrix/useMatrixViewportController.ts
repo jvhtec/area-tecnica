@@ -46,6 +46,7 @@ export function useMatrixViewportController({
   const syncInProgressRef = useRef(false);
   const syncScheduledRef = useRef(false);
   const syncAnimationFrameRef = useRef<number | null>(null);
+  const updateAnimationFrameRef = useRef<number | null>(null);
   const pendingSyncRef = useRef<{ left: number; top: number; source: "main" | "dateHeaders" | "technician" } | null>(null);
   const lastKnownScrollRef = useRef({ left: 0, top: 0 });
   const autoScrolledRef = useRef(false);
@@ -152,8 +153,9 @@ export function useMatrixViewportController({
     if (updateScheduledRef.current) return;
     updateScheduledRef.current = true;
 
-    requestAnimationFrame(() => {
+    updateAnimationFrameRef.current = requestAnimationFrame(() => {
       updateScheduledRef.current = false;
+      updateAnimationFrameRef.current = null;
       updateVirtualizedWindow();
     });
   }, [updateVirtualizedWindow]);
@@ -258,7 +260,13 @@ export function useMatrixViewportController({
       }
       if (syncAnimationFrameRef.current !== null) {
         cancelAnimationFrame(syncAnimationFrameRef.current);
+        syncAnimationFrameRef.current = null;
       }
+      if (updateAnimationFrameRef.current !== null) {
+        cancelAnimationFrame(updateAnimationFrameRef.current);
+        updateAnimationFrameRef.current = null;
+      }
+      updateScheduledRef.current = false;
       pendingSyncRef.current = null;
     };
   }, [throttledDateHeadersScroll]);

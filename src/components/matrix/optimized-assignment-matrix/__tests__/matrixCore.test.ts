@@ -32,7 +32,13 @@ describe('matrixCore', () => {
         [{ id: 'job-1', start_time: '2025-03-01T10:00:00Z', end_time: '2025-03-01T12:00:00Z' }],
         [new Date('2025-03-01T00:00:00Z'), new Date('2025-03-02T00:00:00Z')],
       ),
-    ).toEqual(['staffing-matrix', ['tech-1'], ['job-1'], '2025-03-01', '2025-03-02']);
+    ).toEqual([
+      'staffing-matrix',
+      ['tech-1'],
+      [['job-1', '2025-03-01T10:00:00Z', '2025-03-01T12:00:00Z']],
+      '2025-03-01',
+      '2025-03-02',
+    ]);
   });
 
   it('invalidates scoped matrix query groups', async () => {

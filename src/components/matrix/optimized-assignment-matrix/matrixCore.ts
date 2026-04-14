@@ -73,7 +73,7 @@ export const matrixQueryKeys = {
     [
       "staffing-matrix",
       technicianIds,
-      jobs.map((job) => job.id),
+      jobs.map((job) => [job.id, job.start_time, job.end_time]),
       dates.length ? formatMatrixDateKey(dates[0]!) : null,
       dates.length ? formatMatrixDateKey(dates[dates.length - 1]!) : null,
     ] as const,

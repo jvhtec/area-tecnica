@@ -1,18 +1,22 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { startOfYear } from "date-fns";
+import { endOfYear, startOfYear, subYears } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 
 import { supabase } from "@/integrations/supabase/client";
-
-import { chunkArray, MATRIX_DATE_KEY_FORMAT, MATRIX_TIMEZONE, matrixQueryKeys } from "./matrixCore";
+import {
+  chunkArray,
+  MATRIX_DATE_KEY_FORMAT,
+  MATRIX_TIMEZONE,
+  matrixQueryKeys,
+} from "@/components/matrix/optimized-assignment-matrix/matrixCore";
 import type {
   MatrixStaffingByJobStatus,
   MatrixTechnician,
   MatrixTimesheetAssignment,
   MatrixSortingState,
   TechSortMethod,
-} from "./types";
+} from "@/components/matrix/optimized-assignment-matrix/types";
 
 interface TechCountData {
   counts: Map<string, number>;
@@ -32,6 +36,7 @@ const EMPTY_COUNTS: TechCountData = {
   counts: new Map<string, number>(),
   departments: new Map<string, string>(),
 };
+const MAX_PARALLEL_CHUNKS = 6;
 
 export function useMatrixSortingController({
   technicians,
@@ -53,38 +58,47 @@ export function useMatrixSortingController({
       const batches = chunkArray(technicianIds, 30);
       const errors: Array<{ profileIds: string[]; error: unknown }> = [];
 
-      for (const batch of batches) {
-        const { data, error } = await supabase
-          .rpc("get_assignment_matrix_staffing")
-          .eq("job_id", sortJobId)
-          .in("profile_id", batch);
+      for (let index = 0; index < batches.length; index += MAX_PARALLEL_CHUNKS) {
+        const batchGroup = batches.slice(index, index + MAX_PARALLEL_CHUNKS);
+        const results = await Promise.all(
+          batchGroup.map(async (batch) => {
+            const { data, error } = await supabase
+              .rpc("get_assignment_matrix_staffing")
+              .eq("job_id", sortJobId)
+              .in("profile_id", batch);
 
-        if (error) {
-          errors.push({ profileIds: batch, error });
-          continue;
-        }
+            return { batch, data, error };
+          }),
+        );
 
-        (data || []).forEach((row: {
-          profile_id: string;
-          availability_status: string | null;
-          offer_status: string | null;
-        }) => {
-          const availability =
-            row.availability_status === "pending"
-              ? "requested"
-              : row.availability_status === "expired"
-                ? null
-                : row.availability_status;
-          const offer =
-            row.offer_status === "pending"
-              ? "sent"
-              : row.offer_status === "expired"
-                ? null
-                : row.offer_status;
+        results.forEach(({ batch, data, error }) => {
+          if (error) {
+            errors.push({ profileIds: batch, error });
+            return;
+          }
 
-          map.set(row.profile_id, {
-            availability_status: availability as MatrixStaffingByJobStatus["availability_status"],
-            offer_status: offer as MatrixStaffingByJobStatus["offer_status"],
+          (data || []).forEach((row: {
+            profile_id: string;
+            availability_status: string | null;
+            offer_status: string | null;
+          }) => {
+            const availability =
+              row.availability_status === "pending"
+                ? "requested"
+                : row.availability_status === "expired"
+                  ? null
+                  : row.availability_status;
+            const offer =
+              row.offer_status === "pending"
+                ? "sent"
+                : row.offer_status === "expired"
+                  ? null
+                  : row.offer_status;
+
+            map.set(row.profile_id, {
+              availability_status: availability as MatrixStaffingByJobStatus["availability_status"],
+              offer_status: offer as MatrixStaffingByJobStatus["offer_status"],
+            });
           });
         });
       }
@@ -172,10 +186,17 @@ export function useMatrixSortingController({
   const { data: techLastYearCounts = EMPTY_COUNTS } = useQuery({
     queryKey: matrixQueryKeys.techLastYearCounts(),
     queryFn: async () => {
-      const now = new Date();
-      const lastYear = now.getFullYear() - 1;
-      const yearStart = new Date(lastYear, 0, 1).toISOString().split("T")[0];
-      const yearEnd = new Date(lastYear, 11, 31).toISOString().split("T")[0];
+      const madridLastYear = toZonedTime(subYears(new Date(), 1), MATRIX_TIMEZONE);
+      const yearStart = formatInTimeZone(
+        startOfYear(madridLastYear),
+        MATRIX_TIMEZONE,
+        MATRIX_DATE_KEY_FORMAT,
+      );
+      const yearEnd = formatInTimeZone(
+        endOfYear(madridLastYear),
+        MATRIX_TIMEZONE,
+        MATRIX_DATE_KEY_FORMAT,
+      );
 
       const { data: timesheets, error } = await supabase
         .from("timesheets")

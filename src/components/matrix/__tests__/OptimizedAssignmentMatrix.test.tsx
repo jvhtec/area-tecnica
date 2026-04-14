@@ -99,7 +99,7 @@ vi.mock('@/utils/technicianAvailability', () => ({
 }));
 
 // Mock OptimizedAssignmentMatrixView
-vi.mock('../optimized-assignment-matrix/OptimizedAssignmentMatrixView', () => ({
+vi.mock('@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView', () => ({
   OptimizedAssignmentMatrixView: (props: any) => (
     <div data-testid="matrix-view">
       <div data-testid="technicians-count">{props.technicians.length}</div>
@@ -187,6 +187,7 @@ beforeEach(() => {
     selectedCell: null,
     selectCell: vi.fn(),
     clearSelection: vi.fn(),
+    clearMultiSelection: vi.fn(),
     isCellSelected: vi.fn().mockReturnValue(false),
   });
 
@@ -546,6 +547,7 @@ describe('OptimizedAssignmentMatrix', () => {
       selectedCell: null,
       selectCell,
       clearSelection,
+      clearMultiSelection: vi.fn(),
       isCellSelected,
     });
 

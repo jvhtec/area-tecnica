@@ -173,6 +173,8 @@ export interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignm
   technicianWidth?: number;
   headerHeight?: number;
   mobile?: boolean;
+  hideStaffingEmailButtons?: boolean;
+  hideStaffingWhatsappButtons?: boolean;
 }
 
 export interface MatrixViewportState {
@@ -217,6 +219,8 @@ export interface MatrixDataState {
   allowDirectAssign: boolean;
   allowMarkUnavailable?: boolean;
   mobile: boolean;
+  hideStaffingEmailButtons: boolean;
+  hideStaffingWhatsappButtons: boolean;
   selectedCells: Set<string>;
   staffingMaps: MatrixStaffingMaps;
   profileNamesMap: Map<string, string>;
@@ -319,6 +323,8 @@ export interface LegacyOptimizedAssignmentMatrixViewProps {
   allowDirectAssign: boolean;
   allowMarkUnavailable?: boolean;
   mobile: boolean;
+  hideStaffingEmailButtons?: boolean;
+  hideStaffingWhatsappButtons?: boolean;
   canNavLeft: boolean;
   canNavRight: boolean;
   handleMobileNav: (dir: "left" | "right") => void;
