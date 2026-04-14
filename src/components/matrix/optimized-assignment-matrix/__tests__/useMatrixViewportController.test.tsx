@@ -1,6 +1,6 @@
 import type React from 'react';
 import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useMatrixViewportController } from '../useMatrixViewportController';
 
@@ -24,6 +24,11 @@ describe('useMatrixViewportController', () => {
       callback(0);
       return 0;
     });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
   });
 
   it('calculates the visible window from the main scroll position', () => {
@@ -101,5 +106,63 @@ describe('useMatrixViewportController', () => {
 
     expect(headers.scrollTo).toHaveBeenCalled();
     expect(main.scrollTo).toHaveBeenCalled();
+  });
+
+  it('does not retain React scroll events across throttled date-header updates', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000);
+
+    const { result } = renderHook(() =>
+      useMatrixViewportController({
+        dates: Array.from({ length: 10 }, (_, index) => new Date(`2025-03-${String(index + 1).padStart(2, '0')}T00:00:00Z`)),
+        technicianCount: 10,
+        mobile: true,
+        canExpandBefore: false,
+        canExpandAfter: false,
+        cellWidth: 100,
+        cellHeight: 50,
+        technicianWidth: 200,
+        headerHeight: 80,
+        isInitialLoading: false,
+      }),
+    );
+
+    const headers = document.createElement('div');
+    defineElementMetrics(headers, {
+      scrollLeft: 10,
+      clientWidth: 320,
+      scrollWidth: 1000,
+    });
+    const main = document.createElement('div');
+    defineElementMetrics(main, {
+      scrollLeft: 0,
+      scrollTop: 0,
+      clientWidth: 320,
+      clientHeight: 200,
+      scrollWidth: 1000,
+    });
+
+    result.current.dateHeadersRef.current = headers;
+    result.current.mainScrollRef.current = main;
+
+    act(() => {
+      result.current.handleDateHeadersScroll({ currentTarget: headers } as React.UIEvent<HTMLDivElement>);
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    headers.scrollLeft = 120;
+    const delayedEvent = { currentTarget: headers };
+
+    expect(() => {
+      act(() => {
+        result.current.handleDateHeadersScroll(delayedEvent as React.UIEvent<HTMLDivElement>);
+        delayedEvent.currentTarget = null as unknown as HTMLDivElement;
+        vi.advanceTimersByTime(12);
+      });
+    }).not.toThrow();
+
+    expect(main.scrollLeft).toBe(120);
   });
 });

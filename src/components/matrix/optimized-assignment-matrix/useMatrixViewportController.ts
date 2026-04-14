@@ -128,8 +128,7 @@ export function useMatrixViewportController({
     setCanNavRight(element.scrollLeft < maxScroll);
   }, [mobile]);
 
-  const updateVirtualizedWindow = useCallback(() => {
-    const element = mainScrollRef.current;
+  const updateVirtualizedWindow = useCallback((element: HTMLDivElement | null = mainScrollRef.current) => {
     if (!element) return;
 
     const nextViewport = { width: element.clientWidth, height: element.clientHeight };
@@ -172,8 +171,11 @@ export function useMatrixViewportController({
     (event: React.UIEvent<HTMLDivElement>) => {
       if (syncInProgressRef.current) return;
 
-      const scrollLeft = event.currentTarget.scrollLeft;
-      const scrollTop = event.currentTarget.scrollTop;
+      const target = event.currentTarget;
+      if (!target) return;
+
+      const scrollLeft = target.scrollLeft;
+      const scrollTop = target.scrollTop;
       const previousScrollLeft = previousScrollLeftRef.current;
       const horizontalDelta = previousScrollLeft === null ? 0 : scrollLeft - previousScrollLeft;
       const movedHorizontally = previousScrollLeft !== null && horizontalDelta !== 0;
@@ -186,7 +188,7 @@ export function useMatrixViewportController({
 
       previousScrollLeftRef.current = scrollLeft;
 
-      const maxScrollLeft = event.currentTarget.scrollWidth - event.currentTarget.clientWidth;
+      const maxScrollLeft = target.scrollWidth - target.clientWidth;
       const nearLeftEdge = scrollLeft < 200;
       const nearRightEdge = scrollLeft > maxScrollLeft - 200;
       const now = performance.now();
@@ -209,9 +211,8 @@ export function useMatrixViewportController({
   );
 
   const handleDateHeadersScrollCore = useCallback(
-    (event: React.UIEvent<HTMLDivElement>) => {
+    (scrollLeft: number) => {
       if (syncInProgressRef.current) return;
-      const scrollLeft = event.currentTarget.scrollLeft;
       syncScrollPositions(scrollLeft, mainScrollRef.current?.scrollTop || 0, "dateHeaders");
       lastKnownScrollRef.current.left = scrollLeft;
       updateNavAvailability();
@@ -222,7 +223,10 @@ export function useMatrixViewportController({
   const handleTechnicianScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
       if (syncInProgressRef.current) return;
-      const scrollTop = event.currentTarget.scrollTop;
+      const target = event.currentTarget;
+      if (!target) return;
+
+      const scrollTop = target.scrollTop;
       syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, "technician");
       lastKnownScrollRef.current.top = scrollTop;
       scheduleVirtualizedWindowUpdate();
@@ -230,22 +234,34 @@ export function useMatrixViewportController({
     [scheduleVirtualizedWindowUpdate, syncScrollPositions],
   );
 
-  const handleDateHeadersScroll = useMemo(
+  const throttledDateHeadersScroll = useMemo(
     () => throttle(handleDateHeadersScrollCore, 12),
     [handleDateHeadersScrollCore],
   );
 
+  const handleDateHeadersScroll = useCallback(
+    (event: React.UIEvent<HTMLDivElement>) => {
+      const target = event.currentTarget;
+      if (!target) return;
+      throttledDateHeadersScroll(target.scrollLeft);
+    },
+    [throttledDateHeadersScroll],
+  );
+
   useEffect(() => {
     return () => {
-      if ("cancel" in handleDateHeadersScroll && typeof handleDateHeadersScroll.cancel === "function") {
-        handleDateHeadersScroll.cancel();
+      if (
+        "cancel" in throttledDateHeadersScroll &&
+        typeof throttledDateHeadersScroll.cancel === "function"
+      ) {
+        throttledDateHeadersScroll.cancel();
       }
       if (syncAnimationFrameRef.current !== null) {
         cancelAnimationFrame(syncAnimationFrameRef.current);
       }
       pendingSyncRef.current = null;
     };
-  }, [handleDateHeadersScroll]);
+  }, [throttledDateHeadersScroll]);
 
   const scrollToToday = useCallback(() => {
     const container = mainScrollRef.current;
@@ -329,7 +345,7 @@ export function useMatrixViewportController({
     lastKnownScrollRef.current = { left: targetLeft, top: lastTop };
     previousScrollLeftRef.current = targetLeft;
     previousDatesRef.current = dates.slice();
-    updateVirtualizedWindow();
+    updateVirtualizedWindow(main);
   }, [cellWidth, dates, updateVirtualizedWindow]);
 
   useEffect(() => {

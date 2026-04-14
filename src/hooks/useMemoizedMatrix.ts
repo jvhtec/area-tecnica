@@ -10,6 +10,7 @@ const dateKeyToComparableTs = (dateKey: string) => toMatrixDayTimestamp(dateKey)
 interface Assignment {
   job_id: string;
   technician_id: string;
+  date?: string | null;
   status: string;
   job: {
     id: string;
@@ -63,6 +64,7 @@ export const useMemoizedMatrix = (
   }, [dates]);
 
   const dateTimestamps = useMemo(() => normalizedDateEntries.map((entry) => entry.ts), [normalizedDateEntries]);
+  const dateKeySet = useMemo(() => new Set(normalizedDateEntries.map((entry) => entry.key)), [normalizedDateEntries]);
 
   const findLowerBound = useCallback((target: number) => {
     let left = 0;
@@ -90,24 +92,13 @@ export const useMemoizedMatrix = (
     const lookup = new Map<string, Assignment>();
 
     assignments.forEach((assignment) => {
-      if (!assignment.job) return;
-
-      const jobStartTs = dateKeyToComparableTs(formatDateKeyMadrid(new Date(assignment.job.start_time)));
-      const jobEndTs = dateKeyToComparableTs(formatDateKeyMadrid(new Date(assignment.job.end_time)));
-
-      const startIdx = findLowerBound(jobStartTs);
-      const endIdx = findUpperBound(jobEndTs);
-      if (startIdx > endIdx || startIdx >= normalizedDateEntries.length || endIdx < 0) return;
-
-      for (let idx = startIdx; idx <= endIdx; idx += 1) {
-        const dateKey = normalizedDateEntries[idx]?.key;
-        if (!dateKey) continue;
-        lookup.set(`${assignment.technician_id}:${dateKey}`, assignment);
-      }
+      // Assignment occupancy is timesheet-backed: never expand a row across the full job span.
+      if (!assignment.job || !assignment.date || !dateKeySet.has(assignment.date)) return;
+      lookup.set(`${assignment.technician_id}:${assignment.date}`, assignment);
     });
 
     return lookup;
-  }, [assignments, findLowerBound, findUpperBound, normalizedDateEntries]);
+  }, [assignments, dateKeySet]);
 
   const availabilityLookup = useMemo(() => {
     const lookup = new Map<string, Availability>();
