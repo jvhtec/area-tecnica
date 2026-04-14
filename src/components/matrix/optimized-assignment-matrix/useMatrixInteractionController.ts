@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 
 import { useSelectedCellStore } from "@/stores/useSelectedCellStore";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { ConflictError } from "@/features/staffing/hooks/useStaffing";
-
-import { buildMatrixCellKey, parseMatrixDateKey } from "./matrixCore";
+import {
+  buildMatrixCellKey,
+  MATRIX_DATE_KEY_FORMAT,
+  MATRIX_TIMEZONE,
+  parseMatrixDateKey,
+} from "@/components/matrix/optimized-assignment-matrix/matrixCore";
 import type {
   CellAction,
   MatrixAvailability,
@@ -18,7 +21,23 @@ import type {
   MatrixTimesheetAssignment,
   StaffingChannel,
   StaffingIntentPhase,
-} from "./types";
+} from "@/components/matrix/optimized-assignment-matrix/types";
+
+const FRIDGE_BLOCKED_ACTIONS = new Set<MatrixCellActionType>([
+  "select-job",
+  "assign",
+  "select-job-for-staffing",
+  "confirm",
+  "offer-details",
+  "offer-details-wa",
+  "offer-details-email",
+  "availability-wa",
+  "availability-email",
+]);
+
+function formatStaffingDate(date: Date): string {
+  return formatInTimeZone(date, MATRIX_TIMEZONE, MATRIX_DATE_KEY_FORMAT);
+}
 
 interface UseMatrixInteractionControllerArgs {
   technicians: MatrixTechnician[];
@@ -113,7 +132,7 @@ export function useMatrixInteractionController({
 
   const handleDirectToggleUnavailable = useCallback(
     async (technicianId: string, date: Date) => {
-      const dateKey = formatInTimeZone(date, "Europe/Madrid", "yyyy-MM-dd");
+      const dateKey = formatStaffingDate(date);
       const existing = getAvailabilityForCell(technicianId, date);
 
       if (existing) {
@@ -168,16 +187,7 @@ export function useMatrixInteractionController({
       const assignment = getAssignmentForCell(technicianId, date);
       const isFridge = fridgeSet?.has(technicianId);
 
-      if (
-        isFridge &&
-        (action === "select-job" ||
-          action === "assign" ||
-          action === "select-job-for-staffing" ||
-          action === "confirm" ||
-          action === "offer-details" ||
-          action === "offer-details-wa" ||
-          action === "availability-wa")
-      ) {
+      if (isFridge && FRIDGE_BLOCKED_ACTIONS.has(action)) {
         toast({
           title: "En la nevera",
           description: "Este técnico está en la nevera y no puede ser asignado.",
@@ -206,7 +216,7 @@ export function useMatrixInteractionController({
             open: true,
             jobId: targetJobId,
             profileId: technicianId,
-            dateIso: format(date, "yyyy-MM-dd"),
+            dateIso: formatStaffingDate(date),
             singleDay: true,
             channel: "whatsapp",
           });
@@ -230,7 +240,7 @@ export function useMatrixInteractionController({
             open: true,
             jobId: targetJobId,
             profileId: technicianId,
-            dateIso: format(date, "yyyy-MM-dd"),
+            dateIso: formatStaffingDate(date),
             singleDay: true,
             channel: "email",
           });
@@ -338,11 +348,22 @@ export function useMatrixInteractionController({
       }
 
       void (async () => {
-        const result = await checkTimeConflictEnhanced(cellAction.technicianId, jobId, {
-          targetDateIso: format(cellAction.date, "yyyy-MM-dd"),
-          singleDayOnly: Boolean(options?.singleDay),
-          includePending: true,
-        });
+        let result: Awaited<ReturnType<typeof checkTimeConflictEnhanced>>;
+        try {
+          result = await checkTimeConflictEnhanced(cellAction.technicianId, jobId, {
+            targetDateIso: formatStaffingDate(cellAction.date),
+            singleDayOnly: Boolean(options?.singleDay),
+            includePending: true,
+          });
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "No se pudo comprobar la disponibilidad.";
+          toast({
+            title: "Error al comprobar conflictos",
+            description: message,
+            variant: "destructive",
+          });
+          return;
+        }
 
         if (result.hasHardConflict) {
           const conflict = result.hardConflicts[0];
@@ -359,7 +380,7 @@ export function useMatrixInteractionController({
           open: true,
           jobId,
           profileId: cellAction.technicianId,
-          dateIso: format(cellAction.date, "yyyy-MM-dd"),
+          dateIso: formatStaffingDate(cellAction.date),
           singleDay: Boolean(options?.singleDay),
           channel: defaultChannel,
         });

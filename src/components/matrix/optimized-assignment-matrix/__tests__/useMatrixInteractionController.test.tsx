@@ -11,7 +11,7 @@ vi.mock('@/stores/useSelectedCellStore', () => ({
   useSelectedCellStore: useSelectedCellStoreMock,
 }));
 
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     from: vi.fn(),
   },
@@ -117,5 +117,92 @@ describe('useMatrixInteractionController', () => {
       type: 'select-job-for-staffing',
       technicianId: 'tech-1',
     });
+  });
+
+  it('blocks fridge technicians from email staffing outreach', () => {
+    const toast = vi.fn();
+    const { result } = renderHook(() =>
+      useMatrixInteractionController({
+        technicians: [
+          {
+            id: 'tech-1',
+            first_name: 'Ana',
+            last_name: 'López',
+            email: 'ana@test.com',
+            department: 'sound',
+            role: 'technician',
+          },
+        ],
+        fridgeSet: new Set(['tech-1']),
+        allowDirectAssign: true,
+        isManagementUser: true,
+        getAssignmentForCell: vi.fn().mockReturnValue(undefined),
+        getAvailabilityForCell: vi.fn(),
+        invalidateAssignmentQueries: vi.fn().mockResolvedValue(undefined),
+        prefetchTechnicianData: vi.fn().mockResolvedValue(undefined),
+        updateAssignmentOptimistically: vi.fn(),
+        toast,
+        sendStaffingEmail: vi.fn(),
+        checkTimeConflictEnhanced: vi.fn().mockResolvedValue({ hasHardConflict: false, hardConflicts: [] }),
+        declinedJobsByTech: new Map(),
+      }),
+    );
+
+    act(() => {
+      result.current.handleCellClick('tech-1', new Date('2025-03-01T00:00:00Z'), 'availability-email');
+    });
+
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'En la nevera' }));
+    expect(result.current.availabilityDialog).toBeNull();
+    expect(result.current.cellAction).toBeNull();
+  });
+
+  it('shows a toast when conflict checks fail before staffing availability', async () => {
+    const toast = vi.fn();
+    const checkTimeConflictEnhanced = vi.fn().mockRejectedValue(new Error('Backend offline'));
+    const { result } = renderHook(() =>
+      useMatrixInteractionController({
+        technicians: [
+          {
+            id: 'tech-1',
+            first_name: 'Ana',
+            last_name: 'López',
+            email: 'ana@test.com',
+            department: 'sound',
+            role: 'technician',
+          },
+        ],
+        allowDirectAssign: true,
+        isManagementUser: true,
+        getAssignmentForCell: vi.fn().mockReturnValue(undefined),
+        getAvailabilityForCell: vi.fn(),
+        invalidateAssignmentQueries: vi.fn().mockResolvedValue(undefined),
+        prefetchTechnicianData: vi.fn().mockResolvedValue(undefined),
+        updateAssignmentOptimistically: vi.fn(),
+        toast,
+        sendStaffingEmail: vi.fn(),
+        checkTimeConflictEnhanced,
+        declinedJobsByTech: new Map(),
+      }),
+    );
+
+    act(() => {
+      result.current.handleCellClick('tech-1', new Date('2025-03-01T00:00:00Z'), 'availability-email');
+    });
+
+    await act(async () => {
+      result.current.handleStaffingActionSelected('job-1', 'availability');
+      await Promise.resolve();
+    });
+
+    expect(checkTimeConflictEnhanced).toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Error al comprobar conflictos',
+        description: 'Backend offline',
+        variant: 'destructive',
+      }),
+    );
+    expect(result.current.availabilityDialog).toBeNull();
   });
 });

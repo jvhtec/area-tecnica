@@ -3,7 +3,8 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
 import type { MatrixJobLite } from "@/features/staffing/hooks/useStaffingMatrixStatuses";
 
-const MATRIX_TIMEZONE = "Europe/Madrid";
+export const MATRIX_TIMEZONE = "Europe/Madrid";
+export const MATRIX_DATE_KEY_FORMAT = "yyyy-MM-dd";
 const MATRIX_DEBUG_ENABLED = import.meta.env.DEV && import.meta.env.VITE_DEBUG_MATRIX === "true";
 
 export function chunkArray<T>(items: T[], size: number): T[][] {
@@ -19,7 +20,7 @@ export function chunkArray<T>(items: T[], size: number): T[][] {
 }
 
 export function formatMatrixDateKey(date: Date): string {
-  return formatInTimeZone(date, MATRIX_TIMEZONE, "yyyy-MM-dd");
+  return formatInTimeZone(date, MATRIX_TIMEZONE, MATRIX_DATE_KEY_FORMAT);
 }
 
 export function parseMatrixDateKey(dateKey: string): Date {
@@ -27,7 +28,7 @@ export function parseMatrixDateKey(dateKey: string): Date {
 }
 
 export function toMatrixDayTimestamp(dateKey: string): number {
-  return Date.parse(`${dateKey}T00:00:00Z`);
+  return parseMatrixDateKey(dateKey).getTime();
 }
 
 export function buildMatrixCellKey(technicianId: string, dateOrKey: Date | string): string {

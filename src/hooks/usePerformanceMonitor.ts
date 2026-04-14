@@ -56,8 +56,11 @@ export const usePerformanceMonitor = () => {
   }, [diagnosticsEnabled]);
 
   const incrementCellRender = useCallback(() => {
+    if (!diagnosticsEnabled) {
+      return;
+    }
     cellRenderCountRef.current += 1;
-    if (diagnosticsEnabled && cellRenderCountRef.current % 5000 === 0) {
+    if (cellRenderCountRef.current % 5000 === 0) {
       setMetrics(prev => ({ ...prev, cellRenderCount: cellRenderCountRef.current }));
     }
   }, [diagnosticsEnabled]);

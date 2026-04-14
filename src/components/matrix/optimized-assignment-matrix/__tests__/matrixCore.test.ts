@@ -7,6 +7,8 @@ import {
   invalidateMatrixAvailabilityQueries,
   invalidateMatrixJobsAndStaffingQueries,
   matrixQueryKeys,
+  parseMatrixDateKey,
+  toMatrixDayTimestamp,
 } from '../matrixCore';
 
 describe('matrixCore', () => {
@@ -16,6 +18,11 @@ describe('matrixCore', () => {
     expect(formatMatrixDateKey(date)).toBe('2025-03-02');
     expect(buildMatrixCellKey('tech-1', date)).toBe('tech-1-2025-03-02');
     expect(buildMatrixCellKey('tech-1', '2025-03-03')).toBe('tech-1-2025-03-03');
+  });
+
+  it('parses matrix day timestamps as Madrid local midnight', () => {
+    expect(toMatrixDayTimestamp('2025-03-31')).toBe(parseMatrixDateKey('2025-03-31').getTime());
+    expect(toMatrixDayTimestamp('2025-03-31')).toBe(new Date('2025-03-30T22:00:00.000Z').getTime());
   });
 
   it('builds scoped staffing matrix query keys', () => {

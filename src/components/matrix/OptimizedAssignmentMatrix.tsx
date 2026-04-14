@@ -6,7 +6,7 @@ import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
 import { useStaffingRealtime } from "@/features/staffing/hooks/useStaffingRealtime";
 import { useSendStaffingEmail } from "@/features/staffing/hooks/useStaffing";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { checkTimeConflictEnhanced } from "@/utils/technicianAvailability";
 import { useStaffingMatrixStatuses } from "@/features/staffing/hooks/useStaffingMatrixStatuses";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";

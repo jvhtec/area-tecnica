@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isSameDay } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 import { useDragScroll } from "@/hooks/useDragScroll";
+import { useVirtualizedDateRange } from "@/hooks/useVirtualizedDateRange";
+import { useVirtualizedMatrix } from "@/hooks/useVirtualizedMatrix";
 import { throttle } from "@/utils/throttle";
-
-import { formatMatrixDateKey } from "./matrixCore";
-import type { MatrixViewportState } from "./types";
+import {
+  formatMatrixDateKey,
+  MATRIX_DATE_KEY_FORMAT,
+  MATRIX_TIMEZONE,
+} from "@/components/matrix/optimized-assignment-matrix/matrixCore";
+import type { MatrixViewportState } from "@/components/matrix/optimized-assignment-matrix/types";
 
 interface UseMatrixViewportControllerArgs {
   dates: Date[];
@@ -50,22 +55,31 @@ export function useMatrixViewportController({
   const lastEdgeTriggerRef = useRef(0);
   const previousDatesRef = useRef<Date[] | null>(null);
 
-  const [visibleRows, setVisibleRows] = useState({
-    start: 0,
-    end: Math.min(technicianCount - 1, 20),
-  });
-  const [visibleCols, setVisibleCols] = useState({
-    start: 0,
-    end: Math.min(dates.length - 1, 14),
-  });
+  const [virtualScroll, setVirtualScroll] = useState({ left: 0, top: 0 });
+  const [virtualViewport, setVirtualViewport] = useState({ width: 0, height: 0 });
   const [canNavLeft, setCanNavLeft] = useState(false);
   const [canNavRight, setCanNavRight] = useState(true);
   const [navStep, setNavStep] = useState(3);
 
-  const matrixWidth = useMemo(() => dates.length * cellWidth, [dates.length, cellWidth]);
-  const matrixHeight = useMemo(() => technicianCount * cellHeight, [technicianCount, cellHeight]);
-  const overscanRows = mobile ? 6 : 10;
-  const overscanCols = mobile ? 4 : 6;
+  const { getDateIndexByKey } = useVirtualizedDateRange({
+    timezone: MATRIX_TIMEZONE,
+    dateKeyFormat: MATRIX_DATE_KEY_FORMAT,
+  });
+  const virtualizedMatrix = useVirtualizedMatrix({
+    totalRows: technicianCount,
+    totalCols: dates.length,
+    rowHeight: cellHeight,
+    colWidth: cellWidth,
+    containerHeight: virtualViewport.height,
+    containerWidth: virtualViewport.width,
+    overscanProfile: mobile ? "mobile" : "desktop",
+    scrollLeft: virtualScroll.left,
+    scrollTop: virtualScroll.top,
+  });
+  const matrixWidth = virtualizedMatrix.matrixWidth;
+  const matrixHeight = virtualizedMatrix.matrixHeight;
+  const visibleRows = virtualizedMatrix.window.rows;
+  const visibleCols = virtualizedMatrix.window.cols;
 
   const syncScrollPositions = useCallback((scrollLeft: number, scrollTop: number, source: "main" | "dateHeaders" | "technician") => {
     pendingSyncRef.current = { left: scrollLeft, top: scrollTop, source };
@@ -114,37 +128,25 @@ export function useMatrixViewportController({
     setCanNavRight(element.scrollLeft < maxScroll);
   }, [mobile]);
 
-  const updateVisibleWindow = useCallback(() => {
+  const updateVirtualizedWindow = useCallback(() => {
     const element = mainScrollRef.current;
     if (!element) return;
 
-    const rowStart = Math.max(0, Math.floor(element.scrollTop / cellHeight) - overscanRows);
-    const rowEnd = Math.min(
-      technicianCount - 1,
-      Math.floor((element.scrollTop + element.clientHeight) / cellHeight) + overscanRows,
-    );
-    const colStart = Math.max(0, Math.floor(element.scrollLeft / cellWidth) - overscanCols);
-    const colEnd = Math.min(
-      dates.length - 1,
-      Math.floor((element.scrollLeft + element.clientWidth) / cellWidth) + overscanCols,
+    const nextViewport = { width: element.clientWidth, height: element.clientHeight };
+    setVirtualViewport((previous) =>
+      previous.width !== nextViewport.width || previous.height !== nextViewport.height ? nextViewport : previous,
     );
 
-    setVisibleRows((previous) =>
-      previous.start !== rowStart || previous.end !== rowEnd
-        ? { start: rowStart, end: rowEnd }
-        : previous,
+    const nextScroll = { left: element.scrollLeft, top: element.scrollTop };
+    setVirtualScroll((previous) =>
+      previous.left !== nextScroll.left || previous.top !== nextScroll.top ? nextScroll : previous,
     );
-    setVisibleCols((previous) =>
-      previous.start !== colStart || previous.end !== colEnd
-        ? { start: colStart, end: colEnd }
-        : previous,
-    );
-  }, [cellHeight, cellWidth, dates.length, overscanCols, overscanRows, technicianCount]);
+  }, []);
 
-  const scheduleVisibleWindowUpdate = useCallback(() => {
+  const scheduleVirtualizedWindowUpdate = useCallback(() => {
     if (!hasHandledFirstScrollRef.current) {
       hasHandledFirstScrollRef.current = true;
-      updateVisibleWindow();
+      updateVirtualizedWindow();
       return;
     }
 
@@ -153,15 +155,15 @@ export function useMatrixViewportController({
 
     requestAnimationFrame(() => {
       updateScheduledRef.current = false;
-      updateVisibleWindow();
+      updateVirtualizedWindow();
     });
-  }, [updateVisibleWindow]);
+  }, [updateVirtualizedWindow]);
 
   useDragScroll(mainScrollRef, {
     enabled: !mobile,
     onScroll: (left, top) => {
       syncScrollPositions(left, top, "main");
-      scheduleVisibleWindowUpdate();
+      scheduleVirtualizedWindowUpdate();
       lastKnownScrollRef.current = { left, top };
     },
   });
@@ -178,7 +180,7 @@ export function useMatrixViewportController({
 
       if (previousScrollLeft !== null && !movedHorizontally) {
         syncScrollPositions(scrollLeft, scrollTop, "main");
-        scheduleVisibleWindowUpdate();
+        scheduleVirtualizedWindowUpdate();
         return;
       }
 
@@ -201,9 +203,9 @@ export function useMatrixViewportController({
 
       syncScrollPositions(scrollLeft, scrollTop, "main");
       lastKnownScrollRef.current = { left: scrollLeft, top: scrollTop };
-      scheduleVisibleWindowUpdate();
+      scheduleVirtualizedWindowUpdate();
     },
-    [canExpandAfter, canExpandBefore, onNearEdgeScroll, scheduleVisibleWindowUpdate, syncScrollPositions],
+    [canExpandAfter, canExpandBefore, onNearEdgeScroll, scheduleVirtualizedWindowUpdate, syncScrollPositions],
   );
 
   const handleDateHeadersScrollCore = useCallback(
@@ -223,9 +225,9 @@ export function useMatrixViewportController({
       const scrollTop = event.currentTarget.scrollTop;
       syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, "technician");
       lastKnownScrollRef.current.top = scrollTop;
-      scheduleVisibleWindowUpdate();
+      scheduleVirtualizedWindowUpdate();
     },
-    [scheduleVisibleWindowUpdate, syncScrollPositions],
+    [scheduleVirtualizedWindowUpdate, syncScrollPositions],
   );
 
   const handleDateHeadersScroll = useMemo(
@@ -249,7 +251,8 @@ export function useMatrixViewportController({
     const container = mainScrollRef.current;
     if (!container || dates.length === 0) return false;
 
-    const todayIndex = dates.findIndex((date) => isSameDay(date, new Date()));
+    const todayMadridKey = formatInTimeZone(new Date(), MATRIX_TIMEZONE, MATRIX_DATE_KEY_FORMAT);
+    const todayIndex = getDateIndexByKey(dates, todayMadridKey);
     if (todayIndex === -1 || container.clientWidth === 0) return false;
 
     let scrollPosition = todayIndex * cellWidth - container.clientWidth / 2 + cellWidth / 2;
@@ -258,7 +261,7 @@ export function useMatrixViewportController({
     container.scrollLeft = scrollPosition;
 
     return true;
-  }, [cellWidth, dates, matrixWidth]);
+  }, [cellWidth, dates, getDateIndexByKey, matrixWidth]);
 
   useEffect(() => {
     if (autoScrolledRef.current || isInitialLoading || dates.length === 0) return;
@@ -284,8 +287,8 @@ export function useMatrixViewportController({
   }, [dates.length, isInitialLoading, scrollToToday]);
 
   useEffect(() => {
-    updateVisibleWindow();
-  }, [technicianCount, dates.length, updateVisibleWindow]);
+    updateVirtualizedWindow();
+  }, [technicianCount, dates.length, updateVirtualizedWindow]);
 
   useEffect(() => {
     const main = mainScrollRef.current;
@@ -326,7 +329,8 @@ export function useMatrixViewportController({
     lastKnownScrollRef.current = { left: targetLeft, top: lastTop };
     previousScrollLeftRef.current = targetLeft;
     previousDatesRef.current = dates.slice();
-  }, [cellWidth, dates]);
+    updateVirtualizedWindow();
+  }, [cellWidth, dates, updateVirtualizedWindow]);
 
   useEffect(() => {
     if (!mobile) return;

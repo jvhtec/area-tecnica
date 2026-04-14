@@ -58,7 +58,7 @@ vi.mock('@/stores/useSelectedCellStore', () => ({
   useSelectedCellStore: useSelectedCellStoreMock,
 }));
 
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/integrations/supabase/client', () => ({
   supabase: supabaseMock,
 }));
 
