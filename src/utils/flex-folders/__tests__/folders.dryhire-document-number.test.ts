@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
   createFlexFolderMock,
+  deleteFlexFolderMock,
   updateFlexElementHeaderMock,
   getDryhireParentFolderIdMock,
   insertMock,
 } = vi.hoisted(() => ({
   createFlexFolderMock: vi.fn(),
+  deleteFlexFolderMock: vi.fn(),
   updateFlexElementHeaderMock: vi.fn(),
   getDryhireParentFolderIdMock: vi.fn(),
   insertMock: vi.fn(),
@@ -14,6 +16,7 @@ const {
 
 vi.mock("../api", () => ({
   createFlexFolder: createFlexFolderMock,
+  deleteFlexFolder: deleteFlexFolderMock,
   updateFlexElementHeader: updateFlexElementHeaderMock,
 }));
 
@@ -100,11 +103,13 @@ import { createAllFoldersForJob } from "../folders";
 describe("createAllFoldersForJob dryhire document numbers", () => {
   beforeEach(() => {
     createFlexFolderMock.mockReset();
+    deleteFlexFolderMock.mockReset();
     updateFlexElementHeaderMock.mockReset();
     getDryhireParentFolderIdMock.mockReset();
     insertMock.mockReset();
 
     getDryhireParentFolderIdMock.mockResolvedValue("dryhire-month-parent");
+    deleteFlexFolderMock.mockResolvedValue(undefined);
     updateFlexElementHeaderMock.mockResolvedValue(undefined);
     createFlexFolderMock
       .mockResolvedValueOnce({ elementId: "dryhire-folder" })
@@ -266,7 +271,7 @@ describe("createAllFoldersForJob dryhire document numbers", () => {
     );
   });
 
-  it("does not persist local folder rows when header enforcement fails", async () => {
+  it("cleans up created Flex elements and does not persist local rows when header enforcement fails", async () => {
     updateFlexElementHeaderMock.mockRejectedValueOnce(new Error("header update failed"));
 
     const job = {
@@ -287,6 +292,43 @@ describe("createAllFoldersForJob dryhire document numbers", () => {
       )
     ).rejects.toThrow("header update failed");
 
+    expect(deleteFlexFolderMock).toHaveBeenNthCalledWith(1, "dryhire-presupuesto");
+    expect(deleteFlexFolderMock).toHaveBeenNthCalledWith(2, "dryhire-folder");
+    expect(insertMock).not.toHaveBeenCalled();
+  });
+
+  it("surfaces cleanup failures with dryhire element context", async () => {
+    updateFlexElementHeaderMock
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("presupuesto header failed"));
+    deleteFlexFolderMock
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("dryhire delete failed"));
+
+    const job = {
+      id: "job-cleanup-failure-dryhire",
+      job_type: "dryhire",
+      title: "Cleanup Failure Dryhire Job",
+      start_time: "2025-01-01T10:00:00.000Z",
+      end_time: "2025-01-01T18:00:00.000Z",
+      job_departments: [{ department: "sound" }],
+    };
+
+    await expect(
+      createAllFoldersForJob(
+        job,
+        "2025-01-01T10:00:00.000Z",
+        "2025-01-01T18:00:00.000Z",
+        "250101"
+      )
+    ).rejects.toThrow(
+      "Cleanup also failed for: folder dryhire-folder (250101S): dryhire delete failed"
+    );
+
+    expect(deleteFlexFolderMock).toHaveBeenNthCalledWith(1, "dryhire-presupuesto");
+    expect(deleteFlexFolderMock).toHaveBeenNthCalledWith(2, "dryhire-folder");
     expect(insertMock).not.toHaveBeenCalled();
   });
 });

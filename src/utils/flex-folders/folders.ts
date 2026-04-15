@@ -10,7 +10,7 @@ import {
   getDepartmentExtrasPresupuestoMetadata,
   getSubfolderSelectionSummary,
 } from "./types";
-import { createFlexFolder, updateFlexElementHeader } from "./api";
+import { createFlexFolder, deleteFlexFolder, updateFlexElementHeader } from "./api";
 import {
   FLEX_FOLDER_IDS,
   DEPARTMENT_IDS,
@@ -55,6 +55,16 @@ function parseJobDate(value: unknown, fieldName: string): Date {
   return date;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  return String(error);
+}
+
 function getJobTimezone(job: any): string {
   const timezone = typeof job?.timezone === "string" ? job.timezone.trim() : "";
   return timezone || DEFAULT_FLEX_TIMEZONE;
@@ -75,21 +85,76 @@ function getDryhireFlexSchedule(job: any) {
   };
 }
 
-async function enforceDryhireHeaderFields(
-  elementId: string,
-  documentNumber: string,
-  plannedStartDate: string,
-  plannedEndDate: string
-) {
+interface DryhireCreatedElement {
+  label: string;
+  elementId: string;
+  documentNumber: string;
+}
+
+interface DryhireHeaderFields extends DryhireCreatedElement {
+  plannedStartDate: string;
+  plannedEndDate: string;
+}
+
+async function enforceDryhireHeaderFields({
+  label,
+  elementId,
+  documentNumber,
+  plannedStartDate,
+  plannedEndDate,
+}: DryhireHeaderFields) {
   if (!elementId) {
-    throw new Error("Flex dryhire element creation returned no element ID");
+    throw new Error(`Flex dryhire ${label} creation returned no element ID`);
   }
 
-  await Promise.all([
-    updateFlexElementHeader(elementId, "documentNumber", documentNumber),
-    updateFlexElementHeader(elementId, "plannedStartDate", plannedStartDate),
-    updateFlexElementHeader(elementId, "plannedEndDate", plannedEndDate),
-  ]);
+  const fields = [
+    { fieldType: "documentNumber", value: documentNumber },
+    { fieldType: "plannedStartDate", value: plannedStartDate },
+    { fieldType: "plannedEndDate", value: plannedEndDate },
+  ];
+
+  for (const field of fields) {
+    try {
+      await updateFlexElementHeader(elementId, field.fieldType, field.value);
+    } catch (error) {
+      console.error("Failed to enforce dryhire Flex header field:", {
+        label,
+        elementId,
+        documentNumber,
+        fieldType: field.fieldType,
+        value: field.value,
+        error,
+      });
+      throw new Error(
+        `Failed to enforce dryhire ${label} ${field.fieldType} for element ${elementId} (${documentNumber}): ${getErrorMessage(error)}`
+      );
+    }
+  }
+}
+
+async function cleanupCreatedDryhireElements(elements: DryhireCreatedElement[]) {
+  const cleanupFailures: string[] = [];
+
+  for (const element of elements) {
+    if (!element.elementId) {
+      continue;
+    }
+
+    try {
+      await deleteFlexFolder(element.elementId);
+      console.warn("Deleted dryhire Flex element after header enforcement failure:", element);
+    } catch (error) {
+      console.error("Failed to delete dryhire Flex element after header enforcement failure:", {
+        ...element,
+        error,
+      });
+      cleanupFailures.push(
+        `${element.label} ${element.elementId} (${element.documentNumber}): ${getErrorMessage(error)}`
+      );
+    }
+  }
+
+  return cleanupFailures;
 }
 
 /**
@@ -578,20 +643,47 @@ export async function createAllFoldersForJob(
     };
     const presupuestoFolder = await createFlexFolder(presupuestoFolderPayload);
 
-    await Promise.all([
-      enforceDryhireHeaderFields(
-        dryHireFolder.elementId,
-        dryHireFolderPayload.documentNumber,
-        dryHireFolderPayload.plannedStartDate,
-        dryHireFolderPayload.plannedEndDate
-      ),
-      enforceDryhireHeaderFields(
-        presupuestoFolder.elementId,
-        presupuestoFolderPayload.documentNumber,
-        presupuestoFolderPayload.plannedStartDate,
-        presupuestoFolderPayload.plannedEndDate
-      ),
-    ]);
+    const dryhireHeaderFields: DryhireHeaderFields = {
+      label: "folder",
+      elementId: dryHireFolder.elementId,
+      documentNumber: dryHireFolderPayload.documentNumber,
+      plannedStartDate: dryHireFolderPayload.plannedStartDate,
+      plannedEndDate: dryHireFolderPayload.plannedEndDate,
+    };
+    const presupuestoHeaderFields: DryhireHeaderFields = {
+      label: "presupuesto",
+      elementId: presupuestoFolder.elementId,
+      documentNumber: presupuestoFolderPayload.documentNumber,
+      plannedStartDate: presupuestoFolderPayload.plannedStartDate,
+      plannedEndDate: presupuestoFolderPayload.plannedEndDate,
+    };
+
+    try {
+      await enforceDryhireHeaderFields(dryhireHeaderFields);
+      await enforceDryhireHeaderFields(presupuestoHeaderFields);
+    } catch (error) {
+      console.error("Dryhire Flex header enforcement failed before local persistence. Attempting cleanup.", {
+        jobId: job.id,
+        dryhireElementId: dryhireHeaderFields.elementId,
+        dryhireDocumentNumber: dryhireHeaderFields.documentNumber,
+        presupuestoElementId: presupuestoHeaderFields.elementId,
+        presupuestoDocumentNumber: presupuestoHeaderFields.documentNumber,
+        error,
+      });
+
+      const cleanupFailures = await cleanupCreatedDryhireElements([
+        presupuestoHeaderFields,
+        dryhireHeaderFields,
+      ]);
+      const cleanupMessage =
+        cleanupFailures.length > 0
+          ? ` Cleanup also failed for: ${cleanupFailures.join("; ")}. Manual cleanup may be required.`
+          : " Created Flex elements were deleted; no local folder rows were persisted.";
+
+      throw new Error(
+        `Dryhire Flex header enforcement failed before local persistence: ${getErrorMessage(error)}.${cleanupMessage}`
+      );
+    }
 
     // Save both dryhire parent and presupuesto folders
     await supabase
