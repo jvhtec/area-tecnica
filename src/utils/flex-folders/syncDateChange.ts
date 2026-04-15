@@ -27,31 +27,37 @@ function getErrorMessage(error: unknown): string {
 
 /**
  * Format a date string for Flex API (ISO-like format with milliseconds)
- * Uses Europe/Madrid timezone for consistency with the app
+ * Uses the job timezone for consistency with the app
  */
-function formatDateForFlex(date: Date): string {
-  const zonedDate = toZonedTime(date, DEFAULT_TIMEZONE);
-  // Format as ISO-like string in Madrid timezone
+function formatDateForFlex(date: Date, timezone = DEFAULT_TIMEZONE): string {
+  const zonedDate = toZonedTime(date, timezone);
+  // Format as ISO-like wall-clock time for Flex.
   const formatted = format(zonedDate, "yyyy-MM-dd'T'HH:mm:ss");
   return formatted + ".000Z";
 }
 
 /**
  * Generate a YYMMDD document number from a date
- * Uses Europe/Madrid timezone for consistency with the app
+ * Uses the job timezone for consistency with the app
  */
-function generateBaseDocumentNumber(date: Date): string {
-  const zonedDate = toZonedTime(date, DEFAULT_TIMEZONE);
+function generateBaseDocumentNumber(date: Date, timezone = DEFAULT_TIMEZONE): string {
+  const zonedDate = toZonedTime(date, timezone);
   return format(zonedDate, "yyMMdd");
 }
 
 /**
  * Format date for display in folder names (e.g., "Jan 15, 2026")
- * Uses Europe/Madrid timezone for consistency with the app
+ * Uses the job timezone for consistency with the app
  */
-function formatDateForDisplay(date: Date): string {
-  const zonedDate = toZonedTime(date, DEFAULT_TIMEZONE);
+function formatDateForDisplay(date: Date, timezone = DEFAULT_TIMEZONE): string {
+  const zonedDate = toZonedTime(date, timezone);
   return format(zonedDate, "MMM d, yyyy");
+}
+
+function getEffectiveTimezone(timezone: unknown): string {
+  return typeof timezone === "string" && timezone.trim()
+    ? timezone.trim()
+    : DEFAULT_TIMEZONE;
 }
 
 /**
@@ -133,6 +139,108 @@ function generateFolderName(
   }
 }
 
+interface FlexFolderSyncRow {
+  element_id: string;
+  department: string | null;
+  folder_type: string | null;
+}
+
+function getDryhireDocumentSuffix(folder: FlexFolderSyncRow): string | null {
+  const department = folder.department;
+
+  if (department !== "sound" && department !== "lights") {
+    return null;
+  }
+
+  if (folder.folder_type === "dryhire") {
+    return department === "sound" ? "S" : "L";
+  }
+
+  if (folder.folder_type === "dryhire_presupuesto") {
+    return department === "sound" ? "SDH" : "LDH";
+  }
+
+  return null;
+}
+
+async function updateDryhireElement(
+  folder: FlexFolderSyncRow,
+  newBaseDocNumber: string,
+  formattedStartDate: string,
+  formattedEndDate: string,
+  newTitle?: string
+) {
+  const suffix = getDryhireDocumentSuffix(folder);
+
+  if (!suffix) {
+    throw new Error(
+      `Unsupported dryhire folder row: type=${folder.folder_type || "(none)"}, department=${folder.department || "(none)"}`
+    );
+  }
+
+  const newDocNumber = `${newBaseDocNumber}${suffix}`;
+
+  await updateFlexElementHeader(folder.element_id, "documentNumber", newDocNumber);
+  await updateFlexElementHeader(folder.element_id, "plannedStartDate", formattedStartDate);
+  await updateFlexElementHeader(folder.element_id, "plannedEndDate", formattedEndDate);
+
+  if (newTitle) {
+    await updateFlexElementHeader(folder.element_id, "name", `Dry Hire - ${newTitle}`);
+  }
+
+  return newDocNumber;
+}
+
+async function syncDryhireFlexElementsForJobDateChange(
+  folders: FlexFolderSyncRow[],
+  newBaseDocNumber: string,
+  formattedStartDate: string,
+  formattedEndDate: string,
+  newTitle?: string
+): Promise<SyncResult> {
+  const results: SyncResult = { success: 0, failed: 0, errors: [] };
+  const dryhireFolders = folders.filter(folder =>
+    folder.folder_type === "dryhire" || folder.folder_type === "dryhire_presupuesto"
+  );
+
+  if (dryhireFolders.length === 0) {
+    console.log("[syncFlexElements] No dryhire Flex folder rows found for job");
+    return results;
+  }
+
+  console.log(
+    `[syncFlexElements] Dryhire job detected. Syncing ${dryhireFolders.length} recorded dryhire element(s) without tree traversal.`
+  );
+
+  for (const folder of dryhireFolders) {
+    try {
+      const newDocNumber = await updateDryhireElement(
+        folder,
+        newBaseDocNumber,
+        formattedStartDate,
+        formattedEndDate,
+        newTitle
+      );
+
+      results.success++;
+      console.log(
+        `[syncFlexElements] Updated dryhire element ${folder.element_id} (${folder.folder_type || "unknown"}): ${newDocNumber}`
+      );
+    } catch (error: unknown) {
+      results.failed++;
+      const errorMsg = `Dryhire element ${folder.element_id}: ${getErrorMessage(error)}`;
+      results.errors.push(errorMsg);
+      console.error(`[syncFlexElements] ${errorMsg}`);
+    }
+  }
+
+  console.log(
+    `[syncFlexElements] Dryhire sync complete: ${results.success} succeeded, ${results.failed} failed`
+  );
+
+  return results;
+}
+
 /**
  * Sync all Flex elements for a job when its dates or title changes
  * Updates document numbers, planned dates, and folder names for all nested elements
@@ -154,15 +262,10 @@ export async function syncFlexElementsForJobDateChange(
   // Generate new date values
   const startDate = new Date(newStartTime);
   const endDate = new Date(newEndTime);
-  const newBaseDocNumber = generateBaseDocumentNumber(startDate);
-  const formattedStartDate = formatDateForFlex(startDate);
-  const formattedEndDate = formatDateForFlex(endDate);
-  const displayDate = formatDateForDisplay(startDate);
 
   console.log(
     `[syncFlexElements] Syncing job ${jobId} to new dates: ${newStartTime} - ${newEndTime}${newTitle ? `, new title: ${newTitle}` : ""}`
   );
-  console.log(`[syncFlexElements] New base document number: ${newBaseDocNumber}`);
 
   // Fetch job with location to get the location name and title for folder renaming
   const { data: jobData, error: jobError } = await supabase
@@ -170,6 +273,7 @@ export async function syncFlexElementsForJobDateChange(
     .select(`
       title,
       job_type,
+      timezone,
       location:locations(name)
     `)
     .eq("id", jobId)
@@ -183,6 +287,13 @@ export async function syncFlexElementsForJobDateChange(
   const locationName = jobData?.location?.name || "No Location";
   const jobTitle = newTitle || jobData?.title || "Untitled";
   const isTourDateJob = jobData?.job_type === "tourdate";
+  const effectiveTimezone = getEffectiveTimezone(jobData?.timezone);
+  const newBaseDocNumber = generateBaseDocumentNumber(startDate, effectiveTimezone);
+  const formattedStartDate = formatDateForFlex(startDate, effectiveTimezone);
+  const formattedEndDate = formatDateForFlex(endDate, effectiveTimezone);
+  const displayDate = formatDateForDisplay(startDate, effectiveTimezone);
+
+  console.log(`[syncFlexElements] New base document number: ${newBaseDocNumber}`);
 
   // Fetch all flex_folders for this job
   const { data: folders, error: foldersError } = await supabase
@@ -198,6 +309,16 @@ export async function syncFlexElementsForJobDateChange(
   if (!folders || folders.length === 0) {
     console.log("[syncFlexElements] No flex folders found for job");
     return results;
+  }
+
+  if (jobData?.job_type === "dryhire") {
+    return syncDryhireFlexElementsForJobDateChange(
+      folders,
+      newBaseDocNumber,
+      formattedStartDate,
+      formattedEndDate,
+      newTitle
+    );
   }
 
   console.log(`[syncFlexElements] Found ${folders.length} root folders to sync`);
