@@ -27,18 +27,18 @@ function getErrorMessage(error: unknown): string {
 
 /**
  * Format a date string for Flex API (ISO-like format with milliseconds)
- * Uses Europe/Madrid timezone for consistency with the app
+ * Uses the job timezone for consistency with the app
  */
 function formatDateForFlex(date: Date, timezone = DEFAULT_TIMEZONE): string {
   const zonedDate = toZonedTime(date, timezone);
-  // Format as ISO-like string in Madrid timezone
+  // Format as ISO-like wall-clock time for Flex.
   const formatted = format(zonedDate, "yyyy-MM-dd'T'HH:mm:ss");
   return formatted + ".000Z";
 }
 
 /**
  * Generate a YYMMDD document number from a date
- * Uses Europe/Madrid timezone for consistency with the app
+ * Uses the job timezone for consistency with the app
  */
 function generateBaseDocumentNumber(date: Date, timezone = DEFAULT_TIMEZONE): string {
   const zonedDate = toZonedTime(date, timezone);
@@ -47,11 +47,17 @@ function generateBaseDocumentNumber(date: Date, timezone = DEFAULT_TIMEZONE): st
 
 /**
  * Format date for display in folder names (e.g., "Jan 15, 2026")
- * Uses Europe/Madrid timezone for consistency with the app
+ * Uses the job timezone for consistency with the app
  */
-function formatDateForDisplay(date: Date): string {
-  const zonedDate = toZonedTime(date, DEFAULT_TIMEZONE);
+function formatDateForDisplay(date: Date, timezone = DEFAULT_TIMEZONE): string {
+  const zonedDate = toZonedTime(date, timezone);
   return format(zonedDate, "MMM d, yyyy");
+}
+
+function getEffectiveTimezone(timezone: unknown): string {
+  return typeof timezone === "string" && timezone.trim()
+    ? timezone.trim()
+    : DEFAULT_TIMEZONE;
 }
 
 /**
@@ -256,15 +262,10 @@ export async function syncFlexElementsForJobDateChange(
   // Generate new date values
   const startDate = new Date(newStartTime);
   const endDate = new Date(newEndTime);
-  const newBaseDocNumber = generateBaseDocumentNumber(startDate);
-  const formattedStartDate = formatDateForFlex(startDate);
-  const formattedEndDate = formatDateForFlex(endDate);
-  const displayDate = formatDateForDisplay(startDate);
 
   console.log(
     `[syncFlexElements] Syncing job ${jobId} to new dates: ${newStartTime} - ${newEndTime}${newTitle ? `, new title: ${newTitle}` : ""}`
   );
-  console.log(`[syncFlexElements] New base document number: ${newBaseDocNumber}`);
 
   // Fetch job with location to get the location name and title for folder renaming
   const { data: jobData, error: jobError } = await supabase
@@ -286,6 +287,13 @@ export async function syncFlexElementsForJobDateChange(
   const locationName = jobData?.location?.name || "No Location";
   const jobTitle = newTitle || jobData?.title || "Untitled";
   const isTourDateJob = jobData?.job_type === "tourdate";
+  const effectiveTimezone = getEffectiveTimezone(jobData?.timezone);
+  const newBaseDocNumber = generateBaseDocumentNumber(startDate, effectiveTimezone);
+  const formattedStartDate = formatDateForFlex(startDate, effectiveTimezone);
+  const formattedEndDate = formatDateForFlex(endDate, effectiveTimezone);
+  const displayDate = formatDateForDisplay(startDate, effectiveTimezone);
+
+  console.log(`[syncFlexElements] New base document number: ${newBaseDocNumber}`);
 
   // Fetch all flex_folders for this job
   const { data: folders, error: foldersError } = await supabase
@@ -304,15 +312,11 @@ export async function syncFlexElementsForJobDateChange(
   }
 
   if (jobData?.job_type === "dryhire") {
-    const timezone =
-      typeof jobData?.timezone === "string" && jobData.timezone.trim()
-        ? jobData.timezone.trim()
-        : DEFAULT_TIMEZONE;
     return syncDryhireFlexElementsForJobDateChange(
       folders,
-      generateBaseDocumentNumber(startDate, timezone),
-      formatDateForFlex(startDate, timezone),
-      formatDateForFlex(endDate, timezone),
+      newBaseDocNumber,
+      formattedStartDate,
+      formattedEndDate,
       newTitle
     );
   }

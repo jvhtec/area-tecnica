@@ -7,7 +7,7 @@ const { getElementTreeMock, updateFlexElementHeaderMock, testState } = vi.hoiste
     job: {
       title: "Dry Hire - Alquiler AVL",
       job_type: "dryhire",
-      timezone: "Europe/Madrid",
+      timezone: "America/Los_Angeles",
       location: { name: "Madrid" },
     },
     folders: [] as Array<{
@@ -80,7 +80,7 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-import { syncFlexElementsForJobDateChange } from "../syncDateChange";
+import { syncFlexElementsForJobDateChange } from "@/utils/flex-folders/syncDateChange";
 
 describe("syncFlexElementsForJobDateChange dryhire scoping", () => {
   beforeEach(() => {
@@ -100,7 +100,7 @@ describe("syncFlexElementsForJobDateChange dryhire scoping", () => {
     testState.job = {
       title: "Dry Hire - Alquiler AVL",
       job_type: "dryhire",
-      timezone: "Europe/Madrid",
+      timezone: "America/Los_Angeles",
       location: { name: "Madrid" },
     };
     testState.folders = [
@@ -130,22 +130,22 @@ describe("syncFlexElementsForJobDateChange dryhire scoping", () => {
     expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
       "job-dryhire-folder",
       "documentNumber",
-      "260415S"
+      "260414S"
     );
     expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
       "job-dryhire-presupuesto",
       "documentNumber",
-      "260415SDH"
+      "260414SDH"
     );
     expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
       "job-dryhire-folder",
       "plannedStartDate",
-      "2026-04-15T00:30:00.000Z"
+      "2026-04-14T15:30:00.000Z"
     );
     expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
       "job-dryhire-presupuesto",
       "plannedEndDate",
-      "2026-04-15T03:00:00.000Z"
+      "2026-04-14T18:00:00.000Z"
     );
     expect(updateFlexElementHeaderMock).not.toHaveBeenCalledWith(
       "other-dryhire-folder",
