@@ -520,7 +520,7 @@ Evidence:
 
 - `AssignJobDialog` emits `window.dispatchEvent('assignment-updated')` local event as integration mechanism. (src/components/matrix/AssignJobDialog.tsx:635-637)
 
-**Finding:** Local events are not durable/auditable compared with DB/activity-log based notifications.
+**Finding:** Local events are not durable/auditable compared with DB/activity-log-based notifications.
 
 ### 11.3 In-app `assignment_notifications`
 
@@ -676,4 +676,3 @@ Evidence:
 - Tests:
   - `tests/assignments/critical-paths.test.ts`
   - `src/hooks/__tests__/useJobAssignmentsRealtime.test.ts`
-
