@@ -113,11 +113,11 @@ const lightComponentDatabase: LightComponent[] = [
   { id: 62, name: 'MINI-B AQUA PX', watts: 375, fixtureType: 'led' },
   { id: 63, name: 'FREE PAR PRO 72', watts: 80, fixtureType: 'led' },
   { id: 64, name: 'FRESNEL 1 kW', watts: 1000, fixtureType: 'incandescent' },
-  { id: 65, name: 'FRESNEL 300 W', watts: 760, fixtureType: 'incandescent' },
+  { id: 65, name: 'FRESNEL 300 W', watts: 300, fixtureType: 'incandescent' },
   { id: 66, name: 'ANTARI HZ 500', watts: 480, fixtureType: 'smoke' },
   { id: 67, name: 'TURBINA SHOWTEC SF-250', watts: 1035, fixtureType: 'smoke' },
   { id: 68, name: 'BRITEQ HZFOG II', watts: 1750, fixtureType: 'smoke' },
-  { id: 68, name: 'GRAND MA3 FULL SIZE', watts: 450, fixtureType: 'consoles' }
+  { id: 69, name: 'GRAND MA3 FULL SIZE', watts: 450, fixtureType: 'consoles' }
 
 ];
 
