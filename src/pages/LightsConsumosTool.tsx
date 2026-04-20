@@ -34,6 +34,8 @@ const FIXTURE_PF: Record<FixtureType, { label: string; pf: number }> = {
   incandescent: { label: 'Incandescent / filament', pf: 1.0 },
   discharge: { label: 'Discharge (generic)', pf: 0.9 },
   led: { label: 'LED (generic)', pf: 0.9 },
+  smoke: { label: 'Smoke/Hazer (generic)', pf: 0.95 },
+  consoles: { label: 'Consoles (generic)', pf: 1 },
   'led-pro': { label: 'LED (pro / specified)', pf: 0.95 },
 };
 
@@ -85,9 +87,9 @@ const lightComponentDatabase: LightComponent[] = [
   { id: 36, name: 'MARTIN ATOMIC 3000', watts: 3000, fixtureType: 'discharge' },
   { id: 37, name: 'SGM Q7', watts: 500, fixtureType: 'led' },
   { id: 38, name: 'ELATION SIXBAR 500', watts: 80, fixtureType: 'led' },
-  { id: 39, name: 'SMOKE FACTORY TOUR HAZERII', watts: 1500, fixtureType: 'discharge' },
-  { id: 40, name: 'ROBE 500 FT-PRO', watts: 1200, fixtureType: 'discharge' },
-  { id: 41, name: 'SAHARA TURBO DRYER', watts: 1500, fixtureType: 'discharge' },
+  { id: 39, name: 'SMOKE FACTORY TOUR HAZER II', watts: 1500, fixtureType: 'smoke' },
+  { id: 40, name: 'ROBE 500 FT-PRO', watts: 1200, fixtureType: 'smoke' },
+  { id: 41, name: 'SAHARA TURBO DRYER', watts: 1500, fixtureType: 'smoke' },
   { id: 42, name: 'ROBE SPIIDER', watts: 660, fixtureType: 'led' },
   { id: 43, name: 'GLP JDC1', watts: 1200, fixtureType: 'led' },
   { id: 44, name: 'CAMEO W3', watts: 325, fixtureType: 'led' },
@@ -108,7 +110,14 @@ const lightComponentDatabase: LightComponent[] = [
   { id: 59, name: 'CLAY PAKY A-LEDA K15', watts: 760, fixtureType: 'led' },
   { id: 60, name: 'AROLLA AQUA LT', watts: 1400, fixtureType: 'led' },
   { id: 61, name: 'CUARZO', watts: 400, fixtureType: 'incandescent' },
-  { id: 62, name: 'MINI-B AQUA PX', watts: 375, fixtureType: 'led' }
+  { id: 62, name: 'MINI-B AQUA PX', watts: 375, fixtureType: 'led' },
+  { id: 63, name: 'FREE PAR PRO 72', watts: 80, fixtureType: 'led' },
+  { id: 64, name: 'FRESNEL 1 kW', watts: 1000, fixtureType: 'incandescent' },
+  { id: 65, name: 'FRESNEL 300 W', watts: 300, fixtureType: 'incandescent' },
+  { id: 66, name: 'ANTARI HZ 500', watts: 480, fixtureType: 'smoke' },
+  { id: 67, name: 'TURBINA SHOWTEC SF-250', watts: 1035, fixtureType: 'smoke' },
+  { id: 68, name: 'BRITEQ HZFOG II', watts: 1750, fixtureType: 'smoke' },
+  { id: 69, name: 'GRAND MA3 FULL SIZE', watts: 450, fixtureType: 'consoles' }
 
 ];
 
@@ -1005,10 +1014,9 @@ const LightsConsumosTool: React.FC = () => {
           <div className="rounded-lg border border-muted-foreground/20 bg-muted/30 p-3 text-sm">
             <p className="font-medium text-foreground">Power factor recomendado por tipo de fixture</p>
             <ul className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 text-muted-foreground">
-              <li>{FIXTURE_PF.incandescent.label}: {FIXTURE_PF.incandescent.pf.toFixed(2)}</li>
-              <li>{FIXTURE_PF.discharge.label}: {FIXTURE_PF.discharge.pf.toFixed(2)}</li>
-              <li>{FIXTURE_PF.led.label}: {FIXTURE_PF.led.pf.toFixed(2)}</li>
-              <li>{FIXTURE_PF['led-pro'].label}: {FIXTURE_PF['led-pro'].pf.toFixed(2)}</li>
+              {Object.entries(FIXTURE_PF).map(([key, data]) => (
+                <li key={key}>{data.label}: {data.pf.toFixed(2)}</li>
+              ))}
             </ul>
             <p className="mt-2 text-muted-foreground">Puedes ajustar el PF por ítem si el fabricante especifica un valor distinto.</p>
           </div>
