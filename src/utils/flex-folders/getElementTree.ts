@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { onFlexTokenInvalidate } from "@/utils/flexTokenCache";
 
 /**
  * Types for Flex element tree structure
@@ -28,12 +29,26 @@ export interface FlatElementNode {
 }
 
 let cachedFlexToken: string | null = null;
+let tokenVersion = 0;
+onFlexTokenInvalidate(() => {
+  tokenVersion += 1;
+  cachedFlexToken = null;
+});
 
 /**
- * Gets the Flex authentication token from Supabase secrets
+ * Retrieve the Flex authentication token, using an in-memory cache when available.
+ *
+ * Attempts to return a cached token; if none exists, invokes the Supabase 'get-secret'
+ * function to obtain the secret named `X_AUTH_TOKEN`. The fetched token is stored
+ * in memory only if the token cache was not invalidated during the fetch.
+ *
+ * @returns The Flex authentication token string.
+ * @throws If the Supabase function returns an error or the response does not contain `X_AUTH_TOKEN`.
  */
 async function getFlexAuthToken(): Promise<string> {
   if (cachedFlexToken) return cachedFlexToken;
+  
+  const requestVersion = tokenVersion;
 
   const { data, error } = await supabase.functions.invoke('get-secret', {
     body: { secretName: 'X_AUTH_TOKEN' },
@@ -48,7 +63,10 @@ async function getFlexAuthToken(): Promise<string> {
     throw new Error('Flex auth token response missing X_AUTH_TOKEN');
   }
 
-  cachedFlexToken = token;
+  // Only cache if version hasn't changed (no invalidation during fetch)
+  if (requestVersion === tokenVersion) {
+    cachedFlexToken = token;
+  }
   return token;
 }
 
