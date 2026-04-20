@@ -1014,10 +1014,9 @@ const LightsConsumosTool: React.FC = () => {
           <div className="rounded-lg border border-muted-foreground/20 bg-muted/30 p-3 text-sm">
             <p className="font-medium text-foreground">Power factor recomendado por tipo de fixture</p>
             <ul className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 text-muted-foreground">
-              <li>{FIXTURE_PF.incandescent.label}: {FIXTURE_PF.incandescent.pf.toFixed(2)}</li>
-              <li>{FIXTURE_PF.discharge.label}: {FIXTURE_PF.discharge.pf.toFixed(2)}</li>
-              <li>{FIXTURE_PF.led.label}: {FIXTURE_PF.led.pf.toFixed(2)}</li>
-              <li>{FIXTURE_PF['led-pro'].label}: {FIXTURE_PF['led-pro'].pf.toFixed(2)}</li>
+              {Object.entries(FIXTURE_PF).map(([key, data]) => (
+                <li key={key}>{data.label}: {data.pf.toFixed(2)}</li>
+              ))}
             </ul>
             <p className="mt-2 text-muted-foreground">Puedes ajustar el PF por ítem si el fabricante especifica un valor distinto.</p>
           </div>
