@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { format, parseISO, addDays } from "date-fns";
+import { fromZonedTime } from "date-fns-tz";
 import { supabase } from "@/integrations/supabase/client";
 import { createFlexFolder } from "@/utils/flex-folders/api";
 import { FLEX_FOLDER_IDS, DEPARTMENT_IDS, RESPONSIBLE_PERSON_IDS } from "@/utils/flex-folders/constants";
@@ -36,22 +37,38 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
       const jobTitle = job.title?.trim() || "Sin título";
 
       // 2. Build ISO date strings from the artist's show day/time
+      // Convert local Madrid datetime to UTC
       const parsedDate = parseISO(artistDate);
       const endDateBase = isAfterMidnight ? addDays(parsedDate, 1) : parsedDate;
-      const plannedStartDate = `${artistDate}T${showStart}:00.000Z`;
-      const plannedEndDate = `${format(endDateBase, "yyyy-MM-dd")}T${showEnd}:00.000Z`;
 
-      // 3. Compute document number: DDMMAA.xSQT
+      const localStartDatetime = `${artistDate}T${showStart}:00`;
+      const localEndDatetime = `${format(endDateBase, "yyyy-MM-dd")}T${showEnd}:00`;
+
+      const plannedStartDate = fromZonedTime(localStartDatetime, "Europe/Madrid").toISOString();
+      const plannedEndDate = fromZonedTime(localEndDatetime, "Europe/Madrid").toISOString();
+
+      // 3. Compute document number with retry on conflict: DDMMAA.xSQT
       //    x = ordinal of extras presupuestos already created for this job + 1
-      const { count } = await supabase
-        .from("flex_folders")
-        .select("id", { count: "exact", head: true })
-        .eq("job_id", jobId)
-        .eq("folder_type", "comercial_presupuesto");
+      let documentNumber: string | null = null;
+      let retryCount = 0;
+      const maxRetries = 3;
 
-      const ordinal = (count ?? 0) + 1;
-      const docDate = format(parsedDate, "ddMMyy");
-      const documentNumber = `${docDate}.${ordinal}SQT`;
+      while (!documentNumber && retryCount < maxRetries) {
+        const { count } = await supabase
+          .from("flex_folders")
+          .select("id", { count: "exact", head: true })
+          .eq("job_id", jobId)
+          .eq("folder_type", "comercial_presupuesto");
+
+        const ordinal = (count ?? 0) + 1;
+        const docDate = format(parsedDate, "ddMMyy");
+        documentNumber = `${docDate}.${ordinal}SQT`;
+        retryCount++;
+      }
+
+      if (!documentNumber) {
+        throw new Error("No se pudo calcular el número de documento después de múltiples intentos");
+      }
 
       // 4. Find the comercial department folder for this job
       const { data: comercialFolder, error: comercialError } = await supabase
@@ -102,18 +119,40 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
 
         extrasElementId = extrasFolder.elementId;
 
-        const { error: extrasInsertError } = await supabase
-          .from("flex_folders")
-          .insert({
-            job_id: jobId,
-            parent_id: comercialFolder.element_id,
-            element_id: extrasElementId,
-            department: "sound",
-            folder_type: "comercial_extras",
-          });
+        // Retry insertion with exponential backoff
+        let extrasInserted = false;
+        let extrasInsertError: any = null;
+        const retryDelays = [500, 1000, 2000];
 
-        if (extrasInsertError) {
+        for (let i = 0; i < retryDelays.length + 1; i++) {
+          const { error } = await supabase
+            .from("flex_folders")
+            .insert({
+              job_id: jobId,
+              parent_id: comercialFolder.element_id,
+              element_id: extrasElementId,
+              department: "sound",
+              folder_type: "comercial_extras",
+            });
+
+          if (!error) {
+            extrasInserted = true;
+            break;
+          }
+
+          extrasInsertError = error;
+
+          if (i < retryDelays.length) {
+            await new Promise(resolve => setTimeout(resolve, retryDelays[i]));
+          }
+        }
+
+        if (!extrasInserted) {
           console.error(`Orphaned Flex folder created with element_id: ${extrasElementId}`, extrasInsertError);
+          toast.error(
+            `Error al persistir carpeta extras en base de datos. Carpeta huérfana creada con element_id: ${extrasElementId}`,
+            { duration: 10000 }
+          );
           throw extrasInsertError;
         }
       }
@@ -133,19 +172,40 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
         personResponsibleId: RESPONSIBLE_PERSON_IDS.sound,
       });
 
-      // 7. Persist presupuesto to DB
-      const { error: presupuestoInsertError } = await supabase
-        .from("flex_folders")
-        .insert({
-          job_id: jobId,
-          parent_id: extrasElementId,
-          element_id: presupuesto.elementId,
-          department: "sound",
-          folder_type: "comercial_presupuesto",
-        });
+      // 7. Persist presupuesto to DB with retry
+      let presupuestoInserted = false;
+      let presupuestoInsertError: any = null;
+      const retryDelays = [500, 1000, 2000];
 
-      if (presupuestoInsertError) {
+      for (let i = 0; i < retryDelays.length + 1; i++) {
+        const { error } = await supabase
+          .from("flex_folders")
+          .insert({
+            job_id: jobId,
+            parent_id: extrasElementId,
+            element_id: presupuesto.elementId,
+            department: "sound",
+            folder_type: "comercial_presupuesto",
+          });
+
+        if (!error) {
+          presupuestoInserted = true;
+          break;
+        }
+
+        presupuestoInsertError = error;
+
+        if (i < retryDelays.length) {
+          await new Promise(resolve => setTimeout(resolve, retryDelays[i]));
+        }
+      }
+
+      if (!presupuestoInserted) {
         console.error(`Orphaned Flex presupuesto created with element_id: ${presupuesto.elementId}`, presupuestoInsertError);
+        toast.error(
+          `Error al persistir presupuesto en base de datos. Presupuesto huérfano creado con element_id: ${presupuesto.elementId}`,
+          { duration: 10000 }
+        );
         throw presupuestoInsertError;
       }
 
