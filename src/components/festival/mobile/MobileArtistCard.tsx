@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   Sliders, Radio, Mic2, Speaker, Cable, StickyNote, FileDown,
   Link, FileText, Printer, Pencil, Trash2, ImagePlus, ImageOff,
-  Loader2, MoreHorizontal
+  Loader2, MoreHorizontal, Receipt
 } from "lucide-react";
 import { ConfigSummaryRow } from "./ConfigSummaryRow";
 import { GearMismatchIndicator } from "../GearMismatchIndicator";
@@ -183,6 +183,8 @@ interface MobileArtistCardProps {
   deletingArtistId: string | null;
   uploadingStagePlotArtistId: string | null;
   deletingStagePlotArtistId: string | null;
+  creatingExtrasForArtistId: string | null;
+  onCreateFlexExtras: (artistId: string, artistName: string, artistDate: string, showStart: string, showEnd: string, isAfterMidnight: boolean) => void;
   riderFiles?: MobileArtistRiderFile[];
 }
 
@@ -204,6 +206,8 @@ export const MobileArtistCard = ({
   deletingArtistId,
   uploadingStagePlotArtistId,
   deletingStagePlotArtistId,
+  creatingExtrasForArtistId,
+  onCreateFlexExtras,
   riderFiles = [],
 }: MobileArtistCardProps) => {
   return (
@@ -384,6 +388,16 @@ export const MobileArtistCard = ({
               disabled={deletingStagePlotArtistId === artist.id}
             >
               {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
+            </Button>
+          )}
+          {gearComparison?.mismatches.some(m => m.severity === 'error') && (
+            <Button
+              variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+              onClick={() => onCreateFlexExtras(artist.id, artist.name, artist.date, artist.show_start, artist.show_end, artist.isaftermidnight || false)}
+              disabled={creatingExtrasForArtistId === artist.id}
+              title="Crear presupuesto extras en Flex"
+            >
+              {creatingExtrasForArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
             </Button>
           )}
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditArtist(artist)}>

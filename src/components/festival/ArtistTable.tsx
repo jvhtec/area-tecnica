@@ -1084,7 +1084,7 @@ export const ArtistTable = ({
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => createExtrasPresupuesto(artist.id, artist.name)}
+                              onClick={() => createExtrasPresupuesto(artist.id, artist.name, artist.date, artist.show_start, artist.show_end, artist.isaftermidnight || false)}
                               disabled={creatingExtrasForArtistId === artist.id}
                               title="Crear presupuesto extras en Flex"
                               className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
@@ -1130,6 +1130,8 @@ export const ArtistTable = ({
               deletingArtistId={deletingArtistId}
               uploadingStagePlotArtistId={uploadingStagePlotArtistId}
               deletingStagePlotArtistId={deletingStagePlotArtistId}
+              onCreateFlexExtras={createExtrasPresupuesto}
+              creatingExtrasForArtistId={creatingExtrasForArtistId}
             />
           </div>
 
