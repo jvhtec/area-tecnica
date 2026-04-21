@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, type ChangeEvent, type ClipboardEvent as R
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, FileText, Loader2, Mic, Link, ExternalLink, Printer, ImagePlus, ImageOff } from "lucide-react";
+import { Pencil, Trash2, FileText, Loader2, Mic, Link, ExternalLink, Printer, ImagePlus, ImageOff, Receipt } from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
@@ -19,6 +19,7 @@ import { GearMismatchIndicator } from "./GearMismatchIndicator";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { buildReadableFilename } from "@/utils/fileName";
 import { MobileArtistList } from "./mobile/MobileArtistList";
+import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
 
 interface Artist {
   id: string;
@@ -142,6 +143,7 @@ export const ArtistTable = ({
   selectedDate,
   onArtistStagePlotUpdated
 }: ArtistTableProps) => {
+  const { createExtrasPresupuesto, creatingExtrasForArtistId } = useCreateExtrasPresupuesto(jobId);
   const [deletingArtistId, setDeletingArtistId] = useState<string | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linksDialogOpen, setLinksDialogOpen] = useState(false);
@@ -1076,6 +1078,20 @@ export const ArtistTable = ({
                               title="Delete stage plot"
                             >
                               {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
+                            </Button>
+                          )}
+                          {gearComparison?.mismatches.some(m => m.severity === 'error') && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => createExtrasPresupuesto(artist.id, artist.name)}
+                              disabled={creatingExtrasForArtistId === artist.id}
+                              title="Crear presupuesto extras en Flex"
+                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                            >
+                              {creatingExtrasForArtistId === artist.id
+                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                : <Receipt className="h-4 w-4" />}
                             </Button>
                           )}
                           <Button variant="ghost" size="icon" onClick={() => onEditArtist(artist)} title="Edit artist">
