@@ -6,6 +6,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { createFlexFolder } from "@/utils/flex-folders/api";
 import { FLEX_FOLDER_IDS, DEPARTMENT_IDS, RESPONSIBLE_PERSON_IDS } from "@/utils/flex-folders/constants";
 
+// Module-level queue: serialises presupuesto creation per job so that
+// concurrent button clicks (different artists, same job) cannot read the same
+// count and produce duplicate document numbers within a single browser session.
+const jobCreationQueues = new Map<string, Promise<void>>();
+
 export function useCreateExtrasPresupuesto(jobId: string | undefined) {
   const [creatingExtrasForArtistId, setCreatingExtrasForArtistId] = useState<string | null>(null);
 
@@ -23,6 +28,14 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
     }
 
     setCreatingExtrasForArtistId(artistId);
+
+    // Enqueue: wait for any in-flight request for this job to finish before
+    // reading the count, ensuring ordinals are assigned sequentially.
+    const prevTask = jobCreationQueues.get(jobId) ?? Promise.resolve();
+    let releaseThisTask!: () => void;
+    const thisTask = new Promise<void>(res => { releaseThisTask = res; });
+    jobCreationQueues.set(jobId, prevTask.then(() => thisTask));
+    await prevTask.catch(() => {}); // a failure in the prev task must not block this one
 
     try {
       // 1. Get job title for folder naming
@@ -216,6 +229,7 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
         error instanceof Error ? error.message : "Error al crear el presupuesto de extras en Flex"
       );
     } finally {
+      releaseThisTask();
       setCreatingExtrasForArtistId(null);
     }
   };
