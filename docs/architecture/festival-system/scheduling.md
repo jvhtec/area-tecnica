@@ -27,14 +27,14 @@ Represents staffing allocations per shift:
 - Scheduling container:
   - `src/components/festival/scheduling/FestivalScheduling.tsx`
 - Shift CRUD:
-  - `CreateShiftDialog.tsx`
-  - `EditShiftDialog.tsx`
-  - `ShiftsTable.tsx`
-  - `ShiftsList.tsx`
+  - `src/components/festival/scheduling/CreateShiftDialog.tsx`
+  - `src/components/festival/scheduling/EditShiftDialog.tsx`
+  - `src/components/festival/scheduling/ShiftsTable.tsx`
+  - `src/components/festival/scheduling/ShiftsList.tsx`
 - Assignment operations:
-  - `ManageAssignmentsDialog.tsx`
-  - `CopyShiftsDialog.tsx`
-  - `ShiftTimeCalculator.tsx`
+  - `src/components/festival/scheduling/ManageAssignmentsDialog.tsx`
+  - `src/components/festival/scheduling/CopyShiftsDialog.tsx`
+  - `src/components/festival/scheduling/ShiftTimeCalculator.tsx`
 
 ## 3) Scheduling workflow
 
