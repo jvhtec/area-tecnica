@@ -3,7 +3,7 @@ import { getAvailableWirelessChannels, getRequiredWirelessChannels } from "@/lib
 
 export interface GearMismatch {
   type: 'console' | 'wireless' | 'iem' | 'infrastructure' | 'extras' | 'monitors' | 'microphones';
-  severity: 'error' | 'warning';
+  severity: 'error' | 'warning' | 'info';
   message: string;
   details?: string;
 }
@@ -158,23 +158,13 @@ export const compareArtistRequirements = (
   stageSetup: StageGearSetup | null
 ): ArtistGearComparison => {
   const mismatches: GearMismatch[] = [];
-  
-  console.log('=== GEAR COMPARISON DEBUG START ===');
-  console.log('Artist:', artist.name, 'Stage:', artist.stage);
-  console.log('Artist mic_kit:', artist.mic_kit);
-  console.log('Artist wired_mics:', artist.wired_mics);
-  console.log('Global setup wired_mics:', globalSetup?.wired_mics);
-  console.log('Stage setup wired_mics:', stageSetup?.wired_mics);
-  
+
   // Stage 1 uses global setup. Other stages use only stage-specific setup; missing setup means empty inventory.
   const availableGear: AvailableGear = stageSetup
     ? mapStageSetupToAvailableGear(stageSetup)
     : artist.stage === 1 && globalSetup
       ? mapGlobalSetupToAvailableGear(globalSetup)
       : EMPTY_AVAILABLE_GEAR;
-
-  console.log('Final availableGear.wired_mics:', availableGear.wired_mics);
-  console.log('Final availableGear.wired_mics length:', availableGear.wired_mics?.length || 0);
 
   // Check FOH Console availability
   if (artist.foh_console && artist.foh_console.trim() !== '') {
@@ -183,7 +173,7 @@ export const compareArtistRequirements = (
     if (providedBy === 'band') {
       mismatches.push({
         type: 'console',
-        severity: 'warning',
+        severity: 'info',
         message: `La banda aporta consola FOH "${artist.foh_console}"`
       });
     } else {
@@ -217,7 +207,7 @@ export const compareArtistRequirements = (
     if (fohProvidedBy === 'band') {
       mismatches.push({
         type: 'console',
-        severity: 'warning',
+        severity: 'info',
         message: `La banda aporta Waves/Outboard FOH (${artistFohWavesOutboard})`
       });
     } else if (!availableFohWavesOutboard) {
@@ -252,7 +242,7 @@ export const compareArtistRequirements = (
     if (providedBy === 'band') {
       mismatches.push({
         type: 'console',
-        severity: 'warning',
+        severity: 'info',
         message: `La banda aporta consola de monitores "${artist.mon_console}"`
       });
     } else {
@@ -285,7 +275,7 @@ export const compareArtistRequirements = (
     if (monProvidedBy === 'band') {
       mismatches.push({
         type: 'console',
-        severity: 'warning',
+        severity: 'info',
         message: `La banda aporta Waves/Outboard MON (${artistMonWavesOutboard})`
       });
     } else if (!availableMonWavesOutboard) {
@@ -320,7 +310,7 @@ export const compareArtistRequirements = (
     if (providedBy === 'band') {
       mismatches.push({
         type: 'wireless',
-        severity: 'warning',
+        severity: 'info',
         message: `La banda aporta sistemas inalámbricos`
       });
     } else if (providedBy === 'mixed') {
@@ -344,9 +334,9 @@ export const compareArtistRequirements = (
           if (!availableWireless) {
             mismatches.push({
               type: 'wireless',
-              severity: 'error',
-              message: `Sistema inalámbrico "${artistWireless.model}" no disponible`,
-              details: `Disponible: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'Ninguno'}`
+              severity: 'warning',
+              message: `Sistema inalámbrico "${artistWireless.model}" no coincide con el setup`,
+              details: `Setup configurado: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'Ninguno'}`
             });
           } else {
             const requiredChannels = getRequiredWirelessChannels(artistWireless);
@@ -386,11 +376,11 @@ export const compareArtistRequirements = (
         }
       });
       
-      // Add informational warnings for mixed setup
+      // Add informational note for mixed setup
       if (hasBandSystems && hasFestivalSystems) {
         mismatches.push({
           type: 'wireless',
-          severity: 'warning',
+          severity: 'info',
           message: `Configuración inalámbrica mixta: la banda aporta parte de los sistemas`
         });
       }
@@ -400,13 +390,13 @@ export const compareArtistRequirements = (
         const availableWireless = availableGear.wireless_systems.find(
           w => w.model.toLowerCase() === artistWireless.model.toLowerCase()
         );
-        
+
         if (!availableWireless) {
           mismatches.push({
             type: 'wireless',
-            severity: 'error',
-            message: `Sistema inalámbrico "${artistWireless.model}" no disponible`,
-            details: `Disponible: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'Ninguno'}`
+            severity: 'warning',
+            message: `Sistema inalámbrico "${artistWireless.model}" no coincide con el setup`,
+            details: `Setup configurado: ${availableGear.wireless_systems.map(w => w.model).join(', ') || 'Ninguno'}`
           });
         } else {
           const requiredChannels = getRequiredWirelessChannels(artistWireless);
@@ -454,7 +444,7 @@ export const compareArtistRequirements = (
     if (providedBy === 'band') {
       mismatches.push({
         type: 'iem',
-        severity: 'warning',
+        severity: 'info',
         message: `La banda aporta sistemas IEM`
       });
     } else if (providedBy === 'mixed') {
@@ -478,9 +468,9 @@ export const compareArtistRequirements = (
           if (!availableIEM) {
             mismatches.push({
               type: 'iem',
-              severity: 'error',
-              message: `Sistema IEM "${artistIEM.model}" no disponible`,
-              details: `Disponible: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'Ninguno'}`
+              severity: 'warning',
+              message: `Sistema IEM "${artistIEM.model}" no coincide con el setup`,
+              details: `Setup configurado: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'Ninguno'}`
             });
           } else {
             const requiredChannels = artistIEM.quantity_hh || artistIEM.quantity || 0;
@@ -509,11 +499,11 @@ export const compareArtistRequirements = (
         }
       });
       
-      // Add informational warnings for mixed setup
+      // Add informational note for mixed setup
       if (hasBandSystems && hasFestivalSystems) {
         mismatches.push({
           type: 'iem',
-          severity: 'warning',
+          severity: 'info',
           message: `Configuración IEM mixta: la banda aporta parte de los sistemas`
         });
       }
@@ -523,13 +513,13 @@ export const compareArtistRequirements = (
         const availableIEM = availableGear.iem_systems.find(
           iem => iem.model.toLowerCase() === artistIEM.model.toLowerCase()
         );
-        
+
         if (!availableIEM) {
           mismatches.push({
             type: 'iem',
-            severity: 'error',
-            message: `Sistema IEM "${artistIEM.model}" no disponible`,
-            details: `Disponible: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'Ninguno'}`
+            severity: 'warning',
+            message: `Sistema IEM "${artistIEM.model}" no coincide con el setup`,
+            details: `Setup configurado: ${availableGear.iem_systems.map(iem => iem.model).join(', ') || 'Ninguno'}`
           });
         } else {
           const requiredChannels = artistIEM.quantity_hh || artistIEM.quantity || 0;
@@ -559,51 +549,28 @@ export const compareArtistRequirements = (
     }
   }
 
-  // DEBUGGING ENHANCED Wired Microphone Check
-  console.log('=== ENHANCED MICROPHONE DEBUG START ===');
-  
+  // Wired Microphone Check
   const micKitProvider = artist.mic_kit || 'band';
-  console.log('Raw artist.mic_kit value:', artist.mic_kit);
-  console.log('Raw artist.mic_kit type:', typeof artist.mic_kit);
-  console.log('Processed micKitProvider:', micKitProvider);
-  console.log('micKitProvider type:', typeof micKitProvider);
-  console.log('micKitProvider === "band":', micKitProvider === 'band');
-  console.log('micKitProvider === "festival":', micKitProvider === 'festival');
-  
   const artistHasMicRequirements = artist.wired_mics && Array.isArray(artist.wired_mics) && artist.wired_mics.length > 0;
   const festivalHasMics = availableGear.wired_mics && Array.isArray(availableGear.wired_mics) && availableGear.wired_mics.length > 0;
 
-  console.log('Artist has mic requirements:', artistHasMicRequirements);
-  console.log('Festival has mics:', festivalHasMics);
-  console.log('About to enter conditional logic...');
-
   if (micKitProvider === 'band') {
-    console.log('ENTERING BAND BRANCH - This should NOT happen for Lia Kali!');
     if (artistHasMicRequirements) {
       mismatches.push({
         type: 'microphones',
-        severity: 'warning',
+        severity: 'info',
         message: `La banda aporta kit de micrófonos (${artist.wired_mics?.length || 0} tipos de micro)`
       });
     } else {
       mismatches.push({
         type: 'microphones',
-        severity: 'warning',
+        severity: 'info',
         message: `La banda aporta kit de micrófonos`
       });
     }
   } else if (micKitProvider === 'festival' || micKitProvider === 'mixed') {
-    console.log('ENTERING FESTIVAL/MIXED BRANCH - This should happen for Lia Kali');
-    console.log('Processing festival/mixed mic setup...');
-    
-    // Artist expects festival to provide microphones
     if (artistHasMicRequirements) {
-      console.log('Artist has specific mic requirements, checking each one...');
-      
-      // Artist has specific microphone requirements
       if (!festivalHasMics) {
-        // Festival has no microphones configured but artist expects them
-        console.log('Festival has no mics but artist needs them - ERROR');
         mismatches.push({
           type: 'microphones',
           severity: 'error',
@@ -611,20 +578,11 @@ export const compareArtistRequirements = (
           details: `El artista necesita ${artist.wired_mics?.length || 0} tipos de micro, pero el festival no tiene micros disponibles`
         });
       } else {
-        console.log('Festival has mics, checking individual requirements...');
-        
-        // Check each required microphone against available ones
-        artist.wired_mics?.forEach((artistMic, index) => {
-          console.log(`Checking mic requirement ${index + 1}: ${artistMic.model} (qty: ${artistMic.quantity})`);
-          
+        artist.wired_mics?.forEach((artistMic) => {
           const availableMic = availableGear.wired_mics.find(
             mic => mic.model.toLowerCase() === artistMic.model.toLowerCase()
           );
-          
-          console.log('Found matching available mic:', availableMic);
-          
           if (!availableMic) {
-            console.log(`ERROR: Mic "${artistMic.model}" not found in available mics`);
             mismatches.push({
               type: 'microphones',
               severity: 'error',
@@ -632,28 +590,23 @@ export const compareArtistRequirements = (
               details: `Disponible: ${availableGear.wired_mics.map(m => m.model).join(', ') || 'Ninguno'}`
             });
           } else if (availableMic.quantity < artistMic.quantity) {
-            console.log(`ERROR: Insufficient quantity for "${artistMic.model}"`);
             mismatches.push({
               type: 'microphones',
               severity: 'error',
               message: `Micrófonos "${artistMic.model}" insuficientes`,
               details: `Requiere: ${artistMic.quantity}, Disponible: ${availableMic.quantity}`
             });
-          } else {
-            console.log(`OK: Mic "${artistMic.model}" available with sufficient quantity`);
           }
         });
       }
-      
       if (micKitProvider === 'mixed') {
         mismatches.push({
           type: 'microphones',
-          severity: 'warning',
+          severity: 'info',
           message: `Configuración de micrófonos mixta: la banda aporta micros adicionales`
         });
       }
     } else if (micKitProvider === 'festival') {
-      // Artist expects festival mics but has no specific requirements - this might be okay or an issue
       if (!festivalHasMics) {
         mismatches.push({
           type: 'microphones',
@@ -662,13 +615,7 @@ export const compareArtistRequirements = (
         });
       }
     }
-  } else {
-    console.log('ENTERING UNKNOWN BRANCH - micKitProvider value:', micKitProvider);
-    console.log('This should not happen - unknown mic kit provider');
   }
-
-  console.log('=== MICROPHONE CHECK COMPLETE ===');
-  console.log('Microphone mismatches added:', mismatches.filter(m => m.type === 'microphones'));
 
   // Check Monitor quantity
   if (artist.monitors_enabled && artist.monitors_quantity > availableGear.available_monitors) {
@@ -711,7 +658,7 @@ export const compareArtistRequirements = (
   if (infraProvidedBy === 'band') {
     mismatches.push({
       type: 'infrastructure',
-      severity: 'warning',
+      severity: 'info',
       message: `La banda aporta infraestructura`
     });
   } else {
@@ -761,13 +708,11 @@ export const compareArtistRequirements = (
     }
   }
 
-  console.log('Final mismatches for', artist.name, ':', mismatches);
-
   return {
     artistName: artist.name,
     stage: artist.stage,
     mismatches,
-    hasConflicts: mismatches.length > 0
+    hasConflicts: mismatches.some(m => m.severity === 'error' || m.severity === 'warning')
   };
 };
 
