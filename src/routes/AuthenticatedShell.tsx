@@ -6,6 +6,7 @@ import { AppInit } from "@/components/AppInit";
 import { useActivityPushFallback } from "@/hooks/useActivityPushFallback";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { AchievementBanner } from "@/components/achievements/AchievementBanner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function ActivityPushFallbackInit() {
   useActivityPushFallback();
@@ -69,11 +70,17 @@ export default function AuthenticatedShell() {
   return (
     <RequireAuth>
       <SubscriptionProvider>
-        <AppInit />
-        <ActivityPushFallbackInit />
+        <ErrorBoundary boundaryName="app-init" silent>
+          <AppInit />
+        </ErrorBoundary>
+        <ErrorBoundary boundaryName="activity-push-fallback" silent>
+          <ActivityPushFallbackInit />
+        </ErrorBoundary>
         <TechnicianRouteGuard />
         <OscarRouteGuard />
-        <AchievementBanner />
+        <ErrorBoundary boundaryName="achievement-banner" silent>
+          <AchievementBanner />
+        </ErrorBoundary>
         <Outlet />
       </SubscriptionProvider>
     </RequireAuth>
