@@ -85,7 +85,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
         name: error.name,
         stack: error.stack,
         componentStack: errorInfo.componentStack ?? undefined,
-        url: typeof window !== 'undefined' ? window.location.href : undefined,
+        url: typeof window !== 'undefined' ? window.location.pathname : undefined,
         userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
         silent: Boolean(silent),
         timestamp: new Date().toISOString(),

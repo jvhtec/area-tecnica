@@ -558,7 +558,11 @@ const Layout = () => {
           userEmail={session.user?.email ?? undefined}
         />
       )}
-      <ErrorBoundary boundaryName="pending-tasks-modal" silent>
+      <ErrorBoundary
+        boundaryName="pending-tasks-modal"
+        silent
+        resetKeys={[showPendingTasksModal, userId, userRole, userDepartment]}
+      >
         <PendingTasksModal
           open={showPendingTasksModal}
           onOpenChange={setShowPendingTasksModal}
@@ -567,7 +571,11 @@ const Layout = () => {
           userDepartment={userDepartment}
         />
       </ErrorBoundary>
-      <ErrorBoundary boundaryName="single-task-popup" silent>
+      <ErrorBoundary
+        boundaryName="single-task-popup"
+        silent
+        resetKeys={[showSingleTaskPopup, currentTaskIndex, unacknowledgedTasks.length]}
+      >
         {unacknowledgedTasks.length > 0 && unacknowledgedTasks[currentTaskIndex] && (
           <SingleTaskPopup
             open={showSingleTaskPopup}

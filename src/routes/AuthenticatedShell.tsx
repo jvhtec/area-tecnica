@@ -67,18 +67,23 @@ function OscarRouteGuard() {
 }
 
 export default function AuthenticatedShell() {
+  const location = useLocation();
+  const { user } = useOptimizedAuth();
+  const userId = user?.id ?? null;
+  const recoveryKeys = [location.pathname, userId];
+
   return (
     <RequireAuth>
       <SubscriptionProvider>
-        <ErrorBoundary boundaryName="app-init" silent>
+        <ErrorBoundary boundaryName="app-init" silent resetKeys={recoveryKeys}>
           <AppInit />
         </ErrorBoundary>
-        <ErrorBoundary boundaryName="activity-push-fallback" silent>
+        <ErrorBoundary boundaryName="activity-push-fallback" silent resetKeys={recoveryKeys}>
           <ActivityPushFallbackInit />
         </ErrorBoundary>
         <TechnicianRouteGuard />
         <OscarRouteGuard />
-        <ErrorBoundary boundaryName="achievement-banner" silent>
+        <ErrorBoundary boundaryName="achievement-banner" silent resetKeys={recoveryKeys}>
           <AchievementBanner />
         </ErrorBoundary>
         <Outlet />
