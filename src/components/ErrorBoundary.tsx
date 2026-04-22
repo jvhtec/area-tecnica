@@ -2,7 +2,12 @@ import React from 'react';
 import { RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { isChunkLoadError } from '@/utils/errorUtils';
-import { CHUNK_ERROR_RELOAD_KEY, MAX_CHUNK_ERROR_RELOADS } from '@/utils/chunkErrorConstants';
+import {
+  CHUNK_ERROR_RELOAD_KEY,
+  CHUNK_ERROR_RELOAD_OWNER_KEY,
+  CHUNK_ERROR_RELOAD_OWNER_TTL_MS,
+  MAX_CHUNK_ERROR_RELOADS,
+} from '@/utils/chunkErrorConstants';
 import { recordBoundaryError } from '@/utils/errorTelemetry';
 
 export type ErrorBoundaryFallbackRender = (args: {
@@ -38,9 +43,23 @@ function areResetKeysEqual(a: ReadonlyArray<unknown> = [], b: ReadonlyArray<unkn
   return true;
 }
 
+function generateOwnerId(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // fall through to fallback
+  }
+  return `eb-${Math.random().toString(36).slice(2)}-${Date.now().toString(36)}`;
+}
+
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   state: ErrorBoundaryState = { hasError: false };
   private clearTimeoutId?: ReturnType<typeof setTimeout>;
+  // Unique per-instance id used to scope the chunk-reload counter so sibling
+  // boundaries cannot clear a counter another instance just incremented.
+  private readonly ownerId: string = generateOwnerId();
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
@@ -59,14 +78,55 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     try {
       const count = this.getReloadCount();
       sessionStorage.setItem(CHUNK_ERROR_RELOAD_KEY, (count + 1).toString());
+      sessionStorage.setItem(
+        CHUNK_ERROR_RELOAD_OWNER_KEY,
+        JSON.stringify({ ownerId: this.ownerId, ts: Date.now() }),
+      );
     } catch {
       // Ignore sessionStorage errors
     }
   }
 
-  private clearReloadCount(): void {
+  /**
+   * Clears the reload counter only if this instance "owns" it (i.e. incremented
+   * it last) or if the owner entry is stale. Sibling boundaries whose mount
+   * timer fires while another boundary has an in-flight reload must not wipe
+   * the counter, or MAX_CHUNK_ERROR_RELOADS can be bypassed on every reload.
+   */
+  private maybeClearReloadCount(): void {
     try {
-      sessionStorage.removeItem(CHUNK_ERROR_RELOAD_KEY);
+      const countRaw = sessionStorage.getItem(CHUNK_ERROR_RELOAD_KEY);
+      if (!countRaw) {
+        // Counter already cleared (usually by main.tsx on successful load).
+        // Remove any orphan ownership entry so it can't haunt a later cycle.
+        sessionStorage.removeItem(CHUNK_ERROR_RELOAD_OWNER_KEY);
+        return;
+      }
+
+      const ownerRaw = sessionStorage.getItem(CHUNK_ERROR_RELOAD_OWNER_KEY);
+      if (!ownerRaw) {
+        // Counter exists but no owner metadata — legacy or external write.
+        // Treat as unowned and clear it (matches the prior behaviour).
+        sessionStorage.removeItem(CHUNK_ERROR_RELOAD_KEY);
+        return;
+      }
+
+      let parsed: { ownerId?: string; ts?: number } | null = null;
+      try {
+        parsed = JSON.parse(ownerRaw);
+      } catch {
+        parsed = null;
+      }
+
+      const isOwner = parsed?.ownerId === this.ownerId;
+      const age = Date.now() - (Number(parsed?.ts) || 0);
+      const isStale = age > CHUNK_ERROR_RELOAD_OWNER_TTL_MS;
+
+      if (isOwner || isStale) {
+        sessionStorage.removeItem(CHUNK_ERROR_RELOAD_KEY);
+        sessionStorage.removeItem(CHUNK_ERROR_RELOAD_OWNER_KEY);
+      }
+      // Otherwise another boundary owns the in-flight counter — leave alone.
     } catch {
       // Ignore sessionStorage errors
     }
@@ -145,9 +205,10 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidMount() {
     // Clear reload count after a short delay to ensure child components have rendered
-    // This prevents clearing the count before initial render errors might occur
+    // This prevents clearing the count before initial render errors might occur.
+    // Only this instance's counter (or a stale one) is cleared — see maybeClearReloadCount.
     this.clearTimeoutId = setTimeout(() => {
-      this.clearReloadCount();
+      this.maybeClearReloadCount();
       this.clearTimeoutId = undefined;
     }, 1000); // 1 second delay after mount
   }
@@ -198,8 +259,13 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               : 'Encontramos un problema inesperado. Puedes intentar continuar, recargar la página o borrar los datos locales si el error persiste.'}
           </p>
           {this.state.error?.message && !isChunkError && (
-            <p className="text-xs text-muted-foreground truncate" title={import.meta.env.DEV ? this.state.error.message : undefined}>
-              {import.meta.env.DEV ? this.state.error.message : 'Ha ocurrido un error. Por favor, inténtelo más tarde.'}
+            <p
+              className="text-xs text-muted-foreground truncate"
+              title={import.meta.env.DEV ? this.state.error.message : undefined}
+            >
+              {import.meta.env.DEV
+                ? this.state.error.message
+                : 'Ha ocurrido un error. Por favor, inténtelo más tarde.'}
             </p>
           )}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
