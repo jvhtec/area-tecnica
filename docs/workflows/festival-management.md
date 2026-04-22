@@ -1,83 +1,94 @@
-# Festival Management
+# Festival Management Workflow (System Reference)
 
-> Multi-day event management with artists, riders, gear setup, shift scheduling, and Flex integration.
+> Multi-day event management with artists, riders, gear setup, scheduling, gear comparison, and Flex integration.
 
 ## Overview
 
-Festival management handles multi-day events with complex artist rosters, technical rider requirements, gear allocation, and crew shift scheduling. Festivals are linked to jobs in the `tours` table with festival-specific workflows.
+Festival management is the event-operations subsystem used to:
 
-## Key Files
+- manage artists and rider requirements,
+- configure technical gear globally and by stage,
+- schedule and assign crews,
+- compare artist demand versus configured inventory,
+- and push validated setup information to Flex.
 
-| Category | Path |
-|----------|------|
-| **Pages** | `src/pages/FestivalManagement.tsx`, `FestivalArtistManagement.tsx`, `FestivalGearManagement.tsx`, `Festivals.tsx` |
-| **View model** | `src/pages/festival-management/useFestivalManagementVm.ts` |
-| **Components** | `src/components/festival/` (30+ components in subdirectories) |
-| **Hooks** | `src/hooks/useFestival.ts`, `useFestivalArtists.ts`, `useCombinedGearSetup.ts` |
-| **Shift hooks** | `src/hooks/festival/useFestivalShifts.ts` |
-| **PDF export** | `src/utils/artistPdfExport.ts`, `artistTablePdfExport.ts`, `gearSetupPdfExport.ts`, `shiftsTablePdfExport.ts` |
+Festival execution is attached to a parent job (`jobs.id`) and orchestrated primarily through the festival management pages and view model.
 
-## Database Tables
+## Entry points
 
-| Table | Purpose |
-|-------|---------|
-| `festival_artists` | Artist roster (name, stage, date, show times, soundcheck info) |
-| `festival_artist_forms` | Tokenized form templates for artist requirements |
-| `festival_artist_form_submissions` | Submitted artist requirement forms |
-| `festival_artist_files` | Uploaded rider PDFs and files |
-| `festival_gear_setups` | Global gear config (consoles, wireless, mics, infrastructure) |
-| `festival_stage_gear_setups` | Per-stage gear overrides |
-| `festival_shifts` | Shift time blocks (date, start/end, department, stage) |
-| `festival_shift_assignments` | Technician-to-shift assignments |
-| `festival_settings` | Festival-wide settings (day_start_time) |
-| `festival_stages` | Stage definitions (number, name) |
+| Type | Path |
+|---|---|
+| Main page | `src/pages/FestivalManagement.tsx` |
+| Artist-focused view | `src/pages/FestivalArtistManagement.tsx` |
+| Gear-focused view | `src/pages/FestivalGearManagement.tsx` |
+| Listing/launcher | `src/pages/Festivals.tsx` |
+| VM/orchestration | `src/pages/festival-management/useFestivalManagementVm.ts` |
 
-## Workflows
+## Architecture docs by section
 
-### Artist & Rider Workflow
+For full section-specific architecture, use:
 
-```text
-1. CREATE FESTIVAL → linked to a job
-2. ADD ARTISTS → name, stage, date, show times
-3. SEND FORM LINKS → tokenized URL (7-day expiry) via email/QR code
-4. ARTIST FILLS FORM → consoles, wireless, IEM, mics, infrastructure
-5. ARTIST UPLOADS RIDER → PDF/images stored in festival_artist_files
-6. MANAGEMENT REVIEWS → approval in ArtistManagementDialog
-7. SYSTEM CALCULATES → MicrophoneNeedsCalculator aggregates all artist needs
-8. GENERATE PDF → artist requirements, rider tables
-```
+- [Festival system architecture index](../architecture/festival-system/README.md)
+- [Artist tables & workflow architecture](../architecture/festival-system/artist-tables.md)
+- [Gear setup & comparison architecture](../architecture/festival-system/gear-setup-and-comparison.md)
+- [Scheduling architecture](../architecture/festival-system/scheduling.md)
+- [Flex integration architecture](../architecture/festival-system/flex-integration.md)
 
-### Gear Setup Workflow
+## Core database tables
+
+- Artist domain: `festival_artists`, `festival_artist_forms`, `festival_artist_form_submissions`, `festival_artist_files`
+- Gear domain: `festival_gear_setups`, `festival_stage_gear_setups`
+- Scheduling domain: `festival_shifts`, `festival_shift_assignments`
+- Festival configuration domain: `festival_settings`, `festival_stages`
+
+## End-to-end workflow
 
 ```text
-1. SET GLOBAL GEAR → festival_gear_setups: max stages, consoles, wireless, mics
-2. STAGE OVERRIDES → festival_stage_gear_setups for per-stage differences
-3. COMBINED VIEW → useCombinedGearSetup merges global + stage-specific
-4. MISMATCH DETECTION → GearMismatchIndicator flags conflicts
-5. PDF EXPORT → gear setup documentation
+1) Festival job context initialized
+2) Artists created/imported and form links distributed
+3) Artists submit requirements + rider files
+4) Management reviews submissions and finalizes artist table
+5) Gear setup configured globally and per stage
+6) Gear comparison system flags conflicts/capacity gaps
+7) Crew shifts are created and assignments filled
+8) When mismatches block delivery, create Extras quote in Flex (artist-level action)
+9) Setup data exported (PDF/tables) and/or pushed to Flex pullsheets
+10) Team executes show using validated schedule + technical data
 ```
 
-### Shift Scheduling Workflow
+## Gear comparison system (operational summary)
 
-```text
-1. CREATE SHIFTS → date, time range, department, stage
-2. ASSIGN TECHNICIANS → via ManageAssignmentsDialog
-3. REALTIME UPDATES → useFestivalShifts hook
-4. VIEW → ShiftsTable with color-coded assignments
-5. EXPORT → shifts PDF
-```
+- Compares artist requirements against effective setup (global + stage override rules).
+- Produces mismatch items with severity (`error`, `warning`, `info`).
+- Aggregates additional-needs suggestions by model/category.
+- Renders status via table indicators and detailed tooltip summaries.
 
-## Component Structure
+## Flex integration summary
 
-- `form/sections/` — Form input sections (BasicInfoSection, ConsoleSetupSection, WirelessSetupSection, etc.)
-- `gear-setup/` — Gear configuration (ConsoleConfig, MicrophoneNeedsCalculator, WiredMicConfig, etc.)
-- `scheduling/` — Shift scheduling (CreateShiftDialog, EditShiftDialog, ShiftsTable, etc.)
-- `pdf/` — PDF generation dialogs
-- `mobile/` — Mobile-specific UI
+- Festival UI resolves available Flex context for the current job.
+- Pullsheet push supports selection mode or direct URL mode.
+- Export can be narrowed by gear sections to reduce bad writes.
+- Result summary reports succeeded/failed rows for troubleshooting.
 
-## Integration Points
+## Create Extras Quote integration (Flex)
 
-- **Public Artist Form**: Tokenized public routes (`/festival/artist-form/{token}`) for artists to submit requirements without authentication
-- **Flex Integration**: Push gear data to Flex via `PushToFlexPullsheetDialog`
-- **Activity Logging**: Artist form submissions trigger `festival.public_form.submitted` events
-- **Job System**: Each festival is linked to a parent job record
+Festival artist rows include a **"Crear presupuesto extras en Flex"** action when the gear comparison detects at least one `error` mismatch.
+
+Operational behavior:
+
+- Triggered from desktop and mobile artist actions (`ArtistTable`, `MobileArtistCard`).
+- Uses `useCreateExtrasPresupuesto` to create/resolve: 
+  1. `comercial` department folder,
+  2. `comercial_extras` sound subfolder,
+  3. a new `comercial_presupuesto` document in Flex.
+- Persists created elements in `flex_folders` for traceability.
+- Uses per-job queueing to avoid duplicate document numbers under concurrent clicks.
+
+This integration closes the loop between **gear mismatch detection** and **commercial remediation workflow**.
+
+
+## Related docs
+
+- [Public artist form workflow](./public-artist-form.md)
+- [Flex folder workflows audit](../flex-folder-workflows.md)
+- [Flex selector integration](../FLEX_SELECTOR_INTEGRATION.md)

@@ -23,6 +23,17 @@ Detailed documentation for each major subsystem — key files, database tables, 
 - **[Public Artist Form](workflows/public-artist-form.md)** — Tokenized public routes for artist rider submission
 - **[SoundVision Files](workflows/soundvision-files.md)** — File library with access request and review workflow
 
+
+## Festival architecture (section-specific)
+
+Detailed deep-dive docs for the full festival subsystem:
+
+- **[Festival System Architecture Index](architecture/festival-system/README.md)**
+- **[Artist Tables & Workflow](architecture/festival-system/artist-tables.md)**
+- **[Gear Setup & Comparison](architecture/festival-system/gear-setup-and-comparison.md)**
+- **[Scheduling Architecture](architecture/festival-system/scheduling.md)**
+- **[Flex Integration Architecture](architecture/festival-system/flex-integration.md)**
+
 ## Product / workflows
 - **SoundVision access workflow**
   - `SOUNDVISION_ACCESS_CHANGES.md`
