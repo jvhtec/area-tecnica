@@ -143,7 +143,7 @@ export const ArtistTable = ({
   selectedDate,
   onArtistStagePlotUpdated
 }: ArtistTableProps) => {
-  const { createExtrasPresupuesto, creatingExtrasForArtistId } = useCreateExtrasPresupuesto(jobId);
+  const { createExtrasPresupuesto, isCreatingExtrasFor } = useCreateExtrasPresupuesto(jobId);
   const [deletingArtistId, setDeletingArtistId] = useState<string | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linksDialogOpen, setLinksDialogOpen] = useState(false);
@@ -1085,11 +1085,11 @@ export const ArtistTable = ({
                               variant="ghost"
                               size="icon"
                               onClick={() => createExtrasPresupuesto(artist.id, artist.name, artist.date, artist.show_start, artist.show_end, artist.isaftermidnight || false)}
-                              disabled={creatingExtrasForArtistId === artist.id}
+                              disabled={isCreatingExtrasFor(artist.id)}
                               title="Crear presupuesto extras en Flex"
                               className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
                             >
-                              {creatingExtrasForArtistId === artist.id
+                              {isCreatingExtrasFor(artist.id)
                                 ? <Loader2 className="h-4 w-4 animate-spin" />
                                 : <Receipt className="h-4 w-4" />}
                             </Button>
@@ -1131,7 +1131,7 @@ export const ArtistTable = ({
               uploadingStagePlotArtistId={uploadingStagePlotArtistId}
               deletingStagePlotArtistId={deletingStagePlotArtistId}
               onCreateFlexExtras={createExtrasPresupuesto}
-              creatingExtrasForArtistId={creatingExtrasForArtistId}
+              isCreatingExtrasFor={isCreatingExtrasFor}
             />
           </div>
 

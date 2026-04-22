@@ -87,7 +87,7 @@ interface MobileArtistListProps {
   deletingArtistId: string | null;
   uploadingStagePlotArtistId: string | null;
   deletingStagePlotArtistId: string | null;
-  creatingExtrasForArtistId: string | null;
+  isCreatingExtrasFor: (id: string) => boolean;
   mode?: 'edit' | 'readonly';
   riderFilesByArtistId?: Record<string, MobileArtistRiderFile[]>;
   onDownloadRiderFile?: (file: MobileArtistRiderFile) => void;
@@ -113,7 +113,7 @@ export const MobileArtistList = ({
   deletingArtistId,
   uploadingStagePlotArtistId,
   deletingStagePlotArtistId,
-  creatingExtrasForArtistId,
+  isCreatingExtrasFor,
   mode = 'edit',
   riderFilesByArtistId = {},
   onDownloadRiderFile,
@@ -210,7 +210,7 @@ export const MobileArtistList = ({
             deletingArtistId={deletingArtistId}
             uploadingStagePlotArtistId={uploadingStagePlotArtistId}
             deletingStagePlotArtistId={deletingStagePlotArtistId}
-            creatingExtrasForArtistId={creatingExtrasForArtistId}
+            isCreatingExtrasFor={isCreatingExtrasFor}
             riderFiles={riderFilesByArtistId[artist.id] || []}
           />
         </div>

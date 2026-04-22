@@ -183,7 +183,7 @@ interface MobileArtistCardProps {
   deletingArtistId: string | null;
   uploadingStagePlotArtistId: string | null;
   deletingStagePlotArtistId: string | null;
-  creatingExtrasForArtistId: string | null;
+  isCreatingExtrasFor: (id: string) => boolean;
   onCreateFlexExtras: (artistId: string, artistName: string, artistDate: string, showStart: string, showEnd: string, isAfterMidnight: boolean) => void;
   riderFiles?: MobileArtistRiderFile[];
 }
@@ -206,7 +206,7 @@ export const MobileArtistCard = ({
   deletingArtistId,
   uploadingStagePlotArtistId,
   deletingStagePlotArtistId,
-  creatingExtrasForArtistId,
+  isCreatingExtrasFor,
   onCreateFlexExtras,
   riderFiles = [],
 }: MobileArtistCardProps) => {
@@ -394,10 +394,10 @@ export const MobileArtistCard = ({
             <Button
               variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
               onClick={() => onCreateFlexExtras(artist.id, artist.name, artist.date, artist.show_start, artist.show_end, artist.isaftermidnight || false)}
-              disabled={creatingExtrasForArtistId === artist.id}
+              disabled={isCreatingExtrasFor(artist.id)}
               title="Crear presupuesto extras en Flex"
             >
-              {creatingExtrasForArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
+              {isCreatingExtrasFor(artist.id) ? <Loader2 className="h-4 w-4 animate-spin" /> : <Receipt className="h-4 w-4" />}
             </Button>
           )}
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEditArtist(artist)}>

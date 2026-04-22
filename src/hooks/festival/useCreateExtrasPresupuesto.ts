@@ -11,8 +11,29 @@ import { FLEX_FOLDER_IDS, DEPARTMENT_IDS, RESPONSIBLE_PERSON_IDS } from "@/utils
 // count and produce duplicate document numbers within a single browser session.
 const jobCreationQueues = new Map<string, Promise<void>>();
 
+const RETRY_DELAYS = [500, 1000, 2000];
+
+async function insertWithRetry(insertFn: () => Promise<{ error: any }>): Promise<void> {
+  let lastError: any = null;
+  for (let i = 0; i <= RETRY_DELAYS.length; i++) {
+    const { error } = await insertFn();
+    if (!error) return;
+    lastError = error;
+    if (i < RETRY_DELAYS.length) {
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAYS[i]));
+    }
+  }
+  throw lastError;
+}
+
 export function useCreateExtrasPresupuesto(jobId: string | undefined) {
-  const [creatingExtrasForArtistId, setCreatingExtrasForArtistId] = useState<string | null>(null);
+  const [creatingExtrasForArtistIds, setCreatingExtrasForArtistIds] = useState<Set<string>>(new Set());
+
+  const addCreating = (id: string) =>
+    setCreatingExtrasForArtistIds(prev => new Set(prev).add(id));
+  const removeCreating = (id: string) =>
+    setCreatingExtrasForArtistIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+  const isCreatingExtrasFor = (id: string) => creatingExtrasForArtistIds.has(id);
 
   const createExtrasPresupuesto = async (
     artistId: string,
@@ -27,14 +48,15 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
       return;
     }
 
-    setCreatingExtrasForArtistId(artistId);
+    addCreating(artistId);
 
     // Enqueue: wait for any in-flight request for this job to finish before
     // reading the count, ensuring ordinals are assigned sequentially.
     const prevTask = jobCreationQueues.get(jobId) ?? Promise.resolve();
     let releaseThisTask!: () => void;
     const thisTask = new Promise<void>(res => { releaseThisTask = res; });
-    jobCreationQueues.set(jobId, prevTask.then(() => thisTask));
+    const nextPromise = prevTask.then(() => thisTask);
+    jobCreationQueues.set(jobId, nextPromise);
     await prevTask.catch(() => {}); // a failure in the prev task must not block this one
 
     try {
@@ -60,28 +82,17 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
       const plannedStartDate = fromZonedTime(localStartDatetime, "Europe/Madrid").toISOString();
       const plannedEndDate = fromZonedTime(localEndDatetime, "Europe/Madrid").toISOString();
 
-      // 3. Compute document number with retry on conflict: DDMMAA.xSQT
-      //    x = ordinal of extras presupuestos already created for this job + 1
-      let documentNumber: string | null = null;
-      let retryCount = 0;
-      const maxRetries = 3;
+      // 3. Compute document number: DDMMAA.xSQT
+      //    Count runs inside the queue so the ordinal is always fresh.
+      const { count } = await supabase
+        .from("flex_folders")
+        .select("id", { count: "exact", head: true })
+        .eq("job_id", jobId)
+        .eq("folder_type", "comercial_presupuesto");
 
-      while (!documentNumber && retryCount < maxRetries) {
-        const { count } = await supabase
-          .from("flex_folders")
-          .select("id", { count: "exact", head: true })
-          .eq("job_id", jobId)
-          .eq("folder_type", "comercial_presupuesto");
-
-        const ordinal = (count ?? 0) + 1;
-        const docDate = format(parsedDate, "ddMMyy");
-        documentNumber = `${docDate}.${ordinal}SQT`;
-        retryCount++;
-      }
-
-      if (!documentNumber) {
-        throw new Error("No se pudo calcular el número de documento después de múltiples intentos");
-      }
+      const ordinal = (count ?? 0) + 1;
+      const docDate = format(parsedDate, "ddMMyy");
+      const documentNumber = `${docDate}.${ordinal}SQT`;
 
       // 4. Find the comercial department folder for this job
       const { data: comercialFolder, error: comercialError } = await supabase
@@ -132,41 +143,23 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
 
         extrasElementId = extrasFolder.elementId;
 
-        // Retry insertion with exponential backoff
-        let extrasInserted = false;
-        let extrasInsertError: any = null;
-        const retryDelays = [500, 1000, 2000];
-
-        for (let i = 0; i < retryDelays.length + 1; i++) {
-          const { error } = await supabase
-            .from("flex_folders")
-            .insert({
+        try {
+          await insertWithRetry(() =>
+            supabase.from("flex_folders").insert({
               job_id: jobId,
               parent_id: comercialFolder.element_id,
               element_id: extrasElementId,
               department: "sound",
               folder_type: "comercial_extras",
-            });
-
-          if (!error) {
-            extrasInserted = true;
-            break;
-          }
-
-          extrasInsertError = error;
-
-          if (i < retryDelays.length) {
-            await new Promise(resolve => setTimeout(resolve, retryDelays[i]));
-          }
-        }
-
-        if (!extrasInserted) {
-          console.error(`Orphaned Flex folder created with element_id: ${extrasElementId}`, extrasInsertError);
+            })
+          );
+        } catch (err) {
+          console.error(`Orphaned Flex folder created with element_id: ${extrasElementId}`, err);
           toast.error(
             `Error al persistir carpeta extras en base de datos. Carpeta huérfana creada con element_id: ${extrasElementId}`,
             { duration: 10000 }
           );
-          throw extrasInsertError;
+          throw err;
         }
       }
 
@@ -185,41 +178,24 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
         personResponsibleId: RESPONSIBLE_PERSON_IDS.sound,
       });
 
-      // 7. Persist presupuesto to DB with retry
-      let presupuestoInserted = false;
-      let presupuestoInsertError: any = null;
-      const retryDelays = [500, 1000, 2000];
-
-      for (let i = 0; i < retryDelays.length + 1; i++) {
-        const { error } = await supabase
-          .from("flex_folders")
-          .insert({
+      // 7. Persist presupuesto to DB
+      try {
+        await insertWithRetry(() =>
+          supabase.from("flex_folders").insert({
             job_id: jobId,
             parent_id: extrasElementId,
             element_id: presupuesto.elementId,
             department: "sound",
             folder_type: "comercial_presupuesto",
-          });
-
-        if (!error) {
-          presupuestoInserted = true;
-          break;
-        }
-
-        presupuestoInsertError = error;
-
-        if (i < retryDelays.length) {
-          await new Promise(resolve => setTimeout(resolve, retryDelays[i]));
-        }
-      }
-
-      if (!presupuestoInserted) {
-        console.error(`Orphaned Flex presupuesto created with element_id: ${presupuesto.elementId}`, presupuestoInsertError);
+          })
+        );
+      } catch (err) {
+        console.error(`Orphaned Flex presupuesto created with element_id: ${presupuesto.elementId}`, err);
         toast.error(
           `Error al persistir presupuesto en base de datos. Presupuesto huérfano creado con element_id: ${presupuesto.elementId}`,
           { duration: 10000 }
         );
-        throw presupuestoInsertError;
+        throw err;
       }
 
       toast.success(`Presupuesto "${artistName} - Extras" (${documentNumber}) creado en Flex`);
@@ -230,9 +206,12 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
       );
     } finally {
       releaseThisTask();
-      setCreatingExtrasForArtistId(null);
+      if (jobCreationQueues.get(jobId) === nextPromise) {
+        jobCreationQueues.delete(jobId);
+      }
+      removeCreating(artistId);
     }
   };
 
-  return { createExtrasPresupuesto, creatingExtrasForArtistId };
+  return { createExtrasPresupuesto, isCreatingExtrasFor };
 }
