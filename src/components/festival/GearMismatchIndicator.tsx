@@ -116,7 +116,7 @@ export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMisma
           {infos.length > 0 && (
             <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200">
               <Info className="h-3 w-3 mr-1" />
-              {infos.length} Info
+              {infos.length} Información
             </Badge>
           )}
         </div>
