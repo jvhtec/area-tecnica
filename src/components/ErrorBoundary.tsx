@@ -198,8 +198,8 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
               : 'Encontramos un problema inesperado. Puedes intentar continuar, recargar la página o borrar los datos locales si el error persiste.'}
           </p>
           {this.state.error?.message && !isChunkError && (
-            <p className="text-xs text-muted-foreground truncate" title={this.state.error.message}>
-              {this.state.error.message}
+            <p className="text-xs text-muted-foreground truncate" title={import.meta.env.DEV ? this.state.error.message : undefined}>
+              {import.meta.env.DEV ? this.state.error.message : 'Ha ocurrido un error. Por favor, inténtelo más tarde.'}
             </p>
           )}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
