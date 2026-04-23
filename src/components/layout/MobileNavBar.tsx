@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom"
 import { MoreHorizontal } from "lucide-react"
 
+import { haptics } from "@/lib/haptics"
 import { cn } from "@/lib/utils"
 
 import { NavigationItem } from "./SidebarNavigation"
@@ -58,6 +59,7 @@ export const MobileNavBar = ({
               to={item.to}
               aria-label={item.label}
               aria-current={isActive ? "page" : undefined}
+              onClick={() => void haptics.tap()}
               className={cn(
                 "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold tracking-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 isActive
@@ -82,6 +84,9 @@ export const MobileNavBar = ({
               <button
                 type="button"
                 aria-label="Más opciones"
+                onClick={() => {
+                  void haptics.tap()
+                }}
                 className={cn(
                   "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[11px] font-semibold text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:text-foreground hover:bg-accent",
                   (open || activeInTray) && "bg-blue-600/20 text-blue-400",

@@ -708,7 +708,7 @@ const ConsumosTool: React.FC = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/sound')}>
+            <Button variant="ghost" size="icon" haptic="tap" onClick={() => navigate('/sound')}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>

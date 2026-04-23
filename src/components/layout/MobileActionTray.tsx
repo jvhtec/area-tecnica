@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { LogOut } from "lucide-react"
 
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { haptics } from "@/lib/haptics"
 import { cn } from "@/lib/utils"
 
 import { NavigationItem } from "./SidebarNavigation"
@@ -15,7 +16,7 @@ import { AboutCard } from "./AboutCard"
 
 interface MobileActionTrayProps {
   trayItems: NavigationItem[]
-  renderTrigger: (open: boolean) => React.ReactNode
+  renderTrigger: (open: boolean) => ReactNode
   onSignOut: () => Promise<void> | void
   isLoggingOut: boolean
   notificationProps?: {
@@ -39,17 +40,24 @@ export const MobileActionTray = ({
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen)
+    void haptics.tap()
+  }
+
   const handleNavigate = () => {
+    void haptics.selectionChanged()
     setOpen(false)
   }
 
   const handleSignOut = async () => {
+    void haptics.warning()
     await onSignOut()
     setOpen(false)
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild>{renderTrigger(open)}</SheetTrigger>
       <SheetContent
         side="bottom"
@@ -83,6 +91,7 @@ export const MobileActionTray = ({
                       <Button
                         key={item.id}
                         variant="ghost"
+                        haptic="none"
                         className={cn(
                           "h-full justify-center gap-2 rounded-2xl border border-border/60 bg-muted/40 px-3 py-3 text-xs font-semibold text-muted-foreground transition-colors hover:border-border hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                           isActive && "border-primary/60 bg-primary/10 text-primary",
@@ -118,6 +127,7 @@ export const MobileActionTray = ({
             <Button
               type="button"
               variant="ghost"
+              haptic="none"
               className="w-full justify-center gap-2 py-4 text-base font-semibold"
               onClick={handleSignOut}
               disabled={isLoggingOut}
