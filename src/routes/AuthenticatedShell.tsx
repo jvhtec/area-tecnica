@@ -6,6 +6,7 @@ import { AppInit } from "@/components/AppInit";
 import { useActivityPushFallback } from "@/hooks/useActivityPushFallback";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { AchievementBanner } from "@/components/achievements/AchievementBanner";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function ActivityPushFallbackInit() {
   useActivityPushFallback();
@@ -66,14 +67,25 @@ function OscarRouteGuard() {
 }
 
 export default function AuthenticatedShell() {
+  const location = useLocation();
+  const { user } = useOptimizedAuth();
+  const userId = user?.id ?? null;
+  const recoveryKeys = [location.pathname, userId];
+
   return (
     <RequireAuth>
       <SubscriptionProvider>
-        <AppInit />
-        <ActivityPushFallbackInit />
+        <ErrorBoundary boundaryName="app-init" silent resetKeys={recoveryKeys}>
+          <AppInit />
+        </ErrorBoundary>
+        <ErrorBoundary boundaryName="activity-push-fallback" silent resetKeys={recoveryKeys}>
+          <ActivityPushFallbackInit />
+        </ErrorBoundary>
         <TechnicianRouteGuard />
         <OscarRouteGuard />
-        <AchievementBanner />
+        <ErrorBoundary boundaryName="achievement-banner" silent resetKeys={recoveryKeys}>
+          <AchievementBanner />
+        </ErrorBoundary>
         <Outlet />
       </SubscriptionProvider>
     </RequireAuth>
