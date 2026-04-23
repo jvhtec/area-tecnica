@@ -163,9 +163,17 @@ export function BugReportForm() {
       setScreenshotFilename(null);
     } catch (error) {
       console.error("Error submitting bug report:", error);
+      const errorMessage =
+        typeof error === "object" && error !== null && "message" in error
+          ? (error as Error).message
+          : undefined;
+
       toast({
         title: "Error",
-        description: "No se pudo enviar el informe de error. Por favor, inténtalo de nuevo.",
+        description:
+          errorMessage
+            ? `No se pudo enviar el informe de error. Detalles: ${errorMessage}`
+            : "No se pudo enviar el informe de error. Por favor, inténtalo de nuevo.",
         variant: "destructive",
       });
     } finally {
