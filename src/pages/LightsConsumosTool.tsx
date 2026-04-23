@@ -883,7 +883,7 @@ const LightsConsumosTool: React.FC = () => {
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/lights')}>
+          <Button variant="ghost" size="icon" haptic="tap" onClick={() => navigate('/lights')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <CardTitle className="text-2xl font-bold">

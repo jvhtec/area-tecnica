@@ -1,7 +1,9 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
+import { Capacitor } from "@capacitor/core"
 import { cva, type VariantProps } from "class-variance-authority"
 
+import { haptics } from "@/lib/haptics"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
@@ -33,19 +35,46 @@ const buttonVariants = cva(
   }
 )
 
+type ButtonHaptic = "none" | "tap" | "success" | "warning" | "error"
+
+const shouldTriggerMobileHaptics = (): boolean => {
+  if (typeof window === "undefined") {
+    return false
+  }
+
+  if (Capacitor?.isNativePlatform?.()) {
+    return true
+  }
+
+  return window.matchMedia?.("(pointer: coarse)")?.matches ?? false
+}
+
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
+  haptic?: ButtonHaptic
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, haptic = "none", onClick, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
+
+    const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+      onClick?.(event)
+
+      if (event.defaultPrevented || haptic === "none" || !shouldTriggerMobileHaptics()) {
+        return
+      }
+
+      void haptics[haptic]()
+    }
+
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
+        onClick={handleClick}
         {...props}
       />
     )

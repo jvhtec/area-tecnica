@@ -102,7 +102,7 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
       <div className="mb-6">
         <div className="flex items-center justify-between gap-4 mb-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={handleBackNavigation}>
+            <Button variant="ghost" size="icon" haptic="tap" onClick={handleBackNavigation}>
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>

@@ -3,6 +3,7 @@ import App from './App.tsx'
 import './index.css'
 import { isChunkLoadErrorEvent, isChunkLoadPromiseRejection } from '@/utils/errorUtils'
 import { CHUNK_ERROR_RELOAD_KEY, MAX_CHUNK_ERROR_RELOADS } from '@/utils/chunkErrorConstants'
+import { initializeHapticsPreferences } from '@/stores/useHapticsPreferencesStore'
 
 // Global error handler for chunk load errors that happen outside React's error boundary
 // In-memory guard to prevent infinite reload loops if sessionStorage is unavailable
@@ -102,6 +103,8 @@ window.addEventListener('error', (event) => {
     void handleChunkLoadError();
   }
 });
+
+void initializeHapticsPreferences()
 
 const rootElement = document.getElementById('root')
 

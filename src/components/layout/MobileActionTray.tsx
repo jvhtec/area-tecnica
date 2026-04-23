@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { LogOut } from "lucide-react"
 
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { haptics } from "@/lib/haptics"
 import { cn } from "@/lib/utils"
 
 import { NavigationItem } from "./SidebarNavigation"
@@ -15,7 +16,7 @@ import { AboutCard } from "./AboutCard"
 
 interface MobileActionTrayProps {
   trayItems: NavigationItem[]
-  renderTrigger: (open: boolean) => React.ReactNode
+  renderTrigger: (open: boolean, onTriggerPress: () => void) => ReactNode
   onSignOut: () => Promise<void> | void
   isLoggingOut: boolean
   notificationProps?: {
@@ -39,18 +40,25 @@ export const MobileActionTray = ({
   const [open, setOpen] = useState(false)
   const { pathname } = useLocation()
 
+  const handleOpenChange = (nextOpen: boolean) => {
+    setOpen(nextOpen)
+    void haptics.tap()
+  }
+
   const handleNavigate = () => {
+    void haptics.selectionChanged()
     setOpen(false)
   }
 
   const handleSignOut = async () => {
+    void haptics.warning()
     await onSignOut()
     setOpen(false)
   }
 
   return (
-    <Sheet open={open} onOpenChange={setOpen}>
-      <SheetTrigger asChild>{renderTrigger(open)}</SheetTrigger>
+    <Sheet open={open} onOpenChange={handleOpenChange}>
+      <SheetTrigger asChild>{renderTrigger(open, () => undefined)}</SheetTrigger>
       <SheetContent
         side="bottom"
         className="flex h-[75vh] flex-col overflow-hidden rounded-t-3xl border-none bg-background px-0 pb-0 shadow-2xl [&>[data-radix-dialog-close]]:hidden"

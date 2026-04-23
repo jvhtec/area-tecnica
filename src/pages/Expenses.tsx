@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { useHapticToast } from '@/hooks/useHapticToast';
 import { supabase } from '@/integrations/supabase/client';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { formatCurrency } from '@/lib/utils';
@@ -91,6 +92,7 @@ const ExpensesPage: React.FC = () => {
   const { userRole, isLoading } = useOptimizedAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const hapticToast = useHapticToast();
 
   const [statusFilter, setStatusFilter] = React.useState<ExpenseStatus | 'all'>('all');
   const [technicianFilter, setTechnicianFilter] = React.useState<string>('all');
@@ -313,16 +315,16 @@ const ExpensesPage: React.FC = () => {
     async (expenseId: string) => {
       try {
         await deleteExpense(expenseId);
-        toast.success('Gasto eliminado correctamente');
+        hapticToast.success('Gasto eliminado correctamente');
         setDeleteDialog(null);
         await invalidateExpenseContext();
         refetch();
       } catch (error) {
         console.error('[ExpensesPage] Failed to delete expense', error);
-        toast.error('No se pudo eliminar el gasto');
+        hapticToast.error('No se pudo eliminar el gasto');
       }
     },
-    [deleteExpense, invalidateExpenseContext, refetch]
+    [deleteExpense, hapticToast, invalidateExpenseContext, refetch]
   );
 
   const handleBatchApproval = React.useCallback(
@@ -331,16 +333,16 @@ const ExpensesPage: React.FC = () => {
       try {
         const ids = Array.from(selectedExpenseIds);
         await Promise.all(ids.map((id) => approveExpense(id, approved, reason)));
-        toast.success(approved ? 'Gastos aprobados' : 'Gastos rechazados');
+        hapticToast.success(approved ? 'Gastos aprobados' : 'Gastos rechazados');
         clearSelections();
         await invalidateExpenseContext();
         refetch();
       } catch (error) {
         console.error('[ExpensesPage] Failed to process batch', error);
-        toast.error('No se pudo completar la operación');
+        hapticToast.error('No se pudo completar la operación');
       }
     },
-    [approveExpense, clearSelections, invalidateExpenseContext, refetch, selectedExpenseIds]
+    [approveExpense, clearSelections, hapticToast, invalidateExpenseContext, refetch, selectedExpenseIds]
   );
 
   if (isLoading || !userRole) {
@@ -621,12 +623,12 @@ const ExpensesPage: React.FC = () => {
                                   onClick={async () => {
                                     try {
                                       await approveExpense(expense.id, true);
-                                      toast.success('Gasto aprobado');
+                                      hapticToast.success('Gasto aprobado');
                                       await invalidateExpenseContext();
                                       refetch();
                                     } catch (error) {
                                       console.error('[ExpensesPage] Failed to approve expense', error);
-                                      toast.error('No se pudo aprobar el gasto');
+                                      hapticToast.error('No se pudo aprobar el gasto');
                                     }
                                   }}
                                 >
@@ -635,13 +637,14 @@ const ExpensesPage: React.FC = () => {
                                 <Button
                                   size="sm"
                                   variant="destructive"
-                                  onClick={() =>
+                                  onClick={() => {
+                                    hapticToast.destructiveConfirm();
                                     setRejectDialog({
                                       expenseId: expense.id,
                                       technicianName: technicianName,
                                       reason: '',
                                     })
-                                  }
+                                  }}
                                 >
                                   <XCircle className="h-4 w-4 mr-1" /> Rechazar
                                 </Button>
@@ -704,14 +707,14 @@ const ExpensesPage: React.FC = () => {
                 if (!rejectDialog) return;
                 try {
                   await approveExpense(rejectDialog.expenseId, false, rejectDialog.reason);
-                  toast.success('Gasto rechazado');
+                  hapticToast.success('Gasto rechazado');
                   setRejectDialog(null);
                   clearSelections();
                   await invalidateExpenseContext();
                   refetch();
                 } catch (error) {
                   console.error('[ExpensesPage] Failed to reject expense', error);
-                  toast.error('No se pudo rechazar el gasto');
+                  hapticToast.error('No se pudo rechazar el gasto');
                 }
               }}
             >
@@ -738,6 +741,7 @@ const ExpensesPage: React.FC = () => {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() => {
                 if (deleteDialog) {
+                  hapticToast.destructiveConfirm();
                   handleDeleteExpense(deleteDialog.expenseId);
                 }
               }}
