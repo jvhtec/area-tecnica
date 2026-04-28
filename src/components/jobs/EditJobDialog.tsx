@@ -268,11 +268,13 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
       if (jobError) throw jobError;
 
-      await supabase
+      const { error: prepDeleteError } = await supabase
         .from("job_date_types")
         .delete()
         .eq("job_id", job.id)
         .eq("type", "prep_day");
+
+      if (prepDeleteError) throw prepDeleteError;
 
       if (targetPrepDates.length > 0) {
         const { error: prepErr } = await supabase
