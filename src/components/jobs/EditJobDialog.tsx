@@ -12,7 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect } from "react";
-import { format, subDays } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Department, TECHNICAL_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
@@ -37,6 +36,12 @@ interface EditJobDialogProps {
   job: any;
 }
 
+const PREP_DAY_ELIGIBLE_JOB_TYPES: JobType[] = ["tourdate", "festival", "single", "ciclo", "evento"];
+
+function normalizePrepDayDates(dates: string[]): string[] {
+  return Array.from(new Set(dates.map((date) => date.trim()).filter(Boolean))).sort();
+}
+
 export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) => {
   const fieldClass = "bg-background border-input text-foreground placeholder:text-muted-foreground";
   const [title, setTitle] = useState(job.title);
@@ -51,7 +56,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [isVenueBusy, setIsVenueBusy] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
-  const [prepDaysCount, setPrepDaysCount] = useState(0);
+  const [prepDayDates, setPrepDayDates] = useState<string[]>([]);
 
   // Venue-related state
   const [venueName, setVenueName] = useState("");
@@ -112,12 +117,19 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           setVenueData(null);
         }
 
-        const { data: prepDateTypes } = await supabase
+        const { data: prepDateTypes, error: prepDateTypesError } = await supabase
           .from("job_date_types")
           .select("date")
           .eq("job_id", job.id)
-          .eq("type", "prep_day");
-        setPrepDaysCount(prepDateTypes?.length ?? 0);
+          .eq("type", "prep_day")
+          .order("date", { ascending: true });
+
+        if (prepDateTypesError) {
+          console.error("Error fetching prep day dates:", prepDateTypesError);
+          setPrepDayDates([]);
+        } else {
+          setPrepDayDates(normalizePrepDayDates((prepDateTypes || []).map((row) => row.date)));
+        }
       }
     };
 
@@ -161,6 +173,18 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       place_id: result.place_id,
       coordinates: result.coordinates,
     });
+  };
+
+  const updatePrepDayDate = (index: number, date: string) => {
+    setPrepDayDates((prev) => prev.map((current, currentIndex) => (currentIndex === index ? date : current)));
+  };
+
+  const removePrepDayDate = (index: number) => {
+    setPrepDayDates((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+  };
+
+  const addPrepDayDate = () => {
+    setPrepDayDates((prev) => [...prev, ""]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -213,31 +237,48 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
       if (jobError) throw jobError;
 
-      const eligibleForPrepDays = ['tourdate', 'festival', 'single', 'ciclo', 'evento'].includes(jobType);
-      if (eligibleForPrepDays) {
-        const localStartDate = startTime?.split('T')?.[0];
-        if (localStartDate) {
-          const startDateObj = new Date(`${localStartDate}T12:00:00`);
-          const targetPrepDates = Array.from({ length: prepDaysCount }, (_, idx) =>
-            format(subDays(startDateObj, idx + 1), "yyyy-MM-dd")
-          );
+      const eligibleForPrepDays = PREP_DAY_ELIGIBLE_JOB_TYPES.includes(jobType);
+      const localStartDate = startTime?.split("T")?.[0] ?? "";
+      const targetPrepDates = eligibleForPrepDays ? normalizePrepDayDates(prepDayDates) : [];
 
-          await supabase
-            .from("job_date_types")
-            .delete()
-            .eq("job_id", job.id)
-            .eq("type", "prep_day");
-
-          if (targetPrepDates.length > 0) {
-            const { error: prepErr } = await supabase
-              .from("job_date_types")
-              .upsert(
-                targetPrepDates.map((date) => ({ job_id: job.id, date, type: "prep_day" as const })),
-                { onConflict: "job_id,date" }
-              );
-            if (prepErr) throw prepErr;
-          }
+      if (eligibleForPrepDays && targetPrepDates.length > 0) {
+        if (!localStartDate) {
+          throw new Error("Set a job start date before adding prep days.");
         }
+
+        const invalidDates = targetPrepDates.filter((date) => date >= localStartDate);
+        if (invalidDates.length > 0) {
+          throw new Error(`Prep days must be before the job start date: ${invalidDates.join(", ")}`);
+        }
+
+        const { data: conflictingDateTypes, error: conflictError } = await supabase
+          .from("job_date_types")
+          .select("date, type")
+          .eq("job_id", job.id)
+          .in("date", targetPrepDates)
+          .neq("type", "prep_day");
+
+        if (conflictError) throw conflictError;
+
+        if (conflictingDateTypes && conflictingDateTypes.length > 0) {
+          const conflictSummary = conflictingDateTypes
+            .map((row) => `${row.date} (${row.type})`)
+            .join(", ");
+          throw new Error(`Prep days conflict with existing date types: ${conflictSummary}`);
+        }
+      }
+
+      await supabase
+        .from("job_date_types")
+        .delete()
+        .eq("job_id", job.id)
+        .eq("type", "prep_day");
+
+      if (targetPrepDates.length > 0) {
+        const { error: prepErr } = await supabase
+          .from("job_date_types")
+          .insert(targetPrepDates.map((date) => ({ job_id: job.id, date, type: "prep_day" as const })));
+        if (prepErr) throw prepErr;
       }
 
       // Update departments
@@ -358,6 +399,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       // Refresh jobs and Hoja de Ruta that depends on the job location
       queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
       queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: ["job-tech-prep-days", job.id] });
       queryClient.invalidateQueries({ queryKey: ["hoja-de-ruta", job.id] });
       onOpenChange(false);
     } catch (error: any) {
@@ -371,6 +413,9 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       setIsLoading(false);
     }
   };
+
+  const eligibleForPrepDays = PREP_DAY_ELIGIBLE_JOB_TYPES.includes(jobType);
+  const localStartDate = startTime?.split("T")?.[0] ?? "";
 
   return (
     <>
@@ -472,18 +517,46 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               <Label>Color</Label>
               <SimplifiedJobColorPicker color={color} onChange={setColor} />
             </div>
-            {['tourdate', 'festival', 'single', 'ciclo', 'evento'].includes(jobType) && (
-              <div className="space-y-2">
-                <Label htmlFor="prep-days-count">Prep days (15€/hr)</Label>
-                <Input
-                  id="prep-days-count"
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={prepDaysCount}
-                  onChange={(e) => setPrepDaysCount(Math.max(0, Math.floor(Number(e.target.value) || 0)))}
-                  className={fieldClass}
-                />
+            {eligibleForPrepDays && (
+              <div className="space-y-3 rounded-lg border p-3">
+                <div className="space-y-1">
+                  <Label>Prep days (15€/hr)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Add the exact prep dates. Prep days must be before the job start date{localStartDate ? ` (${localStartDate})` : ""}.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  {prepDayDates.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No prep days added.</p>
+                  )}
+                  {prepDayDates.map((date, index) => (
+                    <div key={`${index}-${date}`} className="flex items-center gap-2">
+                      <Input
+                        type="date"
+                        value={date}
+                        max={localStartDate || undefined}
+                        onChange={(e) => updatePrepDayDate(index, e.target.value)}
+                        className={fieldClass}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => removePrepDayDate(index)}
+                        className="border-border"
+                      >
+                        Remove
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addPrepDayDate}
+                  className="border-border"
+                >
+                  Add prep day
+                </Button>
               </div>
             )}
             <div className="space-y-2">
