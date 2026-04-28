@@ -5,7 +5,7 @@
 -- - 1 eligible tour date in the week => 1.5x
 -- - 2 eligible tour dates in the week => 1.125x per date
 -- - 3+ eligible tour dates in the week => 1x
--- - multi-day tourdate jobs receive the weekly multiplier once per quote, not once per standard payable day.
+-- - multi-day tourdate jobs receive the weekly multiplier on each standard payable day.
 
 CREATE OR REPLACE FUNCTION public.compute_tour_job_rate_quote_2025(_job_id uuid, _tech_id uuid)
 RETURNS jsonb
@@ -362,10 +362,10 @@ BEGIN
     END IF;
 
     standard_after_discount := standard_base;
-    standard_day_rate := ROUND(standard_base, 2);
-    standard_multiplier_bonus := ROUND(standard_after_discount * (per_job_multiplier - 1.0), 2);
-    standard_total := ROUND((standard_day_rate * standard_days) + standard_multiplier_bonus, 2);
-    multiplied_standard_days := CASE WHEN per_job_multiplier > 1.0 THEN 1 ELSE 0 END;
+    standard_day_rate := ROUND(standard_base * per_job_multiplier, 2);
+    standard_total := ROUND(standard_day_rate * standard_days, 2);
+    standard_multiplier_bonus := ROUND((standard_day_rate - standard_after_discount) * standard_days, 2);
+    multiplied_standard_days := CASE WHEN per_job_multiplier > 1.0 THEN standard_days ELSE 0 END;
     display_category := cat;
   END IF;
 
