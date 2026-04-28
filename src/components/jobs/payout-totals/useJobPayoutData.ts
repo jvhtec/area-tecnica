@@ -269,11 +269,27 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   const payoutTotalsWithPrep = React.useMemo(
     () =>
-      payoutTotals.map((p) => ({
-        ...p,
-        prep_days_total_eur: prepDaysMap.get(p.technician_id) || 0,
-      })),
-    [payoutTotals, prepDaysMap]
+      payoutTotals.map((p) => {
+        const prepDaysTotal = prepDaysMap.get(p.technician_id) || 0;
+
+        if (!isTourDate || prepDaysTotal <= 0) {
+          return {
+            ...p,
+            prep_days_total_eur: prepDaysTotal,
+          };
+        }
+
+        // Tour quotes intentionally exclude prep_day from multiplier math and
+        // base quote totals. Prep days are approved fixed-rate timesheets, so
+        // they must be added back into the technician payout exactly once here.
+        return {
+          ...p,
+          timesheets_total_eur: Number(p.timesheets_total_eur || 0) + prepDaysTotal,
+          total_eur: Number(p.total_eur || 0) + prepDaysTotal,
+          prep_days_total_eur: prepDaysTotal,
+        };
+      }),
+    [payoutTotals, prepDaysMap, isTourDate]
   );
 
   /* ── Flex LPO data ── */
