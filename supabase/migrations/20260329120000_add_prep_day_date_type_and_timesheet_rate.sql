@@ -38,6 +38,7 @@ BEGIN
     )) / 3600.0 - (COALESCE(NEW.break_minutes, 0) / 60.0);
   END IF;
 
+  v_worked_hours := GREATEST(v_worked_hours, 0);
   v_raw_worked_hours := v_worked_hours;
   v_worked_hours := ROUND(v_worked_hours);
 
@@ -67,12 +68,14 @@ $$;
 
 DROP TRIGGER IF EXISTS t_biu_apply_prep_day_rate ON public.timesheets;
 CREATE TRIGGER t_biu_apply_prep_day_rate
-BEFORE INSERT OR UPDATE OF job_id, date, start_time, end_time, break_minutes, ends_next_day, amount_eur, amount_breakdown
+BEFORE INSERT OR UPDATE OF job_id, date, start_time, end_time, break_minutes, ends_next_day, amount_eur, amount_breakdown, updated_at
 ON public.timesheets
 FOR EACH ROW
 EXECUTE FUNCTION public.trg_apply_prep_day_rate();
 
 -- Backfill persisted prep-day timesheets so existing rows follow €15/hour logic.
+-- updated_at is intentionally included in the trigger column list above, so this
+-- update forces the trigger to recompute amount_eur and amount_breakdown.
 UPDATE public.timesheets t
 SET updated_at = now()
 WHERE t.job_id IS NOT NULL
