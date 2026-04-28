@@ -23,7 +23,8 @@ export interface DateTypeMeta {
 }
 
 export const DATE_TYPE_ORDER: DateType[] = ["travel", "setup", "rigging", "prep_day", "show", "off", "rehearsal"];
-export const TOUR_DATE_TYPE_ORDER: DateType[] = ["show", "rehearsal", "prep_day", "travel", "setup", "rigging", "off"];
+// tour_dates.type does not include prep_day. Prep days are stored only as job_date_types rows.
+export const TOUR_DATE_TYPE_ORDER: DateType[] = ["show", "rehearsal", "travel", "setup", "rigging", "off"];
 
 export const DATE_TYPE_META: Record<DateType, DateTypeMeta> = {
   travel: {
