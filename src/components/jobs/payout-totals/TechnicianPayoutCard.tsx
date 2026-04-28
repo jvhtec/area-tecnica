@@ -1,13 +1,20 @@
 import React from 'react';
+import { parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import { AlertCircle, Clock, CheckCircle, ExternalLink, Send, Receipt } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertCircle, ChevronDown, Clock, CheckCircle, ExternalLink, Send, Receipt } from 'lucide-react';
 import { cn, formatCurrency } from '@/lib/utils';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
+import type { TechnicianDateRateMode } from '@/hooks/useTechnicianRateModeDates';
 import type { JobPayoutTotals } from '@/types/jobExtras';
+import type { TourJobRateQuote } from '@/types/tourRates';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { surface, controlButton, NON_AUTONOMO_DEDUCTION_EUR } from './types';
 
@@ -21,10 +28,12 @@ const categoryLabels: Record<string, string> = {
 
 interface TechnicianPayoutCardProps {
   payout: JobPayoutTotals;
+  tourQuote?: TourJobRateQuote;
   jobId: string;
   isTourDate: boolean;
   isCicloJob?: boolean;
   isManager: boolean;
+  canViewTechnicianRateModePanel: boolean;
   profileMap: Map<string, TechnicianProfileWithEmail>;
   autonomoMap: Map<string, boolean | null>;
   getTechName: (id: string) => string;
@@ -33,11 +42,18 @@ interface TechnicianPayoutCardProps {
   buildFinDocUrl: (elementId: string | null | undefined) => string | null;
   techDaysMap: Map<string, number>;
   techTotalDaysMap: Map<string, number>;
+  technicianTimesheetDates: string[];
+  rehearsalDateSet: Set<string>;
   missingEmailTechIds: string[];
   sendingByTech: Record<string, boolean>;
   isClosureLocked: boolean;
   /* Override */
   getTechOverride: (techId: string) => JobPayoutOverride | undefined;
+  getTechRateModeDateSelection?: (techId: string, date: string) => TechnicianDateRateMode;
+  setTechnicianRateModeMutation?: {
+    mutate: (args: { jobId: string; technicianId: string; date: string; mode: TechnicianDateRateMode }) => void;
+    isPending: boolean;
+  };
   overrideActorMap: Map<string, { name: string; email: string | null }>;
   editingTechId: string | null;
   editingAmount: string;
@@ -56,10 +72,12 @@ interface TechnicianPayoutCardProps {
 
 export function TechnicianPayoutCard({
   payout,
+  tourQuote,
   jobId,
   isTourDate,
   isCicloJob = false,
   isManager,
+  canViewTechnicianRateModePanel,
   profileMap,
   autonomoMap,
   getTechName,
@@ -68,10 +86,14 @@ export function TechnicianPayoutCard({
   buildFinDocUrl,
   techDaysMap,
   techTotalDaysMap,
+  technicianTimesheetDates,
+  rehearsalDateSet,
   missingEmailTechIds,
   sendingByTech,
   isClosureLocked,
   getTechOverride,
+  getTechRateModeDateSelection,
+  setTechnicianRateModeMutation,
   overrideActorMap,
   editingTechId,
   editingAmount,
@@ -119,6 +141,55 @@ export function TechnicianPayoutCard({
   const totalDays = techTotalDaysMap.get(techId) || 0;
   const approvedDays = techDaysMap.get(techId) || 0;
   const showDaysWarning = !isTourDate && totalDays > 1 && approvedDays < totalDays;
+  const hasRateModeHandlers =
+    typeof getTechRateModeDateSelection === 'function' && !!setTechnicianRateModeMutation;
+  const safeGetTechRateModeDateSelection = React.useCallback((date: string) => {
+    if (typeof getTechRateModeDateSelection === 'function') {
+      return getTechRateModeDateSelection(techId, date);
+    }
+    return 'inherit' as TechnicianDateRateMode;
+  }, [getTechRateModeDateSelection, techId]);
+  const showAdminRateModeSection = isTourDate && canViewTechnicianRateModePanel && technicianTimesheetDates.length > 0;
+  const activeRateModeOverrideCount = React.useMemo(() => {
+    return technicianTimesheetDates.reduce((count, dateStr) => {
+      return count + (safeGetTechRateModeDateSelection(dateStr) === 'inherit' ? 0 : 1);
+    }, 0);
+  }, [technicianTimesheetDates, safeGetTechRateModeDateSelection]);
+  const [isAdminRateModeOpen, setIsAdminRateModeOpen] = React.useState(activeRateModeOverrideCount > 0);
+
+  React.useEffect(() => {
+    if (activeRateModeOverrideCount > 0) {
+      setIsAdminRateModeOpen(true);
+    }
+  }, [activeRateModeOverrideCount]);
+
+  const rateModeSummaryLabel = activeRateModeOverrideCount === 0
+    ? 'Sin excepciones'
+    : activeRateModeOverrideCount === 1
+      ? '1 excepción'
+      : `${activeRateModeOverrideCount} excepciones`;
+
+  const quoteBreakdown = tourQuote?.breakdown ?? null;
+  const rehearsalDays = Number(quoteBreakdown?.rehearsal_days ?? 0);
+  const standardDays = Number(quoteBreakdown?.standard_days ?? 0);
+  const rehearsalDayRate = Number(quoteBreakdown?.rehearsal_rate_eur ?? 0);
+  const standardDayRate = Number(quoteBreakdown?.standard_day_rate_eur ?? 0);
+  const multipliedStandardDays = Number(quoteBreakdown?.multiplied_standard_days ?? 0);
+  const standardMultiplierBonus = Number(quoteBreakdown?.standard_multiplier_bonus_eur ?? 0);
+  const multiplierFactor = Number(
+    quoteBreakdown?.per_job_multiplier
+      ?? tourQuote?.per_job_multiplier
+      ?? tourQuote?.multiplier
+      ?? 1,
+  );
+  const showTourRateBreakdown =
+    isTourDate && !!tourQuote && (rehearsalDays > 0 || standardDays > 0 || standardMultiplierBonus > 0);
+  const multiplierFactorLabel = multiplierFactor.toLocaleString('es-ES', {
+    minimumFractionDigits: Number.isInteger(multiplierFactor) ? 0 : 1,
+    maximumFractionDigits: 3,
+  });
+  const multiplierDaysLabel =
+    multipliedStandardDays === 1 ? '1 día' : `${multipliedStandardDays} días`;
 
   return (
     <div
@@ -224,15 +295,12 @@ export function TechnicianPayoutCard({
             disabled={
               sendingByTech[techId] ||
               (!isTourDate && !payout.payout_approved) ||
-              !profile?.email ||
-              isClosureLocked
+              !profile?.email
             }
             title={
-              isClosureLocked
-                ? 'Periodo de cierre finalizado'
-                : (!isTourDate && !payout.payout_approved
-                  ? 'Aprueba el pago para habilitar el envío'
-                  : (profile?.email ? 'Enviar sólo a este técnico' : 'Sin correo configurado'))
+              !isTourDate && !payout.payout_approved
+                ? 'Aprueba el pago para habilitar el envío'
+                : (profile?.email ? 'Enviar sólo a este técnico' : 'Sin correo configurado')
             }
             className={controlButton}
           >
@@ -270,6 +338,33 @@ export function TechnicianPayoutCard({
             <span>
               Solo {approvedDays} de {totalDays} partes aprobados — el total puede no reflejar todos los días asignados
             </span>
+          </div>
+        )}
+
+        {showTourRateBreakdown && (
+          <div className="ml-6 space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
+            {rehearsalDays > 0 && (
+              <div className="flex justify-between gap-3 text-xs text-muted-foreground">
+                <span>Ensayo: {rehearsalDays} x {formatCurrency(rehearsalDayRate)}</span>
+                <span>{formatCurrency(rehearsalDays * rehearsalDayRate)}</span>
+              </div>
+            )}
+
+            {standardDays > 0 && (
+              <div className="flex justify-between gap-3 text-xs text-muted-foreground">
+                <span>Estándar: {standardDays} x {formatCurrency(standardDayRate)}</span>
+                <span>{formatCurrency(standardDays * standardDayRate)}</span>
+              </div>
+            )}
+
+            {standardMultiplierBonus > 0 && (
+              <div className="flex justify-between gap-3 text-xs text-muted-foreground">
+                <span>
+                  Multiplicador gira: {multiplierDaysLabel} con factor {multiplierFactorLabel}x
+                </span>
+                <span>+{formatCurrency(standardMultiplierBonus)}</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -345,6 +440,98 @@ export function TechnicianPayoutCard({
                 : payout.vehicle_disclaimer_text}
             </span>
           </div>
+        </>
+      )}
+
+      {showAdminRateModeSection && (
+        <>
+          <Separator className="border-border" />
+          <Collapsible
+            open={isAdminRateModeOpen}
+            onOpenChange={setIsAdminRateModeOpen}
+            className="space-y-2"
+          >
+            <CollapsibleTrigger asChild>
+              <button
+                type="button"
+                className="flex w-full items-start justify-between gap-3 rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-left transition-colors hover:bg-muted/40"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">Tarifa por técnico y fecha</div>
+                  <div className="text-xs text-muted-foreground">
+                    Hereda la tarifa global de ensayo salvo cuando fijes una excepción para este técnico.
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <Badge variant={activeRateModeOverrideCount > 0 ? 'default' : 'secondary'} className="text-[10px]">
+                    {rateModeSummaryLabel}
+                  </Badge>
+                  <ChevronDown
+                    className={cn(
+                      'h-4 w-4 text-muted-foreground transition-transform',
+                      isAdminRateModeOpen && 'rotate-180',
+                    )}
+                  />
+                </div>
+              </button>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent className="space-y-2">
+              {technicianTimesheetDates.map((dateStr) => {
+                const selectedMode = safeGetTechRateModeDateSelection(dateStr);
+                const inheritsRehearsal = rehearsalDateSet.has(dateStr);
+                const inheritedLabel = inheritsRehearsal ? 'Ensayo' : 'Estándar';
+                const dateLabel = formatInTimeZone(parseISO(dateStr), 'Europe/Madrid', 'EEE d MMM', {
+                  locale: es,
+                });
+
+                return (
+                  <div
+                    key={`${techId}-${dateStr}`}
+                    className="flex flex-col gap-2 rounded-md border border-border/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium capitalize">{dateLabel}</div>
+                      <div className="text-xs text-muted-foreground">Tarifa global: {inheritedLabel}</div>
+                    </div>
+
+                    <Select
+                      value={selectedMode}
+                      onValueChange={(nextMode) => {
+                        const mode = nextMode as TechnicianDateRateMode;
+                        if (mode === selectedMode) return;
+                        if (!setTechnicianRateModeMutation) return;
+                        setTechnicianRateModeMutation.mutate({
+                          jobId,
+                          technicianId: techId,
+                          date: dateStr,
+                          mode,
+                        });
+                      }}
+                      disabled={!hasRateModeHandlers || (setTechnicianRateModeMutation?.isPending ?? false)}
+                    >
+                      <SelectTrigger className="h-8 w-full text-xs sm:w-[220px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="inherit">Heredar ({inheritedLabel})</SelectItem>
+                        <SelectItem value="rehearsal">Forzar ensayo</SelectItem>
+                        <SelectItem value="standard">Forzar estándar</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              })}
+            </CollapsibleContent>
+            {setTechnicianRateModeMutation?.isPending && (
+              <div className="text-xs text-muted-foreground animate-pulse">Actualizando tarifa calculada…</div>
+            )}
+            {!hasRateModeHandlers && (
+              <div className="text-xs text-muted-foreground">
+                La edición de excepciones no está disponible en esta carga. Recarga la vista para sincronizar los controles.
+              </div>
+            )}
+          </Collapsible>
         </>
       )}
 

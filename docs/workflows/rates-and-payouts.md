@@ -30,7 +30,7 @@ The rates system manages technician compensation: base rates by category, extras
 | `jobs` / `tours` | `rates_approved`, `rates_approved_at`, `rates_approved_by` fields |
 | `rate_extras_2025` | Extra types catalog (travel_half, travel_full, day_off) with amounts |
 | `rate_cards_tour_2025` | Base rates by category (tecnico, especialista, responsable) |
-| `custom_tech_rates` | Profile-specific overrides for base/overtime rates |
+| `custom_tech_rates` | Profile-specific overrides for base/overtime/travel rates |
 | `job_rate_extras` | Per-technician extras (job_id, technician_id, extra_type, quantity, amount_override, status) |
 | `job_technician_payout_overrides` | Manual payout overrides (override_amount_eur, set_by, set_at) |
 | `v_job_tech_payout_2025` | Materialized view: job_id, technician_id, totals (timesheets, extras, expenses) |
@@ -90,6 +90,18 @@ The rates system manages technician compensation: base rates by category, extras
 4. STATUS workflow: pending → approved
 5. READ-ONLY for technicians
 ```
+
+### Travel Rate Resolution
+
+Travel day rates follow a priority chain:
+
+```text
+1. Per-technician custom rate (custom_tech_rates.travel_half_day_eur / travel_full_day_eur)
+2. House tech / assignable management fixed rate (€20)
+3. Catalog default (rate_extras_2025)
+```
+
+Custom travel rates are set per-technician in Settings > Users > Edit User Profile > "Tarifas internas" section (management/admin only). The `extras_total_for_job_tech()` SQL function and the `JobExtrasEditor` frontend component both follow this priority chain.
 
 ## PDF Export
 

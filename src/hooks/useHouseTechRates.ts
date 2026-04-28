@@ -15,6 +15,8 @@ export interface HouseTechRate {
   overtime_hour_eur?: number;
   overtime_hour_especialista_eur?: number | null;
   overtime_hour_responsable_eur?: number | null;
+  travel_half_day_eur?: number | null;
+  travel_full_day_eur?: number | null;
   currency: string;
   updated_by?: string;
   updated_at: string;
@@ -32,6 +34,8 @@ export interface HouseTechRateInput {
   overtime_hour_eur?: number | null;
   overtime_hour_especialista_eur?: number | null;
   overtime_hour_responsable_eur?: number | null;
+  travel_half_day_eur?: number | null;
+  travel_full_day_eur?: number | null;
 }
 
 export function useHouseTechRate(profileId: string) {

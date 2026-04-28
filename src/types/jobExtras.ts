@@ -17,6 +17,7 @@ export interface JobExtraItem {
   unit_eur: number;
   amount_eur: number;
   is_house_tech_rate?: boolean;
+  is_custom_travel_rate?: boolean;
 }
 
 export interface JobExtrasBreakdown {

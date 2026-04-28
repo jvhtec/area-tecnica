@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ArtistSectionProps } from "@/types/artist-form";
 import { useEquipmentModels } from "@/hooks/useEquipmentModels";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { FESTIVAL_CONSOLE_OPTIONS } from "@/constants/festivalConsoleOptions";
 
 export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLocked, language = "es" }: ArtistSectionProps) => {
@@ -24,65 +24,8 @@ export const ConsoleSetupSection = ({ formData, onChange, gearSetup, isFieldLock
   const allFohOptions = Array.from(new Set([...fohConsoleOptions, ...FESTIVAL_CONSOLE_OPTIONS]));
   const allMonOptions = Array.from(new Set([...monConsoleOptions, ...FESTIVAL_CONSOLE_OPTIONS]));
 
-  const festivalFohOptions = useMemo(
-    () =>
-      Array.from(
-        new Set((gearSetup?.foh_consoles || []).map((consoleItem) => consoleItem?.model?.trim()).filter(Boolean))
-      ),
-    [gearSetup?.foh_consoles]
-  );
-
-  const festivalMonOptions = useMemo(
-    () =>
-      Array.from(
-        new Set((gearSetup?.mon_consoles || []).map((consoleItem) => consoleItem?.model?.trim()).filter(Boolean))
-      ),
-    [gearSetup?.mon_consoles]
-  );
-
-  const fohOptions = useMemo(() => {
-    if (formData.foh_console_provided_by === "festival") return festivalFohOptions;
-    return allFohOptions;
-  }, [allFohOptions, festivalFohOptions, formData.foh_console_provided_by]);
-
-  const monOptions = useMemo(() => {
-    if (formData.mon_console_provided_by === "festival") return festivalMonOptions;
-    return allMonOptions;
-  }, [allMonOptions, festivalMonOptions, formData.mon_console_provided_by]);
-
-  useEffect(() => {
-    if (
-      formData.foh_console_provided_by === "festival" &&
-      formData.foh_console &&
-      !fohOptions.includes(formData.foh_console)
-    ) {
-      onChange({ foh_console: "" });
-    }
-    if (
-      formData.foh_console_provided_by === "band" &&
-      formData.foh_console &&
-      !allFohOptions.includes(formData.foh_console)
-    ) {
-      onChange({ foh_console: "" });
-    }
-  }, [allFohOptions, formData.foh_console, formData.foh_console_provided_by, fohOptions, onChange]);
-
-  useEffect(() => {
-    if (
-      formData.mon_console_provided_by === "festival" &&
-      formData.mon_console &&
-      !monOptions.includes(formData.mon_console)
-    ) {
-      onChange({ mon_console: "" });
-    }
-    if (
-      formData.mon_console_provided_by === "band" &&
-      formData.mon_console &&
-      !allMonOptions.includes(formData.mon_console)
-    ) {
-      onChange({ mon_console: "" });
-    }
-  }, [allMonOptions, formData.mon_console, formData.mon_console_provided_by, monOptions, onChange]);
+  const fohOptions = allFohOptions;
+  const monOptions = allMonOptions;
 
   useEffect(() => {
     if (!formData.monitors_from_foh) return;

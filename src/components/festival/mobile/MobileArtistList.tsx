@@ -82,10 +82,12 @@ interface MobileArtistListProps {
   onOpenStagePlotCapture: (artist: Artist) => void;
   onDeleteStagePlot: (artist: Artist) => void;
   onArtistsChanged: () => void;
+  onCreateFlexExtras: (artistId: string, artistName: string, artistDate: string, showStart: string, showEnd: string, isAfterMidnight: boolean) => void;
   printingArtistId: string | null;
   deletingArtistId: string | null;
   uploadingStagePlotArtistId: string | null;
   deletingStagePlotArtistId: string | null;
+  isCreatingExtrasFor: (id: string) => boolean;
   mode?: 'edit' | 'readonly';
   riderFilesByArtistId?: Record<string, MobileArtistRiderFile[]>;
   onDownloadRiderFile?: (file: MobileArtistRiderFile) => void;
@@ -106,10 +108,12 @@ export const MobileArtistList = ({
   onOpenStagePlotCapture,
   onDeleteStagePlot,
   onArtistsChanged,
+  onCreateFlexExtras,
   printingArtistId,
   deletingArtistId,
   uploadingStagePlotArtistId,
   deletingStagePlotArtistId,
+  isCreatingExtrasFor,
   mode = 'edit',
   riderFilesByArtistId = {},
   onDownloadRiderFile,
@@ -201,10 +205,12 @@ export const MobileArtistList = ({
             onDeleteArtist={onDeleteArtist}
             onOpenStagePlotCapture={onOpenStagePlotCapture}
             onDeleteStagePlot={onDeleteStagePlot}
+            onCreateFlexExtras={onCreateFlexExtras}
             printingArtistId={printingArtistId}
             deletingArtistId={deletingArtistId}
             uploadingStagePlotArtistId={uploadingStagePlotArtistId}
             deletingStagePlotArtistId={deletingStagePlotArtistId}
+            isCreatingExtrasFor={isCreatingExtrasFor}
             riderFiles={riderFilesByArtistId[artist.id] || []}
           />
         </div>

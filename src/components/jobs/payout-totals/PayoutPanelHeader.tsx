@@ -10,6 +10,8 @@ interface PayoutPanelHeaderProps {
   isSendingEmails: boolean;
   isLoadingPreview: boolean;
   hasPayouts: boolean;
+  visibleCount: number;
+  approvedCount: number;
   onExport: () => void;
   onPreview: () => void;
   onSendEmails: () => void;
@@ -21,6 +23,8 @@ export function PayoutPanelHeader({
   isSendingEmails,
   isLoadingPreview,
   hasPayouts,
+  visibleCount,
+  approvedCount,
   onExport,
   onPreview,
   onSendEmails,
@@ -40,7 +44,7 @@ export function PayoutPanelHeader({
           className={controlButton}
         >
           <FileDown className="h-4 w-4 mr-1" />
-          {isExporting ? 'Generando\u2026' : 'Exportar PDF'}
+          {isExporting ? 'Generando\u2026' : `Exportar PDF${visibleCount > 0 ? ` (${visibleCount})` : ''}`}
         </Button>
         {isManager && (
           <Button
@@ -63,7 +67,7 @@ export function PayoutPanelHeader({
             className="bg-blue-600 hover:bg-blue-500 text-white"
           >
             <Send className="h-4 w-4 mr-1" />
-            {isSendingEmails ? 'Enviando\u2026' : 'Enviar aprobados'}
+            {isSendingEmails ? 'Enviando\u2026' : `Enviar aprobados${approvedCount > 0 ? ` (${approvedCount})` : ''}`}
           </Button>
         )}
       </div>

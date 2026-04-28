@@ -345,6 +345,10 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
     navigate(`/sound/pesos?tourId=${tour.id}&mode=tour-defaults`);
   };
 
+  const handleLightsPowerDefaults = () => {
+    navigate(`/lights-consumos-tool?tourId=${tour.id}&mode=tour-defaults`);
+  };
+
   const handlePrintSchedule = async () => {
     setIsPrintingSchedule(true);
     try {
@@ -439,6 +443,14 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       description: "Configurar valores por defecto y cálculos de peso",
       icon: Weight,
       onClick: handleWeightDefaults,
+      badge: "Por Defecto",
+      showForTechnician: false
+    },
+    {
+      title: "Requisitos de Potencia Luces",
+      description: "Establecer cálculos de potencia por defecto de luces para todas las fechas",
+      icon: Calculator,
+      onClick: handleLightsPowerDefaults,
       badge: "Por Defecto",
       showForTechnician: false
     },

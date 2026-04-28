@@ -10,6 +10,8 @@ export interface TourDatePowerOverride {
   table_name: string;
   pdu_type: string;
   custom_pdu_type?: string;
+  position?: string | null;
+  custom_position?: string | null;
   total_watts: number;
   current_per_phase: number;
   includes_hoist: boolean;

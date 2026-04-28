@@ -53,7 +53,6 @@ describe("JobPayoutTotalsPanel autonomo badge", () => {
         },
       ],
       visibleTourQuotes: [],
-      tourTimesheetDays: new Map(),
       profilesWithEmail: [
         {
           id: "tech-1",
@@ -82,16 +81,23 @@ describe("JobPayoutTotalsPanel autonomo badge", () => {
       buildFinDocUrl: () => null,
       techDaysMap: new Map([["tech-1", 1]]),
       techTotalDaysMap: new Map([["tech-1", 1]]),
+      technicianTimesheetDatesMap: new Map(),
       payoutOverrides: [],
       overrideActorMap: new Map(),
       getTechOverride: () => undefined,
       calculatedGrandTotal: 100,
       isManager: true,
+      isAdmin: false,
+      canViewTechnicianRateModePanel: false,
+      isAdminOrAdministrative: false,
+      userDepartment: null,
       rehearsalDateSet: new Set(),
       jobTimesheetDates: [],
       allDatesMarked: false,
       toggleDateRehearsalMutation: { mutate: vi.fn(), isPending: false },
       toggleAllDatesRehearsalMutation: { mutate: vi.fn(), isPending: false },
+      getTechRateModeDateSelection: () => "inherit",
+      setTechnicianRateModeMutation: { mutate: vi.fn(), isPending: false },
       standardPayoutTotals: [],
     });
 

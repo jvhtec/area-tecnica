@@ -9,6 +9,8 @@ export interface TourPowerDefault {
   current_per_phase: number;
   pdu_type: string;
   custom_pdu_type?: string;
+  position?: string | null;
+  custom_position?: string | null;
   includes_hoist: boolean;
   department: string | null;
   created_at?: string;
@@ -55,6 +57,8 @@ export const useTourPowerDefaults = (tourId: string) => {
           current_per_phase: data.current_per_phase,
           pdu_type: data.pdu_type,
           custom_pdu_type: data.custom_pdu_type,
+          position: data.position,
+          custom_position: data.custom_position,
           includes_hoist: data.includes_hoist,
           department: data.department
         })

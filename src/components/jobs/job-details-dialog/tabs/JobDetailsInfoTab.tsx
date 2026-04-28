@@ -19,7 +19,7 @@ import { mergePDFs } from "@/utils/pdf/pdfMerge";
 import { generateTimesheetPDF } from "@/utils/timesheet-pdf";
 import { generateJobPayoutPDF, generateRateQuotePDF } from "@/utils/rates-pdf-export";
 import { sendJobPayoutEmails } from "@/lib/job-payout-email";
-import { adjustRehearsalQuotesForMultiDay } from "@/lib/tour-payout-email";
+import { prepareJobPayoutData } from "@/lib/job-payout-data";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import { JobPayoutTotalsPanel } from "@/components/jobs/JobPayoutTotalsPanel";
 import { useJobApprovalStatus } from "@/hooks/useJobApprovalStatus";
@@ -604,18 +604,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       }
 
                       const payoutProfiles = Array.from(profileMap.values());
-                      const techDates = new Map<string, Set<string>>();
-                      (timesheets || []).forEach((row: any) => {
-                        if (!row?.technician_id || !row?.date) return;
-                        if (!techDates.has(row.technician_id)) techDates.set(row.technician_id, new Set());
-                        techDates.get(row.technician_id)!.add(row.date);
-                      });
-                      const daysCounts = new Map<string, number>();
-                      techDates.forEach((dates, techId) => daysCounts.set(techId, dates.size));
-                      const adjustedQuotes = adjustRehearsalQuotesForMultiDay(quotes as any, daysCounts);
                       const quotesWithOverrides = await attachPayoutOverridesToTourQuotes(
                         resolvedJobId,
-                        adjustedQuotes as any
+                        quotes as any
                       );
                       const quoteBlob = (await generateRateQuotePDF(
                         quotesWithOverrides as any,
@@ -632,42 +623,27 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       )) as Blob;
                       payoutBlob = quoteBlob;
                     } else {
-                      // Standard jobs: use aggregated payout totals view
-                      const { data: payouts } = await supabase
-                        .from("v_job_tech_payout_2025")
-                        .select("*")
-                        .eq("job_id", resolvedJobId);
-
-                      const techIds = Array.from(new Set((payouts || []).map((p: any) => p.technician_id)));
-                      const missingProfileIds = techIds.filter(
-                        (id): id is string => typeof id === "string" && !profileMap.has(id)
-                      );
-                      if (missingProfileIds.length) {
-                        const { data: extraProfiles, error: extraProfilesError } = await supabase
-                          .from("profiles")
-                          .select("id, first_name, last_name, department, autonomo")
-                          .in("id", missingProfileIds);
-                        if (extraProfilesError) {
-                          console.error("[JobDetailsDialog] Failed to load technician profiles for payouts", extraProfilesError);
-                        } else {
-                          (extraProfiles || []).forEach((profile: any) => {
-                            if (profile?.id) profileMap.set(profile.id, profile);
-                          });
-                        }
-                      }
-
-                      const payoutProfiles = Array.from(profileMap.values());
-                      payoutBlob = (await generateJobPayoutPDF(
-                        (payouts || []) as any,
-                        {
+                      const payoutData = await prepareJobPayoutData({
+                        jobId: resolvedJobId,
+                        supabase,
+                        jobDetails: {
                           id: jobObj.id,
                           title: jobObj.title,
                           start_time: jobObj.start_time,
                           end_time: jobObj.end_time,
                           tour_id: jobDetails?.tour_id ?? null,
+                          job_type: jobObj.job_type,
+                          invoicing_company: jobDetails?.invoicing_company ?? null,
                         },
-                        payoutProfiles as any,
+                        profiles: Array.from(profileMap.values()),
                         lpoMap,
+                      });
+
+                      payoutBlob = (await generateJobPayoutPDF(
+                        payoutData.payouts as any,
+                        payoutData.job,
+                        payoutData.profiles as any,
+                        payoutData.lpoMap,
                         tsByTech as any,
                         { download: false }
                       )) as Blob;

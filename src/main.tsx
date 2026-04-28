@@ -12,7 +12,50 @@ declare global {
   }
 }
 
-const handleChunkLoadError = () => {
+const handleChunkLoadError = async () => {
+  // Ask the service worker to wipe all caches before we reload so the browser
+  // fetches every asset fresh and won't re-encounter the stale-shell mismatch.
+  const waitForCacheClear = async (): Promise<void> => {
+    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) {
+      return;
+    }
+
+    return new Promise<void>((resolve) => {
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        resolve();
+      }, 2000); // 2 second timeout
+
+      const messageHandler = (event: MessageEvent) => {
+        if (event.data?.source === 'sw' &&
+            (event.data?.type === 'CLEAR_CACHES_DONE' || event.data?.type === 'CLEAR_CACHES_ERROR')) {
+          cleanup();
+          resolve();
+        }
+      };
+
+      const cleanup = () => {
+        clearTimeout(timeoutId);
+        navigator.serviceWorker.removeEventListener('message', messageHandler);
+      };
+
+      navigator.serviceWorker.addEventListener('message', messageHandler);
+
+      try {
+        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_CACHES' });
+      } catch (error) {
+        cleanup();
+        resolve();
+      }
+    });
+  };
+
+  try {
+    await waitForCacheClear();
+  } catch {
+    // ignore — reload will still happen
+  }
+
   try {
     const count = parseInt(sessionStorage.getItem(CHUNK_ERROR_RELOAD_KEY) || '0', 10);
 
@@ -48,7 +91,7 @@ try {
 window.addEventListener('unhandledrejection', (event) => {
   if (isChunkLoadPromiseRejection(event)) {
     event.preventDefault();
-    handleChunkLoadError();
+    void handleChunkLoadError();
   }
 });
 
@@ -56,7 +99,7 @@ window.addEventListener('unhandledrejection', (event) => {
 window.addEventListener('error', (event) => {
   if (isChunkLoadErrorEvent(event)) {
     event.preventDefault();
-    handleChunkLoadError();
+    void handleChunkLoadError();
   }
 });
 

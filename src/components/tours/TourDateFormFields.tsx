@@ -40,10 +40,10 @@ export const TourDateFormFields: React.FC<TourDateFormFieldsProps> = ({
   return (
     <div className="space-y-4">
       <div>
-        <Label htmlFor="tourDateType">Type</Label>
+        <Label htmlFor="tourDateType">Tipo</Label>
         <Select value={tourDateType} onValueChange={setTourDateType}>
           <SelectTrigger>
-            <SelectValue placeholder="Select date type" />
+            <SelectValue placeholder="Seleccione tipo de fecha" />
           </SelectTrigger>
           <SelectContent>
             {TOUR_DATE_TYPE_OPTIONS.map((option) => {

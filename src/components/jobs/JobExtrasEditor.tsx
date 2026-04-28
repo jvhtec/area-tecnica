@@ -26,6 +26,8 @@ interface JobExtrasEditorProps {
   isManager?: boolean;
   isHouseTech?: boolean;
   isAssignableManagement?: boolean;
+  customTravelHalfRate?: number | null;
+  customTravelFullRate?: number | null;
   showVehicleDisclaimer?: boolean;
   vehicleDisclaimerText?: string;
 }
@@ -37,6 +39,8 @@ export function JobExtrasEditor({
   isManager = false,
   isHouseTech = false,
   isAssignableManagement = false,
+  customTravelHalfRate,
+  customTravelFullRate,
   showVehicleDisclaimer = false,
   vehicleDisclaimerText,
 }: JobExtrasEditorProps) {
@@ -88,9 +92,17 @@ export function JobExtrasEditor({
     }
   };
 
-  // Get unit amount for extra type from catalog
-  // House techs and assignable management users get fixed €20 for travel days (both half and full)
+  // Get unit amount for extra type
+  // Priority: custom per-technician rate > house tech fixed €20 > catalog rate
   function getUnitAmount(extraType: JobExtraType): number {
+    // Custom per-technician travel rates (highest priority)
+    if (extraType === 'travel_half' && customTravelHalfRate != null) {
+      return customTravelHalfRate;
+    }
+    if (extraType === 'travel_full' && customTravelFullRate != null) {
+      return customTravelFullRate;
+    }
+    // House techs and assignable management get fixed €20
     const qualifiesForFixedRate = isHouseTech || isAssignableManagement;
     if (qualifiesForFixedRate && (extraType === 'travel_half' || extraType === 'travel_full')) {
       return FIXED_TRAVEL_RATE;
@@ -99,8 +111,14 @@ export function JobExtrasEditor({
     return catalogItem?.amount_eur ?? 0;
   }
 
-  // Check if a given extra type uses the fixed travel rate
+  // Check if a given extra type uses a special travel rate (custom or fixed)
+  function hasCustomTravelRate(extraType: JobExtraType): boolean {
+    return (extraType === 'travel_half' && customTravelHalfRate != null)
+      || (extraType === 'travel_full' && customTravelFullRate != null);
+  }
+
   function usesFixedTravelRate(extraType: JobExtraType): boolean {
+    if (hasCustomTravelRate(extraType)) return false;
     const qualifiesForFixedRate = isHouseTech || isAssignableManagement;
     return qualifiesForFixedRate && (extraType === 'travel_half' || extraType === 'travel_full');
   }
@@ -152,11 +170,12 @@ export function JobExtrasEditor({
                 </Label>
                 <div className="flex items-center gap-2">
                   <Badge
-                    variant={usesFixedTravelRate(extraType) ? "default" : "outline"}
-                    className={`text-xs ${usesFixedTravelRate(extraType) ? 'bg-blue-600 text-white' : ''}`}
+                    variant={usesFixedTravelRate(extraType) || hasCustomTravelRate(extraType) ? "default" : "outline"}
+                    className={`text-xs ${usesFixedTravelRate(extraType) ? 'bg-blue-600 text-white' : hasCustomTravelRate(extraType) ? 'bg-emerald-600 text-white' : ''}`}
                   >
                     {formatCurrency(unitAmount)} each
                     {usesFixedTravelRate(extraType) && ' (plantilla)'}
+                    {hasCustomTravelRate(extraType) && ' (personalizada)'}
                   </Badge>
                   {currentQuantity > 0 && (
                     <Badge variant="secondary" className="text-xs">

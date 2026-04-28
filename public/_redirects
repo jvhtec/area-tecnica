@@ -1,1 +1,3 @@
+/staffing/confirm/* https://syldobdcdsgfgjtbuwxm.functions.supabase.co/staffing-click/confirm/:splat 302
+/staffing/decline/* https://syldobdcdsgfgjtbuwxm.functions.supabase.co/staffing-click/decline/:splat 302
 /* /index.html 200

@@ -1,0 +1,33 @@
+# Area Tecnica (Sector Pro) — Cursor Rules
+
+## Stack & Platform
+React 18 + TypeScript + Vite 6 + Supabase + Tailwind + shadcn/ui + TanStack Query + Zustand.
+Deploy: `dev` preview, `main` production (`sector-pro.work`).
+
+## Mandatory Rules
+- Work on `dev` branch by default; never commit directly to `main`.
+- Always install deps with: `npm install --legacy-peer-deps`.
+- Never add `package-lock.json`.
+- Keep `date-fns` at `^3.6.0` unless explicitly migrating.
+- Do not add `lovable-tagger`.
+- Maintain Supabase schema/RLS compatibility.
+
+## Architecture Conventions
+- Follow domain-based structure in `src/components/*` and `src/features/*`.
+- Keep route-level code in `src/pages/*` (lazy-loading preserved).
+- Prefer shared logic in `src/hooks/*`, `src/lib/*`, and `src/utils/*`.
+- Use existing Zustand stores in `src/stores/*` for global state.
+- Reuse query patterns from TanStack Query setup instead of ad-hoc data loading.
+- Use `@/` imports.
+
+## Key Code Areas
+- UI domains: festival, tours, jobs, matrix, equipment, logistics, messages, timesheet, lights, sound, video.
+- Backend: `supabase/migrations/*` and `supabase/functions/*`.
+- Integrations/types: `src/integrations/supabase/{client.ts,types.ts}`.
+
+## Validation (run as relevant)
+- `npm run lint`
+- `npm run test:run`
+- `npm run build`
+- `npm run lint:functions` (if Edge Functions touched)
+- `npm run cap:sync` (if mobile runtime affected)

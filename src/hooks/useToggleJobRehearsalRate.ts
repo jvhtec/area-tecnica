@@ -42,12 +42,15 @@ interface ToggleDateRehearsalParams {
   enabled: boolean;
 }
 
-const invalidateRehearsalRateQueries = (queryClient: QueryClient, jobId: string) => {
+export const invalidateRehearsalRateQueries = (queryClient: QueryClient, jobId: string) => {
   optimizedInvalidation.invalidateQueryKeys(queryClient, [
     ['job-rehearsal-dates', jobId],
     ['job-tech-payout', jobId],
     ['job-tech-days', jobId],
-    ['manager-job-quotes', jobId],
+    ['manager-job-quotes'],
+    ['tour-job-rate-quotes'],
+    ['tour-job-rate-quotes-manager'],
+    ['technician-tour-rate-quotes'],
     ['timesheets'],
     ['job-tech-payout', jobId, 'tour-timesheet-data'],
   ]);
@@ -59,7 +62,7 @@ const invalidateRehearsalRateQueries = (queryClient: QueryClient, jobId: string)
  * @returns The number of successfully recalculated timesheets
  * @throws Error if any recalculations fail
  */
-async function recalculateTimesheets(timesheetIds: string[]): Promise<number> {
+export async function recalculateTimesheets(timesheetIds: string[]): Promise<number> {
   if (timesheetIds.length === 0) return 0;
 
   const results = await Promise.allSettled(

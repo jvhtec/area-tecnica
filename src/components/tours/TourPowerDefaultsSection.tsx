@@ -8,6 +8,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Trash2, Plus, Zap } from "lucide-react";
 import { useTourPowerDefaults, TourPowerDefault } from "@/hooks/useTourPowerDefaults";
+import {
+  CUSTOM_POWER_POSITION_VALUE,
+  getPowerPositionCustomValue,
+  getPowerPositionSelectValue,
+  getResolvedPowerPosition,
+  NO_POWER_POSITION_VALUE,
+  POWER_POSITION_PRESETS,
+} from "@/utils/powerPositions";
 
 interface TourPowerDefaultsSectionProps {
   tourId: string;
@@ -17,6 +25,8 @@ interface PowerDefaultForm {
   table_name: string;
   pdu_type: string;
   custom_pdu_type: string;
+  position: string;
+  custom_position: string;
   total_watts: string;
   current_per_phase: string;
   includes_hoist: boolean;
@@ -27,6 +37,8 @@ const defaultForm: PowerDefaultForm = {
   table_name: "",
   pdu_type: "CEE 16A",
   custom_pdu_type: "",
+  position: "",
+  custom_position: "",
   total_watts: "",
   current_per_phase: "",
   includes_hoist: false,
@@ -59,6 +71,8 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
       table_name: formData.table_name,
       pdu_type: formData.pdu_type,
       custom_pdu_type: formData.pdu_type === "Custom" ? formData.custom_pdu_type : null,
+      position: formData.custom_position ? null : formData.position || null,
+      custom_position: formData.custom_position || null,
       total_watts: parseFloat(formData.total_watts),
       current_per_phase: parseFloat(formData.current_per_phase),
       includes_hoist: formData.includes_hoist,
@@ -80,6 +94,11 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
       table_name: powerDefault.table_name,
       pdu_type: powerDefault.pdu_type,
       custom_pdu_type: powerDefault.custom_pdu_type || "",
+      position: powerDefault.position || "",
+      custom_position: getPowerPositionCustomValue(
+        powerDefault.position,
+        powerDefault.custom_position
+      ),
       total_watts: powerDefault.total_watts.toString(),
       current_per_phase: powerDefault.current_per_phase.toString(),
       includes_hoist: powerDefault.includes_hoist,
@@ -115,6 +134,8 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
                   {powerDefault.pdu_type === "Custom" && powerDefault.custom_pdu_type
                     ? powerDefault.custom_pdu_type
                     : powerDefault.pdu_type} - {powerDefault.total_watts}W, {powerDefault.current_per_phase}A
+                  {getResolvedPowerPosition(powerDefault.position, powerDefault.custom_position) &&
+                    `, ${getResolvedPowerPosition(powerDefault.position, powerDefault.custom_position)}`}
                   {powerDefault.includes_hoist && " (includes hoist)"}
                   {powerDefault.department && ` - ${powerDefault.department}`}
                 </div>
@@ -199,6 +220,37 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
                 </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label htmlFor="position">Position</Label>
+                <Select
+                  value={getPowerPositionSelectValue(formData.position, formData.custom_position)}
+                  onValueChange={(value) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      position:
+                        value === NO_POWER_POSITION_VALUE ||
+                        value === CUSTOM_POWER_POSITION_VALUE
+                          ? ""
+                          : value,
+                      custom_position:
+                        value === CUSTOM_POWER_POSITION_VALUE ? prev.custom_position : "",
+                    }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select position" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_POWER_POSITION_VALUE}>No position</SelectItem>
+                    {POWER_POSITION_PRESETS.map((position) => (
+                      <SelectItem key={position} value={position}>
+                        {position}
+                      </SelectItem>
+                    ))}
+                    <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Custom</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               {formData.pdu_type === "Custom" && (
                 <div>
                   <Label htmlFor="custom_pdu_type">Custom PDU Type</Label>
@@ -207,6 +259,17 @@ export const TourPowerDefaultsSection: React.FC<TourPowerDefaultsSectionProps> =
                     value={formData.custom_pdu_type}
                     onChange={(e) => setFormData({ ...formData, custom_pdu_type: e.target.value })}
                     placeholder="Enter custom PDU type"
+                  />
+                </div>
+              )}
+              {getPowerPositionSelectValue(formData.position, formData.custom_position) === CUSTOM_POWER_POSITION_VALUE && (
+                <div>
+                  <Label htmlFor="custom_position">Custom Position</Label>
+                  <Input
+                    id="custom_position"
+                    value={formData.custom_position}
+                    onChange={(e) => setFormData({ ...formData, custom_position: e.target.value, position: "" })}
+                    placeholder="Enter custom position"
                   />
                 </div>
               )}

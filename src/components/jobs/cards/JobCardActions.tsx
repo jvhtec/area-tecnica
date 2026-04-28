@@ -10,10 +10,16 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
-import { Department } from "@/types/department";
+import { Department, getDepartmentLabel } from "@/types/department";
 import { useQuery } from "@tanstack/react-query";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +40,21 @@ import {
   type FlatElementNode,
 } from "@/utils/flex-folders";
 import { isFestivalLikeJobType } from "@/utils/jobType";
+import { fetchJobLogo } from "@/utils/pdf/logoUtils";
+import {
+  buildTechnicalPowerSummaryPackFilename,
+  generateTechnicalPowerSummaryPack,
+} from "@/utils/pdf/technicalPowerSummaryPack";
+import {
+  TECHNICAL_POWER_DEPARTMENTS,
+  normalizeTechnicalPowerDepartments,
+  type TechnicalPowerDepartment,
+  type TechnicalPowerSummaryAvailability,
+} from "@/utils/technicalPowerTypes";
+import {
+  getTechnicalPowerSummaryAvailability,
+  loadTechnicalPowerSummaryData,
+} from "@/utils/powerSummaryData";
 
 interface JobCardActionsProps {
   job: any;
@@ -146,6 +167,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const [waAlmacenOpen, setWaAlmacenOpen] = React.useState(false);
   const [waMessage, setWaMessage] = React.useState<string>("");
   const [isSendingWa, setIsSendingWa] = React.useState(false);
+  const [isGeneratingTechnicalPowerPack, setIsGeneratingTechnicalPowerPack] = React.useState(false);
   const [flexSelectorOpen, setFlexSelectorOpen] = React.useState(false);
   const [tourdateSelectorInfo, setTourdateSelectorInfo] = React.useState<{
     mainElementId: string;
@@ -503,9 +525,94 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   };
 
   const canViewCalculators = isProjectManagementPage && (userRole === 'management' || userRole === 'admin');
+  const canGenerateTechnicalPowerPack =
+    isProjectManagementPage && (userRole === 'management' || userRole === 'admin');
 
   const isFestivalLike = isFestivalLikeJobType(job?.job_type);
   const allowedJobType = ['single', 'festival', 'ciclo', 'tourdate'].includes(job?.job_type);
+  const technicalPowerSummaryTitle = React.useMemo(
+    () => job.title || job.name || job.job_name || 'Trabajo',
+    [job.job_name, job.name, job.title]
+  );
+  const technicalPowerSummaryJob = React.useMemo(() => ({
+    id: job.id,
+    job_type: job.job_type,
+    tour_id: job.tour_id ?? null,
+    tour_date_id: job.tour_date_id ?? null,
+  }), [job.id, job.job_type, job.tour_date_id, job.tour_id]);
+  const {
+    data: requiredTechnicalPowerDepartments = [],
+    isLoading: isTechnicalPowerDepartmentsLoading,
+    isError: isTechnicalPowerDepartmentsError,
+  } = useQuery<TechnicalPowerDepartment[]>({
+    queryKey: [...createQueryKey.jobs.detail(job.id), 'technical-power-job-departments'],
+    enabled: canGenerateTechnicalPowerPack && allowedJobType,
+    staleTime: 60 * 1000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('job_departments')
+        .select('department')
+        .eq('job_id', job.id)
+        .in('department', [...TECHNICAL_POWER_DEPARTMENTS]);
+
+      if (error) {
+        throw error;
+      }
+
+      return normalizeTechnicalPowerDepartments(
+        (data || []).map((row) => row.department)
+      );
+    },
+  });
+  const hasRequiredTechnicalPowerDepartments =
+    requiredTechnicalPowerDepartments.length > 0;
+
+  const {
+    data: technicalPowerSummaryPreview,
+    isLoading: isTechnicalPowerSummaryPreviewLoading,
+    isError: isTechnicalPowerSummaryPreviewError,
+  } = useQuery({
+    queryKey: [
+      ...createQueryKey.jobs.detail(job.id),
+      'technical-power-summary',
+      job.job_type ?? null,
+      job.tour_id ?? null,
+      job.tour_date_id ?? null,
+    ],
+    enabled:
+      canGenerateTechnicalPowerPack &&
+      allowedJobType &&
+      hasRequiredTechnicalPowerDepartments,
+    staleTime: 60 * 1000,
+    queryFn: async () =>
+      loadTechnicalPowerSummaryData({
+        job: technicalPowerSummaryJob,
+        supabase,
+      }),
+  });
+
+  const technicalPowerSummaryStatus = React.useMemo(
+    (): TechnicalPowerSummaryAvailability => {
+      if (!technicalPowerSummaryPreview) {
+        return {
+          ready: false,
+          requiredDepartments: requiredTechnicalPowerDepartments,
+          availableDepartments: [],
+          missingDepartments: requiredTechnicalPowerDepartments,
+        };
+      }
+
+      return getTechnicalPowerSummaryAvailability(
+        technicalPowerSummaryPreview,
+        requiredTechnicalPowerDepartments
+      );
+    },
+    [requiredTechnicalPowerDepartments, technicalPowerSummaryPreview]
+  );
+  const hasAvailableTechnicalPowerDepartments =
+    technicalPowerSummaryStatus.availableDepartments.length > 0;
+  const canRetryTechnicalPowerPack =
+    isTechnicalPowerDepartmentsError || isTechnicalPowerSummaryPreviewError;
 
   const navigateToCalculator = (e: React.MouseEvent, type: 'pesos' | 'consumos') => {
     e.stopPropagation();
@@ -527,6 +634,177 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     }
     navigate(`${path}?${params.toString()}`);
   };
+
+  const downloadPdfBlob = React.useCallback((blob: Blob, fileName: string) => {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  }, []);
+
+  const getTechnicalPowerPackTooltip = React.useCallback(() => {
+    if (isGeneratingTechnicalPowerPack) {
+      return 'Generando resumen tecnico de potencia';
+    }
+
+    if (isTechnicalPowerDepartmentsLoading) {
+      return 'Comprobando departamentos tecnicos';
+    }
+
+    if (isTechnicalPowerDepartmentsError) {
+      return 'No se pudieron comprobar los departamentos tecnicos';
+    }
+
+    if (!hasRequiredTechnicalPowerDepartments) {
+      return 'Este trabajo no incluye departamentos tecnicos con resumen de potencia';
+    }
+
+    if (isTechnicalPowerSummaryPreviewLoading) {
+      return 'Comprobando tablas de potencia';
+    }
+
+    if (isTechnicalPowerSummaryPreviewError) {
+      return 'No se pudieron comprobar las tablas de potencia';
+    }
+
+    if (technicalPowerSummaryStatus.ready) {
+      return 'Imprimir resumen tecnico de potencia';
+    }
+
+    if (technicalPowerSummaryStatus.availableDepartments.length > 0) {
+      const missingLabels = technicalPowerSummaryStatus.missingDepartments
+        .map((department) => getDepartmentLabel(department))
+        .join(', ');
+
+      return `Se imprimira con los departamentos disponibles. Pueden faltar en el PDF: ${missingLabels}`;
+    }
+
+    const missingLabels = technicalPowerSummaryStatus.missingDepartments
+      .map((department) => getDepartmentLabel(department))
+      .join(', ');
+
+    return `No hay tablas de potencia disponibles para imprimir. Faltan: ${missingLabels}`;
+  }, [
+    isGeneratingTechnicalPowerPack,
+    hasRequiredTechnicalPowerDepartments,
+    isTechnicalPowerDepartmentsError,
+    isTechnicalPowerDepartmentsLoading,
+    isTechnicalPowerSummaryPreviewError,
+    isTechnicalPowerSummaryPreviewLoading,
+    technicalPowerSummaryStatus,
+  ]);
+
+  const handleGenerateTechnicalPowerPack = React.useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+
+    if (isGeneratingTechnicalPowerPack) {
+      return;
+    }
+
+    setIsGeneratingTechnicalPowerPack(true);
+
+    try {
+      const { data: freshJobDepartments, error: jobDepartmentsError } = await supabase
+        .from('job_departments')
+        .select('department')
+        .eq('job_id', job.id)
+        .in('department', [...TECHNICAL_POWER_DEPARTMENTS]);
+
+      if (jobDepartmentsError) {
+        throw jobDepartmentsError;
+      }
+
+      const requiredDepartments = normalizeTechnicalPowerDepartments(
+        (freshJobDepartments || []).map((row) => row.department)
+      );
+
+      if (requiredDepartments.length === 0) {
+        toast({
+          title: 'Sin departamentos tecnicos',
+          description: 'Este trabajo no incluye departamentos tecnicos con resumen de potencia.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const summary = await loadTechnicalPowerSummaryData({
+        job: technicalPowerSummaryJob,
+        supabase,
+      });
+
+      const summaryStatus = getTechnicalPowerSummaryAvailability(
+        summary,
+        requiredDepartments
+      );
+      if (summaryStatus.availableDepartments.length === 0) {
+        const missingLabels = summaryStatus.missingDepartments
+          .map((department) => getDepartmentLabel(department))
+          .join(', ');
+
+        toast({
+          title: 'Sin tablas de potencia',
+          description: `No existen tablas de potencia disponibles para imprimir. Faltan: ${missingLabels}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      let logoUrl: string | undefined;
+      try {
+        logoUrl = await fetchJobLogo(job.id);
+      } catch (logoError) {
+        console.warn('[JobCardActions] Could not load job logo for technical power pack', logoError);
+      }
+
+      const pdfBlob = await generateTechnicalPowerSummaryPack({
+        jobTitle: technicalPowerSummaryTitle,
+        jobDate: job.start_time || job.date || null,
+        jobLocation: resolveJobLocation(),
+        logoUrl,
+        includedDepartments: summaryStatus.availableDepartments,
+        summary,
+      });
+
+      downloadPdfBlob(pdfBlob, buildTechnicalPowerSummaryPackFilename(technicalPowerSummaryTitle));
+
+      const missingLabels = summaryStatus.missingDepartments
+        .map((department) => getDepartmentLabel(department))
+        .join(', ');
+
+      toast({
+        title: summaryStatus.missingDepartments.length > 0 ? 'Resumen generado parcialmente' : 'Resumen generado',
+        description:
+          summaryStatus.missingDepartments.length > 0
+            ? `El resumen tecnico de potencia se ha descargado. No incluye: ${missingLabels}.`
+            : 'El resumen tecnico de potencia se ha descargado correctamente.',
+      });
+    } catch (error: any) {
+      console.error('[JobCardActions] Failed to generate technical power summary pack', error);
+      toast({
+        title: 'Error al generar el resumen',
+        description: error?.message || 'No se pudo generar el resumen tecnico de potencia.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGeneratingTechnicalPowerPack(false);
+    }
+  }, [
+    downloadPdfBlob,
+    isGeneratingTechnicalPowerPack,
+    job.date,
+    job.id,
+    job.job_name,
+    job.name,
+    job.start_time,
+    resolveJobLocation,
+    technicalPowerSummaryJob,
+    technicalPowerSummaryTitle,
+    toast,
+  ]);
 
   // Show tour defaults indicator on buttons if defaults exist for this tour and department
   const tourId: string | undefined = job?.tour_id || job?.tour?.id || undefined;
@@ -1123,6 +1401,41 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
             {defaultsInfo?.power && <span className="ml-1 inline-block h-2 w-2 rounded-full bg-green-500" title="Existen valores predeterminados de gira" />}
           </Button>
         </>
+      )}
+      {canGenerateTechnicalPowerPack && allowedJobType && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  title="Resumen tecnico de potencia"
+                  disabled={
+                    isGeneratingTechnicalPowerPack ||
+                    isTechnicalPowerDepartmentsLoading ||
+                    isTechnicalPowerSummaryPreviewLoading ||
+                    (!canRetryTechnicalPowerPack &&
+                      (!hasRequiredTechnicalPowerDepartments ||
+                        !hasAvailableTechnicalPowerDepartments))
+                  }
+                  onClick={handleGenerateTechnicalPowerPack}
+                >
+                  {isGeneratingTechnicalPowerPack ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ScrollText className="h-4 w-4" />
+                  )}
+                  <span className="hidden sm:inline">Resumen Potencia</span>
+                </Button>
+              </span>
+            </TooltipTrigger>
+            <TooltipContent>
+              {getTechnicalPowerPackTooltip()}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       )}
       {userRole === 'technician' && job.job_type !== "dryhire" && (
         <TechnicianIncidentReportDialog

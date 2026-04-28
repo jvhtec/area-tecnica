@@ -58,6 +58,7 @@ export interface OptimizedAssignmentMatrixViewProps {
   getAvailabilityForCell: (technicianId: string, date: Date) => any;
   selectedCells: Set<string>;
   staffingMaps: any;
+  profileNamesMap: Map<string, string>;
   handleCellSelect: (technicianId: string, date: Date, selected: boolean) => void;
   handleCellClick: (technicianId: string, date: Date, action: any, selectedJobId?: string) => void;
   handleCellPrefetch: (technicianId: string) => void;
@@ -135,6 +136,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   getAvailabilityForCell,
   selectedCells,
   staffingMaps,
+  profileNamesMap,
   handleCellSelect,
   handleCellClick,
   handleCellPrefetch,
@@ -382,6 +384,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             allowMarkUnavailable={allowMarkUnavailable}
                             staffingStatusProvided={providedByJob}
                             staffingStatusByDateProvided={providedByDate}
+                            profileNamesMap={profileNamesMap}
                             isFridge={fridgeSet?.has(technician.id) || false}
                             mobile={mobile}
                           />

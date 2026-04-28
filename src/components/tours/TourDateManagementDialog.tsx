@@ -21,7 +21,6 @@ import {
   Edit,
   Package,
   Clock,
-  Music,
 } from "lucide-react";
 import { TourDateFormFields } from "./TourDateFormFields";
 import { TourDateListItem } from "./TourDateListItem";
@@ -30,10 +29,20 @@ import { useTourDateRealtime } from "@/hooks/useTourDateRealtime";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { deleteJobDateTypes } from "@/services/deleteJobDateTypes";
+import {
+  buildInclusiveDateRange,
+  syncJobRehearsalDates,
+  syncJobRehearsalDatesForJobs,
+} from "@/services/jobRehearsalDates";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { TECHNICAL_DEPARTMENTS } from "@/types/department";
 import { syncFlexElementsForTourDateChange } from "@/utils/flex-folders/syncDateChange";
-import { DateType, getDateTypeMeta, isSingleDayDateType } from "@/constants/dateTypes";
+import {
+  DateType,
+  getDateTypeMeta,
+  isSingleDayDateType,
+  TOUR_DATE_TYPE_OPTIONS,
+} from "@/constants/dateTypes";
 
 interface TourDateObject {
   id: string;
@@ -239,17 +248,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw deptError;
       }
 
-      // Create job date types for each day in the date range
-      const jobDateTypes = [];
-      const start = new Date(startDate);
-      const end = new Date(finalEndDate);
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        jobDateTypes.push({
-          job_id: newJob.id,
-          date: d.toISOString().split('T')[0],
-          type: tourDateType
-        });
-      }
+      const scheduledDates = buildInclusiveDateRange(startDate, finalEndDate);
+      const jobDateTypes = scheduledDates.map((date) => ({
+        job_id: newJob.id,
+        date,
+        type: tourDateType,
+      }));
 
       const { error: dateTypeError } = await supabase
         .from("job_date_types")
@@ -257,6 +261,10 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       if (dateTypeError) {
         console.error("Error creating job date types:", dateTypeError);
         throw dateTypeError;
+      }
+
+      if (tourDateType === "rehearsal") {
+        await syncJobRehearsalDates(newJob.id, scheduledDates, { seedMissing: true });
       }
 
       // Force refresh all related queries after successful creation
@@ -384,6 +392,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw jobsError;
       }
 
+      const scheduledDates = buildInclusiveDateRange(startDate, finalEndDate);
+
       // Update job date types for all jobs of this tour date
       if (jobs && jobs.length > 0) {
         for (const job of jobs) {
@@ -394,16 +404,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
             .eq("job_id", job.id);
 
           // Create new job date types for the updated date range
-          const jobDateTypes = [];
-          const start = new Date(startDate);
-          const end = new Date(finalEndDate);
-          for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            jobDateTypes.push({
-              job_id: job.id,
-              date: d.toISOString().split('T')[0],
-              type: tourDateType
-            });
-          }
+          const jobDateTypes = scheduledDates.map((date) => ({
+            job_id: job.id,
+            date,
+            type: tourDateType,
+          }));
 
           if (jobDateTypes.length > 0) {
             const { error: dateTypeError } = await supabase
@@ -414,6 +419,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
             }
           }
         }
+
+        await syncJobRehearsalDatesForJobs(
+          jobs.map((job) => job.id),
+          scheduledDates,
+          { seedMissing: tourDateType === "rehearsal" }
+        );
       }
 
       // Sync Flex elements if date changed and flex folders exist
@@ -767,6 +778,37 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                     <div key={dateObj.id} className="p-3 md:p-4 border rounded-lg">
                       {editingTourDate && editingTourDate.id === dateObj.id && !readOnly ? (
                         <div className="flex flex-col gap-3">
+                          <div className="space-y-2">
+                            <Label htmlFor={`edit-tour-date-type-${dateObj.id}`}>Tipo</Label>
+                            <Select
+                              value={editTourDateType}
+                              onValueChange={(value) => {
+                                const nextType = value as DateType;
+                                setEditTourDateType(nextType);
+                                if (isSingleDayDateType(nextType)) {
+                                  setEditEndDate(editStartDate);
+                                }
+                              }}
+                            >
+                              <SelectTrigger id={`edit-tour-date-type-${dateObj.id}`}>
+                                <SelectValue placeholder="Seleccione tipo de fecha" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TOUR_DATE_TYPE_OPTIONS.map((option) => {
+                                  const Icon = option.icon;
+
+                                  return (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      <div className="flex items-center gap-2">
+                                        <Icon className={`h-4 w-4 ${option.iconClassName}`} />
+                                        {option.label}
+                                      </div>
+                                    </SelectItem>
+                                  );
+                                })}
+                              </SelectContent>
+                            </Select>
+                          </div>
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 flex-shrink-0" />
                             <Input

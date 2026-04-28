@@ -27,6 +27,7 @@ export interface MatrixTimesheetAssignment {
   job: MatrixJob;
   status: string | null;
   assigned_at: string | null;
+  assigned_by?: string | null;
   single_day?: boolean | null;
   assignment_date?: string | null;
   sound_role?: string | null;
@@ -111,7 +112,7 @@ export const fetchMatrixTimesheetAssignments = async ({
         .from('job_assignments')
         // NOTE: single_day and assignment_date are deprecated after simplification migration
         // They're kept in the query for backwards compatibility but should eventually be removed
-        .select('job_id, technician_id, sound_role, lights_role, video_role, single_day, assignment_date, status, assigned_at')
+        .select('job_id, technician_id, sound_role, lights_role, video_role, single_day, assignment_date, status, assigned_at, assigned_by')
         .in('job_id', jobBatch)
         .in('technician_id', technicianIds)
     );
@@ -175,6 +176,7 @@ export const fetchMatrixTimesheetAssignments = async ({
         } as MatrixJob,
         status: meta?.status ?? null,
         assigned_at: meta?.assigned_at ?? null,
+        assigned_by: meta?.assigned_by ?? null,
         single_day: meta?.single_day ?? Boolean(meta?.assignment_date),
         assignment_date: meta?.assignment_date ?? null,
         sound_role: meta?.sound_role ?? null,

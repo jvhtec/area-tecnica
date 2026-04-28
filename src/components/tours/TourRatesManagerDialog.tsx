@@ -26,7 +26,7 @@ import { invalidateRatesContext } from '@/services/ratesService';
 import { syncFlexWorkOrdersForJob, FlexWorkOrderSyncResult } from '@/services/flexWorkOrders';
 import { toast } from 'sonner';
 import { generateRateQuotePDF, generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
-import { adjustRehearsalQuotesForMultiDay, sendTourJobEmails } from '@/lib/tour-payout-email';
+import { sendTourJobEmails } from '@/lib/tour-payout-email';
 import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 
@@ -142,15 +142,18 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
       const { data, error } = await supabase
         .from('custom_tech_rates')
-        .select('profile_id, base_day_eur')
+        .select('profile_id, base_day_eur, travel_half_day_eur, travel_full_day_eur')
         .in('profile_id', techIds);
       if (error) throw error;
-      return data as Array<{ profile_id: string; base_day_eur: number }>;
+      return data as Array<{ profile_id: string; base_day_eur: number; travel_half_day_eur: number | null; travel_full_day_eur: number | null }>;
     },
     enabled: open && !!quotes.length,
   });
 
   const houseRateMap = useMemo(() => Object.fromEntries(houseRates.map(r => [r.profile_id, r.base_day_eur])), [houseRates]);
+  const customTravelRateMap = useMemo(() => Object.fromEntries(
+    houseRates.map(r => [r.profile_id, { travel_half_day_eur: r.travel_half_day_eur, travel_full_day_eur: r.travel_full_day_eur }])
+  ), [houseRates]);
 
   // Fixers
   const queryClient = useQueryClient();
@@ -414,27 +417,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                       const lpoMap = new Map(
                         (lpoRows || []).map(r => [r.technician_id, r.lpo_number])
                       );
-                      
-                      const { data: ts, error: tsError } = await supabase
-                        .from('timesheets')
-                        .select('technician_id, date')
-                        .eq('job_id', selectedJobId)
-                        .eq('is_active', true);
-                      if (tsError) {
-                        console.error('[TourRatesManagerDialog] Failed loading timesheets for PDF', tsError);
-                      }
 
-                      const techDates = new Map<string, Set<string>>();
-                      (ts || []).forEach((row: any) => {
-                        if (!row?.technician_id || !row?.date) return;
-                        if (!techDates.has(row.technician_id)) techDates.set(row.technician_id, new Set());
-                        techDates.get(row.technician_id)!.add(row.date);
-                      });
-                      const daysCounts = new Map<string, number>();
-                      techDates.forEach((dates, techId) => daysCounts.set(techId, dates.size));
-                      const adjustedQuotes = adjustRehearsalQuotesForMultiDay(quotes, daysCounts);
-
-                      await generateRateQuotePDF(adjustedQuotes, job, profiles as any, lpoMap);
+                      await generateRateQuotePDF(quotes, job, profiles as any, lpoMap);
                       toast.success('PDF generado');
                     }}
                   >
@@ -690,6 +674,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                           isManager={true}
                           isHouseTech={Boolean(q.is_house_tech)}
                           isAssignableManagement={isAssignableManagement(q.technician_id)}
+                          customTravelHalfRate={customTravelRateMap[q.technician_id]?.travel_half_day_eur}
+                          customTravelFullRate={customTravelRateMap[q.technician_id]?.travel_full_day_eur}
                           showVehicleDisclaimer={Boolean(q.vehicle_disclaimer)}
                           vehicleDisclaimerText={q.vehicle_disclaimer_text}
                         />

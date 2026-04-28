@@ -7,17 +7,26 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { FileText, ArrowLeft, Check, ChevronsUpDown, Trash2 } from 'lucide-react';
+import { FileText, ArrowLeft, Check, ChevronsUpDown, Trash2, Save } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
+import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import {
+  CUSTOM_POWER_POSITION_VALUE,
+  getPowerPositionCustomValue,
+  getPowerPositionSelectValue,
+  NO_POWER_POSITION_VALUE,
+  POWER_POSITION_PRESETS,
+} from '@/utils/powerPositions';
 
 type FixtureType = 'incandescent' | 'discharge' | 'led' | 'led-pro';
 
@@ -25,6 +34,8 @@ const FIXTURE_PF: Record<FixtureType, { label: string; pf: number }> = {
   incandescent: { label: 'Incandescent / filament', pf: 1.0 },
   discharge: { label: 'Discharge (generic)', pf: 0.9 },
   led: { label: 'LED (generic)', pf: 0.9 },
+  smoke: { label: 'Smoke/Hazer (generic)', pf: 0.95 },
+  consoles: { label: 'Consoles (generic)', pf: 1 },
   'led-pro': { label: 'LED (pro / specified)', pf: 0.95 },
 };
 
@@ -76,9 +87,9 @@ const lightComponentDatabase: LightComponent[] = [
   { id: 36, name: 'MARTIN ATOMIC 3000', watts: 3000, fixtureType: 'discharge' },
   { id: 37, name: 'SGM Q7', watts: 500, fixtureType: 'led' },
   { id: 38, name: 'ELATION SIXBAR 500', watts: 80, fixtureType: 'led' },
-  { id: 39, name: 'SMOKE FACTORY TOUR HAZERII', watts: 1500, fixtureType: 'discharge' },
-  { id: 40, name: 'ROBE 500 FT-PRO', watts: 1200, fixtureType: 'discharge' },
-  { id: 41, name: 'SAHARA TURBO DRYER', watts: 1500, fixtureType: 'discharge' },
+  { id: 39, name: 'SMOKE FACTORY TOUR HAZER II', watts: 1500, fixtureType: 'smoke' },
+  { id: 40, name: 'ROBE 500 FT-PRO', watts: 1200, fixtureType: 'smoke' },
+  { id: 41, name: 'SAHARA TURBO DRYER', watts: 1500, fixtureType: 'smoke' },
   { id: 42, name: 'ROBE SPIIDER', watts: 660, fixtureType: 'led' },
   { id: 43, name: 'GLP JDC1', watts: 1200, fixtureType: 'led' },
   { id: 44, name: 'CAMEO W3', watts: 325, fixtureType: 'led' },
@@ -99,7 +110,14 @@ const lightComponentDatabase: LightComponent[] = [
   { id: 59, name: 'CLAY PAKY A-LEDA K15', watts: 760, fixtureType: 'led' },
   { id: 60, name: 'AROLLA AQUA LT', watts: 1400, fixtureType: 'led' },
   { id: 61, name: 'CUARZO', watts: 400, fixtureType: 'incandescent' },
-  { id: 62, name: 'MINI-B AQUA PX', watts: 375, fixtureType: 'led' }
+  { id: 62, name: 'MINI-B AQUA PX', watts: 375, fixtureType: 'led' },
+  { id: 63, name: 'FREE PAR PRO 72', watts: 80, fixtureType: 'led' },
+  { id: 64, name: 'FRESNEL 1 kW', watts: 1000, fixtureType: 'incandescent' },
+  { id: 65, name: 'FRESNEL 300 W', watts: 300, fixtureType: 'incandescent' },
+  { id: 66, name: 'ANTARI HZ 500', watts: 480, fixtureType: 'smoke' },
+  { id: 67, name: 'TURBINA SHOWTEC SF-250', watts: 1035, fixtureType: 'smoke' },
+  { id: 68, name: 'BRITEQ HZFOG II', watts: 1750, fixtureType: 'smoke' },
+  { id: 70, name: 'GRAND MA3 FULL SIZE', watts: 450, fixtureType: 'consoles' }
 
 ];
 
@@ -129,12 +147,20 @@ interface Table {
   rows: TableRow[];
   totalWatts?: number;
   adjustedWatts?: number;
+  totalVa?: number;
   currentPerPhase?: number;
   pduType?: string;
   customPduType?: string;
+  position?: string;
+  customPosition?: string;
   includesHoist?: boolean;
   id?: number | string;
   isDefault?: boolean;
+  defaultTableId?: string;
+  // snapshot of settings at generation time, used for persisting tour defaults
+  snapshotSafetyMargin?: number;
+  snapshotPhaseMode?: 'single' | 'three';
+  snapshotVoltage?: number;
 }
 
 const LightsConsumosTool: React.FC = () => {
@@ -148,6 +174,7 @@ const LightsConsumosTool: React.FC = () => {
   const tourId = searchParams.get('tourId');
   const tourDateId = searchParams.get('tourDateId');
   const mode = searchParams.get('mode');
+  const isTourDefaults = mode === 'tour-defaults';
 
   const {
     isOverrideMode,
@@ -155,6 +182,13 @@ const LightsConsumosTool: React.FC = () => {
     isLoading: overrideLoading,
     saveOverride
   } = useTourOverrideMode(tourId || undefined, tourDateId || undefined, 'lights');
+
+  const {
+    defaultSets,
+    createSet,
+    createTable: createTourDefaultTable,
+    updateTable: updateTourDefaultTable
+  } = useTourDefaultSets(tourId || '', 'lights');
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
@@ -164,6 +198,8 @@ const LightsConsumosTool: React.FC = () => {
   const [includesHoist, setIncludesHoist] = useState(false);
   const [selectedPduType, setSelectedPduType] = useState<string>('default');
   const [customPduType, setCustomPduType] = useState<string>('');
+  const [selectedPosition, setSelectedPosition] = useState<string>(NO_POWER_POSITION_VALUE);
+  const [customPosition, setCustomPosition] = useState<string>('');
   const [phaseMode, setPhaseMode] = useState<'single' | 'three'>('three');
   const [voltage, setVoltage] = useState<number>(400);
   const [componentSearches, setComponentSearches] = useState<Record<number, string>>({});
@@ -181,22 +217,178 @@ const LightsConsumosTool: React.FC = () => {
   });
 
   const [defaultTables, setDefaultTables] = useState<Table[]>([]);
+  // Pending-promise ref serializes concurrent getOrCreateLightsSetId calls.
+  // resolvedSetIdRef persists the created id across the React Query re-fetch window.
+  const pendingSetIdRef = React.useRef<Promise<string> | null>(null);
+  const resolvedSetIdRef = React.useRef<string | null>(null);
   const pduOptions = phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE;
+
+  // Load tour name via React Query for caching and error handling
+  const { data: tourName = '' } = useQuery({
+    queryKey: ['tour', tourId, 'name'],
+    queryFn: async () => {
+      const { data } = await supabase.from('tours').select('name').eq('id', tourId!).single();
+      return data?.name || '';
+    },
+    enabled: isTourDefaults && !!tourId,
+  });
+
+  // defaultSets is already filtered to 'lights' by useTourDefaultSets
+  const getOrCreateLightsSetId = async (): Promise<string> => {
+    // Prefer live data, then cached resolved id, then in-flight promise
+    if (defaultSets.length > 0) {
+      resolvedSetIdRef.current = defaultSets[0].id;
+      return defaultSets[0].id;
+    }
+    if (resolvedSetIdRef.current) return resolvedSetIdRef.current;
+    if (pendingSetIdRef.current) return pendingSetIdRef.current;
+    const creation = createSet({
+      tour_id: tourId!,
+      name: `${tourName || tourId} Lights Defaults`,
+      department: 'lights',
+      description: 'Lights department power defaults'
+    }).then(set => {
+      resolvedSetIdRef.current = set.id;
+      pendingSetIdRef.current = null;
+      return set.id;
+    }).catch(err => {
+      pendingSetIdRef.current = null;
+      throw err;
+    });
+    pendingSetIdRef.current = creation;
+    return creation;
+  };
+
+  const saveTourDefault = async (table: Table) => {
+    if (!tourId) return;
+    // Use values snapshotted at generation time, not current component state
+    const sm = table.snapshotSafetyMargin ?? safetyMargin;
+    const pm = table.snapshotPhaseMode ?? phaseMode;
+    const v  = table.snapshotVoltage ?? voltage;
+    try {
+      const setId = await getOrCreateLightsSetId();
+      const newDefaultTable = await createTourDefaultTable({
+        set_id: setId,
+        table_name: table.name,
+        table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
+        table_type: 'power',
+        total_value: table.totalWatts || 0,
+        metadata: {
+          current_per_phase: table.currentPerPhase,
+          pdu_type: table.customPduType || table.pduType,
+          custom_pdu_type: table.customPduType,
+          position: table.position,
+          custom_position: table.customPosition,
+          includes_hoist: table.includesHoist || false,
+          safetyMargin: sm,
+          phaseMode: pm,
+          voltage: v
+        }
+      });
+      // Replace local numeric id with server UUID so delete/edit handlers
+      // treat this entry as persisted (typeof id !== 'number')
+      setTables(prev => prev.map(t => t.id === table.id
+        ? { ...t, id: newDefaultTable.id, isDefault: true, defaultTableId: newDefaultTable.id }
+        : t
+      ));
+      toast({ title: 'Éxito', description: 'Valor por defecto de gira guardado' });
+    } catch (error: any) {
+      console.error('Error saving tour default:', error);
+      toast({ title: 'Error', description: `Error al guardar valor por defecto: ${error?.message || 'unknown error'}`, variant: 'destructive' });
+    }
+  };
+
+  const saveDefaultTables = async () => {
+    const unsaved = tables.filter(t => !t.isDefault && !t.defaultTableId);
+    if (unsaved.length === 0) {
+      toast({ title: 'Sin tablas nuevas', description: 'Todas las tablas ya están guardadas como valores por defecto' });
+      return;
+    }
+    let setId: string;
+    try {
+      setId = await getOrCreateLightsSetId();
+    } catch (error: any) {
+      console.error('Error getting/creating lights set:', error);
+      toast({ title: 'Error', description: `Error al preparar el conjunto de valores: ${error?.message || 'unknown error'}`, variant: 'destructive' });
+      return;
+    }
+    const failed: string[] = [];
+    for (let i = 0; i < unsaved.length; i++) {
+      const table = unsaved[i];
+      if (i > 0) await new Promise(r => setTimeout(r, 100));
+      // Use values snapshotted at generation time, not current component state
+      const sm = table.snapshotSafetyMargin ?? safetyMargin;
+      const pm = table.snapshotPhaseMode ?? phaseMode;
+      const v  = table.snapshotVoltage ?? voltage;
+      try {
+        const newDefaultTable = await createTourDefaultTable({
+          set_id: setId,
+          table_name: table.name,
+          table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
+          table_type: 'power',
+          total_value: table.totalWatts || 0,
+          metadata: {
+            current_per_phase: table.currentPerPhase,
+            pdu_type: table.customPduType || table.pduType,
+            custom_pdu_type: table.customPduType,
+            position: table.position,
+            custom_position: table.customPosition,
+            includes_hoist: table.includesHoist || false,
+            safetyMargin: sm,
+            phaseMode: pm,
+            voltage: v,
+            order_index: i
+          }
+        });
+        // Replace local numeric id with server UUID (see saveTourDefault for rationale)
+        setTables(prev => prev.map(t => t.id === table.id
+          ? { ...t, id: newDefaultTable.id, isDefault: true, defaultTableId: newDefaultTable.id }
+          : t
+        ));
+      } catch (error: any) {
+        console.error(`Error saving default table "${table.name}":`, error);
+        failed.push(table.name);
+      }
+    }
+    const saved = unsaved.length - failed.length;
+    if (failed.length === 0) {
+      toast({ title: 'Éxito', description: `${saved} valor(es) por defecto guardados` });
+    } else if (saved > 0) {
+      toast({
+        title: 'Completado parcialmente',
+        description: `${saved} guardado(s), ${failed.length} fallido(s): ${failed.join(', ')}`,
+        variant: 'destructive'
+      });
+    } else {
+      toast({ title: 'Error', description: `No se pudo guardar ningún valor por defecto: ${failed.join(', ')}`, variant: 'destructive' });
+    }
+  };
 
   // Load defaults when in override mode
   useEffect(() => {
     if (isOverrideMode && overrideData) {
       const powerDefaults = overrideData.defaults
         .filter(table => table.table_type === 'power')
-        .map(table => ({
-          name: `${table.table_name} (Default)`,
-          rows: table.table_data.rows || [],
-          totalWatts: table.total_value,
-          currentPerPhase: table.metadata?.currentPerPhase,
-          pduType: table.metadata?.pduType,
-          id: `default-${table.id}`,
-          isDefault: true
-        }));
+        .map(table => {
+          const w = table.total_value || 0;
+          const adjW = w * (1 + safetyMargin / 100);
+          // For legacy defaults without per-fixture VA, estimate using global PF=0.9 (typical lighting mix)
+          const estimatedVa = adjW > 0 ? adjW / 0.9 : 0;
+          return {
+            name: `${table.table_name} (Default)`,
+            rows: table.table_data.rows || [],
+            totalWatts: table.total_value,
+            adjustedWatts: adjW,
+            totalVa: estimatedVa,
+            currentPerPhase: table.metadata?.current_per_phase,
+            pduType: table.metadata?.pdu_type,
+            customPduType: table.metadata?.custom_pdu_type,
+            position: table.metadata?.position,
+            customPosition: table.metadata?.custom_position,
+            id: `default-${table.id}`,
+            isDefault: true
+          };
+        });
 
       setDefaultTables(powerDefaults);
     }
@@ -376,6 +568,8 @@ const LightsConsumosTool: React.FC = () => {
         current_per_phase: table.currentPerPhase || 0,
         pdu_type: table.customPduType || table.pduType || '',
         custom_pdu_type: table.customPduType,
+        position: table.position || null,
+        custom_position: table.customPosition || null,
         includes_hoist: table.includesHoist || false,
         override_data: {
           rows: table.rows
@@ -406,6 +600,9 @@ const LightsConsumosTool: React.FC = () => {
           pdu_type: table.customPduType || table.pduType || '',
           includes_hoist: table.includesHoist || false,
           custom_pdu_type: table.customPduType,
+          position: table.position || null,
+          custom_position: table.customPosition || null,
+          table_data: { rows: table.rows },
         });
 
       if (error) throw error;
@@ -452,12 +649,15 @@ const LightsConsumosTool: React.FC = () => {
     });
 
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const totalVa = calculatedRows.reduce((sum, row) => {
+    // Vector sum of apparent power: S = √(P² + Q²)
+    // More accurate than scalar sum Σ(P_i/PF_i) for mixed load types
+    const totalVar = calculatedRows.reduce((sum, row) => {
       const pfValue = Number(row.pf) || getRecommendedPf(row.fixtureType);
-      if (!pfValue) return sum;
-      return sum + (row.totalWatts || 0) / pfValue;
+      if (!pfValue || pfValue >= 1) return sum; // purely resistive loads have no reactive component
+      return sum + (row.totalWatts || 0) * Math.tan(Math.acos(pfValue));
     }, 0);
-    const { currentLine, adjustedWatts } = calculateLineCurrent(totalWatts, totalVa);
+    const totalVa = Math.sqrt(totalWatts * totalWatts + totalVar * totalVar);
+    const { currentLine, adjustedWatts, adjustedVa } = calculateLineCurrent(totalWatts, totalVa);
     const pduSuggestion = recommendPDU(currentLine);
     const pduOverride =
       selectedPduType && selectedPduType !== 'default'
@@ -465,22 +665,38 @@ const LightsConsumosTool: React.FC = () => {
           ? customPduType
           : selectedPduType
         : undefined;
+    const resolvedPosition =
+      selectedPosition === CUSTOM_POWER_POSITION_VALUE
+        ? undefined
+        : selectedPosition === NO_POWER_POSITION_VALUE
+          ? undefined
+          : selectedPosition;
+    const resolvedCustomPosition =
+      selectedPosition === CUSTOM_POWER_POSITION_VALUE ? customPosition : undefined;
 
     const newTable: Table = {
       name: tableName,
       rows: calculatedRows,
       totalWatts,
       adjustedWatts,
+      totalVa: adjustedVa,
       currentPerPhase: currentLine,
       pduType: pduSuggestion,
       customPduType: pduOverride,
+      position: resolvedPosition,
+      customPosition: resolvedCustomPosition,
       includesHoist,
       id: Date.now(),
+      snapshotSafetyMargin: safetyMargin,
+      snapshotPhaseMode: phaseMode,
+      snapshotVoltage: voltage,
     };
 
     setTables((prev) => [...prev, newTable]);
 
-    if (selectedJobId) {
+    if (isTourDefaults) {
+      // user can review before saving defaults
+    } else if (selectedJobId) {
       savePowerRequirementTable(newTable);
     }
 
@@ -499,6 +715,8 @@ const LightsConsumosTool: React.FC = () => {
       }],
     });
     setTableName('');
+    setSelectedPosition(NO_POWER_POSITION_VALUE);
+    setCustomPosition('');
   };
 
   const removeTable = (tableId: number | string) => {
@@ -509,21 +727,40 @@ const LightsConsumosTool: React.FC = () => {
   };
 
   const updateTableSettings = (tableId: number | string, updates: Partial<Table>) => {
-    // Only allow updates to regular tables (numeric IDs), not default tables
-    if (typeof tableId === 'number') {
-      setTables((prev) =>
-        prev.map((table) => {
-          if (table.id === tableId) {
-            const updatedTable = { ...table, ...updates };
-            if (selectedJobId) {
-              savePowerRequirementTable(updatedTable);
-            }
-            return updatedTable;
+    setTables((prev) =>
+      prev.map((table) => {
+        if (table.id === tableId) {
+          const updatedTable = { ...table, ...updates };
+          if (isTourDefaults && updatedTable.defaultTableId) {
+            const sm = updatedTable.snapshotSafetyMargin ?? safetyMargin;
+            const pm = updatedTable.snapshotPhaseMode ?? phaseMode;
+            const v = updatedTable.snapshotVoltage ?? voltage;
+            updateTourDefaultTable({
+              tableId: updatedTable.defaultTableId,
+              updates: {
+                table_data: { rows: updatedTable.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
+                total_value: updatedTable.totalWatts || 0,
+                metadata: {
+                  current_per_phase: updatedTable.currentPerPhase,
+                  pdu_type: updatedTable.customPduType || updatedTable.pduType,
+                  custom_pdu_type: updatedTable.customPduType,
+                  position: updatedTable.position,
+                  custom_position: updatedTable.customPosition,
+                  includes_hoist: updatedTable.includesHoist || false,
+                  safetyMargin: sm,
+                  phaseMode: pm,
+                  voltage: v,
+                },
+              },
+            });
+          } else if (!isTourDefaults && selectedJobId) {
+            savePowerRequirementTable(updatedTable);
           }
-          return table;
-        })
-      );
-    }
+          return updatedTable;
+        }
+        return table;
+      })
+    );
   };
 
   const handleExportPDF = async () => {
@@ -559,6 +796,10 @@ const LightsConsumosTool: React.FC = () => {
         console.error("Error fetching logo:", logoError);
       }
 
+      const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
+      const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
+      const totalSystemKva = allTables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
+
       const pdfBlob = await exportToPDF(
         jobToUse.title,
         allTables.map((table) => ({ ...table, toolType: 'consumos', phaseMode })),
@@ -566,7 +807,7 @@ const LightsConsumosTool: React.FC = () => {
         jobToUse.title,
         ('start_time' in jobToUse ? jobToUse.start_time : null) || new Date().toISOString(),
         undefined,
-        undefined,
+        { totalSystemWatts, totalSystemAmps, totalSystemKva },
         safetyMargin,
         logoUrl
       );
@@ -652,6 +893,29 @@ const LightsConsumosTool: React.FC = () => {
       </CardHeader>
       <CardContent>
         <div className="space-y-6">
+          {isTourDefaults && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-blue-800">
+                    Modo Valores por Defecto de Gira — Luces
+                  </h3>
+                  <p className="text-sm text-blue-700 mt-1">
+                    Las tablas que crees aquí se guardarán como valores por defecto para todas las fechas de la gira.
+                  </p>
+                </div>
+                <Button
+                  onClick={saveDefaultTables}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  disabled={tables.filter(t => !t.isDefault).length === 0}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Guardar Valores por Defecto
+                </Button>
+              </div>
+            </div>
+          )}
+
           {isOverrideMode && overrideData && (
             <TourOverrideModeHeader
               tourName={overrideData.tourName}
@@ -681,10 +945,16 @@ const LightsConsumosTool: React.FC = () => {
                         <span className="font-medium">Total Watts:</span> {table.totalWatts?.toFixed(2)} W
                       </div>
                       <div>
+                        <span className="font-medium">Potencia Aparente:</span> {((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA
+                      </div>
+                      <div>
                         <span className="font-medium">{phaseMode === 'three' ? 'Current per Phase:' : 'Current:'}</span> {table.currentPerPhase?.toFixed(2)} A
                       </div>
                       <div>
                         <span className="font-medium">PDU Type:</span> {table.customPduType || table.pduType}
+                      </div>
+                      <div>
+                        <span className="font-medium">Position:</span> {table.customPosition || table.position || 'N/A'}
                       </div>
                       {table.includesHoist && (
                         <div className="col-span-2 text-gray-600 italic">
@@ -744,15 +1014,14 @@ const LightsConsumosTool: React.FC = () => {
           <div className="rounded-lg border border-muted-foreground/20 bg-muted/30 p-3 text-sm">
             <p className="font-medium text-foreground">Power factor recomendado por tipo de fixture</p>
             <ul className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1 text-muted-foreground">
-              <li>{FIXTURE_PF.incandescent.label}: {FIXTURE_PF.incandescent.pf.toFixed(2)}</li>
-              <li>{FIXTURE_PF.discharge.label}: {FIXTURE_PF.discharge.pf.toFixed(2)}</li>
-              <li>{FIXTURE_PF.led.label}: {FIXTURE_PF.led.pf.toFixed(2)}</li>
-              <li>{FIXTURE_PF['led-pro'].label}: {FIXTURE_PF['led-pro'].pf.toFixed(2)}</li>
+              {Object.entries(FIXTURE_PF).map(([key, data]) => (
+                <li key={key}>{data.label}: {data.pf.toFixed(2)}</li>
+              ))}
             </ul>
             <p className="mt-2 text-muted-foreground">Puedes ajustar el PF por ítem si el fabricante especifica un valor distinto.</p>
           </div>
 
-          {!isOverrideMode && (
+          {!isOverrideMode && !isTourDefaults && (
             <div className="space-y-2">
               <Label htmlFor="jobSelect">Seleccionar Trabajo</Label>
               <Select value={selectedJobId} onValueChange={handleJobSelect}>
@@ -809,13 +1078,42 @@ const LightsConsumosTool: React.FC = () => {
             </div>
           )}
 
+          <div className="space-y-2">
+            <Label>Posición</Label>
+            <Select value={selectedPosition} onValueChange={setSelectedPosition}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sin posición" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NO_POWER_POSITION_VALUE}>Sin posición</SelectItem>
+                {POWER_POSITION_PRESETS.map((position) => (
+                  <SelectItem key={position} value={position}>
+                    {position}
+                  </SelectItem>
+                ))}
+                <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Personalizada</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedPosition === CUSTOM_POWER_POSITION_VALUE && (
+            <div className="space-y-2">
+              <Label>Posición Personalizada</Label>
+              <Input
+                value={customPosition}
+                onChange={(e) => setCustomPosition(e.target.value)}
+                placeholder="Ingrese una posición personalizada"
+              />
+            </div>
+          )}
+
           <div className="flex items-center space-x-2">
             <Checkbox
               id="hoistPower"
               checked={includesHoist}
               onCheckedChange={(checked) => setIncludesHoist(checked as boolean)}
             />
-            <Label htmlFor="hoistPower">Requiere Potencia Adicional para Polipasto (CEE32A 3P+N+G)</Label>
+            <Label htmlFor="hoistPower">Requiere Potencia Adicional para Motor (CEE32A 3P+N+G)</Label>
           </div>
 
           <div className="border rounded-lg overflow-x-auto">
@@ -963,7 +1261,7 @@ const LightsConsumosTool: React.FC = () => {
             <Button onClick={resetCurrentTable} variant="destructive">
               Reiniciar
             </Button>
-            {tables.length > 0 && (
+            {tables.length > 0 && !isTourDefaults && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="w-4 h-4" />
                 Exportar y Subir PDF
@@ -979,19 +1277,34 @@ const LightsConsumosTool: React.FC = () => {
                   {isOverrideMode && (
                     <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
                   )}
+                  {isTourDefaults && table.isDefault && (
+                    <Badge variant="outline" className="bg-green-50 text-green-700">Guardado</Badge>
+                  )}
                 </div>
-                {typeof table.id === 'number' && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => removeTable(table.id as number)}
-                  >
-                    Eliminar Tabla
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {isTourDefaults && !table.isDefault && typeof table.id === 'number' && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => saveTourDefault(table)}
+                    >
+                      <Save className="h-4 w-4 mr-1" />
+                      Guardar
+                    </Button>
+                  )}
+                  {typeof table.id === 'number' && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => removeTable(table.id as number)}
+                    >
+                      Eliminar Tabla
+                    </Button>
+                  )}
+                </div>
               </div>
 
-              {typeof table.id === 'number' && (
+              {table.id !== undefined && (
                 <div className="p-4 bg-muted/50 space-y-4">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2">
@@ -999,10 +1312,10 @@ const LightsConsumosTool: React.FC = () => {
                         id={`hoist-${table.id}`}
                         checked={table.includesHoist}
                         onCheckedChange={(checked) =>
-                          updateTableSettings(table.id as number, { includesHoist: !!checked })
+                          updateTableSettings(table.id as number | string, { includesHoist: !!checked })
                         }
                       />
-                      <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Polipasto (CEE32A 3P+N+G)</Label>
+                      <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Motor (CEE32A 3P+N+G)</Label>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -1017,11 +1330,11 @@ const LightsConsumosTool: React.FC = () => {
                         }
                         onValueChange={(value) => {
                           if (value === 'default') {
-                            updateTableSettings(table.id as number, { customPduType: undefined });
+                            updateTableSettings(table.id as number | string, { customPduType: undefined });
                           } else if (value === 'Custom') {
-                            updateTableSettings(table.id as number, { customPduType: '' });
+                            updateTableSettings(table.id as number | string, { customPduType: '' });
                           } else {
-                            updateTableSettings(table.id as number, { customPduType: value });
+                            updateTableSettings(table.id as number | string, { customPduType: value });
                           }
                         }}
                       >
@@ -1044,7 +1357,45 @@ const LightsConsumosTool: React.FC = () => {
                         placeholder="Ingrese un tipo de PDU personalizado"
                         value={table.customPduType || ''}
                         onChange={(e) =>
-                          updateTableSettings(table.id as number, { customPduType: e.target.value })
+                          updateTableSettings(table.id as number | string, { customPduType: e.target.value })
+                        }
+                        className="w-[220px]"
+                      />
+                    )}
+                    <div className="flex items-center gap-2">
+                      <Label>Posición:</Label>
+                      <Select
+                        value={getPowerPositionSelectValue(table.position, table.customPosition)}
+                        onValueChange={(value) => {
+                          if (value === NO_POWER_POSITION_VALUE) {
+                            updateTableSettings(table.id as number | string, { position: undefined, customPosition: undefined });
+                          } else if (value === CUSTOM_POWER_POSITION_VALUE) {
+                            updateTableSettings(table.id as number | string, { position: undefined, customPosition: '' });
+                          } else {
+                            updateTableSettings(table.id as number | string, { position: value, customPosition: undefined });
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue placeholder="Sin posición" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_POWER_POSITION_VALUE}>Sin posición</SelectItem>
+                          {POWER_POSITION_PRESETS.map((position) => (
+                            <SelectItem key={position} value={position}>
+                              {position}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Personalizada</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {getPowerPositionSelectValue(table.position, table.customPosition) === CUSTOM_POWER_POSITION_VALUE && (
+                      <Input
+                        placeholder="Ingrese una posición personalizada"
+                        value={getPowerPositionCustomValue(table.position, table.customPosition)}
+                        onChange={(e) =>
+                          updateTableSettings(table.id as number | string, { position: undefined, customPosition: e.target.value })
                         }
                         className="w-[220px]"
                       />
@@ -1093,6 +1444,12 @@ const LightsConsumosTool: React.FC = () => {
                   )}
                   <tr className="border-t bg-muted/50 font-medium">
                     <td colSpan={4} className="px-4 py-3 text-right">
+                      Potencia Aparente:
+                    </td>
+                    <td className="px-4 py-3">{((table.totalVa || table.totalWatts || 0) / 1000).toFixed(2)} kVA</td>
+                  </tr>
+                  <tr className="border-t bg-muted/50 font-medium">
+                    <td colSpan={4} className="px-4 py-3 text-right">
                       {phaseMode === 'three' ? 'Corriente por Fase:' : 'Corriente:'}
                     </td>
                     <td className="px-4 py-3">{table.currentPerPhase?.toFixed(2)} A</td>
@@ -1102,6 +1459,12 @@ const LightsConsumosTool: React.FC = () => {
                       PDU Sugerido:
                     </td>
                     <td className="px-4 py-3">{table.pduType}</td>
+                  </tr>
+                  <tr className="border-t bg-muted/50 font-medium">
+                    <td colSpan={4} className="px-4 py-3 text-right">
+                      Posición:
+                    </td>
+                    <td className="px-4 py-3">{table.customPosition || table.position || 'N/A'}</td>
                   </tr>
                   {table.customPduType && (
                     <tr className="border-t bg-muted/50 font-medium text-primary">
@@ -1115,7 +1478,7 @@ const LightsConsumosTool: React.FC = () => {
               </table>
               {table.includesHoist && (
                 <div className="px-4 py-2 text-sm text-gray-500 bg-muted/30 italic">
-                  Se requiere potencia adicional para polipasto: CEE32A 3P+N+G
+                  Se requiere potencia adicional para motor: CEE32A 3P+N+G
                 </div>
               )}
             </div>

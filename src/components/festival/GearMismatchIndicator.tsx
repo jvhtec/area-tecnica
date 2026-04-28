@@ -1,5 +1,5 @@
 
-import { AlertTriangle, XCircle } from "lucide-react";
+import { AlertTriangle, Info, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { GearMismatch } from "@/utils/gearComparisonService";
@@ -24,10 +24,11 @@ export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMisma
 
   const errors = mismatches.filter(m => m.severity === 'error');
   const warnings = mismatches.filter(m => m.severity === 'warning');
+  const infos = mismatches.filter(m => m.severity === 'info');
 
   const tooltipContent = (
     <div className="max-w-sm space-y-2">
-      <p className="font-medium">Problemas de equipo:</p>
+      <p className="font-medium">Estado del equipo:</p>
       {errors.length > 0 && (
         <div>
           <p className="text-red-600 font-medium text-xs">Errores ({errors.length}):</p>
@@ -50,6 +51,17 @@ export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMisma
           ))}
         </div>
       )}
+      {infos.length > 0 && (
+        <div>
+          <p className="text-blue-600 font-medium text-xs">Información ({infos.length}):</p>
+          {infos.map((info, index) => (
+            <div key={index} className="text-xs">
+              <p className="text-blue-600">• {info.message}</p>
+              {info.details && <p className="text-gray-500 ml-2">{info.details}</p>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -68,6 +80,12 @@ export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMisma
               <Badge variant="outline" className="text-xs px-1 bg-orange-100 text-orange-800 border-orange-300">
                 <AlertTriangle className="h-3 w-3 mr-1" />
                 {warnings.length}
+              </Badge>
+            )}
+            {infos.length > 0 && (
+              <Badge variant="outline" className="text-xs px-1 bg-blue-50 text-blue-600 border-blue-200">
+                <Info className="h-3 w-3 mr-1" />
+                {infos.length}
               </Badge>
             )}
           </div>
@@ -93,6 +111,12 @@ export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMisma
             <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
               <AlertTriangle className="h-3 w-3 mr-1" />
               {warnings.length} Advertencia{warnings.length !== 1 ? 's' : ''}
+            </Badge>
+          )}
+          {infos.length > 0 && (
+            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200">
+              <Info className="h-3 w-3 mr-1" />
+              {infos.length} Información
             </Badge>
           )}
         </div>

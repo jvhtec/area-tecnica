@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,7 @@ interface JobExtrasManagementProps {
   jobId: string;
   isManager?: boolean;
   technicianId?: string; // when provided (non-manager), restrict view to this tech
+  visibleTechnicianIds?: string[];
 }
 
 interface JobAssignment {
@@ -24,14 +26,30 @@ interface JobAssignment {
   } | null;
 }
 
+interface CustomTravelRate {
+  profile_id: string;
+  travel_half_day_eur: number | null;
+  travel_full_day_eur: number | null;
+}
+
 const cardBase = "bg-card border-border text-card-foreground";
 const surface = "bg-muted/30 border-border";
 const subtle = "text-muted-foreground";
 const pill = "bg-primary/5 border-primary/10 text-primary dark:text-primary-foreground";
 
-export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: JobExtrasManagementProps) => {
+export const JobExtrasManagement = ({
+  jobId,
+  isManager = false,
+  technicianId,
+  visibleTechnicianIds,
+}: JobExtrasManagementProps) => {
+  const visibleTechnicianIdSet = useMemo(
+    () => new Set(visibleTechnicianIds ?? []),
+    [visibleTechnicianIds]
+  );
+
   const { data: assignments, isLoading: assignmentsLoading } = useQuery({
-    queryKey: ['job-assignments', jobId],
+    queryKey: ['job-assignments', jobId, technicianId, visibleTechnicianIds?.join(',') ?? 'all'],
     queryFn: async () => {
       let query = supabase
         .from('job_assignments')
@@ -47,6 +65,8 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
         .eq('job_id', jobId);
       if (technicianId && !isManager) {
         query = query.eq('technician_id', technicianId);
+      } else if (isManager && visibleTechnicianIds && visibleTechnicianIds.length > 0) {
+        query = query.in('technician_id', visibleTechnicianIds);
       }
       const { data, error } = await query;
 
@@ -56,10 +76,39 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
     enabled: !!jobId,
   });
 
+  // Fetch custom travel rates for all assigned technicians
+  const visibleAssignments = useMemo(
+    () => (assignments ?? []).filter((assignment) => {
+      if (technicianId) return assignment.technician_id === technicianId;
+      if (!visibleTechnicianIds) return true;
+      return visibleTechnicianIdSet.has(assignment.technician_id);
+    }),
+    [assignments, technicianId, visibleTechnicianIds, visibleTechnicianIdSet]
+  );
+
+  const techIds = useMemo(
+    () => visibleAssignments.map((assignment) => assignment.technician_id).sort(),
+    [visibleAssignments]
+  );
+  const techIdsKey = techIds.join(',');
+  const { data: customTravelRates, isLoading: customTravelRatesLoading } = useQuery({
+    queryKey: ['custom-travel-rates', jobId, techIdsKey],
+    queryFn: async () => {
+      if (!techIds.length) return [];
+      const { data, error } = await supabase
+        .from('custom_tech_rates')
+        .select('profile_id, travel_half_day_eur, travel_full_day_eur')
+        .in('profile_id', techIds);
+      if (error) throw error;
+      return (data ?? []) as CustomTravelRate[];
+    },
+    enabled: techIds.length > 0,
+  });
+
   // If technicianId is provided (non-manager), restrict payouts to that technician
   const { data: payoutTotals, isLoading: payoutLoading } = useJobPayoutTotals(jobId, technicianId);
 
-  if (assignmentsLoading || payoutLoading) {
+  if (assignmentsLoading || payoutLoading || customTravelRatesLoading) {
     return (
       <Card className={cardBase}>
         <CardHeader>
@@ -76,9 +125,6 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
       </Card>
     );
   }
-
-  // When not manager and technicianId provided, filter assignments to that technician only
-  const visibleAssignments = assignments?.filter(a => !technicianId || a.technician_id === technicianId) || [];
 
   if (assignmentsLoading || payoutLoading) {
     // covered above, but keep logic order consistent
@@ -102,7 +148,12 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
     );
   }
 
-  const totalExtrasAmount = (isManager ? (payoutTotals?.reduce((sum, payout) => sum + (payout.extras_total_eur || 0), 0) || 0) : (payoutTotals?.[0]?.extras_total_eur || 0));
+  const visiblePayoutTotals = (payoutTotals ?? []).filter((payout) =>
+    visibleAssignments.some((assignment) => assignment.technician_id === payout.technician_id)
+  );
+  const totalExtrasAmount = isManager
+    ? visiblePayoutTotals.reduce((sum, payout) => sum + (payout.extras_total_eur || 0), 0)
+    : (visiblePayoutTotals[0]?.extras_total_eur || 0);
 
   return (
     <Card className={cardBase}>
@@ -132,6 +183,8 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
           ).trim() || 'Unnamed Technician';
           const technicianPayout = payoutTotals?.find(p => p.technician_id === assignment.technician_id);
 
+          const techCustomRates = customTravelRates?.find(r => r.profile_id === assignment.technician_id);
+
           return (
             <div key={assignment.technician_id} className={surface + " rounded-xl p-4 sm:p-5"}>
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
@@ -158,10 +211,12 @@ export const JobExtrasManagement = ({ jobId, isManager = false, technicianId }: 
                   ['admin', 'management'].includes(assignment.profiles?.role || '') &&
                   Boolean(assignment.profiles?.assignable_as_tech)
                 }
+                customTravelHalfRate={techCustomRates?.travel_half_day_eur}
+                customTravelFullRate={techCustomRates?.travel_full_day_eur}
                 showVehicleDisclaimer={technicianPayout?.vehicle_disclaimer || false}
               />
 
-              {index < assignments.length - 1 && <Separator className="mt-4 sm:mt-6" />}
+              {index < visibleAssignments.length - 1 && <Separator className="mt-4 sm:mt-6" />}
             </div>
           );
         })}

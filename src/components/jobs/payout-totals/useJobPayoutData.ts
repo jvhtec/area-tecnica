@@ -6,9 +6,10 @@ import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import { useJobTechnicianPayoutOverrides } from '@/hooks/useJobPayoutOverride';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
+import { useJobTechnicianRateModeDates, useSetTechnicianDateRateMode } from '@/hooks/useTechnicianRateModeDates';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
-import { canManagePayouts } from '@/utils/permissions';
+import { canManagePayouts, isAdministrativeDepartment } from '@/utils/permissions';
 import type { JobPayoutTotals, JobExpenseBreakdownItem } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { FLEX_UI_BASE_URL } from '@/utils/flexUrlResolver';
@@ -20,6 +21,8 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   /* ── Auth ── */
   const { userRole, userDepartment } = useOptimizedAuth();
   const isManager = canManagePayouts(userRole, userDepartment);
+  const isAdmin = userRole === 'admin';
+  const isAdminOrAdministrative = userRole === 'admin' || isAdministrativeDepartment(userDepartment);
 
   /* ── Job metadata ── */
   const {
@@ -65,8 +68,8 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     jobMeta?.tour_id ?? undefined
   );
 
-  /* ── Tour timesheet data (approvals + day counts) ── */
-  const { data: tourTimesheetData = { approvals: new Map<string, boolean>(), daysCounts: new Map<string, number>() } } = useQuery({
+  /* ── Tour timesheet approvals ── */
+  const { data: tourApprovals = new Map<string, boolean>() } = useQuery({
     queryKey: ['job-tech-payout', jobId, 'tour-timesheet-data'],
     enabled: !!jobId && isTourDate,
     queryFn: async () => {
@@ -79,16 +82,11 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
       if (error) throw error;
 
       const techApprovals = new Map<string, boolean[]>();
-      const techDates = new Map<string, Set<string>>();
       (data || []).forEach(t => {
         if (!t.technician_id) return;
         const current = techApprovals.get(t.technician_id) || [];
         current.push(t.approved_by_manager || false);
         techApprovals.set(t.technician_id, current);
-        if (t.date) {
-          if (!techDates.has(t.technician_id)) techDates.set(t.technician_id, new Set());
-          techDates.get(t.technician_id)!.add(t.date);
-        }
       });
 
       const approvalMap = new Map<string, boolean>();
@@ -97,15 +95,38 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
         approvalMap.set(techId, allApproved);
       });
 
-      const daysCountMap = new Map<string, number>();
-      techDates.forEach((dates, techId) => { daysCountMap.set(techId, dates.size); });
-
-      return { approvals: approvalMap, daysCounts: daysCountMap };
+      return approvalMap;
     },
     staleTime: 30 * 1000,
   });
-  const tourApprovals = tourTimesheetData.approvals;
-  const tourTimesheetDays = tourTimesheetData.daysCounts;
+
+  const { data: technicianTimesheetDatesMap = new Map<string, string[]>() } = useQuery({
+    queryKey: ['job-tech-timesheet-dates', jobId],
+    enabled: !!jobId && isTourDate && !jobMetaLoading,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('technician_id, date')
+        .eq('job_id', jobId)
+        .eq('is_active', true);
+
+      if (error) throw error;
+
+      const byTech = new Map<string, Set<string>>();
+      (data || []).forEach((row) => {
+        if (!row.technician_id || !row.date) return;
+        if (!byTech.has(row.technician_id)) {
+          byTech.set(row.technician_id, new Set());
+        }
+        byTech.get(row.technician_id)!.add(row.date);
+      });
+
+      return new Map(
+        Array.from(byTech.entries()).map(([techId, dates]) => [techId, Array.from(dates).sort()]),
+      );
+    },
+    staleTime: 30_000,
+  });
 
   /* ── Standard tech days (approved + total) ── */
   const { data: techDaysMaps = { approved: new Map<string, number>(), total: new Map<string, number>() } } = useQuery({
@@ -187,13 +208,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   const tourPayoutTotals = React.useMemo<JobPayoutTotals[]>(() => {
     return visibleTourQuotes.map((quote) => {
-      const isRehearsalFlat = quote.category === 'rehearsal';
-      const scheduledDays = isRehearsalFlat
-        ? (tourTimesheetDays.get(quote.technician_id) || 1)
-        : 1;
-
-      const perDayRate = Number(quote.total_eur ?? 0);
-      const baseTotal = perDayRate * scheduledDays;
+      const baseTotal = Number(quote.total_eur ?? 0);
       const extrasTotal = Number(
         quote.extras_total_eur ?? (quote.extras?.total_eur != null ? quote.extras.total_eur : 0)
       );
@@ -223,7 +238,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
         expenses_breakdown: techExpenses?.breakdown ?? [],
       } satisfies JobPayoutTotals;
     });
-  }, [visibleTourQuotes, tourApprovals, tourTimesheetDays, tourExpenseData]);
+  }, [visibleTourQuotes, tourApprovals, tourExpenseData]);
 
   const payoutTotals = isTourDate ? tourPayoutTotals : standardPayoutTotals;
   const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading);
@@ -295,7 +310,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     queryFn: async () => {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, autonomo')
+        .select('id, first_name, last_name, email, autonomo, department')
         .in('id', techIds);
       if (error) throw error;
       return (data || []) as TechnicianProfileWithEmail[];
@@ -362,13 +377,25 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     queryKey: ['job-timesheet-dates', jobId],
     enabled: !!jobId && !jobMetaLoading && isManager,
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: scheduledRows, error: scheduledError } = await supabase
+        .from('job_date_types')
+        .select('date')
+        .eq('job_id', jobId);
+
+      if (scheduledError) throw scheduledError;
+
+      const { data: timesheetRows, error } = await supabase
         .from('timesheets')
         .select('date')
         .eq('job_id', jobId)
         .eq('is_active', true);
       if (error) throw error;
-      const uniqueDates = Array.from(new Set((data || []).map(t => t.date).filter(Boolean))) as string[];
+
+      const uniqueDates = Array.from(new Set([
+        ...(scheduledRows || []).map((row) => row.date).filter(Boolean),
+        ...(timesheetRows || []).map((row) => row.date).filter(Boolean),
+      ])) as string[];
+
       return uniqueDates.sort();
     },
     staleTime: 60_000,
@@ -378,6 +405,39 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     () => jobTimesheetDates.length > 0 && jobTimesheetDates.every(date => rehearsalDateSet.has(date)),
     [jobTimesheetDates, rehearsalDateSet]
   );
+
+  /* ── Admin-only technician/date rate-mode exceptions ── */
+  const shouldProbeTechnicianRateModes =
+    !!jobId && isTourDate && !jobMetaLoading && (isManager || isAdminOrAdministrative);
+  const {
+    data: technicianRateModeDates = [],
+    error: technicianRateModeError,
+  } = useJobTechnicianRateModeDates(jobId, {
+    enabled: shouldProbeTechnicianRateModes,
+  });
+  const setTechnicianRateModeMutation = useSetTechnicianDateRateMode();
+  const canViewTechnicianRateModePanel = shouldProbeTechnicianRateModes && !technicianRateModeError;
+
+  const technicianRateModeMap = React.useMemo(() => {
+    const map = new Map<string, Map<string, 'rehearsal' | 'standard'>>();
+
+    technicianRateModeDates.forEach((row) => {
+      if (!map.has(row.technician_id)) {
+        map.set(row.technician_id, new Map());
+      }
+
+      map.get(row.technician_id)!.set(
+        row.date,
+        row.use_rehearsal_rate ? 'rehearsal' : 'standard',
+      );
+    });
+
+    return map;
+  }, [technicianRateModeDates]);
+
+  const getTechRateModeDateSelection = React.useCallback((techId: string, date: string) => {
+    return technicianRateModeMap.get(techId)?.get(date) ?? 'inherit';
+  }, [technicianRateModeMap]);
 
   /* ── Grand total ── */
   const calculatedGrandTotal = React.useMemo(() => {
@@ -404,7 +464,6 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     isClosureLocked,
     payoutTotals: payoutTotalsWithPrep,
     visibleTourQuotes,
-    tourTimesheetDays,
     profilesWithEmail,
     profileMap,
     autonomoMap,
@@ -414,16 +473,23 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     buildFinDocUrl,
     techDaysMap,
     techTotalDaysMap,
+    technicianTimesheetDatesMap,
     payoutOverrides,
     overrideActorMap,
     getTechOverride,
     calculatedGrandTotal,
     isManager,
+    isAdmin,
+    canViewTechnicianRateModePanel,
+    isAdminOrAdministrative,
+    userDepartment,
     rehearsalDateSet,
     jobTimesheetDates,
     allDatesMarked,
     toggleDateRehearsalMutation,
     toggleAllDatesRehearsalMutation,
+    getTechRateModeDateSelection,
+    setTechnicianRateModeMutation,
     standardPayoutTotals,
   };
 }

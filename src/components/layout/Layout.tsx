@@ -30,6 +30,7 @@ import { PendingTasksModal } from "@/components/tasks/PendingTasksModal"
 import { SingleTaskPopup } from "@/components/tasks/SingleTaskPopup"
 import { PendingTasksBadge } from "@/components/tasks/PendingTasksBadge"
 
+import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { AboutCard } from "./AboutCard"
 import { HelpButton } from "./HelpButton"
 import { MobileNavBar } from "./MobileNavBar"
@@ -515,7 +516,34 @@ const Layout = () => {
                   : "pb-10",
             )}
           >
-            <Outlet />
+            <ErrorBoundary
+              boundaryName="route"
+              resetKeys={[location.pathname, location.search]}
+              fallback={({ error, reset, reload }) => (
+                <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+                  <h2 className="text-xl font-semibold">No pudimos cargar esta página</h2>
+                  <p className="max-w-md text-sm text-muted-foreground">
+                    Se produjo un error al mostrar el contenido. Puedes intentar recargar esta sección
+                    o volver a abrirla más tarde. El resto de la aplicación sigue funcionando.
+                  </p>
+                  {error?.message && (
+                    <p className="max-w-md truncate text-xs text-muted-foreground" title={error.message}>
+                      {error.message}
+                    </p>
+                  )}
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button onClick={reset} variant="secondary">
+                      Intentar de nuevo
+                    </Button>
+                    <Button onClick={reload}>
+                      Recargar página
+                    </Button>
+                  </div>
+                </div>
+              )}
+            >
+              <Outlet />
+            </ErrorBoundary>
           </main>
         </div>
       </div>
@@ -530,27 +558,39 @@ const Layout = () => {
           userEmail={session.user?.email ?? undefined}
         />
       )}
-      <PendingTasksModal
-        open={showPendingTasksModal}
-        onOpenChange={setShowPendingTasksModal}
-        userId={userId}
-        userRole={userRole}
-        userDepartment={userDepartment}
-      />
-      {unacknowledgedTasks && unacknowledgedTasks.length > 0 && (
-        <SingleTaskPopup
-          open={showSingleTaskPopup}
-          onOpenChange={setShowSingleTaskPopup}
-          task={unacknowledgedTasks[currentTaskIndex] || null}
-          jobOrTourName={unacknowledgedTasks[currentTaskIndex]?.jobOrTourName || ''}
-          jobOrTourType={unacknowledgedTasks[currentTaskIndex]?.jobOrTourType || 'job'}
-          client={unacknowledgedTasks[currentTaskIndex]?.client}
-          onDismiss={handleSingleTaskDismiss}
-          onViewAll={handleViewAllTasks}
-          totalPendingCount={unacknowledgedTasks.length}
-          currentIndex={currentTaskIndex}
+      <ErrorBoundary
+        boundaryName="pending-tasks-modal"
+        silent
+        resetKeys={[showPendingTasksModal, userId, userRole, userDepartment]}
+      >
+        <PendingTasksModal
+          open={showPendingTasksModal}
+          onOpenChange={setShowPendingTasksModal}
+          userId={userId}
+          userRole={userRole}
+          userDepartment={userDepartment}
         />
-      )}
+      </ErrorBoundary>
+      <ErrorBoundary
+        boundaryName="single-task-popup"
+        silent
+        resetKeys={[showSingleTaskPopup, currentTaskIndex, unacknowledgedTasks.length]}
+      >
+        {unacknowledgedTasks.length > 0 && unacknowledgedTasks[currentTaskIndex] && (
+          <SingleTaskPopup
+            open={showSingleTaskPopup}
+            onOpenChange={setShowSingleTaskPopup}
+            task={unacknowledgedTasks[currentTaskIndex]}
+            jobOrTourName={unacknowledgedTasks[currentTaskIndex]?.jobOrTourName || ''}
+            jobOrTourType={unacknowledgedTasks[currentTaskIndex]?.jobOrTourType || 'job'}
+            client={unacknowledgedTasks[currentTaskIndex]?.client}
+            onDismiss={handleSingleTaskDismiss}
+            onViewAll={handleViewAllTasks}
+            totalPendingCount={unacknowledgedTasks.length}
+            currentIndex={currentTaskIndex}
+          />
+        )}
+      </ErrorBoundary>
     </SidebarProvider>
   )
 }
