@@ -100,6 +100,8 @@ export function TechnicianPayoutCard({
     deduction = daysUsed * NON_AUTONOMO_DEDUCTION_EUR;
   }
   const effectiveTotal = payout.total_eur - deduction;
+  const prepDaysTotal = payout.prep_days_total_eur ?? 0;
+  const timesheetsExcludingPrep = Math.max(0, payout.timesheets_total_eur - prepDaysTotal);
 
   /* Override */
   const rawOverride = getTechOverride(techId);
@@ -248,9 +250,20 @@ export function TechnicianPayoutCard({
             <span>Partes aprobados:</span>
           </div>
           <Badge variant={payout.timesheets_total_eur > 0 ? 'default' : 'secondary'}>
-            {formatCurrency(payout.timesheets_total_eur)}
+            {formatCurrency(timesheetsExcludingPrep)}
           </Badge>
         </div>
+        {prepDaysTotal > 0 && (
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              <span>Prep days:</span>
+            </div>
+            <Badge variant="outline">
+              {formatCurrency(prepDaysTotal)}
+            </Badge>
+          </div>
+        )}
         {showDaysWarning && (
           <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded px-2 py-1">
             <AlertCircle className="h-3 w-3 shrink-0" />
