@@ -52,6 +52,9 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.refresh_timesheet_amounts_for_job_date(uuid,date) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.refresh_timesheet_amounts_for_job_date(uuid,date) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.trg_refresh_timesheets_for_prep_day_date_type()
 RETURNS trigger
 LANGUAGE plpgsql
