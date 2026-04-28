@@ -245,16 +245,19 @@ BEGIN
 
   IF team_member THEN
     WITH tech_week_jobs AS (
-      SELECT DISTINCT j.id
+      SELECT DISTINCT pd.date AS payable_date
       FROM public.jobs j
       JOIN public.job_assignments ja
         ON ja.job_id = j.id
        AND ja.technician_id = _tech_id
+      JOIN public.job_date_types pd
+        ON pd.job_id = j.id
+       AND pd.type <> 'prep_day'
       WHERE j.job_type = 'tourdate'
         AND j.tour_id = tour_group
         AND j.status != 'Cancelado'
-        AND (SELECT iso_year FROM public.iso_year_week_madrid(j.start_time)) = y
-        AND (SELECT iso_week FROM public.iso_year_week_madrid(j.start_time)) = w
+        AND (SELECT iso_year FROM public.iso_year_week_madrid(pd.date::timestamptz)) = y
+        AND (SELECT iso_week FROM public.iso_year_week_madrid(pd.date::timestamptz)) = w
         AND NOT EXISTS (
           SELECT 1
           FROM public.job_date_types only_prep
@@ -410,14 +413,17 @@ BEGIN
     2
   );
 
-  IF rehearsal_days > 0 THEN
-    display_multiplier := 1.0;
-    display_per_job_multiplier := 1.0;
-    after_discount_total := total_base;
-  ELSE
+  IF standard_days > 0 THEN
     display_multiplier := mult;
     display_per_job_multiplier := per_job_multiplier;
-    after_discount_total := ROUND(standard_after_discount * standard_days, 2);
+    after_discount_total := ROUND(
+      (standard_after_discount * standard_days) + (rehearsal_day_rate * rehearsal_days),
+      2
+    );
+  ELSE
+    display_multiplier := 1.0;
+    display_per_job_multiplier := 1.0;
+    after_discount_total := ROUND(rehearsal_day_rate * rehearsal_days, 2);
   END IF;
 
   extras := public.extras_total_for_job_tech(_job_id, _tech_id);
@@ -479,4 +485,4 @@ END;
 $function$;
 
 COMMENT ON FUNCTION public.compute_tour_job_rate_quote_2025(uuid,uuid) IS
-  'Calculates tour job rate quotes. Weekly multipliers are counted per technician: one eligible assigned tour date in an ISO week gets 1.5x, two get 1.125x per date, three or more get 1x. Prep days are excluded from quote day counts and paid via fixed-rate timesheets. Rigging dates only count for technicians assigned to those rigging jobs.';
+  'Calculates tour job rate quotes. Weekly multipliers are counted per technician by eligible payable date: one eligible assigned tour date in an ISO week gets 1.5x, two get 1.125x per date, three or more get 1x. Prep days are excluded from quote day counts and paid via fixed-rate timesheets. Rigging dates only count for technicians assigned to those rigging jobs.';
