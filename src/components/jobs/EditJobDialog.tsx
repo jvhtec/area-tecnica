@@ -195,6 +195,37 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       // Convert local datetime-local input values to UTC using the job's timezone
       const startTimeUTC = localInputToUTC(startTime, timezone);
       const endTimeUTC = localInputToUTC(endTime, timezone);
+      const eligibleForPrepDays = PREP_DAY_ELIGIBLE_JOB_TYPES.includes(jobType);
+      const localStartDate = startTime?.split("T")?.[0] ?? "";
+      const targetPrepDates = eligibleForPrepDays ? normalizePrepDayDates(prepDayDates) : [];
+
+      // Validate prep dates before mutating any job/location records. Payroll edits should not half-save.
+      if (eligibleForPrepDays && targetPrepDates.length > 0) {
+        if (!localStartDate) {
+          throw new Error("Set a job start date before adding prep days.");
+        }
+
+        const invalidDates = targetPrepDates.filter((date) => date >= localStartDate);
+        if (invalidDates.length > 0) {
+          throw new Error(`Prep days must be before the job start date: ${invalidDates.join(", ")}`);
+        }
+
+        const { data: conflictingDateTypes, error: conflictError } = await supabase
+          .from("job_date_types")
+          .select("date, type")
+          .eq("job_id", job.id)
+          .in("date", targetPrepDates)
+          .neq("type", "prep_day");
+
+        if (conflictError) throw conflictError;
+
+        if (conflictingDateTypes && conflictingDateTypes.length > 0) {
+          const conflictSummary = conflictingDateTypes
+            .map((row) => `${row.date} (${row.type})`)
+            .join(", ");
+          throw new Error(`Prep days conflict with existing date types: ${conflictSummary}`);
+        }
+      }
 
       // Handle venue/location updates
       let locationId = job.location_id;
@@ -236,37 +267,6 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         .eq("id", job.id);
 
       if (jobError) throw jobError;
-
-      const eligibleForPrepDays = PREP_DAY_ELIGIBLE_JOB_TYPES.includes(jobType);
-      const localStartDate = startTime?.split("T")?.[0] ?? "";
-      const targetPrepDates = eligibleForPrepDays ? normalizePrepDayDates(prepDayDates) : [];
-
-      if (eligibleForPrepDays && targetPrepDates.length > 0) {
-        if (!localStartDate) {
-          throw new Error("Set a job start date before adding prep days.");
-        }
-
-        const invalidDates = targetPrepDates.filter((date) => date >= localStartDate);
-        if (invalidDates.length > 0) {
-          throw new Error(`Prep days must be before the job start date: ${invalidDates.join(", ")}`);
-        }
-
-        const { data: conflictingDateTypes, error: conflictError } = await supabase
-          .from("job_date_types")
-          .select("date, type")
-          .eq("job_id", job.id)
-          .in("date", targetPrepDates)
-          .neq("type", "prep_day");
-
-        if (conflictError) throw conflictError;
-
-        if (conflictingDateTypes && conflictingDateTypes.length > 0) {
-          const conflictSummary = conflictingDateTypes
-            .map((row) => `${row.date} (${row.type})`)
-            .join(", ");
-          throw new Error(`Prep days conflict with existing date types: ${conflictSummary}`);
-        }
-      }
 
       await supabase
         .from("job_date_types")
