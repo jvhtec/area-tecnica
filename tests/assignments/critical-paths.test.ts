@@ -122,6 +122,8 @@ const configureDialogSupabase = ({
   endTime?: string;
 } = {}) => {
   const insertMock = vi.fn().mockResolvedValue({ error: null });
+  const upsertMock = vi.fn(() => createMockQueryBuilder({ data: null, error: null }));
+  const deleteMock = vi.fn(() => createMockQueryBuilder({ data: null, error: null }));
 
   mockSupabase.from.mockImplementation((table: string) => {
     if (table === "job_assignments") {
@@ -152,7 +154,8 @@ const configureDialogSupabase = ({
 
     if (table === "timesheets") {
       return {
-        delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
+        upsert: upsertMock,
+        delete: deleteMock,
         select: vi.fn(() =>
           createMockQueryBuilder({
             data: existingTimesheetDates.map((date) => ({ date })),
@@ -179,7 +182,7 @@ const configureDialogSupabase = ({
     return createMockQueryBuilder();
   });
 
-  return { insertMock };
+  return { insertMock, upsertMock, deleteMock };
 };
 
 const renderAssignmentDialog = async ({
@@ -380,7 +383,7 @@ describe("Assignments Critical Paths", () => {
 
   describe("Coverage modes", () => {
     it("creates a single-day assignment and toggles only the selected date", async () => {
-      const { insertMock } = configureDialogSupabase();
+      const { insertMock, upsertMock, deleteMock } = configureDialogSupabase();
 
       await renderAssignmentDialog({
         date: new Date("2026-12-02T00:00:00Z"),
@@ -407,18 +410,25 @@ describe("Assignments Critical Paths", () => {
           includePending: true,
         }),
       );
-      expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(1);
-      expect(toggleTimesheetDayMock).toHaveBeenCalledWith({
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-02",
-        present: true,
-        source: "assignment-dialog",
-      });
+      expect(upsertMock).toHaveBeenCalledWith(
+        [
+          {
+            job_id: "job-1",
+            technician_id: "tech-1",
+            date: "2026-12-02",
+            status: "draft",
+            source: "assignment-dialog",
+            is_active: true,
+          },
+        ],
+        { onConflict: "job_id,technician_id,date" },
+      );
+      expect(deleteMock).not.toHaveBeenCalled();
+      expect(toggleTimesheetDayMock).not.toHaveBeenCalled();
     });
 
     it("creates full-job coverage across every job date", async () => {
-      const { insertMock } = configureDialogSupabase();
+      const { insertMock, upsertMock, deleteMock } = configureDialogSupabase();
 
       await renderAssignmentDialog();
 
@@ -438,21 +448,29 @@ describe("Assignments Critical Paths", () => {
         "job-1",
         expect.objectContaining({ includePending: true }),
       );
-      expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(2);
-      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(1, {
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-01",
-        present: true,
-        source: "assignment-dialog",
-      });
-      expect(toggleTimesheetDayMock).toHaveBeenNthCalledWith(2, {
-        jobId: "job-1",
-        technicianId: "tech-1",
-        dateIso: "2026-12-02",
-        present: true,
-        source: "assignment-dialog",
-      });
+      expect(upsertMock).toHaveBeenCalledWith(
+        [
+          {
+            job_id: "job-1",
+            technician_id: "tech-1",
+            date: "2026-12-01",
+            status: "draft",
+            source: "assignment-dialog",
+            is_active: true,
+          },
+          {
+            job_id: "job-1",
+            technician_id: "tech-1",
+            date: "2026-12-02",
+            status: "draft",
+            source: "assignment-dialog",
+            is_active: true,
+          },
+        ],
+        { onConflict: "job_id,technician_id,date" },
+      );
+      expect(deleteMock).not.toHaveBeenCalled();
+      expect(toggleTimesheetDayMock).not.toHaveBeenCalled();
     });
   });
 });

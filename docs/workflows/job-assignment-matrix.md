@@ -67,6 +67,7 @@ Located in `src/utils/technicianAvailability.ts`:
 
 - **Hard conflicts**: Overlapping job times → prompts confirmation dialog; user can proceed via "Forzar asignación" (force assignment) override in `AssignJobDialog.tsx`
 - **Soft conflicts**: Cautionary flags → shows warning, allows assignment
+- **Unavailability-only conflicts**: Availability/vacation conflicts without overlapping jobs still surface in the same review dialog as independent warnings for `full`, `single`, and `multi` coverage modes
 - Checks against:
   - Existing timesheets for overlapping dates
   - Unavailability records from `availability_schedules`
@@ -85,12 +86,53 @@ Located in `src/utils/technicianAvailability.ts`:
 5. CONFLICT CHECK → checkForConflicts()
    - Hard conflict → dialog, requires user override
    - Soft conflict → warning, allows assignment
+   - Unavailability-only conflict → warning, allows explicit override
 6. EXECUTE ASSIGNMENT:
    - Creates/updates job_assignments record
    - Creates timesheets via toggleTimesheetDay
    - Syncs category via syncTimesheetCategoriesForAssignment
    - Calls manage-flex-crew-assignments edge function
    - Sets assigned_by manager ID and timestamp
+
+## Assignment Operations
+
+- **Create assignment**: empty cell → select job → choose role → assign across full span, one day, or multiple selected dates
+- **Modify same job**: existing assignment for the same job can add dates or replace the current date set without creating a duplicate assignment row
+- **Reassign to another job**: removes the previous assignment/timesheets first, then creates the new assignment and recreates coverage on the selected job
+- **Remove assignment**: uses `remove_assignment_with_timesheets` first, then falls back to direct `job_assignments` deletion if needed
+
+## Realtime + Timezone Guarantees
+
+- `useAvailableTechnicians` invalidates the current availability cache on every `job_assignments` `INSERT`, `DELETE`, and `UPDATE`, even when the change belongs to another job, so overlapping assignments cannot leave stale availability in the dialog.
+- `useMemoizedMatrix` normalizes matrix day keys in `Europe/Madrid` and deduplicates repeated date entries before sorting and bucketing jobs/assignments.
+- User-facing assignment dialog dates are formatted in Spanish locale for the dialog body, conflict review, and coverage selector.
+
+## Matrix Core Architecture
+
+- Shared hot-path utilities live in `src/components/matrix/optimized-assignment-matrix/matrixCore.ts` and provide the canonical Madrid day-key helpers, chunking helpers, matrix query-key factory, and scoped invalidation helpers for assignments, availability, and jobs/staffing.
+- `OptimizedAssignmentMatrix.tsx` now acts as an orchestrator instead of owning every behavior directly. Viewport logic moved into `useMatrixViewportController`, sorting/medal logic moved into `useMatrixSortingController`, and dialog/action routing moved into `useMatrixInteractionController`.
+- `OptimizedAssignmentMatrixView` now consumes grouped `viewport`, `data`, `actions`, `dialogs`, and `sorting` state; the old flat prop shape remains as a compatibility shim for tests during the transition.
+- `OptimizedMatrixCell` still owns mutation side effects, but its render path is split into memoized status badges, staffing action buttons, assignment content, unavailable content, and dialog sections so unrelated UI branches do not stay inline in the main cell body.
+- `usePerformanceMonitor` is now opt-in diagnostics only. Normal matrix rendering no longer runs timer-driven memory polling or unconditional console logging.
+
+## Test Coverage
+
+- Unit/component coverage:
+  - `src/components/matrix/__tests__/AssignJobDialog.test.tsx`
+  - `src/components/matrix/assign-job-dialog/__tests__/useAssignJobMutations.test.tsx`
+  - `src/components/matrix/assign-job-dialog/__tests__/conflictUtils.test.ts`
+  - `src/hooks/__tests__/useAvailableTechnicians.test.tsx`
+  - `src/hooks/__tests__/useMemoizedMatrix.test.tsx`
+  - `src/components/matrix/optimized-assignment-matrix/__tests__/matrixCore.test.ts`
+  - `src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixViewportController.test.tsx`
+  - `src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixSortingController.test.tsx`
+  - `src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixInteractionController.test.tsx`
+  - `src/components/matrix/__tests__/OptimizedMatrixCell.test.tsx` render-stability assertion for identical-prop rerenders
+- Playwright coverage:
+  - `tests/e2e/assignments-matrix.spec.ts`
+- Recommended commands:
+  - `npm run test:run -- src/components/matrix/__tests__/AssignJobDialog.test.tsx src/components/matrix/__tests__/OptimizedAssignmentMatrix.test.tsx src/components/matrix/__tests__/OptimizedMatrixCell.test.tsx src/components/matrix/optimized-assignment-matrix/__tests__/OptimizedAssignmentMatrixView.test.tsx src/components/matrix/optimized-assignment-matrix/__tests__/matrixCore.test.ts src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixViewportController.test.tsx src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixSortingController.test.tsx src/components/matrix/optimized-assignment-matrix/__tests__/useMatrixInteractionController.test.tsx src/components/matrix/assign-job-dialog/__tests__/useAssignJobMutations.test.tsx src/components/matrix/assign-job-dialog/__tests__/conflictUtils.test.ts src/hooks/__tests__/useAvailableTechnicians.test.tsx src/hooks/__tests__/useMemoizedMatrix.test.tsx src/hooks/__tests__/useOptimizedMatrixData.test.ts`
+  - `npm run test:e2e -- tests/e2e/assignments-matrix.spec.ts`
 ```
 
 ## Cell Color Coding

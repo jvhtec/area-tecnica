@@ -61,6 +61,8 @@ vi.mock('@/components/matrix/OptimizedAssignmentMatrix', () => ({
       <div data-testid="matrix-jobs">{props.jobs.length}</div>
       <div data-testid="allow-direct-assign">{String(props.allowDirectAssign)}</div>
       <div data-testid="allow-mark-unavailable">{String(props.allowMarkUnavailable)}</div>
+      <div data-testid="hide-staffing-email-buttons">{String(props.hideStaffingEmailButtons)}</div>
+      <div data-testid="hide-staffing-whatsapp-buttons">{String(props.hideStaffingWhatsappButtons)}</div>
     </div>
   ),
 }));
@@ -123,6 +125,7 @@ const mockDateRange = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
 
   useOptimizedAuthMock.mockReturnValue({
     userDepartment: 'sound',
@@ -585,5 +588,23 @@ describe('JobAssignmentMatrix', () => {
     expect(screen.getByTestId('matrix-technicians')).toBeInTheDocument();
     expect(screen.getByTestId('matrix-dates')).toBeInTheDocument();
     expect(screen.getByTestId('matrix-jobs')).toBeInTheDocument();
+  });
+
+  it('lets users hide staffing email and WhatsApp buttons and persists the preference', async () => {
+    const user = userEvent.setup();
+
+    render(<JobAssignmentMatrix />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('optimized-matrix')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole('switch', { name: /mostrar botones de email/i }));
+    await user.click(screen.getByRole('switch', { name: /mostrar botones de whatsapp/i }));
+
+    expect(screen.getByTestId('hide-staffing-email-buttons')).toHaveTextContent('true');
+    expect(screen.getByTestId('hide-staffing-whatsapp-buttons')).toHaveTextContent('true');
+    expect(window.localStorage.getItem('job-assignment-matrix:hide-staffing-email-buttons')).toBe('true');
+    expect(window.localStorage.getItem('job-assignment-matrix:hide-staffing-whatsapp-buttons')).toBe('true');
   });
 });
