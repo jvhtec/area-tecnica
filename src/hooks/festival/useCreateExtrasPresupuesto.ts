@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { format, parseISO, addDays } from "date-fns";
-import { fromZonedTime } from "date-fns-tz";
 import { supabase } from "@/integrations/supabase/client";
 import { createFlexFolder } from "@/utils/flex-folders/api";
 import { FLEX_FOLDER_IDS, DEPARTMENT_IDS, RESPONSIBLE_PERSON_IDS } from "@/utils/flex-folders/constants";
@@ -12,9 +11,25 @@ import { FLEX_FOLDER_IDS, DEPARTMENT_IDS, RESPONSIBLE_PERSON_IDS } from "@/utils
 const jobCreationQueues = new Map<string, Promise<void>>();
 
 const RETRY_DELAYS = [500, 1000, 2000];
+const FLEX_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?$/;
 
-async function insertWithRetry(insertFn: () => Promise<{ error: any }>): Promise<void> {
-  let lastError: any = null;
+export function formatArtistDateTimeForFlex(date: string, time: string): string {
+  const match = time.match(FLEX_TIME_PATTERN);
+  if (!match) {
+    throw new Error(`Hora de artista invalida para Flex: ${time || "(vacia)"}`);
+  }
+
+  const [, hours, minutes, seconds = "00"] = match;
+
+  return `${date}T${hours}:${minutes}:${seconds}.000Z`;
+}
+
+export function formatArtistExtrasFolderDocumentNumber(date: Date): string {
+  return `${format(date, "ddMMyy")}ESQT`;
+}
+
+async function insertWithRetry(insertFn: () => Promise<{ error: unknown }>): Promise<void> {
+  let lastError: unknown = null;
   for (let i = 0; i <= RETRY_DELAYS.length; i++) {
     const { error } = await insertFn();
     if (!error) return;
@@ -71,16 +86,12 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
 
       const jobTitle = job.title?.trim() || "Sin título";
 
-      // 2. Build ISO date strings from the artist's show day/time
-      // Convert local Madrid datetime to UTC
+      // 2. Build Flex date strings from the artist's local show day/time
       const parsedDate = parseISO(artistDate);
       const endDateBase = isAfterMidnight ? addDays(parsedDate, 1) : parsedDate;
 
-      const localStartDatetime = `${artistDate}T${showStart}:00`;
-      const localEndDatetime = `${format(endDateBase, "yyyy-MM-dd")}T${showEnd}:00`;
-
-      const plannedStartDate = fromZonedTime(localStartDatetime, "Europe/Madrid").toISOString();
-      const plannedEndDate = fromZonedTime(localEndDatetime, "Europe/Madrid").toISOString();
+      const plannedStartDate = formatArtistDateTimeForFlex(artistDate, showStart);
+      const plannedEndDate = formatArtistDateTimeForFlex(format(endDateBase, "yyyy-MM-dd"), showEnd);
 
       // 3. Compute document number: DDMMAA.xSQT
       //    Count runs inside the queue so the ordinal is always fresh.
@@ -92,6 +103,7 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
 
       const ordinal = (count ?? 0) + 1;
       const docDate = format(parsedDate, "ddMMyy");
+      const extrasFolderDocumentNumber = formatArtistExtrasFolderDocumentNumber(parsedDate);
       const documentNumber = `${docDate}.${ordinal}SQT`;
 
       // 4. Find the comercial department folder for this job
@@ -138,6 +150,7 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
           plannedEndDate,
           locationId: FLEX_FOLDER_IDS.location,
           departmentId: DEPARTMENT_IDS.sound,
+          documentNumber: extrasFolderDocumentNumber,
           personResponsibleId: RESPONSIBLE_PERSON_IDS.sound,
         });
 
