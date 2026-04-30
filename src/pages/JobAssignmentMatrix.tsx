@@ -302,32 +302,63 @@ export default function JobAssignmentMatrix() {
       const startDate = rangeInfo.start;
       const endDate = rangeInfo.end;
       const windowRange = `[${startDate.toISOString()},${endDate.toISOString()}]`;
+      const allowedJobTypes = ['single', 'festival', 'ciclo', 'tourdate', 'evento'];
 
       // Use interval overlap logic to show all jobs that overlap with the visible date range
       // This ensures long-running jobs (e.g., multi-month tours) are visible even if they
       // extend beyond the current range. A job overlaps if:
       // - Job starts before range ends AND
       // - Job ends after range starts
-      let query = supabase
+      let overlapQuery = supabase
         .from('jobs')
         .select(`
-          id, title, start_time, end_time, color, status, job_type,
+          id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
           job_departments!inner(department),
           job_assignments!job_id(technician_id)
         `)
         .filter('time_range', 'ov', windowRange)
-        .in('job_type', ['single', 'festival', 'ciclo', 'tourdate', 'evento'])
+        .in('job_type', allowedJobTypes)
         .limit(500); // Limit for performance
 
       // Add department filter if selected
-      query = query.eq('job_departments.department', selectedDepartment);
+      overlapQuery = overlapQuery.eq('job_departments.department', selectedDepartment);
 
-      const { data, error } = await query.order('start_time', { ascending: true });
+      const [overlapRes, typedRes] = await Promise.all([
+        overlapQuery.order('start_time', { ascending: true }),
+        supabase
+          .from('job_date_types')
+          .select(`
+            job_id,
+            date,
+            type,
+            jobs!inner(
+              id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
+              job_departments!inner(department),
+              job_assignments!job_id(technician_id)
+            )
+          `)
+          .gte('date', rangeInfo.startFormatted)
+          .lte('date', rangeInfo.endFormatted)
+          .eq('jobs.job_departments.department', selectedDepartment)
+          .in('jobs.job_type', allowedJobTypes)
+          .limit(500),
+      ]);
+      if (overlapRes.error) throw overlapRes.error;
+      if (typedRes.error) throw typedRes.error;
 
-      if (error) throw error;
+      const mergedById = new Map<string, any>();
+      (overlapRes.data || []).forEach((row: any) => {
+        mergedById.set(row.id, row);
+      });
+      (typedRes.data || []).forEach((typed: any) => {
+        const job = Array.isArray(typed.jobs) ? typed.jobs[0] : typed.jobs;
+        if (job?.id && !mergedById.has(job.id)) {
+          mergedById.set(job.id, job);
+        }
+      });
 
       // Filter out cancelled jobs unless they have assigned technicians
-      const filtered = (data || []).map((j: any) => {
+      const filtered = Array.from(mergedById.values()).map((j: any) => {
         const assigns = Array.isArray(j.job_assignments) ? j.job_assignments : [];
         return {
           id: j.id,
@@ -337,6 +368,7 @@ export default function JobAssignmentMatrix() {
           color: j.color,
           status: j.status,
           job_type: j.job_type,
+          job_date_types: Array.isArray(j.job_date_types) ? j.job_date_types : [],
           // keep for downstream UI warnings
           _assigned_count: assigns.length as number,
         };

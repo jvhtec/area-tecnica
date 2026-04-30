@@ -1,7 +1,7 @@
 import type { LucideIcon } from "lucide-react";
-import { HardHat, Mic, Moon, Plane, Star, Wrench } from "lucide-react";
+import { HardHat, Hammer, Mic, Moon, Plane, Star, Wrench } from "lucide-react";
 
-export type DateType = "travel" | "setup" | "rigging" | "show" | "off" | "rehearsal";
+export type DateType = "travel" | "setup" | "rigging" | "show" | "off" | "rehearsal" | "prep_day";
 
 export interface DateTypeMeta {
   value: DateType;
@@ -22,7 +22,8 @@ export interface DateTypeMeta {
   xlsText: string;
 }
 
-export const DATE_TYPE_ORDER: DateType[] = ["travel", "setup", "rigging", "show", "off", "rehearsal"];
+export const DATE_TYPE_ORDER: DateType[] = ["travel", "setup", "rigging", "prep_day", "show", "off", "rehearsal"];
+// tour_dates.type does not include prep_day. Prep days are stored only as job_date_types rows.
 export const TOUR_DATE_TYPE_ORDER: DateType[] = ["show", "rehearsal", "travel", "setup", "rigging", "off"];
 
 export const DATE_TYPE_META: Record<DateType, DateTypeMeta> = {
@@ -79,6 +80,24 @@ export const DATE_TYPE_META: Record<DateType, DateTypeMeta> = {
     isKeyFestivalDay: true,
     xlsBg: "FFEDD5",
     xlsText: "C2410C",
+  },
+  prep_day: {
+    value: "prep_day",
+    label: "Prep Day",
+    labelEs: "Día de preparación",
+    emoji: "🛠️",
+    shortLabel: "P",
+    icon: Hammer,
+    iconClassName: "text-teal-600",
+    badgeClassName: "bg-teal-100 text-teal-800 border-teal-200",
+    festivalBorderClassName: "border-teal-500",
+    festivalBackgroundClassName: "bg-teal-50",
+    festivalBadgeColorClassName: "bg-teal-500",
+    isNonWorking: false,
+    isSingleDay: true,
+    isKeyFestivalDay: true,
+    xlsBg: "CCFBF1",
+    xlsText: "0F766E",
   },
   show: {
     value: "show",

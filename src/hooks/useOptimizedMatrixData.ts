@@ -12,6 +12,7 @@ export interface MatrixJob {
   color?: string | null;
   status: string;
   job_type: string;
+  job_date_types?: Array<{ date: string; type: string }>;
   assigned_count?: number;
   worked_count?: number;
   total_cost_eur?: number;
@@ -469,6 +470,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     
     dates.forEach(date => {
       const dateJobs = jobs.filter((job: MatrixJob) => {
+        const dateKey = format(date, 'yyyy-MM-dd');
+        const hasTypedDate = Array.isArray(job.job_date_types) && job.job_date_types.some((dt) => dt?.date === dateKey);
+        if (hasTypedDate) return true;
         const jobStart = new Date(job.start_time);
         const jobEnd = new Date(job.end_time);
         
