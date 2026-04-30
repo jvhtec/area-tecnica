@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { formatArtistDateTimeForFlex } from "../useCreateExtrasPresupuesto";
+import {
+  formatArtistDateTimeForFlex,
+  formatArtistExtrasFolderDocumentNumber,
+} from "../useCreateExtrasPresupuesto";
 
 vi.mock("sonner", () => ({
   toast: {
@@ -32,6 +35,14 @@ describe("formatArtistDateTimeForFlex", () => {
   it("rejects invalid artist times", () => {
     expect(() => formatArtistDateTimeForFlex("2026-07-18", "24:00")).toThrow(
       "Hora de artista invalida"
+    );
+  });
+});
+
+describe("formatArtistExtrasFolderDocumentNumber", () => {
+  it("uses the extras sound quote document number for the shared extras folder", () => {
+    expect(formatArtistExtrasFolderDocumentNumber(new Date("2026-05-07T12:00:00.000Z"))).toBe(
+      "070526ESQT"
     );
   });
 });
