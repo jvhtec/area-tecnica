@@ -24,6 +24,10 @@ export function formatArtistDateTimeForFlex(date: string, time: string): string 
   return `${date}T${hours}:${minutes}:${seconds}.000Z`;
 }
 
+export function formatArtistExtrasFolderDocumentNumber(date: Date): string {
+  return `${format(date, "ddMMyy")}ESQT`;
+}
+
 async function insertWithRetry(insertFn: () => Promise<{ error: unknown }>): Promise<void> {
   let lastError: unknown = null;
   for (let i = 0; i <= RETRY_DELAYS.length; i++) {
@@ -99,6 +103,7 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
 
       const ordinal = (count ?? 0) + 1;
       const docDate = format(parsedDate, "ddMMyy");
+      const extrasFolderDocumentNumber = formatArtistExtrasFolderDocumentNumber(parsedDate);
       const documentNumber = `${docDate}.${ordinal}SQT`;
 
       // 4. Find the comercial department folder for this job
@@ -145,6 +150,7 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
           plannedEndDate,
           locationId: FLEX_FOLDER_IDS.location,
           departmentId: DEPARTMENT_IDS.sound,
+          documentNumber: extrasFolderDocumentNumber,
           personResponsibleId: RESPONSIBLE_PERSON_IDS.sound,
         });
 
