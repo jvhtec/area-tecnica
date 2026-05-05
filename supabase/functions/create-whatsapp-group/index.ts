@@ -308,10 +308,16 @@ serve(async (req: Request) => {
       }
     }
 
-    // De-duplicate
-    const uniqueParticipants = Array.from(new Set(participants));
+    const actorPhoneNormalized = actor?.phone ? normalizePhone(actor.phone, defaultCC) : null;
+    const actorPhone = actorPhoneNormalized?.ok ? actorPhoneNormalized.value : null;
+
+    // De-duplicate. Do not send the WAHA sender as an explicit participant:
+    // WhatsApp includes the group creator automatically, and WAHA can reject
+    // create-group requests that try to add the creator as a participant.
+    const uniqueParticipants = Array.from(new Set(participants))
+      .filter((phone) => phone !== actorPhone);
     if (uniqueParticipants.length === 0) {
-      return new Response(JSON.stringify({ error: 'No valid phone numbers found', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'No valid phone numbers found besides the WhatsApp sender', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // WAHA config - use actor's endpoint
@@ -337,12 +343,22 @@ serve(async (req: Request) => {
       return { id: jid };
     });
     const actorJidCandidate = (() => {
-      if (actor?.phone && actor.department === department) {
-        const norm = normalizePhone(actor.phone, defaultCC);
-        if (norm.ok) return norm.value.replace(/^\+/, '') + '@c.us';
-      }
       return null;
     })();
+
+    const clearRequestLock = async () => {
+      try {
+        const { error: clearErr } = await supabaseAdmin
+          .from('job_whatsapp_group_requests')
+          .delete()
+          .eq('job_id', job_id)
+          .eq('department', department)
+          .eq('stage_number', effectiveStageNumber);
+        if (clearErr) console.warn('Failed to clear WhatsApp request lock after WAHA failure', clearErr);
+      } catch (clearException) {
+        console.warn('Error clearing WhatsApp request lock after WAHA failure', clearException);
+      }
+    };
 
     let usedFallback = false;
     let wa_group_id = '';
@@ -358,6 +374,7 @@ serve(async (req: Request) => {
           body: JSON.stringify({ name: subject, participants: participantObjects })
         });
       } catch (fe) {
+        await clearRequestLock();
         return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group', url: groupUrl, message: (fe as Error)?.message || String(fe) }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       if (!groupRes.ok) {
@@ -373,14 +390,17 @@ serve(async (req: Request) => {
             });
             if (!fallbackRes.ok) {
               const fbTxt = await fallbackRes.text().catch(() => '');
+              await clearRequestLock();
               return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: fallbackRes.status, url: groupUrl, response: fbTxt, firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
             }
             usedFallback = true;
             groupRes = fallbackRes;
           } catch (fe2) {
+            await clearRequestLock();
             return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group-fallback', url: groupUrl, message: (fe2 as Error)?.message || String(fe2), firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
         } else {
+          await clearRequestLock();
           return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: groupRes.status, url: groupUrl, response: txt }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }

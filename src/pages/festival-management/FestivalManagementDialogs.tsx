@@ -115,7 +115,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
           number: idx + 1,
           name: `Stage ${idx + 1}`,
         }));
-  const requiresStageScopedWhatsapp = maxStages > 1 && waDepartment !== "lights";
+  const requiresStageScopedWhatsapp = maxStages > 1 && waDepartment === "sound";
 
   return (
     <>
@@ -379,7 +379,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
             </div>
             {requiresStageScopedWhatsapp && (
               <div>
-                <label className="block text-sm font-medium mb-2">Stage</label>
+                <label className="block text-sm font-medium mb-2">Stage de sonido</label>
                 <select
                   className="w-full h-9 rounded-md border bg-background px-3 text-sm"
                   value={waStageNumber > 0 ? String(waStageNumber) : ""}
@@ -397,7 +397,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
             {waGroup && (
               <div className="rounded-md bg-green-50 border border-green-200 p-3">
                 <p className="text-sm text-green-800 font-medium">
-                  ✓ Grupo ya creado para este departamento{requiresStageScopedWhatsapp && waStageNumber > 0 ? ` (Stage ${waStageNumber})` : ""}
+                  ✓ Grupo ya creado para {requiresStageScopedWhatsapp && waStageNumber > 0 ? `sonido stage ${waStageNumber}` : "este departamento"}
                 </p>
               </div>
             )}
