@@ -266,7 +266,7 @@ export default function App() {
                             <Route
                               path="/tech-app"
                               element={
-                                <ProtectedRoute allowedRoles={['technician']}>
+                                <ProtectedRoute allowedRoles={['technician']} allowAssignableTech>
                                   <TechnicianSuperApp />
                                 </ProtectedRoute>
                               }
@@ -281,7 +281,7 @@ export default function App() {
                               <Route path="/personal" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><Personal /></ProtectedRoute>} />
                               <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'oscar']}><Dashboard /></ProtectedRoute>} />
                               {/* House tech dashboard routes (regular technicians use /tech-app) */}
-                              <Route path="/technician-dashboard" element={<ProtectedRoute allowedRoles={['house_tech']}><TechnicianDashboard /></ProtectedRoute>} />
+                              <Route path="/technician-dashboard" element={<ProtectedRoute allowedRoles={['house_tech']} allowAssignableTech><TechnicianDashboard /></ProtectedRoute>} />
                               <Route path="/dashboard/unavailability" element={<ProtectedRoute allowedRoles={['house_tech','admin','management']}><TechnicianUnavailabilityAccessGuard /></ProtectedRoute>} />
                               <Route path="/morning-summary" element={<MorningSummary />} />
                               <Route path="/lights" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Lights /></ProtectedRoute>} />

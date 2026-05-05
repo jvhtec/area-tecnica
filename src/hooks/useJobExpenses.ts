@@ -51,14 +51,23 @@ export interface UpdateExpenseData {
   receipt_path?: string;
 }
 
+export interface UseJobExpensesOptions {
+  selfServiceOnly?: boolean;
+}
+
 /**
- * Hook to fetch job expenses for a specific job (filtered by technician for non-managers).
+ * Hook to fetch job expenses for a specific job.
+ * Managers see all expenses by default; selfServiceOnly forces the current user's technician scope.
  */
-export const useJobExpenses = (jobId: string | null | undefined) => {
+export const useJobExpenses = (
+  jobId: string | null | undefined,
+  options: UseJobExpensesOptions = {},
+) => {
   const { user, userRole } = useOptimizedAuth();
+  const selfServiceOnly = options.selfServiceOnly === true;
 
   return useQuery({
-    queryKey: ['job-expenses', jobId, user?.id],
+    queryKey: ['job-expenses', jobId, user?.id, { selfServiceOnly }],
     queryFn: async () => {
       if (!jobId || !user?.id) {
         return [];
@@ -92,8 +101,9 @@ export const useJobExpenses = (jobId: string | null | undefined) => {
         .order('expense_date', { ascending: false })
         .order('created_at', { ascending: false });
 
-      // Technicians and house_tech only see their own expenses
-      if (userRole === 'technician' || userRole === 'house_tech') {
+      // Technicians and house_tech only see their own expenses.
+      // Assignable managers/admins use selfServiceOnly from technician surfaces.
+      if (selfServiceOnly || userRole === 'technician' || userRole === 'house_tech') {
         query = query.eq('technician_id', user.id);
       }
 

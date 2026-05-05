@@ -33,6 +33,22 @@ const renderProtectedRoute = () =>
     { route: "/secure" },
   );
 
+const renderAssignableTechRoute = () =>
+  renderWithProviders(
+    <Routes>
+      <Route
+        path="/tech-self-service"
+        element={
+          <ProtectedRoute allowedRoles={["house_tech"]} allowAssignableTech>
+            <div>Tech Self Service</div>
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/dashboard" element={<div>Dashboard</div>} />
+    </Routes>,
+    { route: "/tech-self-service" },
+  );
+
 beforeEach(() => {
   vi.clearAllMocks();
   useOptimizedAuthMock.mockReturnValue(createAuthState());
@@ -93,5 +109,25 @@ describe("ProtectedRoute", () => {
     );
 
     expect(screen.getByText("House Tech Content")).toBeInTheDocument();
+  });
+
+  it("allows assignable management users into technician self-service routes", () => {
+    useOptimizedAuthMock.mockReturnValue(
+      createAuthState({ userRole: "management", assignableAsTech: true }),
+    );
+
+    renderAssignableTechRoute();
+
+    expect(screen.getByText("Tech Self Service")).toBeInTheDocument();
+  });
+
+  it("blocks management users from technician self-service routes without assignable flag", async () => {
+    useOptimizedAuthMock.mockReturnValue(
+      createAuthState({ userRole: "management", assignableAsTech: false }),
+    );
+
+    renderAssignableTechRoute();
+
+    expect(await screen.findByText("Dashboard")).toBeInTheDocument();
   });
 });

@@ -185,6 +185,38 @@ describe("App route guards and global overlays", () => {
     expect(await screen.findByText("Technician Dashboard Route")).toBeInTheDocument();
   });
 
+  it("allows assignable management users into /tech-app", async () => {
+    mockOptimizedAuthRole("management", { assignableAsTech: true });
+
+    renderAppAt("/tech-app");
+
+    expect(await screen.findByText("Tech App Route")).toBeInTheDocument();
+  });
+
+  it("allows assignable management users into /technician-dashboard", async () => {
+    mockOptimizedAuthRole("management", { assignableAsTech: true });
+
+    renderAppAt("/technician-dashboard");
+
+    expect(await screen.findByText("Technician Dashboard Route")).toBeInTheDocument();
+  });
+
+  it("redirects non-assignable management users away from technician self-service routes", async () => {
+    mockOptimizedAuthRole("management", { assignableAsTech: false });
+
+    renderAppAt("/technician-dashboard");
+
+    expect(await screen.findByText("Dashboard Route")).toBeInTheDocument();
+  });
+
+  it("redirects non-assignable management users away from /tech-app", async () => {
+    mockOptimizedAuthRole("management", { assignableAsTech: false });
+
+    renderAppAt("/tech-app");
+
+    expect(await screen.findByText("Dashboard Route")).toBeInTheDocument();
+  });
+
   it("allows management users into /settings", async () => {
     mockOptimizedAuthRole("management");
 

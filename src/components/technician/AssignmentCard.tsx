@@ -45,7 +45,10 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
   const jobId = assignment.jobs?.id || assignment.festival_jobs?.id;
   const { data: expensePermissions = [] } = useExpensePermissions(jobId);
   const hasActiveExpensePermissions = expensePermissions.some(p => isPermissionActive(p));
-  const { data: expenses = [] } = useJobExpenses(hasActiveExpensePermissions ? jobId : undefined);
+  const { data: expenses = [] } = useJobExpenses(
+    hasActiveExpensePermissions ? jobId : undefined,
+    { selfServiceOnly: true },
+  );
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
 

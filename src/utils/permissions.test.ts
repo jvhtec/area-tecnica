@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { canManagePayouts, isAdministrativeDepartment, normalizeDepartmentKey } from './permissions';
+import {
+  canManagePayouts,
+  hasTechnicianSelfServiceAccess,
+  isAdministrativeDepartment,
+  normalizeDepartmentKey,
+} from './permissions';
 
 describe('payout permissions', () => {
   it('allows admins regardless of department', () => {
@@ -26,5 +31,20 @@ describe('department normalization', () => {
   it('normalizes accented department names', () => {
     expect(normalizeDepartmentKey('Administración')).toBe('administracion');
     expect(isAdministrativeDepartment('Administración')).toBe(true);
+  });
+});
+
+describe('technician self-service access', () => {
+  it('allows technician roles and assignable admin/management users', () => {
+    expect(hasTechnicianSelfServiceAccess('technician')).toBe(true);
+    expect(hasTechnicianSelfServiceAccess('house_tech')).toBe(true);
+    expect(hasTechnicianSelfServiceAccess('management', true)).toBe(true);
+    expect(hasTechnicianSelfServiceAccess('admin', true)).toBe(true);
+  });
+
+  it('denies non-assignable privileged users and unrelated roles', () => {
+    expect(hasTechnicianSelfServiceAccess('management', false)).toBe(false);
+    expect(hasTechnicianSelfServiceAccess('admin', false)).toBe(false);
+    expect(hasTechnicianSelfServiceAccess('logistics', true)).toBe(false);
   });
 });
