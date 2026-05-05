@@ -7,13 +7,15 @@ import { UserRole } from '@/types/user';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles: UserRole[];
+  allowAssignableTech?: boolean;
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
-  allowedRoles
+  allowedRoles,
+  allowAssignableTech = false,
 }) => {
-  const { userRole, isLoading, isProfileLoading } = useOptimizedAuth();
+  const { userRole, assignableAsTech, isLoading, isProfileLoading } = useOptimizedAuth();
 
   // Wait for both session and profile to finish loading before making
   // routing decisions. Without this, userRole can be null while the
@@ -27,7 +29,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     );
   }
 
-  if (!userRole || !allowedRoles.includes(userRole as UserRole)) {
+  const isAllowedByRole = Boolean(userRole && allowedRoles.includes(userRole as UserRole));
+  const isAllowedAsAssignableTech =
+    allowAssignableTech &&
+    assignableAsTech === true &&
+    (userRole === 'admin' || userRole === 'management');
+
+  if (!isAllowedByRole && !isAllowedAsAssignableTech) {
     const dashboardPath = getDashboardPath(userRole as UserRole | null);
     return <Navigate to={dashboardPath} replace />;
   }

@@ -20,7 +20,10 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
     // Expense permissions check
     const { data: expensePermissions = [] } = useExpensePermissions(jobData?.id);
     const hasActiveExpensePermissions = expensePermissions.some(p => isPermissionActive(p));
-    const { data: expenses = [] } = useJobExpenses(hasActiveExpensePermissions ? jobData?.id : undefined);
+    const { data: expenses = [] } = useJobExpenses(
+        hasActiveExpensePermissions ? jobData?.id : undefined,
+        { selfServiceOnly: true },
+    );
     const jobTimezone = jobData?.timezone || 'Europe/Madrid';
 
     // Format time

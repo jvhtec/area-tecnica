@@ -19,6 +19,14 @@ export const canManagePayouts = (role: UserRole, department?: UserDepartment): b
 
 export const isTechnicianRole = (role: UserRole) => role === 'technician' || role === 'house_tech';
 
+export const hasTechnicianSelfServiceAccess = (
+  role: UserRole,
+  assignableAsTech?: boolean | null,
+): boolean =>
+  role === 'technician' ||
+  role === 'house_tech' ||
+  ((role === 'admin' || role === 'management') && assignableAsTech === true);
+
 export const canViewDetails = (_role: UserRole) => true;
 
 export const canEditJobs = (role: UserRole) => ['admin', 'management', 'logistics'].includes(role || '');

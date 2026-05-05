@@ -29,7 +29,7 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { canManagePayouts } from "@/utils/permissions"
+import { canManagePayouts, hasTechnicianSelfServiceAccess } from "@/utils/permissions"
 
 import { SidebarNavigationSkeleton } from "./SidebarNavigationSkeleton"
 
@@ -101,22 +101,20 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     icon: LayoutDashboard,
     mobilePriority: 1,
     mobileSlot: "primary",
-    getPath: () => "/technician-dashboard",
+    getPath: ({ userRole }) => userRole === "technician" ? "/tech-app" : "/technician-dashboard",
     isVisible: ({ userRole, assignableAsTech }) =>
-      userRole === "technician" ||
-      userRole === "house_tech" ||
-      (userRole === "admin" && assignableAsTech === true) ||
-      (userRole === "management" && assignableAsTech === true),
+      hasTechnicianSelfServiceAccess(userRole, assignableAsTech),
   },
   {
     id: "technician-jobs",
-    label: "Trabajos",
+    label: "Mis trabajos",
     mobileLabel: "Trabajos",
     icon: ClipboardList,
     mobilePriority: 2,
     mobileSlot: "primary",
     getPath: () => "/technician-dashboard?tab=jobs",
-    isVisible: ({ userRole }) => userRole === "house_tech",
+    isVisible: ({ userRole, assignableAsTech }) =>
+      userRole !== "technician" && hasTechnicianSelfServiceAccess(userRole, assignableAsTech),
     match: (pathname, _, to) => pathname === "/technician-dashboard" && to.includes("tab=jobs") && window.location.search.includes("tab=jobs"),
   },
   {
@@ -127,7 +125,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 3,
     mobileSlot: "primary",
     getPath: () => "/technician-dashboard?tab=availability",
-    isVisible: ({ userRole }) => userRole === "house_tech",
+    isVisible: ({ userRole, assignableAsTech }) =>
+      userRole !== "technician" && hasTechnicianSelfServiceAccess(userRole, assignableAsTech),
     match: (pathname, _, to) => pathname === "/technician-dashboard" && to.includes("tab=availability") && window.location.search.includes("tab=availability"),
   },
   {
@@ -151,7 +150,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 5,
     mobileSlot: "primary",
     getPath: () => "/technician-dashboard?tab=profile",
-    isVisible: ({ userRole }) => userRole === "house_tech",
+    isVisible: ({ userRole, assignableAsTech }) =>
+      userRole !== "technician" && hasTechnicianSelfServiceAccess(userRole, assignableAsTech),
     match: (pathname, _, to) => pathname === "/technician-dashboard" && to.includes("tab=profile") && window.location.search.includes("tab=profile"),
   },
   {
@@ -521,8 +521,14 @@ export const buildNavigationItems = (
   if (isAdmin) {
     return navigationConfig
       .map((config) => {
-        // Allow technician-dashboard for admins with assignableAsTech flag
-        if (config.id === "technician-dashboard" && context.assignableAsTech) {
+        // Allow technician self-service entries for admins with assignableAsTech flag.
+        if (
+          (config.id === "technician-dashboard" ||
+            config.id === "technician-jobs" ||
+            config.id === "technician-availability" ||
+            config.id === "technician-profile") &&
+          context.assignableAsTech
+        ) {
           return createNavigationItem(config)
         }
         if (adminExcludedIds.has(config.id)) {
@@ -547,6 +553,7 @@ export const SidebarNavigation = ({
   userRole,
   userDepartment,
   hasSoundVisionAccess,
+  assignableAsTech,
   onNavigate,
 }: SidebarNavigationProps) => {
   const location = useLocation()
@@ -556,8 +563,9 @@ export const SidebarNavigation = ({
         userRole,
         userDepartment,
         hasSoundVisionAccess,
+        assignableAsTech,
       }),
-    [userRole, userDepartment, hasSoundVisionAccess],
+    [userRole, userDepartment, hasSoundVisionAccess, assignableAsTech],
   )
 
   if (!userRole) {

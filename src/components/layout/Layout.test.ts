@@ -122,6 +122,31 @@ describe("buildNavigationItems - technician navigation", () => {
     const items = buildNavigationItems(context)
 
     expect(items.map((item) => item.id)).toEqual(["technician-dashboard", "profile"])
+    expect(items.find((item) => item.id === "technician-dashboard")?.to).toBe("/tech-app")
+  })
+
+  it("shows technician self-service entries for assignable management users", () => {
+    const context = buildContext({
+      userRole: "management",
+      userDepartment: "sound",
+      assignableAsTech: true,
+    })
+    const items = buildNavigationItems(context)
+
+    expect(items.find((item) => item.id === "technician-dashboard")?.to).toBe("/technician-dashboard")
+    expect(items.find((item) => item.id === "technician-jobs")?.to).toBe("/technician-dashboard?tab=jobs")
+  })
+
+  it("hides technician self-service entries for non-assignable management users", () => {
+    const context = buildContext({
+      userRole: "management",
+      userDepartment: "sound",
+      assignableAsTech: false,
+    })
+    const items = buildNavigationItems(context)
+
+    expect(items.find((item) => item.id === "technician-dashboard")).toBeUndefined()
+    expect(items.find((item) => item.id === "technician-jobs")).toBeUndefined()
   })
 
   it("shows the house-tech department routes for house technicians", () => {

@@ -1,8 +1,19 @@
 import "@testing-library/jest-dom/vitest";
+import { createRequire } from "node:module";
 import { cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
 
 import { resetMockSupabase } from "./mockSupabase";
+
+const require = createRequire(import.meta.url);
+
+if (typeof globalThis.WebSocket === "undefined") {
+  Object.defineProperty(globalThis, "WebSocket", {
+    configurable: true,
+    writable: true,
+    value: require("ws"),
+  });
+}
 
 const toast = Object.assign(vi.fn(), {
   error: vi.fn(),
