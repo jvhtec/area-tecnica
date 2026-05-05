@@ -2,7 +2,6 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { getDashboardPath } from '@/utils/roleBasedRouting';
-import { hasTechnicianSelfServiceAccess } from '@/utils/permissions';
 import { UserRole } from '@/types/user';
 
 interface ProtectedRouteProps {
@@ -32,7 +31,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 
   const isAllowedByRole = Boolean(userRole && allowedRoles.includes(userRole as UserRole));
   const isAllowedAsAssignableTech =
-    allowAssignableTech && hasTechnicianSelfServiceAccess(userRole, assignableAsTech);
+    allowAssignableTech &&
+    assignableAsTech === true &&
+    (userRole === 'admin' || userRole === 'management');
 
   if (!isAllowedByRole && !isAllowedAsAssignableTech) {
     const dashboardPath = getDashboardPath(userRole as UserRole | null);

@@ -44,6 +44,7 @@ const renderAssignableTechRoute = () =>
           </ProtectedRoute>
         }
       />
+      <Route path="/tech-app" element={<div>Tech App</div>} />
       <Route path="/dashboard" element={<div>Dashboard</div>} />
     </Routes>,
     { route: "/tech-self-service" },
@@ -129,5 +130,13 @@ describe("ProtectedRoute", () => {
     renderAssignableTechRoute();
 
     expect(await screen.findByText("Dashboard")).toBeInTheDocument();
+  });
+
+  it("does not let allowAssignableTech bypass explicit role mismatches for technician roles", async () => {
+    useOptimizedAuthMock.mockReturnValue(createAuthState({ userRole: "technician" }));
+
+    renderAssignableTechRoute();
+
+    expect(await screen.findByText("Tech App")).toBeInTheDocument();
   });
 });
