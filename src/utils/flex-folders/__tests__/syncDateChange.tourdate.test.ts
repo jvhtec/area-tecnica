@@ -206,6 +206,46 @@ describe("syncFlexElementsForTourDateChange scoping", () => {
     );
   });
 
+  it("handles Flex trees that omit the queried root element", async () => {
+    testState.folders = [
+      {
+        element_id: "tourdate-sound-folder",
+        department: "sound",
+        folder_type: "tourdate",
+      },
+    ];
+    getElementTreeMock.mockResolvedValue([
+      {
+        elementId: "child-only-response",
+        displayName: "Child Only",
+        documentNumber: "260502BAD",
+      },
+    ]);
+
+    const result = await syncFlexElementsForTourDateChange(
+      "tour-date-1",
+      "2026-06-03T00:00:00.000Z"
+    );
+
+    expect(result).toEqual({ success: 1, failed: 0, errors: [] });
+    expect(updateFlexElementHeaderMock).toHaveBeenCalledTimes(4);
+    expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
+      "tourdate-sound-folder",
+      "documentNumber",
+      "260603"
+    );
+    expect(updateFlexElementHeaderMock).toHaveBeenCalledWith(
+      "tourdate-sound-folder",
+      "name",
+      "Mallorca - Jun 3, 2026 - Sound"
+    );
+    expect(updateFlexElementHeaderMock).not.toHaveBeenCalledWith(
+      "child-only-response",
+      expect.any(String),
+      expect.any(String)
+    );
+  });
+
   it("keeps tour date job date sync scoped to recorded rows too", async () => {
     const result = await syncFlexElementsForJobDateChange(
       "job-1",
