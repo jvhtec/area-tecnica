@@ -104,6 +104,47 @@ function collectAllElements(
   return result;
 }
 
+function findElementInTree(
+  nodes: FlexElementNode[],
+  elementId: string
+): { elementId: string; documentNumber?: string; displayName?: string } | null {
+  for (const node of nodes) {
+    if (node.elementId === elementId) {
+      return {
+        elementId: node.elementId,
+        documentNumber: node.documentNumber,
+        displayName: node.displayName,
+      };
+    }
+
+    if (node.children && node.children.length > 0) {
+      const match = findElementInTree(node.children, elementId);
+      if (match) return match;
+    }
+  }
+
+  return null;
+}
+
+function getRecordedElementFromTree(
+  tree: FlexElementNode[],
+  elementId: string
+): { elementId: string; documentNumber?: string; displayName?: string } {
+  const element = findElementInTree(tree, elementId);
+  if (element) return element;
+
+  const treeWithSyntheticRoot: FlexElementNode[] = [
+    {
+      elementId,
+      displayName: "",
+      documentNumber: undefined,
+    },
+    ...tree,
+  ];
+
+  return findElementInTree(treeWithSyntheticRoot, elementId)!;
+}
+
 /**
  * Generate folder name based on folder type and job data
  */
@@ -241,6 +282,66 @@ async function syncDryhireFlexElementsForJobDateChange(
   return results;
 }
 
+async function syncRecordedFlexFolderRowsForDateChange(
+  folders: FlexFolderSyncRow[],
+  newBaseDocNumber: string,
+  formattedStartDate: string,
+  formattedEndDate: string,
+  getFolderName: (folder: FlexFolderSyncRow) => string | null,
+  scopeLabel: string
+): Promise<SyncResult> {
+  const results: SyncResult = { success: 0, failed: 0, errors: [] };
+
+  console.log(
+    `[syncFlexElements] Syncing ${folders.length} recorded ${scopeLabel} element(s) without tree traversal updates.`
+  );
+
+  for (const folder of folders) {
+    try {
+      const tree = await getElementTree(folder.element_id);
+      const element = getRecordedElementFromTree(tree, folder.element_id);
+      const suffix = element.documentNumber
+        ? extractDocumentNumberSuffix(element.documentNumber)
+        : "";
+      const newDocNumber = `${newBaseDocNumber}${suffix}`;
+      const updates: Promise<void>[] = [
+        updateFlexElementHeader(folder.element_id, "documentNumber", newDocNumber),
+        updateFlexElementHeader(folder.element_id, "plannedStartDate", formattedStartDate),
+        updateFlexElementHeader(folder.element_id, "plannedEndDate", formattedEndDate),
+      ];
+
+      const newName = getFolderName(folder);
+      if (newName) {
+        updates.push(updateFlexElementHeader(folder.element_id, "name", newName));
+      }
+
+      await Promise.all(updates);
+
+      if (newName) {
+        console.log(
+          `[syncFlexElements] Updated folder name: ${element.displayName || "(unknown)"} -> ${newName}`
+        );
+      }
+
+      results.success++;
+      console.log(
+        `[syncFlexElements] Updated recorded ${scopeLabel} element ${folder.element_id}: ${element.documentNumber || "(no doc#)"} -> ${newDocNumber}`
+      );
+    } catch (error: unknown) {
+      results.failed++;
+      const errorMsg = `Recorded ${scopeLabel} element ${folder.element_id}: ${getErrorMessage(error)}`;
+      results.errors.push(errorMsg);
+      console.error(`[syncFlexElements] ${errorMsg}`);
+    }
+  }
+
+  console.log(
+    `[syncFlexElements] ${scopeLabel} sync complete: ${results.success} succeeded, ${results.failed} failed`
+  );
+
+  return results;
+}
+
 /**
  * Sync all Flex elements for a job when its dates or title changes
  * Updates document numbers, planned dates, and folder names for all nested elements
@@ -318,6 +419,29 @@ export async function syncFlexElementsForJobDateChange(
       formattedStartDate,
       formattedEndDate,
       newTitle
+    );
+  }
+
+  if (isTourDateJob) {
+    return syncRecordedFlexFolderRowsForDateChange(
+      folders,
+      newBaseDocNumber,
+      formattedStartDate,
+      formattedEndDate,
+      (folder) => {
+        if (!folder.department || !folder.folder_type) {
+          return null;
+        }
+
+        return generateFolderName(
+          folder.folder_type,
+          folder.department,
+          jobTitle,
+          locationName,
+          displayDate
+        );
+      },
+      "tour date job"
     );
   }
 
@@ -415,8 +539,8 @@ export async function syncFlexElementsForJobDateChange(
 }
 
 /**
- * Sync all Flex elements for a tour date when its date changes
- * Updates document numbers, planned dates, and folder names for all nested elements
+ * Sync recorded Flex elements for a tour date when its date changes
+ * Updates only elements linked to the tour date in flex_folders.
  *
  * @param tourDateId The tour_date ID whose date changed
  * @param newDate The new date (ISO string)
@@ -471,87 +595,19 @@ export async function syncFlexElementsForTourDateChange(
     return results;
   }
 
-  console.log(`[syncFlexElements] Found ${folders.length} root folders to sync`);
-
-  // Process each root folder and its tree
-  for (const folder of folders) {
-    try {
-      // Fetch the element tree starting from this folder
-      const tree = await getElementTree(folder.element_id);
-
-      // Collect all elements (including the root and all nested children)
-      const allElements = collectAllElements(tree);
-
-      // Also add the root folder itself if not in tree response
-      const hasRoot = allElements.some((e) => e.elementId === folder.element_id);
-      if (!hasRoot) {
-        allElements.unshift({ elementId: folder.element_id, documentNumber: undefined });
+  return syncRecordedFlexFolderRowsForDateChange(
+    folders,
+    newBaseDocNumber,
+    formattedDate,
+    formattedDate,
+    (folder) => {
+      if (folder.folder_type !== "tourdate" || !folder.department) {
+        return null;
       }
 
-      console.log(
-        `[syncFlexElements] Processing folder ${folder.element_id} (${folder.department}): ${allElements.length} elements`
-      );
-
-      // Update each element
-      for (const element of allElements) {
-        try {
-          // Build new document number preserving the suffix
-          const suffix = element.documentNumber
-            ? extractDocumentNumberSuffix(element.documentNumber)
-            : "";
-          const newDocNumber = `${newBaseDocNumber}${suffix}`;
-
-          // Build array of updates to batch
-          const updates: Promise<void>[] = [
-            updateFlexElementHeader(element.elementId, "documentNumber", newDocNumber),
-            updateFlexElementHeader(element.elementId, "plannedStartDate", formattedDate),
-            updateFlexElementHeader(element.elementId, "plannedEndDate", formattedDate),
-          ];
-
-          // Update name for main tourdate folders (they include date in name)
-          // Only update if this is the root folder and it's a tourdate type
-          let newName: string | null = null;
-          if (
-            folder.folder_type === "tourdate" &&
-            element.elementId === folder.element_id &&
-            folder.department
-          ) {
-            const deptLabel = capitalize(folder.department);
-            newName = `${locationName} - ${displayDate} - ${deptLabel}`;
-            updates.push(updateFlexElementHeader(element.elementId, "name", newName));
-          }
-
-          // Execute all updates for this element in parallel
-          await Promise.all(updates);
-
-          if (newName) {
-            console.log(
-              `[syncFlexElements] Updated folder name: ${element.displayName || "(unknown)"} -> ${newName}`
-            );
-          }
-
-          results.success++;
-          console.log(
-            `[syncFlexElements] Updated element ${element.elementId}: ${element.documentNumber || "(no doc#)"} -> ${newDocNumber}`
-          );
-        } catch (elementError: unknown) {
-          results.failed++;
-          const errorMsg = `Element ${element.elementId}: ${getErrorMessage(elementError)}`;
-          results.errors.push(errorMsg);
-          console.error(`[syncFlexElements] ${errorMsg}`);
-        }
-      }
-    } catch (treeError: unknown) {
-      results.failed++;
-      const errorMsg = `Folder ${folder.element_id}: ${getErrorMessage(treeError)}`;
-      results.errors.push(errorMsg);
-      console.error(`[syncFlexElements] ${errorMsg}`);
-    }
-  }
-
-  console.log(
-    `[syncFlexElements] Sync complete: ${results.success} succeeded, ${results.failed} failed`
+      const deptLabel = capitalize(folder.department);
+      return `${locationName} - ${displayDate} - ${deptLabel}`;
+    },
+    "tour date"
   );
-
-  return results;
 }
