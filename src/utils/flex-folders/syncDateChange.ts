@@ -126,6 +126,25 @@ function findElementInTree(
   return null;
 }
 
+function getRecordedElementFromTree(
+  tree: FlexElementNode[],
+  elementId: string
+): { elementId: string; documentNumber?: string; displayName?: string } {
+  const element = findElementInTree(tree, elementId);
+  if (element) return element;
+
+  const treeWithSyntheticRoot: FlexElementNode[] = [
+    {
+      elementId,
+      displayName: "",
+      documentNumber: undefined,
+    },
+    ...tree,
+  ];
+
+  return findElementInTree(treeWithSyntheticRoot, elementId)!;
+}
+
 /**
  * Generate folder name based on folder type and job data
  */
@@ -280,14 +299,7 @@ async function syncRecordedFlexFolderRowsForDateChange(
   for (const folder of folders) {
     try {
       const tree = await getElementTree(folder.element_id);
-      const element = findElementInTree(tree, folder.element_id);
-
-      if (!element) {
-        throw new Error(
-          `Element ${folder.element_id} not found in tree. Cannot determine document number suffix for resync.`
-        );
-      }
-
+      const element = getRecordedElementFromTree(tree, folder.element_id);
       const suffix = element.documentNumber
         ? extractDocumentNumberSuffix(element.documentNumber)
         : "";
