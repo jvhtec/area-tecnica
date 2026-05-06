@@ -22,6 +22,28 @@ type FestivalStageOption = {
   name: string;
 };
 
+const getFunctionErrorMessage = async (error: unknown, fallback: string) => {
+  const candidate = error as {
+    message?: string;
+    details?: string;
+    context?: {
+      json?: () => Promise<{ error?: string; message?: string; reason?: string; details?: string }>;
+    };
+  };
+
+  if (candidate?.context?.json) {
+    try {
+      const payload = await candidate.context.json();
+      const messageFromBody = payload?.error || payload?.message || payload?.reason || payload?.details;
+      if (messageFromBody) return messageFromBody;
+    } catch {
+      // Fall back to the top-level error message when the function body cannot be parsed.
+    }
+  }
+
+  return candidate?.details || candidate?.message || fallback;
+};
+
 export type FestivalManagementVmResult =
   | { status: "missing_job_id" }
   | { status: "loading" }
@@ -90,6 +112,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [isWhatsappDialogOpen, setIsWhatsappDialogOpen] = useState(false);
   const [waDepartment, setWaDepartment] = useState<'sound' | 'lights' | 'video'>('sound');
   const [waStageNumber, setWaStageNumber] = useState<number>(0);
+  const waEffectiveStageNumber = waDepartment === "sound" ? waStageNumber : 0;
   const [isAlmacenDialogOpen, setIsAlmacenDialogOpen] = useState(false);
   const [waMessage, setWaMessage] = useState<string>("");
   const [isSendingWa, setIsSendingWa] = useState(false);
@@ -98,7 +121,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
 
   // Check if WhatsApp group already exists for this job/department
   const { data: waGroup, refetch: refetchWaGroup } = useQuery({
-    queryKey: ['job-whatsapp-group', jobId, waDepartment, waStageNumber],
+    queryKey: ['job-whatsapp-group', jobId, waDepartment, waEffectiveStageNumber],
     enabled: !!jobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
     queryFn: async () => {
       if (!jobId) return null;
@@ -107,7 +130,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         .select('id, wa_group_id')
         .eq('job_id', jobId)
         .eq('department', waDepartment)
-        .eq('stage_number', waStageNumber)
+        .eq('stage_number', waEffectiveStageNumber)
         .maybeSingle();
       if (error) return null;
       return data;
@@ -115,7 +138,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   });
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
-    queryKey: ['job-whatsapp-group-request', jobId, waDepartment, waStageNumber],
+    queryKey: ['job-whatsapp-group-request', jobId, waDepartment, waEffectiveStageNumber],
     enabled: !!jobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
     queryFn: async () => {
       if (!jobId) return null;
@@ -124,7 +147,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         .select('id, created_at')
         .eq('job_id', jobId)
         .eq('department', waDepartment)
-        .eq('stage_number', waStageNumber)
+        .eq('stage_number', waEffectiveStageNumber)
         .maybeSingle();
       if (error) return null;
       return data;
@@ -133,7 +156,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
 
   useEffect(() => {
     const total = Math.max(maxStages, 1);
-    const usesStageScopedWhatsapp = waDepartment !== "lights";
+    const usesStageScopedWhatsapp = waDepartment === "sound";
 
     if (!usesStageScopedWhatsapp) {
       setWaStageNumber(0);
@@ -1039,7 +1062,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
       try {
         setIsSendingWa(true);
         const { error } = await supabase.functions.invoke("create-whatsapp-group", {
-          body: { job_id: jobId, department: waDepartment, stage_number: waStageNumber },
+          body: { job_id: jobId, department: waDepartment, stage_number: waEffectiveStageNumber },
         });
         if (error) throw error;
         toast({
@@ -1050,9 +1073,10 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         await Promise.all([refetchWaGroup(), refetchWaRequest()]);
       } catch (error: any) {
         console.error("Error creating WhatsApp group:", error);
+        const description = await getFunctionErrorMessage(error, "Error al crear grupo de WhatsApp");
         toast({
           title: "Error",
-          description: error.message || "Error al crear grupo de WhatsApp",
+          description,
           variant: "destructive",
         });
         await Promise.all([refetchWaGroup(), refetchWaRequest()]);
@@ -1060,7 +1084,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         setIsSendingWa(false);
       }
     },
-    [jobId, waDepartment, waStageNumber, refetchWaGroup, refetchWaRequest, toast],
+    [jobId, waDepartment, waEffectiveStageNumber, refetchWaGroup, refetchWaRequest, toast],
   );
 
   const handleRetryWhatsappGroup = useCallback(
@@ -1075,7 +1099,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         // Clear the failed request using RPC function
         const { data: clearResult, error: clearError } = await supabase.rpc(
           'clear_whatsapp_group_request',
-          { p_job_id: jobId, p_department: waDepartment, p_stage_number: waStageNumber }
+          { p_job_id: jobId, p_department: waDepartment, p_stage_number: waEffectiveStageNumber }
         );
 
         if (clearError) {
@@ -1122,7 +1146,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
         setIsSendingWa(false);
       }
     },
-    [jobId, waDepartment, waStageNumber, refetchWaGroup, refetchWaRequest, handleCreateWhatsappGroup, toast],
+    [jobId, waDepartment, waEffectiveStageNumber, refetchWaGroup, refetchWaRequest, handleCreateWhatsappGroup, toast],
   );
 
   const handleSendToAlmacen = useCallback(
