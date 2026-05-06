@@ -280,12 +280,14 @@ async function syncRecordedFlexFolderRowsForDateChange(
   for (const folder of folders) {
     try {
       const tree = await getElementTree(folder.element_id);
-      const element =
-        findElementInTree(tree, folder.element_id) || {
-          elementId: folder.element_id,
-          documentNumber: undefined,
-          displayName: undefined,
-        };
+      const element = findElementInTree(tree, folder.element_id);
+
+      if (!element) {
+        throw new Error(
+          `Element ${folder.element_id} not found in tree. Cannot determine document number suffix for resync.`
+        );
+      }
+
       const suffix = element.documentNumber
         ? extractDocumentNumberSuffix(element.documentNumber)
         : "";
