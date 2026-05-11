@@ -21,6 +21,7 @@ import { CopyArtistsDialog } from "@/components/festival/CopyArtistsDialog";
 import { exportFullFestivalSchedulePDF, FullFestivalSchedulePdfData } from "@/utils/fullFestivalSchedulePdfExport";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
+import { getEffectiveFestivalDateType } from "@/constants/dateTypes";
 
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
@@ -341,13 +342,13 @@ const FestivalArtistManagement = () => {
   const isShowDate = (date: Date) => {
     const formattedDate = format(date, 'yyyy-MM-dd');
     const key = `${jobId}-${formattedDate}`;
-    return dateTypes[key] === 'show';
+    return getEffectiveFestivalDateType(dateTypes[key]) === 'show';
   };
   
   const getCurrentDateType = () => {
     if (!selectedDate || !jobId) return null;
     const key = `${jobId}-${selectedDate}`;
-    return dateTypes[key];
+    return getEffectiveFestivalDateType(dateTypes[key]);
   };
 
   const handlePrintTable = async () => {

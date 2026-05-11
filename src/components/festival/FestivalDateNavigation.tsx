@@ -14,7 +14,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { getDateTypeMeta, isKeyFestivalDateType } from "@/constants/dateTypes";
+import { getDateTypeMeta, getEffectiveFestivalDateType, isKeyFestivalDateType } from "@/constants/dateTypes";
 
 interface FestivalDateNavigationProps {
   jobDates: Date[];
@@ -58,7 +58,7 @@ export const FestivalDateNavigation = ({
     return jobDates.filter(date => {
       const formattedDate = format(date, 'yyyy-MM-dd');
       const key = `${jobId}-${formattedDate}`;
-      const dateType = dateTypes[key];
+      const dateType = getEffectiveFestivalDateType(dateTypes[key]);
       return isKeyFestivalDateType(dateType);
     });
   }, [jobDates, showOnlyShowDates, dateTypes, jobId]);
@@ -94,7 +94,7 @@ export const FestivalDateNavigation = ({
   const getDateTypeColor = (date: Date) => {
     const formattedDate = format(date, 'yyyy-MM-dd');
     const key = `${jobId}-${formattedDate}`;
-    const meta = getDateTypeMeta(dateTypes[key]);
+    const meta = getDateTypeMeta(getEffectiveFestivalDateType(dateTypes[key]));
     if (!meta) return "border-gray-300";
     return `${meta.festivalBorderClassName} ${meta.festivalBackgroundClassName}`;
   };
@@ -102,7 +102,7 @@ export const FestivalDateNavigation = ({
   const getDateTypeBadge = (date: Date) => {
     const formattedDate = format(date, 'yyyy-MM-dd');
     const key = `${jobId}-${formattedDate}`;
-    const meta = getDateTypeMeta(dateTypes[key]);
+    const meta = getDateTypeMeta(getEffectiveFestivalDateType(dateTypes[key]));
     if (!meta) return null;
     
     return (
@@ -317,7 +317,7 @@ export const FestivalDateNavigation = ({
                         <div className="text-center">
                           <p>El día del festival es de {dayStartTime} a {dayStartTime} del día siguiente</p>
                           <p>Fecha: {formattedDateValue}</p>
-                          <p>Tipo: {dateTypes[`${jobId}-${formattedDateValue}`] || 'No configurado'}</p>
+                          <p>Tipo: {getEffectiveFestivalDateType(dateTypes[`${jobId}-${formattedDateValue}`])}</p>
                         </div>
                       </TooltipContent>
                     </Tooltip>
