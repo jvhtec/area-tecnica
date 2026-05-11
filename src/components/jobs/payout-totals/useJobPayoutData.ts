@@ -244,6 +244,54 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   const isLoading = jobMetaLoading || (isTourDate ? tourQuotesLoading : standardLoading);
   const error = jobMetaError ?? (isTourDate ? tourQuotesError : standardError);
 
+  const { data: prepDaysMap = new Map<string, number>() } = useQuery({
+    queryKey: ['job-tech-prep-days', jobId],
+    enabled: !!jobId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('technician_id, amount_eur, amount_breakdown, approved_by_manager')
+        .eq('job_id', jobId)
+        .eq('is_active', true)
+        .eq('approved_by_manager', true);
+      if (error) throw error;
+      const map = new Map<string, number>();
+      (data || []).forEach((row: any) => {
+        if (!row.technician_id) return;
+        const isPrepDay = Boolean(row.amount_breakdown?.is_prep_day);
+        if (!isPrepDay) return;
+        map.set(row.technician_id, (map.get(row.technician_id) || 0) + Number(row.amount_eur || 0));
+      });
+      return map;
+    },
+    staleTime: 30_000,
+  });
+
+  const payoutTotalsWithPrep = React.useMemo(
+    () =>
+      payoutTotals.map((p) => {
+        const prepDaysTotal = prepDaysMap.get(p.technician_id) || 0;
+
+        if (!isTourDate || prepDaysTotal <= 0) {
+          return {
+            ...p,
+            prep_days_total_eur: prepDaysTotal,
+          };
+        }
+
+        // Tour quotes intentionally exclude prep_day from multiplier math and
+        // base quote totals. Prep days are approved fixed-rate timesheets, so
+        // they must be added back into the technician payout exactly once here.
+        return {
+          ...p,
+          timesheets_total_eur: Number(p.timesheets_total_eur || 0) + prepDaysTotal,
+          total_eur: Number(p.total_eur || 0) + prepDaysTotal,
+          prep_days_total_eur: prepDaysTotal,
+        };
+      }),
+    [payoutTotals, prepDaysMap, isTourDate]
+  );
+
   /* ── Flex LPO data ── */
   const { data: lpoRows = [] } = useQuery({
     queryKey: ['flex-work-orders-by-job', jobId, technicianId],
@@ -269,8 +317,8 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   /* ── Profiles ── */
   const techIds = React.useMemo(
-    () => Array.from(new Set(payoutTotals.map((p) => p.technician_id).filter(Boolean))) as string[],
-    [payoutTotals]
+    () => Array.from(new Set(payoutTotalsWithPrep.map((p) => p.technician_id).filter(Boolean))) as string[],
+    [payoutTotalsWithPrep]
   );
   const { data: profiles = [] } = useQuery({
     queryKey: ['profiles-for-job-payout', jobId, techIds],
@@ -409,7 +457,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   /* ── Grand total ── */
   const calculatedGrandTotal = React.useMemo(() => {
-    return payoutTotals.reduce((sum, payout) => {
+    return payoutTotalsWithPrep.reduce((sum, payout) => {
       const override = payoutOverrides.find(o => o.technician_id === payout.technician_id);
 
       let deduction = 0;
@@ -422,7 +470,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
       const effectiveTotal = (override?.override_amount_eur ?? payout.total_eur) - (override ? 0 : deduction);
       return sum + effectiveTotal;
     }, 0);
-  }, [payoutTotals, payoutOverrides, autonomoMap, isTourDate, techDaysMap]);
+  }, [payoutTotalsWithPrep, payoutOverrides, autonomoMap, isTourDate, techDaysMap]);
 
   return {
     jobMeta,
@@ -430,7 +478,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     isLoading,
     error: error as Error | null,
     isClosureLocked,
-    payoutTotals,
+    payoutTotals: payoutTotalsWithPrep,
     visibleTourQuotes,
     profilesWithEmail,
     profileMap,

@@ -18,14 +18,19 @@ describe('timesheet rounding regression guard', () => {
     .filter((f) => f.endsWith('.sql'))
     .sort();
 
+  const computeTimesheetDefinitionPattern =
+    /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:"?public"?\.)?"?compute_timesheet_amount_2025"?\s*\(/i;
+
   // Find the LAST migration that defines compute_timesheet_amount_2025
-  // (CREATE OR REPLACE means the last one wins at runtime)
+  // (CREATE OR REPLACE means the last one wins at runtime). Do not include
+  // migrations that merely call the function, because apparently string search
+  // is how civilization collapses one CI failure at a time.
   const functionMigrations = migrationFiles
     .map((f) => ({
       name: f,
       content: readFileSync(join(migrationsDir, f), 'utf-8'),
     }))
-    .filter((f) => f.content.includes('compute_timesheet_amount_2025'));
+    .filter((f) => computeTimesheetDefinitionPattern.test(f.content));
 
   it('should have at least one migration defining compute_timesheet_amount_2025', () => {
     expect(functionMigrations.length).toBeGreaterThan(0);
