@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, Save, FileDown, Printer } from "lucide-react";
-import { useJobs } from "@/hooks/useJobs";
+import { useJobsData } from "@/hooks/useJobsData";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { generateStagePlotPDF } from "@/utils/stage-plot/pdf-generator";
@@ -11,7 +11,7 @@ import { generateStagePlotPDF } from "@/utils/stage-plot/pdf-generator";
 export default function StagePlot() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { data: jobs } = useJobs();
+  const { data: jobs } = useJobsData();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const pendingSaveJobIdRef = useRef<string | null>(null);
   const pendingPDFRef = useRef<boolean>(false);

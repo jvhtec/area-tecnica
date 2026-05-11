@@ -12,7 +12,7 @@ import { DepartmentTabs } from "@/components/project-management/DepartmentTabs";
 import { StatusFilter } from "@/components/project-management/StatusFilter";
 import { JobTypeFilter } from "@/components/project-management/JobTypeFilter";
 import { Input } from "@/components/ui/input";
-import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
+import { useJobsData } from "@/hooks/useJobsData";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { autoCompleteJobs } from "@/utils/jobStatusUtils";
@@ -66,14 +66,14 @@ const ProjectManagement = () => {
   }, [authLoading, userDepartment]);
 
   // Use custom hook to keep the "jobs" tab active/visible.
-  useTabVisibility(["optimized-jobs"]);
+  useTabVisibility(["jobs-data"]);
   
   // Force subscription to required tables
   useEffect(() => {
     forceSubscribe([
-      { table: 'jobs', queryKey: ['optimized-jobs'], priority: 'high' },
-      { table: 'job_assignments', queryKey: ['optimized-jobs'], priority: 'medium' },
-      { table: 'job_departments', queryKey: ['optimized-jobs'], priority: 'medium' }
+      { table: 'jobs', queryKey: ['jobs-data'], priority: 'high' },
+      { table: 'job_assignments', queryKey: ['jobs-data'], priority: 'medium' },
+      { table: 'job_departments', queryKey: ['jobs-data'], priority: 'medium' }
     ]);
   }, [forceSubscribe]);
 
@@ -87,13 +87,13 @@ const ProjectManagement = () => {
   const isSearching = debouncedQuery.trim().length > 0;
 
   // Use optimized jobs hook with built-in filtering and caching
-  const { data: optimizedJobs = [], isLoading: jobsLoading, error: jobsError } = useOptimizedJobs(
-    selectedDepartment,
-    isSearching ? undefined : startDate,
-    isSearching ? undefined : endDate,
-    true, // include dryhire jobs in project management
-    { refetchOnMount: "always" }
-  );
+  const { data: optimizedJobs = [], isLoading: jobsLoading, error: jobsError } = useJobsData({
+    department: selectedDepartment,
+    startDate: isSearching ? undefined : startDate,
+    endDate: isSearching ? undefined : endDate,
+    includeDryhire: true,
+    refetchOnMount: "always",
+  });
 
   // Check user permissions early
   const canCreateItems = ['admin', 'management', 'logistics'].includes(userRole || '');

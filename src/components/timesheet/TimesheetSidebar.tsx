@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, ChevronLeft, ChevronRight, Calendar, MapPin } from "lucide-react";
-import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
+import { useJobsData } from "@/hooks/useJobsData";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { format, isAfter, isBefore, addDays } from "date-fns";
 import { es } from "date-fns/locale";
@@ -17,7 +17,7 @@ interface TimesheetSidebarProps {
 const JOBS_PER_PAGE = 5;
 
 export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => {
-  const { data: allJobs = [], isLoading } = useOptimizedJobs();
+  const { data: allJobs = [], isLoading } = useJobsData();
   const { userRole, user } = useOptimizedAuth();
   const navigate = useNavigate();
 
