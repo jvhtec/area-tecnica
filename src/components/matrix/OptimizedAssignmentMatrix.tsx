@@ -181,44 +181,27 @@ export const OptimizedAssignmentMatrix = ({
       // Get start of current year
       const now = new Date();
       const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
+      const yearEnd = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
 
-      // Get active timesheets from this year for ALL technicians
-      const { data: timesheetData, error: timesheetError } = await supabase
-        .from('timesheets')
-        .select('technician_id')
-        .eq('is_active', true)
-        .gte('date', yearStart);
+      const { data: countRows, error: timesheetError } = await supabase
+        .rpc('get_active_timesheet_counts_by_technician', {
+          p_start_date: yearStart,
+          p_end_date: yearEnd,
+        });
 
       if (timesheetError) {
         console.warn('Failed to fetch timesheet counts', timesheetError);
         return { counts: new Map<string, number>(), departments: new Map<string, string>() };
       }
 
-      // Count timesheets per technician
       const countMap = new Map<string, number>();
-      (timesheetData || []).forEach((timesheet: any) => {
-        const current = countMap.get(timesheet.technician_id) || 0;
-        countMap.set(timesheet.technician_id, current + 1);
-      });
-
-      // Fetch departments for all technicians who have timesheets
-      const techIds = Array.from(countMap.keys());
       const departmentMap = new Map<string, string>();
-
-      if (techIds.length > 0) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, department')
-          .in('id', techIds);
-
-        if (!profileError && profileData) {
-          profileData.forEach((profile: any) => {
-            if (profile.department) {
-              departmentMap.set(profile.id, profile.department);
-            }
-          });
+      (countRows || []).forEach(row => {
+        countMap.set(row.technician_id, Number(row.timesheet_count || 0));
+        if (row.department) {
+          departmentMap.set(row.technician_id, row.department);
         }
-      }
+      });
 
       return { counts: countMap, departments: departmentMap };
     },
@@ -238,44 +221,25 @@ export const OptimizedAssignmentMatrix = ({
       const yearStart = new Date(lastYear, 0, 1).toISOString().split('T')[0];
       const yearEnd = new Date(lastYear, 11, 31).toISOString().split('T')[0];
 
-      // Get active timesheets from last year for ALL technicians
-      const { data: timesheetData, error: timesheetError } = await supabase
-        .from('timesheets')
-        .select('technician_id')
-        .eq('is_active', true)
-        .gte('date', yearStart)
-        .lte('date', yearEnd);
+      const { data: countRows, error: timesheetError } = await supabase
+        .rpc('get_active_timesheet_counts_by_technician', {
+          p_start_date: yearStart,
+          p_end_date: yearEnd,
+        });
 
       if (timesheetError) {
         console.warn('Failed to fetch last year timesheet counts', timesheetError);
         return { counts: new Map<string, number>(), departments: new Map<string, string>() };
       }
 
-      // Count timesheets per technician
       const countMap = new Map<string, number>();
-      (timesheetData || []).forEach((timesheet: any) => {
-        const current = countMap.get(timesheet.technician_id) || 0;
-        countMap.set(timesheet.technician_id, current + 1);
-      });
-
-      // Fetch departments for all technicians who have timesheets
-      const techIds = Array.from(countMap.keys());
       const departmentMap = new Map<string, string>();
-
-      if (techIds.length > 0) {
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, department')
-          .in('id', techIds);
-
-        if (!profileError && profileData) {
-          profileData.forEach((profile: any) => {
-            if (profile.department) {
-              departmentMap.set(profile.id, profile.department);
-            }
-          });
+      (countRows || []).forEach(row => {
+        countMap.set(row.technician_id, Number(row.timesheet_count || 0));
+        if (row.department) {
+          departmentMap.set(row.technician_id, row.department);
         }
-      }
+      });
 
       return { counts: countMap, departments: departmentMap };
     },
