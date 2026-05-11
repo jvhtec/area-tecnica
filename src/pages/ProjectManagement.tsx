@@ -23,6 +23,15 @@ import { cn } from "@/lib/utils";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useCreateJobDialogStore } from "@/stores/useCreateJobDialogStore";
 
+const normalizeSearchText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .trim();
+
+const buildSearchTokens = (query: string) => normalizeSearchText(query).split(/\s+/).filter(Boolean);
+
 const ProjectManagement = () => {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -125,18 +134,19 @@ const ProjectManagement = () => {
   }, [optimizedJobs, canCreateItems, isSearching, toast]);
 
   // Filter jobs by selected job type and statuses with database-level optimization
+  const tokens = buildSearchTokens(debouncedQuery);
   const jobs = (optimizedJobs || []).filter((job: any) => {
     const matchesType = isSearching
       ? true // search overrides type filter
       : (selectedJobTypes.length === 0 ||
         selectedJobTypes.map(t => t.toLowerCase()).includes(String(job.job_type || '').toLowerCase()));
     const matchesStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
-    const q = debouncedQuery.trim().toLowerCase();
+    const searchableValues = [job.title, job.client, job.location?.name, job.location?.formatted_address]
+      .filter(Boolean)
+      .map((value: string) => normalizeSearchText(value));
     const matchesSearch =
-      q.length === 0 ||
-      [job.title, job.client, job.location?.name, job.location?.formatted_address]
-        .filter(Boolean)
-        .some((s: string) => s.toLowerCase().includes(q));
+      tokens.length === 0 ||
+      tokens.every((token) => searchableValues.some((value) => value.includes(token)));
     return matchesType && matchesStatus && matchesSearch;
   });
 
