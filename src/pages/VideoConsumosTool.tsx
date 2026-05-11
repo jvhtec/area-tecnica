@@ -616,7 +616,7 @@ const VideoConsumosTool: React.FC = () => {
     <Card className="w-full max-w-4xl mx-auto my-6">
       <CardHeader className="space-y-1">
         <div className="flex items-center justify-between">
-          <Button variant="ghost" size="icon" onClick={() => navigate('/video')}>
+          <Button variant="ghost" size="icon" haptic="tap" onClick={() => navigate('/video')}>
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center gap-2">

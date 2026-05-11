@@ -17,6 +17,9 @@ import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload"
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
+import { useHapticsPreferencesStore } from "@/stores/useHapticsPreferencesStore";
+import { haptics } from "@/lib/haptics";
+import { Switch } from "@/components/ui/switch";
 
 export const Profile = () => {
   const { toast } = useToast();
@@ -58,6 +61,11 @@ export const Profile = () => {
   const showTechnicianSelfTools =
     (profile?.role === 'admin' || profile?.role === 'management') &&
     profile?.assignable_as_tech === true;
+
+  const hapticsEnabled = useHapticsPreferencesStore((state) => state.hapticsEnabled);
+  const hapticsIntensity = useHapticsPreferencesStore((state) => state.hapticsIntensity);
+  const setHapticsEnabled = useHapticsPreferencesStore((state) => state.setHapticsEnabled);
+  const setHapticsIntensity = useHapticsPreferencesStore((state) => state.setHapticsIntensity);
 
   // Fetch user profile on component mount
   useEffect(() => {
@@ -552,6 +560,59 @@ export const Profile = () => {
               </CardContent>
             </Card>
           )}
+
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Retroalimentación háptica</CardTitle>
+              <CardDescription>
+                Ajusta el feedback táctil para interacciones clave. Se respetará “reducir movimiento” del sistema.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between rounded-lg border p-3">
+                <div className="space-y-1">
+                  <Label htmlFor="haptics-enabled">Activar vibración/hápticos</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Modo por defecto conservador (intensidad suave) y sin vibración cuando el dispositivo lo limita.
+                  </p>
+                </div>
+                <Switch
+                  id="haptics-enabled"
+                  checked={hapticsEnabled}
+                  onCheckedChange={(checked) => {
+                    setHapticsEnabled(checked)
+                    if (checked) {
+                      void haptics.tap()
+                    }
+                  }}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="haptics-intensity">Intensidad</Label>
+                <Select
+                  value={hapticsIntensity}
+                  onValueChange={(value) => {
+                    setHapticsIntensity(value as 'light' | 'medium' | 'strong')
+                    if (hapticsEnabled) {
+                      void haptics.selectionChanged()
+                    }
+                  }}
+                  disabled={!hapticsEnabled}
+                >
+                  <SelectTrigger id="haptics-intensity">
+                    <SelectValue placeholder="Selecciona intensidad" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="light">Suave</SelectItem>
+                    <SelectItem value="medium">Media</SelectItem>
+                    <SelectItem value="strong">Fuerte</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Push notifications */}
           {showPushControls && (
