@@ -30,11 +30,11 @@ describe('tour job quote schedule-range regression guard', () => {
     expect(codeOnly).toMatch(/FROM public\.job_date_types jdt/i);
     expect(codeOnly).toMatch(/schedule_start := COALESCE\(\s*job_date_type_start,\s*tour_date_start,\s*job_start_date,\s*tour_date_legacy_date/i);
     expect(codeOnly).toMatch(/schedule_end := COALESCE\(\s*job_date_type_end,\s*tour_date_end,\s*job_end_date,\s*tour_date_start,\s*tour_date_legacy_date,\s*job_start_date/i);
-    expect(codeOnly).toMatch(/WITH active_timesheet_dates AS \(/i);
+    expect(codeOnly).toMatch(/active_timesheet_dates AS \(/i);
     expect(codeOnly).toMatch(/SELECT DISTINCT t\.date AS payable_date/i);
     expect(codeOnly).toMatch(/FROM public\.timesheets t/i);
     expect(codeOnly).toMatch(/AND COALESCE\(t\.is_active,\s*TRUE\)/i);
-    expect(codeOnly).toMatch(/fallback_assignment_dates AS \(/i);
+    expect(codeOnly).toMatch(/single_day_assignment_dates AS \(/i);
     expect(codeOnly).toMatch(/COALESCE\(ja\.single_day,\s*FALSE\)/i);
     expect(codeOnly).toMatch(/fallback_schedule_dates AS \(/i);
     expect(codeOnly).toMatch(/FROM payable_dates pd/i);
