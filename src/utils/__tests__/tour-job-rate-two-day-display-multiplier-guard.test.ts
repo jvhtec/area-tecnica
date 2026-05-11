@@ -1,27 +1,37 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'fs';
+import { readdirSync, readFileSync } from 'fs';
 import { join } from 'path';
 
-const TWO_DAY_DISPLAY_FIX_MIGRATION = '20260430100000_fix_tour_two_day_display_multiplier.sql';
+const migrationsDir = join(__dirname, '..', '..', '..', 'supabase', 'migrations');
+const computeTourQuoteDefinitionPattern =
+  /CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:"?public"?\.)?"?compute_tour_job_rate_quote_2025"?\s*\(/i;
 
 describe('tour job two-day multiplier display guard', () => {
-  const migration = readFileSync(
-    join(__dirname, '..', '..', '..', 'supabase', 'migrations', TWO_DAY_DISPLAY_FIX_MIGRATION),
-    'utf-8',
-  );
+  const latestTourQuoteMigration = readdirSync(migrationsDir)
+    .filter((file) => file.endsWith('.sql'))
+    .sort()
+    .map((name) => readFileSync(join(migrationsDir, name), 'utf-8'))
+    .filter((content) => computeTourQuoteDefinitionPattern.test(content))
+    .at(-1);
 
   it('keeps the returned two-day multiplier at the per-date 1.125x value', () => {
-    expect(migration).toContain(
-      "'WHEN GREATEST(COALESCE(weekly_counts.cnt, 0), 1) = 2 THEN 2.25::numeric'",
+    expect(latestTourQuoteMigration).toBeDefined();
+    const codeOnly = latestTourQuoteMigration!
+      .split('\n')
+      .filter((line) => !line.trimStart().startsWith('--'))
+      .join('\n');
+
+    expect(codeOnly).toContain(
+      'WHEN GREATEST(COALESCE(weekly_counts.cnt, 0), 1) = 2 THEN 1.125::numeric',
     );
-    expect(migration).toContain(
-      "'WHEN GREATEST(COALESCE(weekly_counts.cnt, 0), 1) = 2 THEN 1.125::numeric'",
+    expect(codeOnly).not.toContain(
+      'WHEN GREATEST(COALESCE(weekly_counts.cnt, 0), 1) = 2 THEN 2.25::numeric',
     );
-    expect(migration).toContain(
-      "'COALESCE(ROUND(AVG(dm.week_multiplier), 3), 1.0)'",
+    expect(codeOnly).toContain(
+      'COALESCE(ROUND(SUM(dm.week_multiplier * dm.week_count) / NULLIF(SUM(dm.week_count), 0), 3), 1.0)',
     );
-    expect(migration).toContain(
-      "'COALESCE(ROUND(AVG(dm.date_multiplier), 3), 1.0)'",
+    expect(codeOnly).toContain(
+      'COALESCE(ROUND(SUM(dm.date_multiplier * dm.week_count) / NULLIF(SUM(dm.week_count), 0), 3), 1.0)',
     );
   });
 

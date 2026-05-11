@@ -1,6 +1,7 @@
--- Supersedes the earlier PR #599 tour quote follow-up migrations.
+-- Final tour quote rules for prep-day support, payable date ranges, and rigging scoping.
 -- Keeps expanded non-prep job_date_types as the quote source of truth while
 -- preventing unassigned rigging dates from counting for every technician.
+-- Returned/display multipliers reflect the per-payable-date multiplier used for payout math.
 
 CREATE OR REPLACE FUNCTION public.compute_tour_job_rate_quote_2025(_job_id uuid, _tech_id uuid)
 RETURNS jsonb
@@ -445,7 +446,7 @@ BEGIN
         CASE
           WHEN NOT team_member THEN 1.0::numeric
           WHEN GREATEST(COALESCE(weekly_counts.cnt, 0), 1) = 1 THEN 1.5::numeric
-          WHEN GREATEST(COALESCE(weekly_counts.cnt, 0), 1) = 2 THEN 2.25::numeric
+          WHEN GREATEST(COALESCE(weekly_counts.cnt, 0), 1) = 2 THEN 1.125::numeric
           ELSE 1.0::numeric
         END AS week_multiplier,
         CASE
@@ -634,4 +635,4 @@ $function$;
 REVOKE EXECUTE ON FUNCTION public.compute_tour_job_rate_quote_2025(uuid,uuid) FROM PUBLIC;
 
 COMMENT ON FUNCTION public.compute_tour_job_rate_quote_2025(uuid,uuid) IS
-  'Calculates tour job rate quotes. Scheduled non-prep job_date_types are the base payable dates, so expanded show dates update quotes before all timesheets exist. Rigging dates count only for technicians assigned to that date or with an active timesheet on it. Weekly multipliers are applied per technician per eligible payable date/week; prep days are fixed-rate timesheets and excluded from quote counts.';
+  'Calculates tour job rate quotes. Scheduled non-prep job_date_types are the base payable dates, expanded show dates update quotes before all timesheets exist, rigging dates count only for assigned technicians, and returned multipliers are per payable date (1 date 1.5x, 2 dates 1.125x each, 3+ dates 1x). Prep days are fixed-rate timesheets and excluded from quote counts.';
