@@ -21,6 +21,8 @@ vi.mock("@/components/jobs/payout-totals/usePayoutActions", () => ({
 
 import { JobPayoutTotalsPanel } from "../JobPayoutTotalsPanel";
 
+const normalizeCurrencyText = (value: string) => value.replace(/\s+/g, "");
+
 describe("JobPayoutTotalsPanel tourdate payouts", () => {
   const buildPayoutData = () => ({
     jobMeta: {
@@ -144,12 +146,11 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
   it("renders mapped tour payouts with totals and extras", () => {
     renderWithProviders(<JobPayoutTotalsPanel jobId="job-tour-1" />);
 
-    const normalize = (value: string) => value.replace(/\s+/g, "");
     const grandTotals = screen.getAllByText(
-      (content) => normalize(content) === normalize(formatCurrency(175)),
+      (content) => normalizeCurrencyText(content) === normalizeCurrencyText(formatCurrency(175)),
     );
     const baseTotals = screen.getAllByText(
-      (content) => normalize(content) === normalize(formatCurrency(150)),
+      (content) => normalizeCurrencyText(content) === normalizeCurrencyText(formatCurrency(150)),
     );
 
     expect(grandTotals.length).toBeGreaterThan(0);
@@ -289,7 +290,12 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
 
     renderWithProviders(<JobPayoutTotalsPanel jobId="job-tour-1" />);
 
-    expect(screen.getByText(/estándar: 2 x/i)).toBeInTheDocument();
+    expect(screen.getByText(
+      (content) => normalizeCurrencyText(content) === normalizeCurrencyText(`Estándar: 2 x ${formatCurrency(360)}`),
+    )).toBeInTheDocument();
+    expect(screen.getByText(
+      (content) => normalizeCurrencyText(content) === normalizeCurrencyText(formatCurrency(720)),
+    )).toBeInTheDocument();
     expect(screen.getByText(/multiplicador gira: 1 día con factor 1,5x/i)).toBeInTheDocument();
     expect(screen.getByText(/\+240/)).toBeInTheDocument();
   });
