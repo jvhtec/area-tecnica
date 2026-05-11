@@ -89,19 +89,21 @@ export function useStaffingMatrixStatuses(
         return out
       }
 
-      // 1) Job-based statuses from aggregated view
+      // 1) Job-based statuses from bounded RPC. Avoid filtering the all-table
+      // staffing status rollup client-side; each call is scoped before DISTINCT ON.
       const mapByJob = new Map<string, ByJobStatus>()
       try {
-        const techBatches = chunk(technicianIds, 20)
-        const jobBatches = chunk(jobIds, 20)
+        const techBatches = chunk(technicianIds, 100)
+        const jobBatches = chunk(jobIds, 100)
         const promises: Promise<any>[] = []
         for (const tb of techBatches) {
           for (const jb of jobBatches) {
             promises.push(
               Promise.resolve(supabase
-                .rpc('get_assignment_matrix_staffing')
-                .in('job_id', jb)
-                .in('profile_id', tb))
+                .rpc('get_assignment_matrix_staffing_filtered', {
+                  p_job_ids: jb,
+                  p_profile_ids: tb
+                }))
             )
           }
         }

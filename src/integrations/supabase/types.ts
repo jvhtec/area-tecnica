@@ -8541,6 +8541,18 @@ export type Database = {
           profile_id: string
         }[]
       }
+      get_assignment_matrix_staffing_filtered: {
+        Args: { p_job_ids: string[]; p_profile_ids: string[] }
+        Returns: {
+          availability_status: string | null
+          availability_updated_at: string | null
+          job_id: string
+          last_change: string
+          offer_status: string | null
+          offer_updated_at: string | null
+          profile_id: string
+        }[]
+      }
       get_current_user_role: { Args: never; Returns: string }
       get_job_total_amounts: {
         Args: { _job_id: string; _user_role?: string }

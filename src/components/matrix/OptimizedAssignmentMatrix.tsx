@@ -127,9 +127,10 @@ export const OptimizedAssignmentMatrix = ({
       const map = new Map<string, { availability_status: string | null; offer_status: string | null }>();
       for (const b of batches) {
         const { data, error } = await supabase
-          .rpc('get_assignment_matrix_staffing')
-          .eq('job_id', sortJobId)
-          .in('profile_id', b);
+          .rpc('get_assignment_matrix_staffing_filtered', {
+            p_job_ids: [sortJobId],
+            p_profile_ids: b,
+          });
         if (error) {
           console.warn('Sort job statuses RPC error', error);
           continue;
