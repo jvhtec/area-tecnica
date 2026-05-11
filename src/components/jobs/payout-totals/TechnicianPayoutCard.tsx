@@ -26,6 +26,10 @@ const categoryLabels: Record<string, string> = {
   'otros': 'Otros',
 };
 
+function roundCurrencyValue(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 interface TechnicianPayoutCardProps {
   payout: JobPayoutTotals;
   tourQuote?: TourJobRateQuote;
@@ -176,6 +180,13 @@ export function TechnicianPayoutCard({
   const standardDayRate = Number(quoteBreakdown?.standard_day_rate_eur ?? 0);
   const multipliedStandardDays = Number(quoteBreakdown?.multiplied_standard_days ?? 0);
   const standardMultiplierBonus = Number(quoteBreakdown?.standard_multiplier_bonus_eur ?? 0);
+  const standardTotalWithMultiplier = roundCurrencyValue(standardDays * standardDayRate);
+  const standardBaseTotal = standardDays > 0
+    ? Math.max(0, roundCurrencyValue(standardTotalWithMultiplier - standardMultiplierBonus))
+    : 0;
+  const standardBaseDayRate = standardDays > 0
+    ? roundCurrencyValue(standardBaseTotal / standardDays)
+    : 0;
   const multiplierFactor = Number(
     quoteBreakdown?.per_job_multiplier
       ?? tourQuote?.per_job_multiplier
@@ -352,8 +363,8 @@ export function TechnicianPayoutCard({
 
             {standardDays > 0 && (
               <div className="flex justify-between gap-3 text-xs text-muted-foreground">
-                <span>Estándar: {standardDays} x {formatCurrency(standardDayRate)}</span>
-                <span>{formatCurrency(standardDays * standardDayRate)}</span>
+                <span>Estándar: {standardDays} x {formatCurrency(standardBaseDayRate)}</span>
+                <span>{formatCurrency(standardBaseTotal)}</span>
               </div>
             )}
 
