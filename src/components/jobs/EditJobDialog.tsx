@@ -44,6 +44,15 @@ function normalizePrepDayDates(dates: string[]): string[] {
   return Array.from(new Set(dates.map((date) => date.trim()).filter(Boolean))).sort();
 }
 
+function getPreviousDateInputValue(date: string): string {
+  const [year, month, day] = date.split("-").map(Number);
+  if (!year || !month || !day) return "";
+
+  const value = new Date(Date.UTC(year, month - 1, day));
+  value.setUTCDate(value.getUTCDate() - 1);
+  return value.toISOString().slice(0, 10);
+}
+
 export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) => {
   const fieldClass = "bg-background border-input text-foreground placeholder:text-muted-foreground";
   const [title, setTitle] = useState(job.title);
@@ -403,6 +412,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
   const eligibleForPrepDays = isPrepDayEligibleJobType(jobType);
   const localStartDate = startTime?.split("T")?.[0] ?? "";
+  const maxPrepDate = getPreviousDateInputValue(localStartDate);
 
   return (
     <>
@@ -521,7 +531,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                       <Input
                         type="date"
                         value={date}
-                        max={localStartDate || undefined}
+                        max={maxPrepDate || undefined}
                         onChange={(e) => updatePrepDayDate(index, e.target.value)}
                         className={fieldClass}
                       />
