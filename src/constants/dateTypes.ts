@@ -157,6 +157,10 @@ export function isKeyFestivalDateType(value?: string | null): boolean {
   return getDateTypeMeta(value)?.isKeyFestivalDay ?? false;
 }
 
+export function getEffectiveFestivalDateType(value?: string | null): DateType {
+  return getDateTypeMeta(value)?.value ?? "show";
+}
+
 export const DATE_TYPE_OPTIONS = DATE_TYPE_ORDER.map((type) => DATE_TYPE_META[type]);
 export const TOUR_DATE_TYPE_OPTIONS = TOUR_DATE_TYPE_ORDER.map((type) => ({
   ...DATE_TYPE_META[type],
