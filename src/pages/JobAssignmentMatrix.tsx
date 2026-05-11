@@ -22,7 +22,6 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { format } from 'date-fns';
 import {
   AVAILABLE_DEPARTMENTS,
   DEPARTMENT_LABELS,
@@ -299,82 +298,7 @@ export default function JobAssignmentMatrix() {
   } = useQuery<any[]>({
     queryKey: ['optimized-matrix-jobs', rangeInfo.startFormatted, rangeInfo.endFormatted, selectedDepartment],
     queryFn: async () => {
-      const startDate = rangeInfo.start;
-      const endDate = rangeInfo.end;
-      const windowRange = `[${startDate.toISOString()},${endDate.toISOString()}]`;
-      const allowedJobTypes = ['single', 'festival', 'ciclo', 'tourdate', 'evento'];
-
-      // Use interval overlap logic to show all jobs that overlap with the visible date range
-      // This ensures long-running jobs (e.g., multi-month tours) are visible even if they
-      // extend beyond the current range. A job overlaps if:
-      // - Job starts before range ends AND
-      // - Job ends after range starts
-      let overlapQuery = supabase
-        .from('jobs')
-        .select(`
-          id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
-          job_departments!inner(department),
-          job_assignments!job_id(technician_id)
-        `)
-        .filter('time_range', 'ov', windowRange)
-        .in('job_type', allowedJobTypes)
-        .limit(500); // Limit for performance
-
-      // Add department filter if selected
-      overlapQuery = overlapQuery.eq('job_departments.department', selectedDepartment);
-
-      const [overlapRes, typedRes] = await Promise.all([
-        overlapQuery.order('start_time', { ascending: true }),
-        supabase
-          .from('job_date_types')
-          .select(`
-            job_id,
-            date,
-            type,
-            jobs!inner(
-              id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
-              job_departments!inner(department),
-              job_assignments!job_id(technician_id)
-            )
-          `)
-          .gte('date', rangeInfo.startFormatted)
-          .lte('date', rangeInfo.endFormatted)
-          .eq('jobs.job_departments.department', selectedDepartment)
-          .in('jobs.job_type', allowedJobTypes)
-          .limit(500),
-      ]);
-      if (overlapRes.error) throw overlapRes.error;
-      if (typedRes.error) throw typedRes.error;
-
-      const mergedById = new Map<string, any>();
-      (overlapRes.data || []).forEach((row: any) => {
-        mergedById.set(row.id, row);
-      });
-      (typedRes.data || []).forEach((typed: any) => {
-        const job = Array.isArray(typed.jobs) ? typed.jobs[0] : typed.jobs;
-        if (job?.id && !mergedById.has(job.id)) {
-          mergedById.set(job.id, job);
-        }
-      });
-
-      // Filter out cancelled jobs unless they have assigned technicians
-      const filtered = Array.from(mergedById.values()).map((j: any) => {
-        const assigns = Array.isArray(j.job_assignments) ? j.job_assignments : [];
-        return {
-          id: j.id,
-          title: j.title,
-          start_time: j.start_time,
-          end_time: j.end_time,
-          color: j.color,
-          status: j.status,
-          job_type: j.job_type,
-          job_date_types: Array.isArray(j.job_date_types) ? j.job_date_types : [],
-          // keep for downstream UI warnings
-          _assigned_count: assigns.length as number,
-        };
-      }).filter((j: any) => j.status !== 'Cancelado' || j._assigned_count > 0);
-
-      return filtered;
+      return fetchJobsForWindow(rangeInfo.start, rangeInfo.end, selectedDepartment);
     },
     enabled: dateRange.length > 0,
     staleTime: 5 * 60 * 1000, // 5 minutes
@@ -426,7 +350,7 @@ export default function JobAssignmentMatrix() {
 
       if (!cancelled && jobIds.length && technicianIds.length) {
         await qc.prefetchQuery({
-          queryKey: ['optimized-matrix-assignments', jobIds, technicianIds, format(start, 'yyyy-MM-dd')],
+          queryKey: ['optimized-matrix-assignments', jobIds, technicianIds, startFormatted],
           queryFn: () => fetchAssignmentsForWindow(jobIds, technicianIds, jobsForWindow),
           staleTime: 30 * 1000,
           gcTime: 2 * 60 * 1000,
@@ -435,7 +359,7 @@ export default function JobAssignmentMatrix() {
 
       if (!cancelled && technicianIds.length) {
         await qc.prefetchQuery({
-          queryKey: ['optimized-matrix-availability', technicianIds, format(start, 'yyyy-MM-dd'), format(end, 'yyyy-MM-dd')],
+          queryKey: ['optimized-matrix-availability', technicianIds, startFormatted, endFormatted],
           queryFn: () => fetchAvailabilityForWindow(technicianIds, start, end),
           staleTime: 60 * 1000,
           gcTime: 10 * 60 * 1000,

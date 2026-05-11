@@ -8842,6 +8842,10 @@ export type Database = {
             Returns: undefined
           }
       update_tour_dates: { Args: never; Returns: undefined }
+      upsert_job_prep_days: {
+        Args: { p_dates: string[]; p_job_id: string }
+        Returns: undefined
+      }
       upsert_venue: {
         Args: {
           p_capacity?: number

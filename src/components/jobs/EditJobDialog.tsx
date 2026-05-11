@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Department, TECHNICAL_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
@@ -36,7 +36,9 @@ interface EditJobDialogProps {
   job: any;
 }
 
-const PREP_DAY_ELIGIBLE_JOB_TYPES: JobType[] = ["tourdate", "festival", "single", "ciclo", "evento"];
+function isPrepDayEligibleJobType(jobType: JobType): boolean {
+  return jobType !== "dryhire";
+}
 
 function normalizePrepDayDates(dates: string[]): string[] {
   return Array.from(new Set(dates.map((date) => date.trim()).filter(Boolean))).sort();
@@ -69,32 +71,39 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { getOrCreateLocationWithDetails } = useLocationManagement();
+  const latestJobRef = useRef(job);
+
+  useEffect(() => {
+    latestJobRef.current = job;
+  }, [job]);
 
   // Reset form when job changes and fetch location data
   useEffect(() => {
     const fetchJobWithLocation = async () => {
-      if (job) {
-        setTitle(job.title);
-        setDescription(job.description || "");
-        setColor(job.color || "#7E69AB");
-        setJobType(job.job_type || "single");
-        setTimezone(job.timezone || "Europe/Madrid");
-        setInvoicingCompany(job.invoicing_company || null);
+      const currentJob = latestJobRef.current;
+
+      if (currentJob) {
+        setTitle(currentJob.title);
+        setDescription(currentJob.description || "");
+        setColor(currentJob.color || "#7E69AB");
+        setJobType(currentJob.job_type || "single");
+        setTimezone(currentJob.timezone || "Europe/Madrid");
+        setInvoicingCompany(currentJob.invoicing_company || null);
 
         // Convert UTC times to local input format using job's timezone
-        if (job.start_time && job.end_time) {
-          const jobTimezone = job.timezone || "Europe/Madrid";
-          setStartTime(utcToLocalInput(job.start_time, jobTimezone));
-          setEndTime(utcToLocalInput(job.end_time, jobTimezone));
+        if (currentJob.start_time && currentJob.end_time) {
+          const jobTimezone = currentJob.timezone || "Europe/Madrid";
+          setStartTime(utcToLocalInput(currentJob.start_time, jobTimezone));
+          setEndTime(utcToLocalInput(currentJob.end_time, jobTimezone));
         }
 
         // Fetch location data if job has a location_id
-        if (job.location_id) {
+        if (currentJob.location_id) {
           try {
             const { data: locationData, error } = await supabase
               .from("locations")
               .select("*")
-              .eq("id", job.location_id)
+              .eq("id", currentJob.location_id)
               .single();
 
             if (!error && locationData) {
@@ -120,7 +129,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         const { data: prepDateTypes, error: prepDateTypesError } = await supabase
           .from("job_date_types")
           .select("date")
-          .eq("job_id", job.id)
+          .eq("job_id", currentJob.id)
           .eq("type", "prep_day")
           .order("date", { ascending: true });
 
@@ -134,7 +143,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
     };
 
     fetchJobWithLocation();
-  }, [job]);
+  }, [job?.id]);
 
   // Fetch current departments when dialog opens
   useEffect(() => {
@@ -195,7 +204,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       // Convert local datetime-local input values to UTC using the job's timezone
       const startTimeUTC = localInputToUTC(startTime, timezone);
       const endTimeUTC = localInputToUTC(endTime, timezone);
-      const eligibleForPrepDays = PREP_DAY_ELIGIBLE_JOB_TYPES.includes(jobType);
+      const eligibleForPrepDays = isPrepDayEligibleJobType(jobType);
       const localStartDate = startTime?.split("T")?.[0] ?? "";
       const targetPrepDates = eligibleForPrepDays ? normalizePrepDayDates(prepDayDates) : [];
 
@@ -208,22 +217,6 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         const invalidDates = targetPrepDates.filter((date) => date >= localStartDate);
         if (invalidDates.length > 0) {
           throw new Error(`Prep days must be before the job start date: ${invalidDates.join(", ")}`);
-        }
-
-        const { data: conflictingDateTypes, error: conflictError } = await supabase
-          .from("job_date_types")
-          .select("date, type")
-          .eq("job_id", job.id)
-          .in("date", targetPrepDates)
-          .neq("type", "prep_day");
-
-        if (conflictError) throw conflictError;
-
-        if (conflictingDateTypes && conflictingDateTypes.length > 0) {
-          const conflictSummary = conflictingDateTypes
-            .map((row) => `${row.date} (${row.type})`)
-            .join(", ");
-          throw new Error(`Prep days conflict with existing date types: ${conflictSummary}`);
         }
       }
 
@@ -268,20 +261,12 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
       if (jobError) throw jobError;
 
-      const { error: prepDeleteError } = await supabase
-        .from("job_date_types")
-        .delete()
-        .eq("job_id", job.id)
-        .eq("type", "prep_day");
+      const { error: prepErr } = await supabase.rpc("upsert_job_prep_days", {
+        p_job_id: job.id,
+        p_dates: targetPrepDates,
+      });
 
-      if (prepDeleteError) throw prepDeleteError;
-
-      if (targetPrepDates.length > 0) {
-        const { error: prepErr } = await supabase
-          .from("job_date_types")
-          .insert(targetPrepDates.map((date) => ({ job_id: job.id, date, type: "prep_day" as const })));
-        if (prepErr) throw prepErr;
-      }
+      if (prepErr) throw prepErr;
 
       // Update departments
       const { data: currentDepts, error: currentDeptsError } = await supabase
@@ -416,7 +401,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
     }
   };
 
-  const eligibleForPrepDays = PREP_DAY_ELIGIBLE_JOB_TYPES.includes(jobType);
+  const eligibleForPrepDays = isPrepDayEligibleJobType(jobType);
   const localStartDate = startTime?.split("T")?.[0] ?? "";
 
   return (
@@ -522,14 +507,14 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             {eligibleForPrepDays && (
               <div className="space-y-3 rounded-lg border p-3">
                 <div className="space-y-1">
-                  <Label>Prep days (15€/hr)</Label>
+                  <Label>Días de preparación (15 €/h)</Label>
                   <p className="text-xs text-muted-foreground">
-                    Add the exact prep dates. Prep days must be before the job start date{localStartDate ? ` (${localStartDate})` : ""}.
+                    Añade las fechas exactas. Deben ser anteriores al inicio del trabajo{localStartDate ? ` (${localStartDate})` : ""}.
                   </p>
                 </div>
                 <div className="space-y-2">
                   {prepDayDates.length === 0 && (
-                    <p className="text-sm text-muted-foreground">No prep days added.</p>
+                    <p className="text-sm text-muted-foreground">No hay días de preparación añadidos.</p>
                   )}
                   {prepDayDates.map((date, index) => (
                     <div key={`${index}-${date}`} className="flex items-center gap-2">
@@ -546,7 +531,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                         onClick={() => removePrepDayDate(index)}
                         className="border-border"
                       >
-                        Remove
+                        Eliminar
                       </Button>
                     </div>
                   ))}
@@ -557,7 +542,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                   onClick={addPrepDayDate}
                   className="border-border"
                 >
-                  Add prep day
+                  Añadir día de preparación
                 </Button>
               </div>
             )}

@@ -64,6 +64,8 @@ BEGIN
 END;
 $$;
 
+REVOKE EXECUTE ON FUNCTION public.trg_apply_prep_day_rate() FROM PUBLIC;
+
 DROP TRIGGER IF EXISTS t_biu_apply_prep_day_rate ON public.timesheets;
 CREATE TRIGGER t_biu_apply_prep_day_rate
 BEFORE INSERT OR UPDATE OF job_id, date, start_time, end_time, break_minutes, ends_next_day, amount_eur, amount_breakdown, updated_at
@@ -196,6 +198,102 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+REVOKE EXECUTE ON FUNCTION public.trg_refresh_timesheets_for_prep_day_date_type() FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION public.upsert_job_prep_days(
+  p_job_id uuid,
+  p_dates date[]
+)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  v_dates date[] := ARRAY[]::date[];
+  v_job_type public.job_type;
+  v_job_start_date date;
+  v_invalid_dates text;
+  v_conflict_summary text;
+BEGIN
+  IF p_job_id IS NULL THEN
+    RAISE EXCEPTION 'Job id is required' USING ERRCODE = '22023';
+  END IF;
+
+  IF auth.role() <> 'service_role'
+     AND COALESCE(public.get_current_user_role(), '') NOT IN ('admin', 'management', 'logistics') THEN
+    RAISE EXCEPTION 'permission denied' USING ERRCODE = '42501';
+  END IF;
+
+  SELECT COALESCE(array_agg(date_value ORDER BY date_value), ARRAY[]::date[])
+  INTO v_dates
+  FROM (
+    SELECT DISTINCT input.date_value
+    FROM unnest(COALESCE(p_dates, ARRAY[]::date[])) AS input(date_value)
+    WHERE input.date_value IS NOT NULL
+  ) normalized;
+
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_job_id::text, 0));
+
+  SELECT
+    j.job_type,
+    (j.start_time AT TIME ZONE COALESCE(NULLIF(j.timezone, ''), 'Europe/Madrid'))::date
+  INTO v_job_type, v_job_start_date
+  FROM public.jobs j
+  WHERE j.id = p_job_id
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Job not found: %', p_job_id USING ERRCODE = 'P0002';
+  END IF;
+
+  IF v_job_type = 'dryhire' AND cardinality(v_dates) > 0 THEN
+    RAISE EXCEPTION 'Prep days are not supported for dry hire jobs' USING ERRCODE = '22023';
+  END IF;
+
+  IF cardinality(v_dates) > 0 THEN
+    SELECT string_agg(date_value::text, ', ' ORDER BY date_value)
+    INTO v_invalid_dates
+    FROM unnest(v_dates) AS requested(date_value)
+    WHERE requested.date_value >= v_job_start_date;
+
+    IF v_invalid_dates IS NOT NULL THEN
+      RAISE EXCEPTION 'Prep days must be before the job start date: %', v_invalid_dates USING ERRCODE = '22023';
+    END IF;
+
+    SELECT string_agg(format('%s (%s)', jdt.date, jdt.type), ', ' ORDER BY jdt.date)
+    INTO v_conflict_summary
+    FROM public.job_date_types jdt
+    WHERE jdt.job_id = p_job_id
+      AND jdt.date = ANY(v_dates)
+      AND jdt.type <> 'prep_day';
+
+    IF v_conflict_summary IS NOT NULL THEN
+      RAISE EXCEPTION 'Prep days conflict with existing date types: %', v_conflict_summary USING ERRCODE = '23505';
+    END IF;
+
+    INSERT INTO public.job_date_types (job_id, date, type)
+    SELECT p_job_id, requested.date_value, 'prep_day'::public.job_date_type
+    FROM unnest(v_dates) AS requested(date_value)
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM public.job_date_types existing
+      WHERE existing.job_id = p_job_id
+        AND existing.date = requested.date_value
+        AND existing.type = 'prep_day'
+    );
+  END IF;
+
+  DELETE FROM public.job_date_types jdt
+  WHERE jdt.job_id = p_job_id
+    AND jdt.type = 'prep_day'
+    AND NOT (jdt.date = ANY(v_dates));
+END;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.upsert_job_prep_days(uuid,date[]) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.upsert_job_prep_days(uuid,date[]) TO authenticated, service_role;
 
 DROP TRIGGER IF EXISTS t_aiud_refresh_timesheets_for_prep_day_date_type ON public.job_date_types;
 CREATE TRIGGER t_aiud_refresh_timesheets_for_prep_day_date_type

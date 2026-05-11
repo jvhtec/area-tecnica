@@ -42,24 +42,66 @@ function hasWholeJobAssignment(assignments: Assignment[]) {
   return assignments.some((assignment) => assignment.scope === 'whole-job');
 }
 
+function isoWeekKey(date: string) {
+  const value = new Date(`${date}T00:00:00Z`);
+  const day = value.getUTCDay() || 7;
+  value.setUTCDate(value.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
+  const week = Math.ceil((((value.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${value.getUTCFullYear()}-W${week}`;
+}
+
 function getPayableQuoteDates(testCase: PayrollCase) {
   const activeTimesheetDates = new Set(testCase.activeTimesheetDates ?? []);
   const singleDayAssignments = testCase.assignments.filter((assignment) => assignment.scope === 'single-day');
+  const scheduledByDate = new Map(testCase.scheduledDates.map((scheduledDate) => [scheduledDate.date, scheduledDate]));
+  const prepDates = new Set(
+    testCase.scheduledDates
+      .filter((scheduledDate) => scheduledDate.type === 'prep_day')
+      .map((scheduledDate) => scheduledDate.date)
+  );
+  const result = new Map<string, ScheduledDate>();
+
+  const addPayableDate = (date: string | undefined) => {
+    if (!date || prepDates.has(date)) return;
+
+    result.set(
+      date,
+      scheduledByDate.get(date) ?? {
+        date,
+        type: 'show',
+        week: isoWeekKey(date),
+      }
+    );
+  };
 
   if (singleDayAssignments.length > 0) {
-    return testCase.scheduledDates.filter((scheduledDate) => {
-      if (scheduledDate.type === 'prep_day') return false;
-      return isAssignedToDate(scheduledDate.date, testCase.assignments) || activeTimesheetDates.has(scheduledDate.date);
+    testCase.scheduledDates.forEach((scheduledDate) => {
+      if (scheduledDate.type === 'prep_day') return;
+      if (isAssignedToDate(scheduledDate.date, testCase.assignments) || activeTimesheetDates.has(scheduledDate.date)) {
+        addPayableDate(scheduledDate.date);
+      }
+    });
+    singleDayAssignments.forEach((assignment) => addPayableDate(assignment.date));
+    activeTimesheetDates.forEach((date) => addPayableDate(date));
+
+    return Array.from(result.values()).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  if (hasWholeJobAssignment(testCase.assignments)) {
+    testCase.scheduledDates.forEach((scheduledDate) => {
+      if (scheduledDate.type === 'prep_day') return;
+      if (scheduledDate.type !== 'rigging' || activeTimesheetDates.has(scheduledDate.date)) {
+        addPayableDate(scheduledDate.date);
+      }
     });
   }
 
-  if (!hasWholeJobAssignment(testCase.assignments)) return [];
-
-  return testCase.scheduledDates.filter((scheduledDate) => {
-    if (scheduledDate.type === 'prep_day') return false;
-    if (scheduledDate.type !== 'rigging') return true;
-    return activeTimesheetDates.has(scheduledDate.date);
+  activeTimesheetDates.forEach((date) => {
+    addPayableDate(date);
   });
+
+  return Array.from(result.values()).sort((a, b) => a.date.localeCompare(b.date));
 }
 
 function calculateCase(testCase: PayrollCase) {
@@ -82,7 +124,7 @@ function calculateCase(testCase: PayrollCase) {
     return weekCount < 3;
   }).length;
   const maxWeekCount = Math.max(1, ...datesByWeek.values());
-  const prepTotal = (testCase.prepTimesheetHours ?? 0) * 15;
+  const prepTotal = Math.round(testCase.prepTimesheetHours ?? 0) * 15;
 
   return {
     quoteDays: payableQuoteDates.length,
@@ -247,6 +289,39 @@ const cases: PayrollCase[] = [
       multiplierBonus: 100,
       prepTotal: 120,
       combinedPayout: 420,
+    },
+  },
+  {
+    name: 'single-day assignment-only date counts even before typed dates exist',
+    baseRate: 200,
+    scheduledDates: [],
+    assignments: [{ scope: 'single-day', date: '2026-05-04' }],
+    expected: {
+      quoteDays: 1,
+      standardDays: 1,
+      multipliedStandardDays: 1,
+      maxWeekCount: 1,
+      standardTotal: 300,
+      multiplierBonus: 100,
+      prepTotal: 0,
+      combinedPayout: 300,
+    },
+  },
+  {
+    name: 'active timesheet-only date counts even before typed dates exist',
+    baseRate: 200,
+    scheduledDates: [],
+    assignments: [],
+    activeTimesheetDates: ['2026-05-04'],
+    expected: {
+      quoteDays: 1,
+      standardDays: 1,
+      multipliedStandardDays: 1,
+      maxWeekCount: 1,
+      standardTotal: 300,
+      multiplierBonus: 100,
+      prepTotal: 0,
+      combinedPayout: 300,
     },
   },
 ];

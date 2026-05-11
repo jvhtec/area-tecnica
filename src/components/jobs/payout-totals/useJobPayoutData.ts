@@ -10,12 +10,25 @@ import { useJobTechnicianRateModeDates, useSetTechnicianDateRateMode } from '@/h
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { canManagePayouts, isAdministrativeDepartment } from '@/utils/permissions';
+import type { Database } from '@/integrations/supabase/types';
 import type { JobPayoutTotals, JobExpenseBreakdownItem } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { FLEX_UI_BASE_URL } from '@/utils/flexUrlResolver';
 import type { JobMetadata, JobPayoutData } from './types';
 import { NON_AUTONOMO_DEDUCTION_EUR } from './types';
 const FIN_DOC_VIEW_ID = '8238f39c-f42e-11e0-a8de-00e08175e43e';
+type TimesheetRow = Pick<
+  Database['public']['Tables']['timesheets']['Row'],
+  'technician_id' | 'amount_eur' | 'amount_breakdown' | 'approved_by_manager'
+>;
+
+function isPrepDayBreakdown(amountBreakdown: TimesheetRow['amount_breakdown']): boolean {
+  if (!amountBreakdown || typeof amountBreakdown !== 'object' || Array.isArray(amountBreakdown)) {
+    return false;
+  }
+
+  return Boolean((amountBreakdown as Record<string, unknown>).is_prep_day);
+}
 
 export function useJobPayoutData(jobId: string, technicianId?: string): JobPayoutData {
   /* ── Auth ── */
@@ -256,10 +269,10 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
         .eq('approved_by_manager', true);
       if (error) throw error;
       const map = new Map<string, number>();
-      (data || []).forEach((row: any) => {
+      const rows = (data || []) as TimesheetRow[];
+      rows.forEach((row) => {
         if (!row.technician_id) return;
-        const isPrepDay = Boolean(row.amount_breakdown?.is_prep_day);
-        if (!isPrepDay) return;
+        if (!isPrepDayBreakdown(row.amount_breakdown)) return;
         map.set(row.technician_id, (map.get(row.technician_id) || 0) + Number(row.amount_eur || 0));
       });
       return map;

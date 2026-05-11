@@ -317,7 +317,7 @@ export function TechnicianPayoutCard({
             <Clock className="h-4 w-4 text-muted-foreground" />
             <span>Partes aprobados:</span>
           </div>
-          <Badge variant={payout.timesheets_total_eur > 0 ? 'default' : 'secondary'}>
+          <Badge variant={timesheetsExcludingPrep > 0 ? 'default' : 'secondary'}>
             {formatCurrency(timesheetsExcludingPrep)}
           </Badge>
         </div>
@@ -325,7 +325,7 @@ export function TechnicianPayoutCard({
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
               <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>Prep days:</span>
+              <span>Días de preparación:</span>
             </div>
             <Badge variant="outline">
               {formatCurrency(prepDaysTotal)}
