@@ -1,0 +1,4 @@
+-- Production migration history contains version 20260412091222, but the
+-- corresponding SQL file is not present in git history or any fetched remote
+-- branch. Keep this no-op marker so Supabase CLI can compare local and remote
+-- migration history without requiring destructive history repair.

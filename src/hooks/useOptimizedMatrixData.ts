@@ -1,7 +1,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import React, { useMemo, useEffect, useCallback } from 'react';
-import { format, isWithinInterval, isSameDay } from 'date-fns';
+import { isWithinInterval, isSameDay } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+
+const MADRID_TIMEZONE = 'Europe/Madrid';
+
+function toMadridDateKey(date: Date | undefined): string {
+  return date ? formatInTimeZone(date, MADRID_TIMEZONE, 'yyyy-MM-dd') : '';
+}
 
 // Define the specific job type that matches what's passed from JobAssignmentMatrix
 export interface MatrixJob {
@@ -12,6 +19,7 @@ export interface MatrixJob {
   color?: string | null;
   status: string;
   job_type: string;
+  job_date_types?: Array<{ date: string; type: string }>;
   assigned_count?: number;
   worked_count?: number;
   total_cost_eur?: number;
@@ -74,8 +82,8 @@ export const fetchMatrixTimesheetAssignments = async ({
 }: FetchMatrixTimesheetArgs): Promise<MatrixTimesheetAssignment[]> => {
   if (!jobIds.length || !technicianIds.length) return [];
 
-  const startIso = startDate ? format(startDate, 'yyyy-MM-dd') : null;
-  const endIso = endDate ? format(endDate, 'yyyy-MM-dd') : null;
+  const startIso = startDate ? toMadridDateKey(startDate) : null;
+  const endIso = endDate ? toMadridDateKey(endDate) : null;
 
   const batchSize = 50;
   const promises: Promise<any>[] = [];
@@ -217,8 +225,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       'optimized-matrix-assignments',
       jobIds,
       technicianIds,
-      format(dateRange.start, 'yyyy-MM-dd'),
-      format(dateRange.end, 'yyyy-MM-dd'),
+      toMadridDateKey(dateRange.start),
+      toMadridDateKey(dateRange.end),
     ],
     queryFn: async (): Promise<MatrixTimesheetAssignment[]> => {
       if (jobIds.length === 0 || technicianIds.length === 0) return [];
@@ -251,7 +259,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     isLoading: availabilityInitialLoading,
     isFetching: availabilityFetching,
   } = useQuery({
-    queryKey: ['optimized-matrix-availability', technicianIds, format(dateRange.start, 'yyyy-MM-dd'), format(dateRange.end, 'yyyy-MM-dd')],
+    queryKey: ['optimized-matrix-availability', technicianIds, toMadridDateKey(dateRange.start), toMadridDateKey(dateRange.end)],
     queryFn: async () => {
       if (technicianIds.length === 0 || !dateRange.start || !dateRange.end) return [] as Array<{ user_id: string; date: string; status: string; notes?: string }>;
 
@@ -259,8 +267,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       const techBatches: string[][] = [];
       for (let i = 0; i < technicianIds.length; i += batchSize) techBatches.push(technicianIds.slice(i, i + batchSize));
 
-      const dateStart = format(dateRange.start, 'yyyy-MM-dd');
-      const dateEnd = format(dateRange.end, 'yyyy-MM-dd');
+      const dateStart = toMadridDateKey(dateRange.start);
+      const dateEnd = toMadridDateKey(dateRange.end);
 
       // Build per-day unavailable marks in the visible range
       const perDay: Map<string, { user_id: string; date: string; status: string; notes?: string }> = new Map();
@@ -378,8 +386,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           const clampStart = new Date(Math.max(startDay.getTime(), new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()));
           const clampEnd = new Date(Math.min(endDay.getTime(), new Date(e.getFullYear(), e.getMonth(), e.getDate()).getTime()));
           for (let d = new Date(clampStart); d.getTime() <= clampEnd.getTime(); d.setDate(d.getDate() + 1)) {
-            const key = `${r.technician_id}-${format(d, 'yyyy-MM-dd')}`;
-            if (!perDay.has(key)) perDay.set(key, { user_id: r.technician_id, date: format(d, 'yyyy-MM-dd'), status: 'unavailable' });
+            const dateKey = toMadridDateKey(d);
+            const key = `${r.technician_id}-${dateKey}`;
+            if (!perDay.has(key)) perDay.set(key, { user_id: r.technician_id, date: dateKey, status: 'unavailable' });
           }
         });
       } catch (e: any) {
@@ -444,7 +453,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   const getAssignmentForCell = useMemo(() => {
     const assignmentMap = buildAssignmentDateMap(allAssignments, dates);
     return (technicianId: string, date: Date) => {
-      const key = `${technicianId}-${format(date, 'yyyy-MM-dd')}`;
+      const key = `${technicianId}-${toMadridDateKey(date)}`;
       return assignmentMap.get(key);
     };
   }, [allAssignments, dates]);
@@ -458,7 +467,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     });
     
     return (technicianId: string, date: Date) => {
-      const key = `${technicianId}-${format(date, 'yyyy-MM-dd')}`;
+      const key = `${technicianId}-${toMadridDateKey(date)}`;
       return availabilityMap.get(key);
     };
   }, [availabilityData]);
@@ -468,7 +477,10 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
     const jobsByDate = new Map<string, MatrixJob[]>();
     
     dates.forEach(date => {
+      const dateKey = toMadridDateKey(date);
       const dateJobs = jobs.filter((job: MatrixJob) => {
+        const hasTypedDate = Array.isArray(job.job_date_types) && job.job_date_types.some((dt) => dt?.date === dateKey);
+        if (hasTypedDate) return true;
         const jobStart = new Date(job.start_time);
         const jobEnd = new Date(job.end_time);
         
@@ -477,11 +489,11 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
                isSameDay(date, jobEnd);
       });
       
-      jobsByDate.set(format(date, 'yyyy-MM-dd'), dateJobs);
+      jobsByDate.set(dateKey, dateJobs);
     });
     
     return (date: Date): MatrixJob[] => {
-      return jobsByDate.get(format(date, 'yyyy-MM-dd')) || [];
+      return jobsByDate.get(toMadridDateKey(date)) || [];
     };
   }, [jobs, dates]);
 
