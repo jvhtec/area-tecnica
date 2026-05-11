@@ -51,9 +51,10 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
       let offers = 0;      // offer sent
 
       const { data: staffingData, error: staffingErr } = await supabase
-        .rpc('get_assignment_matrix_staffing')
-        .eq('job_id', jobId)
-        .in('profile_id', technicianIds);
+        .rpc('get_assignment_matrix_staffing_filtered', {
+          p_job_ids: [jobId],
+          p_profile_ids: technicianIds,
+        });
 
       if (staffingErr) {
         console.warn('Counts staffing RPC error', staffingErr);

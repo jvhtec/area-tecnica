@@ -8529,6 +8529,14 @@ export type Database = {
         Args: { _job_id: string; _tech_id: string }
         Returns: Json
       }
+      get_active_timesheet_counts_by_technician: {
+        Args: { p_start_date: string; p_end_date: string }
+        Returns: {
+          department: string | null
+          technician_id: string
+          timesheet_count: number
+        }[]
+      }
       get_assignment_matrix_staffing: {
         Args: never
         Returns: {
@@ -8539,6 +8547,32 @@ export type Database = {
           offer_status: string
           offer_updated_at: string
           profile_id: string
+        }[]
+      }
+      get_assignment_matrix_staffing_filtered: {
+        Args: { p_job_ids: string[]; p_profile_ids: string[] }
+        Returns: {
+          availability_status: string | null
+          availability_updated_at: string | null
+          job_id: string
+          last_change: string
+          offer_status: string | null
+          offer_updated_at: string | null
+          profile_id: string
+        }[]
+      }
+      get_staffing_requests_matrix_filtered: {
+        Args: { p_job_ids: string[]; p_profile_ids: string[] }
+        Returns: {
+          created_at: string
+          job_id: string
+          phase: string
+          profile_id: string
+          requested_by: string | null
+          single_day: boolean
+          status: string
+          target_date: string | null
+          updated_at: string
         }[]
       }
       get_current_user_role: { Args: never; Returns: string }

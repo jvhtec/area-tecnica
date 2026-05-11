@@ -9,9 +9,10 @@ export function useStaffingStatus(jobId: string, profileId: string) {
 
       // Use the RPC function which reflects the latest statuses
       const { data, error } = await supabase
-        .rpc('get_assignment_matrix_staffing')
-        .eq('job_id', jobId)
-        .eq('profile_id', profileId)
+        .rpc('get_assignment_matrix_staffing_filtered', {
+          p_job_ids: [jobId],
+          p_profile_ids: [profileId],
+        })
         .maybeSingle()
 
       if (error) {

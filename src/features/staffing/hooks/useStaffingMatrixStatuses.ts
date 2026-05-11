@@ -89,19 +89,21 @@ export function useStaffingMatrixStatuses(
         return out
       }
 
-      // 1) Job-based statuses from aggregated view
+      // 1) Job-based statuses from bounded RPC. Avoid filtering the all-table
+      // staffing status rollup client-side; each call is scoped before DISTINCT ON.
       const mapByJob = new Map<string, ByJobStatus>()
       try {
-        const techBatches = chunk(technicianIds, 20)
-        const jobBatches = chunk(jobIds, 20)
+        const techBatches = chunk(technicianIds, 100)
+        const jobBatches = chunk(jobIds, 100)
         const promises: Promise<any>[] = []
         for (const tb of techBatches) {
           for (const jb of jobBatches) {
             promises.push(
               Promise.resolve(supabase
-                .rpc('get_assignment_matrix_staffing')
-                .in('job_id', jb)
-                .in('profile_id', tb))
+                .rpc('get_assignment_matrix_staffing_filtered', {
+                  p_job_ids: jb,
+                  p_profile_ids: tb
+                }))
             )
           }
         }
@@ -143,30 +145,21 @@ export function useStaffingMatrixStatuses(
       // 2) Date-based statuses derived from staffing_requests across visible jobs
       const reqRows: StaffingRequestRow[] = []
       try {
-        const techBatches = chunk(technicianIds, 20)
-        const jobBatches = chunk(jobIds, 20)
-        const promises: Promise<any>[] = []
-        for (const tb of techBatches) {
-          for (const jb of jobBatches) {
-            promises.push(
-              Promise.resolve(supabase
-                .from('staffing_requests')
-                .select('job_id, profile_id, phase, status, updated_at, single_day, target_date, created_at, requested_by')
-                .in('profile_id', tb)
-                .in('job_id', jb))
-            )
-          }
+        const { data, error } = await supabase
+          .rpc('get_staffing_requests_matrix_filtered', {
+            p_job_ids: jobIds,
+            p_profile_ids: technicianIds
+          })
+
+        if (error) {
+          console.warn('Staffing matrix requests RPC error:', error)
+        } else if (data?.length) {
+          data.forEach(row => {
+            reqRows.push(row as StaffingRequestRow)
+          })
         }
-        const results = await Promise.all(promises)
-        results.forEach(res => {
-          if (res.error) {
-            console.warn('Staffing matrix requests error (batch):', res.error)
-            return
-          }
-          if (res.data?.length) reqRows.push(...res.data)
-        })
       } catch (e) {
-        console.warn('Staffing matrix requests batch error:', e)
+        console.warn('Staffing matrix requests RPC error:', e)
       }
 
       // Build job lookup with parsed dates for overlap check

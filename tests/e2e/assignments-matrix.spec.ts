@@ -47,7 +47,10 @@ test("renders the assignments matrix and lets management toggle direct assign mo
         },
       ],
       "get_job_staffing_summary": [],
+      "get_active_timesheet_counts_by_technician": [],
       "get_assignment_matrix_staffing": [],
+      "get_assignment_matrix_staffing_filtered": [],
+      "get_staffing_requests_matrix_filtered": [],
     },
   });
 
