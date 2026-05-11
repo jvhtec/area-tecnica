@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
-import { format } from 'date-fns'
+import {
+  formatMatrixDateKey,
+  matrixDebug,
+  matrixQueryKeys,
+} from '@/components/matrix/optimized-assignment-matrix/matrixCore'
 
 type Status = 'confirmed' | 'declined' | 'expired' | 'requested' | 'sent' | null
 
@@ -39,6 +43,13 @@ interface StaffingRequestRow {
   requested_by: string | null
 }
 
+interface AssignmentMatrixStaffingRow {
+  job_id: string
+  profile_id: string
+  availability_status: string | null
+  offer_status: string | null
+}
+
 interface LatestByPhaseAccumulator {
   availability_status: Status
   offer_status: Status
@@ -69,13 +80,23 @@ const createLatestByPhaseAccumulator = (): LatestByPhaseAccumulator => ({
   pending_offer_job_ids: []
 })
 
+const normalizeDateLikeToMatrixKey = (value: string | Date | null | undefined): string | null => {
+  if (!value) return null
+  if (value instanceof Date) return formatMatrixDateKey(value)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return null
+  return formatMatrixDateKey(parsed)
+}
+
 export function useStaffingMatrixStatuses(
   technicianIds: string[],
   jobs: MatrixJobLite[],
   dates: Date[]
 ) {
   return useQuery({
-    queryKey: ['staffing-matrix', technicianIds, jobs.map(j => j.id), dates[0]?.toISOString(), dates[dates.length - 1]?.toISOString()],
+    queryKey: matrixQueryKeys.staffingMatrix(technicianIds, jobs, dates),
     queryFn: async () => {
       if (!technicianIds.length || !jobs.length || !dates.length) {
         return { byJob: new Map<string, ByJobStatus>(), byDate: new Map<string, ByDateStatus>() }
@@ -83,98 +104,72 @@ export function useStaffingMatrixStatuses(
 
       const jobIds = jobs.map(j => j.id)
 
-      const chunk = <T,>(arr: T[], size: number) => {
-        const out: T[][] = []
-        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
-        return out
-      }
-
       // 1) Job-based statuses from aggregated view
       const mapByJob = new Map<string, ByJobStatus>()
       try {
-        const techBatches = chunk(technicianIds, 20)
-        const jobBatches = chunk(jobIds, 20)
-        const promises: Promise<any>[] = []
-        for (const tb of techBatches) {
-          for (const jb of jobBatches) {
-            promises.push(
-              Promise.resolve(supabase
-                .rpc('get_assignment_matrix_staffing')
-                .in('job_id', jb)
-                .in('profile_id', tb))
-            )
-          }
+        const { data, error } = await supabase
+          .rpc('get_assignment_matrix_staffing')
+          .in('job_id', jobIds)
+          .in('profile_id', technicianIds)
+
+        if (error) {
+          matrixDebug('Staffing matrix byJob error', error)
         }
-        const results = await Promise.all(promises)
-        results.forEach(res => {
-          if (res.error) {
-            console.warn('Staffing matrix byJob error (batch):', res.error)
-            return
+
+        ;((data || []) as AssignmentMatrixStaffingRow[]).forEach((r) => {
+          const key = `${r.job_id}-${r.profile_id}`
+          const mapAvailability = (s: string | null): Status => {
+            if (!s) return null
+            if (s === 'pending') return 'requested'
+            if (s === 'expired') return null // treat cancelled/expired as cleared
+            return s as Status
           }
-          (res.data || []).forEach((r: any) => {
-            const key = `${r.job_id}-${r.profile_id}`
-            const mapAvailability = (s: string | null): Status => {
-              if (!s) return null
-              if (s === 'pending') return 'requested'
-              if (s === 'expired') return null // treat cancelled/expired as cleared
-              return s as any
-            }
-            const mapOffer = (s: string | null): Status => {
-              if (!s) return null
-              if (s === 'pending') return 'sent'
-              if (s === 'expired') return null // treat cancelled/expired as cleared
-              return s as any
-            }
-            const availStatus = mapAvailability(r.availability_status)
-            const offerStatus = mapOffer(r.offer_status)
-            // Only add entry if at least one status is non-null (same logic as byDate)
-            if (availStatus || offerStatus) {
-              mapByJob.set(key, {
-                availability_status: availStatus,
-                offer_status: offerStatus
-              })
-            }
-          })
+          const mapOffer = (s: string | null): Status => {
+            if (!s) return null
+            if (s === 'pending') return 'sent'
+            if (s === 'expired') return null // treat cancelled/expired as cleared
+            return s as Status
+          }
+          const availStatus = mapAvailability(r.availability_status)
+          const offerStatus = mapOffer(r.offer_status)
+          // Only add entry if at least one status is non-null (same logic as byDate)
+          if (availStatus || offerStatus) {
+            mapByJob.set(key, {
+              availability_status: availStatus,
+              offer_status: offerStatus
+            })
+          }
         })
       } catch (e) {
-        console.warn('Staffing matrix byJob batch error:', e)
+        matrixDebug('Staffing matrix byJob error', e)
       }
 
       // 2) Date-based statuses derived from staffing_requests across visible jobs
       const reqRows: StaffingRequestRow[] = []
       try {
-        const techBatches = chunk(technicianIds, 20)
-        const jobBatches = chunk(jobIds, 20)
-        const promises: Promise<any>[] = []
-        for (const tb of techBatches) {
-          for (const jb of jobBatches) {
-            promises.push(
-              Promise.resolve(supabase
-                .from('staffing_requests')
-                .select('job_id, profile_id, phase, status, updated_at, single_day, target_date, created_at, requested_by')
-                .in('profile_id', tb)
-                .in('job_id', jb))
-            )
-          }
+        const { data, error } = await supabase
+          .from('staffing_requests')
+          .select('job_id, profile_id, phase, status, updated_at, single_day, target_date, created_at, requested_by')
+          .in('profile_id', technicianIds)
+          .in('job_id', jobIds)
+
+        if (error) {
+          matrixDebug('Staffing matrix requests error', error)
+        } else if (data?.length) {
+          reqRows.push(...data)
         }
-        const results = await Promise.all(promises)
-        results.forEach(res => {
-          if (res.error) {
-            console.warn('Staffing matrix requests error (batch):', res.error)
-            return
-          }
-          if (res.data?.length) reqRows.push(...res.data)
-        })
       } catch (e) {
-        console.warn('Staffing matrix requests batch error:', e)
+        matrixDebug('Staffing matrix requests error', e)
       }
 
-      // Build job lookup with parsed dates for overlap check
-      const jobLookup = new Map<string, { id: string, start: Date, end: Date }>()
+      // Build job lookup with Madrid-normalized date keys for overlap checks.
+      const jobLookup = new Map<string, { id: string, startKey: string, endKey: string }>()
       jobs.forEach(j => {
-        const start = j.start_time ? new Date(j.start_time) : new Date()
-        const end = j.end_time ? new Date(j.end_time) : new Date()
-        jobLookup.set(j.id, { id: j.id, start, end })
+        const startKey = normalizeDateLikeToMatrixKey(j.start_time)
+        const endKey = normalizeDateLikeToMatrixKey(j.end_time)
+        if (startKey && endKey) {
+          jobLookup.set(j.id, { id: j.id, startKey, endKey })
+        }
       })
 
       // Group requests by technician for faster lookups
@@ -190,28 +185,21 @@ export function useStaffingMatrixStatuses(
       technicianIds.forEach(tid => {
         const reqs = byTech.get(tid) || []
         dates.forEach(d => {
-          const dStr = format(d, 'yyyy-MM-dd')
+          const dStr = formatMatrixDateKey(d)
           // Filter requests based on type:
           // - Single-day requests: exact target_date match (prevents following job reschedules)
           // - Full-span requests: show on all dates within the job's date range
           const matchingRequests = reqs.filter(r => {
             // Single-day requests with target_date: exact match only
             if (r.single_day && r.target_date) {
-              const rDate = typeof r.target_date === 'string' ? r.target_date : format(r.target_date, 'yyyy-MM-dd')
-              return rDate === dStr
+              return normalizeDateLikeToMatrixKey(r.target_date) === dStr
             }
 
             // Full-span requests (no target_date): show on all job dates
             if (!r.single_day) {
               const job = jobLookup.get(r.job_id)
               if (!job) return false
-              const cellDate = new Date(d)
-              cellDate.setHours(0, 0, 0, 0)
-              const start = new Date(job.start)
-              start.setHours(0, 0, 0, 0)
-              const end = new Date(job.end)
-              end.setHours(0, 0, 0, 0)
-              return cellDate >= start && cellDate <= end
+              return dStr >= job.startKey && dStr <= job.endKey
             }
 
             return false
@@ -274,9 +262,9 @@ export function useStaffingMatrixStatuses(
 
       return { byJob: mapByJob, byDate: mapByDate }
     },
-    staleTime: 1500,
+    staleTime: 30_000,
     gcTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
-    placeholderData: (prev) => prev as any,
+    placeholderData: (prev) => prev,
   })
 }

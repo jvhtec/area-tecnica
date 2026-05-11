@@ -1,12 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
+import {
+  invalidateMatrixAssignmentQueries,
+  invalidateMatrixJobsAndStaffingQueries,
+  matrixDebug,
+} from '@/components/matrix/optimized-assignment-matrix/matrixCore'
+
+type StaffingViewStatus = 'requested' | 'sent' | 'confirmed' | 'declined' | null
+
+interface StaffingViewRow {
+  availability_status: string | null
+  offer_status: string | null
+}
+
+const dispatchStaffingUpdated = () => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('staffing-updated'))
+  }
+}
 
 export function useStaffingStatus(jobId: string, profileId: string) {
   return useQuery({
     queryKey: ['staffing', jobId, profileId],
     queryFn: async () => {
-      console.log('🔍 Fetching staffing status (view) for:', { jobId, profileId })
-
       // Use the RPC function which reflects the latest statuses
       const { data, error } = await supabase
         .rpc('get_assignment_matrix_staffing')
@@ -15,7 +31,7 @@ export function useStaffingStatus(jobId: string, profileId: string) {
         .maybeSingle()
 
       if (error) {
-        console.warn('⚠️ staffing view error, falling back to null:', error)
+        matrixDebug('staffing view error, falling back to null', error)
       }
 
       if (!data) {
@@ -36,11 +52,11 @@ export function useStaffingStatus(jobId: string, profileId: string) {
         return s
       }
 
-      const result = {
-        availability_status: mapAvailability(data.availability_status as any),
-        offer_status: mapOffer(data.offer_status as any)
+      const viewRow = data as StaffingViewRow
+      const result: { availability_status: StaffingViewStatus; offer_status: StaffingViewStatus } = {
+        availability_status: mapAvailability(viewRow.availability_status),
+        offer_status: mapOffer(viewRow.offer_status)
       }
-      console.log('📋 Staffing status (view) result:', result)
       return result
     },
     staleTime: 1_000,
@@ -51,7 +67,7 @@ export function useStaffingStatus(jobId: string, profileId: string) {
 
 // Custom error type for conflicts
 export class ConflictError extends Error {
-  constructor(message: string, public details: any) {
+  constructor(message: string, public details: Record<string, unknown>) {
     super(message);
     this.name = 'ConflictError';
   }
@@ -61,13 +77,6 @@ export function useSendStaffingEmail() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null, channel?: 'email' | 'whatsapp', target_date?: string | null, single_day?: boolean, dates?: string[], override_conflicts?: boolean }) => {
-      console.log('🚀 SENDING STAFFING EMAIL:', {
-        payload,
-        job_id_type: typeof payload.job_id,
-        profile_id_type: typeof payload.profile_id,
-        phase_valid: ['availability', 'offer'].includes(payload.phase)
-      });
-
       // Use fetch directly to get full control over error responses
       const session = await supabase.auth.getSession();
       const token = session.data.session?.access_token;
@@ -89,11 +98,8 @@ export function useSendStaffingEmail() {
 
       const data = await response.json();
 
-      console.log('📨 EMAIL RESPONSE:', { status: response.status, data });
-
       // Check for 409 Conflict with structured error details
       if (response.status === 409) {
-        console.error('❌ 409 CONFLICT:', data);
         if (data.details?.conflict_type || data.details?.conflicts || data.details?.unavailability) {
           throw new ConflictError(data.error || 'Conflict detected', data.details);
         }
@@ -101,38 +107,31 @@ export function useSendStaffingEmail() {
 
       // Check for other errors
       if (!response.ok) {
-        console.error('❌ HTTP ERROR:', { status: response.status, data });
         throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`)
       }
 
       if (data?.error) {
-        console.error('❌ API ERROR:', data);
         throw new Error(data.error)
       }
-
-      console.log('✅ STAFFING REQUEST SENT SUCCESSFULLY');
       return data
     },
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: ['staffing', vars.job_id, vars.profile_id] })
       qc.invalidateQueries({ queryKey: ['staffing-by-date', vars.profile_id] })
-      qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
-      qc.invalidateQueries({ queryKey: ['assignment-matrix'] })
-      qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
-      try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
+      void invalidateMatrixJobsAndStaffingQueries(qc)
+      void invalidateMatrixAssignmentQueries(qc)
+      dispatchStaffingUpdated()
       // Fan out push notification (fire-and-forget)
-      try {
-        const type = vars.phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent'
-        void supabase.functions.invoke('push', {
-          body: {
-            action: 'broadcast',
-            type,
-            job_id: vars.job_id,
-            recipient_id: vars.profile_id,
-            channel: vars.channel || 'email'
-          }
-        })
-      } catch {}
+      const type = vars.phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent'
+      void supabase.functions.invoke('push', {
+        body: {
+          action: 'broadcast',
+          type,
+          job_id: vars.job_id,
+          recipient_id: vars.profile_id,
+          channel: vars.channel || 'email'
+        }
+      }).catch(() => undefined)
     }
   })
 }
@@ -141,20 +140,16 @@ export function useCancelStaffingRequest() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer' }) => {
-      console.log('🔴 CANCEL STAFFING: Starting cancellation', payload)
-
       // First, check what records exist for this combination
-      const { data: existingRecords } = await supabase
+      const { data: _existingRecords } = await supabase
         .from('staffing_requests')
         .select('id, status, single_day, target_date')
         .eq('job_id', payload.job_id)
         .eq('profile_id', payload.profile_id)
         .eq('phase', payload.phase)
 
-      console.log('🔴 CANCEL STAFFING: Existing records', existingRecords)
-
       // Cancel ALL non-expired records (not just pending) to ensure cell clears
-      const { data, error, count } = await supabase
+      const { data, error, count: _count } = await supabase
         .from('staffing_requests')
         .update({ status: 'expired' })
         .eq('job_id', payload.job_id)
@@ -163,46 +158,35 @@ export function useCancelStaffingRequest() {
         .neq('status', 'expired') // Cancel any non-expired status
         .select('id')
 
-      console.log('🔴 CANCEL STAFFING: Update result', { data, error, count, rowsAffected: data?.length })
-
       if (error) throw error
 
-      if (!data?.length) {
-        console.warn('🔴 CANCEL STAFFING: No records were updated!')
-      }
-
       // Fire-and-forget notification via same channel used originally
-      try {
-        supabase.functions.invoke('notify-staffing-cancellation', { body: payload }).catch(() => {})
-      } catch {}
+      void supabase.functions
+        .invoke('notify-staffing-cancellation', { body: payload })
+        .catch(() => undefined)
       return { success: true, rowsAffected: data?.length || 0 }
     },
     onSuccess: (_data, vars) => {
-      console.log('🔴 CANCEL STAFFING: onSuccess, invalidating queries')
-
       // Invalidate all related queries
       qc.invalidateQueries({ queryKey: ['staffing', vars.job_id, vars.profile_id] })
       qc.invalidateQueries({ queryKey: ['staffing-by-date', vars.profile_id] })
-      qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
-      qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
-      qc.invalidateQueries({ queryKey: ['assignment-matrix'] })
+      void invalidateMatrixJobsAndStaffingQueries(qc)
+      void invalidateMatrixAssignmentQueries(qc)
 
       // Also refetch to ensure fresh data
       qc.refetchQueries({ queryKey: ['staffing-matrix'], type: 'active' })
 
-      try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
+      dispatchStaffingUpdated()
       // Push broadcast: cancellation
-      try {
-        const type = vars.phase === 'availability' ? 'staffing.availability.cancelled' : 'staffing.offer.cancelled'
-        void supabase.functions.invoke('push', {
-          body: {
-            action: 'broadcast',
-            type,
-            job_id: vars.job_id,
-            recipient_id: vars.profile_id,
-          }
-        })
-      } catch {}
+      const type = vars.phase === 'availability' ? 'staffing.availability.cancelled' : 'staffing.offer.cancelled'
+      void supabase.functions.invoke('push', {
+        body: {
+          action: 'broadcast',
+          type,
+          job_id: vars.job_id,
+          recipient_id: vars.profile_id,
+        }
+      }).catch(() => undefined)
     }
   })
 }

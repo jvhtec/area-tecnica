@@ -1,5 +1,6 @@
 
 import { format, parseISO, startOfDay, endOfDay } from "date-fns";
+import type { Locale } from "date-fns";
 import { toZonedTime, fromZonedTime, formatInTimeZone } from "date-fns-tz";
 
 /**
@@ -23,10 +24,11 @@ export const fromJobTimezone = (date: Date, timezone: string = 'Europe/Madrid'):
 export const formatInJobTimezone = (
   date: Date | string, 
   formatStr: string, 
-  timezone: string = 'Europe/Madrid'
+  timezone: string = 'Europe/Madrid',
+  options?: { locale?: Locale }
 ): string => {
   const utcDate = typeof date === 'string' ? parseISO(date) : date;
-  return formatInTimeZone(utcDate, timezone, formatStr);
+  return formatInTimeZone(utcDate, timezone, formatStr, options);
 };
 
 /**

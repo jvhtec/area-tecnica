@@ -10,6 +10,7 @@ const {
   checkTimeConflictEnhancedMock,
   insertMock,
   deleteMock,
+  upsertMock,
   fromMock,
   authGetUserMock,
   functionsInvokeMock,
@@ -22,6 +23,7 @@ const {
   checkTimeConflictEnhancedMock: vi.fn(),
   insertMock: vi.fn(),
   deleteMock: vi.fn(),
+  upsertMock: vi.fn(),
   fromMock: vi.fn(),
   authGetUserMock: vi.fn(),
   functionsInvokeMock: vi.fn(),
@@ -114,6 +116,7 @@ beforeEach(() => {
   });
   insertMock.mockResolvedValue({ error: null });
   deleteMock.mockResolvedValue({ error: null });
+  upsertMock.mockResolvedValue({ error: null });
   toggleTimesheetDayMock.mockResolvedValue(undefined);
   removeTimesheetAssignmentMock.mockResolvedValue({ deleted_assignment: true, deleted_timesheets: 0 });
   syncTimesheetCategoriesMock.mockResolvedValue(undefined);
@@ -141,7 +144,14 @@ beforeEach(() => {
 
     if (table === 'timesheets') {
       return {
+        upsert: upsertMock,
         delete: vi.fn(() => createMockQueryBuilder({ data: null, error: null })),
+        select: vi.fn(() =>
+          createMockQueryBuilder({
+            data: [],
+            error: null,
+          }),
+        ),
       };
     }
 

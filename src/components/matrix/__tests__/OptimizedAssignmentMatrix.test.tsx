@@ -58,7 +58,7 @@ vi.mock('@/stores/useSelectedCellStore', () => ({
   useSelectedCellStore: useSelectedCellStoreMock,
 }));
 
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/integrations/supabase/client', () => ({
   supabase: supabaseMock,
 }));
 
@@ -99,13 +99,22 @@ vi.mock('@/utils/technicianAvailability', () => ({
 }));
 
 // Mock OptimizedAssignmentMatrixView
-vi.mock('../optimized-assignment-matrix/OptimizedAssignmentMatrixView', () => ({
+vi.mock('@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView', () => ({
   OptimizedAssignmentMatrixView: (props: any) => (
     <div data-testid="matrix-view">
       <div data-testid="technicians-count">{props.technicians.length}</div>
       <div data-testid="dates-count">{props.dates.length}</div>
       <div data-testid="jobs-count">{props.jobs.length}</div>
       <div data-testid="allow-mark-unavailable">{String(props.allowMarkUnavailable)}</div>
+      <div data-testid="cell-action-type">{props.cellAction?.type ?? 'none'}</div>
+      <div data-testid="cell-action-job-id">{props.cellAction?.selectedJobId ?? 'none'}</div>
+      <button
+        type="button"
+        data-testid="direct-assign-cell"
+        onClick={() => props.handleCellClick(props.technicians[0].id, props.dates[0], 'assign', props.jobs[0].id)}
+      >
+        Direct assign
+      </button>
     </div>
   ),
 }));
@@ -158,6 +167,7 @@ beforeEach(() => {
     prefetchTechnicianData: vi.fn(),
     updateAssignmentOptimistically: vi.fn(),
     invalidateAssignmentQueries: vi.fn(),
+    invalidateAvailabilityQueries: vi.fn(),
     isInitialLoading: false,
     isFetching: false,
   });
@@ -177,6 +187,7 @@ beforeEach(() => {
     selectedCell: null,
     selectCell: vi.fn(),
     clearSelection: vi.fn(),
+    clearMultiSelection: vi.fn(),
     isCellSelected: vi.fn().mockReturnValue(false),
   });
 
@@ -288,8 +299,12 @@ describe('OptimizedAssignmentMatrix', () => {
       />
     );
 
-    // Matrix should render in direct assign mode
     expect(screen.getByTestId('matrix-view')).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId('direct-assign-cell'));
+
+    expect(getAssignmentForCell).toHaveBeenCalledWith('tech-1', mockDates[0]);
+    expect(screen.getByTestId('cell-action-type')).toHaveTextContent('assign');
+    expect(screen.getByTestId('cell-action-job-id')).toHaveTextContent('job-1');
   });
 
   it('prevents assignment for technicians in fridge', () => {
@@ -532,6 +547,7 @@ describe('OptimizedAssignmentMatrix', () => {
       selectedCell: null,
       selectCell,
       clearSelection,
+      clearMultiSelection: vi.fn(),
       isCellSelected,
     });
 

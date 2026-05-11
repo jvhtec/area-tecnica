@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
-import { addDays, addWeeks, format, isSameDay, startOfDay, differenceInCalendarDays } from 'date-fns';
+import { addDays, addWeeks, format, startOfDay, differenceInCalendarDays } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 interface DateRangeState {
   centerDate: Date;
@@ -15,6 +16,10 @@ interface UseVirtualizedDateRangeOptions {
   maxWeeksBefore?: number;
   maxWeeksAfter?: number;
   expandByWeeks?: number;
+  dates?: Date[];
+  timezone?: string;
+  dateKeyFormat?: string;
+  todayKey?: string;
 }
 
 export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions = {}) => {
@@ -23,7 +28,11 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
     initialWeeksAfter = 2,
     maxWeeksBefore = 26, // 6 months
     maxWeeksAfter = 26,  // 6 months
-    expandByWeeks = 4    // Expand by 4 weeks at a time
+    expandByWeeks = 4,   // Expand by 4 weeks at a time
+    dates,
+    timezone = 'Europe/Madrid',
+    dateKeyFormat = 'yyyy-MM-dd',
+    todayKey: providedTodayKey,
   } = options;
 
   const [dateState, setDateState] = useState<DateRangeState>({
@@ -54,26 +63,38 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
   }, []);
 
   // Generate the current date range
-  const dateRange = useMemo(() => {
+  const generatedDateRange = useMemo(() => {
     const startDate = addWeeks(dateState.centerDate, -dateState.weeksBefore);
     const endDate = addWeeks(dateState.centerDate, dateState.weeksAfter);
     
-    const dates = [];
+    const generatedDates = [];
     let currentDate = startDate;
     
     while (currentDate <= endDate) {
-      dates.push(new Date(currentDate));
+      generatedDates.push(new Date(currentDate));
       currentDate = addDays(currentDate, 1);
     }
     
-    return dates;
+    return generatedDates;
   }, [dateState]);
+
+  const dateRange = dates ?? generatedDateRange;
+
+  const getDateIndexByKey = useCallback(
+    (targetDates: Date[], dateKey: string) =>
+      targetDates.findIndex((date) => formatInTimeZone(date, timezone, dateKeyFormat) === dateKey),
+    [dateKeyFormat, timezone],
+  );
+
+  const todayKey = useMemo(
+    () => providedTodayKey ?? formatInTimeZone(new Date(), timezone, dateKeyFormat),
+    [dateKeyFormat, providedTodayKey, timezone],
+  );
 
   // Get today's index in the current range
   const todayIndex = useMemo(() => {
-    const today = new Date();
-    return dateRange.findIndex(date => isSameDay(date, today));
-  }, [dateRange]);
+    return getDateIndexByKey(dateRange, todayKey);
+  }, [dateRange, getDateIndexByKey, todayKey]);
 
   // Check if we can expand in either direction
   const canExpandBefore = dateState.weeksBefore < dateState.maxWeeksBefore;
@@ -163,6 +184,8 @@ export const useVirtualizedDateRange = (options: UseVirtualizedDateRangeOptions 
   return {
     dateRange,
     todayIndex,
+    todayKey,
+    getDateIndexByKey,
     canExpandBefore,
     canExpandAfter,
     expandBefore,
