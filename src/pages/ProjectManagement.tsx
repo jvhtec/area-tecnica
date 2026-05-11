@@ -134,13 +134,13 @@ const ProjectManagement = () => {
   }, [optimizedJobs, canCreateItems, isSearching, toast]);
 
   // Filter jobs by selected job type and statuses with database-level optimization
+  const tokens = buildSearchTokens(debouncedQuery);
   const jobs = (optimizedJobs || []).filter((job: any) => {
     const matchesType = isSearching
       ? true // search overrides type filter
       : (selectedJobTypes.length === 0 ||
         selectedJobTypes.map(t => t.toLowerCase()).includes(String(job.job_type || '').toLowerCase()));
     const matchesStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
-    const tokens = buildSearchTokens(debouncedQuery);
     const searchableValues = [job.title, job.client, job.location?.name, job.location?.formatted_address]
       .filter(Boolean)
       .map((value: string) => normalizeSearchText(value));
