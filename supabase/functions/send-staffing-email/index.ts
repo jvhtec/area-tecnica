@@ -122,6 +122,8 @@ serve(async (req) => {
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
 
     const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, idempotency_key } = body;
+    const roleCode = typeof role === 'string' && role.trim().length > 0 ? role.trim() : null;
+    const roleCodePatch = roleCode ? { role_code: roleCode } : {};
     const datesArrayRaw: unknown = (body as any)?.dates;
     const shouldOverrideConflicts = Boolean(override_conflicts);
     const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
@@ -151,7 +153,7 @@ serve(async (req) => {
       job_id: { value: job_id, type: typeof job_id, isValid: !!job_id },
       profile_id: { value: profile_id, type: typeof profile_id, isValid: !!profile_id },
       phase: { value: phase, type: typeof phase, isValidPhase: ["availability","offer"].includes(phase) },
-      role: { value: role ?? null },
+      role: { value: role ?? null, normalized: roleCode },
       message: { value: message ?? null },
       target_date: { value: target_date ?? null, normalized: normalizedTargetDate },
       single_day: { value: single_day ?? null, effective: isSingleDayRequest },
@@ -182,7 +184,7 @@ serve(async (req) => {
       
       const { data: existing, error: idempotencyError } = await supabase
         .from('staffing_requests')
-        .select('id, status, created_at')
+        .select('id, status, created_at, role_code')
         .eq('idempotency_key', idempotency_key)
         .gte('created_at', since24h)
         .maybeSingle();
@@ -190,6 +192,16 @@ serve(async (req) => {
       if (idempotencyError) {
         console.warn('⚠️ Idempotency check failed (non-blocking):', idempotencyError);
       } else if (existing) {
+        if (roleCode && !existing.role_code) {
+          const { error: roleUpdateError } = await supabase
+            .from('staffing_requests')
+            .update({ role_code: roleCode })
+            .eq('id', existing.id);
+          if (roleUpdateError) {
+            console.warn('⚠️ Failed to backfill role_code on idempotent request (non-blocking):', roleUpdateError);
+          }
+        }
+
         console.log('✅ IDEMPOTENT REQUEST DETECTED - returning cached response:', {
           request_id: existing.id,
           created_at: existing.created_at
@@ -566,6 +578,7 @@ serve(async (req) => {
               updated_at: new Date().toISOString(),
               batch_id: batchId,
               idempotency_key: idempotency_key || null,
+              ...roleCodePatch,
             })
             .eq('id', existingFirstRowId)
             .select('id')
@@ -590,6 +603,7 @@ serve(async (req) => {
             target_date: firstDate,
             batch_id: batchId,
             idempotency_key: idempotency_key || null,
+            ...roleCodePatch,
           });
           if (firstInsert.error) {
             const code = firstInsert.error.code;
@@ -638,6 +652,7 @@ serve(async (req) => {
                   updated_at: new Date().toISOString(),
                   batch_id: batchId,
                   idempotency_key: idempotency_key || null,
+                  ...roleCodePatch,
                 })
                 .eq('id', insertedId)
                 .select('id')
@@ -667,6 +682,7 @@ serve(async (req) => {
           single_day: true,
           target_date: d,
           batch_id: batchId,
+          ...roleCodePatch,
         }));
         if (rest.length) {
           console.log('📅 Inserting batch dates:', { count: rest.length, dates: rest.map(r => r.target_date) });
@@ -684,7 +700,7 @@ serve(async (req) => {
         try {
           const cohesion = await supabase
             .from('staffing_requests')
-            .update({ requested_by: actorId, batch_id: batchId, updated_at: new Date().toISOString() })
+            .update({ requested_by: actorId, batch_id: batchId, updated_at: new Date().toISOString(), ...roleCodePatch })
             .eq('job_id', job_id)
             .eq('profile_id', profile_id)
             .eq('phase', phase)
@@ -711,6 +727,7 @@ serve(async (req) => {
           single_day: isSingleDayRequest,
           target_date: normalizedTargetDate,
           idempotency_key: idempotency_key || null,
+          ...roleCodePatch,
         });
         if (insertRes.error && insertRes.error.code === "23505") {
           console.log('🔄 DUPLICATE FOUND, UPDATING...');
@@ -722,6 +739,7 @@ serve(async (req) => {
               token_hash,
               token_expires_at: exp,
               updated_at: new Date().toISOString(),
+              ...roleCodePatch,
               // keep existing shape; do not convert full-span to single-day or vice versa
             })
             .eq("job_id", job_id)
@@ -788,7 +806,7 @@ serve(async (req) => {
         token,
       );
 
-      const roleLabel = labelForRoleCode(role) || null;
+      const roleLabel = labelForRoleCode(roleCode) || null;
       const subject = phase === "availability"
         ? `Consulta de disponibilidad`
         : `Oferta: ${job.title}${roleLabel ? ` — ${roleLabel}` : ''}`;
@@ -1095,7 +1113,7 @@ serve(async (req) => {
           meta: {
             phase,
             status: waOk ? 200 : (lastStatus ?? 0),
-            role: role ?? null,
+            role: roleCode,
             single_day: isSingleDayRequest || isBatch,
             target_date: normalizedTargetDate,
             dates: normalizedDates,
@@ -1142,7 +1160,7 @@ serve(async (req) => {
           meta: {
             phase,
             status: sendRes.status,
-            role: role ?? null,
+            role: roleCode,
             message: message ?? null,
             single_day: isSingleDayRequest || isBatch,
             target_date: normalizedTargetDate,
