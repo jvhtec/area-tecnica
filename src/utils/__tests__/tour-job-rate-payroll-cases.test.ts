@@ -324,6 +324,23 @@ const cases: PayrollCase[] = [
       combinedPayout: 300,
     },
   },
+  {
+    name: 'active timesheet date extends a one-date tour quote to the two-day weekly multiplier',
+    baseRate: 200,
+    scheduledDates: [{ date: '2026-05-04', type: 'show', week: '2026-W19' }],
+    assignments: [{ scope: 'whole-job' }],
+    activeTimesheetDates: ['2026-05-05'],
+    expected: {
+      quoteDays: 2,
+      standardDays: 2,
+      multipliedStandardDays: 2,
+      maxWeekCount: 2,
+      standardTotal: 450,
+      multiplierBonus: 50,
+      prepTotal: 0,
+      combinedPayout: 450,
+    },
+  },
 ];
 
 describe('tour payroll quote value cases', () => {

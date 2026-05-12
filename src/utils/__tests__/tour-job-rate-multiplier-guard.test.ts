@@ -60,8 +60,8 @@ describe('tour job quote multiplier regression guard', () => {
     expect(codeOnly).toMatch(/raw\.type <> 'rigging'/i);
     expect(codeOnly).toMatch(/rja\.technician_id = _tech_id[\s\S]*?COALESCE\(rja\.single_day, FALSE\)[\s\S]*?rja\.assignment_date = raw\.payable_date/i);
     expect(codeOnly).toMatch(/rt\.job_id = _job_id[\s\S]*?rt\.technician_id = _tech_id[\s\S]*?rt\.date = raw\.payable_date[\s\S]*?COALESCE\(rt\.is_active, TRUE\)/i);
-    expect(codeOnly).toMatch(/NOT COALESCE\(ja\.single_day, FALSE\)[\s\S]*?AND pd\.type <> 'rigging'/i);
-    expect(codeOnly).toMatch(/COALESCE\(ja\.single_day, FALSE\) AND ja\.assignment_date = pd\.date/i);
+    expect(codeOnly).toMatch(/JOIN technician_job_assignments tja[\s\S]*?ON tja\.job_id = raw\.job_id[\s\S]*?WHERE raw\.type <> 'rigging'/i);
+    expect(codeOnly).toMatch(/ja\.technician_id = _tech_id[\s\S]*?COALESCE\(ja\.single_day, FALSE\)[\s\S]*?ja\.assignment_date IS NOT NULL/i);
     expect(codeOnly).toMatch(/'rigging_dates_scoped_to_assigned_techs', true/i);
   });
 
@@ -69,9 +69,12 @@ describe('tour job quote multiplier regression guard', () => {
     const { codeOnly } = latestTourQuoteMigration();
 
     expect(codeOnly).toMatch(/CROSS JOIN LATERAL public\.iso_year_week_madrid\(spd\.payable_date::timestamptz\) iw/i);
-    expect(codeOnly).toMatch(/CROSS JOIN LATERAL public\.iso_year_week_madrid\(pd\.date::timestamptz\) other_iw/i);
+    expect(codeOnly).toMatch(/counted_payable_dates AS/i);
+    expect(codeOnly).toMatch(/FROM active_timesheet_dates\s+UNION\s+SELECT job_id, payable_date\s+FROM single_day_assignment_dates\s+UNION\s+SELECT job_id, payable_date\s+FROM scheduled_job_date_type_dates/is);
+    expect(codeOnly).toMatch(/CROSS JOIN LATERAL public\.iso_year_week_madrid\(cpd\.payable_date::timestamptz\) other_iw/i);
     expect(codeOnly).toMatch(/other_iw\.iso_year = iw\.iso_year/i);
     expect(codeOnly).toMatch(/other_iw\.iso_week = iw\.iso_week/i);
+    expect(codeOnly).toMatch(/'weekly_multiplier_count_uses_timesheets', true/i);
     expect(codeOnly).not.toMatch(/iso_year_week_madrid\(j\.start_time\)/i);
   });
 });
