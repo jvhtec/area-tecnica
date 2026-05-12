@@ -81,6 +81,12 @@ export function useStaffingRequestsRealtime(jobId: string) {
           queryClient.invalidateQueries({
             queryKey: ['staffing_requests', jobId]
           })
+          queryClient.invalidateQueries({
+            queryKey: ['staffing_candidates', jobId]
+          })
+          queryClient.invalidateQueries({
+            queryKey: ['staffing_roleless_consultations', jobId]
+          })
         }
       )
       .subscribe()

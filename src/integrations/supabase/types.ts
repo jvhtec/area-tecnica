@@ -5822,6 +5822,7 @@ export type Database = {
           job_id: string
           phase: string
           profile_id: string
+          role_code: string | null
           single_day: boolean
           status: string
           target_date: string | null
@@ -5836,6 +5837,7 @@ export type Database = {
           job_id: string
           phase: string
           profile_id: string
+          role_code?: string | null
           single_day?: boolean
           status: string
           target_date?: string | null
@@ -5850,6 +5852,7 @@ export type Database = {
           job_id?: string
           phase?: string
           profile_id?: string
+          role_code?: string | null
           single_day?: boolean
           status?: string
           target_date?: string | null

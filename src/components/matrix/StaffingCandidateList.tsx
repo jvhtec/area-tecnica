@@ -33,6 +33,35 @@ interface Candidate {
   reasons: unknown
 }
 
+interface RolelessConsultation {
+  phase: string
+  status: string
+  target_date: string | null
+  single_day: boolean
+  updated_at: string | null
+}
+
+const ROLELESS_PHASE_LABELS: Record<string, string> = {
+  availability: 'availability',
+  offer: 'offer'
+}
+
+const ROLELESS_STATUS_LABELS: Record<string, string> = {
+  pending: 'pending',
+  confirmed: 'confirmed',
+  declined: 'declined'
+}
+
+const getRolelessConsultationLabel = (consultation: RolelessConsultation) => {
+  const phase = ROLELESS_PHASE_LABELS[consultation.phase] ?? consultation.phase
+  const status = ROLELESS_STATUS_LABELS[consultation.status] ?? consultation.status
+  const scope = consultation.single_day && consultation.target_date
+    ? ` for ${consultation.target_date}`
+    : ''
+
+  return `Prior manager ${phase} request without role is ${status}${scope}`
+}
+
 export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   campaignId,
   roleCode,
@@ -94,6 +123,43 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
     enabled: candidateIds.length > 0
   })
 
+  const { data: rolelessConsultations = {} } = useQuery<Record<string, RolelessConsultation>>({
+    queryKey: ['staffing_roleless_consultations', jobId, candidateIds],
+    queryFn: async () => {
+      if (candidateIds.length === 0) return {}
+
+      const { data, error } = await supabase
+        .from('staffing_requests')
+        .select('profile_id, phase, status, target_date, single_day, updated_at')
+        .eq('job_id', jobId)
+        .in('profile_id', candidateIds)
+        .or('role_code.is.null,role_code.eq.')
+        .in('phase', ['availability', 'offer'])
+        .in('status', ['pending', 'confirmed', 'declined'])
+        .order('updated_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching prior role-less staffing requests:', error)
+        return {}
+      }
+
+      return (data || []).reduce((acc, request) => {
+        if (!request.profile_id || acc[request.profile_id]) return acc
+
+        acc[request.profile_id] = {
+          phase: request.phase,
+          status: request.status,
+          target_date: request.target_date,
+          single_day: Boolean(request.single_day),
+          updated_at: request.updated_at
+        }
+
+        return acc
+      }, {} as Record<string, RolelessConsultation>)
+    },
+    enabled: candidateIds.length > 0
+  })
+
   // Send availability mutation
   const sendAvailabilityMutation = useMutation({
     mutationFn: async () => {
@@ -148,6 +214,8 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
       setSelectedCandidates(new Set())
       queryClient.invalidateQueries({ queryKey: ['staffing_requests', jobId] })
       queryClient.invalidateQueries({ queryKey: ['staffing_availability_responses', jobId] })
+      queryClient.invalidateQueries({ queryKey: ['staffing_candidates', jobId] })
+      queryClient.invalidateQueries({ queryKey: ['staffing_roleless_consultations', jobId] })
     },
     onError: (error: any) => {
       toast({
@@ -220,6 +288,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
         {/* Select all checkbox */}
         <div className="flex items-center gap-2 p-2 bg-muted rounded">
           <Checkbox
+            aria-label="Select all candidates"
             checked={selectedCandidates.size === candidates.length && candidates.length > 0}
             onCheckedChange={toggleSelectAll}
           />
@@ -230,85 +299,105 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
 
         {/* Candidate list */}
         <div className="space-y-2 max-h-96 overflow-y-auto">
-          {candidates.map((candidate) => (
-            <div
-              key={candidate.profile_id}
-              className="flex items-start gap-3 p-3 border rounded hover:bg-muted"
-            >
-              <Checkbox
-                checked={selectedCandidates.has(candidate.profile_id)}
-                onCheckedChange={() => toggleCandidate(candidate.profile_id)}
-                className="mt-1"
-              />
+          {candidates.map((candidate) => {
+            const rolelessConsultation = rolelessConsultations[candidate.profile_id]
 
-              <Avatar className="h-10 w-10 shrink-0">
-                <AvatarImage
-                  src={profilePictures?.[candidate.profile_id] || undefined}
-                  alt={candidate.full_name}
+            return (
+              <div
+                key={candidate.profile_id}
+                className="flex items-start gap-3 p-3 border rounded hover:bg-muted"
+              >
+                <Checkbox
+                  aria-label={`Select ${candidate.full_name}`}
+                  checked={selectedCandidates.has(candidate.profile_id)}
+                  onCheckedChange={() => toggleCandidate(candidate.profile_id)}
+                  className="mt-1"
                 />
-                <AvatarFallback className="text-xs">
-                  {getInitials(candidate.full_name)}
-                </AvatarFallback>
-              </Avatar>
 
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <p className="font-medium text-sm">{candidate.full_name}</p>
-                  {candidate.final_score >= 80 && (
-                    <Badge className="bg-green-100 text-green-800">⭐ Top</Badge>
-                  )}
-                  {candidate.soft_conflict && (
-                    <Badge className="bg-yellow-100 text-yellow-800">⚠ Soft Conflict</Badge>
-                  )}
-                </div>
+                <Avatar className="h-10 w-10 shrink-0">
+                  <AvatarImage
+                    src={profilePictures?.[candidate.profile_id] || undefined}
+                    alt={candidate.full_name}
+                  />
+                  <AvatarFallback className="text-xs">
+                    {getInitials(candidate.full_name)}
+                  </AvatarFallback>
+                </Avatar>
 
-                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-2">
-                  <div>Skills: <span className="font-semibold">{candidate.skills_score}</span>pts</div>
-                  <div>Reliability: <span className="font-semibold">{candidate.reliability_score}</span>pts</div>
-                  <div>
-                    Proximity:{' '}
-                    <span className="font-semibold">
-                      {typeof candidate.distance_to_madrid_km === 'number'
-                        ? candidate.distance_to_madrid_km.toFixed(1)
-                        : '—'}
-                    </span>
-                    km
-                  </div>
-                  <div>Fairness: <span className="font-semibold">{candidate.fairness_score}</span>pts</div>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <div className="h-2 flex-1 bg-muted rounded overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500"
-                      style={{ width: `${(candidate.final_score / 100) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-xs font-semibold text-foreground">{candidate.final_score}</span>
-                </div>
-
-                {(Array.isArray(candidate.reasons) ? candidate.reasons : []).length > 0 && (
-                  <button
-                    onClick={() => setExpandedReasons(
-                      expandedReasons === candidate.profile_id ? null : candidate.profile_id
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <p className="font-medium text-sm">{candidate.full_name}</p>
+                    {candidate.final_score >= 80 && (
+                      <Badge className="bg-green-100 text-green-800">⭐ Top</Badge>
                     )}
-                    className="text-xs text-blue-600 hover:text-blue-800 mt-1 flex items-center gap-1"
-                  >
-                    <Info size={14} />
-                    {expandedReasons === candidate.profile_id ? 'Hide' : 'Show'} reasons
-                  </button>
-                )}
-
-                {expandedReasons === candidate.profile_id && (
-                  <div className="mt-2 p-2 bg-blue-500/10 rounded text-xs space-y-1">
-                    {(Array.isArray(candidate.reasons) ? candidate.reasons : []).map((reason, idx) => (
-                      <div key={idx} className="text-muted-foreground">• {reason}</div>
-                    ))}
+                    {candidate.soft_conflict && (
+                      <Badge className="bg-yellow-100 text-yellow-800">⚠ Soft Conflict</Badge>
+                    )}
+                    {rolelessConsultation && (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px]"
+                        title={getRolelessConsultationLabel(rolelessConsultation)}
+                      >
+                        No-role request
+                      </Badge>
+                    )}
                   </div>
-                )}
+
+                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-2">
+                    <div>Skills: <span className="font-semibold">{candidate.skills_score}</span>pts</div>
+                    <div>Reliability: <span className="font-semibold">{candidate.reliability_score}</span>pts</div>
+                    <div>
+                      Proximity:{' '}
+                      <span className="font-semibold">
+                        {typeof candidate.distance_to_madrid_km === 'number'
+                          ? candidate.distance_to_madrid_km.toFixed(1)
+                          : '—'}
+                      </span>
+                      km
+                    </div>
+                    <div>Fairness: <span className="font-semibold">{candidate.fairness_score}</span>pts</div>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    <div className="h-2 flex-1 bg-muted rounded overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500"
+                        style={{ width: `${(candidate.final_score / 100) * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-semibold text-foreground">{candidate.final_score}</span>
+                  </div>
+
+                  {rolelessConsultation && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {getRolelessConsultationLabel(rolelessConsultation)}
+                    </p>
+                  )}
+
+                  {(Array.isArray(candidate.reasons) ? candidate.reasons : []).length > 0 && (
+                    <button
+                      onClick={() => setExpandedReasons(
+                        expandedReasons === candidate.profile_id ? null : candidate.profile_id
+                      )}
+                      className="text-xs text-blue-600 hover:text-blue-800 mt-1 flex items-center gap-1"
+                    >
+                      <Info size={14} />
+                      {expandedReasons === candidate.profile_id ? 'Hide' : 'Show'} reasons
+                    </button>
+                  )}
+
+                  {expandedReasons === candidate.profile_id && (
+                    <div className="mt-2 p-2 bg-blue-500/10 rounded text-xs space-y-1">
+                      {(Array.isArray(candidate.reasons) ? candidate.reasons : []).map((reason, idx) => (
+                        <div key={idx} className="text-muted-foreground">• {reason}</div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         {/* Action buttons */}

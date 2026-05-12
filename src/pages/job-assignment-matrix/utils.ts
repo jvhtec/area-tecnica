@@ -25,6 +25,42 @@ export type MatrixJob = {
   _assigned_count?: number;
 };
 
+type MatrixJobAssignment = {
+  status?: string | null;
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+  production_role?: string | null;
+};
+
+const ROLE_FIELD_BY_DEPARTMENT = {
+  sound: "sound_role",
+  lights: "lights_role",
+  video: "video_role",
+  production: "production_role",
+} as const;
+
+function hasAssignedRole(role: string | null | undefined) {
+  if (!role) return false;
+  return role.trim().toLowerCase() !== "none";
+}
+
+export function countMatrixAssignmentsForDepartment(assignments: MatrixJobAssignment[], department: string) {
+  const activeAssignments = assignments.filter((assignment) => {
+    const status = (assignment.status || "").toLowerCase();
+    return status !== "declined";
+  });
+
+  const roleField = ROLE_FIELD_BY_DEPARTMENT[department as keyof typeof ROLE_FIELD_BY_DEPARTMENT];
+  if (!roleField) return activeAssignments.length;
+
+  return activeAssignments.filter((assignment) => hasAssignedRole(assignment[roleField])).length;
+}
+
+export function shouldShowMatrixJob(job: Pick<MatrixJob, "status" | "_assigned_count">) {
+  return job.status !== "Cancelado" || (job._assigned_count ?? 0) > 0;
+}
+
 export async function fetchJobsForWindow(start: Date, end: Date, department: string) {
   const windowRange = `[${start.toISOString()},${end.toISOString()}]`;
   const allowedJobTypes = ["single", "festival", "ciclo", "tourdate", "evento"];
@@ -35,7 +71,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
       `
       id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
       job_departments!inner(department),
-      job_assignments!job_id(technician_id)
+      job_assignments!job_id(technician_id, status, sound_role, lights_role, video_role, production_role)
     `
     )
     .filter("time_range", "ov", windowRange)
@@ -56,7 +92,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
       jobs!inner(
         id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
         job_departments!inner(department),
-        job_assignments!job_id(technician_id)
+        job_assignments!job_id(technician_id, status, sound_role, lights_role, video_role, production_role)
       )
     `
     )
@@ -101,10 +137,10 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
         status: j.status,
         job_type: j.job_type,
         job_date_types: Array.isArray(j.job_date_types) ? j.job_date_types : [],
-        _assigned_count: assigns.length as number,
+        _assigned_count: countMatrixAssignmentsForDepartment(assigns, department),
       } as MatrixJob;
     })
-    .filter((j) => j.status !== "Cancelado" || (j._assigned_count ?? 0) > 0);
+    .filter(shouldShowMatrixJob);
 }
 
 export async function fetchAssignmentsForWindow(jobIds: string[], technicianIds: string[], jobs: MatrixJob[]) {
