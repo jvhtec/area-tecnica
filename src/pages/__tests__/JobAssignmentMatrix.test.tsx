@@ -61,6 +61,8 @@ vi.mock('@/components/matrix/OptimizedAssignmentMatrix', () => ({
       <div data-testid="matrix-jobs">{props.jobs.length}</div>
       <div data-testid="allow-direct-assign">{String(props.allowDirectAssign)}</div>
       <div data-testid="allow-mark-unavailable">{String(props.allowMarkUnavailable)}</div>
+      <div data-testid="hide-staffing-email-buttons">{String(props.hideStaffingEmailButtons)}</div>
+      <div data-testid="hide-staffing-whatsapp-buttons">{String(props.hideStaffingWhatsappButtons)}</div>
     </div>
   ),
 }));
@@ -123,8 +125,10 @@ const mockDateRange = [
 
 beforeEach(() => {
   vi.clearAllMocks();
+  window.localStorage.clear();
 
   useOptimizedAuthMock.mockReturnValue({
+    user: { id: 'user-1' },
     userDepartment: 'sound',
     userRole: 'technician',
   });
@@ -273,8 +277,27 @@ describe('JobAssignmentMatrix', () => {
     });
   });
 
+  it('lets users hide staffing email and WhatsApp buttons and persists the preference per user', async () => {
+    const user = userEvent.setup();
+
+    render(<JobAssignmentMatrix />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('optimized-matrix')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getAllByRole('switch', { name: /mostrar botones de email/i })[0]);
+    await user.click(screen.getAllByRole('switch', { name: /mostrar botones de whatsapp/i })[0]);
+
+    expect(screen.getByTestId('hide-staffing-email-buttons')).toHaveTextContent('true');
+    expect(screen.getByTestId('hide-staffing-whatsapp-buttons')).toHaveTextContent('true');
+    expect(window.localStorage.getItem('job-assignment-matrix:hide-staffing-email-buttons:user-1')).toBe('true');
+    expect(window.localStorage.getItem('job-assignment-matrix:hide-staffing-whatsapp-buttons:user-1')).toBe('true');
+  });
+
   it('toggles mark unavailable mode for management users', async () => {
     useOptimizedAuthMock.mockReturnValue({
+      user: { id: 'manager-1' },
       userDepartment: 'sound',
       userRole: 'management',
     });
@@ -297,6 +320,7 @@ describe('JobAssignmentMatrix', () => {
 
   it('hides mark unavailable toggle for regular technicians', async () => {
     useOptimizedAuthMock.mockReturnValue({
+      user: { id: 'tech-1' },
       userDepartment: 'sound',
       userRole: 'technician',
     });

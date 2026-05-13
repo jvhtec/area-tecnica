@@ -163,7 +163,7 @@ describe('OptimizedMatrixCell', () => {
     expect(screen.getByText(/FOH/i)).toBeInTheDocument();
   });
 
-  it('displays confirmed status badge', () => {
+  it('does not render a redundant confirmed status badge', () => {
     render(
       <OptimizedMatrixCell
         technician={mockTechnician}
@@ -177,11 +177,11 @@ describe('OptimizedMatrixCell', () => {
       />
     );
 
-    expect(screen.getByText('C')).toBeInTheDocument();
+    expect(screen.queryByText('C')).not.toBeInTheDocument();
   });
 
-  it('shows declined status for declined assignment', () => {
-    const declinedAssignment = { ...mockAssignment, status: 'declined' };
+  it('shows declined status for normalized declined assignment', () => {
+    const declinedAssignment = { ...mockAssignment, status: ' Declined ' };
 
     render(
       <OptimizedMatrixCell
@@ -351,6 +351,71 @@ describe('OptimizedMatrixCell', () => {
 
     expect(screen.getByTitle('Enviar oferta')).toBeInTheDocument();
     expect(screen.getByTitle('Enviar oferta por WhatsApp')).toBeInTheDocument();
+  });
+
+  it('can hide email staffing action buttons without hiding WhatsApp buttons', () => {
+    render(
+      <OptimizedMatrixCell
+        technician={mockTechnician}
+        date={mockDate}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+        hideStaffingEmailButtons={true}
+      />
+    );
+
+    expect(screen.queryByTitle('Solicitar disponibilidad')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Solicitar disponibilidad por WhatsApp')).toBeInTheDocument();
+  });
+
+  it('can hide WhatsApp staffing action buttons without hiding email buttons', () => {
+    render(
+      <OptimizedMatrixCell
+        technician={mockTechnician}
+        date={mockDate}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+        hideStaffingWhatsappButtons={true}
+      />
+    );
+
+    expect(screen.getByTitle('Solicitar disponibilidad')).toBeInTheDocument();
+    expect(screen.queryByTitle('Solicitar disponibilidad por WhatsApp')).not.toBeInTheDocument();
+  });
+
+  it('hides staffing badges and action buttons once the assignment is confirmed', () => {
+    const staleStaffingStatus = {
+      availability_status: 'confirmed',
+      offer_status: 'sent',
+    };
+
+    render(
+      <OptimizedMatrixCell
+        technician={mockTechnician}
+        date={mockDate}
+        assignment={mockAssignment}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+        staffingStatusProvided={staleStaffingStatus}
+      />
+    );
+
+    expect(screen.queryByText('C')).not.toBeInTheDocument();
+    expect(screen.queryByText('A:✓')).not.toBeInTheDocument();
+    expect(screen.queryByText('O:?')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Enviar oferta')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Enviar oferta por WhatsApp')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Solicitar disponibilidad')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Solicitar disponibilidad por WhatsApp')).not.toBeInTheDocument();
   });
 
   it('displays fridge indicator when technician is in fridge', () => {

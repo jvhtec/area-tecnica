@@ -39,6 +39,21 @@ import {
   type StaffingSummaryRow,
 } from './job-assignment-matrix/utils';
 
+const HIDE_STAFFING_EMAIL_BUTTONS_STORAGE_KEY = 'job-assignment-matrix:hide-staffing-email-buttons';
+const HIDE_STAFFING_WHATSAPP_BUTTONS_STORAGE_KEY = 'job-assignment-matrix:hide-staffing-whatsapp-buttons';
+
+const getUserScopedStorageKey = (baseKey: string, userId?: string | null) =>
+  userId ? `${baseKey}:${userId}` : baseKey;
+
+const readStoredBoolean = (key: string) => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(key) === 'true';
+  } catch {
+    return false;
+  }
+};
+
 /**
  * Render the interactive job assignment matrix UI for viewing and managing technician assignments.
  *
@@ -52,7 +67,7 @@ import {
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
   const prefetchStatusRef = React.useRef<Map<string, 'pending' | 'done'>>(new Map<string, 'pending' | 'done'>());
-  const { userDepartment, userRole } = useOptimizedAuth();
+  const { user, userDepartment, userRole } = useOptimizedAuth();
   const [defaultDepartment, setDefaultDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const hasManualDepartmentSelection = React.useRef(false);
@@ -68,6 +83,8 @@ export default function JobAssignmentMatrix() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allowDirectAssign, setAllowDirectAssign] = useState(false);
   const [allowMarkUnavailable, setAllowMarkUnavailable] = useState(false);
+  const [hideStaffingEmailButtons, setHideStaffingEmailButtons] = useState(false);
+  const [hideStaffingWhatsappButtons, setHideStaffingWhatsappButtons] = useState(false);
   const canMarkUnavailable = userRole === 'management' || userRole === 'admin';
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [hideFridge, setHideFridge] = useState<boolean>(true);
@@ -78,6 +95,11 @@ export default function JobAssignmentMatrix() {
     jobTitle: string;
   }>(null);
   const [lastAcknowledgedHash, setLastAcknowledgedHash] = useState<string | null>(null);
+  const skipNextStaffingPreferencePersistRef = React.useRef(true);
+  const staffingPreferenceStorageKeys = React.useMemo(() => ({
+    email: getUserScopedStorageKey(HIDE_STAFFING_EMAIL_BUTTONS_STORAGE_KEY, user?.id),
+    whatsapp: getUserScopedStorageKey(HIDE_STAFFING_WHATSAPP_BUTTONS_STORAGE_KEY, user?.id),
+  }), [user?.id]);
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -90,6 +112,33 @@ export default function JobAssignmentMatrix() {
       console.warn('Failed to read outstanding hash from storage', error);
     }
   }, []);
+
+  React.useEffect(() => {
+    skipNextStaffingPreferencePersistRef.current = true;
+    setHideStaffingEmailButtons(readStoredBoolean(staffingPreferenceStorageKeys.email));
+    setHideStaffingWhatsappButtons(readStoredBoolean(staffingPreferenceStorageKeys.whatsapp));
+  }, [staffingPreferenceStorageKeys.email, staffingPreferenceStorageKeys.whatsapp]);
+
+  React.useEffect(() => {
+    if (skipNextStaffingPreferencePersistRef.current) {
+      skipNextStaffingPreferencePersistRef.current = false;
+      return;
+    }
+
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem(staffingPreferenceStorageKeys.email, String(hideStaffingEmailButtons));
+      window.localStorage.setItem(staffingPreferenceStorageKeys.whatsapp, String(hideStaffingWhatsappButtons));
+    } catch (error) {
+      console.warn('Failed to persist staffing button visibility preferences', error);
+    }
+  }, [
+    hideStaffingEmailButtons,
+    hideStaffingWhatsappButtons,
+    staffingPreferenceStorageKeys.email,
+    staffingPreferenceStorageKeys.whatsapp,
+  ]);
+
   const specialtyOptions = React.useMemo(() => {
     if (selectedDepartment === 'lights') {
       return ['Operador (MA2)', 'Operador (MA3)', 'Operador (HOG)', 'Operador (AVO)', 'Dimmer', 'Rigging', 'Montador'] as const;
@@ -612,8 +661,19 @@ export default function JobAssignmentMatrix() {
     if (selectedSkills.length) c += selectedSkills.length;
     if (hideFridge) c++;
     if (allowDirectAssign) c++;
+    if (hideStaffingEmailButtons) c++;
+    if (hideStaffingWhatsappButtons) c++;
     return c;
-  }, [selectedDepartment, defaultDepartment, debouncedSearch, selectedSkills, hideFridge, allowDirectAssign]);
+  }, [
+    selectedDepartment,
+    defaultDepartment,
+    debouncedSearch,
+    selectedSkills,
+    hideFridge,
+    allowDirectAssign,
+    hideStaffingEmailButtons,
+    hideStaffingWhatsappButtons,
+  ]);
 
   const outstandingJobsCount = staffingReminderQuery.isSuccess ? outstandingJobs.length : null;
   const outstandingJobsDescription =
@@ -758,6 +818,22 @@ export default function JobAssignmentMatrix() {
                 />
               </div>
             )}
+            <div className="flex items-center gap-2 pr-2 border-r">
+              <span className="text-sm font-medium">Email</span>
+              <Switch
+                checked={!hideStaffingEmailButtons}
+                onCheckedChange={(v) => setHideStaffingEmailButtons(!v)}
+                aria-label="Mostrar botones de email"
+              />
+            </div>
+            <div className="flex items-center gap-2 pr-2 border-r">
+              <span className="text-sm font-medium">WhatsApp</span>
+              <Switch
+                checked={!hideStaffingWhatsappButtons}
+                onCheckedChange={(v) => setHideStaffingWhatsappButtons(!v)}
+                aria-label="Mostrar botones de WhatsApp"
+              />
+            </div>
             <Users className="h-4 w-4" />
             <Badge variant="secondary" className="text-xs">
               {filteredTechnicians.length} técnicos
@@ -835,6 +911,8 @@ export default function JobAssignmentMatrix() {
                     setSelectedSkills([]);
                     setHideFridge(false);
                     setAllowDirectAssign(false);
+                    setHideStaffingEmailButtons(false);
+                    setHideStaffingWhatsappButtons(false);
                   }}
                 >
                   Limpiar
@@ -898,6 +976,22 @@ export default function JobAssignmentMatrix() {
                 <Switch checked={allowMarkUnavailable} onCheckedChange={(v) => { setAllowMarkUnavailable(Boolean(v)); if (v) setAllowDirectAssign(false); }} aria-label="Alternar marcar no disponible" />
               </div>
             )}
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Mostrar email</span>
+              <Switch
+                checked={!hideStaffingEmailButtons}
+                onCheckedChange={(v) => setHideStaffingEmailButtons(!v)}
+                aria-label="Mostrar botones de email"
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Mostrar WhatsApp</span>
+              <Switch
+                checked={!hideStaffingWhatsappButtons}
+                onCheckedChange={(v) => setHideStaffingWhatsappButtons(!v)}
+                aria-label="Mostrar botones de WhatsApp"
+              />
+            </div>
           </div>
         )}
       </div>
@@ -920,6 +1014,8 @@ export default function JobAssignmentMatrix() {
             fridgeSet={fridgeSet}
             allowDirectAssign={allowDirectAssign}
             allowMarkUnavailable={allowMarkUnavailable}
+            hideStaffingEmailButtons={hideStaffingEmailButtons}
+            hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
             mobile={isMobile}
             cellWidth={isMobile ? 140 : undefined}
             cellHeight={isMobile ? 80 : undefined}

@@ -14,7 +14,12 @@ This file provides working guidance for coding agents operating in this reposito
 ## Non-Negotiable Rules
 
 1. **Branch discipline**
-   - Work from `dev` unless explicitly instructed otherwise.
+   - Default to a new feature branch from the current remote `main`:
+     ```bash
+     git fetch origin main
+     git switch -c codex/<short-description> origin/main
+     ```
+   - Work from `dev` only when explicitly requested for preview-environment work.
    - Never commit directly to `main`.
 
 2. **Dependency install**
@@ -88,6 +93,30 @@ If changes affect mobile runtime behavior, ensure Capacitor sync path remains va
 ```bash
 npm run cap:sync
 ```
+
+## Production PR Workflow
+
+Use this workflow for production-bound work unless the user explicitly requests a different release path:
+
+1. Start from the current remote `main` on a new branch:
+   ```bash
+   git fetch origin main
+   git switch -c codex/<short-description> origin/main
+   ```
+2. Keep the change focused. Do not cherry-pick broad historical PRs when only a subset of behavior is needed; backport the intended behavior onto current `main`.
+3. Run the relevant local validation from the checklist above. For broad or shared UI/data changes, prefer the full trio:
+   ```bash
+   npm run lint
+   npm run test:run
+   npm run build
+   ```
+4. Commit, push the branch, and open a PR to `main`.
+5. Wait for all GitHub CI checks and CodeRabbit to finish. Inspect CodeRabbit summary, inline comments, and pre-merge checks.
+6. Address every actionable CI or CodeRabbit issue with follow-up commits, rerun relevant local validation, push, and wait again until clean.
+7. Before merging:
+   - If the PR includes Supabase migrations, run a production `supabase db push --dry-run`, apply the pending migrations to the linked production project, and confirm a follow-up dry run reports the remote database is up to date.
+   - If the PR has no database migration, no Supabase production push is required; merging `main` is the production deploy path.
+8. Merge only after CI, CodeRabbit, and any required production migration/deploy steps are clean. Verify the PR is merged and the local worktree is clean.
 
 ## Operational Notes
 

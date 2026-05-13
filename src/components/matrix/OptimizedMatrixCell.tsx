@@ -71,6 +71,8 @@ interface OptimizedMatrixCellProps {
   profileNamesMap?: Map<string, string>;
   isFridge?: boolean;
   mobile?: boolean;
+  hideStaffingEmailButtons?: boolean;
+  hideStaffingWhatsappButtons?: boolean;
 }
 
 const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
@@ -129,7 +131,9 @@ export const OptimizedMatrixCell = memo(({
   staffingStatusByDateProvided = null,
   profileNamesMap = EMPTY_PROFILE_NAMES_MAP,
   isFridge = false,
-  mobile = false
+  mobile = false,
+  hideStaffingEmailButtons = false,
+  hideStaffingWhatsappButtons = false,
 }: OptimizedMatrixCellProps) => {
   // Track cell renders for performance monitoring
   React.useEffect(() => {
@@ -139,9 +143,11 @@ export const OptimizedMatrixCell = memo(({
   const isTodayCell = isToday(date);
   const isWeekendCell = isWeekend(date);
   const hasAssignment = !!assignment;
-  const isDeclinedAssignment = hasAssignment && assignment.status === 'declined';
+  const assignmentStatus = hasAssignment ? normalizeStatus(assignment.status) : null;
+  const isConfirmedAssignment = assignmentStatus === 'confirmed';
+  const isDeclinedAssignment = assignmentStatus === 'declined';
   const isUnavailable = availability?.status === 'unavailable';
-  const confirmedBg = hasAssignment && assignment.status === 'confirmed' ? (assignment?.job?.color || null) : null;
+  const confirmedBg = isConfirmedAssignment ? (assignment?.job?.color || null) : null;
   const confirmedTextColor = confirmedBg ? pickTextColor(confirmedBg) : undefined;
   const confirmedSubTextColor = confirmedTextColor ? (rgbaFromHex(confirmedTextColor, 0.9) || confirmedTextColor) : undefined;
   const displayName = formatUserName(technician.first_name, technician.nickname, technician.last_name) || 'Técnico';
@@ -293,7 +299,7 @@ export const OptimizedMatrixCell = memo(({
   }, [assignment, technician.id, technician.department, multiDateRemoval.otherDatesCount, multiDateRemoval.currentDate]);
 
   // Use job-specific status for assigned cells, date-based status for empty cells
-  const staffingStatus = hasAssignment ? staffingStatusByJob : staffingStatusByDate;
+  const staffingStatus = isConfirmedAssignment ? null : (hasAssignment ? staffingStatusByJob : staffingStatusByDate);
 
   // Debug logging for staffing status changes
   React.useEffect(() => {
@@ -440,6 +446,13 @@ export const OptimizedMatrixCell = memo(({
   const canSendOffer = staffingStatus?.availability_status === 'confirmed' && (!staffingStatus?.offer_status || staffingStatus.offer_status === 'declined' || staffingStatus.offer_status === 'expired');
   // Manual progression: allow offering even if availability isn't in confirmed state
   const canOfferFallback = !hasAssignment && !isUnavailable && !canSendOffer;
+  const canShowOfferAction = canSendOffer || canOfferFallback;
+  const showAvailabilityEmail = canAskAvailability && !hideStaffingEmailButtons;
+  const showAvailabilityWhatsapp = canAskAvailability && !hideStaffingWhatsappButtons;
+  const showOfferEmail = canShowOfferAction && !hideStaffingEmailButtons;
+  const showOfferWhatsapp = canShowOfferAction && !hideStaffingWhatsappButtons;
+  const hasVisibleStaffingAction =
+    showAvailabilityEmail || showAvailabilityWhatsapp || showOfferEmail || showOfferWhatsapp;
 
   // Skip noisy debug logs in production
 
@@ -462,7 +475,7 @@ export const OptimizedMatrixCell = memo(({
             borderLeftColor: assignment?.job?.color,
             borderLeftWidth: hasAssignment && assignment?.job?.color ? '3px' : '1px',
             // If assignment is confirmed, paint background with the job color
-            background: hasAssignment && assignment.status === 'confirmed' && assignment?.job?.color
+            background: isConfirmedAssignment && assignment?.job?.color
               ? assignment.job.color
               : undefined
           }}
@@ -587,67 +600,75 @@ export const OptimizedMatrixCell = memo(({
           )}
 
           {/* Staffing Action Buttons */}
-          {(canAskAvailability || canSendOffer || canOfferFallback) && (
+          {hasVisibleStaffingAction && (
             <div className={`${actionButtonsPosClass} flex gap-1 z-10`}>
               {canAskAvailability && (
                 <>
-                  <Button
-                    variant="ghost"
-                    size={mobile ? 'default' : 'sm'}
-                    className={`${actionBtnSize} p-0 hover:bg-blue-100`}
-                    onClick={(e) => handleStaffingEmail(e, 'availability')}
-                    disabled={isSendingEmail}
-                    title="Solicitar disponibilidad"
-                  >
-                    <Mail className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-blue-600`} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size={mobile ? 'default' : 'sm'}
-                    className={`${actionBtnSize} p-0 hover:bg-emerald-100`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClick('availability-wa');
-                    }}
-                    disabled={isSendingEmail}
-                    title="Solicitar disponibilidad por WhatsApp"
-                  >
-                    <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-emerald-600`} />
-                  </Button>
+                  {showAvailabilityEmail && (
+                    <Button
+                      variant="ghost"
+                      size={mobile ? 'default' : 'sm'}
+                      className={`${actionBtnSize} p-0 hover:bg-blue-100`}
+                      onClick={(e) => handleStaffingEmail(e, 'availability')}
+                      disabled={isSendingEmail}
+                      title="Solicitar disponibilidad"
+                    >
+                      <Mail className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-blue-600`} />
+                    </Button>
+                  )}
+                  {showAvailabilityWhatsapp && (
+                    <Button
+                      variant="ghost"
+                      size={mobile ? 'default' : 'sm'}
+                      className={`${actionBtnSize} p-0 hover:bg-emerald-100`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onClick('availability-wa');
+                      }}
+                      disabled={isSendingEmail}
+                      title="Solicitar disponibilidad por WhatsApp"
+                    >
+                      <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} text-emerald-600`} />
+                    </Button>
+                  )}
                 </>
               )}
-              {(canSendOffer || canOfferFallback) && (
+              {canShowOfferAction && (
                 <>
-                  <Button
-                    variant="ghost"
-                    size={mobile ? 'default' : 'sm'}
-                    className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
-                    onClick={(e) => handleStaffingEmail(e, 'offer')}
-                    disabled={isSendingEmail}
-                    title={canSendOffer ? 'Enviar oferta' : 'Enviar oferta (progreso manual)'}
-                  >
-                    <CheckCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size={mobile ? 'default' : 'sm'}
-                    className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-emerald-100' : 'opacity-80 hover:bg-muted'}`}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onClick('offer-details-wa', jobId || assignment?.job_id || undefined);
-                    }}
-                    disabled={isSendingEmail}
-                    title={canSendOffer ? 'Enviar oferta por WhatsApp' : 'Enviar oferta por WhatsApp (progreso manual)'}
-                  >
-                    <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-emerald-600' : 'text-muted-foreground'}`} />
-                  </Button>
+                  {showOfferEmail && (
+                    <Button
+                      variant="ghost"
+                      size={mobile ? 'default' : 'sm'}
+                      className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-green-100' : 'opacity-80 hover:bg-muted'}`}
+                      onClick={(e) => handleStaffingEmail(e, 'offer')}
+                      disabled={isSendingEmail}
+                      title={canSendOffer ? 'Enviar oferta' : 'Enviar oferta (progreso manual)'}
+                    >
+                      <CheckCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-green-600' : 'text-muted-foreground'}`} />
+                    </Button>
+                  )}
+                  {showOfferWhatsapp && (
+                    <Button
+                      variant="ghost"
+                      size={mobile ? 'default' : 'sm'}
+                      className={`${actionBtnSize} p-0 ${canSendOffer ? 'hover:bg-emerald-100' : 'opacity-80 hover:bg-muted'}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onClick('offer-details-wa', jobId || assignment?.job_id || undefined);
+                      }}
+                      disabled={isSendingEmail}
+                      title={canSendOffer ? 'Enviar oferta por WhatsApp' : 'Enviar oferta por WhatsApp (progreso manual)'}
+                    >
+                      <MessageCircle className={`${mobile ? 'h-4 w-4' : 'h-3 w-3'} ${canSendOffer ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+                    </Button>
+                  )}
                 </>
               )}
             </div>
           )}
           {/* Assignment Content */}
           {hasAssignment && (
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden pr-7">
               <div
                 className={cn('font-medium truncate text-xs', assignment.status !== 'confirmed' ? '' : '')}
                 style={{ color: assignment.status === 'confirmed' ? confirmedTextColor : undefined }}
@@ -691,14 +712,10 @@ export const OptimizedMatrixCell = memo(({
               )}
 
               {/* Status Badge - moved to not conflict with staffing badges */}
-              {hasAssignment && (
-                <div className="absolute bottom-1 right-1">
-                  <Badge
-                    variant={assignment.status === 'confirmed' ? 'default' : 'secondary'}
-                    className="text-xs px-1 py-0 h-4"
-                  >
-                    {assignment.status === 'confirmed' ? 'C' :
-                      assignment.status === 'declined' ? 'R' : 'P'}
+              {!isConfirmedAssignment && (
+                <div className="absolute bottom-1 right-1" title={assignmentStatusLabel(assignment.status)}>
+                  <Badge variant="secondary" className="text-xs px-1 py-0 h-4">
+                    {isDeclinedAssignment ? 'R' : 'P'}
                   </Badge>
                 </div>
               )}

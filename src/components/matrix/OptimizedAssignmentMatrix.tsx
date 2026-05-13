@@ -38,7 +38,9 @@ export const OptimizedAssignmentMatrix = ({
   cellHeight,
   technicianWidth,
   headerHeight,
-  mobile = false
+  mobile = false,
+  hideStaffingEmailButtons = false,
+  hideStaffingWhatsappButtons = false,
 }: OptimizedAssignmentMatrixExtendedProps) => {
   const [cellAction, setCellAction] = useState<CellAction | null>(null);
   const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
@@ -1250,7 +1252,9 @@ export const OptimizedAssignmentMatrix = ({
     TECHNICIAN_WIDTH, HEADER_HEIGHT, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight,
     dateHeadersRef, technicianScrollRef, mainScrollRef, visibleCols, visibleRows,
     dates, technicians, orderedTechnicians,
-    fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile, canNavLeft, canNavRight, handleMobileNav,
+    fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile,
+    hideStaffingEmailButtons, hideStaffingWhatsappButtons,
+    canNavLeft, canNavRight, handleMobileNav,
     handleDateHeadersScroll, handleTechnicianScroll, handleMainScroll, cycleTechSort, getSortLabel,
     isManagementUser, setCreateUserOpen, createUserOpen, qc, setSortJobId,
     getJobsForDate, getAssignmentForCell, getAvailabilityForCell, selectedCells, staffingMaps,
