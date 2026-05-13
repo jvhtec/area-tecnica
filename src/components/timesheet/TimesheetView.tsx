@@ -36,6 +36,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ExpenseList, ExpenseSummaryCard } from "@/components/expenses";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
+import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
 
 import { TimesheetEditForm } from "./TimesheetEditForm";
 import { TimesheetRejectDialog } from "./TimesheetRejectDialog";
@@ -393,8 +394,8 @@ export const TimesheetView = ({
     return acc;
   }, {} as Record<string, Timesheet[]>);
 
-  const isManagementUser = userRole === 'admin' || userRole === 'management';
-  const isTechnician = userRole === 'technician' || userRole === 'house_tech';
+  const isManagementUser = isManagementRole(userRole);
+  const isTechnician = isTechnicianRole(userRole);
   const isHouseTech = userRole === 'house_tech';
 
   console.log('TimesheetView Debug:', {

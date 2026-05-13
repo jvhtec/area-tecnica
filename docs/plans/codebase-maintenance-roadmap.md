@@ -2,7 +2,7 @@
 
 **Snapshot date:** 2026-05-13
 **Baseline:** `main == origin/main` at `74433cb722ea1e85b7f647af28471aba2d6bbd22`
-**Change type:** Documentation roadmap only. No runtime code, database schema, generated type, route, dependency, or UI behavior changes.
+**Change type:** Roadmap plus maintenance follow-through. No database schema, generated type, dependency, or intended UI behavior changes.
 
 This roadmap turns the current maintenance audit into concrete, sequenced backlog tasks. The goal is a clean, maintainable, optimized codebase with explicit workstreams for type safety, data-layer consistency, monolith reduction, performance, Supabase operations, and legacy cleanup.
 
@@ -24,6 +24,11 @@ This roadmap turns the current maintenance audit into concrete, sequenced backlo
 - Previously flagged unchecked delete paths in equipment and logistics now check Supabase errors before continuing.
 - Flex folder creation for tour dates now checks the relevant `flex_folders` insert errors and throws on failure.
 - Older audit line counts are superseded by this 2026-05-13 snapshot. Use the metrics above as the baseline for future progress tracking.
+
+### Progress Started From This Roadmap
+
+- 2026-05-13: P6-02 started by removing the obsolete `src/utils/pdf/tourLogoUtils.ts` compatibility re-export and pointing tour PDF imports at `src/utils/pdf/logoUtils.ts`.
+- 2026-05-13: P2-04 completed for active app code by adding shared permission role groups, predicates, and `usePermissions`; replacing scattered admin/management checks across routes, pages, hooks, layout, jobs, matrix, tours, SoundVision, timesheets, and legacy wrappers; and adding focused permission tests. The remaining `admin`/`management` scan hits are central helpers plus test fixtures.
 
 ## Phase 0: Safety and Type Baseline
 
@@ -51,7 +56,7 @@ This roadmap turns the current maintenance audit into concrete, sequenced backlo
 | P2-01 | Component/page data access | Move direct Supabase calls out of route and UI components into hooks or services, prioritizing files with many direct calls. | Components/pages no longer own query construction except for trivial auth/session reads. Initial target: reduce component/page direct Supabase hits by 50%. | Static scan for `supabase.(from|rpc|storage|functions|auth)` in `src/components` and `src/pages`; affected page tests. | P1-03 for shared wrappers. |
 | P2-02 | Query keys | Replace inline `queryKey: [...]` usage with centralized key factories in `src/lib/react-query.ts` or feature-local key modules. | Query invalidation uses stable keys; inline query-key hits are reduced by at least 60%. | Static scan for `queryKey\\s*:\\s*\\[`; focused regression tests for invalidation-heavy flows. | None. |
 | P2-03 | Mutation/toast boilerplate | Introduce shared mutation helpers for success/error toast and invalidation patterns. Standardize the preferred toast API. | Repeated dialog mutation boilerplate is removed from the highest-use flows; toast behavior remains consistent. | `npm run lint`; manual mutation smoke tests for edited flows. | Agreement on preferred toast API. |
-| P2-04 | Permissions | Centralize repeated role checks behind `src/utils/permissions.ts` and a `usePermissions` hook. | Inline admin/management checks are reduced substantially, and permission behavior is covered by unit tests. | Static scan for repeated role predicates; permission unit tests. | None. |
+| P2-04 | Permissions | Centralize repeated role checks behind `src/utils/permissions.ts` and a `usePermissions` hook. | Active app inline admin/management checks are removed or converted to named predicates/constants, and permission behavior is covered by unit tests. | Static scan for repeated role predicates; permission unit tests. | None. |
 | P2-05 | Date/timezone handling | Audit `new Date(` usage and route domain-sensitive date operations through timezone-aware utilities. | Scheduling, payroll, wallboard, and PDF export dates are explicit about local date versus instant semantics. | Date utility tests around Europe/Madrid DST boundaries; affected workflow tests. | None. |
 
 ## Phase 3: Monolith Refactors

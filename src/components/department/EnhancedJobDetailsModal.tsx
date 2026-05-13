@@ -21,7 +21,7 @@ import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
-import { canManagePayouts } from '@/utils/permissions';
+import { canManagePayouts, isManagementRole } from '@/utils/permissions';
 import { getVisibleFinancialTechnicianIds } from '@/components/jobs/financialViewerScope';
 
 interface EnhancedJobDetailsModalProps {
@@ -66,7 +66,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     const [isApproving, setIsApproving] = useState(false);
     const queryClient = useQueryClient();
 
-    const isManager = ['admin', 'management'].includes(userRole || '');
+    const isManager = isManagementRole(userRole);
     const canManageJobPayouts = canManagePayouts(userRole, userDepartment);
     const isHouseTech = userRole === 'house_tech';
 

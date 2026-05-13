@@ -42,6 +42,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import type { Map as MapboxMap } from 'mapbox-gl';
 import { Theme } from '@/components/technician/types';
+import { isManagementRole } from '@/utils/permissions';
 
 export interface SoundVisionInteractiveMapProps {
     theme: Theme;
@@ -212,7 +213,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
     const stateRegions = [...new Set(venues?.map((v) => v.state_region).filter(Boolean))].sort();
 
     const hasActiveFilters = city || country || stateRegion || fileType || searchTerm;
-    const isManagement = profile?.role === 'admin' || profile?.role === 'management';
+    const isManagement = isManagementRole(profile?.role);
 
     const canOpenReviews = (file: SoundVisionFile) =>
         isManagement || file.hasDownloaded || file.hasReviewed;

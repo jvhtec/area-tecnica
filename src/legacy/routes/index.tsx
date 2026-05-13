@@ -13,6 +13,7 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import RatesCenterPage from "@/pages/RatesCenterPage";
 import ExpensesPage from "@/pages/Expenses";
+import { MANAGEMENT_ALLOWED_ROLES } from "@/utils/permissions";
 
 // Create a placeholder for missing pages
 const Placeholder = () => (
@@ -83,7 +84,7 @@ const router = createBrowserRouter([
       {
         path: "/vacation-management",
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'management']}>
+          <ProtectedRoute allowedRoles={MANAGEMENT_ALLOWED_ROLES}>
             <VacationManagement />
           </ProtectedRoute>
         )
@@ -91,7 +92,7 @@ const router = createBrowserRouter([
       {
         path: "/management/rates",
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'management']}>
+          <ProtectedRoute allowedRoles={MANAGEMENT_ALLOWED_ROLES}>
             <RatesCenterPage />
           </ProtectedRoute>
         )
@@ -179,7 +180,7 @@ const router = createBrowserRouter([
       {
         path: "/settings",
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'management']}>
+          <ProtectedRoute allowedRoles={MANAGEMENT_ALLOWED_ROLES}>
             <Placeholder />
           </ProtectedRoute>
         )

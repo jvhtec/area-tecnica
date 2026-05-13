@@ -11,6 +11,7 @@ import { Info, Edit3, Save, X, Clock, Plus, Trash2, Bell } from "lucide-react"
 import { supabase } from "@/lib/supabase"
 import { useToast } from "@/hooks/use-toast"
 import { getChangelogVersionAutofill } from "@/lib/changelog-version"
+import { isAdminRole, isManagementRole } from "@/utils/permissions"
 
 // Get the version from Vite's env variables
 const defaultVersion = import.meta.env.VITE_APP_VERSION || "dev"
@@ -92,12 +93,8 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
   const { toast } = useToast()
 
   // Allow editing for management/admin or Javier by email
-  const canEditChangelog = (userRole === "management" || userRole === "admin") || (userEmail?.toLowerCase() === 'sonido@sector-pro.com')
-
-  // REMOVED: The early return that was hiding the component for management users
-  // if (userRole === "management") {
-  //   return null;
-  // }
+  const canDeleteChangelog = isAdminRole(userRole)
+  const canEditChangelog = isManagementRole(userRole) || (userEmail?.toLowerCase() === 'sonido@sector-pro.com')
 
   // Check for recent updates (within last 24 hours)
   useEffect(() => {
@@ -362,7 +359,7 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
                           <Edit3 className="h-3 w-3" />
                         </Button>
                       )}
-                      {userRole === 'admin' && editingEntry !== entry.id && (
+                      {canDeleteChangelog && editingEntry !== entry.id && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -438,7 +435,7 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
                           <X className="h-3 w-3 mr-1" />
                           Cancel
                         </Button>
-                        {userRole === 'admin' && (
+                        {canDeleteChangelog && (
                           <Button
                             variant="destructive"
                             size="sm"

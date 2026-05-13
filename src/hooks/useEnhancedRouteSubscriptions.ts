@@ -8,6 +8,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { isAdminRole } from '@/utils/permissions';
 
 // Define subscription requirements for each route
 export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
@@ -185,7 +186,7 @@ export function useEnhancedRouteSubscriptions() {
   const queryClient = useQueryClient();
   const { lastRefreshTime, connectionStatus } = useSubscriptionContext();
   const { userRole } = useOptimizedAuth();
-  const isAdmin = userRole === 'admin';
+  const isAdmin = isAdminRole(userRole);
   const manager = UnifiedSubscriptionManager.getInstance(queryClient);
   const lastActiveTimestamp = useRef<number>(Date.now());
   const wasInactive = useRef<boolean>(false);

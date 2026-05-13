@@ -7,6 +7,7 @@
 
 import { useShortcutStore } from '@/stores/useShortcutStore';
 import { NavigateFunction } from 'react-router-dom';
+import { MANAGEMENT_ALLOWED_ROLES, PROJECT_MANAGEMENT_ALLOWED_ROLES } from '@/utils/permissions';
 
 export interface NavigationShortcut {
   id: string;
@@ -65,7 +66,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/logistics',
     keybind: 'Ctrl+5',
     icon: 'Truck',
-    requiredRoles: ['admin', 'management', 'logistics', 'house_tech'],
+    requiredRoles: [...PROJECT_MANAGEMENT_ALLOWED_ROLES, 'house_tech'],
   },
   {
     id: 'nav-tours',
@@ -97,7 +98,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/project-management',
     keybind: 'Ctrl+9',
     icon: 'FolderKanban',
-    requiredRoles: ['admin', 'management', 'logistics'],
+    requiredRoles: PROJECT_MANAGEMENT_ALLOWED_ROLES,
   },
   {
     id: 'nav-job-assignment-matrix',
@@ -105,7 +106,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/job-assignment-matrix',
     keybind: 'Ctrl+0',
     icon: 'Calendar',
-    requiredRoles: ['admin', 'management'],
+    requiredRoles: MANAGEMENT_ALLOWED_ROLES,
   },
   {
     id: 'nav-rates',
@@ -113,7 +114,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/management/rates',
     keybind: 'Ctrl+Shift+R',
     icon: 'DollarSign',
-    requiredRoles: ['admin', 'management'],
+    requiredRoles: MANAGEMENT_ALLOWED_ROLES,
   },
   {
     id: 'nav-expenses',
@@ -121,7 +122,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/gastos',
     keybind: 'Ctrl+Shift+G',
     icon: 'Receipt',
-    requiredRoles: ['admin', 'management', 'logistics'],
+    requiredRoles: PROJECT_MANAGEMENT_ALLOWED_ROLES,
   },
   {
     id: 'nav-timesheets',
@@ -158,7 +159,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/settings',
     keybind: 'Ctrl+,',
     icon: 'Settings',
-    requiredRoles: ['admin', 'management'],
+    requiredRoles: MANAGEMENT_ALLOWED_ROLES,
   },
 ];
 

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useOptimizedAuth } from './useOptimizedAuth';
 import { expenseCopy } from '@/components/expenses/expenseCopy';
 import type { ExpenseStatus } from '@/components/expenses/ExpenseStatusBadge';
+import { isManagementRole } from '@/utils/permissions';
 
 export interface JobExpense {
   id: string;
@@ -288,7 +289,7 @@ export const useReceiptUpload = () => {
  */
 export const useJobApprovedExpenses = (jobId: string | null | undefined) => {
   const { user, userRole } = useOptimizedAuth();
-  const isManager = userRole === 'admin' || userRole === 'management';
+  const isManager = isManagementRole(userRole);
 
   return useQuery({
     queryKey: ['job-approved-expenses', jobId],

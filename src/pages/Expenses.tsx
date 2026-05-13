@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { formatCurrency } from '@/lib/utils';
+import { isManagementRole } from '@/utils/permissions';
 import {
   Card,
   CardContent,
@@ -104,7 +105,7 @@ const ExpensesPage: React.FC = () => {
   const [deleteDialog, setDeleteDialog] = React.useState<{ expenseId: string; technicianName: string; amount: number } | null>(null);
 
   const canAccess = userRole ? ALLOWED_ROLES.includes(userRole) : false;
-  const canDeleteExpenses = userRole === 'admin' || userRole === 'management';
+  const canDeleteExpenses = isManagementRole(userRole);
 
   React.useEffect(() => {
     if (!isLoading && userRole && !canAccess) {

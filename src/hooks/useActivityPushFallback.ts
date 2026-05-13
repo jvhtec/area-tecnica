@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth'
+import { isManagementRole } from '@/utils/permissions'
 
 const COVERED_CODES = new Set<string>([
   'job.created',
@@ -31,7 +32,7 @@ export function useActivityPushFallback() {
   useEffect(() => {
     if (!enabled) return
     // Only run on management/admin to reduce duplicates
-    if (!['admin','management'].includes(userRole || '')) return
+    if (!isManagementRole(userRole)) return
 
     const channel = supabase
       .channel('activity-push-fallback')

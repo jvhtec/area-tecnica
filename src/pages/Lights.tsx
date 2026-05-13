@@ -18,6 +18,7 @@ import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { isManagementRole } from "@/utils/permissions";
 
 const Lights = () => {
   const navigate = useNavigate();
@@ -32,6 +33,7 @@ const Lights = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const currentDepartment = "lights";
   const { userRole } = useOptimizedAuth();
+  const canManageJobs = isManagementRole(userRole);
 
   const mobileTools = useMemo(
     () => [
@@ -104,7 +106,7 @@ const Lights = () => {
 
   const handleDeleteClick = useCallback(async (jobId: string) => {
     // Check permissions
-    if (!["admin", "management"].includes(userRole || "")) {
+    if (!canManageJobs) {
       toast({
         title: "Permission denied",
         description: "Only admin and management users can delete jobs",
@@ -140,7 +142,7 @@ const Lights = () => {
           variant: "destructive"
         });
       }
-  }, [queryClient, toast, userRole]);
+  }, [canManageJobs, queryClient, toast]);
 
   const handleAssignmentDialogClose = useCallback(() => {
     setIsAssignmentDialogOpen(false);
@@ -177,7 +179,7 @@ const Lights = () => {
             jobs={departmentJobs}
             date={date ?? new Date()}
             onDateSelect={(nextDate) => setDate(nextDate)}
-            canCreateJob={userRole ? ["admin", "management"].includes(userRole) : false}
+            canCreateJob={canManageJobs}
             onCreateJob={() => handleCreateJob(undefined)}
             userRole={userRole}
             onEditJob={handleEditClick}

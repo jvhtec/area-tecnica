@@ -20,7 +20,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useDeleteSoundVisionFile, useDownloadSoundVisionFile, SoundVisionFile } from '@/hooks/useSoundVisionFiles';
-import { canDeleteSoundVisionFiles } from '@/utils/permissions';
+import { canDeleteSoundVisionFiles, isManagementRole } from '@/utils/permissions';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -57,10 +57,7 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
   const downloadFile = useDownloadSoundVisionFile();
 
   const canDelete = canDeleteSoundVisionFiles(profile?.role);
-  const isManagement = useMemo(
-    () => profile?.role === 'admin' || profile?.role === 'management',
-    [profile?.role]
-  );
+  const isManagement = useMemo(() => isManagementRole(profile?.role), [profile?.role]);
 
   useEffect(() => {
     if (!selectedFile) return;

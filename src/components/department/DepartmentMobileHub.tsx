@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { supabase } from "@/lib/supabase";
 import { Badge } from "@/components/ui/badge";
+import { isManagementRole } from "@/utils/permissions";
 
 interface ToolDefinition {
   label: string;
@@ -106,7 +107,7 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
 
   const t = isDark ? themeTokens.dark : themeTokens.light;
 
-  const canEdit = userRole ? ["admin", "management"].includes(userRole) : false;
+  const canEdit = isManagementRole(userRole);
 
   // Load user filter preferences from profiles
   useEffect(() => {

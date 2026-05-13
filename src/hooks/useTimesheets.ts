@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Timesheet } from "@/types/timesheet";
 import { toast } from "sonner";
 import { RATES_QUERY_KEYS } from "@/constants/ratesQueryKeys";
+import { isManagementRole } from "@/utils/permissions";
 
 type TimesheetVisibilityRow = Pick<
   Timesheet,
@@ -221,7 +222,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
 
   useEffect(() => {
     // Only management can trigger auto-creation; avoid for technicians/house tech
-    const allowAuto = opts?.userRole === 'admin' || opts?.userRole === 'management';
+    const allowAuto = isManagementRole(opts?.userRole);
     if (!jobId || !allowAuto) return;
     // Only attempt once per job to avoid loops
     if (autoCreateAttemptedFor.current === jobId) return;

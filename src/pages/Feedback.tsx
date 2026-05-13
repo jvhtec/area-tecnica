@@ -7,12 +7,13 @@ import { FeatureRequestForm } from "@/components/feedback/FeatureRequestForm";
 import { AdminPanel } from "@/components/feedback/AdminPanel";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { initConsoleCapture } from "@/utils/consoleCapture";
+import { isManagementRole } from "@/utils/permissions";
 
 export default function Feedback() {
   const { userRole } = useOptimizedAuth();
   const [activeTab, setActiveTab] = useState("bug");
 
-  const isAdmin = userRole === "admin" || userRole === "management";
+  const isAdmin = isManagementRole(userRole);
 
   // Initialize console capture when component mounts
   useEffect(() => {

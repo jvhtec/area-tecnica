@@ -30,6 +30,7 @@ import { JobCardDocuments } from "../JobCardDocuments";
 import { JobCardHeader } from "../JobCardHeader";
 import { JobCardProgress } from "../JobCardProgress";
 import { ConfettiBurst } from "@/components/ui/celebration/ConfettiBurst";
+import { isManagementRole } from "@/utils/permissions";
 
 export interface JobCardNewViewProps {
   job: any;
@@ -243,6 +244,7 @@ export function JobCardNewView({
   handleFlexPickerConfirm,
 }: JobCardNewViewProps) {
   const reducedMotion = useReducedMotion();
+  const canManageTransportRequests = userDepartment === "logistics" || (isManagementRole(userRole) && !isTechDept);
   const isAndreaWeddingJob = job?.id === "eeb00e4d-7d38-4687-9d04-31471b89adfc";
   const [celebrateSeed, setCelebrateSeed] = React.useState(0);
   const [celebrateOrigin, setCelebrateOrigin] = React.useState<{ xPct: number; yPct: number } | null>(null);
@@ -578,7 +580,7 @@ export function JobCardNewView({
           )}
 
           {transportDialogOpen &&
-            (userDepartment === "logistics" || ((userRole === "management" || userRole === "admin") && !isTechDept)) && (
+            canManageTransportRequests && (
               <Dialog open={transportDialogOpen} onOpenChange={setTransportDialogOpen}>
                 <DialogContent className="max-w-xl">
                   <div className="space-y-4">

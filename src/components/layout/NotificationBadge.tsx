@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { useAppBadgeSource } from "@/hooks/useAppBadgeSource"
 import { supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
+import { isDepartmentManagementRole } from "@/utils/permissions"
 
 interface NotificationBadgeProps {
   userId: string
@@ -43,7 +44,7 @@ export const NotificationBadge = ({
         .select("id", { count: "exact", head: true })
         .eq("status", "unread")
 
-      if (userRole === "management") {
+      if (isDepartmentManagementRole(userRole)) {
         deptQuery = deptQuery.eq("department", userDepartment)
       } else if (userRole === "technician") {
         deptQuery = deptQuery.eq("sender_id", userId)
@@ -120,7 +121,7 @@ export const NotificationBadge = ({
   }, [fetchUnreadMessages])
 
   const handleMessageNotificationClick = () => {
-    if (userRole === "management") {
+    if (isDepartmentManagementRole(userRole)) {
       navigate("/dashboard?showMessages=true")
     } else if (userRole === "technician") {
       navigate("/technician-dashboard?showMessages=true")

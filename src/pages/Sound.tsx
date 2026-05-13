@@ -33,6 +33,7 @@ import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDeta
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
 import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
 import { isJobOnDate } from "@/utils/timezoneUtils";
+import { isManagementRole } from "@/utils/permissions";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -61,6 +62,7 @@ const Sound = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();
+  const canManageJobs = isManagementRole(userRole);
 
   // Generate navigation items for mobile nav bar
   const navigationItems = useMemo(() => {
@@ -195,7 +197,7 @@ const Sound = () => {
   };
 
   const handleDeleteClick = async (jobId: string) => {
-    if (!["admin", "management"].includes(userRole || "")) {
+    if (!canManageJobs) {
       toast({
         title: "Permission denied",
         description: "Only admin and management users can delete jobs",
@@ -241,7 +243,7 @@ const Sound = () => {
             jobs={departmentJobs}
             date={date || new Date()}
             onDateSelect={setDate}
-            canCreateJob={userRole ? ["admin", "management"].includes(userRole) : false}
+            canCreateJob={canManageJobs}
             onCreateJob={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
             userRole={userRole}
             onEditJob={handleEditClick}
@@ -274,7 +276,7 @@ const Sound = () => {
             <LightsHeader
               onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
               department="Sound"
-              canCreate={userRole ? ["admin", "management"].includes(userRole) : true}
+              canCreate={userRole ? canManageJobs : true}
             />
 
             <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">

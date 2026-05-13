@@ -55,6 +55,7 @@ import {
   getTechnicalPowerSummaryAvailability,
   loadTechnicalPowerSummaryData,
 } from "@/utils/powerSummaryData";
+import { isAdminRole, isManagementRole } from "@/utils/permissions";
 
 interface JobCardActionsProps {
   job: any;
@@ -147,10 +148,11 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const normalizedUserDepartment = typeof userDepartment === 'string'
     ? userDepartment.toLowerCase().replace(/_warehouse$/, '')
     : '';
+  const isManagementUser = isManagementRole(userRole);
   const canSendProductionWhatsapp = Boolean(
     isProjectManagementPage
     && department === 'production'
-    && (userRole === 'admin'
+    && (isAdminRole(userRole)
       || normalizedUserDepartment === 'production'
       || normalizedUserDepartment === 'produccion'
       || normalizedUserDepartment === 'producción')
@@ -524,9 +526,9 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     navigate(`/timesheets?jobId=${job.id}`);
   };
 
-  const canViewCalculators = isProjectManagementPage && (userRole === 'management' || userRole === 'admin');
+  const canViewCalculators = isProjectManagementPage && isManagementUser;
   const canGenerateTechnicalPowerPack =
-    isProjectManagementPage && (userRole === 'management' || userRole === 'admin');
+    isProjectManagementPage && isManagementUser;
 
   const isFestivalLike = isFestivalLikeJobType(job?.job_type);
   const allowedJobType = ['single', 'festival', 'ciclo', 'tourdate'].includes(job?.job_type);
@@ -1228,7 +1230,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           {transportButtonLabel}
         </Button>
       )}
-      {isProjectManagementPage && department !== 'production' && (userRole === 'management' || userRole === 'admin') && onCreateWhatsappGroup && job.job_type !== 'dryhire' && (
+      {isProjectManagementPage && department !== 'production' && isManagementUser && onCreateWhatsappGroup && job.job_type !== 'dryhire' && (
         <>
           {/* Show retry button if there's a request but no group (failed creation) */}
           {whatsappRequest && !whatsappGroup && onRetryWhatsappGroup ? (
@@ -1257,7 +1259,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           )}
         </>
       )}
-      {isProjectManagementPage && department !== 'production' && (userRole === 'management' || userRole === 'admin') && (
+      {isProjectManagementPage && department !== 'production' && isManagementUser && (
         <Button
           variant="outline"
           size="sm"

@@ -11,6 +11,7 @@ import type { Department } from "@/types/department";
 import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
+import { isManagementRole } from "@/utils/permissions";
 import { generateIndividualStagePDFs } from "@/utils/pdf/individualStagePdfGenerator";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { format, isValid } from "date-fns";
@@ -64,6 +65,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const [flexPickerOptions, setFlexPickerOptions] = useState<CreateFoldersOptions | undefined>(undefined);
   const [flexPickerMode, setFlexPickerMode] = useState<"create" | "add">("add");
   const [isJobPresetsOpen, setIsJobPresetsOpen] = useState(false);
+  const isManagementUser = isManagementRole(userRole);
 
   // New action states
   const [isUploadingDocument, setIsUploadingDocument] = useState(false);
@@ -99,7 +101,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   // Check if WhatsApp group already exists for this job/department
   const { data: waGroup, refetch: refetchWaGroup } = useQuery({
     queryKey: ['job-whatsapp-group', jobId, waDepartment, waStageNumber],
-    enabled: !!jobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
+    enabled: !!jobId && !!waDepartment && isManagementUser,
     queryFn: async () => {
       if (!jobId) return null;
       const { data, error } = await supabase
@@ -116,7 +118,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
     queryKey: ['job-whatsapp-group-request', jobId, waDepartment, waStageNumber],
-    enabled: !!jobId && !!waDepartment && (userRole === 'management' || userRole === 'admin'),
+    enabled: !!jobId && !!waDepartment && isManagementUser,
     queryFn: async () => {
       if (!jobId) return null;
       const { data, error } = await supabase

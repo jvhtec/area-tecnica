@@ -18,7 +18,13 @@ import { Loader2 } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { GlobalCreateJobDialog } from '@/components/jobs/GlobalCreateJobDialog';
 import { useShortcutInitialization } from '@/hooks/useShortcutInitialization';
-import { canManagePayouts } from '@/utils/permissions';
+import {
+  MANAGEMENT_ALLOWED_ROLES,
+  canAccessDisponibilidad,
+  canManagePayouts,
+  hasTechnicianSelfServiceAccess,
+  isAdminRole,
+} from '@/utils/permissions';
 
 const ReactQueryDevtoolsLazy = import.meta.env.DEV
   ? lazy(() =>
@@ -144,7 +150,6 @@ function RouteAwareGlobalOverlays() {
 }
 
 const SOUND_DEPARTMENT = "sound";
-const LIGHTS_DEPARTMENT = "lights";
 const SOUND_TOOL_ROLES = ["admin", "management", "house_tech"] as const;
 const SOUND_TOOL_ROLES_WITH_TECH = [...SOUND_TOOL_ROLES, "technician"] as const;
 
@@ -155,7 +160,7 @@ const FestivalsAccessGuard = () => {
     return null;
   }
 
-  const isAdmin = userRole === "admin";
+  const isAdmin = isAdminRole(userRole);
   const isSoundMember = userDepartment?.toLowerCase() === SOUND_DEPARTMENT;
 
   if (!isAdmin && !isSoundMember) {
@@ -172,14 +177,7 @@ const DisponibilidadAccessGuard = () => {
     return null;
   }
 
-  const normalizedDepartment = userDepartment?.toLowerCase();
-  const isAdmin = userRole === "admin";
-  const hasManagementDepartmentAccess =
-    userRole === "management" &&
-    (normalizedDepartment === SOUND_DEPARTMENT ||
-      normalizedDepartment === LIGHTS_DEPARTMENT);
-
-  if (!isAdmin && !hasManagementDepartmentAccess) {
+  if (!canAccessDisponibilidad(userRole, userDepartment)) {
     return <Navigate to="/dashboard" replace />;
   }
 
@@ -207,14 +205,7 @@ const TechnicianUnavailabilityAccessGuard = () => {
     return null;
   }
 
-  // House techs always manage their own availability here.
-  if (userRole === 'house_tech') {
-    return <TechnicianUnavailability />;
-  }
-
-  // Admin/management can only access if they are assignable as technician.
-  const isPrivileged = userRole === 'admin' || userRole === 'management';
-  if (isPrivileged && assignableAsTech) {
+  if (hasTechnicianSelfServiceAccess(userRole, assignableAsTech)) {
     return <TechnicianUnavailability />;
   }
 
@@ -288,20 +279,20 @@ export default function App() {
                               <Route path="/video" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Video /></ProtectedRoute>} />
                               <Route path="/logistics" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech']}><Logistics /></ProtectedRoute>} />
                               <Route path="/profile" element={<Profile />} />
-                              <Route path="/settings" element={<ProtectedRoute allowedRoles={['admin', 'management']}><Settings /></ProtectedRoute>} />
+                              <Route path="/settings" element={<ProtectedRoute allowedRoles={MANAGEMENT_ALLOWED_ROLES}><Settings /></ProtectedRoute>} />
                               <Route path="/project-management" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><ProjectManagement /></ProtectedRoute>} />
                               <Route path="/tasks" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics', 'house_tech', 'oscar']}><GlobalTasks /></ProtectedRoute>} />
                               <Route path="/equipment-management" element={<EquipmentManagement />} />
-                              <Route path="/job-assignment-matrix" element={<ProtectedRoute allowedRoles={['admin', 'management']}><JobAssignmentMatrix /></ProtectedRoute>} />
+                              <Route path="/job-assignment-matrix" element={<ProtectedRoute allowedRoles={MANAGEMENT_ALLOWED_ROLES}><JobAssignmentMatrix /></ProtectedRoute>} />
                               <Route path="/activity" element={<ProtectedRoute allowedRoles={['admin']}><ActivityCenter /></ProtectedRoute>} />
                               <Route path="/timesheets" element={<Timesheets />} />
                               <Route path="/tours" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><Tours /></ProtectedRoute>} />
                               <Route path="/festivals" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalsAccessGuard /></ProtectedRoute>} />
-                              <Route path="/incident-reports" element={<ProtectedRoute allowedRoles={['admin', 'management']}><IncidentReports /></ProtectedRoute>} />
+                              <Route path="/incident-reports" element={<ProtectedRoute allowedRoles={MANAGEMENT_ALLOWED_ROLES}><IncidentReports /></ProtectedRoute>} />
                               <Route path="/announcements" element={<ProtectedRoute allowedRoles={['admin']}><Announcements /></ProtectedRoute>} />
                               <Route path="/management/wallboard-presets" element={<ProtectedRoute allowedRoles={['admin']}><WallboardPresets /></ProtectedRoute>} />
-                              <Route path="/management/rates" element={<ProtectedRoute allowedRoles={['admin', 'management']}><RatesCenterPage /></ProtectedRoute>} />
-                              <Route path="/management/payouts-due" element={<ProtectedRoute allowedRoles={['admin', 'management']}><PayoutsDueAccessGuard /></ProtectedRoute>} />
+                              <Route path="/management/rates" element={<ProtectedRoute allowedRoles={MANAGEMENT_ALLOWED_ROLES}><RatesCenterPage /></ProtectedRoute>} />
+                              <Route path="/management/payouts-due" element={<ProtectedRoute allowedRoles={MANAGEMENT_ALLOWED_ROLES}><PayoutsDueAccessGuard /></ProtectedRoute>} />
                               <Route path="/gastos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'logistics']}><ExpensesPage /></ProtectedRoute>} />
                               <Route path="/feedback" element={<Feedback />} />
                               <Route path="/soundvision-files" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><SoundVisionFiles /></ProtectedRoute>} />
@@ -342,7 +333,7 @@ export default function App() {
                               <Route path="/tour-dates/:tourDateId/video/consumos" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><VideoConsumosTool /></ProtectedRoute>} />
 
                               {/* Disponibilidad Route */}
-                              <Route path="/disponibilidad" element={<ProtectedRoute allowedRoles={['admin', 'management']}><DisponibilidadAccessGuard /></ProtectedRoute>} />
+                              <Route path="/disponibilidad" element={<ProtectedRoute allowedRoles={MANAGEMENT_ALLOWED_ROLES}><DisponibilidadAccessGuard /></ProtectedRoute>} />
 
                               {/* Festival Management Routes */}
                               <Route path="/festival-management/:jobId" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalManagement /></ProtectedRoute>} />

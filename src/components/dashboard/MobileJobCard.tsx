@@ -28,6 +28,7 @@ import {
   Loader2,
   FileText
 } from "lucide-react";
+import { isManagementRole } from "@/utils/permissions";
 import { cn } from "@/lib/utils";
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
@@ -68,6 +69,7 @@ export function MobileJobCard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { userRole } = useOptimizedAuth();
+  const isManagementUser = isManagementRole(userRole);
   const [dateTypeDialogOpen, setDateTypeDialogOpen] = useState(false);
   const [selectedDateType, setSelectedDateType] = useState<DateType>('show');
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
@@ -432,7 +434,7 @@ export function MobileJobCard({
                     </DropdownMenuItem>
                   )}
                   
-                  {["admin", "management"].includes(userRole || "") && (
+                  {isManagementUser && (
                     <DropdownMenuItem 
                       onClick={handleDeleteClick}
                       className="text-destructive focus:text-destructive"

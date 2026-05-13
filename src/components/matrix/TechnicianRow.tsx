@@ -17,6 +17,7 @@ import { startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date
 import { useToast } from '@/hooks/use-toast';
 import { formatUserName } from '@/utils/userName';
 import { CityAutocomplete } from '@/components/maps/CityAutocomplete';
+import { isAdminRole, isManagementRole } from '@/utils/permissions';
 
 interface TechnicianRowProps {
   technician: {
@@ -42,8 +43,8 @@ interface TechnicianRowProps {
 
 const TechnicianRowComp = ({ technician, height, isFridge = false, compact = false, medalRank, lastYearMedalRank }: TechnicianRowProps) => {
   const { userRole } = useOptimizedAuth();
-  const isAdmin = userRole === 'admin';
-  const isManagementUser = ['admin', 'management'].includes(userRole || '');
+  const isAdmin = isAdminRole(userRole);
+  const isManagementUser = isManagementRole(userRole);
   const [skillsOpen, setSkillsOpen] = React.useState(false);
   const [popoverOpen, setPopoverOpen] = React.useState(false);
   const qc = useQueryClient();

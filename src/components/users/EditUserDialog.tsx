@@ -17,6 +17,7 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { formatUserName } from "@/utils/userName";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
+import { isManagementRole } from "@/utils/permissions";
 
 interface EditUserDialogProps {
   user: Profile | null;
@@ -32,7 +33,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
   const [isAutonomo, setIsAutonomo] = useState<boolean>(user?.autonomo !== false);
   const [selectedRole, setSelectedRole] = useState<string>(user?.role || "technician");
   const { userRole } = useOptimizedAuth();
-  const isManagementUser = ['admin', 'management'].includes(userRole || '');
+  const isManagementUser = isManagementRole(userRole);
   const [flexUrl, setFlexUrl] = useState<string>("");
   const [flexResourceId, setFlexResourceId] = useState<string>(user?.flex_resource_id || "");
   const [isSendingOnboarding, setIsSendingOnboarding] = useState(false);

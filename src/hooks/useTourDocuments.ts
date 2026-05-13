@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { toast } from "sonner";
+import { canUploadDocuments, isManagementRole } from "@/utils/permissions";
 
 export interface TourDocument {
   id: string;
@@ -20,8 +21,8 @@ export const useTourDocuments = (tourId: string) => {
   const { user, userRole } = useOptimizedAuth();
   const queryClient = useQueryClient();
 
-  const isManager = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const canManageVisibility = ['admin', 'management'].includes(userRole || '');
+  const isManager = canUploadDocuments(userRole);
+  const canManageVisibility = isManagementRole(userRole);
 
   const { data: documents = [], isLoading, error } = useQuery({
     queryKey: ['tour-documents', tourId],

@@ -17,6 +17,7 @@ import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { FestivalsPagination } from "@/components/ui/festivals-pagination";
 import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils";
 import { isFestivalLikeJobType } from "@/utils/jobType";
+import { canUploadDocuments, isAdminRole } from "@/utils/permissions";
 
 const ITEMS_PER_PAGE = 9; // 3x3 grid
 
@@ -212,14 +213,14 @@ const Festivals = () => {
     }
   };
 
-  const isAdmin = userRole === 'admin';
+  const isAdmin = isAdminRole(userRole);
   const isSoundMember = userDepartment?.toLowerCase() === 'sound';
 
   if (!authLoading && !isAdmin && !isSoundMember) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const canPrintDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const canPrintDocuments = canUploadDocuments(userRole);
   const emptyFunction = () => {};
 
   return (

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { useAppBadgeSource } from "@/hooks/useAppBadgeSource";
+import { isManagementRole } from "@/utils/permissions";
 
 interface IncidentReportsNotificationBadgeProps {
   userRole: string;
@@ -27,7 +28,7 @@ export const IncidentReportsNotificationBadge = ({
       console.log("Checking for new incident reports...");
       
       // Only management and admin users can see incident reports
-      if (!['management', 'admin'].includes(userRole)) {
+      if (!isManagementRole(userRole)) {
         return;
       }
 

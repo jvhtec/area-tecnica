@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { canAccessDashboard, canViewPendingExpenses, isManagementRole } from "@/utils/permissions";
 
 const DashboardMobileHub = lazy(() =>
   import("@/components/dashboard/DashboardMobileHub").then((m) => ({ default: m.DashboardMobileHub }))
@@ -52,8 +53,6 @@ const getSelectedDateJobs = (date: Date | undefined, jobs: any[]) => {
   });
 };
 
-const DASHBOARD_ROLES = ['admin', 'management', 'logistics', 'oscar'] as const;
-
 const Dashboard = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -69,7 +68,7 @@ const Dashboard = () => {
   useEffect(() => {
     if (authLoading) return;
 
-    if (userRole && !DASHBOARD_ROLES.includes(userRole as typeof DASHBOARD_ROLES[number])) {
+    if (userRole && !canAccessDashboard(userRole)) {
       const redirectPath = getDashboardPath(userRole as any);
       navigate(redirectPath, { replace: true });
     }
@@ -98,7 +97,7 @@ const Dashboard = () => {
 
   const { data: pendingExpensesSummary, isLoading: isLoadingPendingExpenses } = useQuery({
     queryKey: ['dashboard-expenses-summary'],
-    enabled: !!userRole && DASHBOARD_ROLES.includes(userRole as typeof DASHBOARD_ROLES[number]),
+    enabled: canAccessDashboard(userRole),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_expenses')
@@ -128,14 +127,14 @@ const Dashboard = () => {
   // Parse optional deep-link params (e.g. open messages dialog)
   useEffect(() => {
     if (authLoading) return;
-    if (!userRole || !["admin", "management"].includes(userRole)) return;
+    if (!isManagementRole(userRole)) return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("showMessages") === "true") {
       setMessagesOpen(true);
     }
   }, [authLoading, userRole]);
 
-  const canManage = userRole === "admin" || userRole === "management";
+  const canManage = isManagementRole(userRole);
 
   const openMessages = useCallback(() => setMessagesOpen(true), []);
   const openEmailComposer = useCallback(() => setEmailComposerOpen(true), []);
@@ -156,7 +155,7 @@ const Dashboard = () => {
 
   const handleDeleteClick = useCallback(async (jobId: string) => {
     // Check permissions
-    if (!["admin", "management"].includes(userRole || "")) {
+    if (!isManagementRole(userRole)) {
       toast({
         title: "Permission denied",
         description: "Only admin and management users can delete jobs",
@@ -206,7 +205,7 @@ const Dashboard = () => {
   }
 
   // Don't render anything if user is unauthorized (they'll be redirected)
-  if (!userRole || !DASHBOARD_ROLES.includes(userRole as typeof DASHBOARD_ROLES[number])) {
+  if (!canAccessDashboard(userRole)) {
     return null;
   }
 
@@ -318,7 +317,7 @@ const Dashboard = () => {
             )}
 
             {/* Pending expenses summary */}
-            {["admin", "management", "logistics"].includes(userRole) && (
+            {canViewPendingExpenses(userRole) && (
               <div className="bg-card rounded-xl border border-border overflow-hidden shadow-sm">
                 <div className="p-4 border-b border-border flex items-center justify-between">
                   <div>

@@ -22,6 +22,8 @@ import { Bell, Bug } from "lucide-react";
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getDashboardPath } from '@/utils/roleBasedRouting'
+import { isManagementRole } from '@/utils/permissions'
+import type { UserRole } from '@/types/user'
 import { usePushDebug } from '@/hooks/usePushDebug'
 import { PushNotificationMatrix } from '@/components/settings/PushNotificationMatrix'
 import { PushNotificationSchedule } from '@/components/settings/PushNotificationSchedule'
@@ -103,17 +105,17 @@ const Settings = () => {
 
 
   const { userRole, isLoading: authLoading } = useOptimizedAuth();
-  const isManagementUser = ['admin', 'management'].includes(userRole || '');
+  const isManagementUser = isManagementRole(userRole);
 
   // Early security check: Only allow admin, management
   useEffect(() => {
     if (authLoading) return;
 
-    if (userRole && !['admin', 'management'].includes(userRole)) {
-      const redirectPath = getDashboardPath(userRole as any);
+    if (userRole && !isManagementUser) {
+      const redirectPath = getDashboardPath(userRole as UserRole);
       navigate(redirectPath, { replace: true });
     }
-  }, [userRole, authLoading, navigate]);
+  }, [userRole, authLoading, isManagementUser, navigate]);
   const {
     isSupported,
     permission,

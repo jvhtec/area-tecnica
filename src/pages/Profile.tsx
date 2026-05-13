@@ -17,6 +17,7 @@ import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload"
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
+import { canUseCustomFolderStructure, canUseHouseTechCalendar, isAdminRole } from "@/utils/permissions";
 
 export const Profile = () => {
   const { toast } = useToast();
@@ -54,9 +55,9 @@ export const Profile = () => {
   const showEnableButton = canEnable && !isInitializing;
   const isBlocked = permission === 'denied';
   const showPushControls = ['technician', 'house_tech', 'oscar'].includes(profile?.role);
-  const showIcsCard = ['technician', 'house_tech', 'management', 'admin'].includes(profile?.role);
+  const showIcsCard = profile?.role === 'technician' || canUseHouseTechCalendar(profile?.role);
   const showTechnicianSelfTools =
-    (profile?.role === 'admin' || profile?.role === 'management') &&
+    canUseCustomFolderStructure(profile?.role) &&
     profile?.assignable_as_tech === true;
 
   // Fetch user profile on component mount
@@ -326,7 +327,7 @@ export const Profile = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="department">Departamento</Label>
-                    {profile.role === 'admin' || profile.role === 'super_admin' ? (
+                    {isAdminRole(profile.role) || profile.role === 'super_admin' ? (
                       <Select
                         value={profile.department || ''}
                         onValueChange={(value) => setProfile({ ...profile, department: value as Department })}
@@ -446,7 +447,7 @@ export const Profile = () => {
           </div>
 
           {/* Folder structure */}
-          {(profile.role === 'admin' || profile.role === 'management') && (
+          {canUseCustomFolderStructure(profile.role) && (
             <Card className="h-full">
               <CardHeader>
                 <CardTitle>Personalización de estructura de carpetas</CardTitle>

@@ -5,6 +5,7 @@ import { MessageCard } from "./MessageCard";
 import { useMessagesQuery } from "./hooks/useMessagesQuery";
 import { useMessageOperations } from "./hooks/useMessageOperations";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
+import { isDepartmentManagementRole } from "@/utils/permissions";
 
 interface MessagesListProps {
   theme?: {
@@ -59,6 +60,7 @@ export const MessagesList = ({ theme, isDark = false }: MessagesListProps) => {
 
   const { messages, loading, isFetching, setMessages } = useMessagesQuery(userRole, userDepartment);
   const { handleDeleteMessage, handleMarkAsRead, handleGrantSoundVisionAccess } = useMessageOperations(messages, setMessages, toast);
+  const isDepartmentManager = isDepartmentManagementRole(userRole);
 
   if (loading) {
     return <div className={`text-sm ${theme?.textMuted || 'text-muted-foreground'} animate-pulse`}>Cargando mensajes...</div>;
@@ -76,11 +78,11 @@ export const MessagesList = ({ theme, isDark = false }: MessagesListProps) => {
           <MessageCard
             key={message.id}
             message={message}
-            currentUserId={userRole === 'management' ? message.sender_id : undefined}
+            currentUserId={isDepartmentManager ? message.sender_id : undefined}
             onDelete={handleDeleteMessage}
             onMarkAsRead={handleMarkAsRead}
             onGrantSoundVisionAccess={handleGrantSoundVisionAccess}
-            isManagement={userRole === 'management'}
+            isManagement={isDepartmentManager}
             theme={theme}
             isDark={isDark}
           />

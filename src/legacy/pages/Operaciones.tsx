@@ -18,6 +18,7 @@ import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
+import { isManagementRole } from "@/utils/permissions";
 
 const Operaciones = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
@@ -30,6 +31,7 @@ const Operaciones = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const currentDepartment = "video";
   const { userRole } = useOptimizedAuth();
+  const canManageJobs = isManagementRole(userRole);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -89,7 +91,7 @@ const Operaciones = () => {
 
   const handleDeleteClick = useCallback(async (jobId: string) => {
     // Check permissions
-    if (!["admin", "management"].includes(userRole || "")) {
+    if (!canManageJobs) {
       toast({
         title: "Permission denied",
         description: "Only admin and management users can delete jobs",
@@ -126,7 +128,7 @@ const Operaciones = () => {
         variant: "destructive"
       });
     }
-  }, [queryClient, toast, userRole]);
+  }, [canManageJobs, queryClient, toast]);
 
   const handleCreateJob = useCallback((preset?: JobType) => {
     setPresetJobType(preset);
@@ -140,7 +142,7 @@ const Operaciones = () => {
       <LightsHeader
         onCreateJob={handleCreateJob}
         department="Video"
-        canCreate={userRole ? ["admin", "management"].includes(userRole) : true}
+        canCreate={userRole ? canManageJobs : true}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

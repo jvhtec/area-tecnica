@@ -5,20 +5,23 @@ import { listActivity } from '@/features/activity/api';
 import { getActivityMeta } from '@/features/activity/catalog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { getDashboardPath } from '@/utils/roleBasedRouting';
+import { isManagementRole } from '@/utils/permissions';
+import type { UserRole } from '@/types/user';
 
 export default function ActivityCenter() {
   const navigate = useNavigate();
   const { userRole, isLoading: authLoading } = useOptimizedAuth();
+  const isManagementUser = isManagementRole(userRole);
 
   // Early security check: Only allow admin, management
   useEffect(() => {
     if (authLoading) return;
 
-    if (userRole && !['admin', 'management'].includes(userRole)) {
-      const redirectPath = getDashboardPath(userRole as any);
+    if (userRole && !isManagementUser) {
+      const redirectPath = getDashboardPath(userRole as UserRole);
       navigate(redirectPath, { replace: true });
     }
-  }, [userRole, authLoading, navigate]);
+  }, [userRole, authLoading, isManagementUser, navigate]);
 
   const { data = [], isLoading, error, refetch } = useQuery({
     queryKey: ['activity', 'all'],
@@ -35,7 +38,7 @@ export default function ActivityCenter() {
   }
 
   // Don't render anything if user is unauthorized
-  if (!userRole || !['admin', 'management'].includes(userRole)) {
+  if (!userRole || !isManagementUser) {
     return null;
   }
 

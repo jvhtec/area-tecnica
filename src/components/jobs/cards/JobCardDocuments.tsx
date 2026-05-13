@@ -7,6 +7,7 @@ import { Eye, Download, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
+import { isManagementRole } from "@/utils/permissions";
 
 export interface JobDocument {
   id: string;
@@ -31,6 +32,8 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
   onDeleteDocument,
   showTitle = true,
 }) => {
+  const canManageDocuments = isManagementRole(userRole);
+
   if (documents.length === 0) {
     return null;
   }
@@ -132,7 +135,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
                     Template SoundVision File
                   </Badge>
                 )}
-                {['admin','management'].includes(userRole || '') && (
+                {canManageDocuments && (
                   <span className={`text-[10px] px-1.5 py-0.5 rounded ${doc.visible_to_tech ? 'bg-green-500/20 text-green-800 dark:text-green-200' : 'bg-muted text-muted-foreground'}`}>
                     {doc.visible_to_tech ? 'Tech-visible' : 'Hidden from tech'}
                   </span>
@@ -146,7 +149,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
               </span>
             </div>
             <div className="flex gap-2">
-              {['admin','management'].includes(userRole || '') && (
+              {canManageDocuments && (
                 <div className="flex items-center gap-2 pr-2">
                   <span className="text-xs text-muted-foreground select-none">Tech can view</span>
                   <Switch
@@ -172,7 +175,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
               >
                 <Download className="h-4 w-4" />
               </Button>
-              {['admin', 'management'].includes(userRole || '') && !isReadOnly && (
+              {canManageDocuments && !isReadOnly && (
                 <Button
                   variant="ghost"
                   size="icon"
