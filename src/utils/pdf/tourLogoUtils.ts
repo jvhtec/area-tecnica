@@ -1,1 +1,0 @@
-export { fetchTourLogo } from './logoUtils';

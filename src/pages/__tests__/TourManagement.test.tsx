@@ -74,7 +74,7 @@ vi.mock("react-router-dom", async () => {
   };
 });
 
-vi.mock("@/utils/pdf/tourLogoUtils", () => ({
+vi.mock("@/utils/pdf/logoUtils", () => ({
   fetchTourLogo: (...args: any[]) => fetchTourLogoMock(...args),
 }));
 

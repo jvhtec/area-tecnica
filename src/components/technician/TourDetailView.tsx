@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale';
 import { ArrowLeft, Calendar as CalendarIcon, FileText, Download, AlertTriangle, Loader2, Users, Globe } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Theme } from './types';
-import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
+import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 
 interface TourDateLocation {
     id: string;

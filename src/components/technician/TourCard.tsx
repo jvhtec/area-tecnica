@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Speaker, Sliders, Camera, User, Radio, MoreVertical, Calendar as CalendarIcon, FileText, ChevronRight } from 'lucide-react';
 import { Theme } from './types';
-import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
+import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 
 interface TourCardProps {
     tour: {

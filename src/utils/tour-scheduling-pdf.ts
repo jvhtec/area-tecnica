@@ -2,7 +2,7 @@
 import type jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
+import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { getWeatherForJob } from '@/utils/weather/weatherApi';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';

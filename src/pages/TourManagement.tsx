@@ -40,7 +40,7 @@ import { TourPresetManagerDialog } from "@/components/tours/TourPresetManagerDia
 import { format } from "date-fns";
 import { useTourAssignments } from "@/hooks/useTourAssignments";
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { fetchTourLogo } from "@/utils/pdf/tourLogoUtils";
+import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { useToast } from "@/hooks/use-toast";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
