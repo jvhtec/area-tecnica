@@ -180,8 +180,8 @@ describe('OptimizedMatrixCell', () => {
     expect(screen.queryByText('C')).not.toBeInTheDocument();
   });
 
-  it('shows declined status for declined assignment', () => {
-    const declinedAssignment = { ...mockAssignment, status: 'declined' };
+  it('shows declined status for normalized declined assignment', () => {
+    const declinedAssignment = { ...mockAssignment, status: ' Declined ' };
 
     render(
       <OptimizedMatrixCell
