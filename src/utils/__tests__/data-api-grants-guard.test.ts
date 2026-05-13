@@ -16,6 +16,9 @@ const createTablePattern =
 const directGrantPattern =
   /\bGRANT\b[\s\S]*?\bON\s+(?!ALL\s+TABLES\b|SCHEMA\b|FUNCTION\b|SEQUENCE\b|TYPE\b|DATABASE\b|LANGUAGE\b)(?:TABLE\s+)?([\s\S]*?)\s+\bTO\b/gi;
 
+/**
+ * Removes SQL comments while preserving line count for useful diagnostics.
+ */
 function stripSqlComments(sql: string): string {
   const withoutBlockComments = sql.replace(/\/\*[\s\S]*?\*\//g, (match) =>
     '\n'.repeat(match.split('\n').length - 1),
@@ -24,6 +27,9 @@ function stripSqlComments(sql: string): string {
   return withoutBlockComments.replace(/--.*$/gm, '');
 }
 
+/**
+ * Normalizes relation references and treats unqualified names as public schema.
+ */
 function normalizeRelationName(rawName: string): string {
   const parts = rawName
     .split('.')
@@ -37,6 +43,9 @@ function normalizeRelationName(rawName: string): string {
   return `${parts[parts.length - 2]}.${parts[parts.length - 1]}`;
 }
 
+/**
+ * Splits the relation list from a direct GRANT statement.
+ */
 function splitGrantRelations(rawRelations: string): string[] {
   return rawRelations
     .split(',')
@@ -44,6 +53,9 @@ function splitGrantRelations(rawRelations: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Finds public schema tables created by a migration file.
+ */
 function findPublicTableCreates(file: string, sql: string): PublicTableCreate[] {
   const creates: PublicTableCreate[] = [];
   const codeOnly = stripSqlComments(sql);
@@ -64,6 +76,9 @@ function findPublicTableCreates(file: string, sql: string): PublicTableCreate[] 
   return creates;
 }
 
+/**
+ * Finds public schema tables referenced by direct table GRANT statements.
+ */
 function findDirectTableGrants(sql: string): Set<string> {
   const grants = new Set<string>();
   const codeOnly = stripSqlComments(sql);
