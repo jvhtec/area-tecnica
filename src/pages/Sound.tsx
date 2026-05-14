@@ -61,8 +61,9 @@ const Sound = () => {
   const { data: jobs } = useJobs();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();
+  const { user, userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();
   const canManageJobs = isManagementRole(userRole);
+  const canUseDetailsOnlyMode = canManageJobs || userRole === "house_tech";
 
   // Generate navigation items for mobile nav bar
   const navigationItems = useMemo(() => {
@@ -407,7 +408,7 @@ const Sound = () => {
                     onJobClick={handleJobClick}
                     userRole={userRole}
                     selectedDate={date}
-                    detailsOnlyMode={userRole ? ["admin", "management", "house_tech"].includes(userRole) : false}
+                    detailsOnlyMode={canUseDetailsOnlyMode}
                     department={currentDepartment}
                     viewMode="sidebar"
                   />
@@ -516,6 +517,7 @@ const Sound = () => {
           }}
           userRole={userRole}
           userDepartment={userDepartment}
+          userId={user?.id}
           department={currentDepartment}
         />
       )}

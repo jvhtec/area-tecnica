@@ -19,18 +19,14 @@ export const IncidentReportsNotificationBadge = ({
   const [newReportsCount, setNewReportsCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const isEligibleForBadge = isManagementRole(userRole);
 
   const fetchNewIncidentReports = useCallback(async () => {
-    if (isLoading) return;
+    if (!isEligibleForBadge || isLoading) return;
 
     try {
       setIsLoading(true);
       console.log("Checking for new incident reports...");
-      
-      // Only management and admin users can see incident reports
-      if (!isManagementRole(userRole)) {
-        return;
-      }
 
       let query = supabase
         .from('job_documents')
@@ -65,9 +61,15 @@ export const IncidentReportsNotificationBadge = ({
     } finally {
       setIsLoading(false);
     }
-  }, [userRole, lastReadTimestamp, isLoading]);
+  }, [isEligibleForBadge, lastReadTimestamp, isLoading]);
 
   useEffect(() => {
+    if (!isEligibleForBadge) {
+      setHasNewReports(false);
+      setNewReportsCount(0);
+      return;
+    }
+
     // Initial fetch with a slight delay
     const timeoutId = setTimeout(() => {
       fetchNewIncidentReports();
@@ -99,7 +101,7 @@ export const IncidentReportsNotificationBadge = ({
       console.log("Cleaning up incident reports subscription");
       supabase.removeChannel(channel);
     };
-  }, [fetchNewIncidentReports]);
+  }, [fetchNewIncidentReports, isEligibleForBadge]);
 
   const handleIncidentReportsClick = () => {
     navigate('/incident-reports');
@@ -107,8 +109,6 @@ export const IncidentReportsNotificationBadge = ({
     setHasNewReports(false);
     setNewReportsCount(0);
   };
-
-  const isEligibleForBadge = ['management', 'admin'].includes(userRole);
 
   useAppBadgeSource('incident-reports', {
     count: newReportsCount,

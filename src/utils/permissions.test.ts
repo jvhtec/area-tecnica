@@ -7,10 +7,20 @@ import {
   canAccessSoundVision,
   canDeleteDocuments,
   canDeleteSoundVisionFiles,
+  canDeleteTourDocuments,
   canManagePayouts,
+  canPrintFestivalDocuments,
+  canReceiveMorningSummary,
+  canSubmitTechnicianIncidentReports,
   canUseCustomFolderStructure,
   canUseHouseTechCalendar,
+  canUseProfileCalendarSubscription,
+  canUseTechnicianSelfTools,
+  canUploadDocuments,
+  canUploadTourDocuments,
+  canViewAchievements,
   canViewPendingExpenses,
+  canViewProfilePushControls,
   hasTechnicianSelfServiceAccess,
   isAdminRole,
   isAdministrativeDepartment,
@@ -82,11 +92,12 @@ describe('management role helpers', () => {
     expect(canDeleteDocuments('logistics')).toBe(false);
   });
 
-  it('allows house tech calendar access to house tech and management roles only', () => {
+  it('allows house tech calendar access to house tech and management roles', () => {
     expect(canUseHouseTechCalendar('house_tech')).toBe(true);
     expect(canUseHouseTechCalendar('management')).toBe(true);
     expect(canUseHouseTechCalendar('admin')).toBe(true);
     expect(canUseHouseTechCalendar('technician')).toBe(false);
+    expect(canUseProfileCalendarSubscription('technician')).toBe(true);
   });
 
   it('centralizes dashboard, expenses, and project access predicates', () => {
@@ -118,5 +129,27 @@ describe('management role helpers', () => {
     expect(canUseCustomFolderStructure('admin')).toBe(true);
     expect(canUseCustomFolderStructure('management')).toBe(true);
     expect(canUseCustomFolderStructure('logistics')).toBe(false);
+    expect(canUseTechnicianSelfTools('management', true)).toBe(true);
+    expect(canUseTechnicianSelfTools('technician', true)).toBe(false);
+  });
+
+  it('centralizes document and festival print permissions', () => {
+    expect(canUploadDocuments('logistics')).toBe(true);
+    expect(canUploadTourDocuments('technician')).toBe(true);
+    expect(canUploadTourDocuments('house_tech')).toBe(true);
+    expect(canDeleteTourDocuments('logistics')).toBe(true);
+    expect(canPrintFestivalDocuments('management')).toBe(true);
+    expect(canPrintFestivalDocuments('technician')).toBe(false);
+  });
+
+  it('centralizes profile and incident-report visibility predicates', () => {
+    expect(canViewAchievements('technician')).toBe(true);
+    expect(canViewAchievements('admin')).toBe(true);
+    expect(canReceiveMorningSummary('house_tech')).toBe(true);
+    expect(canReceiveMorningSummary('logistics')).toBe(false);
+    expect(canViewProfilePushControls('oscar')).toBe(true);
+    expect(canViewProfilePushControls('logistics')).toBe(false);
+    expect(canSubmitTechnicianIncidentReports('technician')).toBe(true);
+    expect(canSubmitTechnicianIncidentReports('house_tech')).toBe(false);
   });
 });

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { isTechnicianRole } from '@/utils/permissions';
 import type {
   Achievement,
   AchievementProgress,
@@ -77,7 +78,7 @@ export function useAchievements(targetUserId?: string) {
  */
 export function useUnseenAchievements() {
   const { user, userRole } = useOptimizedAuth();
-  const isTech = userRole === 'technician' || userRole === 'house_tech';
+  const isTech = isTechnicianRole(userRole);
 
   return useQuery({
     queryKey: unseenQueryKey(user?.id),

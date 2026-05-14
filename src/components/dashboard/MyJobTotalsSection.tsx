@@ -12,6 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTourRatesApprovalMap } from '@/hooks/useTourRatesApproval';
 import { useJobRatesApprovalMap } from '@/hooks/useJobRatesApproval';
 import type { TourJobRateQuote } from '@/types/tourRates';
+import { isTechnicianRole } from '@/utils/permissions';
 
 export function MyJobTotalsSection() {
   const { userRole } = useOptimizedAuth();
@@ -40,7 +41,7 @@ export function MyJobTotalsSection() {
 
   const isLoading = isLoadingPayouts || isLoadingTours;
 
-  const isTech = ['technician', 'house_tech'].includes(userRole || '');
+  const isTech = isTechnicianRole(userRole);
 
   const quoteHasExtras = (quote: TourJobRateQuote) => {
     if ((quote.extras_total_eur ?? 0) > 0) {

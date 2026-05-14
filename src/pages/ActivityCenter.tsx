@@ -26,6 +26,7 @@ export default function ActivityCenter() {
   const { data = [], isLoading, error, refetch } = useQuery({
     queryKey: ['activity', 'all'],
     queryFn: () => listActivity({ limit: 50 }),
+    enabled: !authLoading && Boolean(userRole) && isManagementUser,
   });
 
   // Show loading state while checking authorization

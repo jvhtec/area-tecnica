@@ -3,7 +3,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { toast } from "sonner";
-import { canUploadDocuments, isManagementRole } from "@/utils/permissions";
+import {
+  canDeleteTourDocuments,
+  canUploadDocuments,
+  canUploadTourDocuments,
+  isManagementRole,
+} from "@/utils/permissions";
 
 export interface TourDocument {
   id: string;
@@ -127,6 +132,15 @@ export const useTourDocuments = (tourId: string) => {
 
   const deleteDocument = useMutation({
     mutationFn: async (document: TourDocument) => {
+      if (!user?.id) {
+        throw new Error('Not authenticated');
+      }
+
+      const canDeleteAnyTourDocument = canDeleteTourDocuments(userRole);
+      if (document.uploaded_by !== user.id && !canDeleteAnyTourDocument) {
+        throw new Error('Not allowed');
+      }
+
       console.log('Deleting document:', document.file_name);
       
       // Delete from storage first
@@ -194,13 +208,12 @@ export const useTourDocuments = (tourId: string) => {
     // User can delete their own documents
     if (document.uploaded_by === user.id) return true;
     
-    // Admins/management/logistics can delete any document
-    return ['admin', 'management', 'logistics'].includes(userRole || '');
+    return canDeleteTourDocuments(userRole);
   };
 
   const canUpload =
     Boolean(user?.id) &&
-    (isManager || ['technician', 'house_tech'].includes(userRole || ''));
+    canUploadTourDocuments(userRole);
 
   return {
     documents,

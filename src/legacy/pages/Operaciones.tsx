@@ -30,7 +30,7 @@ const Operaciones = () => {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const currentDepartment = "video";
-  const { userRole } = useOptimizedAuth();
+  const { userRole, isLoading: authLoading } = useOptimizedAuth();
   const canManageJobs = isManagementRole(userRole);
 
   const queryClient = useQueryClient();
@@ -56,13 +56,14 @@ const Operaciones = () => {
       const metaN = (e.key.toLowerCase() === 'n') && (e.metaKey || e.ctrlKey);
       if (metaN) {
         e.preventDefault();
+        if (!canManageJobs) return;
         setPresetJobType(undefined);
         setIsJobDialogOpen(true);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [canManageJobs]);
 
   const departmentJobs = useMemo(() => {
     return jobs.filter((job) =>
@@ -131,9 +132,18 @@ const Operaciones = () => {
   }, [canManageJobs, queryClient, toast]);
 
   const handleCreateJob = useCallback((preset?: JobType) => {
+    if (!canManageJobs) {
+      toast({
+        title: "Permission denied",
+        description: "Only admin and management users can create jobs",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setPresetJobType(preset);
     setIsJobDialogOpen(true);
-  }, []);
+  }, [canManageJobs, toast]);
 
   const handleDateTypeChange = useCallback(() => { }, []);
 
@@ -142,7 +152,7 @@ const Operaciones = () => {
       <LightsHeader
         onCreateJob={handleCreateJob}
         department="Video"
-        canCreate={userRole ? canManageJobs : true}
+        canCreate={!authLoading && canManageJobs}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">

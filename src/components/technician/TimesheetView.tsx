@@ -40,6 +40,7 @@ import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { formatCurrency } from '@/lib/utils';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
+import { isTechnicianRole } from '@/utils/permissions';
 import { Timesheet, TimesheetFormData } from '@/types/timesheet';
 import SignatureCanvas from 'react-signature-canvas';
 import { Theme } from './types';
@@ -109,7 +110,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
   } = useTimesheets(job?.id, { userRole });
 
   // Get my earnings total
-  const isTech = userRole === 'technician' || userRole === 'house_tech';
+  const isTech = isTechnicianRole(userRole);
   const { data: payoutRows = [], isLoading: payoutLoading } = useJobPayoutTotals(job?.id, isTech ? userId : undefined);
   const { data: approvalRow } = useJobRatesApproval(job?.id);
   const isRatesApproved = approvalRow?.rates_approved ?? false;

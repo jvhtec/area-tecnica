@@ -17,7 +17,7 @@ import { useConnectionStatus } from "@/hooks/useConnectionStatus";
 import { FestivalsPagination } from "@/components/ui/festivals-pagination";
 import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils";
 import { isFestivalLikeJobType } from "@/utils/jobType";
-import { canUploadDocuments, isAdminRole } from "@/utils/permissions";
+import { canPrintFestivalDocuments, isAdminRole } from "@/utils/permissions";
 
 const ITEMS_PER_PAGE = 9; // 3x3 grid
 
@@ -220,7 +220,7 @@ const Festivals = () => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const canPrintDocuments = canUploadDocuments(userRole);
+  const canPrintDocuments = canPrintFestivalDocuments(userRole);
   const emptyFunction = () => {};
 
   return (

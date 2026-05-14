@@ -44,7 +44,7 @@ import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { exportTourPDF } from "@/lib/tourPdfExport";
 import { useToast } from "@/hooks/use-toast";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
-import { isManagementRole } from "@/utils/permissions";
+import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { TourDateFlexButton } from "@/components/tours/TourDateFlexButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -78,7 +78,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   const isManagementUser = isManagementRole(userRole);
   const [searchParams] = useSearchParams();
   const mode = searchParams.get('mode');
-  const isTechnicianView = mode === 'technician' || ['technician', 'house_tech'].includes(userRole || '');
+  const isTechnicianView = mode === 'technician' || isTechnicianRole(userRole);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDatesOpen, setIsDatesOpen] = useState(false);

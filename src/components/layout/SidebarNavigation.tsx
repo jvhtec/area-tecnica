@@ -101,7 +101,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 1,
     mobileSlot: "primary",
     getPath: () => "/dashboard",
-    isVisible: ({ userRole }) => isDepartmentManagementRole(userRole) || userRole === "oscar",
+    isVisible: ({ userRole }) => isManagementRole(userRole) || userRole === "oscar",
   },
   {
     id: "technician-dashboard",

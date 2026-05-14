@@ -9,19 +9,20 @@ export const getVisibleFinancialTechnicianIds = (
   technicians: TechnicianDepartmentRow[],
   userRole?: string | null,
   userDepartment?: string | null,
+  viewerId?: string | null,
 ): string[] | null => {
   if (!technicians.length) return [];
 
   if (
     isAdminRole(userRole)
     || userRole === 'logistics'
-    || isAdministrativeDepartment(userDepartment)
+    || (isDepartmentManagementRole(userRole) && isAdministrativeDepartment(userDepartment))
   ) {
     return null;
   }
 
   if (!isDepartmentManagementRole(userRole)) {
-    return null;
+    return viewerId ? [viewerId] : [];
   }
 
   const normalizedViewerDepartment = normalizeDepartmentKey(userDepartment);

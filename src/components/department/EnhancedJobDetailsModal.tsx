@@ -39,6 +39,7 @@ interface EnhancedJobDetailsModalProps {
     onClose: () => void;
     userRole?: string | null;
     userDepartment?: string | null;
+    userId?: string | null;
     department?: string;
 }
 
@@ -57,7 +58,7 @@ interface StaffAssignment {
     } | null;
 }
 
-export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole, userDepartment, department = 'sound' }: EnhancedJobDetailsModalProps) => {
+export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole, userDepartment, userId, department = 'sound' }: EnhancedJobDetailsModalProps) => {
     const [activeTab, setActiveTab] = useState<TabId>('Info');
     const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
     const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
@@ -186,8 +187,8 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
             }))
             .filter((assignment) => Boolean(assignment.id));
 
-        return getVisibleFinancialTechnicianIds(technicians, userRole, userDepartment);
-    }, [staffAssignments, userDepartment, userRole]);
+        return getVisibleFinancialTechnicianIds(technicians, userRole, userDepartment, userId);
+    }, [staffAssignments, userDepartment, userId, userRole]);
 
     const invalidateJobQueries = () => {
         if (!resolvedJobId) return;
@@ -911,6 +912,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                 <JobExtrasManagement
                                     jobId={resolvedJobId}
                                     isManager={isManager}
+                                    technicianId={isManager ? undefined : userId || undefined}
                                     visibleTechnicianIds={visibleFinancialTechnicianIds ?? undefined}
                                 />
                             </div>

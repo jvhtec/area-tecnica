@@ -21,7 +21,7 @@ import { JobDetailsRestaurantsTab } from "./job-details-dialog/tabs/JobDetailsRe
 import { JobDetailsWeatherTab } from "./job-details-dialog/tabs/JobDetailsWeatherTab";
 import { StaffingOrchestratorPanel } from "@/components/matrix/StaffingOrchestratorPanel";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
-import { canAssignPersonnel, canManagePayouts, isManagementRole, isTechnicianRole } from "@/utils/permissions";
+import { canAccessExpenses, canAssignPersonnel, canManagePayouts, isManagementRole, isTechnicianRole } from "@/utils/permissions";
 import { getVisibleFinancialTechnicianIds } from "@/components/jobs/financialViewerScope";
 
 export { enrichTimesheetsWithProfiles } from "./job-details-dialog/enrichTimesheetsWithProfiles";
@@ -93,7 +93,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
   const canSeeRateTabs = (isManager || jobRatesApproved) && !isHouseTech;
   const showTourRatesTab = !isDryhire && jobDetails?.job_type === "tourdate" && canSeeRateTabs;
 
-  const canManageExpenses = ["admin", "management", "logistics"].includes(userRole || "");
+  const canManageExpenses = canAccessExpenses(userRole);
   const showExpensesTab = !isDryhire && canManageExpenses;
 
   // Fetch expenses to check if there are any for highlighting the tab
@@ -128,8 +128,8 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
       }))
       .filter((assignment: { id?: string }) => Boolean(assignment.id));
 
-    return getVisibleFinancialTechnicianIds(assignmentTechnicians, userRole, userDepartment);
-  }, [jobDetails?.job_assignments, userDepartment, userRole]);
+    return getVisibleFinancialTechnicianIds(assignmentTechnicians, userRole, userDepartment, user?.id);
+  }, [jobDetails?.job_assignments, user?.id, userDepartment, userRole]);
 
   const visibleExpenseTechnicianOptions = useMemo(() => {
     if (!visibleFinancialTechnicianIds) return expenseTechnicianOptions;

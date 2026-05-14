@@ -28,7 +28,7 @@ import {
   Loader2,
   FileText
 } from "lucide-react";
-import { isManagementRole } from "@/utils/permissions";
+import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
 import { cn } from "@/lib/utils";
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
@@ -70,6 +70,7 @@ export function MobileJobCard({
   const queryClient = useQueryClient();
   const { userRole } = useOptimizedAuth();
   const isManagementUser = isManagementRole(userRole);
+  const isTechnicianUser = isTechnicianRole(userRole);
   const [dateTypeDialogOpen, setDateTypeDialogOpen] = useState(false);
   const [selectedDateType, setSelectedDateType] = useState<DateType>('show');
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
@@ -324,7 +325,7 @@ export function MobileJobCard({
                   <DropdownMenuSeparator />
                   
                   {/* View Details - for technicians and house techs */}
-                  {(userRole === 'technician' || userRole === 'house_tech') && (
+                  {isTechnicianUser && (
                     <DropdownMenuItem 
                       onClick={(e) => {
                         e.stopPropagation();
@@ -415,7 +416,7 @@ export function MobileJobCard({
                   <DropdownMenuSeparator />
                   
                   {/* View Details - for technicians and house techs */}
-                  {(userRole === 'technician' || userRole === 'house_tech') && (
+                  {isTechnicianUser && (
                     <DropdownMenuItem 
                       onClick={(e) => {
                         e.stopPropagation();

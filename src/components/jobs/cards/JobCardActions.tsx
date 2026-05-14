@@ -55,7 +55,11 @@ import {
   getTechnicalPowerSummaryAvailability,
   loadTechnicalPowerSummaryData,
 } from "@/utils/powerSummaryData";
-import { isAdminRole, isManagementRole } from "@/utils/permissions";
+import {
+  canSubmitTechnicianIncidentReports,
+  isManagementRole,
+  isTechnicianRole,
+} from "@/utils/permissions";
 
 interface JobCardActionsProps {
   job: any;
@@ -149,10 +153,11 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     ? userDepartment.toLowerCase().replace(/_warehouse$/, '')
     : '';
   const isManagementUser = isManagementRole(userRole);
+  const isTechnicianUser = isTechnicianRole(userRole);
   const canSendProductionWhatsapp = Boolean(
     isProjectManagementPage
     && department === 'production'
-    && (isAdminRole(userRole)
+    && (isManagementUser
       || normalizedUserDepartment === 'production'
       || normalizedUserDepartment === 'produccion'
       || normalizedUserDepartment === 'producción')
@@ -1316,10 +1321,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={onFestivalArtistsClick}
           className="hover:bg-accent/50"
-          title={userRole === 'technician' || userRole === 'house_tech' ? 'Ver Festival' : 'Gestionar Festival'}
+          title={isTechnicianUser ? 'Ver Festival' : 'Gestionar Festival'}
         >
           <Users className="h-4 w-4 mr-1" />
-          <span className="hidden sm:inline">{userRole === 'technician' || userRole === 'house_tech' ? 'Ver Festival' : 'Gestionar Festival'}</span>
+          <span className="hidden sm:inline">{isTechnicianUser ? 'Ver Festival' : 'Gestionar Festival'}</span>
         </Button>
       )}
       {!isFestivalLike && job.job_type !== "dryhire" && isProjectManagementPage && canManageArtists && (
@@ -1328,10 +1333,10 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           size="sm"
           onClick={handleManageJob}
           className="hover:bg-accent/50"
-          title={userRole === 'technician' || userRole === 'house_tech' ? 'Ver Trabajo' : 'Gestionar Trabajo'}
+          title={isTechnicianUser ? 'Ver Trabajo' : 'Gestionar Trabajo'}
         >
           <Settings className="h-4 w-4 mr-1" />
-          <span className="hidden sm:inline">{userRole === 'technician' || userRole === 'house_tech' ? 'Ver Trabajo' : 'Gestionar Trabajo'}</span>
+          <span className="hidden sm:inline">{isTechnicianUser ? 'Ver Trabajo' : 'Gestionar Trabajo'}</span>
         </Button>
       )}
       {!isHouseTech && job.job_type !== "dryhire" && isProjectManagementPage && (
@@ -1439,7 +1444,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
           </Tooltip>
         </TooltipProvider>
       )}
-      {userRole === 'technician' && job.job_type !== "dryhire" && (
+      {canSubmitTechnicianIncidentReports(userRole) && job.job_type !== "dryhire" && (
         <TechnicianIncidentReportDialog
           job={job}
           techName={techName}

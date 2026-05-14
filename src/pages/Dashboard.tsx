@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { Badge } from "@/components/ui/badge";
@@ -97,7 +97,7 @@ const Dashboard = () => {
 
   const { data: pendingExpensesSummary, isLoading: isLoadingPendingExpenses } = useQuery({
     queryKey: ['dashboard-expenses-summary'],
-    enabled: canAccessDashboard(userRole),
+    enabled: canViewPendingExpenses(userRole),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_expenses')

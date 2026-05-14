@@ -192,7 +192,7 @@ const Lights = () => {
             <LightsHeader
               onCreateJob={handleCreateJob}
               department="Luces"
-              canCreate={userRole ? ["admin","management"].includes(userRole) : true}
+              canCreate={canManageJobs}
             />
 
             <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">

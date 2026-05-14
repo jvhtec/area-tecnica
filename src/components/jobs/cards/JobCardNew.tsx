@@ -342,7 +342,7 @@ function JobCardNewFull({
   const isScheduled = (jobEvents?.length || 0) > 0;
   const hasRequest = Boolean(myTransportRequest) || (Array.isArray(allRequests) && allRequests.length > 0);
   const isTechDept = !!currentUserDepartment && ['sound', 'lights', 'video'].includes(currentUserDepartment);
-  const canManageTransportRequests = (currentUserDepartment === 'logistics') || (isManagementUser && !isTechDept);
+  const canManageTransportRequests = (currentUserDepartment === 'logistics') || isManagementUser;
 
   const handleCancelTransportRequest = React.useCallback(
     async (requestId: string) => {

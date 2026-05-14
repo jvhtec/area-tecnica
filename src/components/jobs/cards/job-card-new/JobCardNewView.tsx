@@ -244,7 +244,7 @@ export function JobCardNewView({
   handleFlexPickerConfirm,
 }: JobCardNewViewProps) {
   const reducedMotion = useReducedMotion();
-  const canManageTransportRequests = userDepartment === "logistics" || (isManagementRole(userRole) && !isTechDept);
+  const canManageTransportRequests = userDepartment === "logistics" || isManagementRole(userRole);
   const isAndreaWeddingJob = job?.id === "eeb00e4d-7d38-4687-9d04-31471b89adfc";
   const [celebrateSeed, setCelebrateSeed] = React.useState(0);
   const [celebrateOrigin, setCelebrateOrigin] = React.useState<{ xPct: number; yPct: number } | null>(null);
@@ -565,7 +565,7 @@ export function JobCardNewView({
             </Dialog>
           )}
 
-          {transportDialogOpen && isTechDept && userDepartment && (
+          {transportDialogOpen && !canManageTransportRequests && isTechDept && userDepartment && (
             <TransportRequestDialog
               open={transportDialogOpen}
               onOpenChange={setTransportDialogOpen}
