@@ -294,7 +294,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         throw error;
       }
 
-      const context = data as PublicFormContextResponse;
+      const context = data as unknown as PublicFormContextResponse;
       if (!context?.ok) {
         if (context?.status === "submitted") {
           if (cancelled) return;

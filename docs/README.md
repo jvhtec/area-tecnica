@@ -67,6 +67,10 @@ Detailed deep-dive docs for the full festival subsystem:
 - **Performance**
   - `PERFORMANCE_AUDIT.md`
   - `PERFORMANCE_AUDIT_REPORT.md`
+- **Generated Supabase types**
+  - Source: `src/integrations/supabase/types.ts`
+  - Regenerate from the linked project with `npx supabase gen types typescript --linked --schema public > src/integrations/supabase/types.ts`
+  - Last roadmap regeneration: P0-01 on 2026-05-15
 - **Security / observability**
   - `SECURITY_AUDIT_LOGGING.md`
 
