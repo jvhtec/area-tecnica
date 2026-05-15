@@ -8,7 +8,7 @@ export function getCategoryFromRole(roleCode: string | null | undefined): 'respo
   
   const normalized = roleCode.trim().toUpperCase();
   
-  // Check if it's a valid role code format (XXX-XXX-X)
+  // Check if it's a valid role code format such as SND-FOH-R.
   if (!normalized.match(/^[A-Z]{3}-[A-Z]+-[RET]$/)) {
     return null;
   }

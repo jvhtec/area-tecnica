@@ -115,7 +115,7 @@ export async function createDryhireYearFolders(year: number): Promise<void> {
   const yearSuffix = String(year).slice(-2);
 
   for (const dept of departments) {
-    // Document number for root folder: XXX.YY (e.g., 555.25 for lights 2025)
+    // Document number for root folder: PREFIX.YY (e.g., 555.25 for lights 2025)
     const rootDocumentNumber = `${departmentPrefixes[dept]}.${yearSuffix}`;
 
     // Create main folder for the year/department
@@ -153,7 +153,7 @@ export async function createDryhireYearFolders(year: number): Promise<void> {
       const monthKey = String(monthIndex + 1).padStart(2, "0");
       const monthName = MONTH_NAMES[monthIndex];
 
-      // Document number for month subfolder: XXX.YY.MM (e.g., 555.25.01 for lights Jan 2025)
+      // Document number for month subfolder: PREFIX.YY.MM (e.g., 555.25.01 for lights Jan 2025)
       const monthDocumentNumber = `${rootDocumentNumber}.${monthKey}`;
 
       // Calculate month start/end dates

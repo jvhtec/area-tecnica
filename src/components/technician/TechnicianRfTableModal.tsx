@@ -668,7 +668,7 @@ export function TechnicianRfTableModal({
                   : "bg-white text-slate-500 border border-slate-200"
             }`}
           >
-            TODOS ({normalizedArtists.length})
+            Todos ({normalizedArtists.length})
           </button>
           {stageOptions.map((s) => (
             <button

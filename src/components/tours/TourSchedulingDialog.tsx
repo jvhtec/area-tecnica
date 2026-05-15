@@ -28,7 +28,6 @@ import {
 } from "lucide-react";
 import { TourTimelineView } from "./scheduling/TourTimelineView";
 import { TourItineraryBuilder } from "./scheduling/TourItineraryBuilder";
-import { TourTravelPlanner } from "./scheduling/TourTravelPlanner";
 import { EnhancedTourTravelPlanner } from "./scheduling/EnhancedTourTravelPlanner";
 import { TourSettingsPanel } from "./scheduling/TourSettingsPanel";
 import { TourContactsManager } from "./scheduling/TourContactsManager";

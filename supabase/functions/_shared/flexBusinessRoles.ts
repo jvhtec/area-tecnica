@@ -11,12 +11,12 @@ const SOUND_BUSINESS_ROLE_IDS: Record<Tier, string> = {
   tecnico: '2f6cf050-c5c1-11ea-a087-2a0a4490a7fb',
 }
 
-// Extend these maps once LIGHTS/VIDEO IDs are confirmed
+// Roadmap P0-04 tracks confirmed LIGHTS/VIDEO Flex dictionary IDs.
 const LIGHTS_BUSINESS_ROLE_IDS: Partial<Record<Tier, string>> = {
-  // TODO: fill with Flex dictionary IDs for lights tiers
+  // Lights tiers are unsupported until their Flex dictionary IDs are confirmed.
 }
 const VIDEO_BUSINESS_ROLE_IDS: Partial<Record<Tier, string>> = {
-  // TODO: fill with Flex dictionary IDs for video tiers
+  // Video tiers are unsupported until their Flex dictionary IDs are confirmed.
 }
 
 export function inferTierFromRoleCode(role: string | null | undefined): Tier | null {
@@ -40,4 +40,3 @@ export function businessRoleIdFor(dept: Dept, tier: Tier | null): string | null 
       return null
   }
 }
-

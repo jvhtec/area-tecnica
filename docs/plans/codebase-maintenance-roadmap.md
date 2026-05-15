@@ -29,6 +29,7 @@ This roadmap turns the current maintenance audit into concrete, sequenced backlo
 
 - 2026-05-13: P6-02 started by removing the obsolete `src/utils/pdf/tourLogoUtils.ts` compatibility re-export and pointing tour PDF imports at `src/utils/pdf/logoUtils.ts`.
 - 2026-05-13: P2-04 completed for active app code by adding shared permission role groups, predicates, and `usePermissions`; replacing scattered admin/management checks across routes, pages, hooks, layout, jobs, matrix, tours, SoundVision, timesheets, and legacy wrappers; and adding focused permission tests. The remaining `admin`/`management` scan hits are central helpers plus test fixtures.
+- 2026-05-15: P6-03 completed for `src` and `supabase` by removing unused placeholder code, replacing open source TODO/FIXME/HACK notes with roadmap task references, and cleaning scan false positives. `rg -n "TODO|FIXME|HACK|XXX" src supabase` now returns no matches.
 
 ## Phase 0: Safety and Type Baseline
 

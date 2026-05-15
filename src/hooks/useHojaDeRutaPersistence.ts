@@ -444,7 +444,7 @@ export const useHojaDeRutaPersistence = (
       });
 
       const { error: replaceAllError } = await supabase.rpc(
-        // TODO: Regenerate Supabase types after this migration is deployed to remove this cast.
+        // Roadmap P0-01 removes this cast once generated Supabase types include replace_hoja_de_ruta_all.
         'replace_hoja_de_ruta_all' as unknown as keyof Database['public']['Functions'],
         {
           p_hoja_de_ruta_id: hojaDeRutaId,
