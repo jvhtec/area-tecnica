@@ -28,11 +28,11 @@ export const isAdministrativeDepartment = (department?: UserDepartment): boolean
 
 export const isAdminRole = (role: UserRole): boolean => role === 'admin';
 
-export const isManagementRole = (role: UserRole): boolean => MANAGEMENT_ROLES.has(role || '');
+export const isManagementRole = (role: UserRole): boolean => MANAGEMENT_ROLES.has(role as AppUserRole);
 
 export const isDepartmentManagementRole = (role: UserRole): boolean => role === 'management';
 
-export const canAccessDashboard = (role: UserRole): boolean => DASHBOARD_ROLES.has(role || '');
+export const canAccessDashboard = (role: UserRole): boolean => DASHBOARD_ROLES.has(role as AppUserRole);
 
 export const canAccessDisponibilidad = (role: UserRole, department?: UserDepartment): boolean =>
   isAdminRole(role) || (isDepartmentManagementRole(role) && DISPONIBILIDAD_DEPARTMENTS.has(normalizeDepartmentKey(department)));
