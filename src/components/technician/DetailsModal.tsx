@@ -111,6 +111,20 @@ type HojaDeRutaTransport = {
     return_date_time: string | null;
     logistics_categories: string[] | null;
 };
+
+const JOB_TYPE_LABELS: Record<string, string> = {
+    single: 'Un solo día',
+    tour: 'Gira',
+    tourdate: 'Fecha de gira',
+    festival: 'Festival',
+    ciclo: 'Ciclo',
+    dryhire: 'Alquiler seco',
+    evento: 'Evento',
+};
+
+const getJobTypeLabel = (jobType?: string | null) =>
+    jobType ? JOB_TYPE_LABELS[jobType] ?? 'Un solo día' : 'Un solo día';
+
 type RoomOccupantProfile = {
     id: string;
     first_name: string | null;
@@ -1046,7 +1060,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                     <label className={`text-xs ${theme.textMuted} font-bold uppercase`}>Tipo de trabajo</label>
                                     <div className="mt-2">
                                         <span className={`px-3 py-1 rounded-full ${isDark ? 'bg-[#1a1d26] border-[#2a2e3b]' : 'bg-slate-100 border-slate-200'} border text-xs ${theme.textMain} font-medium`}>
-                                            {job?.job_type === 'single' ? 'Un solo día' : job?.job_type || 'Un solo día'}
+                                            {getJobTypeLabel(job?.job_type)}
                                         </span>
                                     </div>
                                 </div>

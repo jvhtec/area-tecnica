@@ -1,5 +1,5 @@
 import { format } from 'date-fns';
-import type { SpeakerSection, AmplifierResults } from '../components/sound/amplifier-tool/types';
+import type { SpeakerSection, AmplifierResults } from '@/components/sound/amplifier-tool/types';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 
 export const generateAmplifierPdf = async (

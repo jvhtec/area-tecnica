@@ -489,6 +489,7 @@ export function PushToFlexPullsheetDialog({
       const normalizedSubsystem =
         item.subsystem ??
         resolveSubsystemForEquipment({ category: item.category as EquipmentCategory | null }) ??
+        // Amplification PA preset categories are valid subsystem identifiers when no explicit subsystem is stored.
         normalizePresetSubsystem(item.category) ??
         null;
       const mergeKey = `${item.resourceId}:${normalizedSubsystem ?? ''}`;

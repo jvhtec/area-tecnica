@@ -268,6 +268,13 @@ export const TourDefaultsManager = ({
     return 0;
   };
 
+  const getLegacyWeightQuantity = (table: CombinedDefaultType): number => {
+    if (isLegacyWeightDefault(table)) {
+      return table.quantity || 1;
+    }
+    return 1;
+  };
+
   // Helper function to get current per phase based on format
   const getCurrentPerPhase = (table: CombinedDefaultType): number | undefined => {
     if (isNewFormatTable(table)) {
@@ -383,7 +390,7 @@ export const TourDefaultsManager = ({
           return {
             name: getTableName(defaultItem),
             rows: [{
-              quantity: '1',
+              quantity: getLegacyWeightQuantity(defaultItem).toString(),
               componentName: getTableName(defaultItem),
               weight: isLegacyWeightDefault(defaultItem) ? defaultItem.weight_kg?.toString() : undefined,
               watts: undefined,
@@ -582,7 +589,7 @@ export const TourDefaultsManager = ({
     if (typedWeightOverrides.length > 0) {
       combinedTables = typedWeightOverrides.map((override) => {
         return {
-          name: (override as any).table_name || override.item_name || 'Override',
+          name: (override as any).table_name || override.item_name || 'Anulación',
           rows: (override.override_data as any)?.rows || [],
           totalWeight: (override.weight_kg || 0) * (override.quantity || 1),
           totalWatts: undefined,
@@ -635,7 +642,7 @@ export const TourDefaultsManager = ({
           return {
             name: getTableName(defaultItem),
             rows: [{
-              quantity: '1',
+              quantity: getLegacyWeightQuantity(defaultItem).toString(),
               componentName: getTableName(defaultItem),
               weight: isLegacyWeightDefault(defaultItem) ? defaultItem.weight_kg?.toString() : undefined,
               watts: undefined,

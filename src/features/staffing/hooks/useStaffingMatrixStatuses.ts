@@ -131,13 +131,13 @@ export function useStaffingMatrixStatuses(
               if (!s) return null
               if (s === 'pending') return 'requested'
               if (s === 'expired') return null // treat cancelled/expired as cleared
-              return s as any
+              return toMatrixStatus(s)
             }
             const mapOffer = (s: string | null): Status => {
               if (!s) return null
               if (s === 'pending') return 'sent'
               if (s === 'expired') return null // treat cancelled/expired as cleared
-              return s as any
+              return toMatrixStatus(s)
             }
             const availStatus = mapAvailability(r.availability_status)
             const offerStatus = mapOffer(r.offer_status)

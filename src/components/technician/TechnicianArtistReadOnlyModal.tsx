@@ -14,6 +14,7 @@ import { MobileArtistList } from "@/components/festival/mobile/MobileArtistList"
 import type { MobileArtistRiderFile } from "@/components/festival/mobile/MobileArtistCard";
 import { Theme } from "./types";
 import { createQueryKey } from "@/lib/optimized-react-query";
+import type { Tables } from "@/integrations/supabase/types";
 
 type TechnicianArtistReadOnlyModalProps = {
   theme: Theme;
@@ -80,6 +81,8 @@ type FestivalStage = {
   number: number;
   name: string;
 };
+type FestivalArtistRow = Tables<"festival_artists">;
+type ReadOnlyWiredMic = NonNullable<ReadOnlyArtist["wired_mics"]>[number];
 
 const NOOP = () => {};
 
@@ -103,6 +106,29 @@ const formatChipDate = (date: string) => {
   }
 };
 
+const asArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+const asMicKit = (value: string | null): ReadOnlyArtist["mic_kit"] =>
+  value === "festival" || value === "band" || value === "mixed" ? value : null;
+
+const mapRawToReadOnlyArtist = (artist: FestivalArtistRow): ReadOnlyArtist => ({
+  ...artist,
+  date: artist.date || "",
+  show_start: artist.show_start || "",
+  show_end: artist.show_end || "",
+  soundcheck: Boolean(artist.soundcheck),
+  foh_console: artist.foh_console || null,
+  mon_console: artist.mon_console || null,
+  wireless_systems: asArray(artist.wireless_systems),
+  iem_systems: asArray(artist.iem_systems),
+  monitors_enabled: Boolean(artist.monitors_enabled),
+  monitors_quantity: artist.monitors_quantity || 0,
+  extras_sf: Boolean(artist.extras_sf),
+  extras_df: Boolean(artist.extras_df),
+  extras_djbooth: Boolean(artist.extras_djbooth),
+  mic_kit: asMicKit(artist.mic_kit),
+  wired_mics: asArray<ReadOnlyWiredMic>(artist.wired_mics),
+});
+
 export function TechnicianArtistReadOnlyModal({
   theme,
   isDark,
@@ -125,7 +151,7 @@ export function TechnicianArtistReadOnlyModal({
         .order("date", { ascending: true });
 
       if (error) throw error;
-      return ((data || []) as unknown as ReadOnlyArtist[]).sort((left, right) => {
+      return (data || []).map(mapRawToReadOnlyArtist).sort((left, right) => {
         const leftDate = String(left.date || "");
         const rightDate = String(right.date || "");
         if (leftDate !== rightDate) return leftDate.localeCompare(rightDate);

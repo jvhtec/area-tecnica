@@ -216,7 +216,7 @@ export const useHojaDeRutaPersistence = (
         venue: venueFromJob || {
           name: mainData.venue_name || '',
           address: mainData.venue_address || '',
-          coordinates: mainData.venue_latitude && mainData.venue_longitude ? {
+          coordinates: mainData.venue_latitude != null && mainData.venue_longitude != null ? {
             lat: Number(mainData.venue_latitude),
             lng: Number(mainData.venue_longitude)
           } : undefined
@@ -272,7 +272,7 @@ export const useHojaDeRutaPersistence = (
         address: acc.address || '',
         check_in: acc.check_in || '',
         check_out: acc.check_out || '',
-        coordinates: acc.latitude && acc.longitude ? {
+        coordinates: acc.latitude != null && acc.longitude != null ? {
 	          lat: Number(acc.latitude),
 	          lng: Number(acc.longitude)
         } : undefined,

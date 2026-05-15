@@ -1,5 +1,5 @@
 
-import { FestivalGearSetup } from "./festival";
+import { ConsoleSetup, FestivalGearSetup } from "./festival";
 import { WiredMic } from "@/components/festival/gear-setup/WiredMicConfig";
 
 export interface ArtistSectionProps {
@@ -14,10 +14,10 @@ export interface ArtistSectionProps {
     soundcheck_start?: string;
     soundcheck_end?: string;
     foh_console: string;
-    foh_consoles: any[];
+    foh_consoles: ConsoleSetup[];
     foh_console_provided_by: string;
     mon_console: string;
-    mon_consoles: any[];
+    mon_consoles: ConsoleSetup[];
     mon_console_provided_by: string;
     monitors_from_foh: boolean;
     foh_waves_outboard: string;

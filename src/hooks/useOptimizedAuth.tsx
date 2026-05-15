@@ -178,13 +178,13 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       setIsProfileLoading(true);
 
       const selectProfile = async (columns: string): Promise<{ data: ProfileQueryResult | null; error: any }> => {
-        const { data, error } = await (supabase as any)
+        const { data, error } = await supabase
           .from('profiles')
           .select(columns)
           .eq('id', userId)
           .limit(1);
 
-        return { data: (data?.[0] ?? null) as ProfileQueryResult | null, error };
+        return { data: (data?.[0] ?? null) as unknown as ProfileQueryResult | null, error };
       };
 
       // Prefer new flag name; alias to expected key. Fallback if columns missing.

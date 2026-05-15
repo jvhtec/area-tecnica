@@ -13,9 +13,11 @@ const corsHeaders = {
 interface RequestBody {
   job_id: string;
   technician_id: string;
-  department: 'sound' | 'lights';
+  department: 'sound' | 'lights' | 'video';
   action: 'add' | 'remove';
 }
+
+type BusinessRoleDepartment = RequestBody['department'];
 
 interface InsertError {
   crew_call_id: string;
@@ -32,6 +34,11 @@ interface FlexCrewAssignment {
 
 /** Standard codeList params for Flex row-data queries */
 const FLEX_CODE_LIST = ['contact', 'business-role', 'pickup-date', 'return-date', 'notes', 'quantity', 'status'] as const;
+const BUSINESS_ROLE_DEPARTMENTS = ['sound', 'lights', 'video'] as const;
+
+function isBusinessRoleDepartment(department: string): department is BusinessRoleDepartment {
+  return BUSINESS_ROLE_DEPARTMENTS.includes(department as BusinessRoleDepartment);
+}
 
 /** Build query params for Flex row-data endpoint */
 function buildFlexRowDataParams(includeTimestamp = true): URLSearchParams {
@@ -131,16 +138,26 @@ async function setBusinessRole(
   flexHeaders: Record<string, string>
 ): Promise<void> {
   if (!lineItemId) return;
-  if (!['sound', 'lights', 'video'].includes(department)) return;
-  const dept = department as 'sound' | 'lights' | 'video';
+  if (!isBusinessRoleDepartment(department)) return;
+  const dept = department;
 
   try {
-    const { data: ja } = await supabase
+    const { data: ja, error: jaError } = await supabase
       .from('job_assignments')
       .select('sound_role, lights_role, video_role')
       .eq('job_id', jobId)
       .eq('technician_id', technicianId)
       .maybeSingle();
+
+    if (jaError) {
+      console.warn('[setBusinessRole] Failed to load technician role for business-role mapping', {
+        jobId,
+        technicianId,
+        department: dept,
+        error: jaError.message,
+      });
+      return;
+    }
 
     const role = dept === 'sound'
       ? ja?.sound_role ?? null

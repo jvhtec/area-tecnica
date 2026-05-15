@@ -207,6 +207,7 @@ export default function TechnicianSuperApp() {
             description,
             start_time,
             end_time,
+            created_at,
             timezone,
             location_id,
             job_type,
@@ -303,7 +304,7 @@ export default function TechnicianSuperApp() {
             video_role: assignment?.video_role,
             jobs: {
               ...job,
-              created_at: job.created_at || row.date || '',
+              created_at: job.created_at || '',
               job_type: job.job_type || 'single',
               artist_count: artistCountByJob.get(row.job_id) || 0
             }

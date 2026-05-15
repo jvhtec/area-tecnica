@@ -301,7 +301,7 @@ const hasProviderTextToken = (value: string): boolean =>
   value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN);
 
 const stripProviderTextTokens = (value: string): string =>
-  value.replace(FESTIVAL_TEXT_TOKEN, '').replace(BAND_TEXT_TOKEN, '');
+  value.split(FESTIVAL_TEXT_TOKEN).join('').split(BAND_TEXT_TOKEN).join('');
 
 const getProviderTokenType = (line: string): 'festival' | 'band' | 'default' => {
   if (line.includes(FESTIVAL_TEXT_TOKEN)) return 'festival';
