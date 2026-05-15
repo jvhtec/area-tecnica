@@ -55,9 +55,10 @@ import { DetailsModal } from '@/components/technician/DetailsModal';
 import { AboutModal } from '@/components/technician/AboutModal';
 import { TechnicianArtistReadOnlyModal } from '@/components/technician/TechnicianArtistReadOnlyModal';
 import { TechnicianRfTableModal } from '@/components/technician/TechnicianRfTableModal';
+import type { JobWithLocationAndDocs } from '@/types/job';
 
 // --- TYPE DEFINITIONS ---
-interface TechnicianJobData {
+interface TechnicianJobData extends JobWithLocationAndDocs {
   id: string;
   title: string;
   description?: string;
@@ -65,20 +66,12 @@ interface TechnicianJobData {
   end_time: string;
   timezone?: string;
   location_id?: string;
-  job_type?: string;
+  job_type: JobWithLocationAndDocs['job_type'];
   color?: string;
   status?: string;
   artist_count?: number;
-  location?: { name: string } | null;
-  job_documents?: Array<{
-    id: string;
-    file_name: string;
-    file_path: string;
-    visible_to_tech?: boolean;
-    uploaded_at?: string;
-    read_only?: boolean;
-    template_type?: string | null;
-  }>;
+  location?: JobWithLocationAndDocs['location'];
+  job_documents?: JobWithLocationAndDocs['job_documents'];
 }
 
 interface TechnicianAssignment {
@@ -214,6 +207,7 @@ export default function TechnicianSuperApp() {
             description,
             start_time,
             end_time,
+            created_at,
             timezone,
             location_id,
             job_type,
@@ -297,6 +291,7 @@ export default function TechnicianSuperApp() {
             video_role: assignment?.video_role
           });
 
+          const job = (Array.isArray(row.jobs) ? row.jobs[0] : row.jobs) as unknown as JobWithLocationAndDocs;
           return {
             id: `job-${row.job_id}`,
             job_id: row.job_id,
@@ -308,11 +303,13 @@ export default function TechnicianSuperApp() {
             lights_role: assignment?.lights_role,
             video_role: assignment?.video_role,
             jobs: {
-              ...row.jobs,
+              ...job,
+              created_at: job.created_at || '',
+              job_type: job.job_type || 'single',
               artist_count: artistCountByJob.get(row.job_id) || 0
             }
           };
-        });
+        }) as TechnicianAssignment[];
     },
     'timesheets',
     {
@@ -477,7 +474,7 @@ export default function TechnicianSuperApp() {
           onClose={() => setSelectedTourId(null)}
           onOpenJob={(jobId) => {
             // Find the job in assignments and pass the job data, not the assignment
-            const assignment = (assignments as TechnicianAssignment[]).find(
+            const assignment = (assignments as unknown as TechnicianAssignment[]).find(
               a => a.job_id === jobId || a.jobs?.id === jobId
             );
             if (assignment?.jobs) {

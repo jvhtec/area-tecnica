@@ -48,7 +48,7 @@ export function useSetTechnicianPayoutOverride() {
         throw error;
       }
 
-      const result = data as TechnicianPayoutOverrideResult;
+      const result = data as unknown as TechnicianPayoutOverrideResult;
 
       // Send notification email if successful (silently, no user notifications)
       if (result.success && result.job_type !== 'ciclo') {
@@ -126,7 +126,7 @@ export function useRemoveTechnicianPayoutOverride() {
         throw error;
       }
 
-      const result = data as TechnicianPayoutOverrideResult;
+      const result = data as unknown as TechnicianPayoutOverrideResult;
 
       // Send notification email if successful (silently, no user notifications)
       if (result.success && result.job_type !== 'ciclo') {

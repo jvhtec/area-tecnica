@@ -5,7 +5,10 @@ import type {
   TravelArrangement,
   Accommodation,
   AuxiliaryMachineryRequirement,
+  Transport,
+  WeatherData,
 } from "@/types/hoja-de-ruta";
+import type { Json } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
@@ -213,9 +216,9 @@ export const useHojaDeRutaPersistence = (
         venue: venueFromJob || {
           name: mainData.venue_name || '',
           address: mainData.venue_address || '',
-          coordinates: mainData.venue_latitude && mainData.venue_longitude ? {
-            lat: parseFloat(mainData.venue_latitude),
-            lng: parseFloat(mainData.venue_longitude)
+          coordinates: mainData.venue_latitude != null && mainData.venue_longitude != null ? {
+            lat: Number(mainData.venue_latitude),
+            lng: Number(mainData.venue_longitude)
           } : undefined
         },
         contacts: contacts?.length ? contacts.map(c => ({
@@ -227,11 +230,11 @@ export const useHojaDeRutaPersistence = (
         logistics: {
           transport: transport?.length ? transport.map(t => ({
             id: t.id,
-            transport_type: t.transport_type,
+            transport_type: t.transport_type as Transport["transport_type"],
             driver_name: t.driver_name,
             driver_phone: t.driver_phone,
             license_plate: t.license_plate,
-            company: t.company,
+            company: t.company as Transport["company"],
             date_time: toDateTimeLocalInMadrid(t.date_time),
             has_return: t.has_return,
             return_date_time: toDateTimeLocalInMadrid(t.return_date_time),
@@ -259,7 +262,7 @@ export const useHojaDeRutaPersistence = (
         auxiliaryStaffSetupQty: toSafeNonNegativeInt(mainData.aux_staff_setup_qty),
         auxiliaryStaffDismantleQty: toSafeNonNegativeInt(mainData.aux_staff_dismantle_qty),
         auxiliaryMachinery: normalizeAuxiliaryMachinery(mainData.aux_machinery_requirements),
-        weather: mainData.weather_data || []
+        weather: (Array.isArray(mainData.weather_data) ? mainData.weather_data : []) as unknown as WeatherData[]
       };
 
       // Transform accommodations data
@@ -269,9 +272,9 @@ export const useHojaDeRutaPersistence = (
         address: acc.address || '',
         check_in: acc.check_in || '',
         check_out: acc.check_out || '',
-        coordinates: acc.latitude && acc.longitude ? {
-          lat: parseFloat(acc.latitude),
-          lng: parseFloat(acc.longitude)
+        coordinates: acc.latitude != null && acc.longitude != null ? {
+	          lat: Number(acc.latitude),
+	          lng: Number(acc.longitude)
         } : undefined,
         rooms: acc.hoja_de_ruta_room_assignments?.map(room => ({
           room_type: room.room_type,
@@ -344,13 +347,13 @@ export const useHojaDeRutaPersistence = (
         venue_longitude: eventData.venue?.coordinates?.lng || null,
         schedule: eventData.schedule || '',
         // Save multi-day program as JSONB
-        program_schedule_json: eventData.programScheduleDays && eventData.programScheduleDays.length > 0 ? eventData.programScheduleDays : null,
+        program_schedule_json: eventData.programScheduleDays && eventData.programScheduleDays.length > 0 ? eventData.programScheduleDays as unknown as Json : null,
         power_requirements: eventData.powerRequirements || '',
         auxiliary_needs: eventData.auxiliaryNeeds || '',
         aux_staff_setup_qty: auxiliaryStaffSetupQty,
         aux_staff_dismantle_qty: auxiliaryStaffDismantleQty,
-        aux_machinery_requirements: auxiliaryMachinery,
-        weather_data: eventData.weather || null,
+        aux_machinery_requirements: auxiliaryMachinery as unknown as Json,
+        weather_data: eventData.weather as unknown as Json || null,
         updated_at: now,
         last_modified: now,
         last_modified_by: userId

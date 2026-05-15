@@ -13,6 +13,10 @@ import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { canUseHouseTechCalendar, isManagementRole } from '@/utils/permissions';
 
+type VacationRole = 'house_tech' | 'management' | 'admin';
+const isVacationRole = (role: string | null | undefined): role is VacationRole =>
+  role === 'house_tech' || role === 'management' || role === 'admin';
+
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
   const [isVacationSectionOpen, setIsVacationSectionOpen] = useState(false);
@@ -57,7 +61,7 @@ const Personal = () => {
       );
     }
 
-    if (canUseHouseTechCalendar(userRole)) {
+    if (isVacationRole(userRole) && canUseHouseTechCalendar(userRole)) {
       return (
         <VacationRequestsTabs
           userRole={userRole}

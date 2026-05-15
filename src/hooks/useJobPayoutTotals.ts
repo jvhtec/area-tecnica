@@ -92,7 +92,7 @@ export function useMyJobPayoutTotals() {
         expenses_total_eur: Number(item.expenses_total_eur ?? 0),
         total_eur: Number(item.total_eur ?? 0),
         extras_breakdown: (item.extras_breakdown ?? {}) as JobPayoutTotals['extras_breakdown'],
-        expenses_breakdown: (item.expenses_breakdown ?? []) as JobPayoutTotals['expenses_breakdown'],
+        expenses_breakdown: (item.expenses_breakdown ?? []) as unknown as JobPayoutTotals['expenses_breakdown'],
       }));
     },
     staleTime: 30 * 1000, // 30 seconds

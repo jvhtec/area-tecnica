@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatUserName } from '@/utils/userName';
 import { CityAutocomplete } from '@/components/maps/CityAutocomplete';
 import { isAdminRole, isManagementRole } from '@/utils/permissions';
+import type { UserRole } from '@/types/user';
 
 interface TechnicianRowProps {
   technician: {
@@ -193,7 +194,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
           phone: editedData.phone || null,
           dni: editedData.dni || null,
           department: editedData.department,
-          role: editedData.role,
+          role: editedData.role as UserRole,
           residencia: editedData.residencia || null,
           home_latitude: editedData.home_latitude,
           home_longitude: editedData.home_longitude,

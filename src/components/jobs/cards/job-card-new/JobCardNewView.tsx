@@ -45,7 +45,7 @@ export interface JobCardNewViewProps {
   appliedBorderColor: string;
   appliedBgColor: string;
   collapsed: boolean;
-  toggleCollapse: () => void;
+  toggleCollapse: (e: React.MouseEvent) => void;
   handleJobCardClick: (e?: React.MouseEvent) => void;
   isSelected: boolean;
 
@@ -71,7 +71,7 @@ export interface JobCardNewViewProps {
   documents: any[];
   docsCollapsed: boolean;
   setDocsCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
-  handleDeleteDocument: (jobId: string, document: any) => void;
+  handleDeleteDocument: (document: any) => void;
 
   riderFiles: Array<{ id: string; file_name: string; file_path: string; uploaded_at: string; artist_id: string }>;
   cardArtistNameMap: Map<string, string>;
@@ -471,7 +471,7 @@ export function JobCardNewView({
                         <JobCardDocuments
                           documents={documents}
                           userRole={userRole}
-                          onDeleteDocument={(jobId, document) => handleDeleteDocument(jobId, document)}
+                          onDeleteDocument={(document) => handleDeleteDocument(document)}
                           showTitle={false}
                         />
                       </div>

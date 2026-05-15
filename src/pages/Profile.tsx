@@ -17,6 +17,7 @@ import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload"
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
+import type { Json } from "@/integrations/supabase/types";
 import {
   canReceiveMorningSummary,
   canUseCustomFolderStructure,
@@ -95,8 +96,8 @@ export const Profile = () => {
       }
 
         setProfile(data);
-        setFolderStructure(data.custom_folder_structure);
-        setTourFolderStructure(data.custom_tour_folder_structure);
+        setFolderStructure(data.custom_folder_structure as unknown as FolderStructure | null);
+        setTourFolderStructure(data.custom_tour_folder_structure as unknown as FolderStructure | null);
       setNeedsPasswordChange(user.user_metadata?.needs_password_change ?? false);
     };
 
@@ -121,8 +122,8 @@ export const Profile = () => {
           home_latitude: profile.home_latitude,
           home_longitude: profile.home_longitude,
           bg_color: profile.bg_color || null,
-          custom_folder_structure: folderStructure,
-          custom_tour_folder_structure: tourFolderStructure,
+          custom_folder_structure: folderStructure as unknown as Json,
+          custom_tour_folder_structure: tourFolderStructure as unknown as Json,
         })
         .eq('id', profile.id);
 
@@ -150,8 +151,8 @@ export const Profile = () => {
       const { error } = await supabase
         .from('profiles')
         .update({
-          custom_folder_structure: folderStructure,
-          custom_tour_folder_structure: tourFolderStructure,
+          custom_folder_structure: folderStructure as unknown as Json,
+          custom_tour_folder_structure: tourFolderStructure as unknown as Json,
         })
         .eq('id', profile.id);
 

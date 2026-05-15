@@ -177,14 +177,14 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       console.log('🔄 Fetching fresh profile data...');
       setIsProfileLoading(true);
 
-      const selectProfile = async (columns: string) => {
+      const selectProfile = async (columns: string): Promise<{ data: ProfileQueryResult | null; error: any }> => {
         const { data, error } = await supabase
           .from('profiles')
           .select(columns)
           .eq('id', userId)
           .limit(1);
 
-        return { data: data?.[0] ?? null, error };
+        return { data: (data?.[0] ?? null) as unknown as ProfileQueryResult | null, error };
       };
 
       // Prefer new flag name; alias to expected key. Fallback if columns missing.
@@ -204,7 +204,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
         // Default both new fields to false
         if (data) {
-          const typedData = data as ProfileQueryResult;
+          const typedData = data as unknown as ProfileQueryResult;
           typedData.soundvision_access = false;
           typedData.assignable_as_tech = false;
           data = typedData;
@@ -247,7 +247,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
                 error = fallback.error;
 
                 if (data) {
-                  const typedData = data as ProfileQueryResult;
+                  const typedData = data as unknown as ProfileQueryResult;
                   typedData.soundvision_access = false;
                   typedData.assignable_as_tech = false;
                   data = typedData;
@@ -264,7 +264,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
 
       if (data) {
-        const typedData = data as ProfileQueryResult;
+        const typedData = data as unknown as ProfileQueryResult;
         const soundVisionAccess = Boolean(typedData.soundvision_access);
         const assignableAsTech = Boolean(typedData.assignable_as_tech);
         setUserRole(typedData.role);

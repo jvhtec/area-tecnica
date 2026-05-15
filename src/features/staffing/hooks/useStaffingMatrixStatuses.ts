@@ -3,6 +3,18 @@ import { supabase } from '@/integrations/supabase/client'
 import { format } from 'date-fns'
 
 type Status = 'confirmed' | 'declined' | 'expired' | 'requested' | 'sent' | null
+const toMatrixStatus = (value: string | null): Status => {
+  if (
+    value === 'confirmed' ||
+    value === 'declined' ||
+    value === 'expired' ||
+    value === 'requested' ||
+    value === 'sent'
+  ) {
+    return value
+  }
+  return null
+}
 
 export interface MatrixJobLite {
   id: string
@@ -119,13 +131,13 @@ export function useStaffingMatrixStatuses(
               if (!s) return null
               if (s === 'pending') return 'requested'
               if (s === 'expired') return null // treat cancelled/expired as cleared
-              return s as any
+              return toMatrixStatus(s)
             }
             const mapOffer = (s: string | null): Status => {
               if (!s) return null
               if (s === 'pending') return 'sent'
               if (s === 'expired') return null // treat cancelled/expired as cleared
-              return s as any
+              return toMatrixStatus(s)
             }
             const availStatus = mapAvailability(r.availability_status)
             const offerStatus = mapOffer(r.offer_status)
@@ -222,7 +234,7 @@ export function useStaffingMatrixStatuses(
               }
               const accT = acc.availability_updated_at || 0
               if (t > accT) {
-                const mapped = r.status === 'pending' ? 'requested' : (r.status === 'expired' ? null : r.status)
+	                const mapped = r.status === 'pending' ? 'requested' : (r.status === 'expired' ? null : toMatrixStatus(r.status))
                 acc.availability_status = mapped
                 acc.availability_updated_at = t
                 acc.availability_job_id = r.job_id
@@ -236,7 +248,7 @@ export function useStaffingMatrixStatuses(
               }
               const accT = acc.offer_updated_at || 0
               if (t > accT) {
-                const mapped = r.status === 'pending' ? 'sent' : (r.status === 'expired' ? null : r.status)
+	                const mapped = r.status === 'pending' ? 'sent' : (r.status === 'expired' ? null : toMatrixStatus(r.status))
                 acc.offer_status = mapped
                 acc.offer_updated_at = t
                 acc.offer_job_id = r.job_id

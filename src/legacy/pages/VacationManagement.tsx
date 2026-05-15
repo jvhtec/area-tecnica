@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '@/lib/supabase';
-import { getPendingVacationRequests, approveVacationRequests, rejectVacationRequests } from '../../supabase-server/src/api/vacation-requests';
+import { vacationRequestsApi } from '@/lib/vacation-requests';
+import { queryClient } from '@/lib/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
@@ -19,31 +20,30 @@ interface VacationRequest {
   created_at: string;
 }
 
+const VACATION_PENDING_QUERY_KEY = ['vacationRequests', 'pending'] as const;
+
 const VacationManagement = () => {
-  const [pendingRequests, setPendingRequests] = useState<VacationRequest[]>([]);
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isApproving, setIsApproving] = useState(false);
+  const [isRejecting, setIsRejecting] = useState(false);
   const { toast } = useToast();
 
-  const fetchRequests = async () => {
-    setIsLoading(true);
-    const { data, error } = await getPendingVacationRequests(supabase);
-    if (error) {
-      toast({
-        title: "Error fetching requests",
-        description: error.message || "Failed to load vacation requests.",
-        variant: "destructive",
-      });
-      setPendingRequests([]);
-    } else {
-      setPendingRequests(data as VacationRequest[]);
-    }
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    fetchRequests();
-  }, []);
+  const { data: pendingRequests = [], isLoading } = useQuery({
+    queryKey: VACATION_PENDING_QUERY_KEY,
+    queryFn: async () => {
+      try {
+        return (await vacationRequestsApi.getPendingRequests()) as VacationRequest[];
+      } catch (error) {
+        toast({
+          title: "Error fetching requests",
+          description: error instanceof Error ? error.message : "Failed to load vacation requests.",
+          variant: "destructive",
+        });
+        throw error;
+      }
+    },
+    retry: false,
+  });
 
   const handleSelectRequest = (id: string, isChecked: boolean) => {
     setSelectedRequests(prev =>
@@ -60,6 +60,7 @@ const VacationManagement = () => {
   };
 
   const handleApproveSelected = async () => {
+    if (isApproving) return;
     if (selectedRequests.length === 0) {
       toast({
         title: "No requests selected",
@@ -69,24 +70,28 @@ const VacationManagement = () => {
       return;
     }
 
-    const { error } = await approveVacationRequests(supabase, selectedRequests);
-    if (error) {
-      toast({
-        title: "Approval failed",
-        description: error.message || "Failed to approve selected requests.",
-        variant: "destructive",
-      });
-    } else {
+    setIsApproving(true);
+    try {
+      await vacationRequestsApi.approveRequests(selectedRequests);
       toast({
         title: "Requests approved!",
         description: `${selectedRequests.length} vacation requests have been approved.`,
       });
       setSelectedRequests([]);
-      fetchRequests(); // Refresh the list
+      await queryClient.invalidateQueries({ queryKey: VACATION_PENDING_QUERY_KEY });
+    } catch (error) {
+      toast({
+        title: "Approval failed",
+        description: error instanceof Error ? error.message : "Failed to approve selected requests.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsApproving(false);
     }
   };
 
   const handleRejectSelected = async () => {
+    if (isRejecting) return;
     if (selectedRequests.length === 0) {
       toast({
         title: "No requests selected",
@@ -96,22 +101,27 @@ const VacationManagement = () => {
       return;
     }
 
-    const { error } = await rejectVacationRequests(supabase, selectedRequests);
-    if (error) {
-      toast({
-        title: "Rejection failed",
-        description: error.message || "Failed to reject selected requests.",
-        variant: "destructive",
-      });
-    } else {
+    setIsRejecting(true);
+    try {
+      await vacationRequestsApi.rejectRequests(selectedRequests);
       toast({
         title: "Requests rejected!",
         description: `${selectedRequests.length} vacation requests have been rejected.`,
       });
       setSelectedRequests([]);
-      fetchRequests(); // Refresh the list
+      await queryClient.invalidateQueries({ queryKey: VACATION_PENDING_QUERY_KEY });
+    } catch (error) {
+      toast({
+        title: "Rejection failed",
+        description: error instanceof Error ? error.message : "Failed to reject selected requests.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRejecting(false);
     }
   };
+
+  const isProcessing = isApproving || isRejecting;
 
   return (
     <div className="w-full max-w-full space-y-4 md:space-y-6">
@@ -129,7 +139,7 @@ const VacationManagement = () => {
               <div className="flex flex-col sm:flex-row justify-end gap-2 mb-4">
                 <Button 
                   onClick={handleApproveSelected} 
-                  disabled={selectedRequests.length === 0}
+                  disabled={selectedRequests.length === 0 || isProcessing}
                   size="sm"
                   className="w-full sm:w-auto"
                 >
@@ -139,7 +149,7 @@ const VacationManagement = () => {
                 <Button 
                   variant="outline" 
                   onClick={handleRejectSelected} 
-                  disabled={selectedRequests.length === 0}
+                  disabled={selectedRequests.length === 0 || isProcessing}
                   size="sm"
                   className="w-full sm:w-auto"
                 >

@@ -33,6 +33,7 @@ export const ArtistForm = () => {
     rider_missing: boolean;
   }>({
     name: "",
+    max_stages: 1,
     stage: 1,
     date: "",
     show_start: "20:00",
@@ -41,10 +42,12 @@ export const ArtistForm = () => {
     soundcheck_start: "18:00",
     soundcheck_end: "19:00",
     foh_console: "",
+    foh_consoles: [],
     foh_console_provided_by: "festival",
     foh_tech: false,
     foh_waves_outboard: "",
     mon_console: "",
+    mon_consoles: [],
     mon_console_provided_by: "festival",
     monitors_from_foh: false,
     mon_waves_outboard: "",

@@ -3,6 +3,21 @@
 
 export type Dept = 'sound' | 'lights' | 'video'
 export type Tier = 'responsable' | 'especialista' | 'tecnico'
+export type BusinessRoleLookup =
+  | {
+      supported: true
+      dept: Dept
+      tier: Tier
+      roleId: string
+      diagnostic?: undefined
+    }
+  | {
+      supported: false
+      dept: Dept
+      tier: Tier | null
+      roleId: null
+      diagnostic: string
+    }
 
 // Known Flex dictionary IDs for SOUND business-role tiers
 const SOUND_BUSINESS_ROLE_IDS: Record<Tier, string> = {
@@ -28,15 +43,50 @@ export function inferTierFromRoleCode(role: string | null | undefined): Tier | n
 }
 
 export function businessRoleIdFor(dept: Dept, tier: Tier | null): string | null {
-  if (!tier) return null
+  const lookup = businessRoleLookupFor(dept, tier)
+  return lookup.supported ? lookup.roleId : null
+}
+
+export function businessRoleLookupFor(dept: Dept, tier: Tier | null): BusinessRoleLookup {
+  if (!tier) {
+    return {
+      supported: false,
+      dept,
+      tier,
+      roleId: null,
+      diagnostic: `No Flex business-role tier could be inferred for ${dept}. Expected a role code suffix of -R, -E, or -T.`
+    }
+  }
+
+  let roleId: string | undefined
   switch (dept) {
     case 'sound':
-      return SOUND_BUSINESS_ROLE_IDS[tier] || null
+      roleId = SOUND_BUSINESS_ROLE_IDS[tier]
+      break
     case 'lights':
-      return LIGHTS_BUSINESS_ROLE_IDS[tier] || null
+      roleId = LIGHTS_BUSINESS_ROLE_IDS[tier]
+      break
     case 'video':
-      return VIDEO_BUSINESS_ROLE_IDS[tier] || null
+      roleId = VIDEO_BUSINESS_ROLE_IDS[tier]
+      break
     default:
-      return null
+      roleId = undefined
+  }
+
+  if (roleId) {
+    return {
+      supported: true,
+      dept,
+      tier,
+      roleId
+    }
+  }
+
+  return {
+    supported: false,
+    dept,
+    tier,
+    roleId: null,
+    diagnostic: `${dept} Flex business-role ID for tier "${tier}" is not configured. Confirm the Flex dictionary ID before business-role sync can set this field.`
   }
 }

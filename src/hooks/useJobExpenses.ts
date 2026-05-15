@@ -129,9 +129,10 @@ export const useJobExpenseMutations = () => {
 
       const { data: expense, error } = await supabase
         .from('job_expenses')
-        .insert({
-          ...data,
-          technician_id: user.id,
+	        .insert({
+	          ...data,
+	          amount_eur: data.amount_original * (data.fx_rate ?? 1),
+	          technician_id: user.id,
           status: 'draft',
           created_by: user.id,
         })
@@ -327,7 +328,7 @@ export const useJobApprovedExpenses = (jobId: string | null | undefined) => {
       const { data, error } = await query;
       if (error) throw error;
 
-      const rawExpenses = data || [];
+	      const rawExpenses = (data || []) as unknown as JobExpense[];
 
       // Group expenses by technician and category
       const expensesByTechnicianAndCategory = new Map<string, Map<string, number>>();
@@ -352,8 +353,8 @@ export const useJobApprovedExpenses = (jobId: string | null | undefined) => {
       const groupedExpenses: Array<{ technician_id: string; category_slug: string; amount_eur: number }> = [];
       expensesByTechnicianAndCategory.forEach((categoryMap, technicianId) => {
         categoryMap.forEach((amount, categorySlug) => {
-          groupedExpenses.push({
-            technician_id,
+	          groupedExpenses.push({
+	            technician_id: technicianId,
             category_slug: categorySlug || 'otros',
             amount_eur: amount,
           });

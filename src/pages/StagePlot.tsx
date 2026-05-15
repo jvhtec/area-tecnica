@@ -177,7 +177,7 @@ export default function StagePlot() {
     setIsGeneratingPDF(true);
     pendingPDFRef.current = true;
 
-    let timeoutId: ReturnType<typeof window.setTimeout> | null = null;
+    let timeoutId: number | null = null;
 
     const cleanup = () => {
       if (timeoutId) {

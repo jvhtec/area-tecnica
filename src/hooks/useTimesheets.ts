@@ -66,7 +66,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         console.warn('get_timesheets_batch error', visBatchErr);
       }
       const visibilityMap = new Map<string, TimesheetVisibilityRow>();
-      (visibilityRows || []).forEach((row: TimesheetVisibilityRow) => {
+      ((visibilityRows || []) as unknown as TimesheetVisibilityRow[]).forEach((row) => {
         visibilityMap.set(row.id, row);
       });
 

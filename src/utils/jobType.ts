@@ -25,7 +25,6 @@ export function isKnownJobType(jobType?: string | null): jobType is JobType {
   if (!jobType) return false;
   return [
     "single",
-    "multi_day",
     "tour",
     "tourdate",
     "festival",

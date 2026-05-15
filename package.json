@@ -9,6 +9,7 @@
     "build": "vite build && node scripts/inject-sw-version.mjs",
     "build:dev": "vite build --mode development && node scripts/inject-sw-version.mjs",
     "build:staging": "vite build --mode staging && node scripts/inject-sw-version.mjs",
+    "typecheck": "tsc --noEmit --pretty false -p tsconfig.app.json",
     "lint": "npm run lint:all",
     "lint:app": "eslint src tests vite.config.ts",
     "lint:functions": "eslint supabase/functions",

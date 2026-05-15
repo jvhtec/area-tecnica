@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
-import { businessRoleIdFor, inferTierFromRoleCode } from './flexBusinessRoles.ts'
+import { businessRoleLookupFor, inferTierFromRoleCode } from './flexBusinessRoles.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,9 +13,11 @@ const corsHeaders = {
 interface RequestBody {
   job_id: string;
   technician_id: string;
-  department: 'sound' | 'lights';
+  department: 'sound' | 'lights' | 'video';
   action: 'add' | 'remove';
 }
+
+type BusinessRoleDepartment = RequestBody['department'];
 
 interface InsertError {
   crew_call_id: string;
@@ -32,6 +34,11 @@ interface FlexCrewAssignment {
 
 /** Standard codeList params for Flex row-data queries */
 const FLEX_CODE_LIST = ['contact', 'business-role', 'pickup-date', 'return-date', 'notes', 'quantity', 'status'] as const;
+const BUSINESS_ROLE_DEPARTMENTS = ['sound', 'lights', 'video'] as const;
+
+function isBusinessRoleDepartment(department: string): department is BusinessRoleDepartment {
+  return BUSINESS_ROLE_DEPARTMENTS.includes(department as BusinessRoleDepartment);
+}
 
 /** Build query params for Flex row-data endpoint */
 function buildFlexRowDataParams(includeTimestamp = true): URLSearchParams {
@@ -119,7 +126,7 @@ async function discoverLineItemId(
 }
 
 /**
- * Set business role for a line item in a crew call (SOUND department only).
+ * Set business role for a line item in a crew call when the Flex dictionary ID is known.
  */
 async function setBusinessRole(
   supabase: ReturnType<typeof createClient>,
@@ -130,30 +137,50 @@ async function setBusinessRole(
   lineItemId: string,
   flexHeaders: Record<string, string>
 ): Promise<void> {
-  if (department !== 'sound' || !lineItemId) return;
+  if (!lineItemId) return;
+  if (!isBusinessRoleDepartment(department)) return;
+  const dept = department;
 
   try {
-    const { data: ja } = await supabase
+    const { data: ja, error: jaError } = await supabase
       .from('job_assignments')
-      .select('sound_role')
+      .select('sound_role, lights_role, video_role')
       .eq('job_id', jobId)
       .eq('technician_id', technicianId)
       .maybeSingle();
 
-    const role = ja?.sound_role ?? null;
-    const tier = inferTierFromRoleCode(role);
-    const roleId = businessRoleIdFor('sound', tier);
+    if (jaError) {
+      console.warn('[setBusinessRole] Failed to load technician role for business-role mapping', {
+        jobId,
+        technicianId,
+        department: dept,
+        error: jaError.message,
+      });
+      return;
+    }
 
-    if (roleId) {
+    const role = dept === 'sound'
+      ? ja?.sound_role ?? null
+      : dept === 'lights'
+        ? ja?.lights_role ?? null
+        : dept === 'video'
+          ? ja?.video_role ?? null
+          : null;
+    const tier = inferTierFromRoleCode(role);
+    const lookup = businessRoleLookupFor(dept, tier);
+
+    if (lookup.supported) {
       const rowDataUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crewCallElementId)}/row-data/`;
       const setRes = await fetch(rowDataUrl, {
         method: 'POST',
         headers: { ...flexHeaders, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lineItemId, fieldType: 'business-role', payloadValue: roleId })
+        body: JSON.stringify({ lineItemId, fieldType: 'business-role', payloadValue: lookup.roleId })
       });
       if (!setRes.ok) {
         console.warn('[setBusinessRole] Failed to set business-role', setRes.status);
       }
+    } else {
+      console.info('[setBusinessRole] Business-role not set:', lookup.diagnostic);
     }
   } catch (err) {
     console.warn('[setBusinessRole] Error setting business-role', err);
@@ -326,7 +353,7 @@ serve(async (req) => {
           .eq('id', existingAssignment!.id);
       }
 
-      // Set business-role for SOUND department (setBusinessRole guards against null lineItemId)
+      // Set business-role when the department/tier has a confirmed Flex dictionary ID.
       if (effectiveLineItemId) {
         await setBusinessRole(supabase, department, job_id, technician_id, crewCall.flex_element_id, effectiveLineItemId, flexHeaders);
       }

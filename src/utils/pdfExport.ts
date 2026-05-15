@@ -170,12 +170,14 @@ export const exportToPDF = async (
           if (table.maxMomentNm !== undefined || table.maxDeflectionMm !== undefined) {
             const need = 30; checkPageBreak(need);
             doc.setFontSize(11); doc.setTextColor(0, 0, 0);
+            const checkLabel = (value: unknown) =>
+              value === true ? 'OK' : value === false ? 'FALLA' : 'No validado';
             if (table.maxMomentNm !== undefined) {
-              doc.text(`Momento Máximo: ${Number(table.maxMomentNm).toFixed(0)} N·m (${table.okMoment ? 'OK' : 'FALLA'})`, 14, yPosition);
+              doc.text(`Momento Máximo: ${Number(table.maxMomentNm).toFixed(0)} N·m (${checkLabel(table.okMoment)})`, 14, yPosition);
               yPosition += 6;
             }
             if (table.maxDeflectionMm !== undefined) {
-              doc.text(`Deflexión Máxima: ${Number(table.maxDeflectionMm).toFixed(1)} mm (${table.okDefl ? 'OK' : 'FALLA'})`, 14, yPosition);
+              doc.text(`Deflexión Máxima: ${Number(table.maxDeflectionMm).toFixed(1)} mm (${checkLabel(table.okDefl)})`, 14, yPosition);
               yPosition += 10;
             }
           }

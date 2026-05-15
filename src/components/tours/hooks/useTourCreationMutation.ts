@@ -292,6 +292,9 @@ export const useTourCreationMutation = () => {
           .insert({
             tour_id: tour.id,
             date: dateInfo.date,
+            start_date: dateInfo.date,
+            end_date: dateInfo.date,
+            tour_date_type: "show",
             location_id: locationId,
           })
           .select(`

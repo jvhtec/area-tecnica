@@ -212,13 +212,23 @@ export const generateStagePlotPDF = async (
 
     // Apply rotation if needed
     if (item.rot && item.rot !== 0) {
-      pdfDoc.document.saveGraphicsState();
       const centerX = itemX + itemW / 2;
       const centerY = itemY + itemH / 2;
-      pdfDoc.document.translate(centerX, centerY);
-      pdfDoc.document.rotate((item.rot * Math.PI) / 180);
-      pdfDoc.document.rect(-itemW / 2, -itemH / 2, itemW, itemH, 'FD');
-      pdfDoc.document.restoreGraphicsState();
+      const radians = (item.rot * Math.PI) / 180;
+      const matrix = pdfDoc.document.Matrix(
+        Math.cos(radians),
+        Math.sin(radians),
+        -Math.sin(radians),
+        Math.cos(radians),
+        centerX,
+        centerY
+      );
+      pdfDoc.document.advancedAPI((doc) => {
+        doc.saveGraphicsState();
+        doc.setCurrentTransformationMatrix(matrix);
+        doc.rect(-itemW / 2, -itemH / 2, itemW, itemH, 'FD');
+        doc.restoreGraphicsState();
+      });
     } else {
       pdfDoc.document.rect(itemX, itemY, itemW, itemH, 'FD');
     }

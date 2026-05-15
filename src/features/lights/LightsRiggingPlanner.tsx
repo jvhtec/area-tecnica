@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FileText, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, FileText, Plus, Trash2 } from "lucide-react";
 
 import { useToast } from "@/hooks/use-toast";
 import { exportToPDF } from "@/utils/pdfExport";
@@ -169,7 +169,12 @@ const LightsRiggingPlanner: React.FC = () => {
     }));
 
     let suggestion: UITruss["suggestion"];
-    if (result.okAgainstAllowables.moment === false || result.okAgainstAllowables.deflection === false) {
+    if (!tr.allowablesVerified) {
+      suggestion = {
+        severity: "warn",
+        message: tr.validationNote ?? "Moment/deflection pass-fail is disabled because this truss model has not been validated against manufacturer data."
+      };
+    } else if (result.okAgainstAllowables.moment === false || result.okAgainstAllowables.deflection === false) {
       suggestion = {
         severity: "warn",
         message: "Truss model may be insufficient (moment/deflection). Consider upgrading model or adding supports."
@@ -283,6 +288,13 @@ const LightsRiggingPlanner: React.FC = () => {
               </Button>
             )}
           </div>
+        </div>
+
+        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>
+            Reaction estimates are available, but moment and deflection pass/fail is disabled until truss constants are validated from manufacturer datasheets.
+          </span>
         </div>
 
         {!isTourDefaults && !jobIdFromUrl && (

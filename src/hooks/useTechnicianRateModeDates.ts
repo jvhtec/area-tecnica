@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
-import { createEntityQueryOptions } from '@/lib/react-query';
 import { toast } from 'sonner';
 import { invalidateRehearsalRateQueries, recalculateTimesheets } from '@/hooks/useToggleJobRehearsalRate';
 
@@ -19,25 +18,20 @@ export function useJobTechnicianRateModeDates(
 ) {
   const { enabled = true } = options;
 
-  return useQuery(
-    createEntityQueryOptions<TechnicianRateModeRow[]>(
-      'job-technician-rate-mode-dates',
-      jobId,
-      {
-        enabled: !!jobId && enabled,
-        queryFn: async (): Promise<TechnicianRateModeRow[]> => {
-          const { data, error } = await supabase
-            .from('job_technician_rate_mode_dates')
-            .select('job_id, technician_id, date, use_rehearsal_rate, created_at, created_by, updated_at, updated_by')
-            .eq('job_id', jobId);
+  return useQuery({
+    queryKey: ['job-technician-rate-mode-dates', jobId],
+    enabled: !!jobId && enabled,
+    queryFn: async (): Promise<TechnicianRateModeRow[]> => {
+      const { data, error } = await supabase
+        .from('job_technician_rate_mode_dates')
+        .select('job_id, technician_id, date, use_rehearsal_rate, created_at, created_by, updated_at, updated_by')
+        .eq('job_id', jobId);
 
-          if (error) throw error;
-          return (data || []) as TechnicianRateModeRow[];
-        },
-        staleTime: 30_000,
-      },
-    ),
-  );
+      if (error) throw error;
+      return (data || []) as TechnicianRateModeRow[];
+    },
+    staleTime: 30_000,
+  });
 }
 
 interface SetTechnicianDateRateModeParams {

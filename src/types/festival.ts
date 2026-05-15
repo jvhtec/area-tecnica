@@ -55,6 +55,7 @@ export type ProviderType = 'festival' | 'band' | 'mixed';
 
 export interface ArtistFormData {
   readonly name: string;
+  readonly max_stages: number;
   readonly stage: number;
   readonly date: string;
   readonly show_start: string;
@@ -63,8 +64,10 @@ export interface ArtistFormData {
   readonly soundcheck_start?: string;
   readonly soundcheck_end?: string;
   foh_console: string;
+  foh_consoles: ConsoleSetup[];
   foh_console_provided_by: ProviderType;
   mon_console: string;
+  mon_consoles: ConsoleSetup[];
   mon_console_provided_by: ProviderType;
   monitors_from_foh: boolean;
   foh_waves_outboard: string;

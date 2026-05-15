@@ -34,7 +34,12 @@ export interface RfIemTablePdfData {
   artists: ArtistRfIemData[];
 }
 
-type RawArtistLike = ArtistRfIemData & {
+export type RawArtistLike = {
+  id?: string;
+  name: string;
+  stage: number;
+  wirelessSystems?: RfIemSystemData[];
+  iemSystems?: RfIemSystemData[];
   wireless_systems?: unknown;
   iem_systems?: unknown;
   wireless_provided_by?: unknown;
@@ -42,9 +47,13 @@ type RawArtistLike = ArtistRfIemData & {
   date?: unknown;
   isaftermidnight?: unknown;
   isAfterMidnight?: unknown;
+  showStart?: unknown;
   show_start?: unknown;
+  showEnd?: unknown;
   show_end?: unknown;
+  soundcheckStart?: unknown;
   soundcheck_start?: unknown;
+  soundcheckEnd?: unknown;
   soundcheck_end?: unknown;
 };
 
@@ -454,7 +463,7 @@ export const hasProviderTextToken = (value: string): boolean =>
   value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN) || value.includes(MIXED_TEXT_TOKEN);
 
 export const stripProviderTextTokens = (value: string): string =>
-  value.replaceAll(FESTIVAL_TEXT_TOKEN, '').replaceAll(BAND_TEXT_TOKEN, '').replaceAll(MIXED_TEXT_TOKEN, '');
+  value.split(FESTIVAL_TEXT_TOKEN).join('').split(BAND_TEXT_TOKEN).join('').split(MIXED_TEXT_TOKEN).join('');
 
 const getProviderTokenType = (line: string): 'festival' | 'band' | 'mixed' | 'default' => {
   if (line.includes(FESTIVAL_TEXT_TOKEN)) return 'festival';

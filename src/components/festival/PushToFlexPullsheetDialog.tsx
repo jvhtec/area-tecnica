@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PA_PRESET_ALLOWED_CATEGORIES, resolveSubsystemForEquipment } from '@/types/equipment';
+import type { EquipmentCategory, PresetSubsystem } from '@/types/equipment';
 
 interface PushToFlexPullsheetDialogProps {
   open: boolean;
@@ -37,7 +38,7 @@ type PaPresetOption = {
 type PresetEquipmentRow = {
   id: string;
   name: string;
-  category: string | null;
+  category: EquipmentCategory | null;
   resource_id: string | null;
 };
 
@@ -48,6 +49,11 @@ type PresetItemRow = {
 };
 
 const PA_PRESET_CATEGORIES = new Set(PA_PRESET_ALLOWED_CATEGORIES);
+const PRESET_SUBSYSTEMS: PresetSubsystem[] = ['mains', 'outs', 'subs', 'fronts', 'delays', 'other', 'amplification'];
+const isPaPresetCategory = (category: string | null): category is EquipmentCategory =>
+  !!category && PA_PRESET_CATEGORIES.has(category as (typeof PA_PRESET_ALLOWED_CATEGORIES)[number]);
+const normalizePresetSubsystem = (value: string | null | undefined): PresetSubsystem | null =>
+  PRESET_SUBSYSTEMS.includes(value as PresetSubsystem) ? (value as PresetSubsystem) : null;
 
 type GearSection = 'consolas' | 'rf' | 'iem' | 'wired_mics';
 
@@ -413,11 +419,12 @@ export function PushToFlexPullsheetDialog({
         const foundByResource = new Map<string, EquipmentItem>();
         const missing: string[] = [];
 
-        (data || []).forEach((row: PresetItemRow) => {
+        (data || []).forEach((rawRow) => {
+          const row = rawRow as unknown as PresetItemRow;
           const equipmentRow = Array.isArray(row.equipment) ? row.equipment[0] : row.equipment;
           if (!equipmentRow) return;
 
-          if (!equipmentRow.category || !PA_PRESET_CATEGORIES.has(equipmentRow.category)) return;
+          if (!isPaPresetCategory(equipmentRow.category)) return;
 
           const qty = Number(row.quantity) || 0;
           if (qty <= 0) return;
@@ -427,7 +434,7 @@ export function PushToFlexPullsheetDialog({
             return;
           }
 
-          const subsystem = row.subsystem ?? resolveSubsystemForEquipment(equipmentRow);
+          const subsystem = normalizePresetSubsystem(row.subsystem) ?? resolveSubsystemForEquipment(equipmentRow);
           const mergeKey = `${equipmentRow.resource_id}:${subsystem ?? ''}`;
 
           const existing = foundByResource.get(mergeKey);
@@ -481,10 +488,11 @@ export function PushToFlexPullsheetDialog({
     for (const item of items) {
       const normalizedSubsystem =
         item.subsystem ??
-        resolveSubsystemForEquipment({ category: item.category ?? null }) ??
-        item.category ??
-        '';
-      const mergeKey = `${item.resourceId}:${normalizedSubsystem}`;
+        resolveSubsystemForEquipment({ category: item.category as EquipmentCategory | null }) ??
+        // Amplification PA preset categories are valid subsystem identifiers when no explicit subsystem is stored.
+        normalizePresetSubsystem(item.category) ??
+        null;
+      const mergeKey = `${item.resourceId}:${normalizedSubsystem ?? ''}`;
       const existing = merged.get(mergeKey);
       if (existing) {
         existing.quantity += item.quantity;
@@ -492,7 +500,7 @@ export function PushToFlexPullsheetDialog({
           existing.subsystem = normalizedSubsystem;
         }
       } else {
-        merged.set(mergeKey, { ...item, subsystem: normalizedSubsystem || item.subsystem });
+        merged.set(mergeKey, { ...item, subsystem: normalizedSubsystem });
       }
     }
 

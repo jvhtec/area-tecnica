@@ -102,7 +102,7 @@ export const fetchMatrixTimesheetAssignments = async ({
     if (startIso) query = query.gte('date', startIso);
     if (endIso) query = query.lte('date', endIso);
 
-    promises.push(query);
+    promises.push(Promise.resolve(query));
   }
 
   // Leverage materialized view for staffing status/cost rollups per job
@@ -114,7 +114,7 @@ export const fetchMatrixTimesheetAssignments = async ({
 
   for (let i = 0; i < jobIds.length; i += assignmentBatchSize) {
     const jobBatch = jobIds.slice(i, i + assignmentBatchSize);
-    assignmentPromises.push(
+    assignmentPromises.push(Promise.resolve(
       supabase
         .from('job_assignments')
         // NOTE: single_day and assignment_date are deprecated after simplification migration
@@ -122,7 +122,7 @@ export const fetchMatrixTimesheetAssignments = async ({
         .select('job_id, technician_id, sound_role, lights_role, video_role, single_day, assignment_date, status, assigned_at, assigned_by')
         .in('job_id', jobBatch)
         .in('technician_id', technicianIds)
-    );
+    ));
   }
 
   const [timesheetResults, staffingResult, ...assignmentResults] = await Promise.all([

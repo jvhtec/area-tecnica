@@ -157,15 +157,16 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
         extrasElementId = extrasFolder.elementId;
 
         try {
-          await insertWithRetry(() =>
-            supabase.from("flex_folders").insert({
+          await insertWithRetry(async () => {
+            const { error } = await supabase.from("flex_folders").insert({
               job_id: jobId,
               parent_id: comercialFolder.element_id,
               element_id: extrasElementId,
               department: "sound",
               folder_type: "comercial_extras",
-            })
-          );
+            });
+            return { error };
+          });
         } catch (err) {
           console.error(`Orphaned Flex folder created with element_id: ${extrasElementId}`, err);
           toast.error(
@@ -193,15 +194,16 @@ export function useCreateExtrasPresupuesto(jobId: string | undefined) {
 
       // 7. Persist presupuesto to DB
       try {
-        await insertWithRetry(() =>
-          supabase.from("flex_folders").insert({
+        await insertWithRetry(async () => {
+          const { error } = await supabase.from("flex_folders").insert({
             job_id: jobId,
             parent_id: extrasElementId,
             element_id: presupuesto.elementId,
             department: "sound",
             folder_type: "comercial_presupuesto",
-          })
-        );
+          });
+          return { error };
+        });
       } catch (err) {
         console.error(`Orphaned Flex presupuesto created with element_id: ${presupuesto.elementId}`, err);
         toast.error(

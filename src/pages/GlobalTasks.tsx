@@ -136,7 +136,8 @@ function isOverdueMadrid(isoDate: string): boolean {
 }
 
 export default function GlobalTasks() {
-  const { userRole, userId, userDepartment } = useOptimizedAuth();
+  const { user, userRole, userDepartment } = useOptimizedAuth();
+  const userId = user?.id ?? null;
   const defaultDept = React.useMemo(() => normalizeDeptOrDefault(userDepartment), [userDepartment]);
   const isProductionDepartmentUser = defaultDept === 'production';
   const canChooseDepartment = userRole === 'oscar' || isProductionDepartmentUser;

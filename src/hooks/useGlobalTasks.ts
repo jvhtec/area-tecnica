@@ -19,6 +19,8 @@ const DOC_FK: Record<Dept, string> = {
   administrative: 'administrative_task_id',
 };
 
+const dynamicSupabase = supabase as unknown as { from: (table: string) => any };
+
 export interface GlobalTaskFilters {
   status?: 'not_started' | 'in_progress' | 'completed' | null;
   assignedTo?: string | null;
@@ -86,8 +88,8 @@ export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTas
   const query = useQuery({
     queryKey: ['global-tasks', dept, filters],
     queryFn: async () => {
-      let q = supabase
-        .from(table as any)
+      let q = dynamicSupabase
+        .from(table)
         .select(`
           *,
           assigned_to_profile:assigned_to(id, first_name, last_name),
@@ -115,7 +117,7 @@ export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTas
 
       const { data, error } = await q.order('created_at', { ascending: false });
       if (error) throw error;
-      return (data || []) as GlobalTask[];
+      return (data || []) as unknown as GlobalTask[];
     },
     refetchOnWindowFocus: true,
     refetchInterval: 30000,

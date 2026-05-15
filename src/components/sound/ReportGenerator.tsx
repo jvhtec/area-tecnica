@@ -14,6 +14,7 @@ import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { FolderOpen, Check, X, Upload } from "lucide-react";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
+import type jsPDF from "jspdf";
 
 const reportSections = [
   {

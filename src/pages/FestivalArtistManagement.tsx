@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentProps } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -61,6 +61,7 @@ const FestivalArtistManagement = () => {
     isDeletingArtist,
     invalidateArtists
   } = useArtistsQuery(jobId, selectedDate, dayStartTime);
+  const artistRows = artists as unknown as ComponentProps<typeof ArtistTable>["artists"];
   const {
     data: festivalSettings
   } = useQuery({
@@ -359,7 +360,7 @@ const FestivalArtistManagement = () => {
     console.log('Artists data before filtering:', artists);
     
     try {
-      const filteredArtists = artists.filter(artist => {
+      const filteredArtists = artistRows.filter(artist => {
         const matchesStage = !printStage || artist.stage?.toString() === printStage;
         const matchesDate = artist.date === printDate;
         return matchesStage && matchesDate;
@@ -391,8 +392,8 @@ const FestivalArtistManagement = () => {
             end: artist.soundcheck_end
           } : undefined,
           technical: {
-            fohTech: artist.foh_tech,
-            monTech: artist.mon_tech,
+            fohTech: artist.foh_tech || false,
+            monTech: artist.mon_tech || false,
             fohConsole: {
               model: artist.foh_console,
               providedBy: artist.foh_console_provided_by
@@ -405,11 +406,11 @@ const FestivalArtistManagement = () => {
             fohWavesOutboard: artist.foh_waves_outboard || "",
             monWavesOutboard: artist.mon_waves_outboard || "",
             wireless: {
-              systems: wirelessSystems,
+              systems: Array.isArray(wirelessSystems) ? wirelessSystems : [],
               providedBy: artist.wireless_provided_by
             },
             iem: {
-              systems: iemSystems,
+              systems: Array.isArray(iemSystems) ? iemSystems : [],
               providedBy: artist.iem_provided_by
             },
             monitors: {
@@ -743,7 +744,7 @@ const FestivalArtistManagement = () => {
               isShowDate(new Date(selectedDate)) ? (
                 <div className="w-full">
                   <ArtistTable 
-                    artists={artists} 
+                    artists={artistRows}
                     isLoading={artistsLoading} 
                     onEditArtist={handleEditArtist} 
                     onDeleteArtist={handleDeleteArtist} 
@@ -781,7 +782,7 @@ const FestivalArtistManagement = () => {
       )}
 
       <ArtistTablePrintDialog
-        artists={artists}
+        artists={artistRows}
         jobTitle={jobTitle}
         selectedDate={printDate}
         stageFilter={printStage}

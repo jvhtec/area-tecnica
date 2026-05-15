@@ -28,15 +28,20 @@ interface HouseTech {
 }
 
 interface Assignment {
-  id: string;
+  id?: string;
   technician_id: string;
-  job_id: string;
+  job_id?: string;
   assignment_date?: string;
   single_day?: boolean;
   dates?: string[];
+  job?: {
+    id?: string;
+    title: string;
+    color?: string | null;
+  };
   jobs?: {
     title: string;
-    color?: string;
+    color?: string | null;
   };
 }
 

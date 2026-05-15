@@ -13,7 +13,7 @@ import { ExtraRequirementsSection } from "./form/sections/ExtraRequirementsSecti
 import { InfrastructureSection } from "./form/sections/InfrastructureSection";
 import { NotesSection } from "./form/sections/NotesSection";
 import { MicKitSection } from "./form/sections/MicKitSection";
-import { FestivalGearSetup } from "@/types/festival";
+import { ConsoleSetup, FestivalGearSetup } from "@/types/festival";
 import { ArtistSectionProps } from "@/types/artist-form";
 import { Download, Eye, FileText, Loader2, Printer, Trash2 } from "lucide-react";
 import { normalizeWirelessSystem, normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
@@ -90,6 +90,26 @@ const asArray = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T
 const hasText = (value: unknown) => asString(value).trim().length > 0;
 const hasPositiveNumber = (value: unknown) => asNumber(value) > 0;
 
+const asFiniteNumber = (value: unknown) => {
+  const numeric = typeof value === "number" ? value : typeof value === "string" ? Number(value) : 0;
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const normalizeConsoleSetups = (value: unknown): ConsoleSetup[] =>
+  asArray<Record<string, unknown>>(value)
+    .map((consoleSetup) => ({
+      model: asString(consoleSetup.model),
+      quantity: asFiniteNumber(consoleSetup.quantity),
+      notes: asString(consoleSetup.notes) || undefined,
+    }))
+    .filter((consoleSetup) =>
+      consoleSetup.model.trim().length > 0 ||
+      consoleSetup.quantity > 0 ||
+      Boolean(consoleSetup.notes?.trim())
+    );
+
+const hasConsoleSetups = (value: unknown) => normalizeConsoleSetups(value).length > 0;
+
 const normalizeFestivalLogoPath = (filePath: string) => {
   let normalized = filePath.trim();
   if (!normalized) return "";
@@ -103,6 +123,7 @@ const normalizeFestivalLogoPath = (filePath: string) => {
 
 const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistFormState => ({
   name: "",
+  max_stages: 1,
   stage: 1,
   date: blankDate,
   show_start: "",
@@ -111,9 +132,11 @@ const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistFormStat
   soundcheck_start: "",
   soundcheck_end: "",
   foh_console: "",
+  foh_consoles: [],
   foh_console_provided_by: "festival",
   foh_tech: false,
   mon_console: "",
+  mon_consoles: [],
   mon_console_provided_by: "festival",
   monitors_from_foh: false,
   foh_waves_outboard: "",
@@ -231,10 +254,11 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
         if (cancelled) return;
         if (gearData) {
+          const normalizedGearData = gearData as unknown as FestivalGearSetup;
           setGearSetup({
-            ...(gearData as FestivalGearSetup),
-            wireless_systems: normalizeWirelessSystems((gearData as FestivalGearSetup).wireless_systems, "wireless"),
-            iem_systems: normalizeWirelessSystems((gearData as FestivalGearSetup).iem_systems, "iem"),
+            ...normalizedGearData,
+            wireless_systems: normalizeWirelessSystems(normalizedGearData.wireless_systems, "wireless"),
+            iem_systems: normalizeWirelessSystems(normalizedGearData.iem_systems, "iem"),
           });
         }
 
@@ -352,12 +376,14 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         nextLockedFields.add("foh_console");
         nextLockedFields.add("foh_console_provided_by");
       }
+      if (hasConsoleSetups(artistData.foh_consoles)) nextLockedFields.add("foh_consoles");
       if (hasText(artistData.foh_waves_outboard)) nextLockedFields.add("foh_waves_outboard");
       if (asBoolean(artistData.foh_tech)) nextLockedFields.add("foh_tech");
       if (hasText(artistData.mon_console)) {
         nextLockedFields.add("mon_console");
         nextLockedFields.add("mon_console_provided_by");
       }
+      if (hasConsoleSetups(artistData.mon_consoles)) nextLockedFields.add("mon_consoles");
       if (asBoolean(artistData.monitors_from_foh)) nextLockedFields.add("monitors_from_foh");
       if (hasText(artistData.mon_waves_outboard)) nextLockedFields.add("mon_waves_outboard");
       if (asBoolean(artistData.mon_tech)) nextLockedFields.add("mon_tech");
@@ -414,8 +440,12 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
       setLockedFields(nextLockedFields);
 
+      const fohConsoles = normalizeConsoleSetups(artistData.foh_consoles);
+      const monConsoles = normalizeConsoleSetups(artistData.mon_consoles);
+
       setFormData((prev) => ({
         ...prev,
+        max_stages: asNumber(artistData.max_stages) || prev.max_stages || 1,
         name: asString(artistData.name),
         stage: asNumber(artistData.stage) || 1,
         date: asString(artistData.date),
@@ -425,10 +455,12 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         soundcheck_start: normalizeTime(asString(artistData.soundcheck_start)),
         soundcheck_end: normalizeTime(asString(artistData.soundcheck_end)),
         foh_console: asString(artistData.foh_console),
+        foh_consoles: fohConsoles.length > 0 ? fohConsoles : prev.foh_consoles,
         foh_console_provided_by: asString(artistData.foh_console_provided_by) || "festival",
         foh_tech: asBoolean(artistData.foh_tech),
         foh_waves_outboard: asString(artistData.foh_waves_outboard),
         mon_console: asString(artistData.mon_console),
+        mon_consoles: monConsoles.length > 0 ? monConsoles : prev.mon_consoles,
         mon_console_provided_by: asString(artistData.mon_console_provided_by) || "festival",
         monitors_from_foh: asBoolean(artistData.monitors_from_foh),
         mon_waves_outboard: asString(artistData.mon_waves_outboard),

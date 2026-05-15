@@ -353,6 +353,7 @@ export function usePayoutActions({
                 extras_breakdown: { items: a.quote.extras?.items ?? [], total_eur: extrasTotal },
                 expenses_total_eur: expensesTotal,
                 expenses_breakdown: expensesBreakdown,
+                vehicle_disclaimer: techPayout?.vehicle_disclaimer ?? false,
               },
               deduction_eur: a.deduction_eur,
               pdfBase64: a.pdfBase64,

@@ -205,7 +205,7 @@ export const ArtistTable = ({
           return;
         }
 
-        setFestivalGearSetup(mainSetup);
+        setFestivalGearSetup(mainSetup as unknown as FestivalGearSetup);
 
         // Fetch stage-specific setups if main setup exists
         if (mainSetup) {
@@ -219,7 +219,7 @@ export const ArtistTable = ({
           } else {
             const stageSetupsMap: Record<number, StageGearSetup> = {};
             stageSetups?.forEach(setup => {
-              stageSetupsMap[setup.stage_number] = setup;
+              stageSetupsMap[setup.stage_number] = setup as unknown as StageGearSetup;
             });
             setStageGearSetups(stageSetupsMap);
           }

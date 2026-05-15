@@ -1,7 +1,7 @@
 import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
-import { createEntityQueryOptions, optimizedInvalidation } from '@/lib/react-query';
+import { optimizedInvalidation } from '@/lib/react-query';
 import { toast } from 'sonner';
 
 type RehearsalDateRow = Tables<'job_rehearsal_dates'>;
@@ -16,24 +16,19 @@ interface UseJobRehearsalDatesOptions {
 export function useJobRehearsalDates(jobId: string, options: UseJobRehearsalDatesOptions = {}) {
   const { enabled = true } = options;
 
-  return useQuery(
-    createEntityQueryOptions<RehearsalDateRow[]>(
-      'job-rehearsal-dates',
-      jobId,
-      {
-        enabled: !!jobId && enabled,
-        queryFn: async (): Promise<RehearsalDateRow[]> => {
-          const { data, error } = await supabase
-            .from('job_rehearsal_dates')
-            .select('id, job_id, date')
-            .eq('job_id', jobId);
-          if (error) throw error;
-          return (data || []) as RehearsalDateRow[];
-        },
-        staleTime: 30_000,
-      }
-    )
-  );
+  return useQuery({
+    queryKey: ['job-rehearsal-dates', jobId],
+    enabled: !!jobId && enabled,
+    queryFn: async (): Promise<RehearsalDateRow[]> => {
+      const { data, error } = await supabase
+        .from('job_rehearsal_dates')
+        .select('id, job_id, date')
+        .eq('job_id', jobId);
+      if (error) throw error;
+      return (data || []) as RehearsalDateRow[];
+    },
+    staleTime: 30_000,
+  });
 }
 
 interface ToggleDateRehearsalParams {

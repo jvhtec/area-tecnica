@@ -2,7 +2,7 @@
 import { useParams } from 'react-router-dom';
 import { useFestival } from '@/hooks/useFestival';
 import { TimeoutLoader } from '@/components/ui/timeout-loader';
-import { FestivalManagement } from './FestivalManagement';
+import { FestivalManagement } from '@/components/festival/FestivalManagement';
 import { useEffect } from 'react';
 import { ensureRealtimeConnection } from '@/lib/supabase';
 import { toast } from 'sonner';

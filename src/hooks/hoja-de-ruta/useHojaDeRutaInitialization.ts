@@ -17,6 +17,13 @@ export const useHojaDeRutaInitialization = (
 ) => {
   const { toast } = useToast();
 
+  const buildClientContacts = (jobData: { client_name?: string | null; client_phone?: string | null }) =>
+    jobData.client_name ? [{
+      name: jobData.client_name,
+      role: "Cliente",
+      phone: jobData.client_phone || ""
+    }] : [{ name: "", role: "", phone: "" }];
+
   // Fetch power requirements for a job
   const fetchPowerRequirements = useCallback(async (jobId: string): Promise<string> => {
     if (!jobId) return "";
@@ -161,11 +168,7 @@ export const useHojaDeRutaInitialization = (
             ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
             : undefined,
         },
-        contacts: jobData.client_name ? [{
-          name: jobData.client_name,
-          role: "Cliente",
-          phone: jobData.client_phone || ""
-        }] : [{ name: "", role: "", phone: "" }],
+        contacts: buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
         logistics: {
           transport: [],
           loadingDetails: "",
@@ -342,11 +345,7 @@ export const useHojaDeRutaInitialization = (
           },
           contacts: savedEventData?.contacts?.length > 0 
             ? savedEventData.contacts
-            : jobData.client_name ? [{
-                name: jobData.client_name,
-                role: "Cliente",
-                phone: jobData.client_phone || ""
-              }] : [{ name: "", role: "", phone: "" }],
+            : buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
           logistics: savedEventData?.logistics || {
             transport: [],
             loadingDetails: "",
@@ -403,11 +402,7 @@ export const useHojaDeRutaInitialization = (
               ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
               : undefined,
           },
-          contacts: jobData.client_name ? [{
-            name: jobData.client_name,
-            role: "Cliente",
-            phone: jobData.client_phone || ""
-          }] : [{ name: "", role: "", phone: "" }],
+          contacts: buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
           logistics: {
             transport: [],
             loadingDetails: "",

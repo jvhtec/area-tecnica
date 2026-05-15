@@ -8,7 +8,7 @@ export interface JobDocument {
   template_type?: string | null;
 }
 
-export type JobType = "single" | "multi_day" | "tour" | "tourdate" | "festival" | "ciclo" | "dryhire" | "evento";
+export type JobType = "single" | "tour" | "tourdate" | "festival" | "ciclo" | "dryhire" | "evento";
 
 export type InvoicingCompany = "Production Sector" | "Sharecable" | "MFO";
 
@@ -26,6 +26,7 @@ export interface TechnicianProfile {
   first_name?: string;
   last_name?: string;
   email?: string;
+  profile_picture_url?: string | null;
 }
 
 export interface StaffAssignment {

@@ -41,6 +41,7 @@ import {
   splitTokenizedSegments,
   stripProviderTextTokens,
   type ArtistRfIemData,
+  type RawArtistLike,
 } from "@/utils/rfIemTablePdfExport";
 import { Theme } from "./types";
 
@@ -521,7 +522,7 @@ export function TechnicianRfTableModal({
   // --- Normalization & filtering ---
 
   const normalizedArtists = useMemo(
-    () => rawArtists.map((a) => normalizeRfIemArtistInput(a)).filter(hasRfIemContent),
+    () => rawArtists.map((a) => normalizeRfIemArtistInput(a as RawArtistLike)).filter(hasRfIemContent),
     [rawArtists]
   );
 

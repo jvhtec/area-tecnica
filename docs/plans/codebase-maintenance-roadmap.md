@@ -31,6 +31,9 @@ This roadmap turns the current maintenance audit into concrete, sequenced backlo
 - 2026-05-13: P2-04 completed for active app code by adding shared permission role groups, predicates, and `usePermissions`; replacing scattered admin/management checks across routes, pages, hooks, layout, jobs, matrix, tours, SoundVision, timesheets, and legacy wrappers; and adding focused permission tests. The remaining `admin`/`management` scan hits are central helpers plus test fixtures.
 - 2026-05-15: P6-03 completed for `src` and `supabase` by removing unused placeholder code, replacing open source TODO/FIXME/HACK notes with roadmap task references, and cleaning scan false positives. `rg -n "TODO|FIXME|HACK|XXX" src supabase` now returns no matches.
 - 2026-05-15: P0-01 completed by regenerating `src/integrations/supabase/types.ts` from linked project `syldobdcdsgfgjtbuwxm` with `npx supabase gen types typescript --linked --schema public`. The generated schema now includes the tracked drift examples: `resource_id`, `dryhire_parent_folders`, `get_public_artist_form_context`, `clear_whatsapp_group_request`, `rank_staffing_candidates`, `replace_hoja_de_ruta_all`, custom travel-rate columns, and invoicing-company fields. Follow-up local type fixes removed the obsolete Hoja de Ruta RPC cast and aligned stock/tour-rate call sites with the regenerated fields. `npx tsc --noEmit --pretty false -p tsconfig.app.json` still fails with 277 remaining diagnostics; none reference the P0-01 missing schema/RPC/column examples.
+- 2026-05-16: P0-02 completed by clearing the app no-emit TypeScript baseline and adding `npm run typecheck` as `tsc --noEmit --pretty false -p tsconfig.app.json`.
+- 2026-05-16: P0-03 completed through explicit safety disablement rather than unverified manufacturer substitution. `src/data/trussModels.ts` documents the unverified legacy constants, truss models default to `allowablesVerified: false`, `solveTrussWithTilt` suppresses moment/deflection pass-fail unless a model is explicitly verified, and rigging PDFs render unverified checks as `No validado` instead of `OK` or `FALLA`.
+- 2026-05-16: P0-04 completed for the unsupported-state path. Flex business-role mappings now expose structured lookup diagnostics, sound keeps confirmed dictionary IDs, lights/video remain unsupported until IDs are confirmed, and `sync-flex-crew-for-job` returns `business_role_diagnostics` instead of silently omitting missing roles.
 
 ## Phase 0: Safety and Type Baseline
 
@@ -108,6 +111,7 @@ This roadmap turns the current maintenance audit into concrete, sequenced backlo
 - Prefer small PRs that reduce one metric or one monolith at a time.
 - Do not combine cleanup with behavior changes unless the behavior change is required to make the cleanup safe.
 - For broad/shared UI or data changes, run:
+  - `npm run typecheck`
   - `npm run lint`
   - `npm run test:run`
   - `npm run build`
@@ -115,4 +119,4 @@ This roadmap turns the current maintenance audit into concrete, sequenced backlo
   - `npm run lint:functions`
 - For mobile runtime changes, also run:
   - `npm run cap:sync`
-- Once Phase 0 makes type checking clean, add `npm run typecheck` to the standard local and CI validation path.
+- Type checking is part of the standard local and CI validation path as of P0-02.
