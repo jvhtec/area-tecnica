@@ -47,6 +47,20 @@ export function StockManagement() {
         <div className="space-y-4">
           {equipmentWithStock?.map((item) => {
             const currentQuantity = item.current_quantity || 0;
+            const equipment: Equipment | null =
+              item.equipment_id && item.equipment_name && item.category && item.department
+                ? {
+                    id: item.equipment_id,
+                    name: item.equipment_name,
+                    category: item.category,
+                    department: item.department,
+                    image_id: null,
+                    manufacturer: null,
+                    resource_id: null,
+                    created_at: null,
+                    updated_at: null,
+                  }
+                : null;
 
             return (
               <div key={item.equipment_id} className="flex items-center justify-between">
@@ -64,29 +78,16 @@ export function StockManagement() {
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => handleAddStock({
-                        id: item.equipment_id,
-                        name: item.equipment_name,
-                        category: item.category,
-                        department: item.department,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                      })}
+                      onClick={() => equipment && handleAddStock(equipment)}
+                      disabled={!equipment}
                     >
                       <Plus className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => handleRemoveStock({
-                        id: item.equipment_id,
-                        name: item.equipment_name,
-                        category: item.category,
-                        department: item.department,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString()
-                      })}
-                      disabled={currentQuantity <= 0}
+                      onClick={() => equipment && handleRemoveStock(equipment)}
+                      disabled={!equipment || currentQuantity <= 0}
                     >
                       <Minus className="h-4 w-4" />
                     </Button>

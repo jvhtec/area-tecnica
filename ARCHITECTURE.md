@@ -181,7 +181,7 @@ area-tecnica/
 │   ├── integrations/                 # External service clients
 │   │   └── supabase/
 │   │       ├── client.ts             # Supabase client instance
-│   │       └── types.ts             # Auto-generated DB types (8,999 lines)
+│   │       └── types.ts             # Auto-generated DB types (11,143 lines)
 │   │
 │   ├── legacy/                       # Deprecated code (migration in progress)
 │   │

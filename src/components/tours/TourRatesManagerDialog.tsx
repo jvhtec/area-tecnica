@@ -135,18 +135,25 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   const [isSendingEmails, setIsSendingEmails] = useState(false);
   const [sendingByTech, setSendingByTech] = useState<Record<string, boolean>>({});
 
+  type HouseRateRow = {
+    profile_id: string;
+    base_day_eur: number;
+    travel_half_day_eur: number | null;
+    travel_full_day_eur: number | null;
+  };
+
   // House rates in bulk (to show current values when fixing)
   const { data: houseRates = [] } = useQuery({
     queryKey: ['house-tech-rates-bulk', quotes.map(q => q.technician_id)],
     queryFn: async () => {
-      if (!quotes.length) return [] as Array<{ profile_id: string; base_day_eur: number }>;
+      if (!quotes.length) return [] as HouseRateRow[];
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
       const { data, error } = await supabase
         .from('custom_tech_rates')
         .select('profile_id, base_day_eur, travel_half_day_eur, travel_full_day_eur')
         .in('profile_id', techIds);
       if (error) throw error;
-      return data as Array<{ profile_id: string; base_day_eur: number; travel_half_day_eur: number | null; travel_full_day_eur: number | null }>;
+      return data as HouseRateRow[];
     },
     enabled: open && !!quotes.length,
   });

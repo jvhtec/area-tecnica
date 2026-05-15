@@ -1,6 +1,5 @@
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
 import type {
   EventData,
   TravelArrangement,
@@ -443,16 +442,12 @@ export const useHojaDeRutaPersistence = (
         staffCount: staffRows.length,
       });
 
-      const { error: replaceAllError } = await supabase.rpc(
-        // Roadmap P0-01 removes this cast once generated Supabase types include replace_hoja_de_ruta_all.
-        'replace_hoja_de_ruta_all' as unknown as keyof Database['public']['Functions'],
-        {
-          p_hoja_de_ruta_id: hojaDeRutaId,
-          p_transport_rows: transportRows,
-          p_contact_rows: contactsRows,
-          p_staff_rows: staffRows,
-        }
-      );
+      const { error: replaceAllError } = await supabase.rpc('replace_hoja_de_ruta_all', {
+        p_hoja_de_ruta_id: hojaDeRutaId,
+        p_transport_rows: transportRows,
+        p_contact_rows: contactsRows,
+        p_staff_rows: staffRows,
+      });
 
       if (replaceAllError) {
         console.error('❌ SAVE: Error replacing transport/contacts/staff via RPC:', replaceAllError);
