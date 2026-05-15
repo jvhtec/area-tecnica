@@ -91,7 +91,8 @@ export function usePendingTasks(userId: string | null, userRole: string | null, 
       // Group tasks by job/tour
       const grouped = new Map<string, GroupedPendingTask>();
 
-      (data || []).forEach((task: PendingTask) => {
+      const tasks = (data || []) as unknown as PendingTask[];
+      tasks.forEach((task) => {
         const isJob = !!task.job_id;
         const isTour = !!task.tour_id;
         const isGlobal = !isJob && !isTour;

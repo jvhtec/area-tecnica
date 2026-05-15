@@ -125,7 +125,7 @@ export function TechnicianArtistReadOnlyModal({
         .order("date", { ascending: true });
 
       if (error) throw error;
-      return ((data || []) as ReadOnlyArtist[]).sort((left, right) => {
+      return ((data || []) as unknown as ReadOnlyArtist[]).sort((left, right) => {
         const leftDate = String(left.date || "");
         const rightDate = String(right.date || "");
         if (leftDate !== rightDate) return leftDate.localeCompare(rightDate);
@@ -486,6 +486,8 @@ export function TechnicianArtistReadOnlyModal({
                     deletingArtistId={null}
                     uploadingStagePlotArtistId={null}
                     deletingStagePlotArtistId={null}
+                    onCreateFlexExtras={NOOP}
+                    isCreatingExtrasFor={() => false}
                     mode="readonly"
                     riderFilesByArtistId={riderFilesByArtistId}
                     onDownloadRiderFile={handleDownloadRiderFile}

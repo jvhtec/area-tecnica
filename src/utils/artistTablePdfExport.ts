@@ -1,5 +1,6 @@
 import { GearMismatch, EquipmentNeeds } from './gearComparisonService';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import type jsPDF from 'jspdf';
 
 // Local interfaces for internal PDF generation use
 interface WirelessSystemDetail {
@@ -300,7 +301,7 @@ const hasProviderTextToken = (value: string): boolean =>
   value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN);
 
 const stripProviderTextTokens = (value: string): string =>
-  value.replaceAll(FESTIVAL_TEXT_TOKEN, '').replaceAll(BAND_TEXT_TOKEN, '');
+  value.replace(FESTIVAL_TEXT_TOKEN, '').replace(BAND_TEXT_TOKEN, '');
 
 const getProviderTokenType = (line: string): 'festival' | 'band' | 'default' => {
   if (line.includes(FESTIVAL_TEXT_TOKEN)) return 'festival';

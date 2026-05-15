@@ -6,6 +6,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { createQueryKey } from "@/lib/optimized-react-query";
 
+type DynamicSupabaseClient = { from: (table: string) => any };
+const dynamicSupabase = supabase as unknown as DynamicSupabaseClient;
+
 export interface MyTour {
   id: string;
   name: string;
@@ -59,7 +62,7 @@ export const useMyTours = () => {
 
       // 2) Tours where the technician has at least one active timesheet entry in the tour
       // (timesheets are the canonical source of which days a tech actually works).
-      const { data: timeRows, error: timeError } = await supabase
+      const { data: timeRows, error: timeError } = await dynamicSupabase
         .from('timesheets')
         .select(`
           job_id,

@@ -215,8 +215,8 @@ export const generateStagePlotPDF = async (
       pdfDoc.document.saveGraphicsState();
       const centerX = itemX + itemW / 2;
       const centerY = itemY + itemH / 2;
-      pdfDoc.document.translate(centerX, centerY);
-      pdfDoc.document.rotate((item.rot * Math.PI) / 180);
+      (pdfDoc.document as any).translate(centerX, centerY);
+      (pdfDoc.document as any).rotate((item.rot * Math.PI) / 180);
       pdfDoc.document.rect(-itemW / 2, -itemH / 2, itemW, itemH, 'FD');
       pdfDoc.document.restoreGraphicsState();
     } else {

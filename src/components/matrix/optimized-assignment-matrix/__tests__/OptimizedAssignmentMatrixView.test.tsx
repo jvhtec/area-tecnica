@@ -148,6 +148,7 @@ const createMockProps = (overrides?: Partial<OptimizedAssignmentMatrixViewProps>
   isGlobalCellSelected: () => false,
   techMedalRankings: new Map(),
   techLastYearMedalRankings: new Map(),
+  profileNamesMap: new Map(),
   ...overrides,
 });
 

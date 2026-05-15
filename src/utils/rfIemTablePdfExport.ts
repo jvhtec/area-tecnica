@@ -454,7 +454,7 @@ export const hasProviderTextToken = (value: string): boolean =>
   value.includes(FESTIVAL_TEXT_TOKEN) || value.includes(BAND_TEXT_TOKEN) || value.includes(MIXED_TEXT_TOKEN);
 
 export const stripProviderTextTokens = (value: string): string =>
-  value.replaceAll(FESTIVAL_TEXT_TOKEN, '').replaceAll(BAND_TEXT_TOKEN, '').replaceAll(MIXED_TEXT_TOKEN, '');
+  value.replace(FESTIVAL_TEXT_TOKEN, '').replace(BAND_TEXT_TOKEN, '').replace(MIXED_TEXT_TOKEN, '');
 
 const getProviderTokenType = (line: string): 'festival' | 'band' | 'mixed' | 'default' => {
   if (line.includes(FESTIVAL_TEXT_TOKEN)) return 'festival';

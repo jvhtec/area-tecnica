@@ -350,7 +350,7 @@ describe('OptimizedAssignmentMatrix', () => {
 
     render(
       <OptimizedAssignmentMatrix
-        technicians={[...mockTechnicians, { id: 'tech-3', first_name: 'Bob', last_name: 'Johnson', department: 'sound', role: 'technician' }]}
+        technicians={[...mockTechnicians, { id: 'tech-3', first_name: 'Bob', last_name: 'Johnson', email: 'bob@example.com', department: 'sound', role: 'technician' }]}
         dates={mockDates}
         jobs={mockJobs}
       />

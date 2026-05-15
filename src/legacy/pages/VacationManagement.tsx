@@ -3,8 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '@/lib/supabase';
-import { getPendingVacationRequests, approveVacationRequests, rejectVacationRequests } from '../../supabase-server/src/api/vacation-requests';
+import { vacationRequestsApi } from '@/lib/vacation-requests';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 
@@ -27,16 +26,16 @@ const VacationManagement = () => {
 
   const fetchRequests = async () => {
     setIsLoading(true);
-    const { data, error } = await getPendingVacationRequests(supabase);
-    if (error) {
+    try {
+      const data = await vacationRequestsApi.getPendingRequests();
+      setPendingRequests(data as VacationRequest[]);
+    } catch (error) {
       toast({
         title: "Error fetching requests",
-        description: error.message || "Failed to load vacation requests.",
+        description: error instanceof Error ? error.message : "Failed to load vacation requests.",
         variant: "destructive",
       });
       setPendingRequests([]);
-    } else {
-      setPendingRequests(data as VacationRequest[]);
     }
     setIsLoading(false);
   };
@@ -69,20 +68,20 @@ const VacationManagement = () => {
       return;
     }
 
-    const { error } = await approveVacationRequests(supabase, selectedRequests);
-    if (error) {
-      toast({
-        title: "Approval failed",
-        description: error.message || "Failed to approve selected requests.",
-        variant: "destructive",
-      });
-    } else {
+    try {
+      await vacationRequestsApi.approveRequests(selectedRequests);
       toast({
         title: "Requests approved!",
         description: `${selectedRequests.length} vacation requests have been approved.`,
       });
       setSelectedRequests([]);
       fetchRequests(); // Refresh the list
+    } catch (error) {
+      toast({
+        title: "Approval failed",
+        description: error instanceof Error ? error.message : "Failed to approve selected requests.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -96,20 +95,20 @@ const VacationManagement = () => {
       return;
     }
 
-    const { error } = await rejectVacationRequests(supabase, selectedRequests);
-    if (error) {
-      toast({
-        title: "Rejection failed",
-        description: error.message || "Failed to reject selected requests.",
-        variant: "destructive",
-      });
-    } else {
+    try {
+      await vacationRequestsApi.rejectRequests(selectedRequests);
       toast({
         title: "Requests rejected!",
         description: `${selectedRequests.length} vacation requests have been rejected.`,
       });
       setSelectedRequests([]);
       fetchRequests(); // Refresh the list
+    } catch (error) {
+      toast({
+        title: "Rejection failed",
+        description: error instanceof Error ? error.message : "Failed to reject selected requests.",
+        variant: "destructive",
+      });
     }
   };
 

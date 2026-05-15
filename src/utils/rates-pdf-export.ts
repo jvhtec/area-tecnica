@@ -11,6 +11,7 @@ import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUti
 import { appendAutonomoLabel } from '@/utils/autonomo';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
+import type jsPDF from 'jspdf';
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
 // Fixed travel rate for house techs and assignable management users

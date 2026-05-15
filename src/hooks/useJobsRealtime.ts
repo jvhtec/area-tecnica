@@ -106,7 +106,7 @@ export function useJobsRealtime() {
             throw timesheetError;
           }
           if (timesheetRows) {
-            allTimesheetRows.push(...(timesheetRows as TimesheetRowWithTechnician[]));
+            allTimesheetRows.push(...(timesheetRows as unknown as TimesheetRowWithTechnician[]));
           }
         }
 

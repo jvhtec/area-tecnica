@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { EventData, TravelArrangement, Accommodation } from "@/types/hoja-de-ruta";
+import { EventData, TravelArrangement, Accommodation, Transport } from "@/types/hoja-de-ruta";
 import { useJobSelection } from "@/hooks/useJobSelection";
 import { useToast } from "@/hooks/use-toast";
 import { useHojaDeRutaPersistence } from "./useHojaDeRutaPersistence";

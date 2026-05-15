@@ -44,6 +44,12 @@ const noopSnapshot: SubscriptionSnapshot = {
   subscriptionCount: 0,
   subscriptionsByTable: {},
   lastRefreshTime: 0,
+  activeConnections: 0,
+  queuedSubscriptions: 0,
+  failedConnections: 0,
+  averageResponseTime: 0,
+  circuitBreakerOpen: false,
+  lastHealthCheck: 0,
 };
 
 const noopManager = {
@@ -51,7 +57,11 @@ const noopManager = {
   getSnapshot: () => noopSnapshot,
   reestablishSubscriptions: () => false,
   forceRefreshSubscriptions: () => {},
-  subscribeToTable: () => ({ unsubscribe: () => {} }),
+  subscribeToTable: (table = "noop", queryKey: string | string[] = []) => ({
+    key: "noop",
+    unsubscribe: () => {},
+    options: { table, queryKey, priority: "low" as const },
+  }),
   markRefreshed: () => {},
 } satisfies SubscriptionContextInternal["manager"];
 
@@ -66,7 +76,7 @@ const SubscriptionContext = createContext<SubscriptionContextInternal>({
 export const useSubscriptionContext = (): SubscriptionContextType => {
   const ctx = useContext(SubscriptionContext);
 
-  const snapshot = useSyncExternalStore(
+  const snapshot: SubscriptionSnapshot = useSyncExternalStore(
     ctx.manager.subscribe.bind(ctx.manager),
     ctx.manager.getSnapshot.bind(ctx.manager),
     ctx.manager.getSnapshot.bind(ctx.manager),

@@ -54,7 +54,8 @@ export const applyOptimisticUpdate = <T>(
 // Optimized helper for invalidating related entities
 export const invalidateRelatedQueries = (entities: string[]) => {
   entities.forEach(entity => {
-    const key = createQueryKey[entity as keyof typeof createQueryKey]?.all || [entity];
+    const keyGenerator = createQueryKey[entity as keyof typeof createQueryKey];
+    const key = keyGenerator && 'all' in keyGenerator ? keyGenerator.all : [entity];
     queryClient.invalidateQueries({ queryKey: key });
   });
 };

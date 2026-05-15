@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { businessRoleIdFor, inferTierFromRoleCode } from "./flexBusinessRoles.ts";
+import { businessRoleLookupFor, inferTierFromRoleCode } from "./flexBusinessRoles.ts";
 
 type Dept = "sound" | "lights" | "video";
 
@@ -79,22 +79,34 @@ serve(async (req: Request) => {
       "Accept": "*/*"
     };
 
+    type BusinessRoleSetResult =
+      | { status: "set" }
+      | { status: "skipped"; diagnostic: string }
+      | { status: "failed"; diagnostic: string };
+
     async function setBusinessRoleIfNeeded(
       args: { dept: Dept; crew_call_flex_id: string; lineItemId: string; role: string | null },
       headers: Record<string, string>
-    ): Promise<boolean> {
+    ): Promise<BusinessRoleSetResult> {
       const { dept, crew_call_flex_id, lineItemId, role } = args;
       // Determine tier from our role code suffix (e.g., -R/-E/-T)
       const tier = inferTierFromRoleCode(role);
-      const roleId = businessRoleIdFor(dept, tier);
-      if (!roleId) return false;
+      const lookup = businessRoleLookupFor(dept, tier);
+      if (!lookup.supported) {
+        return {
+          status: "skipped",
+          diagnostic: `tech role "${role ?? "none"}": ${lookup.diagnostic}`
+        };
+      }
       const rowDataUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/line-item/${encodeURIComponent(crew_call_flex_id)}/row-data/`;
       const res = await fetch(rowDataUrl, {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/json" },
-        body: JSON.stringify({ lineItemId, fieldType: "business-role", payloadValue: roleId })
+        body: JSON.stringify({ lineItemId, fieldType: "business-role", payloadValue: lookup.roleId })
       });
-      return res.ok;
+      return res.ok
+        ? { status: "set" }
+        : { status: "failed", diagnostic: `Flex rejected business-role update for ${dept}/${tier}: HTTP ${res.status}` };
     }
 
     for (const dept of depts) {
@@ -185,6 +197,7 @@ serve(async (req: Request) => {
       let kept = 0;
       let failedAdds = 0;
       let rolesSet = 0;
+      const businessRoleDiagnostics: string[] = [];
       const errors: string[] = [];
 
       // Adds
@@ -230,9 +243,16 @@ serve(async (req: Request) => {
 
         // Apply business-role if mappable (SOUND supported; LIGHTS/VIDEO when IDs provided)
         try {
-          const ok = await setBusinessRoleIfNeeded({ dept, crew_call_flex_id: flex_crew_call_id, lineItemId, role: (add as any).role ?? null }, flexHeaders);
-          if (ok) rolesSet += 1;
-        } catch (_) { /* ignore */ }
+          const roleResult = await setBusinessRoleIfNeeded({ dept, crew_call_flex_id: flex_crew_call_id, lineItemId, role: (add as any).role ?? null }, flexHeaders);
+          if (roleResult.status === "set") {
+            rolesSet += 1;
+          } else {
+            businessRoleDiagnostics.push(`tech ${add.technician_id}: ${roleResult.diagnostic}`);
+          }
+        } catch (err) {
+          const message = err && (err as any).message ? (err as any).message : String(err);
+          businessRoleDiagnostics.push(`tech ${add.technician_id}: unexpected business-role error: ${message}`);
+        }
       }
 
       // Known removals (DB rows)
@@ -415,6 +435,7 @@ serve(async (req: Request) => {
         current_count: freshCurrentRows.length,
         scanned_items,
         planned_delete_count,
+        business_role_diagnostics: businessRoleDiagnostics.length ? businessRoleDiagnostics : undefined,
         errors: errors.length ? errors : undefined
       };
     }

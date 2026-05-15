@@ -304,7 +304,7 @@ export const TourDefaultsManager = ({
         const { tables, safetyMargin } = buildNormalizedTourPowerTables({
           department: department as 'sound' | 'lights' | 'video',
           defaultTables: relevantDefaults.filter(isNewFormatTable),
-          legacyDefaults: relevantDefaults.filter(isLegacyPowerDefault),
+          legacyDefaults: relevantDefaults.filter(isLegacyPowerDefault) as any,
         });
 
         const powerSummary = {
@@ -359,60 +359,53 @@ export const TourDefaultsManager = ({
       const tables = sortedDefaults.map(defaultItem => {
         // Check if this is new format with table_data
         if (isNewFormatTable(defaultItem) && defaultItem.table_data?.rows) {
-          const watts = type === 'power' ? defaultItem.total_value : undefined;
+          const watts = undefined;
           return {
             name: getTableName(defaultItem),
             rows: defaultItem.table_data.rows || [],
-            totalWeight: type === 'weight' ? defaultItem.total_value : undefined,
-            totalWatts: watts,
+            totalWeight: defaultItem.total_value,
+            totalWatts: undefined,
             totalVa: watts ? computeTotalVa(watts, defaultItem.metadata, department) : undefined,
-            currentPerPhase: type === 'power' ? defaultItem.metadata?.current_per_phase : undefined,
-            pduType: type === 'power' ? (defaultItem.metadata?.custom_pdu_type || defaultItem.metadata?.pdu_type) : undefined,
-            customPduType: type === 'power' ? defaultItem.metadata?.custom_pdu_type : undefined,
-            position: type === 'power' ? defaultItem.metadata?.position : undefined,
-            customPosition: type === 'power' ? defaultItem.metadata?.custom_position : undefined,
-            includesHoist: type === 'power' ? (defaultItem.metadata?.includes_hoist || false) : undefined,
-            dualMotors: type === 'weight' ? (defaultItem.metadata?.dualMotors || false) : undefined,
-            riggingPoint: type === 'weight' ? defaultItem.metadata?.riggingPoint : undefined,
-            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            currentPerPhase: undefined,
+            pduType: undefined,
+            customPduType: undefined,
+            position: undefined,
+            customPosition: undefined,
+            includesHoist: undefined,
+            dualMotors: defaultItem.metadata?.dualMotors || false,
+            riggingPoint: defaultItem.metadata?.riggingPoint,
+            toolType: 'pesos' as const,
             id: Date.now() + Math.random()
           };
         } else {
           // Legacy format - create a summary row
-          const watts = type === 'power' ? getPowerValue(defaultItem) : undefined;
+          const watts = undefined;
           return {
             name: getTableName(defaultItem),
             rows: [{
               quantity: '1',
               componentName: getTableName(defaultItem),
-              weight: type === 'weight' && isLegacyWeightDefault(defaultItem) ? defaultItem.weight_kg?.toString() : undefined,
-              watts: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.total_watts?.toString() : undefined,
-              totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+              weight: isLegacyWeightDefault(defaultItem) ? defaultItem.weight_kg?.toString() : undefined,
+              watts: undefined,
+              totalWeight: getWeightValue(defaultItem),
               totalWatts: watts,
             }],
-            totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+            totalWeight: getWeightValue(defaultItem),
             totalWatts: watts,
             totalVa: watts ? computeTotalVa(watts, null, department) : undefined,
-            currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
-            pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.custom_pdu_type || defaultItem.pdu_type) : undefined,
-            customPduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.custom_pdu_type : undefined,
-            position: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.position : undefined,
-            customPosition: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.custom_position : undefined,
-            includesHoist: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.includes_hoist || false) : undefined,
-            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            currentPerPhase: undefined,
+            pduType: undefined,
+            customPduType: undefined,
+            position: undefined,
+            customPosition: undefined,
+            includesHoist: undefined,
+            toolType: 'pesos' as const,
             id: Date.now() + Math.random()
           };
         }
       });
 
-      // Calculate power summary for power exports
-      let powerSummary;
-      if (type === 'power') {
-        const totalSystemWatts = tables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
-        const totalSystemAmps = tables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-        const totalSystemKva = tables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
-        powerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
-      }
+      const powerSummary = undefined;
 
       // Get safety margin from the first default's metadata, fallback to 0
       const safetyMargin = (() => {
@@ -535,7 +528,7 @@ export const TourDefaultsManager = ({
         department: department as 'sound' | 'lights' | 'video',
         overrides: (overrides || []) as TourDatePowerOverrideRow[],
         defaultTables: defaultsData.filter(isNewFormatTable),
-        legacyDefaults: defaultsData.filter(isLegacyPowerDefault),
+        legacyDefaults: defaultsData.filter(isLegacyPowerDefault) as any,
       });
 
       if (tables.length === 0) return false;
@@ -589,8 +582,8 @@ export const TourDefaultsManager = ({
     if (typedWeightOverrides.length > 0) {
       combinedTables = typedWeightOverrides.map((override) => {
         return {
-          name: override.table_name || override.item_name || 'Override',
-          rows: override.override_data?.rows || [],
+          name: (override as any).table_name || override.item_name || 'Override',
+          rows: (override.override_data as any)?.rows || [],
           totalWeight: (override.weight_kg || 0) * (override.quantity || 1),
           totalWatts: undefined,
           totalVa: undefined,
@@ -602,7 +595,7 @@ export const TourDefaultsManager = ({
           id: Date.now() + Math.random()
         };
       });
-      safetyMargin = typedWeightOverrides[0]?.override_data?.safetyMargin || 0;
+      safetyMargin = (typedWeightOverrides[0]?.override_data as any)?.safetyMargin || 0;
     } else {
       // Sort defaults by order_index if available, then by created_at
       const sortedDefaults = [...defaultsData].sort((a, b) => {
@@ -618,47 +611,47 @@ export const TourDefaultsManager = ({
       combinedTables = sortedDefaults.map(defaultItem => {
         // Check if this is new format with table_data
         if (isNewFormatTable(defaultItem) && defaultItem.table_data?.rows) {
-          const watts = type === 'power' ? defaultItem.total_value : undefined;
+          const watts = undefined;
           return {
             name: getTableName(defaultItem),
             rows: defaultItem.table_data.rows || [],
-            totalWeight: type === 'weight' ? defaultItem.total_value : undefined,
+            totalWeight: defaultItem.total_value,
             totalWatts: watts,
             totalVa: watts ? computeTotalVa(watts, defaultItem.metadata, department) : undefined,
-            currentPerPhase: type === 'power' ? defaultItem.metadata?.current_per_phase : undefined,
-            pduType: type === 'power' ? (defaultItem.metadata?.custom_pdu_type || defaultItem.metadata?.pdu_type) : undefined,
-            customPduType: type === 'power' ? defaultItem.metadata?.custom_pdu_type : undefined,
-            position: type === 'power' ? defaultItem.metadata?.position : undefined,
-            customPosition: type === 'power' ? defaultItem.metadata?.custom_position : undefined,
-            includesHoist: type === 'power' ? (defaultItem.metadata?.includes_hoist || false) : undefined,
-            dualMotors: type === 'weight' ? (defaultItem.metadata?.dualMotors || false) : undefined,
-            riggingPoint: type === 'weight' ? defaultItem.metadata?.riggingPoint : undefined,
-            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            currentPerPhase: undefined,
+            pduType: undefined,
+            customPduType: undefined,
+            position: undefined,
+            customPosition: undefined,
+            includesHoist: undefined,
+            dualMotors: defaultItem.metadata?.dualMotors || false,
+            riggingPoint: defaultItem.metadata?.riggingPoint,
+            toolType: 'pesos' as const,
             id: Date.now() + Math.random()
           };
         } else {
           // Legacy format
-          const watts = type === 'power' ? getPowerValue(defaultItem) : undefined;
+          const watts = undefined;
           return {
             name: getTableName(defaultItem),
             rows: [{
               quantity: '1',
               componentName: getTableName(defaultItem),
-              weight: type === 'weight' && isLegacyWeightDefault(defaultItem) ? defaultItem.weight_kg?.toString() : undefined,
-              watts: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.total_watts?.toString() : undefined,
-              totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+              weight: isLegacyWeightDefault(defaultItem) ? defaultItem.weight_kg?.toString() : undefined,
+              watts: undefined,
+              totalWeight: getWeightValue(defaultItem),
               totalWatts: watts,
             }],
-            totalWeight: type === 'weight' ? getWeightValue(defaultItem) : undefined,
+            totalWeight: getWeightValue(defaultItem),
             totalWatts: watts,
             totalVa: watts ? computeTotalVa(watts, null, department) : undefined,
-            currentPerPhase: type === 'power' ? getCurrentPerPhase(defaultItem) : undefined,
-            pduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.custom_pdu_type || defaultItem.pdu_type) : undefined,
-            customPduType: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.custom_pdu_type : undefined,
-            position: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.position : undefined,
-            customPosition: type === 'power' && isLegacyPowerDefault(defaultItem) ? defaultItem.custom_position : undefined,
-            includesHoist: type === 'power' && isLegacyPowerDefault(defaultItem) ? (defaultItem.includes_hoist || false) : undefined,
-            toolType: (type === 'power' ? 'consumos' : 'pesos') as 'consumos' | 'pesos',
+            currentPerPhase: undefined,
+            pduType: undefined,
+            customPduType: undefined,
+            position: undefined,
+            customPosition: undefined,
+            includesHoist: undefined,
+            toolType: 'pesos' as const,
             id: Date.now() + Math.random()
           };
         }
@@ -667,14 +660,7 @@ export const TourDefaultsManager = ({
 
     if (combinedTables.length === 0) return false;
 
-    // Calculate power summary for power exports
-    let powerSummary;
-    if (type === 'power') {
-      const totalSystemWatts = combinedTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
-      const totalSystemAmps = combinedTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
-      const totalSystemKva = combinedTables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
-      powerSummary = { totalSystemWatts, totalSystemAmps, totalSystemKva };
-    }
+    const powerSummary = undefined;
 
     const locationName = (tourDate.locations as any)?.name || UNKNOWN_LOCATION_LABEL;
     const dateStr = tourDate.date; // Pass ISO string directly for proper parsing

@@ -7,6 +7,12 @@ export type SubscriptionSnapshot = {
   subscriptionCount: number;
   subscriptionsByTable: Record<string, string[]>;
   lastRefreshTime: number;
+  activeConnections: number;
+  queuedSubscriptions: number;
+  failedConnections: number;
+  averageResponseTime: number;
+  circuitBreakerOpen: boolean;
+  lastHealthCheck: number;
 };
 
 export type RealtimeSubscriptionFilter = {
@@ -67,6 +73,12 @@ export class UnifiedSubscriptionManager {
       subscriptionCount: 0,
       subscriptionsByTable: {},
       lastRefreshTime: Date.now(),
+      activeConnections: 0,
+      queuedSubscriptions: 0,
+      failedConnections: 0,
+      averageResponseTime: 0,
+      circuitBreakerOpen: false,
+      lastHealthCheck: Date.now(),
     };
     
     // Initialize connection
@@ -137,7 +149,10 @@ export class UnifiedSubscriptionManager {
       connectionStatus: this.connectionStatus,
       activeSubscriptions: this.getActiveSubscriptions(),
       subscriptionCount: this.getSubscriptionCount(),
+      activeConnections: this.getSubscriptionCount(),
+      queuedSubscriptions: this.pendingSubscriptions.size,
       subscriptionsByTable: this.getSubscriptionsByTable(),
+      lastHealthCheck: Date.now(),
     };
     this.notify();
   }

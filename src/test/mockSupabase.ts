@@ -87,16 +87,21 @@ export function createMockQueryBuilder<T = unknown>(
   const builder = {} as MockQueryBuilder<T>;
 
   chainMethods.forEach((method) => {
-    (builder as Record<string, ReturnType<typeof vi.fn>>)[method] = vi.fn(() => builder);
+    (builder as unknown as Record<string, ReturnType<typeof vi.fn>>)[method] = vi.fn(() => builder);
   });
 
   builder.single = vi.fn(async () => result);
   builder.maybeSingle = vi.fn(async () => result);
   builder.csv = vi.fn(async () => result);
   // Intentionally make the builder thenable so it can be awaited like a real Supabase query
-  builder.then = (onFulfilled?: (value: MockSupabaseResult<T>) => unknown, onRejected?: (reason: unknown) => unknown) =>
+  builder.then = <TResult1 = MockSupabaseResult<T>, TResult2 = never>(
+    onFulfilled?: ((value: MockSupabaseResult<T>) => TResult1 | PromiseLike<TResult1>) | null,
+    onRejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ) =>
     Promise.resolve(result).then(onFulfilled, onRejected);
-  builder.catch = (onRejected?: (reason: unknown) => unknown) =>
+  builder.catch = <TResult = never>(
+    onRejected?: ((reason: unknown) => TResult | PromiseLike<TResult>) | null,
+  ) =>
     Promise.resolve(result).catch(onRejected);
   builder.finally = (onFinally?: (() => void) | undefined) =>
     Promise.resolve(result).finally(onFinally);

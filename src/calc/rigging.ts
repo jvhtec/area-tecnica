@@ -16,6 +16,8 @@ export type TrussModel = {
   EI: number;                 // N·m² (E*I) from datasheet
   allowableM_Nm?: number;     // optional
   allowableDeflectionM?: number; // e.g., L/200
+  allowablesVerified?: boolean;
+  validationNote?: string;
 };
 
 export type Support = {
@@ -153,6 +155,8 @@ export function solveTrussWithTilt(
   const supportReactionsN = Rc.slice(); // already vertical reactions
   const supportReactionsKg = supportReactionsN.map(R => R / g);
 
+  const canEvaluateAllowables = truss.allowablesVerified === true;
+
   return {
     supportReactionsN,
     supportReactionsKg,
@@ -162,8 +166,8 @@ export function solveTrussWithTilt(
     deflectionsM,
     xNodesM: x,
     okAgainstAllowables: {
-      moment: truss.allowableM_Nm === undefined ? undefined : maxM <= truss.allowableM_Nm,
-      deflection: truss.allowableDeflectionM === undefined ? undefined : maxW <= truss.allowableDeflectionM
+      moment: !canEvaluateAllowables || truss.allowableM_Nm === undefined ? undefined : maxM <= truss.allowableM_Nm,
+      deflection: !canEvaluateAllowables || truss.allowableDeflectionM === undefined ? undefined : maxW <= truss.allowableDeflectionM
     }
   };
 }
@@ -243,4 +247,3 @@ function sampleMid(EI: number, L: number, de: number[], q: number) {
   const wMid = N1*de[0] + N2*de[1] + N3*de[2] + N4*de[3];
   return { wMid, Mabs };
 }
-

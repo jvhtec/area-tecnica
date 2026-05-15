@@ -13,6 +13,7 @@ interface Artist {
   id: string;
   name: string;
   stage: number;
+  date?: string;
   show_start: string;
   show_end: string;
   soundcheck: boolean;
@@ -393,7 +394,7 @@ export const MobileArtistCard = ({
           {gearComparison?.mismatches.some(m => m.severity === 'error') && (
             <Button
               variant="ghost" size="icon" className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-              onClick={() => onCreateFlexExtras(artist.id, artist.name, artist.date, artist.show_start, artist.show_end, artist.isaftermidnight || false)}
+              onClick={() => onCreateFlexExtras(artist.id, artist.name, artist.date || "", artist.show_start, artist.show_end, artist.isaftermidnight || false)}
               disabled={isCreatingExtrasFor(artist.id)}
               title="Crear presupuesto extras en Flex"
             >

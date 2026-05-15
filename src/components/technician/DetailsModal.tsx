@@ -1046,7 +1046,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                     <label className={`text-xs ${theme.textMuted} font-bold uppercase`}>Tipo de trabajo</label>
                                     <div className="mt-2">
                                         <span className={`px-3 py-1 rounded-full ${isDark ? 'bg-[#1a1d26] border-[#2a2e3b]' : 'bg-slate-100 border-slate-200'} border text-xs ${theme.textMain} font-medium`}>
-                                            {job?.job_type === 'multi_day' ? 'Varios días' : job?.job_type === 'single' ? 'Un solo día' : job?.job_type || 'Un solo día'}
+                                            {job?.job_type === 'single' ? 'Un solo día' : job?.job_type || 'Un solo día'}
                                         </span>
                                     </div>
                                 </div>
@@ -1243,7 +1243,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                         <div>
                                             <h2 className={`text-lg font-bold ${theme.textMain}`}>{locationData?.name || 'Sin ubicación'}</h2>
                                             <p className={`text-sm ${theme.textMuted} mt-1 max-w-xs leading-relaxed`}>
-                                                {locationData?.formatted_address || locationData?.address || 'Dirección no disponible'}
+                                                {locationData?.formatted_address || ('address' in locationData ? locationData.address : undefined) || 'Dirección no disponible'}
                                             </p>
                                         </div>
                                         <Button onClick={handleOpenMaps} size="sm" className="whitespace-nowrap">

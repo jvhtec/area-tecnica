@@ -397,7 +397,7 @@ export function TechnicianPayoutCard({
                 {payout.extras_breakdown.items.map((item, idx) => (
                   <div key={idx} className="flex justify-between text-xs text-muted-foreground">
                     <span>
-                      {item.extra_type.replaceAll('_', ' ')} \u00d7 {item.quantity}
+                      {item.extra_type.replace(/_/g, ' ')} x {item.quantity}
                     </span>
                     <span>{formatCurrency(item.amount_eur)}</span>
                   </div>

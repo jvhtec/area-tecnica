@@ -28,7 +28,7 @@ import {
   POWER_POSITION_PRESETS,
 } from '@/utils/powerPositions';
 
-type FixtureType = 'incandescent' | 'discharge' | 'led' | 'led-pro';
+type FixtureType = 'incandescent' | 'discharge' | 'led' | 'led-pro' | 'smoke' | 'consoles';
 
 const FIXTURE_PF: Record<FixtureType, { label: string; pf: number }> = {
   incandescent: { label: 'Incandescent / filament', pf: 1.0 },

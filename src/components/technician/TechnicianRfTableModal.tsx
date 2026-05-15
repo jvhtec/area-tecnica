@@ -521,7 +521,7 @@ export function TechnicianRfTableModal({
   // --- Normalization & filtering ---
 
   const normalizedArtists = useMemo(
-    () => rawArtists.map((a) => normalizeRfIemArtistInput(a)).filter(hasRfIemContent),
+    () => rawArtists.map((a) => normalizeRfIemArtistInput(a as any)).filter(hasRfIemContent),
     [rawArtists]
   );
 

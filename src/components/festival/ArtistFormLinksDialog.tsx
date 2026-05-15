@@ -389,7 +389,7 @@ export const ArtistFormLinksDialog = ({
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                onClick={downloadBlankTemplatePdf}
+                onClick={() => downloadBlankTemplatePdf()}
                 disabled={isGeneratingBlankPdf || dateFilter === ALL_DATES_VALUE}
               >
                 <Printer className="h-4 w-4 mr-2" />

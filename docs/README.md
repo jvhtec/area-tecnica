@@ -76,6 +76,7 @@ Detailed deep-dive docs for the full festival subsystem:
 
 ## Plans / Roadmaps
 - **[Codebase Maintenance Roadmap](plans/codebase-maintenance-roadmap.md)** - phased technical-debt, refactor, type-safety, performance, and ops cleanup backlog
+  - Phase 0 is complete as of 2026-05-16: `npm run typecheck` is available, rigging pass/fail is disabled for unverified truss constants, and Flex lights/video business-role gaps return diagnostics.
   - P6-03 source placeholder cleanup is complete as of 2026-05-15; deferred source work should reference a durable roadmap or issue ID rather than bare TODO/FIXME/HACK comments.
 - `migrations/` (migration notes)
 

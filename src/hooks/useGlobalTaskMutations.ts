@@ -32,6 +32,13 @@ const DOC_FK: Record<Dept, string> = {
   administrative: 'administrative_task_id',
 };
 
+type DynamicSupabaseClient = {
+  from: (table: string) => any;
+};
+
+const dynamicSupabase = supabase as unknown as DynamicSupabaseClient;
+const fromDynamicTable = (table: string) => dynamicSupabase.from(table);
+
 /**
  * Returns the current UTC instant as an ISO string for timestamptz columns.
  */
@@ -126,8 +133,7 @@ export function useGlobalTaskMutations(department: Dept) {
     if (params.job_id) payload.job_id = params.job_id;
     if (params.tour_id) payload.tour_id = params.tour_id;
 
-    const { data, error } = await supabase
-      .from(targetTable as any)
+    const { data, error } = await fromDynamicTable(targetTable)
       .insert(payload)
       .select()
       .single();
@@ -244,8 +250,7 @@ export function useGlobalTaskMutations(department: Dept) {
     if (params.job_id) payloadBase.job_id = params.job_id;
     if (params.tour_id) payloadBase.tour_id = params.tour_id;
 
-    let existingQuery = supabase
-      .from(table as any)
+    let existingQuery = fromDynamicTable(table)
       .select('assigned_to')
       .eq('task_type', params.task_type)
       .in('assigned_to', normalizedAssigneeIds);
@@ -277,7 +282,7 @@ export function useGlobalTaskMutations(department: Dept) {
       assigned_to: assigneeId,
     }));
 
-    const { data, error } = await supabase.from(table as any).insert(payloads).select('id, assigned_to');
+    const { data, error } = await fromDynamicTable(table).insert(payloads).select('id, assigned_to');
     if (error) throw error;
 
     return { created: data || [], skippedAssigneeIds };
@@ -285,7 +290,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
   const updateTask = async (id: string, fields: TaskUpdate) => {
     const sanitized: TaskUpdate = { ...fields, updated_at: nowUTC() };
-    const { error } = await supabase.from(table as any).update(sanitized).eq('id', id);
+    const { error } = await fromDynamicTable(table).update(sanitized).eq('id', id);
     if (error) throw error;
   };
 
@@ -293,15 +298,13 @@ export function useGlobalTaskMutations(department: Dept) {
     const failures: string[] = [];
 
     // First, get the task to know job_id/tour_id for mirror cleanup
-    const { data: task } = await supabase
-      .from(table as any)
+    const { data: task } = await fromDynamicTable(table)
       .select('job_id, tour_id')
       .eq('id', id)
       .maybeSingle();
 
     // Fetch all attachments for this task
-    const { data: docs } = await supabase
-      .from('task_documents')
+    const { data: docs } = await fromDynamicTable('task_documents')
       .select('id, file_path')
       .eq(docFk, id);
 
@@ -310,7 +313,7 @@ export function useGlobalTaskMutations(department: Dept) {
       for (const doc of docs) {
         try {
           // Delete from task_documents table
-          const { error: taskDocDeleteError } = await supabase.from('task_documents').delete().eq('id', doc.id);
+          const { error: taskDocDeleteError } = await fromDynamicTable('task_documents').delete().eq('id', doc.id);
           if (taskDocDeleteError) {
             failures.push(`doc ${doc.id}: failed to delete task_documents row (${taskDocDeleteError.message})`);
           }
@@ -360,7 +363,7 @@ export function useGlobalTaskMutations(department: Dept) {
     }
 
     // Finally, delete the task row
-    const { error } = await supabase.from(table as any).delete().eq('id', id);
+    const { error } = await fromDynamicTable(table).delete().eq('id', id);
     if (error) {
       failures.push(`task ${id}: failed to delete task row (${error.message})`);
     }
@@ -378,8 +381,7 @@ export function useGlobalTaskMutations(department: Dept) {
     const { data: authData } = await supabase.auth.getUser();
     const assignerId = authData?.user?.id ?? null;
 
-    const { data: currentTask, error: currentTaskError } = await supabase
-      .from(table as any)
+    const { data: currentTask, error: currentTaskError } = await fromDynamicTable(table)
       .select('id, task_type, job_id, tour_id, assigned_to, created_by')
       .eq('id', id)
       .maybeSingle();
@@ -391,8 +393,7 @@ export function useGlobalTaskMutations(department: Dept) {
     }
 
     if (userId) {
-      let conflictQuery = supabase
-        .from(table as any)
+      let conflictQuery = fromDynamicTable(table)
         .select('id')
         .eq('task_type', currentTask.task_type)
         .eq('assigned_to', userId)
@@ -418,8 +419,7 @@ export function useGlobalTaskMutations(department: Dept) {
       }
     }
 
-    const { data, error } = await supabase
-      .from(table as any)
+    const { data, error } = await fromDynamicTable(table)
       .update({ assigned_to: userId, updated_at: nowUTC() })
       .eq('id', id)
       .select('id, task_type, created_by')
@@ -468,8 +468,7 @@ export function useGlobalTaskMutations(department: Dept) {
     const { data: authData } = await supabase.auth.getUser();
     const userId = authData?.user?.id ?? null;
 
-    const { data: task } = await supabase
-      .from(table as any)
+    const { data: task } = await fromDynamicTable(table)
       .select('id, task_type, assigned_to, created_by, job_id, tour_id')
       .eq('id', id)
       .maybeSingle();
@@ -520,8 +519,7 @@ export function useGlobalTaskMutations(department: Dept) {
   };
 
   const setDueDate = async (id: string, due_at: string | null) => {
-    const { error } = await supabase
-      .from(table as any)
+    const { error } = await fromDynamicTable(table)
       .update({ due_at, updated_at: nowUTC() })
       .eq('id', id);
     if (error) throw error;
@@ -538,21 +536,18 @@ export function useGlobalTaskMutations(department: Dept) {
     }
 
     // Get the previous link state so we can clean up old mirrors
-    const { data: prevTask } = await supabase
-      .from(table as any)
+    const { data: prevTask } = await fromDynamicTable(table)
       .select('job_id, tour_id')
       .eq('id', id)
       .maybeSingle();
 
-    const { error } = await supabase
-      .from(table as any)
+    const { error } = await fromDynamicTable(table)
       .update({ job_id: jobId, tour_id: tourId, updated_at: nowUTC() })
       .eq('id', id);
     if (error) throw error;
 
     // Fetch existing task documents
-    const { data: taskDocs } = await supabase
-      .from('task_documents')
+    const { data: taskDocs } = await fromDynamicTable('task_documents')
       .select('id, file_name, file_path')
       .eq(docFk, id);
 

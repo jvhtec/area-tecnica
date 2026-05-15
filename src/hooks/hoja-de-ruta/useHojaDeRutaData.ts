@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { EventData, TravelArrangement, Accommodation, Restaurant } from '@/types/hoja-de-ruta';
+import type { Json } from '@/integrations/supabase/types';
 
 /**
  * Normalizes a datetime value to a valid UTC ISO string for database storage.
@@ -115,8 +116,8 @@ export const useHojaDeRutaData = () => {
         aux_staff_setup_qty: toSafeNonNegativeInt(eventData.auxiliaryStaffSetupQty),
         aux_staff_dismantle_qty: toSafeNonNegativeInt(eventData.auxiliaryStaffDismantleQty),
         aux_machinery_requirements: Array.isArray(eventData.auxiliaryMachinery)
-          ? eventData.auxiliaryMachinery.filter(item => item.quantity > 0)
-          : [],
+          ? eventData.auxiliaryMachinery.filter(item => item.quantity > 0) as unknown as Json
+          : [] as unknown as Json,
         status: 'draft',
         last_modified: new Date().toISOString()
       };

@@ -103,6 +103,7 @@ const normalizeFestivalLogoPath = (filePath: string) => {
 
 const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistFormState => ({
   name: "",
+  max_stages: 1,
   stage: 1,
   date: blankDate,
   show_start: "",
@@ -111,9 +112,11 @@ const createInitialFormData = (isBlank: boolean, blankDate = ""): ArtistFormStat
   soundcheck_start: "",
   soundcheck_end: "",
   foh_console: "",
+  foh_consoles: [],
   foh_console_provided_by: "festival",
   foh_tech: false,
   mon_console: "",
+  mon_consoles: [],
   mon_console_provided_by: "festival",
   monitors_from_foh: false,
   foh_waves_outboard: "",
@@ -231,10 +234,11 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
         if (cancelled) return;
         if (gearData) {
+          const normalizedGearData = gearData as unknown as FestivalGearSetup;
           setGearSetup({
-            ...(gearData as FestivalGearSetup),
-            wireless_systems: normalizeWirelessSystems((gearData as FestivalGearSetup).wireless_systems, "wireless"),
-            iem_systems: normalizeWirelessSystems((gearData as FestivalGearSetup).iem_systems, "iem"),
+            ...normalizedGearData,
+            wireless_systems: normalizeWirelessSystems(normalizedGearData.wireless_systems, "wireless"),
+            iem_systems: normalizeWirelessSystems(normalizedGearData.iem_systems, "iem"),
           });
         }
 

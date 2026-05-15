@@ -72,7 +72,7 @@ if (options.bold !== undefined || options.fontSize !== undefined || options.text
   }
 
   if (options.alignment !== undefined || options.wrapText !== undefined) {
-    const existing = (cell.alignment as ExcelJS.Alignment) || {};
+    const existing = (cell.alignment || {}) as any;
     cell.alignment = {
       ...existing,
       vertical: existing.vertical ?? "middle",

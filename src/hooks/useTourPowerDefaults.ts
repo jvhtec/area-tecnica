@@ -14,6 +14,17 @@ export interface TourPowerDefault {
   includes_hoist: boolean;
   department: string | null;
   created_at?: string;
+  metadata?: {
+    pf?: number;
+    safetyMargin?: number;
+    phaseMode?: 'single' | 'three';
+    voltage?: number;
+    [key: string]: unknown;
+  } | null;
+  pf?: number;
+  safetyMargin?: number;
+  phaseMode?: 'single' | 'three';
+  voltage?: number;
 }
 
 export const useTourPowerDefaults = (tourId: string) => {

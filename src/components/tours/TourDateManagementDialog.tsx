@@ -44,6 +44,14 @@ import {
   TOUR_DATE_TYPE_OPTIONS,
 } from "@/constants/dateTypes";
 
+type TourDateTableType = Exclude<DateType, "prep_day">;
+type DynamicSupabaseClient = { from: (table: string) => any };
+
+const dynamicSupabase = supabase as unknown as DynamicSupabaseClient;
+const fromDynamicTable = (table: string) => dynamicSupabase.from(table);
+const toTourDateTableType = (type: DateType): TourDateTableType =>
+  type === "prep_day" ? "show" : type;
+
 interface TourDateObject {
   id: string;
   date: string;
@@ -148,6 +156,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw new Error("Tour ID is required");
       }
       const finalEndDate = isSingleDayDateType(tourDateType) ? startDate : (endDate || startDate);
+      const dbTourDateType = toTourDateTableType(tourDateType);
       const rehearsalDays = Math.ceil((new Date(finalEndDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
       console.log("Adding new tour date:", { startDate, finalEndDate, location, tourId, tourDateType, isTourPackOnly });
@@ -166,7 +175,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           date: startDate, // Keep for backward compatibility
           start_date: startDate,
           end_date: finalEndDate,
-          tour_date_type: tourDateType,
+          tour_date_type: dbTourDateType,
           rehearsal_days: rehearsalDays,
           location_id: locationId,
           is_tour_pack_only: isTourPackOnly,
@@ -304,6 +313,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw new Error("Tour ID is required");
       }
       const finalEndDate = isSingleDayDateType(tourDateType) ? startDate : (endDate || startDate);
+      const dbTourDateType = toTourDateTableType(tourDateType);
       const rehearsalDays = Math.ceil((new Date(finalEndDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
       console.log("Editing tour date:", { dateId, startDate, finalEndDate, newLocation, tourDateType, isTourPackOnly });
       let locationId: string | null = null;
@@ -330,7 +340,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           date: startDate,
           start_date: startDate,
           end_date: finalEndDate,
-          tour_date_type: tourDateType,
+          tour_date_type: dbTourDateType,
           rehearsal_days: rehearsalDays,
           location_id: locationId,
           is_tour_pack_only: isTourPackOnly,
@@ -607,14 +617,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           try {
             if (step.subquery) {
               // Handle task documents which reference task IDs
-              const { data: taskIds } = await supabase
-                .from(step.subquery)
+              const { data: taskIds } = await fromDynamicTable(step.subquery)
                 .select("id")
                 .in("job_id", jobIds);
 
               if (taskIds && taskIds.length > 0) {
-                const { error } = await supabase
-                  .from(step.table)
+                const { error } = await fromDynamicTable(step.table)
                   .delete()
                   .in(step.condition, taskIds.map(t => t.id));
 
@@ -633,8 +641,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
               }
             } else {
               // Direct deletion by job_id
-              const { error } = await supabase
-                .from(step.table)
+              const { error } = await fromDynamicTable(step.table)
                 .delete()
                 .in(step.condition, jobIds);
 

@@ -5,6 +5,7 @@ import { WiredMic } from "@/components/festival/gear-setup/WiredMicConfig";
 export interface ArtistSectionProps {
   formData: {
     name: string;
+    max_stages: number;
     stage: number;
     date: string;
     show_start: string;
@@ -13,8 +14,10 @@ export interface ArtistSectionProps {
     soundcheck_start?: string;
     soundcheck_end?: string;
     foh_console: string;
+    foh_consoles: any[];
     foh_console_provided_by: string;
     mon_console: string;
+    mon_consoles: any[];
     mon_console_provided_by: string;
     monitors_from_foh: boolean;
     foh_waves_outboard: string;

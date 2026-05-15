@@ -185,8 +185,9 @@ export const WirelessConfig = ({
     }
 
     if (isFrequencyBandSelection(system.band)) {
-      const isModelOption = modelOptions.some((option) => option.code === system.band?.code);
-      return isModelOption ? system.band.code : CUSTOM_BAND_VALUE;
+      const selectedBand = system.band;
+      const isModelOption = modelOptions.some((option) => option.code === selectedBand.code);
+      return isModelOption ? selectedBand.code : CUSTOM_BAND_VALUE;
     }
 
     const bandValue = system.band.trim();

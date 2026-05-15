@@ -1,4 +1,4 @@
-import parseISO from 'date-fns/parseISO';
+import { parseISO } from 'date-fns/parseISO';
 import { formatInTimeZone } from 'date-fns-tz';
 
 import { buildReadableFilename } from '@/utils/fileName';

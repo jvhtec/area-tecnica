@@ -432,7 +432,7 @@ export const MobileArtistConfigEditor = ({
           .single();
 
         if (!error && data) {
-          setFormData(buildFormData(data));
+          setFormData(buildFormData(data as unknown as Artist));
         }
       } catch (err) {
         console.error("Error fetching artist data:", err);

@@ -21,6 +21,8 @@ export type CompletionSource =
   | 'auto_consumos_video_doc'
   | string;
 
+export type { Department };
+
 interface CompleteTaskParams {
   taskId: string;
   department: Department;
@@ -57,6 +59,13 @@ const TASK_TABLE: Record<Department, string> = {
   production: 'production_job_tasks',
   administrative: 'administrative_job_tasks',
 };
+
+type DynamicSupabaseClient = {
+  from: (table: string) => any;
+};
+
+const dynamicSupabase = supabase as unknown as DynamicSupabaseClient;
+const fromTaskTable = (table: string) => dynamicSupabase.from(table);
 
 /**
  * Mark a single task as completed.
@@ -95,8 +104,7 @@ export async function completeTask(
     }
 
     // Fetch task details for push notification
-    const { data: task, error: fetchError } = await supabase
-      .from(tableName)
+    const { data: task, error: fetchError } = await fromTaskTable(tableName)
       .select('id, task_type, assigned_to, job_id, tour_id')
       .eq('id', taskId)
       .maybeSingle();
@@ -107,8 +115,7 @@ export async function completeTask(
     }
 
     // Update the task to completed
-    const { error: updateError } = await supabase
-      .from(tableName)
+    const { error: updateError } = await fromTaskTable(tableName)
       .update({
         status: 'completed',
         progress: 100,
@@ -184,8 +191,7 @@ export async function revertTask(params: {
     const tableName = TASK_TABLE[department];
     const progress = newStatus === 'in_progress' ? 50 : 0;
 
-    const { error: updateError } = await supabase
-      .from(tableName)
+    const { error: updateError } = await fromTaskTable(tableName)
       .update({
         status: newStatus,
         progress,
@@ -270,8 +276,7 @@ export async function bulkCompleteTasks(
 
       try {
         // Build the query based on whether we have jobId or tourId
-        let query = supabase
-          .from(tableName)
+        let query = fromTaskTable(tableName)
           .select('id, task_type, status, assigned_to, job_id, tour_id')
           .eq('task_type', taskType)
           .neq('status', 'completed');
@@ -298,8 +303,7 @@ export async function bulkCompleteTasks(
 
         // Update all matching tasks to completed
         const taskIds = matchingTasks.map((t) => t.id);
-        const { error: updateError } = await supabase
-          .from(tableName)
+        const { error: updateError } = await fromTaskTable(tableName)
           .update({
             status: 'completed',
             progress: 100,

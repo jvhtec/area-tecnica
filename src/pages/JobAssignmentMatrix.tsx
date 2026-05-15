@@ -36,6 +36,7 @@ import {
   type Department,
   type MatrixJob,
   type OutstandingJobInfo,
+  type OutstandingRoleInfo,
   type StaffingAssignmentRow,
   type StaffingSummaryRow,
 } from './job-assignment-matrix/utils';
