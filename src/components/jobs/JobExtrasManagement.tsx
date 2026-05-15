@@ -8,6 +8,7 @@ import { DollarSign, Users } from 'lucide-react';
 import { JobExtrasEditor } from './JobExtrasEditor';
 import { formatCurrency } from '@/lib/utils';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
+import { isManagementRole } from '@/utils/permissions';
 
 interface JobExtrasManagementProps {
   jobId: string;
@@ -208,7 +209,7 @@ export const JobExtrasManagement = ({
                 isManager={isManager}
                 isHouseTech={assignment.profiles?.role === 'house_tech'}
                 isAssignableManagement={
-                  ['admin', 'management'].includes(assignment.profiles?.role || '') &&
+                  isManagementRole(assignment.profiles?.role) &&
                   Boolean(assignment.profiles?.assignable_as_tech)
                 }
                 customTravelHalfRate={techCustomRates?.travel_half_day_eur}

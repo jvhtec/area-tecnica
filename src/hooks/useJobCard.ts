@@ -7,6 +7,12 @@ import { JobDocument } from '@/components/jobs/cards/JobCardDocuments';
 import { Department } from '@/types/department';
 import { useDeletionState } from './useDeletionState';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
+import {
+  canCreateFolders,
+  canEditJobs as canEditJobsForRole,
+  canManageFestivalArtists,
+  canUploadDocuments as canUploadDocumentsForRole,
+} from '@/utils/permissions';
 
 export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
   const { toast } = useToast();
@@ -34,10 +40,10 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
 
   // Role-based permissions
   const isHouseTech = userRole === 'house_tech';
-  const canEditJobs = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const canManageArtists = ['admin', 'management', 'logistics', 'technician', 'house_tech'].includes(userRole || '');
-  const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const canEditJobs = canEditJobsForRole(userRole);
+  const canManageArtists = canManageFestivalArtists(userRole);
+  const canUploadDocuments = canUploadDocumentsForRole(userRole);
+  const canCreateFlexFolders = canCreateFolders(userRole);
 
   // Check if this job is being deleted to prevent queries
   const isJobBeingDeleted = isDeletingJob(job.id);

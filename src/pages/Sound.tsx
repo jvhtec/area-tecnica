@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useCallback, useState, useEffect, useMemo } from "react";
 import { CreateJobDialog } from "@/components/jobs/CreateJobDialog";
 import { useJobs } from "@/hooks/useJobs";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
@@ -33,6 +33,7 @@ import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDeta
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
 import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
 import { isJobOnDate } from "@/utils/timezoneUtils";
+import { isManagementRole } from "@/utils/permissions";
 
 const Sound = () => {
   const navigate = useNavigate();
@@ -60,7 +61,9 @@ const Sound = () => {
   const { data: jobs } = useJobs();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { userRole, hasSoundVisionAccess, userDepartment } = useOptimizedAuth();
+  const { user, userRole, hasSoundVisionAccess, userDepartment, isLoading: authLoading } = useOptimizedAuth();
+  const canManageJobs = isManagementRole(userRole);
+  const canUseDetailsOnlyMode = canManageJobs || userRole === "house_tech";
 
   // Generate navigation items for mobile nav bar
   const navigationItems = useMemo(() => {
@@ -132,6 +135,20 @@ const Sound = () => {
     },
   ];
 
+  const handleCreateJob = useCallback((preset?: JobType) => {
+    if (!canManageJobs) {
+      toast({
+        title: "Permiso denegado",
+        description: "Solo administradores y usuarios de gestión pueden crear trabajos",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPresetJobType(preset);
+    setIsJobDialogOpen(true);
+  }, [canManageJobs, toast]);
+
   // Keyboard shortcut: Cmd/Ctrl+N to open create job dialog
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -146,13 +163,12 @@ const Sound = () => {
       const metaN = (e.key.toLowerCase() === 'n') && (e.metaKey || e.ctrlKey);
       if (metaN) {
         e.preventDefault();
-        setPresetJobType(undefined);
-        setIsJobDialogOpen(true);
+        handleCreateJob(undefined);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [handleCreateJob]);
 
   const departmentJobs = useMemo(() => {
     if (!jobs) return [];
@@ -195,33 +211,33 @@ const Sound = () => {
   };
 
   const handleDeleteClick = async (jobId: string) => {
-    if (!["admin", "management"].includes(userRole || "")) {
+    if (!canManageJobs) {
       toast({
-        title: "Permission denied",
-        description: "Only admin and management users can delete jobs",
+        title: "Permiso denegado",
+        description: "Solo administradores y usuarios de gestión pueden eliminar trabajos",
         variant: "destructive"
       });
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this job? This action cannot be undone and will remove all related data.")) return;
+    if (!window.confirm("¿Seguro que quieres eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.")) return;
 
     try {
       const result = await deleteJobOptimistically(jobId);
 
       if (result.success) {
         toast({
-          title: "Job deleted",
-          description: result.details || "The job has been removed and cleanup is running in background."
+          title: "Trabajo eliminado",
+          description: result.details || "El trabajo se ha eliminado y la limpieza continúa en segundo plano."
         });
         await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       } else {
-        throw new Error(result.error || "Unknown deletion error");
+        throw new Error(result.error || "Error desconocido al eliminar");
       }
     } catch (error: any) {
       console.error("Error in optimistic job deletion:", error);
       toast({
-        title: "Error deleting job",
+        title: "Error al eliminar el trabajo",
         description: error.message,
         variant: "destructive"
       });
@@ -241,8 +257,8 @@ const Sound = () => {
             jobs={departmentJobs}
             date={date || new Date()}
             onDateSelect={setDate}
-            canCreateJob={userRole ? ["admin", "management"].includes(userRole) : false}
-            onCreateJob={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
+            canCreateJob={!authLoading && canManageJobs}
+            onCreateJob={() => handleCreateJob(undefined)}
             userRole={userRole}
             onEditJob={handleEditClick}
             onDeleteJob={handleDeleteClick}
@@ -272,9 +288,9 @@ const Sound = () => {
         <div className="p-4 md:p-8">
           <div className="mx-auto w-full max-w-full space-y-6">
             <LightsHeader
-              onCreateJob={(preset) => { setPresetJobType(preset); setIsJobDialogOpen(true); }}
+              onCreateJob={handleCreateJob}
               department="Sound"
-              canCreate={userRole ? ["admin", "management"].includes(userRole) : true}
+              canCreate={!authLoading && canManageJobs}
             />
 
             <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">
@@ -405,7 +421,7 @@ const Sound = () => {
                     onJobClick={handleJobClick}
                     userRole={userRole}
                     selectedDate={date}
-                    detailsOnlyMode={userRole ? ["admin", "management", "house_tech"].includes(userRole) : false}
+                    detailsOnlyMode={canUseDetailsOnlyMode}
                     department={currentDepartment}
                     viewMode="sidebar"
                   />
@@ -414,12 +430,14 @@ const Sound = () => {
             </div>
 
             {/* Desktop FAB */}
-            <Button
-              className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
-              onClick={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
-            >
-              <Plus className="h-6 w-6" />
-            </Button>
+            {!authLoading && canManageJobs && (
+              <Button
+                className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
+                onClick={() => handleCreateJob(undefined)}
+              >
+                <Plus className="h-6 w-6" />
+              </Button>
+            )}
           </div>
         </div>
       )}
@@ -514,6 +532,7 @@ const Sound = () => {
           }}
           userRole={userRole}
           userDepartment={userDepartment}
+          userId={user?.id ?? null}
           department={currentDepartment}
         />
       )}

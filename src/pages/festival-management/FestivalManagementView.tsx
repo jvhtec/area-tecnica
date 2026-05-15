@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Department } from "@/types/department";
+import { canSubmitTechnicianIncidentReports, isDepartmentManagementRole, isManagementRole } from "@/utils/permissions";
 
 import { FestivalManagementDialogs } from "./FestivalManagementDialogs";
 
@@ -119,6 +120,8 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
     handleRiderView,
     handleRiderDownload,
   } = vm;
+  const isManagementUser = isManagementRole(userRole);
+  const isDepartmentManager = isDepartmentManagementRole(userRole);
 
   return (
     <div className="max-w-[1920px] mx-auto px-4 py-4 md:py-6 space-y-4 md:space-y-6">
@@ -620,7 +623,7 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                 )}
 
                 {/* WhatsApp Group */}
-                {(userRole === "management" || userRole === "admin") && (
+                {isManagementUser && (
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-green-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <MessageCircle className="h-4 w-4 flex-shrink-0 text-green-500" />
@@ -636,7 +639,7 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                 )}
 
                 {/* Almacén Messaging */}
-                {(userRole === "management" || userRole === "admin") && (
+                {isManagementUser && (
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-amber-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <MessageCircle className="h-4 w-4 flex-shrink-0 text-amber-500" />
@@ -658,7 +661,7 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                 )}
 
                 {/* Pesos Calculator */}
-                {userRole === "management" && (
+                {isDepartmentManager && (
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-indigo-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <Scale className="h-4 w-4 flex-shrink-0 text-indigo-500" />
@@ -672,7 +675,7 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                 )}
 
                 {/* Consumos Calculator */}
-                {userRole === "management" && (
+                {isDepartmentManager && (
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-yellow-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <Zap className="h-4 w-4 flex-shrink-0 text-yellow-500" />
@@ -691,7 +694,7 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                 )}
 
                 {/* Incident Report */}
-                {userRole === "technician" && (
+                {canSubmitTechnicianIncidentReports(userRole) && (
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-red-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />

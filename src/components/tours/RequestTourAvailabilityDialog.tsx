@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { buildTourSchedulePdfBlob } from '@/lib/tourPdfExport';
 import { uploadTourPdfWithRecord } from '@/utils/tourDocumentsUpload';
+import { isDepartmentManagementRole, isTechnicianRole } from '@/utils/permissions';
 
 type TourDateLite = { id: string; date: string; location?: { name?: string | null } | null; is_tour_pack_only?: boolean | null };
 type Props = {
@@ -33,7 +34,7 @@ export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenCha
         const { data, error } = await supabase.rpc('get_profiles_with_skills');
         if (error) throw error;
         const filtered = (data || [])
-          .filter((t: any) => ['technician', 'house_tech'].includes(t.role) || (t.role === 'management' && t.assignable_as_tech))
+          .filter((t: any) => isTechnicianRole(t.role) || (isDepartmentManagementRole(t.role) && t.assignable_as_tech))
           .map((t: any) => ({ id: t.id, name: `${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email || t.id }))
           .sort((a: any, b: any) => a.name.localeCompare(b.name));
         setTechOptions(filtered);

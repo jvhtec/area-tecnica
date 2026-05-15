@@ -8,6 +8,7 @@ import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { UserRole } from "@/types/user";
 import { logAuthEvent, logSecurityEvent } from "@/lib/security-audit";
+import { canAccessSoundVision } from "@/utils/permissions";
 
 interface AuthContextType {
   session: Session | null;
@@ -819,13 +820,11 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     };
   }, [refreshSession, session, toast, tokenManager]);
 
-  const normalizedDepartment = userDepartment?.toLowerCase();
-  const hasSoundVisionAccess =
-    Boolean(soundVisionAccessFlag) ||
-    userRole === 'admin' ||
-    userRole === 'management' ||
-    (userRole === 'house_tech' && normalizedDepartment === 'sound') ||
-    (userRole === 'technician' && normalizedDepartment === 'sound');
+  const hasSoundVisionAccess = canAccessSoundVision(
+    userRole,
+    userDepartment,
+    Boolean(soundVisionAccessFlag),
+  );
 
   const value = {
     session,

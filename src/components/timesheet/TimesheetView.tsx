@@ -36,6 +36,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ExpenseList, ExpenseSummaryCard } from "@/components/expenses";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
+import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
 
 import { TimesheetEditForm } from "./TimesheetEditForm";
 import { TimesheetRejectDialog } from "./TimesheetRejectDialog";
@@ -128,7 +129,7 @@ export const TimesheetView = ({
     let filtered = timesheets;
 
     // First filter by role
-    if (userRole === 'technician' || userRole === 'house_tech') {
+    if (isTechnicianRole(userRole)) {
       filtered = filtered.filter(t => t.technician_id === user.id);
     }
 
@@ -393,8 +394,8 @@ export const TimesheetView = ({
     return acc;
   }, {} as Record<string, Timesheet[]>);
 
-  const isManagementUser = userRole === 'admin' || userRole === 'management';
-  const isTechnician = userRole === 'technician' || userRole === 'house_tech';
+  const isManagementUser = isManagementRole(userRole);
+  const isTechnician = isTechnicianRole(userRole);
   const isHouseTech = userRole === 'house_tech';
 
   console.log('TimesheetView Debug:', {
@@ -911,9 +912,8 @@ export const TimesheetView = ({
                   */}
                   {(() => {
                     const breakdownVisible = !!timesheet.amount_breakdown_visible;
-                    const isTechnicianRole = userRole === 'technician';
-                    const isHouseTechRole = userRole === 'house_tech';
-                    const canShowRates = isManagementUser || (isTechnicianRole && breakdownVisible) || (isHouseTechRole && breakdownVisible);
+                    const isTechnicianOnlyRole = userRole === 'technician';
+                    const canShowRates = isManagementUser || (isTechnicianOnlyRole && breakdownVisible);
                     if (!canShowRates) return null;
                     return (
                       <div className="mt-4 p-3 rounded-md border">
@@ -980,7 +980,7 @@ export const TimesheetView = ({
                                   Evento: tarifa fija de 12h (base + plus) independientemente de las horas trabajadas.
                                 </div>
                               )}
-                              {(userRole === 'technician' || userRole === 'house_tech') && (
+                              {isTechnicianOnlyRole && (
                                 <div className="col-span-2 md:col-span-5 text-xs text-muted-foreground mt-1">
                                   Notas: redondeo después de 30 minutos; pueden aplicarse algunas condiciones como descuentos de 30€ para autónomos según el contrato.
                                 </div>

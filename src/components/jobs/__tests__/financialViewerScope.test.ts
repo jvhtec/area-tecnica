@@ -23,6 +23,12 @@ describe('getVisibleFinancialTechnicianIds', () => {
     expect(getVisibleFinancialTechnicianIds(technicians, 'logistics', 'sound')).toBeNull();
   });
 
+  it('scopes non-management users to the current viewer only', () => {
+    expect(getVisibleFinancialTechnicianIds(technicians, 'house_tech', 'sound', 'house-1')).toEqual(['house-1']);
+    expect(getVisibleFinancialTechnicianIds(technicians, 'technician', 'administrative', 'tech-1')).toEqual(['tech-1']);
+    expect(getVisibleFinancialTechnicianIds(technicians, 'house_tech', 'sound')).toEqual([]);
+  });
+
   it('returns an empty list when a scoped manager has no matching department', () => {
     expect(getVisibleFinancialTechnicianIds(technicians, 'management', 'video')).toEqual([]);
     expect(getVisibleFinancialTechnicianIds(technicians, 'management', null)).toEqual([]);

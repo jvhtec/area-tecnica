@@ -18,6 +18,7 @@ import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
+import { isManagementRole } from "@/utils/permissions";
 
 const Operaciones = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
@@ -29,7 +30,8 @@ const Operaciones = () => {
   const [selectedJob, setSelectedJob] = useState<any>(null);
   const [date, setDate] = useState<Date | undefined>(new Date());
   const currentDepartment = "video";
-  const { userRole } = useOptimizedAuth();
+  const { userRole, isLoading: authLoading } = useOptimizedAuth();
+  const canManageJobs = isManagementRole(userRole);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -54,13 +56,14 @@ const Operaciones = () => {
       const metaN = (e.key.toLowerCase() === 'n') && (e.metaKey || e.ctrlKey);
       if (metaN) {
         e.preventDefault();
+        if (!canManageJobs) return;
         setPresetJobType(undefined);
         setIsJobDialogOpen(true);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [canManageJobs]);
 
   const departmentJobs = useMemo(() => {
     return jobs.filter((job) =>
@@ -89,16 +92,16 @@ const Operaciones = () => {
 
   const handleDeleteClick = useCallback(async (jobId: string) => {
     // Check permissions
-    if (!["admin", "management"].includes(userRole || "")) {
+    if (!canManageJobs) {
       toast({
-        title: "Permission denied",
-        description: "Only admin and management users can delete jobs",
+        title: "Permiso denegado",
+        description: "Solo administradores y usuarios de gestión pueden eliminar trabajos",
         variant: "destructive"
       });
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this job?")) return;
+    if (!window.confirm("¿Seguro que quieres eliminar este trabajo?")) return;
 
     try {
       console.log("Operaciones page: Starting optimistic job deletion for:", jobId);
@@ -108,30 +111,39 @@ const Operaciones = () => {
 
       if (result.success) {
         toast({
-          title: "Job deleted",
-          description: result.details || "The job has been removed and cleanup completed"
+          title: "Trabajo eliminado",
+          description: result.details || "El trabajo se ha eliminado y la limpieza se ha completado"
         });
 
         // Invalidate queries to refresh the list
         await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
         await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       } else {
-        throw new Error(result.error || "Unknown deletion error");
+        throw new Error(result.error || "Error desconocido al eliminar");
       }
     } catch (error: any) {
       console.error("Operaciones page: Error in optimistic job deletion:", error);
       toast({
-        title: "Error deleting job",
+        title: "Error al eliminar el trabajo",
         description: error.message,
         variant: "destructive"
       });
     }
-  }, [queryClient, toast, userRole]);
+  }, [canManageJobs, queryClient, toast]);
 
   const handleCreateJob = useCallback((preset?: JobType) => {
+    if (!canManageJobs) {
+      toast({
+        title: "Permiso denegado",
+        description: "Solo administradores y usuarios de gestión pueden crear trabajos",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setPresetJobType(preset);
     setIsJobDialogOpen(true);
-  }, []);
+  }, [canManageJobs, toast]);
 
   const handleDateTypeChange = useCallback(() => { }, []);
 
@@ -140,7 +152,7 @@ const Operaciones = () => {
       <LightsHeader
         onCreateJob={handleCreateJob}
         department="Video"
-        canCreate={userRole ? ["admin", "management"].includes(userRole) : true}
+        canCreate={!authLoading && canManageJobs}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -224,12 +236,14 @@ const Operaciones = () => {
       ) : null}
 
       {/* Mobile FAB */}
-      <Button
-        className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
-        onClick={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      {!authLoading && canManageJobs && (
+        <Button
+          className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
+          onClick={() => handleCreateJob(undefined)}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      )}
     </div>
   );
 };

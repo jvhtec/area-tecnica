@@ -17,6 +17,15 @@ import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload"
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { MorningSummarySubscription } from "@/components/settings/MorningSummarySubscription";
 import { CityAutocomplete } from "@/components/maps/CityAutocomplete";
+import {
+  canReceiveMorningSummary,
+  canUseCustomFolderStructure,
+  canUseProfileCalendarSubscription,
+  canUseTechnicianSelfTools,
+  canViewAchievements,
+  canViewProfilePushControls,
+  isManagementRole,
+} from "@/utils/permissions";
 
 export const Profile = () => {
   const { toast } = useToast();
@@ -53,11 +62,12 @@ export const Profile = () => {
   const hasSubscription = Boolean(subscription);
   const showEnableButton = canEnable && !isInitializing;
   const isBlocked = permission === 'denied';
-  const showPushControls = ['technician', 'house_tech', 'oscar'].includes(profile?.role);
-  const showIcsCard = ['technician', 'house_tech', 'management', 'admin'].includes(profile?.role);
-  const showTechnicianSelfTools =
-    (profile?.role === 'admin' || profile?.role === 'management') &&
-    profile?.assignable_as_tech === true;
+  const showPushControls = canViewProfilePushControls(profile?.role);
+  const showIcsCard = canUseProfileCalendarSubscription(profile?.role);
+  const showTechnicianSelfTools = canUseTechnicianSelfTools(
+    profile?.role,
+    profile?.assignable_as_tech,
+  );
 
   // Fetch user profile on component mount
   useEffect(() => {
@@ -326,7 +336,7 @@ export const Profile = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="department">Departamento</Label>
-                    {profile.role === 'admin' || profile.role === 'super_admin' ? (
+                    {isManagementRole(profile.role) || profile.role === 'super_admin' ? (
                       <Select
                         value={profile.department || ''}
                         onValueChange={(value) => setProfile({ ...profile, department: value as Department })}
@@ -446,7 +456,7 @@ export const Profile = () => {
           </div>
 
           {/* Folder structure */}
-          {(profile.role === 'admin' || profile.role === 'management') && (
+          {canUseCustomFolderStructure(profile.role) && (
             <Card className="h-full">
               <CardHeader>
                 <CardTitle>Personalización de estructura de carpetas</CardTitle>
@@ -505,7 +515,7 @@ export const Profile = () => {
           )}
 
           {/* Achievements */}
-          {['technician', 'house_tech', 'admin', 'management'].includes(profile?.role) && (
+          {canViewAchievements(profile?.role) && (
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -671,7 +681,7 @@ export const Profile = () => {
           )}
 
           {/* Morning summary */}
-          {['house_tech', 'management', 'admin'].includes(profile?.role) && (
+          {canReceiveMorningSummary(profile?.role) && (
             <MorningSummarySubscription />
           )}
 

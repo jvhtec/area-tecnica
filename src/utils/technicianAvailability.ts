@@ -1,5 +1,6 @@
 
 import { supabase } from "@/lib/supabase";
+import { hasTechnicianSelfServiceAccess } from "@/utils/permissions";
 
 export interface TechnicianJobConflict {
   id: string;
@@ -67,12 +68,9 @@ export async function getAvailableTechnicians(
       return [];
     }
 
-    const eligibleTechnicians = allTechnicians.filter((tech: any) => {
-      if (tech.role === 'management' || tech.role === 'admin') {
-        return !!tech.assignable_as_tech;
-      }
-      return tech.role === 'technician' || tech.role === 'house_tech';
-    });
+    const eligibleTechnicians = allTechnicians.filter((tech: any) =>
+      hasTechnicianSelfServiceAccess(tech.role, tech.assignable_as_tech)
+    );
 
     if (eligibleTechnicians.length === 0) {
       return [];

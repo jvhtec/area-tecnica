@@ -11,6 +11,7 @@ import { toast } from "sonner";
 import { TokenManager } from "@/lib/token-manager";
 import { UnifiedSubscriptionManager, type SubscriptionSnapshot } from "@/lib/unified-subscription-manager";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { isAdminRole } from "@/utils/permissions";
 
 interface SubscriptionContextType {
   connectionStatus: "connected" | "disconnected" | "connecting";
@@ -94,7 +95,7 @@ interface SubscriptionProviderProps {
 export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
   const queryClient = useQueryClient();
   const { userRole } = useOptimizedAuth();
-  const isAdmin = userRole === "admin";
+  const isAdmin = isAdminRole(userRole);
 
   const manager = useMemo(() => UnifiedSubscriptionManager.getInstance(queryClient), [queryClient]);
 
@@ -180,4 +181,3 @@ export function SubscriptionProvider({ children }: SubscriptionProviderProps) {
 
   return <SubscriptionContext.Provider value={value}>{children}</SubscriptionContext.Provider>;
 }
-

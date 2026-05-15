@@ -14,6 +14,7 @@ import { es } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
+import { canManageJobAssignments } from '@/utils/permissions';
 
 interface MobileAssignmentsDialogProps {
   open: boolean;
@@ -39,7 +40,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
   const [selectedJobDate, setSelectedJobDate] = useState<Date | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const canManageAssignments = ['admin', 'management', 'house_tech'].includes(userRole || '');
+  const canManageAssignments = canManageJobAssignments(userRole);
 
   const roleOptions = useMemo(() => roleOptionsForDiscipline(department) || [], [department]);
 

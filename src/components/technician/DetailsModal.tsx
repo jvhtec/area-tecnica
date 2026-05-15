@@ -17,6 +17,7 @@ import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-re
 import { createSignedUrl } from '@/utils/jobDocuments';
 import { labelForCode } from '@/utils/roles';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { isTechnicianRole } from '@/utils/permissions';
 import type { TourDocument } from '@/hooks/useTourDocuments';
 import type { Restaurant, WeatherData } from '@/types/hoja-de-ruta';
 import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from '@/types/job';
@@ -1743,7 +1744,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                             <h3 className={`text-lg font-bold ${theme.textMain}`}>Documentos de la gira</h3>
                                         </div>
 
-                                        {['technician', 'house_tech'].includes(userRole || '') ? (
+                                        {isTechnicianRole(userRole) ? (
                                             <Button
                                                 variant="outline"
                                                 size="sm"
@@ -1754,7 +1755,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                         ) : null}
                                     </div>
 
-                                    {isUploadingTourDocument && ['technician', 'house_tech'].includes(userRole || '') ? (
+                                    {isUploadingTourDocument && isTechnicianRole(userRole) ? (
                                         <div className={`${isDark ? 'bg-[#151820] border-[#2a2e3b]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-3 mb-3`}>
                                             <TourDocumentUploader
                                                 tourId={tourId}

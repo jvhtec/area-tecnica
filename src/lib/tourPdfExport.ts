@@ -1,6 +1,6 @@
 
 import { format } from 'date-fns';
-import { fetchTourLogo } from '@/utils/pdf/tourLogoUtils';
+import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { buildReadableFilename } from '@/utils/fileName';
 

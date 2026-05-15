@@ -9,7 +9,7 @@ import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehe
 import { useJobTechnicianRateModeDates, useSetTechnicianDateRateMode } from '@/hooks/useTechnicianRateModeDates';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
-import { canManagePayouts, isAdministrativeDepartment } from '@/utils/permissions';
+import { canManagePayouts, isAdminRole, isAdministrativeDepartment } from '@/utils/permissions';
 import type { Database } from '@/integrations/supabase/types';
 import type { JobPayoutTotals, JobExpenseBreakdownItem } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
@@ -34,8 +34,8 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   /* ── Auth ── */
   const { userRole, userDepartment } = useOptimizedAuth();
   const isManager = canManagePayouts(userRole, userDepartment);
-  const isAdmin = userRole === 'admin';
-  const isAdminOrAdministrative = userRole === 'admin' || isAdministrativeDepartment(userDepartment);
+  const isAdmin = isAdminRole(userRole);
+  const isAdminOrAdministrative = isAdmin || isAdministrativeDepartment(userDepartment);
 
   /* ── Job metadata ── */
   const {

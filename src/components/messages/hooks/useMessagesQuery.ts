@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Message } from '../types';
 import { useMessagesSubscription } from './useMessagesSubscription';
+import { isDepartmentManagementRole } from '@/utils/permissions';
 
 export const useMessagesQuery = (userRole: string | null, userDepartment: string | null) => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -36,7 +37,7 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
         `)
         .order('created_at', { ascending: false });
 
-      if (userRole === 'management') {
+      if (isDepartmentManagementRole(userRole)) {
         query.eq('department', userDepartment);
       } else {
         query.eq('sender_id', await supabase.auth.getUser().then(res => res.data.user?.id));

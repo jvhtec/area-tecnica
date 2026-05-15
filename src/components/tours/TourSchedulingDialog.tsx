@@ -41,6 +41,7 @@ import {
   generateCompleteDaySheetSet,
 } from "@/utils/tour-scheduling-pdf-enhanced";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { isManagementRole } from "@/utils/permissions";
 
 interface TourSchedulingDialogProps {
   open: boolean;
@@ -68,7 +69,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
   const [accommodations, setAccommodations] = useState<any[]>([]);
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
 
-  const canEdit = userRole === 'admin' || userRole === 'management';
+  const canEdit = isManagementRole(userRole);
 
   // Load tour data and associated hoja de ruta records
   useEffect(() => {

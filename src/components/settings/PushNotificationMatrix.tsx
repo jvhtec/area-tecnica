@@ -12,6 +12,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 import { useRef } from 'react';
 import { useDragScroll } from '@/hooks/useDragScroll';
+import { isManagementRole } from '@/utils/permissions';
 
 type RecipientType = 'management_user' | 'department' | 'broadcast' | 'natural' | 'assigned_technicians';
 
@@ -144,7 +145,7 @@ function routeKey(event: string, type: RecipientType, target: string | null) {
 
 export function PushNotificationMatrix() {
   const { userRole } = useOptimizedAuth();
-  const isManagement = ['admin', 'management'].includes(userRole || '');
+  const isManagement = isManagementRole(userRole);
   const isMobile = useIsMobile();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

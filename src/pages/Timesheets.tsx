@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { es } from 'date-fns/locale';
 import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { isManagementRole } from '@/utils/permissions';
 
 export default function Timesheets() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -23,8 +24,8 @@ export default function Timesheets() {
   const { data: jobs = [], isLoading: jobsLoading } = useOptimizedJobs();
   const { timesheets } = useTimesheets(selectedJobId || "", { userRole });
 
-  const canManage = userRole === 'admin' || userRole === 'management';
-  const canDownloadPDF = userRole === 'admin' || userRole === 'management';
+  const canManage = isManagementRole(userRole);
+  const canDownloadPDF = canManage;
 
   // Initialize department filter with user's department if available
   const [filterDepartment, setFilterDepartment] = useState<string>("all");

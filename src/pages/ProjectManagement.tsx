@@ -22,6 +22,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { cn } from "@/lib/utils";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useCreateJobDialogStore } from "@/stores/useCreateJobDialogStore";
+import { canEditJobs } from "@/utils/permissions";
 
 const normalizeSearchText = (value: string) =>
   value
@@ -105,7 +106,7 @@ const ProjectManagement = () => {
   );
 
   // Check user permissions early
-  const canCreateItems = ['admin', 'management', 'logistics'].includes(userRole || '');
+  const canCreateItems = canEditJobs(userRole);
 
   // Auto-complete past jobs when data loads
   useEffect(() => {

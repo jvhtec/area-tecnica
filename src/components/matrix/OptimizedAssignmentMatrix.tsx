@@ -16,6 +16,7 @@ import { throttle } from '@/utils/throttle';
 import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
 import { useDragScroll } from '@/hooks/useDragScroll';
 import { formatUserName } from '@/utils/userName';
+import { isManagementRole } from '@/utils/permissions';
 
 import { OptimizedAssignmentMatrixView } from './optimized-assignment-matrix/OptimizedAssignmentMatrixView';
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps, TechSortMethod } from './optimized-assignment-matrix/types';
@@ -77,7 +78,7 @@ export const OptimizedAssignmentMatrix = ({
   const lastKnownScrollRef = useRef({ left: 0, top: 0 });
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const { userRole } = useOptimizedAuth();
-  const isManagementUser = ['admin', 'management'].includes(userRole || '');
+  const isManagementUser = isManagementRole(userRole);
   const qc = useQueryClient();
   // Sorting focus by job
   const [sortJobId, setSortJobId] = useState<string | null>(null);

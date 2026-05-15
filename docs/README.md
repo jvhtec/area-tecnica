@@ -71,7 +71,7 @@ Detailed deep-dive docs for the full festival subsystem:
   - `SECURITY_AUDIT_LOGGING.md`
 
 ## Plans / Roadmaps
-- `plans/` (grouped plans)
+- **[Codebase Maintenance Roadmap](plans/codebase-maintenance-roadmap.md)** - phased technical-debt, refactor, type-safety, performance, and ops cleanup backlog
 - `migrations/` (migration notes)
 
 ## Screenshots

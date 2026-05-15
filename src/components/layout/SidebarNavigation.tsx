@@ -29,7 +29,16 @@ import {
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { canManagePayouts, hasTechnicianSelfServiceAccess } from "@/utils/permissions"
+import {
+  canAccessDisponibilidad,
+  canAccessExpenses,
+  canAccessProjectManagement,
+  canManagePayouts,
+  hasTechnicianSelfServiceAccess,
+  isAdminRole,
+  isDepartmentManagementRole,
+  isManagementRole,
+} from "@/utils/permissions"
 
 import { SidebarNavigationSkeleton } from "./SidebarNavigationSkeleton"
 
@@ -92,7 +101,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 1,
     mobileSlot: "primary",
     getPath: () => "/dashboard",
-    isVisible: ({ userRole }) => userRole === "management" || userRole === "oscar",
+    isVisible: ({ userRole }) => isManagementRole(userRole) || userRole === "oscar",
   },
   {
     id: "technician-dashboard",
@@ -172,7 +181,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 11,
     mobileSlot: "secondary",
     getPath: () => "/job-assignment-matrix",
-    isVisible: ({ userRole }) => userRole === "management",
+    isVisible: ({ userRole }) => isDepartmentManagementRole(userRole),
   },
   {
      id: "management-rates",
@@ -182,7 +191,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
      mobilePriority: 10,
      mobileSlot: "secondary",
      getPath: () => "/management/rates",
-     isVisible: ({ userRole }) => userRole === "management",
+     isVisible: ({ userRole }) => isDepartmentManagementRole(userRole),
    },
    {
      id: "management-payouts-due",
@@ -202,8 +211,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
      mobilePriority: 9,
      mobileSlot: "secondary",
      getPath: () => "/gastos",
-     isVisible: ({ userRole }) =>
-       userRole === "admin" || userRole === "management" || userRole === "logistics",
+     isVisible: ({ userRole }) => canAccessExpenses(userRole),
    },
    {
     id: "management-department",
@@ -226,7 +234,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
       return departmentIconMap[normalized] ? `/${normalized}` : null
     },
     isVisible: ({ userRole, userDepartment }) => {
-      if (userRole !== "management" || !userDepartment) {
+      if (!isDepartmentManagementRole(userRole) || !userDepartment) {
         return false
       }
       const normalized = userDepartment.toLowerCase()
@@ -241,7 +249,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 6,
     mobileSlot: "secondary",
     getPath: () => "/lights",
-    isVisible: ({ userRole }) => userRole === "admin",
+    isVisible: ({ userRole }) => isAdminRole(userRole),
   },
   {
     id: "admin-video",
@@ -251,7 +259,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 6,
     mobileSlot: "secondary",
     getPath: () => "/video",
-    isVisible: ({ userRole }) => userRole === "admin",
+    isVisible: ({ userRole }) => isAdminRole(userRole),
   },
   {
     id: "admin-sound",
@@ -261,7 +269,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 6,
     mobileSlot: "secondary",
     getPath: () => "/sound",
-    isVisible: ({ userRole }) => userRole === "admin",
+    isVisible: ({ userRole }) => isAdminRole(userRole),
   },
   {
     id: "house-department",
@@ -295,7 +303,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobileSlot: "primary",
     getPath: () => "/tours",
     isVisible: ({ userRole }) =>
-      userRole === "management" || userRole === "house_tech",
+      isDepartmentManagementRole(userRole) || userRole === "house_tech",
   },
   {
     id: "festivals",
@@ -316,16 +324,8 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 7,
     mobileSlot: "secondary",
     getPath: () => "/disponibilidad",
-    isVisible: ({ userRole, userDepartment }) => {
-      if (userRole === "admin") {
-        return true
-      }
-      if (userRole !== "management") {
-        return false
-      }
-      const normalized = userDepartment?.toLowerCase()
-      return normalized === "sound" || normalized === "lights"
-    },
+    isVisible: ({ userRole, userDepartment }) =>
+      canAccessDisponibilidad(userRole, userDepartment),
   },
   {
     id: "project-management",
@@ -335,10 +335,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 8,
     mobileSlot: "secondary",
     getPath: () => "/project-management",
-    isVisible: ({ userRole }) =>
-      userRole === "admin" ||
-      userRole === "management" ||
-      userRole === "logistics",
+    isVisible: ({ userRole }) => canAccessProjectManagement(userRole),
   },
   {
     id: "global-tasks",
@@ -349,9 +346,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobileSlot: "secondary",
     getPath: () => "/tasks",
     isVisible: ({ userRole }) =>
-      userRole === "admin" ||
-      userRole === "management" ||
-      userRole === "logistics" ||
+      canAccessProjectManagement(userRole) ||
       userRole === "house_tech" ||
       userRole === "oscar",
   },
@@ -364,9 +359,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobileSlot: "primary",
     getPath: () => "/logistics",
     isVisible: ({ userRole }) =>
-      userRole === "admin" ||
-      userRole === "management" ||
-      userRole === "logistics" ||
+      canAccessProjectManagement(userRole) ||
       userRole === "house_tech",
   },
   {
@@ -387,7 +380,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 12,
     mobileSlot: "secondary",
     getPath: () => "/management/wallboard-presets",
-    isVisible: ({ userRole }) => userRole === "admin",
+    isVisible: ({ userRole }) => isAdminRole(userRole),
   },
   {
     id: "announcements",
@@ -397,7 +390,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 12,
     mobileSlot: "secondary",
     getPath: () => "/announcements",
-    isVisible: ({ userRole }) => userRole === "admin",
+    isVisible: ({ userRole }) => isAdminRole(userRole),
   },
   {
     id: "incident-reports",
@@ -407,8 +400,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 13,
     mobileSlot: "secondary",
     getPath: () => "/incident-reports",
-    isVisible: ({ userRole }) =>
-      userRole === "admin" || userRole === "management",
+    isVisible: ({ userRole }) => isManagementRole(userRole),
   },
   {
     id: "activity",
@@ -418,7 +410,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 14,
     mobileSlot: "secondary",
     getPath: () => "/activity",
-    isVisible: ({ userRole }) => userRole === "admin",
+    isVisible: ({ userRole }) => isAdminRole(userRole),
   },
   {
     id: "feedback",
@@ -438,8 +430,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     mobilePriority: 15,
     mobileSlot: "secondary",
     getPath: () => "/settings",
-    isVisible: ({ userRole }) =>
-      userRole === "admin" || userRole === "management",
+    isVisible: ({ userRole }) => isManagementRole(userRole),
   },
 ]
 
@@ -481,7 +472,7 @@ export const buildNavigationItems = (
     return []
   }
 
-  const isAdmin = context.userRole === "admin"
+  const isAdmin = isAdminRole(context.userRole)
 
   const createNavigationItem = (
     config: NavigationItemConfig,

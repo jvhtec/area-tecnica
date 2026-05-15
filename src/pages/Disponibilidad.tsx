@@ -19,6 +19,7 @@ import { useOptimizedJobs } from '@/hooks/useOptimizedJobs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { MobileAvailabilityView } from '@/components/disponibilidad/MobileAvailabilityView';
+import { canAccessDisponibilidad, isAdminRole, isDepartmentManagementRole } from '@/utils/permissions';
 
 type DisponibilidadDepartment = 'sound' | 'lights';
 
@@ -36,11 +37,9 @@ export default function Disponibilidad() {
   const isMobile = useIsMobile();
 
   const normalizedDepartment = userDepartment?.toLowerCase();
-  const isAdmin = userRole === 'admin';
-  const isManagement = userRole === 'management';
-  const hasManagementDepartmentAccess =
-    userRole === 'management' &&
-    (normalizedDepartment === 'sound' || normalizedDepartment === 'lights');
+  const isAdmin = isAdminRole(userRole);
+  const isManagement = isDepartmentManagementRole(userRole);
+  const hasDisponibilidadAccess = canAccessDisponibilidad(userRole, userDepartment);
 
   const [adminDepartment, setAdminDepartment] = useState<DisponibilidadDepartment>('sound');
 
@@ -52,11 +51,11 @@ export default function Disponibilidad() {
 
   const department: DisponibilidadDepartment | null = isAdmin
     ? adminDepartment
-    : hasManagementDepartmentAccess
+    : hasDisponibilidadAccess
       ? (normalizedDepartment as DisponibilidadDepartment)
       : null;
 
-  if (isManagement && !hasManagementDepartmentAccess) {
+  if (isManagement && !hasDisponibilidadAccess) {
     return (
       <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
         <h1 className="text-2xl font-semibold mb-4">Acceso restringido</h1>

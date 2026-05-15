@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getOptimizedProfilePictureUrl } from "@/utils/imageOptimization";
+import { isManagementRole } from "@/utils/permissions";
 
 interface DashboardMobileHubProps {
   jobs: any[];
@@ -65,7 +66,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   const [isStatusFilterOpen, setIsStatusFilterOpen] = useState(false);
   const [userProfile, setUserProfile] = useState<{ first_name?: string; last_name?: string; profile_picture_url?: string } | null>(null);
 
-  const canEdit = userRole ? ["admin", "management"].includes(userRole) : false;
+  const canEdit = isManagementRole(userRole);
 
   // Load user filter preferences from profiles
   useEffect(() => {

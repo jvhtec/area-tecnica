@@ -7,6 +7,7 @@ import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { supabase } from "@/lib/supabase";
 import { format } from "date-fns";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
+import { canUseCustomFolderStructure, isManagementRole } from "@/utils/permissions";
 
 export const useJobActions = (job: any, userRole: string | null, onDeleteClick?: (jobId: string) => void) => {
   const { toast } = useToast();
@@ -26,7 +27,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
       return;
     }
     
-    if (!["admin", "management"].includes(userRole || "")) {
+    if (!isManagementRole(userRole)) {
       toast({
         title: "Permission denied",
         description: "Only admin and management users can delete jobs",
@@ -208,7 +209,7 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
           .single();
 
         // Only use custom structure for management users
-        if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_folder_structure) {
+        if (profile && canUseCustomFolderStructure(profile.role) && profile.custom_folder_structure) {
           folderStructure = profile.custom_folder_structure;
           usedCustomStructure = true;
         }

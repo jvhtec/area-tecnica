@@ -28,6 +28,7 @@ import {
   Loader2,
   FileText
 } from "lucide-react";
+import { canViewDetails, isManagementRole } from "@/utils/permissions";
 import { cn } from "@/lib/utils";
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
@@ -68,6 +69,8 @@ export function MobileJobCard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { userRole } = useOptimizedAuth();
+  const isManagementUser = isManagementRole(userRole);
+  const canViewJobDetails = canViewDetails(userRole);
   const [dateTypeDialogOpen, setDateTypeDialogOpen] = useState(false);
   const [selectedDateType, setSelectedDateType] = useState<DateType>('show');
   const [jobDetailsDialogOpen, setJobDetailsDialogOpen] = useState(false);
@@ -321,8 +324,8 @@ export function MobileJobCard({
                   
                   <DropdownMenuSeparator />
                   
-                  {/* View Details - for technicians and house techs */}
-                  {(userRole === 'technician' || userRole === 'house_tech') && (
+                  {/* View Details */}
+                  {canViewJobDetails && (
                     <DropdownMenuItem 
                       onClick={(e) => {
                         e.stopPropagation();
@@ -410,21 +413,6 @@ export function MobileJobCard({
                     </DropdownMenuItem>
                   )}
                   
-                  <DropdownMenuSeparator />
-                  
-                  {/* View Details - for technicians and house techs */}
-                  {(userRole === 'technician' || userRole === 'house_tech') && (
-                    <DropdownMenuItem 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setJobDetailsDialogOpen(true);
-                      }}
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      View Details
-                    </DropdownMenuItem>
-                  )}
-                  
                   {canEditJobs && (
                     <DropdownMenuItem onClick={handleEditButtonClick}>
                       <Edit className="mr-2 h-4 w-4" />
@@ -432,7 +420,7 @@ export function MobileJobCard({
                     </DropdownMenuItem>
                   )}
                   
-                  {["admin", "management"].includes(userRole || "") && (
+                  {isManagementUser && (
                     <DropdownMenuItem 
                       onClick={handleDeleteClick}
                       className="text-destructive focus:text-destructive"

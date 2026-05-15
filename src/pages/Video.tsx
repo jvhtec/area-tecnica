@@ -20,6 +20,7 @@ import { CalendarSection } from "@/components/dashboard/CalendarSection";
 import { TodaySchedule } from "@/components/dashboard/TodaySchedule";
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { isManagementRole } from "@/utils/permissions";
 
 const Video = () => {
   const isMobile = useIsMobile();
@@ -33,6 +34,7 @@ const Video = () => {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const currentDepartment = "video";
   const { userRole } = useOptimizedAuth();
+  const canManageJobs = isManagementRole(userRole);
 
   const mobileTools = useMemo(
     () => [
@@ -67,13 +69,14 @@ const Video = () => {
       const metaN = (e.key.toLowerCase() === 'n') && (e.metaKey || e.ctrlKey);
       if (metaN) {
         e.preventDefault();
+        if (!canManageJobs) return;
         setPresetJobType(undefined);
         setIsJobDialogOpen(true);
       }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [canManageJobs]);
 
   const departmentJobs = useMemo(() => {
     if (!jobs) return [];
@@ -107,6 +110,15 @@ const Video = () => {
   }, []);
 
   const handleDeleteClick = useCallback(async (jobId: string) => {
+    if (!canManageJobs) {
+      toast({
+        title: "Permission denied",
+        description: "Only admin and management users can delete jobs",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!window.confirm("Are you sure you want to delete this job?")) return;
 
     try {
@@ -129,7 +141,7 @@ const Video = () => {
         variant: "destructive",
       });
     }
-  }, [queryClient, toast]);
+  }, [canManageJobs, queryClient, toast]);
 
   const handleAssignmentDialogClose = useCallback(() => {
     setIsAssignmentDialogOpen(false);
@@ -145,9 +157,18 @@ const Video = () => {
   }, []);
 
   const handleCreateJob = useCallback((preset?: JobType) => {
+    if (!canManageJobs) {
+      toast({
+        title: "Permission denied",
+        description: "Only admin and management users can create jobs",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setPresetJobType(preset);
     setIsJobDialogOpen(true);
-  }, []);
+  }, [canManageJobs, toast]);
 
   return (
     <div className="min-h-screen bg-background text-foreground p-4 md:p-8">
@@ -161,6 +182,10 @@ const Video = () => {
             jobs={departmentJobs}
             date={date ?? new Date()}
             onDateSelect={(nextDate) => setDate(nextDate)}
+            userRole={userRole}
+            onEditJob={handleEditClick}
+            onDeleteJob={handleDeleteClick}
+            onJobClick={handleJobClick}
           />
         )}
         {!isMobile && (
@@ -168,7 +193,7 @@ const Video = () => {
             <LightsHeader
               onCreateJob={handleCreateJob}
               department="Video"
-              canCreate={userRole ? ["admin","management"].includes(userRole) : true}
+              canCreate={canManageJobs}
             />
 
             <div className="bg-card border border-border rounded-xl p-3 sm:p-4 shadow-sm">
@@ -259,12 +284,14 @@ const Video = () => {
       ) : null}
 
       {/* Mobile FAB */}
-      <Button 
-        className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
-        onClick={() => handleCreateJob(undefined)}
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      {canManageJobs && (
+        <Button
+          className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
+          onClick={() => handleCreateJob(undefined)}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      )}
     </div>
   );
 };

@@ -27,6 +27,12 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreateFoldersOptions } from "@/utils/flex-folders";
 import { isFestivalLikeJobType } from "@/utils/jobType";
+import {
+  canUseCustomFolderStructure,
+  isAdminRole,
+  isDepartmentManagementRole,
+  isManagementRole,
+} from "@/utils/permissions";
 
 export interface JobCardNewProps {
   job: any;
@@ -199,13 +205,13 @@ function JobCardNewFull({
   const [selectedTransportRequest, setSelectedTransportRequest] = useState<any | null>(null);
   const [logisticsInitialEventType, setLogisticsInitialEventType] = useState<'load' | 'unload' | undefined>(undefined);
   const { user, userDepartment: currentUserDepartment } = useOptimizedAuth();
+  const isManagementUser = isManagementRole(userRole);
 
   const canGenerateTransportPdf = React.useMemo(() => {
-    const normalizedRole = (userRole || '').trim().toLowerCase();
     const normalizedDepartment = (currentUserDepartment || '').trim().toLowerCase();
 
-    if (normalizedRole === 'admin') return true;
-    if (normalizedRole !== 'management') return false;
+    if (isAdminRole(userRole)) return true;
+    if (!isDepartmentManagementRole(userRole)) return false;
 
     return ['logistics', 'production', 'produccion', 'producción'].includes(normalizedDepartment);
   }, [currentUserDepartment, userRole]);
@@ -317,7 +323,7 @@ function JobCardNewFull({
       if (error) return [];
       return data || [];
     },
-    enabled: !!job?.id && ((currentUserDepartment === 'logistics') || ['admin', 'management'].includes(userRole || '')),
+    enabled: !!job?.id && ((currentUserDepartment === 'logistics') || isManagementUser),
   });
 
   const { data: jobEvents = [] } = useQuery({
@@ -336,6 +342,7 @@ function JobCardNewFull({
   const isScheduled = (jobEvents?.length || 0) > 0;
   const hasRequest = Boolean(myTransportRequest) || (Array.isArray(allRequests) && allRequests.length > 0);
   const isTechDept = !!currentUserDepartment && ['sound', 'lights', 'video'].includes(currentUserDepartment);
+  const canManageTransportRequests = (currentUserDepartment === 'logistics') || isManagementUser;
 
   const handleCancelTransportRequest = React.useCallback(
     async (requestId: string) => {
@@ -362,7 +369,7 @@ function JobCardNewFull({
 
   const transportButtonLabel = (() => {
     if (isScheduled) return 'Transport Scheduled';
-    if ((currentUserDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) {
+    if (canManageTransportRequests) {
       return allRequests.length > 0 ? `Requests (${allRequests.length})` : 'Logistics';
     }
     if (isTechDept) {
@@ -375,7 +382,7 @@ function JobCardNewFull({
 
   const handleTransportClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if ((currentUserDepartment === 'logistics') || ((userRole === 'management' || userRole === 'admin') && !isTechDept)) {
+    if (canManageTransportRequests) {
       // If there are no pending requests, allow creating a logistics event directly.
       if (!isAllRequestsLoading && allRequests.length === 0) {
         setSelectedTransportRequest(null);
@@ -393,7 +400,7 @@ function JobCardNewFull({
   // WhatsApp group existence for this job + department (for management only)
   const { data: waGroup, refetch: refetchWaGroup } = useQuery({
     queryKey: ['job-whatsapp-group', job.id, department, 0],
-    enabled: !!job?.id && !!department && (userRole === 'management' || userRole === 'admin'),
+    enabled: !!job?.id && !!department && isManagementUser,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_whatsapp_groups')
@@ -409,7 +416,7 @@ function JobCardNewFull({
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
     queryKey: ['job-whatsapp-group-request', job.id, department, 0],
-    enabled: !!job?.id && !!department && (userRole === 'management' || userRole === 'admin'),
+    enabled: !!job?.id && !!department && isManagementUser,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_whatsapp_group_requests')
@@ -464,7 +471,7 @@ function JobCardNewFull({
 
   // Core group creation logic (shared by initial creation and retry)
   const createWhatsappGroupCore = async () => {
-    if (!(userRole === 'management' || userRole === 'admin')) return;
+    if (!isManagementUser) return;
     try {
       // Pre-check: warn for missing phones
       const { data: rows } = await supabase
@@ -520,7 +527,7 @@ function JobCardNewFull({
 
   const handleRetryWhatsappGroup = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!(userRole === 'management' || userRole === 'admin')) return;
+    if (!isManagementUser) return;
 
     try {
       // Clear the failed request using RPC function
@@ -681,7 +688,7 @@ function JobCardNewFull({
       return;
     }
 
-    if (!["admin", "management"].includes(userRole || "")) {
+    if (!isManagementUser) {
       toast({
         title: "Permission denied",
         description: "Only admin and management users can delete jobs",
@@ -918,7 +925,7 @@ function JobCardNewFull({
           .single();
 
         // Only use custom structure for management users
-        if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_folder_structure) {
+        if (profile && canUseCustomFolderStructure(profile.role) && profile.custom_folder_structure) {
           folderStructure = profile.custom_folder_structure;
         }
       }

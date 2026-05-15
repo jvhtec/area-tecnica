@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
+import { isTechnicianRole } from '@/utils/permissions';
 
 interface MyJobTotalProps {
   jobId: string;
@@ -17,7 +18,7 @@ interface MyJobTotalProps {
 
 export function MyJobTotal({ jobId, filterTechnicianId }: MyJobTotalProps) {
   const { user, userRole } = useOptimizedAuth();
-  const isTech = userRole === 'technician' || userRole === 'house_tech';
+  const isTech = isTechnicianRole(userRole);
   // Techs: filter by current user. Management: fetch all rows for job.
   const { data: rows = [], isLoading, error } = useJobPayoutTotals(jobId, isTech ? user?.id : undefined);
   const { data: approvalRow } = useJobRatesApproval(jobId);

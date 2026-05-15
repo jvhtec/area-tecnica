@@ -11,6 +11,7 @@ import { ChevronDown, ChevronRight, LayoutDashboard, Briefcase, Calendar as Cale
 import { useNavigate } from 'react-router-dom';
 import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { canUseHouseTechCalendar, isManagementRole } from '@/utils/permissions';
 
 const Personal = () => {
   const [date, setDate] = useState<Date>(new Date());
@@ -56,7 +57,7 @@ const Personal = () => {
       );
     }
 
-    if (userRole === 'house_tech' || userRole === 'management' || userRole === 'admin') {
+    if (canUseHouseTechCalendar(userRole)) {
       return (
         <VacationRequestsTabs
           userRole={userRole}
@@ -80,7 +81,7 @@ const Personal = () => {
   };
 
   // House techs have read-only access (can't mark dates)
-  const canEditDates = userRole === 'admin' || userRole === 'management';
+  const canEditDates = isManagementRole(userRole);
 
   return (
     <div className={`min-h-screen flex flex-col ${theme.bg} transition-colors duration-300 font-sans`}>

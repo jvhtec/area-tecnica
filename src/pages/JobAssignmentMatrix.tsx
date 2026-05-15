@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+import { hasTechnicianSelfServiceAccess, isManagementRole } from '@/utils/permissions';
 import {
   AVAILABLE_DEPARTMENTS,
   DEPARTMENT_LABELS,
@@ -85,7 +86,7 @@ export default function JobAssignmentMatrix() {
   const [allowMarkUnavailable, setAllowMarkUnavailable] = useState(false);
   const [hideStaffingEmailButtons, setHideStaffingEmailButtons] = useState(false);
   const [hideStaffingWhatsappButtons, setHideStaffingWhatsappButtons] = useState(false);
-  const canMarkUnavailable = userRole === 'management' || userRole === 'admin';
+  const canMarkUnavailable = isManagementRole(userRole);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [hideFridge, setHideFridge] = useState<boolean>(true);
   const [showStaffingReminder, setShowStaffingReminder] = useState(false);
@@ -232,13 +233,7 @@ export default function JobAssignmentMatrix() {
           }
         }
 
-        if (tech.role === 'technician' || tech.role === 'house_tech') {
-          return true;
-        }
-        if (tech.role === 'management' || tech.role === 'admin') {
-          return !!tech.assignable_as_tech;
-        }
-        return false;
+        return hasTechnicianSelfServiceAccess(tech.role, tech.assignable_as_tech);
       });
 
       return filtered.sort((a: any, b: any) => {

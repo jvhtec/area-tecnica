@@ -7,6 +7,12 @@ import { format } from 'date-fns';
 import { createQueryKey } from '@/lib/optimized-react-query';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
+import {
+  canCreateFolders,
+  canEditJobs as canEditJobsForRole,
+  canManageFestivalArtists,
+  canUploadDocuments as canUploadDocumentsForRole,
+} from '@/utils/permissions';
 
 type UseOptimizedJobCardOptions = {
   enableRoleSummary?: boolean;
@@ -197,10 +203,10 @@ export const useOptimizedJobCard = (
   // Memoized permission checks
   const permissions = useMemo(() => {
     const isHouseTech = userRole === 'house_tech';
-    const canEditJobs = ['admin', 'management', 'logistics'].includes(userRole || '');
-    const canManageArtists = ['admin', 'management', 'logistics', 'technician', 'house_tech'].includes(userRole || '');
-    const canUploadDocuments = ['admin', 'management', 'logistics'].includes(userRole || '');
-    const canCreateFlexFolders = ['admin', 'management', 'logistics'].includes(userRole || '');
+    const canEditJobs = canEditJobsForRole(userRole);
+    const canManageArtists = canManageFestivalArtists(userRole);
+    const canUploadDocuments = canUploadDocumentsForRole(userRole);
+    const canCreateFlexFolders = canCreateFolders(userRole);
     
     return {
       isHouseTech,

@@ -7,6 +7,12 @@
 
 import { useShortcutStore } from '@/stores/useShortcutStore';
 import { NavigateFunction } from 'react-router-dom';
+import {
+  DASHBOARD_ALLOWED_ROLES,
+  MANAGEMENT_ALLOWED_ROLES,
+  MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
+  PROJECT_MANAGEMENT_ALLOWED_ROLES,
+} from '@/utils/permissions';
 
 export interface NavigationShortcut {
   id: string;
@@ -25,7 +31,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/dashboard',
     keybind: 'Ctrl+1',
     icon: 'LayoutDashboard',
-    requiredRoles: ['admin', 'management', 'logistics', 'oscar'],
+    requiredRoles: DASHBOARD_ALLOWED_ROLES,
   },
   {
     id: 'nav-technician-dashboard',
@@ -41,7 +47,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/sound',
     keybind: 'Ctrl+2',
     icon: 'Volume2',
-    requiredRoles: ['admin', 'management', 'house_tech'],
+    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
   },
   {
     id: 'nav-lights',
@@ -49,7 +55,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/lights',
     keybind: 'Ctrl+3',
     icon: 'Lightbulb',
-    requiredRoles: ['admin', 'management', 'house_tech'],
+    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
   },
   {
     id: 'nav-video',
@@ -57,7 +63,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/video',
     keybind: 'Ctrl+4',
     icon: 'Video',
-    requiredRoles: ['admin', 'management', 'house_tech'],
+    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
   },
   {
     id: 'nav-logistics',
@@ -65,7 +71,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/logistics',
     keybind: 'Ctrl+5',
     icon: 'Truck',
-    requiredRoles: ['admin', 'management', 'logistics', 'house_tech'],
+    requiredRoles: [...PROJECT_MANAGEMENT_ALLOWED_ROLES, 'house_tech'],
   },
   {
     id: 'nav-tours',
@@ -73,7 +79,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/tours',
     keybind: 'Ctrl+6',
     icon: 'Plane',
-    requiredRoles: ['admin', 'management', 'house_tech'],
+    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
   },
   {
     id: 'nav-festivals',
@@ -81,7 +87,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/festivals',
     keybind: 'Ctrl+7',
     icon: 'Music',
-    requiredRoles: ['admin', 'management', 'house_tech'],
+    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
   },
   {
     id: 'nav-personal',
@@ -89,7 +95,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/personal',
     keybind: 'Ctrl+8',
     icon: 'Users',
-    requiredRoles: ['admin', 'management', 'logistics', 'house_tech'],
+    requiredRoles: [...PROJECT_MANAGEMENT_ALLOWED_ROLES, 'house_tech'],
   },
   {
     id: 'nav-project-management',
@@ -97,7 +103,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/project-management',
     keybind: 'Ctrl+9',
     icon: 'FolderKanban',
-    requiredRoles: ['admin', 'management', 'logistics'],
+    requiredRoles: PROJECT_MANAGEMENT_ALLOWED_ROLES,
   },
   {
     id: 'nav-job-assignment-matrix',
@@ -105,7 +111,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/job-assignment-matrix',
     keybind: 'Ctrl+0',
     icon: 'Calendar',
-    requiredRoles: ['admin', 'management'],
+    requiredRoles: MANAGEMENT_ALLOWED_ROLES,
   },
   {
     id: 'nav-rates',
@@ -113,7 +119,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/management/rates',
     keybind: 'Ctrl+Shift+R',
     icon: 'DollarSign',
-    requiredRoles: ['admin', 'management'],
+    requiredRoles: MANAGEMENT_ALLOWED_ROLES,
   },
   {
     id: 'nav-expenses',
@@ -121,7 +127,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/gastos',
     keybind: 'Ctrl+Shift+G',
     icon: 'Receipt',
-    requiredRoles: ['admin', 'management', 'logistics'],
+    requiredRoles: PROJECT_MANAGEMENT_ALLOWED_ROLES,
   },
   {
     id: 'nav-timesheets',
@@ -143,7 +149,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/hoja-de-ruta',
     keybind: 'Ctrl+Shift+H',
     icon: 'Map',
-    requiredRoles: ['admin', 'management', 'house_tech'],
+    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
   },
   {
     id: 'nav-profile',
@@ -158,7 +164,7 @@ export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
     route: '/settings',
     keybind: 'Ctrl+,',
     icon: 'Settings',
-    requiredRoles: ['admin', 'management'],
+    requiredRoles: MANAGEMENT_ALLOWED_ROLES,
   },
 ];
 

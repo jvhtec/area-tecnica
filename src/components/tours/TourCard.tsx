@@ -16,6 +16,7 @@ import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { createTourRootFolders, createTourDateFolders, createTourRootFoldersManual } from "@/utils/tourFolders";
 import { useQueryClient } from "@tanstack/react-query";
+import { canUseCustomFolderStructure } from "@/utils/permissions";
 
 // File System Access API types
 declare global {
@@ -245,7 +246,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
           .single();
 
         // Only use custom tour structure for management users
-        if (profile && (profile.role === 'admin' || profile.role === 'management') && profile.custom_tour_folder_structure) {
+        if (profile && canUseCustomFolderStructure(profile.role) && profile.custom_tour_folder_structure) {
           folderStructure = profile.custom_tour_folder_structure;
         }
       }

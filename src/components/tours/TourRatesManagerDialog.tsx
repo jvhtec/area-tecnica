@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { generateRateQuotePDF, generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
 import { sendTourJobEmails } from '@/lib/tour-payout-email';
 import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
+import { isManagementRole } from '@/utils/permissions';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 
 type TourRatesManagerDialogProps = {
@@ -96,7 +97,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
 
   const isAssignableManagement = (id: string) => {
     const p = profiles.find((x: any) => x.id === id);
-    return p && ['admin', 'management'].includes(p.role || '') && Boolean(p.assignable_as_tech);
+    return p && isManagementRole(p.role) && Boolean(p.assignable_as_tech);
   };
 
   // Debug logging for manager view

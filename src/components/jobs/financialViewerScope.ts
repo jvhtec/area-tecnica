@@ -1,4 +1,4 @@
-import { isAdministrativeDepartment, normalizeDepartmentKey } from '@/utils/permissions';
+import { isAdminRole, isAdministrativeDepartment, isDepartmentManagementRole, normalizeDepartmentKey } from '@/utils/permissions';
 
 interface TechnicianDepartmentRow {
   id: string;
@@ -9,19 +9,20 @@ export const getVisibleFinancialTechnicianIds = (
   technicians: TechnicianDepartmentRow[],
   userRole?: string | null,
   userDepartment?: string | null,
+  viewerId?: string | null,
 ): string[] | null => {
   if (!technicians.length) return [];
 
   if (
-    userRole === 'admin'
+    isAdminRole(userRole)
     || userRole === 'logistics'
-    || isAdministrativeDepartment(userDepartment)
+    || (isDepartmentManagementRole(userRole) && isAdministrativeDepartment(userDepartment))
   ) {
     return null;
   }
 
-  if (userRole !== 'management') {
-    return null;
+  if (!isDepartmentManagementRole(userRole)) {
+    return viewerId ? [viewerId] : [];
   }
 
   const normalizedViewerDepartment = normalizeDepartmentKey(userDepartment);

@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useMorningSummarySubscription } from '@/hooks/useMorningSummarySubscription';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { Bell, Info } from 'lucide-react';
+import { canReceiveMorningSummary } from '@/utils/permissions';
 
 type Department = {
   value: string;
@@ -30,7 +31,7 @@ export function MorningSummarySubscription() {
   const [selectedDepartments, setSelectedDepartments] = useState<string[]>([]);
 
   // Check if user has access (management, admin, or house_tech)
-  const hasAccess = userRole && ['admin', 'management', 'house_tech'].includes(userRole);
+  const hasAccess = canReceiveMorningSummary(userRole);
 
   // Sync with loaded subscription
   useEffect(() => {

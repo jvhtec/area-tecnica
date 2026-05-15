@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
+import { MANAGEMENT_ALLOWED_ROLES } from '@/utils/permissions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -74,7 +75,7 @@ function getPublicDisplayUrl(value?: string, slug?: string): string {
 }
 
 export default function WallboardPresets() {
-  useRoleGuard(['admin', 'management']);
+  useRoleGuard(MANAGEMENT_ALLOWED_ROLES);
   const { toast } = useToast();
 
   const [loading, setLoading] = useState(false);

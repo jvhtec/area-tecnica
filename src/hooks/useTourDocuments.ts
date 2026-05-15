@@ -3,6 +3,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { toast } from "sonner";
+import {
+  canDeleteTourDocuments,
+  canUploadDocuments,
+  canUploadTourDocuments,
+  isManagementRole,
+} from "@/utils/permissions";
 
 export interface TourDocument {
   id: string;
@@ -20,8 +26,8 @@ export const useTourDocuments = (tourId: string) => {
   const { user, userRole } = useOptimizedAuth();
   const queryClient = useQueryClient();
 
-  const isManager = ['admin', 'management', 'logistics'].includes(userRole || '');
-  const canManageVisibility = ['admin', 'management'].includes(userRole || '');
+  const isManager = canUploadDocuments(userRole);
+  const canManageVisibility = isManagementRole(userRole);
 
   const { data: documents = [], isLoading, error } = useQuery({
     queryKey: ['tour-documents', tourId],
@@ -47,6 +53,7 @@ export const useTourDocuments = (tourId: string) => {
   const uploadDocument = useMutation({
     mutationFn: async ({ file, fileName }: { file: File; fileName?: string }) => {
       if (!user?.id) throw new Error("User not authenticated");
+      if (!canUploadTourDocuments(userRole)) throw new Error("Not allowed");
 
       const fileExt = file.name.split('.').pop();
       const fileId = crypto.randomUUID();
@@ -126,6 +133,15 @@ export const useTourDocuments = (tourId: string) => {
 
   const deleteDocument = useMutation({
     mutationFn: async (document: TourDocument) => {
+      if (!user?.id) {
+        throw new Error('Not authenticated');
+      }
+
+      const canDeleteAnyTourDocument = canDeleteTourDocuments(userRole);
+      if (document.uploaded_by !== user.id && !canDeleteAnyTourDocument) {
+        throw new Error('Not allowed');
+      }
+
       console.log('Deleting document:', document.file_name);
       
       // Delete from storage first
@@ -193,13 +209,12 @@ export const useTourDocuments = (tourId: string) => {
     // User can delete their own documents
     if (document.uploaded_by === user.id) return true;
     
-    // Admins/management/logistics can delete any document
-    return ['admin', 'management', 'logistics'].includes(userRole || '');
+    return canDeleteTourDocuments(userRole);
   };
 
   const canUpload =
     Boolean(user?.id) &&
-    (isManager || ['technician', 'house_tech'].includes(userRole || ''));
+    canUploadTourDocuments(userRole);
 
   return {
     documents,

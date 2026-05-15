@@ -50,6 +50,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
+import { isDepartmentManagementRole, isManagementRole } from '@/utils/permissions';
 
 interface JobAssignmentDialogProps {
   isOpen: boolean;
@@ -117,7 +118,7 @@ const formatAssignmentTechnicianName = (assignment: any) => {
 // Helper function to format available technician name
 const formatAvailableTechnicianName = (technician: { first_name: string; last_name: string; role: string }) => {
   const isHouseTech = technician.role === 'house_tech';
-  const isManagement = technician.role === 'management';
+  const isManagement = isDepartmentManagementRole(technician.role);
   const suffix = isHouseTech ? ' (House Tech)' : isManagement ? ' (Mgmt)' : '';
   return `${technician.first_name} ${technician.last_name}${suffix}`;
 };
@@ -204,7 +205,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   // Filter technicians: include technicians, house techs, and flagged admin/management
   const filteredTechnicians = availableTechnicians.filter(tech =>
-    tech.role === 'technician' || tech.role === 'house_tech' || tech.role === 'management' || tech.role === 'admin'
+    tech.role === 'technician' || tech.role === 'house_tech' || isManagementRole(tech.role)
   );
 
   const isClosureLocked = useMemo(
@@ -336,7 +337,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     try {
       // Guard against over-assignment when requirements exist and no override
       const selectedCode = currentDepartment === 'sound' ? soundRole : currentDepartment === 'lights' ? lightsRole : 'none';
-      if (reqForDept && selectedCode && selectedCode !== 'none' && !['admin', 'management'].includes(userRole || '')) {
+      if (reqForDept && selectedCode && selectedCode !== 'none' && !isManagementRole(userRole)) {
         const left = remainingByRole.get(selectedCode) ?? 0;
         if (left <= 0) {
           toast({ title: 'Role full', description: 'No remaining slots for this role', variant: 'destructive' });
@@ -489,7 +490,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   const getDepartmentRoleOptions = () => {
     const all = roleOptionsForDiscipline(currentDepartment);
-    if (reqForDept && !['admin', 'management'].includes(userRole || '')) {
+    if (reqForDept && !isManagementRole(userRole)) {
       const remainingSet = new Set(
         Array.from(remainingByRole.entries())
           .filter(([, left]) => left > 0)

@@ -21,7 +21,7 @@ import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { useJobApprovalStatus } from '@/hooks/useJobApprovalStatus';
 import { JobPayoutTotalsPanel } from '@/components/jobs/JobPayoutTotalsPanel';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
-import { canManagePayouts } from '@/utils/permissions';
+import { canManagePayouts, isManagementRole } from '@/utils/permissions';
 import { getVisibleFinancialTechnicianIds } from '@/components/jobs/financialViewerScope';
 
 interface EnhancedJobDetailsModalProps {
@@ -39,6 +39,7 @@ interface EnhancedJobDetailsModalProps {
     onClose: () => void;
     userRole?: string | null;
     userDepartment?: string | null;
+    userId: string | null;
     department?: string;
 }
 
@@ -57,7 +58,7 @@ interface StaffAssignment {
     } | null;
 }
 
-export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole, userDepartment, department = 'sound' }: EnhancedJobDetailsModalProps) => {
+export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole, userDepartment, userId, department = 'sound' }: EnhancedJobDetailsModalProps) => {
     const [activeTab, setActiveTab] = useState<TabId>('Info');
     const [documentLoading, setDocumentLoading] = useState<Set<string>>(new Set());
     const [weatherData, setWeatherData] = useState<WeatherData[] | undefined>(undefined);
@@ -66,7 +67,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     const [isApproving, setIsApproving] = useState(false);
     const queryClient = useQueryClient();
 
-    const isManager = ['admin', 'management'].includes(userRole || '');
+    const isManager = isManagementRole(userRole);
     const canManageJobPayouts = canManagePayouts(userRole, userDepartment);
     const isHouseTech = userRole === 'house_tech';
 
@@ -186,8 +187,8 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
             }))
             .filter((assignment) => Boolean(assignment.id));
 
-        return getVisibleFinancialTechnicianIds(technicians, userRole, userDepartment);
-    }, [staffAssignments, userDepartment, userRole]);
+        return getVisibleFinancialTechnicianIds(technicians, userRole, userDepartment, userId);
+    }, [staffAssignments, userDepartment, userId, userRole]);
 
     const invalidateJobQueries = () => {
         if (!resolvedJobId) return;
@@ -911,6 +912,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                 <JobExtrasManagement
                                     jobId={resolvedJobId}
                                     isManager={isManager}
+                                    technicianId={isManager ? undefined : userId || undefined}
                                     visibleTechnicianIds={visibleFinancialTechnicianIds ?? undefined}
                                 />
                             </div>

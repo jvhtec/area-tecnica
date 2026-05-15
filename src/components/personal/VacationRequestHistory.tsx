@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Theme } from "@/components/technician/types";
+import { isManagementRole } from "@/utils/permissions";
 
 interface VacationRequestHistoryProps {
   theme: Theme;
@@ -38,7 +39,7 @@ export const VacationRequestHistory: React.FC<VacationRequestHistoryProps> = ({ 
         const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
         role = prof?.role ?? null;
       }
-      if (!cancelled) setIsManager(role === 'admin' || role === 'management');
+      if (!cancelled) setIsManager(isManagementRole(role));
     })();
     return () => { cancelled = true; };
   }, []);

@@ -16,6 +16,7 @@ import type { VacationRequest } from "@/lib/vacation-requests";
 import { downloadVacationRequestPDF } from "@/utils/vacationRequestPdfExport";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Theme } from "@/components/technician/types";
+import { isManagementRole } from "@/utils/permissions";
 
 interface VacationRequestsTabsProps {
   userRole: 'house_tech' | 'management' | 'admin';
@@ -33,6 +34,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
   isDark
 }) => {
   const isMobile = useIsMobile();
+  const canManageVacationRequests = isManagementRole(userRole);
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const {
     userRequests,
@@ -344,7 +346,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
               <CalendarDays className="h-4 w-4" />
               Mis solicitudes
             </TabsTrigger>
-            {(userRole === 'management' || userRole === 'admin') && (
+            {canManageVacationRequests && (
               <TabsTrigger value="department-requests" className="flex-1 flex items-center justify-center gap-2">
                 <Users className="h-4 w-4" />
                 Dpto.
@@ -359,7 +361,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
             </div>
           </TabsContent>
 
-          {(userRole === 'management' || userRole === 'admin') && (
+          {canManageVacationRequests && (
             <TabsContent value="department-requests" className="space-y-4 mt-4">
               <Card className={`${theme.card} rounded-2xl`}>
                 <CardContent className="p-4 space-y-3">
@@ -426,7 +428,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
           <CalendarDays className="h-4 w-4" />
           Mis solicitudes
         </TabsTrigger>
-        {(userRole === 'management' || userRole === 'admin') && (
+        {canManageVacationRequests && (
           <TabsTrigger value="department-requests" className="flex-1 flex items-center justify-center gap-2">
             <Users className="h-4 w-4" />
             Solicitudes del departamento
@@ -444,7 +446,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
         <VacationRequestHistory theme={theme} isDark={isDark} source="user" />
       </TabsContent>
 
-      {(userRole === 'management' || userRole === 'admin') && (
+      {canManageVacationRequests && (
         <TabsContent value="department-requests" className="space-y-4">
           <Card className={`${theme.card} rounded-2xl`}>
             <CardContent className="p-4 space-y-3">

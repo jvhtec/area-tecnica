@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { JobExtrasDialog } from "./JobExtrasDialog";
 import { isFestivalLikeJobType } from "@/utils/jobType";
+import { canManageFestivalArtists, isManagementRole } from "@/utils/permissions";
 
 interface JobCardProps {
   job: Job;
@@ -41,9 +42,9 @@ export const JobCard = ({
   };
   
   // Define who can access festival management
-  const canManageFestival = ['admin', 'management', 'logistics', 'technician'].includes(userRole || '');
+  const canManageFestival = canManageFestivalArtists(userRole);
   // Define who can edit and delete jobs
-  const canEditJobs = ['admin', 'management'].includes(userRole || '');
+  const canEditJobs = isManagementRole(userRole);
   const isFestivalLike = isFestivalLikeJobType(job.job_type);
 
   return (
