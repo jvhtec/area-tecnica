@@ -94,14 +94,14 @@ const Operaciones = () => {
     // Check permissions
     if (!canManageJobs) {
       toast({
-        title: "Permission denied",
-        description: "Only admin and management users can delete jobs",
+        title: "Permiso denegado",
+        description: "Solo administradores y usuarios de gestión pueden eliminar trabajos",
         variant: "destructive"
       });
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this job?")) return;
+    if (!window.confirm("¿Seguro que quieres eliminar este trabajo?")) return;
 
     try {
       console.log("Operaciones page: Starting optimistic job deletion for:", jobId);
@@ -111,20 +111,20 @@ const Operaciones = () => {
 
       if (result.success) {
         toast({
-          title: "Job deleted",
-          description: result.details || "The job has been removed and cleanup completed"
+          title: "Trabajo eliminado",
+          description: result.details || "El trabajo se ha eliminado y la limpieza se ha completado"
         });
 
         // Invalidate queries to refresh the list
         await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
         await queryClient.invalidateQueries({ queryKey: ["jobs"] });
       } else {
-        throw new Error(result.error || "Unknown deletion error");
+        throw new Error(result.error || "Error desconocido al eliminar");
       }
     } catch (error: any) {
       console.error("Operaciones page: Error in optimistic job deletion:", error);
       toast({
-        title: "Error deleting job",
+        title: "Error al eliminar el trabajo",
         description: error.message,
         variant: "destructive"
       });
@@ -134,8 +134,8 @@ const Operaciones = () => {
   const handleCreateJob = useCallback((preset?: JobType) => {
     if (!canManageJobs) {
       toast({
-        title: "Permission denied",
-        description: "Only admin and management users can create jobs",
+        title: "Permiso denegado",
+        description: "Solo administradores y usuarios de gestión pueden crear trabajos",
         variant: "destructive"
       });
       return;
@@ -236,12 +236,14 @@ const Operaciones = () => {
       ) : null}
 
       {/* Mobile FAB */}
-      <Button
-        className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
-        onClick={() => { setPresetJobType(undefined); setIsJobDialogOpen(true); }}
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      {!authLoading && canManageJobs && (
+        <Button
+          className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
+          onClick={() => handleCreateJob(undefined)}
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      )}
     </div>
   );
 };

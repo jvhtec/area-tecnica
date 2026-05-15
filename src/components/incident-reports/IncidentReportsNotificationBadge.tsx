@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
@@ -20,11 +20,13 @@ export const IncidentReportsNotificationBadge = ({
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const isEligibleForBadge = isManagementRole(userRole);
+  const fetchInProgressRef = useRef(false);
 
   const fetchNewIncidentReports = useCallback(async () => {
-    if (!isEligibleForBadge || isLoading) return;
+    if (!isEligibleForBadge || fetchInProgressRef.current) return;
 
     try {
+      fetchInProgressRef.current = true;
       setIsLoading(true);
       console.log("Checking for new incident reports...");
 
@@ -59,9 +61,10 @@ export const IncidentReportsNotificationBadge = ({
     } catch (error) {
       console.error("Error checking new incident reports:", error);
     } finally {
+      fetchInProgressRef.current = false;
       setIsLoading(false);
     }
-  }, [isEligibleForBadge, lastReadTimestamp, isLoading]);
+  }, [isEligibleForBadge, lastReadTimestamp]);
 
   useEffect(() => {
     if (!isEligibleForBadge) {

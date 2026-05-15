@@ -413,21 +413,6 @@ export function MobileJobCard({
                     </DropdownMenuItem>
                   )}
                   
-                  <DropdownMenuSeparator />
-                  
-                  {/* View Details - for technicians and house techs */}
-                  {isTechnicianUser && (
-                    <DropdownMenuItem 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setJobDetailsDialogOpen(true);
-                      }}
-                    >
-                      <FileText className="mr-2 h-4 w-4" />
-                      View Details
-                    </DropdownMenuItem>
-                  )}
-                  
                   {canEditJobs && (
                     <DropdownMenuItem onClick={handleEditButtonClick}>
                       <Edit className="mr-2 h-4 w-4" />

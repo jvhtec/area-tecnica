@@ -53,6 +53,7 @@ export const useTourDocuments = (tourId: string) => {
   const uploadDocument = useMutation({
     mutationFn: async ({ file, fileName }: { file: File; fileName?: string }) => {
       if (!user?.id) throw new Error("User not authenticated");
+      if (!canUploadTourDocuments(userRole)) throw new Error("Not allowed");
 
       const fileExt = file.name.split('.').pop();
       const fileId = crypto.randomUUID();

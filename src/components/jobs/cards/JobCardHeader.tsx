@@ -10,7 +10,7 @@ import { JobStatusSelector } from "@/components/jobs/JobStatusSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJobDistance } from "@/hooks/useJobDistance";
 import { getDateTypeMeta } from "@/constants/dateTypes";
-import { canEditJobs } from "@/utils/permissions";
+import { isManagementRole } from "@/utils/permissions";
 
 interface JobCardHeaderProps {
   job: any;
@@ -80,11 +80,10 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
                 {job.invoicing_company}
               </Badge>
             )}
-            {isProjectManagementPage && (
+            {isProjectManagementPage && isManagementRole(userRole) && (
               <JobStatusSelector
                 jobId={job.id}
                 currentStatus={job.status}
-                disabled={!canEditJobs(userRole)}
               />
             )}
           </div>

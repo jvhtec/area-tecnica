@@ -39,7 +39,7 @@ interface EnhancedJobDetailsModalProps {
     onClose: () => void;
     userRole?: string | null;
     userDepartment?: string | null;
-    userId?: string | null;
+    userId: string | null;
     department?: string;
 }
 

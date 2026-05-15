@@ -8,6 +8,7 @@ import {
   canDeleteDocuments,
   canDeleteSoundVisionFiles,
   canDeleteTourDocuments,
+  canManageJobAssignments,
   canManagePayouts,
   canPrintFestivalDocuments,
   canReceiveMorningSummary,
@@ -131,6 +132,14 @@ describe('management role helpers', () => {
     expect(canUseCustomFolderStructure('logistics')).toBe(false);
     expect(canUseTechnicianSelfTools('management', true)).toBe(true);
     expect(canUseTechnicianSelfTools('technician', true)).toBe(false);
+  });
+
+  it('centralizes mobile assignment permissions', () => {
+    expect(canManageJobAssignments('admin')).toBe(true);
+    expect(canManageJobAssignments('management')).toBe(true);
+    expect(canManageJobAssignments('house_tech')).toBe(true);
+    expect(canManageJobAssignments('logistics')).toBe(false);
+    expect(canManageJobAssignments('technician')).toBe(false);
   });
 
   it('centralizes document and festival print permissions', () => {
