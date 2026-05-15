@@ -122,8 +122,7 @@ serve(async (req) => {
       );
     }
 
-    // Send confirmation email (optional - can be implemented later)
-    // TODO: Send confirmation email to reporter
+    // Roadmap P5-02 tracks confirmation-email delivery once shared Edge Function mail helpers exist.
 
     return new Response(
       JSON.stringify({

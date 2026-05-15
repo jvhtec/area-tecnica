@@ -92,8 +92,7 @@ export interface OptimizedAssignmentMatrixViewProps {
   handleEmailError: (error: any, payload: any) => void;
   conflictDialog: any;
   setConflictDialog: (value: any) => void;
-  // TODO: isGlobalCellSelected is intended for future Stream Deck integration
-  // Will be used to highlight/indicate selected cells for external control
+  // Roadmap P3-06 keeps this prop reserved for Stream Deck-aware matrix view integration.
   isGlobalCellSelected: (technicianId: string, date: Date) => boolean;
   techMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;
   techLastYearMedalRankings: Map<string, 'gold' | 'silver' | 'bronze'>;

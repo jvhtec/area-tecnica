@@ -1,7 +1,7 @@
 // src/data/trussModels.ts
 import type { TrussModel } from "@/calc/rigging";
 
-// TODO: Fill real values from manufacturer datasheets (EI, self weight, allowables).
+// Roadmap P0-03 tracks manufacturer-sourced values before the rigging calculator is reactivated.
 export const TRUSS_MODELS: TrussModel[] = [
   {
     id: "H30V-8",
@@ -22,4 +22,3 @@ export const TRUSS_MODELS: TrussModel[] = [
     allowableDeflectionM: 10/200
   }
 ];
-

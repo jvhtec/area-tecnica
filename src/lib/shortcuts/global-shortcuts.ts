@@ -34,13 +34,6 @@ export const GLOBAL_SHORTCUTS: Omit<GlobalShortcut, 'action'>[] = [
     keybind: 'Ctrl+Shift+R',
     icon: 'RefreshCw',
   },
-  {
-    id: 'global-search',
-    label: 'Buscar',
-    description: 'Abrir búsqueda global',
-    keybind: 'Ctrl+K',
-    icon: 'Search',
-  },
 ];
 
 /**
@@ -71,19 +64,6 @@ export function registerGlobalShortcuts() {
     defaultKeybind: 'Ctrl+Shift+R',
     action: () => {
       window.location.reload();
-    },
-  });
-
-  // Search shortcut (placeholder - implement when search is ready)
-  shortcutStore.registerShortcut({
-    id: 'global-search',
-    category: 'global',
-    label: 'Buscar',
-    description: 'Abrir búsqueda global',
-    defaultKeybind: 'Ctrl+K',
-    action: () => {
-      // TODO: Implement global search
-      console.log('Global search not yet implemented');
     },
   });
 

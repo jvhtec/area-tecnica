@@ -1,5 +1,5 @@
 // Supabase configuration is injected via Vite env vars.
-// IMPORTANT: Vite requires STATIC property access (import.meta.env.VITE_XXX)
+// IMPORTANT: Vite requires STATIC property access (for example, import.meta.env.VITE_SUPABASE_URL)
 // to properly inline values at bundle time. Dynamic access like env[name] won't work.
 
 // Check if we're in a test environment (Vitest)

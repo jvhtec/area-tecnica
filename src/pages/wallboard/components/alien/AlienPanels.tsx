@@ -184,7 +184,7 @@ export const AlienPendingPanel: React.FC<{ data: PendingActionsFeed | null }> = 
           {it.text}
         </div>
       ))}
-      {(data?.items.length ?? 0) === 0 && <div className="text-amber-300">TODOS LOS SISTEMAS NOMINALES</div>}
+      {(data?.items.length ?? 0) === 0 && <div className="text-amber-300">Todos los sistemas nominales</div>}
     </div>
   </AlienShell>
 );
