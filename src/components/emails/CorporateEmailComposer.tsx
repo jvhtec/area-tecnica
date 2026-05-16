@@ -17,7 +17,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { X, Upload, FileText, Image as ImageIcon, Send, Users } from "lucide-react";
 import DOMPurify from "dompurify";
@@ -30,6 +30,8 @@ import type {
   PdfAttachment,
 } from "@/types/corporate-email";
 
+
+import { queryKeys } from "@/lib/react-query";
 export function CorporateEmailComposer() {
   const { toast } = useToast();
   const [subject, setSubject] = useState("");
@@ -47,10 +49,9 @@ export function CorporateEmailComposer() {
 
   // Fetch profiles for recipient picker
   const { data: profiles = [] } = useQuery({
-    queryKey: ["profiles", recipientSearch],
+    queryKey: queryKeys.scope("profiles", recipientSearch),
     queryFn: async () => {
-      let query = supabase
-        .from("profiles")
+      let query = dataLayerClient.from("profiles")
         .select("id, first_name, last_name, email, department, role")
         .not("email", "is", null)
         .order("first_name");
@@ -71,7 +72,7 @@ export function CorporateEmailComposer() {
   // Send email mutation
   const sendEmailMutation = useMutation({
     mutationFn: async (request: SendCorporateEmailRequest) => {
-      const { data, error } = await supabase.functions.invoke<SendCorporateEmailResponse>(
+      const { data, error } = await dataLayerClient.functions.invoke<SendCorporateEmailResponse>(
         "send-corporate-email",
         {
           body: request,

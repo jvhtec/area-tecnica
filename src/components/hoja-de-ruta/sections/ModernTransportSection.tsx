@@ -8,7 +8,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { motion, AnimatePresence } from "framer-motion";
 import { Truck, Plus, Trash2, Download } from "lucide-react";
 import { Transport } from "@/types/hoja-de-ruta";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   LOGISTICS_HOJA_CATEGORY_LABELS,
@@ -110,8 +110,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
 
     setIsImporting(true);
     try {
-      const { data: logisticsEvents, error } = await supabase
-        .from('logistics_events')
+      const { data: logisticsEvents, error } = await dataLayerClient.from('logistics_events')
         .select('*')
         .eq('job_id', jobId)
         .eq('is_hoja_relevant', true)

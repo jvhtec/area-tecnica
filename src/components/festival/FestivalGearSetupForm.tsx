@@ -2,10 +2,11 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Save, Upload } from "lucide-react";
 import { GearSetupFormData } from "@/types/festival-gear";
-import { StageGearSetup } from "@/types/festival";
+import { FestivalGearSetup } from "@/types/festival";
+import type { Database, Json } from "@/integrations/supabase/types";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
 import { WirelessSetupSection } from "./form/sections/WirelessSetupSection";
 import { MonitorSetupSection } from "./form/sections/MonitorSetupSection";
@@ -54,6 +55,39 @@ const buildEmptyStageSetup = (maxStages = 1): GearSetupFormData => ({
   notes: "",
 });
 
+type FestivalGearSetupRow = Database["public"]["Tables"]["festival_gear_setups"]["Row"];
+
+const jsonArrayOrEmpty = <T,>(value: Json | null | undefined): T[] => (
+  Array.isArray(value) ? value as unknown as T[] : []
+);
+
+const toJson = (value: unknown): Json => value as Json;
+
+const mapGearSetupRow = (row: FestivalGearSetupRow): FestivalGearSetup => ({
+  id: row.id,
+  job_id: row.job_id || "",
+  max_stages: row.max_stages || 1,
+  foh_consoles: jsonArrayOrEmpty<GearSetupFormData["foh_consoles"][number]>(row.foh_consoles),
+  mon_consoles: jsonArrayOrEmpty<GearSetupFormData["mon_consoles"][number]>(row.mon_consoles),
+  foh_waves_outboard: row.foh_waves_outboard,
+  mon_waves_outboard: row.mon_waves_outboard,
+  wireless_systems: normalizeWirelessSystems(row.wireless_systems, "wireless"),
+  iem_systems: normalizeWirelessSystems(row.iem_systems, "iem"),
+  wired_mics: jsonArrayOrEmpty<GearSetupFormData["wired_mics"][number]>(row.wired_mics),
+  available_monitors: row.available_monitors || 0,
+  has_side_fills: row.has_side_fills || false,
+  has_drum_fills: row.has_drum_fills || false,
+  has_dj_booths: row.has_dj_booths || false,
+  available_cat6_runs: row.available_cat6_runs || 0,
+  available_hma_runs: row.available_hma_runs || 0,
+  available_coax_runs: row.available_coax_runs || 0,
+  available_analog_runs: row.available_analog_runs || 0,
+  available_opticalcon_duo_runs: row.available_opticalcon_duo_runs || 0,
+  notes: row.notes || undefined,
+  created_at: row.created_at || undefined,
+  updated_at: row.updated_at || undefined,
+});
+
 export const FestivalGearSetupForm = ({
   jobId,
   stageNumber = 1,
@@ -62,7 +96,7 @@ export const FestivalGearSetupForm = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [setup, setSetup] = useState<GearSetupFormData>(buildEmptyStageSetup());
-  const [globalSetup, setGlobalSetup] = useState(null);
+  const [globalSetup, setGlobalSetup] = useState<FestivalGearSetup | null>(null);
   const [existingSetupId, setExistingSetupId] = useState<string | null>(null);
   const [stageSetupId, setStageSetupId] = useState<string | null>(null);
   const [hasStageSpecificSetup, setHasStageSpecificSetup] = useState(false);
@@ -75,8 +109,7 @@ export const FestivalGearSetupForm = ({
         setIsLoading(true);
         
         // Fetch the main gear setup (no date filter needed)
-        const { data: setupData, error: setupError } = await supabase
-          .from('festival_gear_setups')
+        const { data: setupData, error: setupError } = await dataLayerClient.from('festival_gear_setups')
           .select('*')
           .eq('job_id', jobId)
           .single();
@@ -100,13 +133,12 @@ export const FestivalGearSetupForm = ({
           console.log('Found existing global setup:', setupData);
           console.log('Global setup wired_mics:', setupData.wired_mics);
           // Store the gear setup for validation purposes
-          setGlobalSetup(setupData);
+          setGlobalSetup(mapGearSetupRow(setupData));
           setExistingSetupId(setupData.id);
           
           // For non-primary stages, check for stage-specific setup
           if (!isPrimaryStage) {
-            const { data: stageSetupData, error: stageError } = await supabase
-              .from('festival_stage_gear_setups')
+            const { data: stageSetupData, error: stageError } = await dataLayerClient.from('festival_stage_gear_setups')
               .select('*')
               .eq('gear_setup_id', setupData.id)
               .eq('stage_number', stageNumber)
@@ -126,13 +158,13 @@ export const FestivalGearSetupForm = ({
               // Update form with stage-specific data
               setSetup({
                 max_stages: setupData.max_stages || 1,
-                foh_consoles: stageSetupData.foh_consoles || [],
-                mon_consoles: stageSetupData.mon_consoles || [],
+                foh_consoles: jsonArrayOrEmpty<GearSetupFormData["foh_consoles"][number]>(stageSetupData.foh_consoles),
+                mon_consoles: jsonArrayOrEmpty<GearSetupFormData["mon_consoles"][number]>(stageSetupData.mon_consoles),
                 foh_waves_outboard: stageSetupData.foh_waves_outboard || "",
                 mon_waves_outboard: stageSetupData.mon_waves_outboard || "",
                 wireless_systems: normalizeWirelessSystems(stageSetupData.wireless_systems, "wireless"),
                 iem_systems: normalizeWirelessSystems(stageSetupData.iem_systems, "iem"),
-                wired_mics: stageSetupData.wired_mics || [],
+                wired_mics: jsonArrayOrEmpty<GearSetupFormData["wired_mics"][number]>(stageSetupData.wired_mics),
                 monitors_enabled: stageSetupData.monitors_enabled || false,
                 monitors_quantity: stageSetupData.monitors_quantity || 0,
                 extras_sf: stageSetupData.extras_sf || false,
@@ -165,13 +197,13 @@ export const FestivalGearSetupForm = ({
             // Update form values with global data
             setSetup({
               max_stages: setupData.max_stages || 1,
-              foh_consoles: setupData.foh_consoles || [],
-              mon_consoles: setupData.mon_consoles || [],
+              foh_consoles: jsonArrayOrEmpty<GearSetupFormData["foh_consoles"][number]>(setupData.foh_consoles),
+              mon_consoles: jsonArrayOrEmpty<GearSetupFormData["mon_consoles"][number]>(setupData.mon_consoles),
               foh_waves_outboard: setupData.foh_waves_outboard || "",
               mon_waves_outboard: setupData.mon_waves_outboard || "",
               wireless_systems: normalizeWirelessSystems(setupData.wireless_systems, "wireless"),
               iem_systems: normalizeWirelessSystems(setupData.iem_systems, "iem"),
-              wired_mics: setupData.wired_mics || [],
+              wired_mics: jsonArrayOrEmpty<GearSetupFormData["wired_mics"][number]>(setupData.wired_mics),
               monitors_enabled: setupData.available_monitors > 0,
               monitors_quantity: setupData.available_monitors || 0,
               extras_sf: setupData.has_side_fills || false,
@@ -258,13 +290,13 @@ export const FestivalGearSetupForm = ({
           id: existingSetupId ?? undefined,
           job_id: jobId,
           max_stages: setup.max_stages,
-          foh_consoles: setup.foh_consoles,
-          mon_consoles: setup.mon_consoles,
+          foh_consoles: toJson(setup.foh_consoles),
+          mon_consoles: toJson(setup.mon_consoles),
           foh_waves_outboard: setup.foh_waves_outboard,
           mon_waves_outboard: setup.mon_waves_outboard,
-          wireless_systems: setup.wireless_systems,
-          iem_systems: setup.iem_systems,
-          wired_mics: sanitizedWiredMics, // Use sanitized version
+          wireless_systems: toJson(setup.wireless_systems),
+          iem_systems: toJson(setup.iem_systems),
+          wired_mics: toJson(sanitizedWiredMics), // Use sanitized version
           has_side_fills: setup.extras_sf,
           has_drum_fills: setup.extras_df,
           has_dj_booths: setup.extras_djbooth,
@@ -286,8 +318,7 @@ export const FestivalGearSetupForm = ({
         console.log('Payload wired_mics serialized:', JSON.stringify(setupPayload.wired_mics, null, 2));
 
         // Upsert the global setup
-        const { data: globalData, error: globalError } = await supabase
-          .from('festival_gear_setups')
+        const { data: globalData, error: globalError } = await dataLayerClient.from('festival_gear_setups')
           .upsert(setupPayload, { 
             onConflict: 'job_id' 
           })
@@ -306,7 +337,7 @@ export const FestivalGearSetupForm = ({
         // Update the existingSetupId with the new ID if this was a new record
         if (globalData && globalData.length > 0) {
           setExistingSetupId(globalData[0].id);
-          setGlobalSetup(globalData[0]);
+          setGlobalSetup(mapGearSetupRow(globalData[0]));
         }
       } else {
         // For non-primary stages, we need to make sure the global setup exists first
@@ -319,8 +350,7 @@ export const FestivalGearSetupForm = ({
             max_stages: Math.max(setup.max_stages, stageNumber || 1)
           };
           
-          const { data: newGlobalSetup, error: newGlobalError } = await supabase
-            .from('festival_gear_setups')
+          const { data: newGlobalSetup, error: newGlobalError } = await dataLayerClient.from('festival_gear_setups')
             .upsert(basicGlobalSetup, { 
               onConflict: 'job_id' 
             })
@@ -333,11 +363,10 @@ export const FestivalGearSetupForm = ({
           
           globalSetupId = newGlobalSetup[0].id;
           setExistingSetupId(globalSetupId);
-          setGlobalSetup(newGlobalSetup[0]);
+          setGlobalSetup(mapGearSetupRow(newGlobalSetup[0]));
         } else {
           // Update only the max_stages on the global setup if needed
-          const { error: updateMaxStagesError } = await supabase
-            .from('festival_gear_setups')
+          const { error: updateMaxStagesError } = await dataLayerClient.from('festival_gear_setups')
             .update({
               max_stages: Math.max(globalSetup?.max_stages || 1, stageNumber)
             })
@@ -348,19 +377,23 @@ export const FestivalGearSetupForm = ({
             // Non-critical error, continue with stage setup
           }
         }
+
+        if (!globalSetupId) {
+          throw new Error('No global gear setup ID available');
+        }
         
         // STEP 2: For non-primary stages, create/update stage-specific setup
         const stagePayload = {
           id: stageSetupId ?? undefined,
           gear_setup_id: globalSetupId,
           stage_number: stageNumber,
-          foh_consoles: setup.foh_consoles,
-          mon_consoles: setup.mon_consoles,
+          foh_consoles: toJson(setup.foh_consoles),
+          mon_consoles: toJson(setup.mon_consoles),
           foh_waves_outboard: setup.foh_waves_outboard,
           mon_waves_outboard: setup.mon_waves_outboard,
-          wireless_systems: setup.wireless_systems,
-          iem_systems: setup.iem_systems,
-          wired_mics: sanitizedWiredMics, // Use sanitized version
+          wireless_systems: toJson(setup.wireless_systems),
+          iem_systems: toJson(setup.iem_systems),
+          wired_mics: toJson(sanitizedWiredMics), // Use sanitized version
           monitors_enabled: setup.monitors_enabled,
           monitors_quantity: setup.monitors_quantity,
           extras_sf: setup.extras_sf,
@@ -386,8 +419,7 @@ export const FestivalGearSetupForm = ({
         console.log('Stage payload wired_mics type:', typeof stagePayload.wired_mics);
         
         // Upsert the stage setup
-        const { data: stageData, error: stageError } = await supabase
-          .from('festival_stage_gear_setups')
+        const { data: stageData, error: stageError } = await dataLayerClient.from('festival_stage_gear_setups')
           .upsert(stagePayload)
           .select();
         

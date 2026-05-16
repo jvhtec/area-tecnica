@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { User, Search } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
@@ -45,8 +45,7 @@ export const ProfileAutocomplete: React.FC<ProfileAutocompleteProps> = ({
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name, dni, department, role')
         .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%,dni.ilike.%${searchTerm}%`)
         .limit(10);

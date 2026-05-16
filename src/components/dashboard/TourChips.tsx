@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Button } from "@/components/ui/button";
 import { Plus, Eye, EyeOff, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -13,6 +13,8 @@ import { useTourSubscription } from "@/hooks/useTourSubscription";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface TourChipsProps {
   onTourClick?: (tourId: string) => void;
   readOnly?: boolean;
@@ -31,11 +33,10 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
   useTourSubscription();
 
   const { data: tours = [], refetch: refetchTours } = useQuery({
-    queryKey: ["tours"],
+    queryKey: queryKeys.scope("tours"),
     queryFn: async () => {
       console.log("Fetching tours...");
-      const { data: toursData, error: toursError } = await supabase
-        .from("tours")
+      const { data: toursData, error: toursError } = await dataLayerClient.from("tours")
         .select(`
           id,
           name,

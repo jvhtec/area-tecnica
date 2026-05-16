@@ -3,8 +3,7 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Upload, Image as ImageIcon } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 export const CompanyLogoUploader = () => {
   const [isUploading, setIsUploading] = useState(false);
 
@@ -21,7 +20,7 @@ export const CompanyLogoUploader = () => {
 
     setIsUploading(true);
     try {
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await dataLayerClient.storage
         .from('company-assets')
         .upload('sector-pro-logo.png', file, {
           upsert: true,

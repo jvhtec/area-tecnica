@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { FileText, Loader2, Trash2, Upload, Eye, X } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ViewFileDialog } from "./ViewFileDialog";
@@ -27,8 +27,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
 
   const fetchFiles = async () => {
     try {
-      const { data, error } = await supabase
-        .from("festival_artist_files")
+      const { data, error } = await dataLayerClient.from("festival_artist_files")
         .select("*")
         .eq("artist_id", artistId);
 
@@ -69,7 +68,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       const filePath = `${artistId}/${crypto.randomUUID()}.${fileExt}`;
 
       // First upload the file to storage
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await dataLayerClient.storage
         .from('festival_artist_files')
         .upload(filePath, file);
 
@@ -79,8 +78,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       }
 
       // Then create the database record
-      const { error: dbError } = await supabase
-        .from('festival_artist_files')
+      const { error: dbError } = await dataLayerClient.from('festival_artist_files')
         .insert({
           artist_id: artistId,
           file_name: file.name,
@@ -117,7 +115,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
 
     try {
       // First delete from storage
-      const { error: storageError } = await supabase.storage
+      const { error: storageError } = await dataLayerClient.storage
         .from('festival_artist_files')
         .remove([selectedFile.file_path]);
 
@@ -127,8 +125,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
       }
 
       // Then delete the database record
-      const { error: dbError } = await supabase
-        .from('festival_artist_files')
+      const { error: dbError } = await dataLayerClient.from('festival_artist_files')
         .delete()
         .eq('id', selectedFile.id);
 
@@ -158,7 +155,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
 
   const downloadFile = async (file: any) => {
     try {
-      const { data, error } = await supabase.storage
+      const { data, error } = await dataLayerClient.storage
         .from('festival_artist_files')
         .download(file.file_path);
 
@@ -185,7 +182,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
 
   const handleViewFile = async (file: any) => {
     try {
-      const { data } = await supabase.storage
+      const { data } = await dataLayerClient.storage
         .from('festival_artist_files')
         .createSignedUrl(file.file_path, 3600); // URL valid for 1 hour
 

@@ -7,9 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Equipment } from "@/types/equipment";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface StockMovementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -36,8 +38,7 @@ export function StockMovementDialog({
       if (!session?.user?.id) throw new Error('Not authenticated');
       
       // Get current stock entry
-      const { data: stockEntry } = await supabase
-        .from('global_stock_entries')
+      const { data: stockEntry } = await dataLayerClient.from('global_stock_entries')
         .select('*')
         .eq('equipment_id', equipment.id)
         .maybeSingle();
@@ -53,8 +54,7 @@ export function StockMovementDialog({
       }
 
       // Begin transaction
-      const { error: stockMovementError } = await supabase
-        .from('stock_movements')
+      const { error: stockMovementError } = await dataLayerClient.from('stock_movements')
         .insert({
           equipment_id: equipment.id,
           quantity: movementQty,
@@ -67,15 +67,13 @@ export function StockMovementDialog({
 
       // Update or insert stock entry
       if (stockEntry) {
-        const { error: updateError } = await supabase
-          .from('global_stock_entries')
+        const { error: updateError } = await dataLayerClient.from('global_stock_entries')
           .update({ base_quantity: newBaseQty })
           .eq('id', stockEntry.id);
 
         if (updateError) throw updateError;
       } else {
-        const { error: insertError } = await supabase
-          .from('global_stock_entries')
+        const { error: insertError } = await dataLayerClient.from('global_stock_entries')
           .insert({
             equipment_id: equipment.id,
             base_quantity: newBaseQty
@@ -86,9 +84,9 @@ export function StockMovementDialog({
     },
     onSuccess: () => {
       // Invalidate queries to refresh the UI - use partial match to catch all department variants
-      queryClient.invalidateQueries({ queryKey: ['current-stock-levels'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['stock-movements'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['equipment-with-stock'], exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('current-stock-levels'), exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('stock-movements'), exact: false });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('equipment-with-stock'), exact: false });
       toast({
         title: "Success",
         description: `Stock ${isAddition ? 'added' : 'removed'} successfully`

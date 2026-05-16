@@ -12,10 +12,12 @@ import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 import { format, eachDayOfInterval } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
 import { canManageJobAssignments } from '@/utils/permissions';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface MobileAssignmentsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -61,11 +63,10 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
   } = useJobAssignmentsRealtime(jobId);
 
   const { data: jobMeta } = useQuery({
-    queryKey: ['mobile-job-meta', jobId],
+    queryKey: queryKeys.scope('mobile-job-meta', jobId),
     enabled: open && !!jobId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('id, start_time, end_time, job_date_types(date, type)')
         .eq('id', jobId)
         .single();

@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,8 +61,7 @@ export const EditShiftDialog = ({
   const handleSubmit = async (values: FormValues) => {
     setIsSubmitting(true);
     try {
-      const { error } = await supabase
-        .from("festival_shifts")
+      const { error } = await dataLayerClient.from("festival_shifts")
         .update({
           name: values.name,
           start_time: values.start_time,

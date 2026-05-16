@@ -11,7 +11,7 @@ import { expenseCopy } from './expenseCopy';
 import { formatCurrency } from '@/lib/utils';
 import type { JobExpense } from '@/hooks/useJobExpenses';
 import { useJobExpenseMutations } from '@/hooks/useJobExpenses';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
@@ -45,7 +45,7 @@ export const ExpenseList: React.FC<ExpenseListProps> = ({
 
   const handleViewReceipt = async (receiptPath: string) => {
     try {
-      const { data, error } = await supabase.storage
+      const { data, error } = await dataLayerClient.storage
         .from('expense-receipts')
         .createSignedUrl(receiptPath, 3600); // 1 hour expiry
 

@@ -10,7 +10,7 @@ import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useJobActions } from '@/hooks/useJobActions';
 import { useFolderExistence } from "@/hooks/useFolderExistence";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { format } from "date-fns";
 import { 
   MoreVertical, 
@@ -44,6 +44,8 @@ import { openFlexElement } from "@/utils/flex-folders";
 import { isFestivalLikeJobType } from "@/utils/jobType";
 import { DateType, DATE_TYPE_OPTIONS, getDateTypeMeta } from "@/constants/dateTypes";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface MobileJobCardProps {
   job: any;
   department?: Department;
@@ -166,8 +168,7 @@ export function MobileJobCard({
     try {
       const dateStr = format(currentDate, 'yyyy-MM-dd');
       
-      const { error } = await supabase
-        .from('job_date_types')
+      const { error } = await dataLayerClient.from('job_date_types')
         .upsert({
           job_id: job.id,
           date: dateStr,
@@ -184,7 +185,7 @@ export function MobileJobCard({
       });
 
       // Ensure both mobile and desktop calendars refresh their caches
-      queryClient.invalidateQueries({ queryKey: ['job_date_types', dateStr] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job_date_types', dateStr) });
       queryClient.invalidateQueries({
         predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'date-types'
       });

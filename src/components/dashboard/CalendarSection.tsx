@@ -7,7 +7,7 @@ import { CalendarGrid } from "./calendar-section/CalendarGrid";
 import { CalendarJobCard } from "./calendar-section/CalendarJobCard";
 import { PrintDialog } from "./calendar-section/PrintDialog";
 import type { CalendarExportRange, PrintSettings } from "./calendar-section/types";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
 import { loadExceljs } from "@/utils/lazyExceljs";
 import { saveWorkbook, toArgb, tintColor, thinBorder, hexToRgb, getContrastHexColor } from "@/utils/excelExport";
@@ -102,10 +102,9 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
   useEffect(() => {
     const loadUserPreferences = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await dataLayerClient.auth.getSession();
         if (!session?.user?.id) return;
-        const { data: profile, error } = await supabase
-          .from("profiles")
+        const { data: profile, error } = await dataLayerClient.from("profiles")
           .select("selected_job_types, selected_job_statuses")
           .eq("id", session.user.id)
           .single();
@@ -128,15 +127,14 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 
   const saveUserPreferences = async (types: string[], statuses?: string[]) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await dataLayerClient.auth.getSession();
       if (!session?.user?.id) return;
 
       const updateData = statuses !== undefined
         ? { selected_job_types: types, selected_job_statuses: statuses }
         : { selected_job_types: types };
 
-      const { error } = await supabase
-        .from("profiles")
+      const { error } = await dataLayerClient.from("profiles")
         .update(updateData)
         .eq("id", session.user.id);
       if (error) {

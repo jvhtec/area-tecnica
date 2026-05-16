@@ -6,13 +6,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
 import { MicKitSection } from "./form/sections/MicKitSection";
 import { ArtistFormData } from "@/types/festival";
 import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 import { WiredMic } from "./gear-setup/WiredMicConfig";
 import { FESTIVAL_CONSOLE_OPTIONS } from "@/constants/festivalConsoleOptions";
+import type { Json } from "@/integrations/supabase/types";
 
 export const ArtistForm = () => {
   const { token } = useParams();
@@ -105,8 +106,7 @@ export const ArtistForm = () => {
     setIsLoading(true);
     try {
       // First verify the form token is valid and get the form details
-      const { data: formInfo, error: formError } = await supabase
-        .from('festival_artist_forms')
+      const { data: formInfo, error: formError } = await dataLayerClient.from('festival_artist_forms')
         .select('id, artist_id, status, expires_at')
         .eq('token', token)
         .single();
@@ -138,12 +138,11 @@ export const ArtistForm = () => {
       console.log('Submitting form data:', submissionData);
 
       // Create form submission using the actual form ID
-      const { error: submissionError } = await supabase
-        .from('festival_artist_form_submissions')
+      const { error: submissionError } = await dataLayerClient.from('festival_artist_form_submissions')
         .insert({
           form_id: formInfo.id,
           artist_id: formInfo.artist_id,
-          form_data: submissionData,
+          form_data: submissionData as unknown as Json,
           status: 'submitted',
           submitted_at: new Date().toISOString(),
         });
@@ -154,8 +153,7 @@ export const ArtistForm = () => {
       }
 
       // Update the artist record with the form data (only fields that exist in the table)
-      const { error: updateError } = await supabase
-        .from('festival_artists')
+      const { error: updateError } = await dataLayerClient.from('festival_artists')
         .update({
           name: formData.name,
           stage: formData.stage,
@@ -173,9 +171,9 @@ export const ArtistForm = () => {
           monitors_from_foh: formData.monitors_from_foh,
           mon_waves_outboard: formData.mon_waves_outboard,
           mon_tech: formData.mon_tech,
-          wireless_systems: formData.wireless_systems,
+          wireless_systems: formData.wireless_systems as unknown as Json,
           wireless_provided_by: formData.wireless_provided_by,
-          iem_systems: formData.iem_systems,
+          iem_systems: formData.iem_systems as unknown as Json,
           iem_provided_by: formData.iem_provided_by,
           monitors_enabled: formData.monitors_enabled,
           monitors_quantity: formData.monitors_quantity,
@@ -208,9 +206,8 @@ export const ArtistForm = () => {
       }
 
       // Mark the form as completed
-      const { error: updateFormError } = await supabase
-        .from('festival_artist_forms')
-        .update({ status: 'completed' })
+      const { error: updateFormError } = await dataLayerClient.from('festival_artist_forms')
+        .update({ status: 'submitted' })
         .eq('id', formInfo.id);
 
       if (updateFormError) throw updateFormError;

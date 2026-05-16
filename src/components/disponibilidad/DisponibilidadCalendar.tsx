@@ -12,8 +12,7 @@ import { Calendar as CalendarIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { format } from 'date-fns';
 import type { PresetWithItems } from '@/types/equipment';
 import { getCategoriesForDepartment, type Department } from '@/types/equipment';
@@ -24,6 +23,8 @@ import { useRef } from 'react';
 import { useDayRender } from 'react-day-picker';
 import { cn } from '@/lib/utils';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface DisponibilidadCalendarProps {
   selectedDate?: Date;
   onDateSelect?: (date: Date | undefined) => void;
@@ -39,12 +40,11 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect, className }
 
   // Fetch equipment base stock (base_quantity) for this department's categories
   const { data: stockData } = useQuery({
-    queryKey: ['equipment-base-stock', department],
+    queryKey: queryKeys.scope('equipment-base-stock', department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('equipment_availability_with_rentals')
+      const { data, error } = await dataLayerClient.from('equipment_availability_with_rentals')
         .select('equipment_id, equipment_name, category, base_quantity')
-        .in('category', departmentCategories as string[])
+        .in('category', departmentCategories)
         .order('category')
         .order('equipment_name');
 
@@ -55,10 +55,9 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect, className }
 
   // Fetch all preset assignments for the department (removed user_id filter)
   const { data: presetAssignments, isLoading: isLoadingAssignments } = useQuery({
-    queryKey: ['preset-assignments', userDepartment],
+    queryKey: queryKeys.scope('preset-assignments', userDepartment),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('day_preset_assignments')
+      const { data, error } = await dataLayerClient.from('day_preset_assignments')
         .select(`
           *,
           preset:presets!inner (
@@ -90,8 +89,7 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect, className }
     mutationFn: async ({ date, presetId }: { date: Date; presetId: string }) => {
       if (!session?.user?.id) throw new Error('Must be logged in');
 
-      const { error } = await supabase
-        .from('day_preset_assignments')
+      const { error } = await dataLayerClient.from('day_preset_assignments')
         .insert({
           date: format(date, 'yyyy-MM-dd'),
           preset_id: presetId,
@@ -102,7 +100,7 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect, className }
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['preset-assignments'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('preset-assignments') });
       toast({
         title: "Success",
         description: "Preset assigned successfully"
@@ -134,11 +132,10 @@ export function DisponibilidadCalendar({ selectedDate, onDateSelect, className }
 
   // Fetch sub-rentals overlapping the assignments range for this department
   const { data: subRentals = [] } = useQuery({
-    queryKey: ['sub-rentals-range', userDepartment, assignmentsRange.start, assignmentsRange.end],
+    queryKey: queryKeys.scope('sub-rentals-range', userDepartment, assignmentsRange.start, assignmentsRange.end),
     queryFn: async () => {
       if (!assignmentsRange.start || !assignmentsRange.end) return [] as any[];
-      const { data, error } = await supabase
-        .from('sub_rentals')
+      const { data, error } = await dataLayerClient.from('sub_rentals')
         .select('equipment_id, quantity, start_date, end_date, department')
         .eq('department', (userDepartment || '').toString())
         .lte('start_date', assignmentsRange.end)

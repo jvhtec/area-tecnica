@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
@@ -210,7 +210,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
     }
 
     try {
-      const { data: signedData, error: signedError } = await supabase.storage
+      const { data: signedData, error: signedError } = await dataLayerClient.storage
         .from("festival-logos")
         .createSignedUrl(normalizedPath, 60 * 60);
 
@@ -221,7 +221,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
       console.warn("Could not create signed logo URL:", error);
     }
 
-    const { data } = supabase.storage.from("festival-logos").getPublicUrl(normalizedPath);
+    const { data } = dataLayerClient.storage.from("festival-logos").getPublicUrl(normalizedPath);
     if (data?.publicUrl) {
       return data.publicUrl;
     }
@@ -247,8 +247,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
           return;
         }
 
-        const { data: gearData } = await supabase
-          .from("festival_gear_setups")
+        const { data: gearData } = await dataLayerClient.from("festival_gear_setups")
           .select("*")
           .eq("job_id", blankJobId)
           .maybeSingle();
@@ -258,8 +257,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
           setGearSetup(mapFestivalGearSetup(gearData));
         }
 
-        const { data: stagesData } = await supabase
-          .from("festival_stages")
+        const { data: stagesData } = await dataLayerClient.from("festival_stages")
           .select("number, name")
           .eq("job_id", blankJobId);
 
@@ -273,8 +271,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
           setStageNames(stageMap);
         }
 
-        const { data: logoData } = await supabase
-          .from("festival_logos")
+        const { data: logoData } = await dataLayerClient.from("festival_logos")
           .select("file_path")
           .eq("job_id", blankJobId)
           .maybeSingle();
@@ -305,7 +302,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
       setStageNames({});
 
-      const { data, error } = await supabase.rpc("get_public_artist_form_context", {
+      const { data, error } = await dataLayerClient.rpc("get_public_artist_form_context", {
         p_token: token,
       });
 
@@ -514,8 +511,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
       if (Object.keys(stageMapFromContext).length > 0) {
         setStageNames(stageMapFromContext);
       } else if (artistJobId) {
-        const { data: stagesData } = await supabase
-          .from("festival_stages")
+        const { data: stagesData } = await dataLayerClient.from("festival_stages")
           .select("number, name")
           .eq("job_id", artistJobId);
 
@@ -581,7 +577,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase.functions.invoke("submit-public-artist-form", {
+      const { data, error } = await dataLayerClient.functions.invoke("submit-public-artist-form", {
         body: {
           token,
           formData,
@@ -681,7 +677,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
   const openRiderFile = useCallback(
     async (file: RiderFileRecord) => {
       try {
-        const { data, error } = await supabase.storage
+        const { data, error } = await dataLayerClient.storage
           .from("festival_artist_files")
           .createSignedUrl(file.file_path, 60 * 60);
 
@@ -705,7 +701,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
   const downloadRiderFile = useCallback(
     async (file: RiderFileRecord) => {
       try {
-        const { data, error } = await supabase.storage
+        const { data, error } = await dataLayerClient.storage
           .from("festival_artist_files")
           .download(file.file_path);
 
@@ -756,7 +752,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
         payload.append("token", token);
         selectedFiles.forEach((file) => payload.append("files", file));
 
-        const { data, error } = await supabase.functions.invoke("upload-public-artist-rider", {
+        const { data, error } = await dataLayerClient.functions.invoke("upload-public-artist-rider", {
           body: payload,
         });
 
@@ -834,7 +830,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
       setDeletingRiderId(file.id);
 
       try {
-        const { data, error } = await supabase.functions.invoke("delete-public-artist-rider", {
+        const { data, error } = await dataLayerClient.functions.invoke("delete-public-artist-rider", {
           body: {
             token,
             fileId: file.id,

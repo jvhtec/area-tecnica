@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { CalendarIcon, Users, Clock } from "lucide-react";
 import { format } from "date-fns";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { toast } from "sonner";
 
 interface Festival {
@@ -73,8 +73,7 @@ export const CopyArtistsDialog = ({
   const loadFestivals = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("jobs")
+      const { data, error } = await dataLayerClient.from("jobs")
         .select("id, title, start_time, end_time")
         .in("job_type", ["festival", "ciclo"])
         .neq("id", currentJobId)
@@ -92,8 +91,7 @@ export const CopyArtistsDialog = ({
 
   const loadAvailableDates = async (festivalId: string) => {
     try {
-      const { data, error } = await supabase
-        .from("festival_artists")
+      const { data, error } = await dataLayerClient.from("festival_artists")
         .select("date")
         .eq("job_id", festivalId)
         .not("date", "is", null);
@@ -111,8 +109,7 @@ export const CopyArtistsDialog = ({
   const loadArtists = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from("festival_artists")
+      const { data, error } = await dataLayerClient.from("festival_artists")
         .select("id, name, stage, date, show_start, show_end")
         .eq("job_id", selectedFestival)
         .eq("date", selectedSourceDate)
@@ -162,8 +159,7 @@ export const CopyArtistsDialog = ({
     setIsCopying(true);
     try {
       // Fetch full artist data for selected artists
-      const { data: artistsData, error: fetchError } = await supabase
-        .from("festival_artists")
+      const { data: artistsData, error: fetchError } = await dataLayerClient.from("festival_artists")
         .select("*")
         .in("id", selectedArtists);
 
@@ -199,8 +195,7 @@ export const CopyArtistsDialog = ({
       }) || [];
 
       // Insert copied artists
-      const { error: insertError } = await supabase
-        .from("festival_artists")
+      const { error: insertError } = await dataLayerClient.from("festival_artists")
         .insert(artistsToCopy);
 
       if (insertError) throw insertError;
