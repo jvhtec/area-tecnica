@@ -54,6 +54,8 @@ export const IncidentReportsManagement = () => {
     .sort((a, b) => {
       const aValue = getSortValue(a);
       const bValue = getSortValue(b);
+
+      if (aValue === bValue) return 0;
       
       if (sortDirection === "asc") {
         return aValue > bValue ? 1 : -1;

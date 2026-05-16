@@ -1,4 +1,4 @@
-import type { Dept, DeptCounts } from '@/pages/wallboard/types';
+import type { Dept, DeptCounts } from '@/types/wallboard';
 
 export type { Dept };
 

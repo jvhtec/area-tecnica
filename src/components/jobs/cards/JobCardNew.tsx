@@ -47,6 +47,11 @@ type AssignmentWithProfile = {
 };
 
 type AssignmentRoleKey = "sound_role" | "lights_role" | "video_role";
+const ASSIGNMENT_ROLE_BY_DEPARTMENT: Partial<Record<Department, AssignmentRoleKey>> = {
+  sound: "sound_role",
+  lights: "lights_role",
+  video: "video_role",
+};
 
 type JobAssignmentContactRow = {
   sound_role?: string | null;
@@ -578,7 +583,11 @@ function JobCardNewFull({
         .from('job_assignments')
         .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
         .eq('job_id', job.id);
-      const deptKey: AssignmentRoleKey = department === 'sound' ? 'sound_role' : department === 'lights' ? 'lights_role' : 'video_role';
+      const deptKey = ASSIGNMENT_ROLE_BY_DEPARTMENT[department];
+      if (!deptKey) {
+        toast({ title: 'Departamento no soportado', description: 'Solo sonido, luces o vídeo pueden crear grupos de WhatsApp.', variant: 'destructive' });
+        return;
+      }
       const assignmentRows = (rows || []) as JobAssignmentContactRow[];
       const crew = assignmentRows.filter((r) => !!r[deptKey]);
       const missing: string[] = [];

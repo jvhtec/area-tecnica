@@ -590,6 +590,10 @@ export async function createAllFoldersForJob(
       return;
     }
 
+    if (!job.job_departments || job.job_departments.length === 0) {
+      throw new Error("Missing job_departments for dryhire job");
+    }
+
     const departmentCandidate = job.job_departments[0]?.department;
     if (departmentCandidate !== "sound" && departmentCandidate !== "lights") {
       throw new Error("Invalid department for dryhire job");

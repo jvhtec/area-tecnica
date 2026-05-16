@@ -198,20 +198,24 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
           .select('id')
           .eq('tour_date_id', date.id)
           .maybeSingle();
+
+        if (result.error) throw result.error;
         
         const { data: existing } = result;
 
         if (existing) return; // Skip if already exists
 
         // Get job
-        const { data: job } = await supabase
+        const { data: job, error: jobError } = await supabase
           .from('jobs')
           .select('id')
           .eq('tour_date_id', date.id)
           .maybeSingle();
 
+        if (jobError) throw jobError;
+
         // Create hoja de ruta with empty schedule
-        await supabase
+        const { error: insertError } = await supabase
           .from('hoja_de_ruta')
           .insert({
             job_id: job?.id || null,
@@ -219,6 +223,8 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
             program_schedule_json: defaultProgramSchedule() as unknown as Json,
             status: 'draft',
           });
+
+        if (insertError) throw insertError;
       });
 
       await Promise.all(promises);

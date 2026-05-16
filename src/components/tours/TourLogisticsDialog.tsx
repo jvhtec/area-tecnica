@@ -10,12 +10,11 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
-import type { Database } from '@/integrations/supabase/types'
+import type { Database, Json } from '@/integrations/supabase/types'
 
 type Department = 'sound' | 'lights' | 'video'
 type JobRow = Database['public']['Tables']['jobs']['Row']
 type TransportRequestRow = Database['public']['Tables']['transport_requests']['Row']
-type TransportRequestInsert = Database['public']['Tables']['transport_requests']['Insert']
 type TransportRequestItemRow = Database['public']['Tables']['transport_request_items']['Row']
 
 interface TourLogisticsDialogProps {
@@ -25,6 +24,7 @@ interface TourLogisticsDialogProps {
 }
 
 type VehicleItem = { transport_type: string; leftover_space_meters?: number | '' }
+type TransportRequestRpcItem = { transport_type: string; leftover_space_meters: number | null }
 type TourLogisticsJob = Pick<JobRow, 'id' | 'title' | 'start_time' | 'job_type' | 'status'>
 type TransportRequestWithItems = Pick<
   TransportRequestRow,
@@ -35,6 +35,23 @@ type TransportRequestWithItems = Pick<
 
 const getErrorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error)
+
+const parseLeftoverSpaceInput = (value: string): VehicleItem['leftover_space_meters'] | null => {
+  if (value === '') return ''
+
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return null
+
+  return Math.max(0, parsed)
+}
+
+const toTransportRequestRpcItems = (items: VehicleItem[]): TransportRequestRpcItem[] =>
+  items
+    .filter((item) => Boolean(item.transport_type))
+    .map((item) => ({
+      transport_type: item.transport_type,
+      leftover_space_meters: item.leftover_space_meters === '' ? null : item.leftover_space_meters ?? null,
+    }))
 
 export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogisticsDialogProps) {
   const { toast } = useToast()
@@ -130,49 +147,17 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
 
         // Find existing request for job+department
         const existing = existingReqs.find(r => r.job_id === jobId)
-        let requestId: string | null = existing?.id || null
+        const { error } = await supabase.rpc('replace_transport_request_with_items', {
+          p_request_id: existing?.id || null,
+          p_job_id: jobId,
+          p_department: department,
+          p_note: note || null,
+          p_status: existing?.status || 'requested',
+          p_created_by: existing?.created_by || userId,
+          p_items: toTransportRequestRpcItems(items) as unknown as Json,
+        })
 
-        const payload: TransportRequestInsert = {
-          job_id: jobId,
-          department,
-          note: note || null,
-          status: existing?.status || 'requested',
-          created_by: existing?.created_by || userId,
-        }
-
-        if (requestId) {
-          const { error: uErr } = await supabase.from('transport_requests').update(payload).eq('id', requestId)
-          if (uErr) throw uErr
-          // replace items
-          const { error: dErr } = await supabase.from('transport_request_items').delete().eq('request_id', requestId)
-          if (dErr) throw dErr
-          const toInsert = items.filter(it => !!it.transport_type).map(it => ({
-            request_id: requestId!,
-            transport_type: it.transport_type,
-            leftover_space_meters: it.leftover_space_meters === '' ? null : it.leftover_space_meters,
-          }))
-          if (toInsert.length) {
-            const { error: iErr } = await supabase.from('transport_request_items').insert(toInsert)
-            if (iErr) throw iErr
-          }
-        } else {
-          const { data: ins, error: iErr } = await supabase
-            .from('transport_requests')
-            .insert(payload)
-            .select('id')
-            .single()
-          if (iErr) throw iErr
-          requestId = ins.id
-          const toInsert = items.filter(it => !!it.transport_type).map(it => ({
-            request_id: requestId!,
-            transport_type: it.transport_type,
-            leftover_space_meters: it.leftover_space_meters === '' ? null : it.leftover_space_meters,
-          }))
-          if (toInsert.length) {
-            const { error: iiErr } = await supabase.from('transport_request_items').insert(toInsert)
-            if (iiErr) throw iiErr
-          }
-        }
+        if (error) throw error
       }
 
       toast({ title: 'Logística actualizada para las fechas de gira' })
@@ -242,7 +227,8 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                   value={it.leftover_space_meters === '' ? '' : it.leftover_space_meters}
                   onChange={(e) => {
                     const val = e.target.value
-                    const num: VehicleItem['leftover_space_meters'] = val === '' ? '' : Math.max(0, Number(val))
+                    const num = parseLeftoverSpaceInput(val)
+                    if (num === null) return
                     const next = defaultItems.slice()
                     next[idx] = { ...next[idx], leftover_space_meters: num }
                     setDefaultItems(next)
@@ -319,7 +305,8 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                             value={it.leftover_space_meters === '' ? '' : it.leftover_space_meters}
                             onChange={(e) => {
                               const val = e.target.value
-                              const num: VehicleItem['leftover_space_meters'] = val === '' ? '' : Math.max(0, Number(val))
+                              const num = parseLeftoverSpaceInput(val)
+                              if (num === null) return
                               const next = (overrides[job.id] || []).slice()
                               next[idx] = { ...next[idx], leftover_space_meters: num }
                               setOverrideFor(job.id, next)

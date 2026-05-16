@@ -1,8 +1,8 @@
 import type { AnnouncementLevel } from '@/constants/announcementLevels';
 import type { DateType } from '@/constants/dateTypes';
+import type { Dept, DeptCounts } from '@/types/wallboard';
 
-export type Dept = 'sound' | 'lights' | 'video';
-export type DeptCounts = Record<Dept, number> & { total?: number };
+export type { Dept, DeptCounts } from '@/types/wallboard';
 
 export interface JobsOverviewFeed {
   jobs: Array<{

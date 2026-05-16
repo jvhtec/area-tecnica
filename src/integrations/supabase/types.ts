@@ -10495,6 +10495,10 @@ export type Database = {
         Args: { p_hoja_de_ruta_id: string; p_transport_rows: Json }
         Returns: undefined
       }
+      replace_job_required_roles: {
+        Args: { p_departments: string[]; p_job_id: string; p_rows: Json }
+        Returns: undefined
+      }
       replace_job_expense_receipt: {
         Args: {
           p_expense_id: string
@@ -10534,6 +10538,18 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      replace_transport_request_with_items: {
+        Args: {
+          p_created_by: string
+          p_department: string
+          p_items: Json
+          p_job_id: string
+          p_note: string | null
+          p_request_id: string | null
+          p_status: string
+        }
+        Returns: string
       }
       resolve_category_for_timesheet: {
         Args: { _job_id: string; _tech_id: string }

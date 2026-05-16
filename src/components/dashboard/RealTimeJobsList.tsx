@@ -41,7 +41,7 @@ export function RealTimeJobsList({
   const { jobs: displayedJobs, total: totalMatchingJobs } = useMemo(() => {
     const filtered = jobs.filter(job => {
       if (filterByDepartment && department) {
-        const jobDepartments = job.job_departments.map((d: { department: string }) => d.department);
+        const jobDepartments = (job.job_departments || []).map((d: { department: string }) => d.department);
         if (!jobDepartments.includes(department)) {
           return false;
         }

@@ -664,13 +664,7 @@ export const generateEnhancedEventDaySheet = async (
 
   // Weather
   try {
-    const jobQuery = await supabase
-      .from('jobs')
-      .select('id')
-      .eq('tour_date_id', tourDate.id)
-      .maybeSingle();
-
-    if (jobQuery.data?.id && tourDate.location?.formatted_address) {
+    if (tourDate.location?.formatted_address) {
       const weatherData = await getWeatherForJob({ address: tourDate.location.formatted_address }, tourDate.date);
 
       if (weatherData && weatherData.length > 0) {

@@ -33,7 +33,7 @@ type AvailabilityStatus = 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavaila
 interface AvailabilityStore {
   data: Record<string, AvailabilityStatus>;
   listeners: Set<() => void>;
-  subscribe(listener: () => void): () => boolean;
+  subscribe(listener: () => void): () => void;
   getSnapshot(): Record<string, AvailabilityStatus>;
   setData(newData: Record<string, AvailabilityStatus>): void;
   updateKey(key: string, status: AvailabilityStatus | null): void;
@@ -44,9 +44,11 @@ const availabilityStore: AvailabilityStore = {
   data: {} as Record<string, AvailabilityStatus>,
   listeners: new Set<() => void>(),
 
-  subscribe(listener: () => void): () => boolean {
+  subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   },
 
   getSnapshot(): Record<string, AvailabilityStatus> {

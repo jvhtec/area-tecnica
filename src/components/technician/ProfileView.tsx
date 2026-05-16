@@ -24,7 +24,7 @@ interface UserProfile {
     dni?: string;
     residencia?: string;
     bg_color?: string;
-    profile_picture_url?: string;
+    profile_picture_url?: string | null;
     role?: string;
     department?: string;
     calendar_ics_token?: string;
@@ -320,9 +320,9 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                                 }));
                             }}
                             onRemove={() => {
-                                queryClient.setQueryData(['user-profile', user.id], (old: UserProfile | undefined) => ({
+                                queryClient.setQueryData(['user-profile', user.id], (old: UserProfile | undefined): UserProfile => ({
                                     ...(old ?? {}),
-                                    profile_picture_url: null as string | null
+                                    profile_picture_url: null
                                 }));
                             }}
                             size="lg"

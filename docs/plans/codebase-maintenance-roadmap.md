@@ -34,7 +34,7 @@ This roadmap turns the current maintenance audit into concrete, sequenced backlo
 - 2026-05-16: P0-02 completed by clearing the app no-emit TypeScript baseline and adding `npm run typecheck` as `tsc --noEmit --pretty false -p tsconfig.app.json`.
 - 2026-05-16: P0-03 completed through explicit safety disablement rather than unverified manufacturer substitution. `src/data/trussModels.ts` documents the unverified legacy constants, truss models default to `allowablesVerified: false`, `solveTrussWithTilt` suppresses moment/deflection pass-fail unless a model is explicitly verified, and rigging PDFs render unverified checks as `No validado` instead of `OK` or `FALLA`.
 - 2026-05-16: P0-04 completed for the unsupported-state path. Flex business-role mappings now expose structured lookup diagnostics, sound keeps confirmed dictionary IDs, lights/video remain unsupported until IDs are confirmed, and `sync-flex-crew-for-job` returns `business_role_diagnostics` instead of silently omitting missing roles.
-- 2026-05-16: Phase 1 completed across P1-01 through P1-05. Tour scheduling PDF exporters compile without `@ts-nocheck`; the `src` `as any` count dropped from the post-P0 baseline of `529` to `338`; dynamic Supabase/task/Flex/staffing access now uses narrowed table unions or typed wrappers; festival gear JSON normalization is centralized in `src/utils/festivalGearMappers.ts`; and `tsconfig.app.json` now enables `noImplicitAny`. Local validation passed with `npm run typecheck`, `npm run lint`, `npm run test:run`, `npm run build`, `npm run cap:sync`, and `git diff --check`.
+- 2026-05-16: Phase 1 completed across P1-01 through P1-05. Tour scheduling PDF exporters compile without `@ts-nocheck`; the `src` `as any` count dropped from the post-P0 baseline of `529` to `325`; dynamic Supabase/task/Flex/staffing access now uses narrowed table unions or typed wrappers; festival gear JSON normalization is centralized in `src/utils/festivalGearMappers.ts`; `tsconfig.app.json` now enables `noImplicitAny`; and CodeRabbit follow-up added additive transactional RPCs for tour requirement/logistics replacement writes. Local validation passed with `npm run typecheck`, `npm run lint`, `npm run test:run`, `npm run build`, `npm run cap:sync`, and `git diff --check`.
 
 ## Phase 0: Safety and Type Baseline
 
@@ -47,7 +47,7 @@ This roadmap turns the current maintenance audit into concrete, sequenced backlo
 
 ## Phase 1: Type Debt and Generated Schema Hygiene
 
-**Status:** Complete as of 2026-05-16. Phase 1 landed as one systematic cleanup pass after Phase 0, with no database migrations and no intended runtime behavior changes.
+**Status:** Complete as of 2026-05-16. Phase 1 landed as one systematic cleanup pass after Phase 0, with additive Supabase RPC migration support for atomic tour requirement/logistics replacement writes and no intended user-facing behavior changes.
 
 | ID | Affected area | Concrete task | Acceptance criteria | Validation | Dependencies |
 | --- | --- | --- | --- | --- | --- |
