@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+
+import { queryKeys } from "@/lib/react-query";
 export type PushNotificationSchedule = {
   id: string;
   event_type: string;
@@ -19,7 +21,7 @@ export function usePushNotificationSchedule(eventType: string) {
   const queryClient = useQueryClient();
 
   const { data: schedule, isLoading, error } = useQuery({
-    queryKey: ['push-notification-schedule', eventType],
+    queryKey: queryKeys.scope('push-notification-schedule', eventType),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('push_notification_schedules' as any)
@@ -45,7 +47,7 @@ export function usePushNotificationSchedule(eventType: string) {
       return data as unknown as PushNotificationSchedule;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['push-notification-schedule', eventType] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('push-notification-schedule', eventType) });
       toast({
         title: 'Configuración actualizada',
         description: 'Los cambios en la programación se han guardado correctamente.',

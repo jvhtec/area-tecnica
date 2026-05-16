@@ -2,9 +2,11 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+
+import { queryKeys } from "@/lib/react-query";
 export function useTourRatesApproval(tourId?: string) {
   return useQuery({
-    queryKey: ['tour-rates-approval', tourId],
+    queryKey: queryKeys.scope('tour-rates-approval', tourId),
     enabled: !!tourId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -21,7 +23,7 @@ export function useTourRatesApproval(tourId?: string) {
 export function useTourRatesApprovalMap(tourIds: string[]) {
   const unique = useMemo(() => Array.from(new Set(tourIds.filter(Boolean))), [tourIds]);
   return useQuery({
-    queryKey: ['tour-rates-approval-map', unique],
+    queryKey: queryKeys.scope('tour-rates-approval-map', unique),
     enabled: unique.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase

@@ -1,5 +1,5 @@
-import { FestivalManagementView } from "./festival-management/FestivalManagementView";
-import { useFestivalManagementVm } from "./festival-management/useFestivalManagementVm";
+import { FestivalManagementView } from "@/pages/festival-management/FestivalManagementView";
+import { useFestivalManagementVm } from "@/features/festival-management/useFestivalManagementVm";
 
 const FestivalManagement = () => {
   const result = useFestivalManagementVm();
@@ -20,4 +20,3 @@ const FestivalManagement = () => {
 };
 
 export default FestivalManagement;
-

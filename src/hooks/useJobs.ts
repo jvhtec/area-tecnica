@@ -5,20 +5,22 @@ import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { trackError } from "@/lib/errorTracking";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useJobs = () => {
   // Set up multi-table subscriptions using our enhanced hooks
   useMultiTableSubscription([
-    { table: 'jobs', queryKey: ['jobs'], priority: 'high' },
-    { table: 'job_assignments', queryKey: ['jobs'], priority: 'medium' },
-    { table: 'job_departments', queryKey: ['jobs'], priority: 'medium' },
+    { table: 'jobs', queryKey: queryKeys.scope('jobs'), priority: 'high' },
+    { table: 'job_assignments', queryKey: queryKeys.scope('jobs'), priority: 'medium' },
+    { table: 'job_departments', queryKey: queryKeys.scope('jobs'), priority: 'medium' },
     // Documents and tour dates change less frequently; keep lower priority
-    { table: 'job_documents', queryKey: ['jobs'], priority: 'low' },
-    { table: 'tour_dates', queryKey: ['jobs'], priority: 'low' },
-    { table: 'tours', queryKey: ['jobs'], priority: 'low' },
+    { table: 'job_documents', queryKey: queryKeys.scope('jobs'), priority: 'low' },
+    { table: 'tour_dates', queryKey: queryKeys.scope('jobs'), priority: 'low' },
+    { table: 'tours', queryKey: queryKeys.scope('jobs'), priority: 'low' },
   ]);
 
   return useQuery({
-    queryKey: ["jobs"],
+    queryKey: queryKeys.scope("jobs"),
     queryFn: async () => {
       console.log("Fetching jobs...");
       

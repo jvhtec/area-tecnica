@@ -5,6 +5,8 @@ import { supabase } from "@/lib/enhanced-supabase-client";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 
+
+import { queryKeys } from "@/lib/react-query";
 type SubscriptionOptions = {
   table: string;
   schema?: string;
@@ -71,7 +73,7 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
           if (Array.isArray(queryKey)) {
             queryClient.invalidateQueries({ queryKey });
           } else {
-            queryClient.invalidateQueries({ queryKey: [queryKey] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.custom(queryKey) });
           }
           
           // For artist table specifically, also refetch immediately
@@ -79,7 +81,7 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
             if (Array.isArray(queryKey)) {
               queryClient.refetchQueries({ queryKey });
             } else {
-              queryClient.refetchQueries({ queryKey: [queryKey] });
+              queryClient.refetchQueries({ queryKey: queryKeys.custom(queryKey) });
             }
           }
         }
@@ -137,8 +139,8 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
               queryClient.invalidateQueries({ queryKey });
               queryClient.refetchQueries({ queryKey });
             } else {
-              queryClient.invalidateQueries({ queryKey: [queryKey] });
-              queryClient.refetchQueries({ queryKey: [queryKey] });
+              queryClient.invalidateQueries({ queryKey: queryKeys.custom(queryKey) });
+              queryClient.refetchQueries({ queryKey: queryKeys.custom(queryKey) });
             }
           });
         });
@@ -154,7 +156,7 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
           if (Array.isArray(queryKey)) {
             queryClient.invalidateQueries({ queryKey });
           } else {
-            queryClient.invalidateQueries({ queryKey: [queryKey] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.custom(queryKey) });
           }
         });
       }

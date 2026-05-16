@@ -3,29 +3,31 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { vacationRequestsApi, VacationRequestSubmission } from '@/lib/vacation-requests';
 import { useToast } from '@/hooks/use-toast';
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useVacationRequests = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const userRequestsQuery = useQuery({
-    queryKey: ['vacation-requests', 'user'],
+    queryKey: queryKeys.scope('vacation-requests', 'user'),
     queryFn: vacationRequestsApi.getUserRequests,
   });
 
   const departmentRequestsQuery = useQuery({
-    queryKey: ['vacation-requests', 'department'],
+    queryKey: queryKeys.scope('vacation-requests', 'department'),
     queryFn: vacationRequestsApi.getDepartmentRequests,
   });
 
   const pendingRequestsQuery = useQuery({
-    queryKey: ['vacation-requests', 'pending'],
+    queryKey: queryKeys.scope('vacation-requests', 'pending'),
     queryFn: vacationRequestsApi.getPendingRequests,
   });
 
   const submitRequestMutation = useMutation({
     mutationFn: vacationRequestsApi.submitRequest,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vacation-requests'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('vacation-requests') });
       toast({
         title: "Request submitted!",
         description: "Your vacation request has been submitted for approval.",
@@ -43,7 +45,7 @@ export const useVacationRequests = () => {
   const approveRequestsMutation = useMutation({
     mutationFn: vacationRequestsApi.approveRequests,
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['vacation-requests'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('vacation-requests') });
       toast({
         title: "Requests approved!",
         description: `${data.length} vacation request(s) have been approved.`,
@@ -62,7 +64,7 @@ export const useVacationRequests = () => {
     mutationFn: ({ requestIds, rejectionReason }: { requestIds: string[]; rejectionReason?: string }) =>
       vacationRequestsApi.rejectRequests(requestIds, rejectionReason),
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['vacation-requests'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('vacation-requests') });
       toast({
         title: "Requests rejected!",
         description: `${data.length} vacation request(s) have been rejected.`,

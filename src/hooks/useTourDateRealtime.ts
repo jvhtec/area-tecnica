@@ -3,6 +3,8 @@ import React from "react";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { useQueryClient } from "@tanstack/react-query";
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Hook for real-time updates to tour date management
  * Subscribes to changes in tour_dates, flex_folders, and locations tables
@@ -14,7 +16,7 @@ export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]
   // Subscribe to tour dates changes - matches parent component query key
   useRealtimeSubscription({
     table: 'tour_dates',
-    queryKey: ['tour', tourId],
+    queryKey: queryKeys.scope('tour', tourId),
     event: '*',
     filter: tourId ? `tour_id=eq.${tourId}` : undefined,
   });
@@ -22,14 +24,14 @@ export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]
   // Subscribe to flex folders changes for the specific tour dates
   useRealtimeSubscription({
     table: 'flex_folders', 
-    queryKey: ['flex-folders-existence', ...tourDateIds],
+    queryKey: queryKeys.scope('flex-folders-existence', ...tourDateIds),
     event: '*',
   });
 
   // Subscribe to locations changes - also matches parent component query key
   useRealtimeSubscription({
     table: 'locations',
-    queryKey: ['tour', tourId],
+    queryKey: queryKeys.scope('tour', tourId),
     event: '*',
   });
 
@@ -43,12 +45,12 @@ export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]
       // when the subscription is delivering timely updates.
       const fallbackIntervalMs = 15000;
       const interval = setInterval(() => {
-        const state = queryClient.getQueryState(['tour', tourId]);
+        const state = queryClient.getQueryState(queryKeys.scope('tour', tourId));
         const dataUpdatedAt = state?.dataUpdatedAt ?? 0;
         const isFresh = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt < fallbackIntervalMs;
 
         if (!isFresh) {
-          queryClient.invalidateQueries({ queryKey: ['tour', tourId] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour', tourId) });
         }
       }, fallbackIntervalMs);
 

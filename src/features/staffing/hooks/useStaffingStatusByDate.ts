@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { format, startOfDay, endOfDay } from 'date-fns'
 
+
+import { queryKeys } from "@/lib/react-query";
 type StaffingByDate = {
   availability_status: 'confirmed' | 'declined' | 'expired' | 'requested' | null,
   offer_status: 'confirmed' | 'declined' | 'expired' | 'sent' | null,
@@ -30,7 +32,7 @@ type NormalizedStatusRow = {
 
 export function useStaffingStatusByDate(profileId: string, date: Date) {
   return useQuery({
-    queryKey: ['staffing-by-date', profileId, format(date, 'yyyy-MM-dd')],
+    queryKey: queryKeys.scope('staffing-by-date', profileId, format(date, 'yyyy-MM-dd')),
     queryFn: async (): Promise<StaffingByDate> => {
       console.log('🔍 Fetching staffing status by date for:', { profileId, date: format(date, 'yyyy-MM-dd') })
       

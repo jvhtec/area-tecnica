@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface Venue {
   id: string;
   name: string;
@@ -29,7 +31,7 @@ export interface VenueMetadata {
 
 export const useVenues = (searchTerm?: string) => {
   return useQuery({
-    queryKey: ['venues', searchTerm],
+    queryKey: queryKeys.scope('venues', searchTerm),
     queryFn: async () => {
       let query = supabase.from('venues').select('*').order('name');
 
@@ -65,7 +67,7 @@ export const useUpsertVenue = () => {
       return data as string; // Returns venue_id
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['venues'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('venues') });
     },
     onError: (error) => {
       console.error('Error upserting venue:', error);

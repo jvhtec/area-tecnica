@@ -1,4 +1,11 @@
 import type { CalendarFeed, JobsOverviewJob } from './types';
+import {
+  addMadridCalendarDays,
+  formatMadridDateKey,
+  fromMadridDateKey,
+  getMadridMonthGrid,
+  MADRID_TIMEZONE,
+} from '@/utils/timezoneUtils';
 
 export const DAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const;
 export const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -15,23 +22,17 @@ export type CalendarCell = {
 };
 
 export function formatDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = `${date.getMonth() + 1}`.padStart(2, '0');
-  const day = `${date.getDate()}`.padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  return formatMadridDateKey(date);
 }
 
 export function buildCalendarFromJobsList(jobs: JobsOverviewJob[]): CalendarFeed {
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const offset = (startOfMonth.getDay() + 6) % 7;
-  const gridStart = new Date(startOfMonth.getTime() - offset * MS_PER_DAY);
-  const gridEnd = new Date(gridStart.getTime() + 42 * MS_PER_DAY - 1);
+  const grid = getMadridMonthGrid(now);
 
-  const calendarStartISO = gridStart.toISOString();
-  const calendarEndISO = gridEnd.toISOString();
-  const calendarStartMs = gridStart.getTime();
-  const calendarEndMs = gridEnd.getTime();
+  const calendarStartISO = grid.gridStart.toISOString();
+  const calendarEndISO = grid.gridEnd.toISOString();
+  const calendarStartMs = grid.gridStart.getTime();
+  const calendarEndMs = grid.gridEnd.getTime();
 
   const jobsByDate: Record<string, JobsOverviewJob[]> = {};
   const jobDateLookup: Record<string, string> = {};
@@ -46,19 +47,18 @@ export function buildCalendarFromJobsList(jobs: JobsOverviewJob[]): CalendarFeed
     const spanEnd = Math.min(endTs, calendarEndMs);
     if (spanEnd < spanStart) return;
 
-    const primaryKey = formatDateKey(new Date(job.start_time));
+    const primaryKey = formatMadridDateKey(new Date(job.start_time));
     jobDateLookup[job.id] = primaryKey;
 
-    let day = new Date(spanStart);
-    day.setHours(0, 0, 0, 0);
-    const lastDay = new Date(spanEnd);
-    lastDay.setHours(0, 0, 0, 0);
+    let dayKey = formatMadridDateKey(new Date(spanStart));
+    const lastDayKey = formatMadridDateKey(new Date(spanEnd));
 
-    while (day.getTime() <= lastDay.getTime()) {
-      const key = formatDateKey(day);
-      const bucket = jobsByDate[key] ?? (jobsByDate[key] = []);
+    while (dayKey <= lastDayKey) {
+      const bucket = jobsByDate[dayKey] ?? (jobsByDate[dayKey] = []);
       bucket.push(job);
-      day = new Date(day.getTime() + MS_PER_DAY);
+      const nextDayKey = addMadridCalendarDays(dayKey, 1);
+      if (nextDayKey === dayKey) break;
+      dayKey = nextDayKey;
     }
   });
 
@@ -67,8 +67,8 @@ export function buildCalendarFromJobsList(jobs: JobsOverviewJob[]): CalendarFeed
     jobsByDate,
     jobDateLookup,
     range: { start: calendarStartISO, end: calendarEndISO },
-    focusMonth: now.getMonth(),
-    focusYear: now.getFullYear(),
+    focusMonth: grid.focusMonth,
+    focusYear: grid.focusYear,
   };
 }
 
@@ -78,15 +78,11 @@ export function buildCalendarModel(
   currentMonthOnly: boolean = true
 ): { dayNames: readonly string[]; monthLabel: string; cells: CalendarCell[] } {
   const today = new Date();
+  const grid = getMadridMonthGrid(today);
   const highlightSet = highlightIds ? new Set(highlightIds) : new Set<string>();
 
-  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const offset = (startOfMonth.getDay() + 6) % 7;
-  const gridStart = new Date(startOfMonth.getTime() - offset * MS_PER_DAY);
-  const gridEnd = new Date(gridStart.getTime() + (42 - 1) * MS_PER_DAY);
-
   const dayCount = 42;
-  const todayKey = formatDateKey(today);
+  const todayKey = grid.todayKey;
 
   const jobsByKey = data?.jobsByDate ?? {};
   const highlightByKey = new Map<string, Set<string>>();
@@ -100,21 +96,20 @@ export function buildCalendarModel(
     });
   }
 
-  const monthFormatter = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' });
-  const monthLabel = monthFormatter.format(startOfMonth);
+  const monthFormatter = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: MADRID_TIMEZONE });
+  const monthLabel = monthFormatter.format(fromMadridDateKey(grid.monthStartKey, '12:00:00'));
 
-  const focusMonth = today.getMonth();
-  const focusYear = today.getFullYear();
+  const focusMonthKey = grid.monthStartKey.slice(0, 7);
 
   const cells: CalendarCell[] = Array.from({ length: dayCount }, (_, idx) => {
-    const date = new Date(gridStart.getTime() + idx * MS_PER_DAY);
-    const isoKey = formatDateKey(date);
+    const isoKey = grid.dateKeys[idx];
+    const date = fromMadridDateKey(isoKey, '12:00:00');
     const jobs = jobsByKey[isoKey] ?? [];
     const highlightBucket = highlightByKey.get(isoKey) ?? new Set<string>();
     return {
       date,
       isoKey,
-      inMonth: date.getMonth() === focusMonth && date.getFullYear() === focusYear,
+      inMonth: isoKey.startsWith(focusMonthKey),
       isToday: isoKey === todayKey,
       jobs,
       hasHighlight: highlightBucket.size > 0,

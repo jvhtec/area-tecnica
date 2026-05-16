@@ -2,8 +2,10 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { Profile } from "../types";
+import { Profile } from "@/components/users/types";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useUserManagement = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -29,7 +31,7 @@ export const useUserManagement = () => {
         description: "The user has been successfully deleted.",
       });
       
-      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('profiles') });
     } catch (error: any) {
       console.error("Delete error:", error);
       toast({
@@ -55,7 +57,7 @@ export const useUserManagement = () => {
         description: "The user profile has been successfully updated.",
       });
 
-      queryClient.invalidateQueries({ queryKey: ['profiles'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('profiles') });
       
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.id === updatedData.id) {

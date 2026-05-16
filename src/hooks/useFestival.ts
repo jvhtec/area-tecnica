@@ -4,6 +4,8 @@ import { supabase, ensureRealtimeConnection } from '@/lib/enhanced-supabase-clie
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
+
+import { queryKeys } from "@/lib/react-query";
 export type Festival = {
   id: string;
   name: string;
@@ -79,7 +81,7 @@ export function useFestival(festivalId: string) {
     refetch,
     isPaused,
   } = useQuery({
-    queryKey: ['festival', festivalId],
+    queryKey: queryKeys.scope('festival', festivalId),
     queryFn: fetchFestival,
     enabled: !!festivalId,
     staleTime: 5 * 60 * 1000, // 5 minutes

@@ -1,10 +1,10 @@
 
 import { useState } from "react";
-import { Profile } from "./types";
-import { UserCard } from "./UserCard";
-import { EditUserDialog } from "./EditUserDialog";
-import { DeleteUserDialog } from "./DeleteUserDialog";
-import { useUserManagement } from "./hooks/useUserManagement";
+import { Profile } from "@/components/users/types";
+import { UserCard } from "@/components/users/UserCard";
+import { EditUserDialog } from "@/components/users/EditUserDialog";
+import { DeleteUserDialog } from "@/components/users/DeleteUserDialog";
+import { useUserManagement } from "@/hooks/users/useUserManagement";
 import { Badge } from "@/components/ui/badge";
 import {
   Accordion,

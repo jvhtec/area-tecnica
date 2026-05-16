@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
+
+import { queryKeys } from "@/lib/react-query";
 // Helper function to format artist time data
 const formatArtistTimeData = (artistData: any) => {
   const formattedData = { ...artistData };
@@ -32,7 +34,7 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['festival-artists', jobId, selectedDate] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId, selectedDate) });
       toast({
         title: "Success",
         description: "Artist created successfully",
@@ -62,7 +64,7 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['festival-artists', jobId, selectedDate] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId, selectedDate) });
       toast({
         title: "Success",
         description: "Artist updated successfully",

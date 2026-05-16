@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface TourDefaultSet {
   id: string;
   tour_id: string;
@@ -31,7 +33,7 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
 
   // Fetch default sets
   const { data: defaultSets = [], isLoading: setsLoading } = useQuery({
-    queryKey: ["tour-default-sets", tourId, department],
+    queryKey: queryKeys.scope("tour-default-sets", tourId, department),
     queryFn: async () => {
       let query = supabase
         .from("tour_default_sets")
@@ -52,7 +54,7 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
 
   // Fetch default tables for all sets
   const { data: defaultTables = [], isLoading: tablesLoading } = useQuery({
-    queryKey: ["tour-default-tables", tourId, department],
+    queryKey: queryKeys.scope("tour-default-tables", tourId, department),
     queryFn: async () => {
       if (defaultSets.length === 0) return [];
 
@@ -83,7 +85,7 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-default-sets", tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-default-sets", tourId) });
       toast({
         title: "Success",
         description: "Default set created successfully",
@@ -111,7 +113,7 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-default-tables", tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-default-tables", tourId) });
       toast({
         title: "Success",
         description: "Default table saved successfully",
@@ -140,7 +142,7 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-default-tables", tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-default-tables", tourId) });
       toast({
         title: "Success",
         description: "Default table updated successfully",
@@ -167,8 +169,8 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
       return setId;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-default-sets", tourId] });
-      queryClient.invalidateQueries({ queryKey: ["tour-default-tables", tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-default-sets", tourId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-default-tables", tourId) });
       toast({
         title: "Success",
         description: "Default set deleted successfully",
@@ -195,7 +197,7 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
       return tableId;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-default-tables", tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-default-tables", tourId) });
       toast({
         title: "Success",
         description: "Default table deleted successfully",

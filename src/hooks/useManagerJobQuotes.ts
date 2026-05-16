@@ -3,9 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { attachPayoutOverridesToTourQuotes } from '@/services/tourPayoutOverrides';
 
+
+import { queryKeys } from "@/lib/react-query";
 export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: string) {
   return useQuery({
-    queryKey: ['manager-job-quotes', jobId, jobType, tourId],
+    queryKey: queryKeys.scope('manager-job-quotes', jobId, jobType, tourId),
     enabled: !!jobId,
     queryFn: async (): Promise<TourJobRateQuote[]> => {
       if (!jobId) return [] as TourJobRateQuote[];

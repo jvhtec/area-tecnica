@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { trackError } from '@/lib/errorTracking';
 
+
+import { queryKeys } from "@/lib/react-query";
 export function useRecalcTimesheet() {
   const queryClient = useQueryClient();
   
@@ -16,8 +18,8 @@ export function useRecalcTimesheet() {
       return data;
     },
     onSuccess: (_data, timesheetId) => {
-      queryClient.invalidateQueries({ queryKey: ['timesheet', timesheetId] });
-      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('timesheet', timesheetId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('timesheets') });
     },
     onError: (error, timesheetId) => {
       void trackError(error, {

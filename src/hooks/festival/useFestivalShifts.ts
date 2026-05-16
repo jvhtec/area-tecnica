@@ -6,6 +6,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface UseFestivalShiftsParams {
   jobId: string;
   selectedDate: string;
@@ -24,19 +26,19 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Set up real-time subscriptions for both tables
-  useTableSubscription('festival_shifts', ['festival_shifts', jobId, selectedDate]);
-  useTableSubscription('festival_shift_assignments', ['festival_shift_assignments', jobId, selectedDate]);
+  useTableSubscription('festival_shifts', queryKeys.scope('festival_shifts', jobId, selectedDate));
+  useTableSubscription('festival_shift_assignments', queryKeys.scope('festival_shift_assignments', jobId, selectedDate));
 
   const fetchShifts = useCallback(async () => {
     if (!selectedDate || !jobId) {
       return [];
     }
-    
+
     try {
       console.log(`Fetching shifts for job: ${jobId}, date: ${selectedDate}`);
-      
+
       // 1. First fetch all shifts for the given job and date
       const { data: shiftsData, error: shiftsError } = await supabase
         .from("festival_shifts")
@@ -49,7 +51,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
         console.error("Error fetching shifts:", shiftsError);
         throw shiftsError;
       }
-      
+
       console.log("Shifts data retrieved:", shiftsData);
 
       if (!shiftsData || shiftsData.length === 0) {
@@ -58,7 +60,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
 
       // 2. Get all shift IDs
       const shiftIds = shiftsData.map(shift => shift.id);
-      
+
       // 3. Fetch assignments separately
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from("festival_shift_assignments")
@@ -78,7 +80,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
         .map(assignment => assignment.technician_id);
 
       let profilesData: Record<string, ShiftProfile> = {};
-      
+
       if (technicianIds.length > 0) {
         const { data: profiles, error: profilesError } = await supabase
           .from("profiles")
@@ -103,11 +105,11 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
           .filter(assignment => assignment.shift_id === shift.id)
           .map(assignment => ({
             ...assignment,
-            profiles: assignment.technician_id 
-              ? profilesData[assignment.technician_id] 
+            profiles: assignment.technician_id
+              ? profilesData[assignment.technician_id]
               : null
           }));
-          
+
         return {
           ...shift,
           assignments: shiftAssignments
@@ -116,7 +118,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
 
       console.log("Final processed shifts with assignments:", shiftsWithAssignments);
       return shiftsWithAssignments;
-      
+
     } catch (error: any) {
       console.error("Error in fetchShifts:", error);
       toast({
@@ -129,7 +131,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
   }, [selectedDate, jobId, toast]);
 
   const { data: shifts = [], isLoading: queryLoading, refetch } = useQuery({
-    queryKey: ['festival_shifts', jobId, selectedDate],
+    queryKey: queryKeys.scope('festival_shifts', jobId, selectedDate),
     queryFn: fetchShifts,
     enabled: !!jobId && !!selectedDate,
     staleTime: 0,
@@ -140,15 +142,15 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
   // Enhanced refetch function that also invalidates related queries
   const enhancedRefetch = useCallback(async () => {
     console.log("Enhanced refetch triggered - invalidating queries and refetching");
-    
+
     // Invalidate all related queries
-    await queryClient.invalidateQueries({ 
-      queryKey: ['festival_shifts'] 
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.scope('festival_shifts')
     });
-    await queryClient.invalidateQueries({ 
-      queryKey: ['festival_shift_assignments'] 
+    await queryClient.invalidateQueries({
+      queryKey: queryKeys.scope('festival_shift_assignments')
     });
-    
+
     // Force refetch
     return await refetch();
   }, [queryClient, refetch]);

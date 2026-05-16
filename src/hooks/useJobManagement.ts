@@ -8,6 +8,8 @@ import { useCallback } from "react";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useJobManagement = (
   selectedDepartment: Department,
   startDate: Date,
@@ -79,7 +81,7 @@ export const useJobManagement = (
   }, [selectedDepartment, startDate, endDate, isProjectManagementPage]);
 
   const { data: jobs, isLoading: jobsLoading } = useQuery({
-    queryKey: ["jobs", selectedDepartment, startDate, endDate],
+    queryKey: queryKeys.scope("jobs", selectedDepartment, startDate, endDate),
     queryFn: fetchJobs,
     staleTime: 1000 * 30,
     refetchOnWindowFocus: true

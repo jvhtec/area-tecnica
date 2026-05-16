@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { TourJobRateQuote } from '@/types/tourRates';
 import type { Database } from '@/integrations/supabase/types';
 
+
+import { queryKeys } from "@/lib/react-query";
 type TourJobRateQuoteRow = Database['public']['Views']['v_tour_job_rate_quotes_2025']['Row'];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -46,7 +48,7 @@ const normalizeTourJobRateQuote = (item: TourJobRateQuoteRow): TourJobRateQuote 
 
 export function useTourJobRateQuotes(jobId?: string) {
   return useQuery({
-    queryKey: ['tour-job-rate-quotes', jobId],
+    queryKey: queryKeys.scope('tour-job-rate-quotes', jobId),
     queryFn: async (): Promise<TourJobRateQuote[]> => {
       const query = supabase
         .from('v_tour_job_rate_quotes_2025')
@@ -68,7 +70,7 @@ export function useTourJobRateQuotes(jobId?: string) {
 
 export function useTechnicianTourRateQuotes() {
   return useQuery({
-    queryKey: ['technician-tour-rate-quotes'],
+    queryKey: queryKeys.scope('technician-tour-rate-quotes'),
     queryFn: async (): Promise<TourJobRateQuote[]> => {
       const { data, error } = await supabase
         .from('v_tour_job_rate_quotes_2025')

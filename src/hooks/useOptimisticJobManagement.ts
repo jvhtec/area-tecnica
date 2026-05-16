@@ -9,6 +9,8 @@ import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
 import { trackError } from "@/lib/errorTracking";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useOptimisticJobManagement = (
   selectedDepartment: Department,
   startDate: Date,
@@ -87,8 +89,10 @@ export const useOptimisticJobManagement = (
     return jobsWithFilteredDocs;
   }, [selectedDepartment, startDate, endDate, isProjectManagementPage]);
 
+  const jobsQueryKey = queryKeys.scope("jobs", selectedDepartment, startDate, endDate);
+
   const { data: jobs, isLoading: jobsLoading } = useQuery({
-    queryKey: ["jobs", selectedDepartment, startDate, endDate],
+    queryKey: jobsQueryKey,
     queryFn: fetchJobs,
     staleTime: 1000 * 30,
     refetchOnWindowFocus: true
@@ -155,7 +159,7 @@ export const useOptimisticJobManagement = (
       
       // Perform optimistic update - remove job from cache immediately
       queryClient.setQueryData(
-        ["jobs", selectedDepartment, startDate, endDate],
+        jobsQueryKey,
         (oldJobs: any[]) => {
           if (!oldJobs) return oldJobs;
           return oldJobs.filter(job => job.id !== jobId);
@@ -172,8 +176,8 @@ export const useOptimisticJobManagement = (
         });
       } else {
         // Restore job in cache if deletion failed
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-        queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
         throw new Error(result.error || "Unknown deletion error");
       }
     } catch (error: any) {
@@ -190,8 +194,8 @@ export const useOptimisticJobManagement = (
       });
       
       // Restore the cache by refetching
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
       throw error;
     }
   };

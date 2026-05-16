@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useArtistsQuery = (jobId: string | undefined, selectedDate: string, dayStartTime: string = "07:00") => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -14,7 +16,7 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
     error,
     refetch
   } = useQuery({
-    queryKey: ['festival-artists', jobId, selectedDate],
+    queryKey: queryKeys.scope('festival-artists', jobId, selectedDate),
     queryFn: async () => {
       if (!jobId || !selectedDate) return [];
 
@@ -83,7 +85,7 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['festival-artists', jobId, selectedDate] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId, selectedDate) });
       toast({
         title: "Success",
         description: "Artist deleted successfully",
@@ -101,7 +103,7 @@ export const useArtistsQuery = (jobId: string | undefined, selectedDate: string,
 
   // Function to invalidate and refetch artists
   const invalidateArtists = () => {
-    queryClient.invalidateQueries({ queryKey: ['festival-artists', jobId, selectedDate] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('festival-artists', jobId, selectedDate) });
   };
 
   return {

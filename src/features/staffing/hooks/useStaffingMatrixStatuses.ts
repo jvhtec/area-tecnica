@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { format } from 'date-fns'
 
+
+import { queryKeys } from "@/lib/react-query";
 type Status = 'confirmed' | 'declined' | 'expired' | 'requested' | 'sent' | null
 const toMatrixStatus = (value: string | null): Status => {
   if (
@@ -87,7 +89,7 @@ export function useStaffingMatrixStatuses(
   dates: Date[]
 ) {
   return useQuery({
-    queryKey: ['staffing-matrix', technicianIds, jobs.map(j => j.id), dates[0]?.toISOString(), dates[dates.length - 1]?.toISOString()],
+    queryKey: queryKeys.scope('staffing-matrix', technicianIds, jobs.map(j => j.id), dates[0]?.toISOString(), dates[dates.length - 1]?.toISOString()),
     queryFn: async () => {
       if (!technicianIds.length || !jobs.length || !dates.length) {
         return { byJob: new Map<string, ByJobStatus>(), byDate: new Map<string, ByDateStatus>() }

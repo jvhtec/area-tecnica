@@ -3,6 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { WiredMic } from "@/components/festival/gear-setup/WiredMicConfig";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface ArtistMicRequirement {
   id: string;
   name: string;
@@ -28,7 +30,7 @@ interface MicrophoneAnalysisResult {
 
 export const useMicrophoneAnalysis = (jobId: string, stageNumber: number) => {
   return useQuery({
-    queryKey: ['microphone-analysis', jobId, stageNumber],
+    queryKey: queryKeys.scope('microphone-analysis', jobId, stageNumber),
     queryFn: async (): Promise<MicrophoneAnalysisResult> => {
       const { data: artists, error } = await supabase
         .from('festival_artists')

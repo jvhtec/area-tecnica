@@ -7,6 +7,8 @@ import { toast } from 'sonner';
 import { aggregateJobTimesheets, TimesheetRowWithTechnician } from '@/utils/timesheetAssignments';
 import type { AggregatedTimesheetAssignment } from '@/utils/timesheetAssignments';
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Hook to fetch jobs with real-time updates
  */
@@ -150,7 +152,7 @@ export function useJobsRealtime() {
     error,
     refetch
   } = useQuery({
-    queryKey: ['jobs'],
+    queryKey: queryKeys.scope('jobs'),
     queryFn: fetchJobs,
     retry: maxRetries,
     retryDelay: attemptIndex => Math.min(1000 * (2 ** attemptIndex), 10000),

@@ -7,7 +7,13 @@ import { WallboardApi, WallboardApiError } from '@/lib/wallboard-api';
 import { useLgScreensaverBlock } from '@/hooks/useLgScreensaverBlock';
 import { WakeLockVideo } from '@/components/WakeLockVideo';
 
-import { buildCalendarFromJobsList, formatDateKey, MS_PER_DAY } from './calendar';
+import { buildCalendarFromJobsList } from './calendar';
+import {
+  addMadridCalendarDays,
+  formatMadridDateKey,
+  fromMadridDateKey,
+  getMadridMonthGrid,
+} from '@/utils/timezoneUtils';
 import {
   DEFAULT_HIGHLIGHT_TTL_SECONDS,
   DEFAULT_PANEL_DURATIONS,
@@ -258,21 +264,18 @@ export function WallboardDisplay({
     let isFirstLoad = true;
     const fetchAll = async () => {
       const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const weekEnd = new Date(todayStart.getTime() + 7 * MS_PER_DAY - 1);
-      const startOfMonth = new Date(todayStart.getFullYear(), todayStart.getMonth(), 1);
-      const monthOffset = (startOfMonth.getDay() + 6) % 7;
-      const calendarGridStart = new Date(startOfMonth.getTime() - monthOffset * MS_PER_DAY);
-      const calendarGridEnd = new Date(calendarGridStart.getTime() + 42 * MS_PER_DAY - 1);
-      const weekStartISO = todayStart.toISOString();
-      const weekEndISO = weekEnd.toISOString();
-      const calendarStartISO = calendarGridStart.toISOString();
-      const calendarEndISO = calendarGridEnd.toISOString();
+      const todayKey = formatMadridDateKey(now);
+      const todayStart = fromMadridDateKey(todayKey);
+      const weekEndKey = addMadridCalendarDays(todayKey, 6);
+      const weekEnd = fromMadridDateKey(weekEndKey, '23:59:59.999');
+      const calendarGrid = getMadridMonthGrid(now);
+      const calendarStartISO = calendarGrid.gridStart.toISOString();
+      const calendarEndISO = calendarGrid.gridEnd.toISOString();
       const calendarRange = `[${calendarStartISO},${calendarEndISO}]`;
       const weekStartMs = todayStart.getTime();
       const weekEndMs = weekEnd.getTime();
-      const calendarStartMs = calendarGridStart.getTime();
-      const calendarEndMs = calendarGridEnd.getTime();
+      const calendarStartMs = calendarGrid.gridStart.getTime();
+      const calendarEndMs = calendarGrid.gridEnd.getTime();
 
       const jobOverlapsWeek = (j: WallboardJobRow) => {
         const startTime = new Date(j.start_time).getTime();
@@ -461,7 +464,7 @@ export function WallboardDisplay({
         if (!Number.isFinite(startTs) || !Number.isFinite(endTs)) return;
 
         // Primary date for lookups/highlights – keep as start date
-        const primaryKey = formatDateKey(new Date(job.start_time));
+        const primaryKey = formatMadridDateKey(new Date(job.start_time));
         jobDateLookup[job.id] = primaryKey;
 
         // Add the job to every calendar day it spans within the visible window
@@ -469,16 +472,15 @@ export function WallboardDisplay({
         const spanEnd = Math.min(endTs, calendarEndMs);
         if (spanEnd < spanStart) return;
 
-        let day = new Date(spanStart);
-        day.setHours(0, 0, 0, 0);
-        const lastDay = new Date(spanEnd);
-        lastDay.setHours(0, 0, 0, 0);
+        let dayKey = formatMadridDateKey(new Date(spanStart));
+        const lastDayKey = formatMadridDateKey(new Date(spanEnd));
 
-        while (day.getTime() <= lastDay.getTime()) {
-          const key = formatDateKey(day);
-          const bucket = jobsByDate[key] ?? (jobsByDate[key] = []);
+        while (dayKey <= lastDayKey) {
+          const bucket = jobsByDate[dayKey] ?? (jobsByDate[dayKey] = []);
           bucket.push(job);
-          day = new Date(day.getTime() + MS_PER_DAY);
+          const nextDayKey = addMadridCalendarDays(dayKey, 1);
+          if (nextDayKey === dayKey) break;
+          dayKey = nextDayKey;
         }
       });
 
@@ -598,8 +600,8 @@ export function WallboardDisplay({
           jobsByDate,
           jobDateLookup,
           range: { start: calendarStartISO, end: calendarEndISO },
-          focusMonth: todayStart.getMonth(),
-          focusYear: todayStart.getFullYear(),
+          focusMonth: calendarGrid.focusMonth,
+          focusYear: calendarGrid.focusYear,
         });
         setCrew(crewPayload);
         setDocs(docPayload);
@@ -607,13 +609,11 @@ export function WallboardDisplay({
       }
 
       // 5) Logistics calendar (next 7 days)
-      const startDate = weekStartISO.slice(0, 10);
-      const endDate = weekEndISO.slice(0, 10);
       const { data: le, error: leErr } = await supabase
         .from('logistics_events')
         .select('id,event_date,event_time,title,transport_type,license_plate,job_id,event_type,loading_bay,color,logistics_event_departments(department)')
-        .gte('event_date', startDate)
-        .lte('event_date', endDate)
+        .gte('event_date', todayKey)
+        .lte('event_date', weekEndKey)
         .order('event_date', { ascending: true })
         .order('event_time', { ascending: true });
       if (leErr) {

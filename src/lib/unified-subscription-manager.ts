@@ -1,6 +1,8 @@
 import { QueryClient } from "@tanstack/react-query";
 import { supabase } from "./supabase";
 
+
+import { queryKeys } from "@/lib/react-query";
 export type SubscriptionSnapshot = {
   connectionStatus: 'connected' | 'disconnected' | 'connecting';
   activeSubscriptions: string[];
@@ -668,11 +670,11 @@ export class UnifiedSubscriptionManager {
           try {
             this.queryClient.invalidateQueries({ queryKey: JSON.parse(k) });
           } catch {
-            this.queryClient.invalidateQueries({ queryKey: [table] });
+            this.queryClient.invalidateQueries({ queryKey: queryKeys.custom(table) });
           }
         });
       } else {
-        this.queryClient.invalidateQueries({ queryKey: [table] });
+        this.queryClient.invalidateQueries({ queryKey: queryKeys.custom(table) });
       }
     });
 

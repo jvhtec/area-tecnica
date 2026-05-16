@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface IncidentReport {
   id: string;
   job_id: string;
@@ -32,7 +34,7 @@ export const useIncidentReports = () => {
     isLoading,
     error
   } = useQuery({
-    queryKey: ["incident-reports"],
+    queryKey: queryKeys.scope("incident-reports"),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("job_documents")
@@ -91,7 +93,7 @@ export const useIncidentReports = () => {
           });
         }
       } catch {}
-      queryClient.invalidateQueries({ queryKey: ["incident-reports"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("incident-reports") });
       toast({
         title: "Reporte eliminado",
         description: "El reporte de incidencia ha sido eliminado correctamente.",

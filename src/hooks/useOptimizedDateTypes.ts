@@ -1,12 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Optimized hook for fetching date types with aggressive caching
  */
 export const useOptimizedDateTypes = (jobIds: string[], dates: string[]) => {
   return useQuery({
-    queryKey: ['date-types', jobIds.sort(), dates.sort()],
+    queryKey: queryKeys.scope('date-types', [...jobIds].sort(), [...dates].sort()),
     queryFn: async () => {
       if (!jobIds.length || !dates.length) {
         return {};

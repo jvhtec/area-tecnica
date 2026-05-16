@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { JobPayoutTotals } from '@/types/jobExtras';
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface UseJobPayoutTotalsOptions {
   enabled?: boolean;
 }
@@ -12,7 +14,7 @@ export function useJobPayoutTotals(
   options?: UseJobPayoutTotalsOptions
 ) {
   return useQuery({
-    queryKey: ['job-tech-payout', jobId, technicianId],
+    queryKey: queryKeys.scope('job-tech-payout', jobId, technicianId),
     queryFn: async (): Promise<JobPayoutTotals[]> => {
       // 1. Fetch totals from view
       let query = supabase
@@ -78,7 +80,7 @@ export function useJobPayoutTotals(
 
 export function useMyJobPayoutTotals() {
   return useQuery({
-    queryKey: ['my-job-payout-totals'],
+    queryKey: queryKeys.scope('my-job-payout-totals'),
     queryFn: async (): Promise<JobPayoutTotals[]> => {
       const { data, error } = await supabase
         .from('v_job_tech_payout_2025')

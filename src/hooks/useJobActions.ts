@@ -9,6 +9,8 @@ import { format } from "date-fns";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
 import { canUseCustomFolderStructure, isManagementRole } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useJobActions = (job: any, userRole: string | null, onDeleteClick?: (jobId: string) => void) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -57,8 +59,8 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
           onDeleteClick(job.id);
         }
         
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
@@ -141,9 +143,9 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
 
       // Parallelize independent query invalidations
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["folder-existence"] })
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("folder-existence") })
       ]);
 
     } catch (error: any) {

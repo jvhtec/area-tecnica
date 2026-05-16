@@ -6,6 +6,8 @@ import { toast } from "sonner";
 import { RATES_QUERY_KEYS } from "@/constants/ratesQueryKeys";
 import { isManagementRole } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 type TimesheetVisibilityRow = Pick<
   Timesheet,
   'id' | 'amount_eur' | 'amount_breakdown' | 'amount_eur_visible' | 'amount_breakdown_visible'
@@ -20,7 +22,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
 
   const invalidateApprovalContext = useCallback(() => {
     if (!jobId) return;
-    queryClient.invalidateQueries({ queryKey: ['job-approval-status', jobId] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-approval-status', jobId) });
     queryClient.invalidateQueries({ queryKey: RATES_QUERY_KEYS.approvals });
   }, [jobId, queryClient]);
 

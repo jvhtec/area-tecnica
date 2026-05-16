@@ -7,19 +7,31 @@ import { Badge } from "@/components/ui/badge";
 import { TourColorSection } from "./TourColorSection";
 import { TourDeleteSection } from "./TourDeleteSection";
 import { TourDefaultsManager } from "./TourDefaultsManager";
-import { useTourManagement } from "./hooks/useTourManagement";
+import { useTourManagement } from "@/hooks/tours/useTourManagement";
 import { TourLogoManager } from "./TourLogoManager";
 import { useNavigate } from "react-router-dom";
 import { Calculator, Weight, Settings, Package, XCircle, CheckCircle } from "lucide-react";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import type { InvoicingCompany } from "@/types/job";
+
+
+import { queryKeys } from "@/lib/react-query";
+interface Tour {
+  id: string;
+  name: string;
+  status?: string | null;
+  color?: string | null;
+  description?: string | null;
+  invoicing_company?: InvoicingCompany | null;
+}
 
 interface TourManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tour: any;
+  tour: Tour;
   tourDateId?: string; // Add optional tour date ID for override mode
 }
 
@@ -94,16 +106,15 @@ export const TourManagementDialog = ({
   const handleBulkTourPackUpdate = async (tourPackOnly: boolean) => {
     setIsUpdatingTourPack(true);
     try {
-      const { error } = await supabase
-        .from("tour_dates")
+      const { error } = await dataLayerClient.from("tour_dates")
         .update({ is_tour_pack_only: tourPackOnly })
         .eq("tour_id", tour.id);
 
       if (error) throw error;
 
       // Refresh tour data
-      await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour", tour.id) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") });
 
       toast({
         title: "Éxito",
@@ -127,8 +138,7 @@ export const TourManagementDialog = ({
 
     setIsUpdatingStatus(true);
     try {
-      const { error } = await supabase
-        .from('tours')
+      const { error } = await dataLayerClient.from('tours')
         .update({ status: newStatus })
         .eq('id', tour.id);
 
@@ -136,21 +146,18 @@ export const TourManagementDialog = ({
 
       // When cancelling a tour, mark all its tourdate jobs as Cancelado
       if (newStatus === 'cancelled') {
-        const { error: jobsErr } = await supabase
-          .from('jobs')
+        const { error: jobsErr } = await dataLayerClient.from('jobs')
           .update({ status: 'Cancelado' })
           .eq('tour_id', tour.id)
           .eq('job_type', 'tourdate');
-        if (jobsErr) {
-          console.warn('Failed to mark tour jobs as Cancelado:', jobsErr);
-        }
+        if (jobsErr) throw jobsErr;
       }
 
       // Refresh tour data
-      await queryClient.invalidateQueries({ queryKey: ["tour", tour.id] });
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour", tour.id) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
 
       toast({
         title: "Éxito",

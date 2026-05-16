@@ -2,6 +2,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface TourDate {
   id: string;
   tour: {
@@ -21,7 +23,7 @@ export interface JobSelection {
 
 export const useJobSelection = () => {
   return useQuery({
-    queryKey: ["jobs-for-selection"],
+    queryKey: queryKeys.scope("jobs-for-selection"),
     queryFn: async () => {
       console.log("Fetching jobs for selection...");
       

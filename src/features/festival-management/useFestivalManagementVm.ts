@@ -18,6 +18,8 @@ import { format, isValid } from "date-fns";
 
 import type { ArtistRiderFile, FestivalJob, JobDocumentEntry } from "./types";
 
+
+import { queryKeys } from "@/lib/react-query";
 type FestivalStageOption = {
   number: number;
   name: string;
@@ -100,7 +102,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
 
   // Check if WhatsApp group already exists for this job/department
   const { data: waGroup, refetch: refetchWaGroup } = useQuery({
-    queryKey: ['job-whatsapp-group', jobId, waDepartment, waStageNumber],
+    queryKey: queryKeys.scope('job-whatsapp-group', jobId, waDepartment, waStageNumber),
     enabled: !!jobId && !!waDepartment && isManagementUser,
     queryFn: async () => {
       if (!jobId) return null;
@@ -117,7 +119,7 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   });
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
-    queryKey: ['job-whatsapp-group-request', jobId, waDepartment, waStageNumber],
+    queryKey: queryKeys.scope('job-whatsapp-group-request', jobId, waDepartment, waStageNumber),
     enabled: !!jobId && !!waDepartment && isManagementUser,
     queryFn: async () => {
       if (!jobId) return null;

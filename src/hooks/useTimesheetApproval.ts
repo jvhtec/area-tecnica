@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+
+import { queryKeys } from "@/lib/react-query";
 export function useTimesheetApproval() {
   const queryClient = useQueryClient();
   
@@ -51,8 +53,8 @@ export function useTimesheetApproval() {
       return data;
     },
     onSuccess: (_data, timesheetId) => {
-      queryClient.invalidateQueries({ queryKey: ['timesheet', timesheetId] });
-      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('timesheet', timesheetId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('timesheets') });
       toast.success('Timesheet approved and rates calculated');
     },
     onError: (error) => {
