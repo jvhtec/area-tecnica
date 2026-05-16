@@ -20,6 +20,8 @@ import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { isManagementRole } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 const Operaciones = () => {
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
   const [presetJobType, setPresetJobType] = useState<JobType | undefined>(undefined);
@@ -116,8 +118,8 @@ const Operaciones = () => {
         });
 
         // Invalidate queries to refresh the list
-        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
       } else {
         throw new Error(result.error || "Error desconocido al eliminar");
       }

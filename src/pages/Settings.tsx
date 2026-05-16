@@ -16,7 +16,7 @@ import { DEPARTMENT_LABELS } from "@/types/department";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { toast } from "@/hooks/use-toast";
 import { Bell, Bug } from "lucide-react";
 import { useEffect, useState } from 'react'
@@ -147,7 +147,7 @@ const Settings = () => {
 
   const handleTestNotification = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('push', {
+      const { data, error } = await dataLayerClient.functions.invoke('push', {
         body: { action: 'test', url: '/settings' }
       });
 
@@ -194,7 +194,7 @@ const Settings = () => {
       })
       setTimeout(async () => {
         try {
-          const { error } = await supabase.functions.invoke('push', {
+          const { error } = await dataLayerClient.functions.invoke('push', {
             body: { action: 'test', url: '/settings' },
           })
           if (error) throw error

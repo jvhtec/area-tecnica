@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
@@ -194,8 +194,7 @@ const PesosTool: React.FC = () => {
           setSelectedJob(found);
           return;
         }
-        const { data, error } = await supabase
-          .from('jobs')
+        const { data, error } = await dataLayerClient.from('jobs')
           .select('id, title, start_time, end_time, tour_date_id')
           .eq('id', jobIdFromUrl)
           .single();
@@ -244,8 +243,7 @@ const PesosTool: React.FC = () => {
     if (!selectedJob?.tour_date_id) return;
 
     try {
-      const { data } = await supabase
-        .from('tour_dates')
+      const { data } = await dataLayerClient.from('tour_dates')
         .select(`
           date,
           tour:tours(name),
@@ -269,8 +267,7 @@ const PesosTool: React.FC = () => {
   useEffect(() => {
     const fetchTourInfo = async () => {
       if (tourId) {
-        const { data } = await supabase
-          .from('tours')
+        const { data } = await dataLayerClient.from('tours')
           .select('name')
           .eq('id', tourId)
           .single();
@@ -281,8 +278,7 @@ const PesosTool: React.FC = () => {
       }
 
       if (tourDateId) {
-        const { data } = await supabase
-          .from('tour_dates')
+        const { data } = await dataLayerClient.from('tour_dates')
           .select(`
             date,
             locations (

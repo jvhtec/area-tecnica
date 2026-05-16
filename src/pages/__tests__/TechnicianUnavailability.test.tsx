@@ -25,8 +25,14 @@ vi.mock("@/lib/supabase", () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: mockSupabase,
+}));
+
 import TechnicianUnavailability from "../TechnicianUnavailability";
 
+
+import { queryKeys } from "@/lib/react-query";
 describe("TechnicianUnavailability", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -127,14 +133,14 @@ describe("TechnicianUnavailability", () => {
       );
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["my-unavailability"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.scope("my-unavailability") });
   });
 
   it("deletes a single block and invalidates my-unavailability", async () => {
     const user = userEvent.setup();
     const { deleteBuilder } = configureSupabase([
       {
-        id: "block-1",
+        id: 1,
         technician_id: "tech-1",
         date: "2026-03-12",
         status: "day_off",
@@ -154,9 +160,9 @@ describe("TechnicianUnavailability", () => {
     await user.click(within(card as HTMLElement).getByRole("button"));
 
     await waitFor(() => {
-      expect(deleteBuilder.eq).toHaveBeenCalledWith("id", "block-1");
+      expect(deleteBuilder.eq).toHaveBeenCalledWith("id", 1);
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["my-unavailability"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.scope("my-unavailability") });
   });
 });

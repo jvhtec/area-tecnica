@@ -18,6 +18,8 @@ import { useOptimizedJobs } from '@/hooks/useOptimizedJobs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
+
+import { queryKeys } from "@/lib/react-query";
 export default function LightsDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);
@@ -31,7 +33,7 @@ export default function LightsDisponibilidad() {
   const { data: jobsToday = [] } = useOptimizedJobs('lights' as any, dayStart, dayEnd);
 
   const { data: assignedPresets } = useQuery({
-    queryKey: ['preset-assignments', 'lights', selectedDate],
+    queryKey: queryKeys.scope('preset-assignments', 'lights', selectedDate),
     queryFn: async () => {
       if (!selectedDate) return null;
       

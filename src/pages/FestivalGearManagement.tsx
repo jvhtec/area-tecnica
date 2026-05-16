@@ -18,6 +18,8 @@ import { PrintOptions, PrintOptionsDialog } from "@/components/festival/pdf/Prin
 import { Badge } from "@/components/ui/badge";
 import { buildReadableFilename } from "@/utils/fileName";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface StageInfo {
   id?: string;
   number: number;
@@ -45,17 +47,17 @@ const FestivalGearManagement = () => {
     {
       table: "jobs",
       filter: `id=eq.${jobId}`,
-      queryKey: ["job", jobId]
+      queryKey: queryKeys.scope("job", jobId)
     },
     {
       table: "festival_gear_setups",
       filter: `job_id=eq.${jobId}`,
-      queryKey: ["festival-gear", jobId]
+      queryKey: queryKeys.scope("festival-gear", jobId)
     },
     {
       table: "festival_stages",
       filter: `job_id=eq.${jobId}`,
-      queryKey: ["festival-stages", jobId]
+      queryKey: queryKeys.scope("festival-stages", jobId)
     }
   ]);
 

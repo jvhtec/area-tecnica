@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { TourChips } from "@/components/dashboard/TourChips";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useNavigate } from "react-router-dom";
 
@@ -20,11 +20,10 @@ const Tours = () => {
   // Fetch user data and preferences
   useEffect(() => {
     const fetchUserPrefs = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await dataLayerClient.auth.getSession();
       if (session?.user?.id) {
         setUserId(session.user.id);
-        const { data, error } = await supabase
-          .from("profiles")
+        const { data, error } = await dataLayerClient.from("profiles")
           .select("tours_expanded")
           .eq("id", session.user.id)
           .single();
@@ -47,8 +46,7 @@ const Tours = () => {
     const newValue = !showTours;
     setShowTours(newValue);
     if (userId) {
-      const { error } = await supabase
-        .from("profiles")
+      const { error } = await dataLayerClient.from("profiles")
         .update({ tours_expanded: newValue })
         .eq("id", userId);
       if (error) {

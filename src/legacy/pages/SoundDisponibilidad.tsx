@@ -19,6 +19,8 @@ import { useOptimizedTableSubscriptions } from '@/hooks/useOptimizedSubscription
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
+
+import { queryKeys } from "@/lib/react-query";
 export default function SoundDisponibilidad() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showPresetDialog, setShowPresetDialog] = useState(false);
@@ -33,7 +35,7 @@ export default function SoundDisponibilidad() {
   const { data: jobsToday = [] } = useOptimizedJobs('sound' as any, dayStart, dayEnd);
 
   const { data: assignedPresets } = useQuery({
-    queryKey: ['preset-assignments', 'sound', selectedDate],
+    queryKey: queryKeys.scope('preset-assignments', 'sound', selectedDate),
     queryFn: async () => {
       if (!selectedDate) return null;
       
@@ -74,12 +76,12 @@ export default function SoundDisponibilidad() {
 
   // Realtime: subscribe to assignments and stock affecting this view
   useOptimizedTableSubscriptions([
-    { table: 'day_preset_assignments', queryKey: ['preset-assignments'], priority: 'high' },
-    { table: 'preset_items', queryKey: ['preset-assignments'], priority: 'medium' },
-    { table: 'presets', queryKey: ['presets'], priority: 'low' },
-    { table: 'equipment', queryKey: ['equipment-with-stock', 'sound'], priority: 'low' },
-    { table: 'current_stock_levels', queryKey: ['equipment-with-stock', 'sound'], priority: 'medium' },
-    { table: 'sub_rentals', queryKey: ['equipment-with-stock', 'sound'], priority: 'medium' },
+    { table: 'day_preset_assignments', queryKey: queryKeys.scope('preset-assignments'), priority: 'high' },
+    { table: 'preset_items', queryKey: queryKeys.scope('preset-assignments'), priority: 'medium' },
+    { table: 'presets', queryKey: queryKeys.scope('presets'), priority: 'low' },
+    { table: 'equipment', queryKey: queryKeys.scope('equipment-with-stock', 'sound'), priority: 'low' },
+    { table: 'current_stock_levels', queryKey: queryKeys.scope('equipment-with-stock', 'sound'), priority: 'medium' },
+    { table: 'sub_rentals', queryKey: queryKeys.scope('equipment-with-stock', 'sound'), priority: 'medium' },
   ]);
 
   // Fetch job logos for display

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,14 +73,13 @@ export const Profile = () => {
   // Fetch user profile on component mount
   useEffect(() => {
     const fetchProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await dataLayerClient.auth.getUser();
       if (!user) {
         navigate('/auth');
         return;
       }
 
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
@@ -109,8 +108,7 @@ export const Profile = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from('profiles')
+      const { error } = await dataLayerClient.from('profiles')
         .update({
           first_name: profile.first_name,
           nickname: profile.nickname,
@@ -148,8 +146,7 @@ export const Profile = () => {
   const handleFolderStructureSave = async () => {
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
+      const { error } = await dataLayerClient.from('profiles')
         .update({
           custom_folder_structure: folderStructure as unknown as Json,
           custom_tour_folder_structure: tourFolderStructure as unknown as Json,
@@ -176,7 +173,7 @@ export const Profile = () => {
 
   const handleRotateIcsToken = async () => {
     try {
-      const { data, error } = await supabase.rpc('rotate_my_calendar_ics_token');
+      const { data, error } = await dataLayerClient.rpc('rotate_my_calendar_ics_token');
       if (error) throw error;
       const newToken = data as string;
       setProfile((p: any) => ({ ...p, calendar_ics_token: newToken }));
@@ -204,7 +201,7 @@ export const Profile = () => {
     setLoading(true);
     try {
       // First verify the current password
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await dataLayerClient.auth.signInWithPassword({
         email: profile.email,
         password: passwordForm.currentPassword,
       });
@@ -214,7 +211,7 @@ export const Profile = () => {
       }
 
       // Update the password
-      const { error: updateError } = await supabase.auth.updateUser({
+      const { error: updateError } = await dataLayerClient.auth.updateUser({
         password: passwordForm.newPassword
       });
 
@@ -222,7 +219,7 @@ export const Profile = () => {
 
       // If this was a forced password change, update the user metadata
       if (needsPasswordChange) {
-        const { error: metadataError } = await supabase.auth.updateUser({
+        const { error: metadataError } = await dataLayerClient.auth.updateUser({
           data: { needs_password_change: false }
         });
 

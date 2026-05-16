@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StockEntry, getCategoriesForDepartment } from '@/types/equipment';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToast } from '@/hooks/use-toast';
 import { StockCreationManager } from '@/components/disponibilidad/StockCreationManager';
@@ -10,6 +10,8 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 
+
+import { queryKeys } from "@/lib/react-query";
 export function EquipmentManagement() {
   const auth = useOptimizedAuth();
   const { session } = auth;
@@ -20,14 +22,13 @@ export function EquipmentManagement() {
 
   // Fetch current stock entries filtered by user department categories
   const { data: stockEntries = [], error: stockError } = useQuery({
-    queryKey: ['stock-entries', userDepartment],
+    queryKey: queryKeys.scope('stock-entries', userDepartment),
     queryFn: async () => {
       if (!session?.user?.id || !userDepartment) return [];
       
       const categories = getCategoriesForDepartment(userDepartment as any);
       
-      const { data, error } = await supabase
-        .from('global_stock_entries')
+      const { data, error } = await dataLayerClient.from('global_stock_entries')
         .select('*, equipment!inner(category)')
         .in('equipment.category', categories);
 
@@ -47,8 +48,7 @@ export function EquipmentManagement() {
 
       // Process each stock entry individually
       for (const entry of updatedStock) {
-        const { error: upsertError } = await supabase
-          .from('global_stock_entries')
+        const { error: upsertError } = await dataLayerClient.from('global_stock_entries')
           .upsert({
             id: entry.id,
             equipment_id: entry.equipment_id,
@@ -62,8 +62,8 @@ export function EquipmentManagement() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock-entries'] });
-      queryClient.invalidateQueries({ queryKey: ['current-stock-levels'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('stock-entries') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('current-stock-levels') });
       toast({
         title: "Éxito",
         description: "Inventario actualizado correctamente"

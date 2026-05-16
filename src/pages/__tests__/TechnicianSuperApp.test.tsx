@@ -47,6 +47,10 @@ vi.mock("@/lib/supabase", () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: mockSupabase,
+}));
+
 vi.mock("@/components/technician/DashboardScreen", () => ({
   DashboardScreen: ({ assignments }: { assignments: any[] }) => (
     <div data-testid="dashboard-screen">Dashboard assignments: {assignments.length}</div>

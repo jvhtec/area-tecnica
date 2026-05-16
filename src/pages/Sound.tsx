@@ -27,7 +27,7 @@ import { SoundVisionAccessRequestDialog } from "@/components/soundvision/SoundVi
 import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub";
 import { MobileNavBar } from "@/components/layout/MobileNavBar";
 import { buildNavigationItems } from "@/components/layout/SidebarNavigation";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { EnhancedJobDetailsModal } from "@/components/department/EnhancedJobDetailsModal";
 import { MobileAssignmentsDialog } from "@/components/department/MobileAssignmentsDialog";
@@ -35,6 +35,8 @@ import { selectPrimaryNavigationItems } from "@/components/layout/Layout";
 import { isJobOnDate } from "@/utils/timezoneUtils";
 import { isManagementRole } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 const Sound = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -107,7 +109,7 @@ const Sound = () => {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
     try {
-      await supabase.auth.signOut();
+      await dataLayerClient.auth.signOut();
       navigate('/auth');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -230,7 +232,7 @@ const Sound = () => {
           title: "Trabajo eliminado",
           description: result.details || "El trabajo se ha eliminado y la limpieza continúa en segundo plano."
         });
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
       } else {
         throw new Error(result.error || "Error desconocido al eliminar");
       }

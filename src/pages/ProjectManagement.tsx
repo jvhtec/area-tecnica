@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, Search, Filter, X, Plus } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Department } from "@/types/department";
 import { startOfMonth, endOfMonth, addMonths } from "date-fns";
 import { MonthNavigation } from "@/components/project-management/MonthNavigation";
@@ -24,6 +24,8 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useCreateJobDialogStore } from "@/stores/useCreateJobDialogStore";
 import { canEditJobs } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 const normalizeSearchText = (value: string) =>
   value
     .normalize("NFD")
@@ -81,9 +83,9 @@ const ProjectManagement = () => {
   // Force subscription to required tables
   useEffect(() => {
     forceSubscribe([
-      { table: 'jobs', queryKey: ['optimized-jobs'], priority: 'high' },
-      { table: 'job_assignments', queryKey: ['optimized-jobs'], priority: 'medium' },
-      { table: 'job_departments', queryKey: ['optimized-jobs'], priority: 'medium' }
+      { table: 'jobs', queryKey: queryKeys.scope('optimized-jobs'), priority: 'high' },
+      { table: 'job_assignments', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' },
+      { table: 'job_departments', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' }
     ]);
   }, [forceSubscribe]);
 
@@ -173,14 +175,13 @@ const ProjectManagement = () => {
   useEffect(() => {
     const checkAccess = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await dataLayerClient.auth.getSession();
         if (!session) {
           console.log("ProjectManagement: No session found, redirecting to auth");
           navigate("/auth");
           return;
         }
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
+        const { data: profile, error: profileError } = await dataLayerClient.from("profiles")
           .select("role")
           .eq("id", session.user.id)
           .single();
@@ -209,11 +210,10 @@ const ProjectManagement = () => {
   useEffect(() => {
     const loadUserPreferences = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await dataLayerClient.auth.getSession();
         if (!session?.user?.id) return;
         
-        const { data: profile, error } = await supabase
-          .from("profiles")
+        const { data: profile, error } = await dataLayerClient.from("profiles")
           .select("selected_job_statuses")
           .eq("id", session.user.id)
           .single();
@@ -237,11 +237,10 @@ const ProjectManagement = () => {
   // Save user preferences when status selection changes
   const saveUserPreferences = async (statuses: string[]) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await dataLayerClient.auth.getSession();
       if (!session?.user?.id) return;
       
-      const { error } = await supabase
-        .from("profiles")
+      const { error } = await dataLayerClient.from("profiles")
         .update({ selected_job_statuses: statuses })
         .eq("id", session.user.id);
         

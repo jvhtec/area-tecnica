@@ -20,6 +20,10 @@ vi.mock("@/lib/supabase", () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: mockSupabase,
+}));
+
 vi.mock("@/components/dashboard/TourChips", () => ({
   TourChips: (props: any) => {
     tourChipsMock(props);

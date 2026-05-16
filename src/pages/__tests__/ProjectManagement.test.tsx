@@ -69,8 +69,8 @@ vi.mock("@/utils/jobStatusUtils", () => ({
 const mockGetSession = vi.fn();
 const mockFrom = vi.fn();
 
-vi.mock("@/lib/supabase", () => ({
-  supabase: {
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: {
     auth: {
       getSession: (...args: any[]) => mockGetSession(...args),
     },
