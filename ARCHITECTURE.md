@@ -171,6 +171,7 @@ area-tecnica/
 │   │   ├── lights/                   # Lighting department logic
 │   │   ├── rates/                    # Rate management
 │   │   ├── staffing/                 # Crew staffing logic
+│   │   ├── technical-tools/          # Shared Consumos/Pesos calculations, persistence, and controls
 │   │   ├── timesheets/               # Timesheet calculations
 │   │   └── wallboard/                # Digital signage display
 │   │

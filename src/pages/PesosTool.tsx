@@ -7,6 +7,12 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { PesosToolView } from './pesos-tool/PesosToolView';
+import {
+  calculateWeightRows,
+  formatRiggingPoint,
+  sumWeightRows,
+} from '@/features/technical-tools/weights/weightCalculations';
+import { uploadWeightReportAndCompleteTasks } from '@/features/technical-tools/weights/weightPersistence';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -123,7 +129,7 @@ const PesosTool: React.FC = () => {
     return match ? match[1].trim() : name;
   };
 
-  const formatSuffixNumber = (value: number) => `SX${value.toString().padStart(2, '0')}`;
+  const formatSuffixNumber = (value: number) => formatRiggingPoint('SX', value);
 
   const assignSuffixes = (tablesToAssign: Table[]): Table[] => {
     let counter = 1;
@@ -592,20 +598,8 @@ const PesosTool: React.FC = () => {
     }
 
     // Calculate each row's total weight.
-    const calculatedRows = currentTable.rows.map((row) => {
-      const component = soundComponentDatabase.find((c) => c.id.toString() === row.componentId);
-      const totalWeight =
-        parseFloat(row.quantity) && parseFloat(row.weight)
-          ? parseFloat(row.quantity) * parseFloat(row.weight)
-          : 0;
-      return {
-        ...row,
-        componentName: component?.name || '',
-        totalWeight,
-      };
-    });
-
-    const totalWeight = calculatedRows.reduce((sum, row) => sum + (row.totalWeight || 0), 0);
+    const calculatedRows = calculateWeightRows(currentTable.rows, soundComponentDatabase);
+    const totalWeight = sumWeightRows(calculatedRows);
 
     // For grouping, assign a new clusterId for this generation.
     const newClusterId = Date.now().toString();
@@ -766,29 +760,21 @@ const PesosTool: React.FC = () => {
       );
 
       const fileName = `Pesos Report - ${selectedJob.title}.pdf`;
+      let completedTasksCount = 0;
 
       // Upload PDF first - only auto-complete tasks if upload succeeds
       try {
-        const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
-        await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/pesos');
+        completedTasksCount = await uploadWeightReportAndCompleteTasks({
+          fileName,
+          jobId: selectedJobId,
+          pdfBlob,
+        });
       } catch (uploadErr) {
         throw uploadErr;
       }
 
-      // Auto-complete all Pesos tasks for this job after successful upload
-      // This automation marks relevant tasks as completed with proper audit trail
-      let completedTasksCount = 0;
-      try {
-        const { autoCompletePesosTasks } = await import('@/utils/taskAutoCompletion');
-        const result = await autoCompletePesosTasks(selectedJobId);
-        completedTasksCount = result.completedCount;
-
-        if (result.completedCount > 0) {
-          console.log(`Auto-completed ${result.completedCount} Pesos task(s)`);
-        }
-      } catch (autoCompleteErr) {
-        // Non-fatal: log but don't fail the upload flow
-        console.warn('Task auto-completion failed:', autoCompleteErr);
+      if (completedTasksCount > 0) {
+        console.log(`Auto-completed ${completedTasksCount} Pesos task(s)`);
       }
 
       toast({
