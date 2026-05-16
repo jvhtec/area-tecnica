@@ -131,6 +131,7 @@ area-tecnica/
 │   │   ├── incident-reports/         # Incident reporting
 │   │   ├── jobs/                     # Job management
 │   │   │   ├── cards/                # Job card variants
+│   │   │   │   └── job-card-actions/ # Split job-card actions, dialogs, and service hooks
 │   │   │   └── job-details-dialog/
 │   │   ├── landing/                  # Public landing page
 │   │   ├── layout/                   # App shell & navigation
