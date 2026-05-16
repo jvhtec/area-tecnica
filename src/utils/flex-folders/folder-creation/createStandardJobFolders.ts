@@ -1,27 +1,26 @@
-import { supabase } from "@/lib/supabase";
-
-import { createFlexFolder } from "../api";
+import { supabase } from "@/integrations/supabase/client";
+import { createFlexFolder } from "@/utils/flex-folders/api";
 import {
   DEPARTMENT_IDS,
   DEPARTMENT_SUFFIXES,
   FLEX_FOLDER_IDS,
   RESPONSIBLE_PERSON_IDS,
-} from "../constants";
-import { getDepartmentCustomPullsheetMetadata, type DepartmentKey } from "../types";
-import { createComercialExtras } from "./createComercialExtras";
+} from "@/utils/flex-folders/constants";
+import { getDepartmentCustomPullsheetMetadata, type DepartmentKey } from "@/utils/flex-folders/types";
+import { createComercialExtras } from "@/utils/flex-folders/folder-creation/createComercialExtras";
 import {
   buildPullsheetTemplates,
   getJobDepartments,
   shouldCreateDepartmentFolder,
   shouldCreateItem,
   upsertCrewCall,
-} from "./helpers";
+} from "@/utils/flex-folders/folder-creation/helpers";
 import type {
   ExistingFolderMaps,
   FlexFolderRow,
   FolderCreationBaseArgs,
   PullsheetTemplate,
-} from "./types";
+} from "@/utils/flex-folders/folder-creation/types";
 
 type CreateStandardJobFoldersArgs = FolderCreationBaseArgs & ExistingFolderMaps & {
   existingMainFolder?: FlexFolderRow;
@@ -68,13 +67,28 @@ export const createStandardJobFolders = async ({
     const topFolder = await createFlexFolder(topPayload);
     topFolderId = topFolder.elementId;
 
-    await supabase
+    if (!topFolderId) {
+      throw new Error("Flex main folder creation returned no element ID");
+    }
+
+    const { error: mainInsertError } = await supabase
       .from("flex_folders")
       .insert({
         job_id: job.id,
         element_id: topFolderId,
         folder_type: "main_event",
       });
+
+    if (mainInsertError) {
+      console.error("Failed to persist main Flex folder:", {
+        jobId: job.id,
+        elementId: topFolderId,
+        error: mainInsertError,
+      });
+      throw new Error(
+        `Failed to persist main Flex folder for job ${job.id} (element_id: ${topFolderId}): ${mainInsertError.message}`
+      );
+    }
   } else {
     console.log("Reusing existing main Flex folder for job:", topFolderId);
   }
@@ -119,7 +133,7 @@ export const createStandardJobFolders = async ({
       console.log(`Creating department folder for ${dept}:`, deptPayload);
       const deptFolder = await createFlexFolder(deptPayload);
 
-      const { data: [childRow], error: childErr } = await supabase
+      const { data: childRows, error: childErr } = await supabase
         .from("flex_folders")
         .insert({
           job_id: job.id,
@@ -132,6 +146,16 @@ export const createStandardJobFolders = async ({
 
       if (childErr) {
         console.error("Error inserting department folder row:", childErr);
+        throw new Error(
+          `Failed to persist department folder for ${dept} (job_id: ${job.id}, element_id: ${deptFolder.elementId}): ${childErr.message}`
+        );
+      }
+
+      const childRow = childRows?.[0];
+      if (!childRow) {
+        throw new Error(
+          `Failed to retrieve persisted department folder row for ${dept} (job_id: ${job.id}, element_id: ${deptFolder.elementId})`
+        );
       }
 
       deptFolderId = childRow?.element_id ?? deptFolder.elementId;
@@ -183,13 +207,14 @@ export const createStandardJobFolders = async ({
           : "hoja_info_vx";
       const parentFolderRow = existingDepartmentMap.get(dept);
       try {
-        await supabase.from("flex_folders").insert({
+        const { error: insertError } = await supabase.from("flex_folders").insert({
           job_id: job.id,
           parent_id: parentFolderRow?.id ?? null,
           element_id: hojaInfoResponse.elementId,
           department: dept,
           folder_type: hojaInfoFolderType,
         });
+        if (insertError) throw insertError;
         console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
       } catch (err) {
         console.error(`Failed to persist hojaInfo for ${dept}:`, err);
@@ -257,13 +282,14 @@ export const createStandardJobFolders = async ({
           const pullsheetResponse = await createFlexFolder(pullsheetPayload);
           const parentFolderRow = existingDepartmentMap.get(dept);
           try {
-            await supabase.from("flex_folders").insert({
+            const { error: insertError } = await supabase.from("flex_folders").insert({
               job_id: job.id,
               parent_id: parentFolderRow?.id ?? null,
               element_id: pullsheetResponse.elementId,
               department: dept,
               folder_type: "pull_sheet",
             });
+            if (insertError) throw insertError;
             console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
           } catch (err) {
             console.error(`Failed to persist pullsheet ${template.name}:`, err);
@@ -324,13 +350,14 @@ export const createStandardJobFolders = async ({
 
         const parentFolderRow = existingDepartmentMap.get(dept);
         try {
-          await supabase.from("flex_folders").insert({
+          const { error: insertError } = await supabase.from("flex_folders").insert({
             job_id: job.id,
             parent_id: parentFolderRow?.id ?? null,
             element_id: created.elementId,
             department: dept,
             folder_type: folderTypeMap[sf.key],
           });
+          if (insertError) throw insertError;
           console.log(`Persisted ${sf.key} for ${dept} with element_id: ${created.elementId}`);
         } catch (err) {
           console.error(`Failed to persist ${sf.key} for ${dept}:`, err);
@@ -426,23 +453,32 @@ export const createStandardJobFolders = async ({
 
             if (insertError) {
               console.error("Failed to persist work order Flex folder:", insertError);
+              throw new Error(
+                `Failed to persist work order Flex folder for job ${job.id} (${dept}, element_id: ${created.elementId}): ${insertError.message}`
+              );
             } else if (insertedRow) {
               existingWorkOrderMap.set(dept, insertedRow as FlexFolderRow);
+            } else {
+              throw new Error(
+                `Failed to retrieve persisted work order Flex folder for job ${job.id} (${dept}, element_id: ${created.elementId})`
+              );
             }
           } catch (error) {
             console.error("Unexpected error inserting work order Flex folder:", error);
+            throw error;
           }
         }
         if (sf.key === "gastosDePersonal") {
           const parentFolderRow = existingDepartmentMap.get(dept);
           try {
-            await supabase.from("flex_folders").insert({
+            const { error: insertError } = await supabase.from("flex_folders").insert({
               job_id: job.id,
               parent_id: parentFolderRow?.id ?? null,
               element_id: created.elementId,
               department: dept,
               folder_type: "hoja_gastos",
             });
+            if (insertError) throw insertError;
             console.log(`Persisted gastos de personal with element_id: ${created.elementId}`);
           } catch (err) {
             console.error("Failed to persist gastos de personal:", err);

@@ -24,15 +24,7 @@ vi.mock("../dryhireFolderService", () => ({
   getDryhireParentFolderId: getDryhireParentFolderIdMock,
 }));
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: () => {
-      throw new Error("Unexpected use of integrations supabase client in dryhire folder test");
-    },
-  },
-}));
-
-vi.mock("@/lib/supabase", () => {
+vi.mock("@/integrations/supabase/client", () => {
   type SupabaseResult<T> = Promise<{ data: T; error: any }>;
 
   type QueryAction = "select" | "insert";

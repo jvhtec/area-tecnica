@@ -1,17 +1,16 @@
-import { supabase } from "@/lib/supabase";
-
-import { createFlexFolder } from "../api";
+import { supabase } from "@/integrations/supabase/client";
+import { createFlexFolder } from "@/utils/flex-folders/api";
 import {
   DEPARTMENT_IDS,
   FLEX_FOLDER_IDS,
   RESPONSIBLE_PERSON_IDS,
-} from "../constants";
+} from "@/utils/flex-folders/constants";
 import {
   getDepartmentExtrasPresupuestoMetadata,
   type CreateFoldersOptions,
-} from "../types";
-import { shouldCreateItem } from "./helpers";
-import type { FlexFolderJob } from "./types";
+} from "@/utils/flex-folders/types";
+import { shouldCreateItem } from "@/utils/flex-folders/folder-creation/helpers";
+import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
 
 type CreateComercialExtrasArgs = {
   formattedEndDate: string;
@@ -168,7 +167,7 @@ export const createComercialExtras = async ({
         const presupuestoResponse = await createFlexFolder(childPayload);
 
         try {
-          await supabase.from("flex_folders").insert({
+          const { error: insertError } = await supabase.from("flex_folders").insert({
             job_id: job.id,
             tour_date_id: tourDateId ?? null,
             parent_id: presupuestoParentDbId || parentElementId,
@@ -176,6 +175,7 @@ export const createComercialExtras = async ({
             department: extra.dept,
             folder_type: "comercial_presupuesto",
           });
+          if (insertError) throw insertError;
           console.log(`Persisted comercial presupuesto for ${extra.dept} with element_id: ${presupuestoResponse.elementId}`);
         } catch (err) {
           console.error(`Failed to persist comercial presupuesto for ${extra.dept}:`, err);

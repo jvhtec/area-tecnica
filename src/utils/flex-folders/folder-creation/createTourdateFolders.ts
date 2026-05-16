@@ -1,16 +1,15 @@
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
-import { supabase } from "@/lib/supabase";
-
-import { createFlexFolder } from "../api";
+import { supabase } from "@/integrations/supabase/client";
+import { createFlexFolder } from "@/utils/flex-folders/api";
 import {
   DEPARTMENT_IDS,
   DEPARTMENT_SUFFIXES,
   FLEX_FOLDER_IDS,
   RESPONSIBLE_PERSON_IDS,
-} from "../constants";
-import { getDepartmentCustomPullsheetMetadata, type DepartmentKey } from "../types";
-import { createComercialExtras } from "./createComercialExtras";
+} from "@/utils/flex-folders/constants";
+import { getDepartmentCustomPullsheetMetadata, type DepartmentKey } from "@/utils/flex-folders/types";
+import { createComercialExtras } from "@/utils/flex-folders/folder-creation/createComercialExtras";
 import {
   buildPullsheetTemplates,
   getTourJobDepartments,
@@ -18,21 +17,26 @@ import {
   shouldCreateDepartmentFolder,
   shouldCreateItem,
   upsertCrewCall,
-} from "./helpers";
+} from "@/utils/flex-folders/folder-creation/helpers";
 import type {
   ExistingFolderMaps,
   FlexFolderRow,
   FolderCreationBaseArgs,
   PullsheetTemplate,
-} from "./types";
+} from "@/utils/flex-folders/folder-creation/types";
 
 type CreateTourdateFoldersArgs = FolderCreationBaseArgs & Pick<
   ExistingFolderMaps,
   "existingTourDateDepartmentMap"
->;
+> & {
+  existingFolders: FlexFolderRow[];
+};
+
+const FOLDER_LABEL_TIMEZONE = "Europe/Madrid";
 
 export const createTourdateFolders = async ({
   documentNumber,
+  existingFolders,
   existingTourDateDepartmentMap,
   formattedEndDate,
   formattedStartDate,
@@ -121,7 +125,17 @@ export const createTourdateFolders = async ({
     "comercial",
   ];
   const locationName = resolveTourdateLocationName(job);
-  const formattedDate = format(new Date(job.start_time), "MMM d, yyyy");
+  const formattedDate = formatInTimeZone(new Date(job.start_time), FOLDER_LABEL_TIMEZONE, "MMM d, yyyy");
+  const existingPersonnelSubfolderMap = new Map<string, FlexFolderRow>();
+  for (const folder of existingFolders) {
+    if (folder.department !== "personnel") continue;
+    if (folder.folder_type === "work_orders") {
+      existingPersonnelSubfolderMap.set("workOrder", folder);
+    }
+    if (folder.folder_type === "hoja_gastos") {
+      existingPersonnelSubfolderMap.set("gastosDePersonal", folder);
+    }
+  }
 
   for (const dept of allDepartments) {
     if (!shouldCreateDepartmentFolder(dept, selectedDepartments)) {
@@ -135,7 +149,7 @@ export const createTourdateFolders = async ({
       continue;
     }
 
-    const { data: [parentRow], error: parentErr } = await supabase
+    const { data: parentRows, error: parentErr } = await supabase
       .from("flex_folders")
       .select("*")
       .eq("element_id", parentFolderId)
@@ -145,6 +159,7 @@ export const createTourdateFolders = async ({
       console.error("Error fetching parent row:", parentErr);
       continue;
     }
+    const parentRow = parentRows?.[0];
     if (!parentRow) {
       console.warn(`No local DB row found for parent element_id=${parentFolderId}`);
       continue;
@@ -174,7 +189,7 @@ export const createTourdateFolders = async ({
       console.log(`Creating tour date folder for ${dept}:`, tourDateFolderPayload);
       const tourDateFolder = await createFlexFolder(tourDateFolderPayload);
 
-      const { data: [childRow], error: childErr } = await supabase
+      const { data: childRows, error: childErr } = await supabase
         .from("flex_folders")
         .insert({
           job_id: job.id,
@@ -188,7 +203,16 @@ export const createTourdateFolders = async ({
 
       if (childErr) {
         console.error("Error inserting child folder row:", childErr);
-        continue;
+        throw new Error(
+          `Failed to persist tourdate folder for ${dept} (job_id: ${job.id}, element_id: ${tourDateFolder.elementId}): ${childErr.message}`
+        );
+      }
+
+      const childRow = childRows?.[0];
+      if (!childRow) {
+        throw new Error(
+          `Failed to retrieve persisted tourdate folder row for ${dept} (job_id: ${job.id}, element_id: ${tourDateFolder.elementId})`
+        );
       }
 
       deptFolderId = childRow?.element_id ?? tourDateFolder.elementId;
@@ -238,7 +262,7 @@ export const createTourdateFolders = async ({
           : "hoja_info_vx";
 
       try {
-        await supabase.from("flex_folders").insert({
+        const { error: insertError } = await supabase.from("flex_folders").insert({
           job_id: job.id,
           tour_date_id: job.tour_date_id ?? null,
           parent_id: deptFolderRowId ?? null,
@@ -246,6 +270,7 @@ export const createTourdateFolders = async ({
           department: dept,
           folder_type: hojaInfoFolderType,
         });
+        if (insertError) throw insertError;
         console.log(`Persisted hojaInfo for ${dept} with element_id: ${hojaInfoResponse.elementId}`);
       } catch (err) {
         console.error(`Failed to persist hojaInfo for ${dept}:`, err);
@@ -302,7 +327,7 @@ export const createTourdateFolders = async ({
         };
 
         try {
-          await supabase.from("flex_folders").insert({
+          const { error: insertError } = await supabase.from("flex_folders").insert({
             job_id: job.id,
             tour_date_id: job.tour_date_id ?? null,
             parent_id: deptFolderRowId ?? null,
@@ -310,6 +335,7 @@ export const createTourdateFolders = async ({
             department: dept,
             folder_type: folderTypeMap[sf.key],
           });
+          if (insertError) throw insertError;
           console.log(`Persisted ${sf.key} for ${dept} with element_id: ${subFolderResponse.elementId}`);
         } catch (err) {
           console.error(`Failed to persist ${sf.key} for ${dept}:`, err);
@@ -392,7 +418,7 @@ export const createTourdateFolders = async ({
           const pullsheetResponse = await createFlexFolder(pullsheetPayload);
 
           try {
-            await supabase.from("flex_folders").insert({
+            const { error: insertError } = await supabase.from("flex_folders").insert({
               job_id: job.id,
               tour_date_id: job.tour_date_id ?? null,
               parent_id: deptFolderRowId ?? null,
@@ -400,6 +426,7 @@ export const createTourdateFolders = async ({
               department: dept,
               folder_type: "pull_sheet",
             });
+            if (insertError) throw insertError;
             console.log(`Persisted pullsheet ${template.name} with element_id: ${pullsheetResponse.elementId}`);
           } catch (err) {
             console.error(`Failed to persist pullsheet ${template.name}:`, err);
@@ -417,24 +444,36 @@ export const createTourdateFolders = async ({
       const personnelSubfolders: {
         name: string;
         suffix: string;
+        key: "gastosDePersonal" | "workOrder";
         definitionId: string;
+        folderType: "hoja_gastos" | "work_orders";
       }[] = [];
       if (shouldCreateItem("personnel", "workOrder", options)) {
         personnelSubfolders.push({
           name: `Orden de Trabajo - ${job.title}`,
           suffix: "OT",
+          key: "workOrder",
           definitionId: FLEX_FOLDER_IDS.ordenTrabajo,
+          folderType: "work_orders",
         });
       }
       if (shouldCreateItem("personnel", "gastosDePersonal", options)) {
         personnelSubfolders.push({
           name: `Gastos de Personal - ${job.title}`,
           suffix: "GP",
+          key: "gastosDePersonal",
           definitionId: FLEX_FOLDER_IDS.hojaGastos,
+          folderType: "hoja_gastos",
         });
       }
 
       for (const sf of personnelSubfolders) {
+        const existingSubfolder = existingPersonnelSubfolderMap.get(sf.key);
+        if (existingSubfolder?.element_id) {
+          console.log(`Reusing existing personnel ${sf.key} folder:`, existingSubfolder.element_id);
+          continue;
+        }
+
         const subPayload = {
           definitionId: sf.definitionId,
           parentElementId: deptFolderId,
@@ -449,7 +488,39 @@ export const createTourdateFolders = async ({
           personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
         };
 
-        await createFlexFolder(subPayload);
+        const subFolderResponse = await createFlexFolder(subPayload);
+
+        try {
+          const { data: insertedRow, error: insertError } = await supabase
+            .from("flex_folders")
+            .insert({
+              job_id: job.id,
+              tour_date_id: job.tour_date_id ?? null,
+              parent_id: deptFolderRowId ?? null,
+              element_id: subFolderResponse.elementId,
+              department: dept,
+              folder_type: sf.folderType,
+            })
+            .select("*")
+            .single();
+
+          if (insertError) throw insertError;
+          if (!insertedRow) {
+            throw new Error(
+              `Failed to retrieve persisted personnel ${sf.key} folder row for job ${job.id} (element_id: ${subFolderResponse.elementId})`
+            );
+          }
+
+          existingPersonnelSubfolderMap.set(sf.key, insertedRow as FlexFolderRow);
+          console.log(`Persisted personnel ${sf.key} with element_id: ${subFolderResponse.elementId}`);
+        } catch (err) {
+          console.error(`Failed to persist personnel ${sf.key}:`, err);
+          console.error(`Orphaned Flex folder created with element_id: ${subFolderResponse.elementId}`);
+          throw new Error(
+            `Failed to persist personnel ${sf.key} (element_id: ${subFolderResponse.elementId}). ` +
+            `Flex folder was created but could not be recorded in database. Original error: ${err}`
+          );
+        }
       }
 
       const personnelcrewCall: { name: string; suffix: "CCS" | "CCL" }[] = [];

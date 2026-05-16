@@ -1,27 +1,26 @@
-import { supabase } from "@/lib/supabase";
-
 import {
   createFlexFolder,
   deleteFlexFolder,
   updateFlexElementHeader,
-} from "../api";
+} from "@/utils/flex-folders/api";
 import {
   DEPARTMENT_IDS,
   DEPARTMENT_SUFFIXES,
   FLEX_FOLDER_IDS,
   RESPONSIBLE_PERSON_IDS,
-} from "../constants";
-import { getDryhireParentFolderId } from "../dryhireFolderService";
+} from "@/utils/flex-folders/constants";
+import { getDryhireParentFolderId } from "@/utils/flex-folders/dryhireFolderService";
+import { supabase } from "@/integrations/supabase/client";
 import {
   getDryhireFlexSchedule,
   getErrorMessage,
-} from "./helpers";
+} from "@/utils/flex-folders/folder-creation/helpers";
 import type {
   DryhireCreatedElement,
   DryhireHeaderFields,
   FlexFolderJob,
   FlexFolderRow,
-} from "./types";
+} from "@/utils/flex-folders/folder-creation/types";
 
 type CreateDryhireFoldersArgs = {
   existingFolders: FlexFolderRow[] | null | undefined;
@@ -201,7 +200,7 @@ export const createDryhireFolders = async ({
     );
   }
 
-  await supabase
+  const { error: insertError } = await supabase
     .from("flex_folders")
     .insert([
       {
@@ -219,4 +218,26 @@ export const createDryhireFolders = async ({
         folder_type: "dryhire_presupuesto",
       },
     ]);
+
+  if (insertError) {
+    console.error("Failed to persist dryhire Flex folders. Attempting cleanup.", {
+      jobId: job.id,
+      dryhireElementId: dryhireHeaderFields.elementId,
+      presupuestoElementId: presupuestoHeaderFields.elementId,
+      insertError,
+    });
+
+    const cleanupFailures = await cleanupCreatedDryhireElements([
+      presupuestoHeaderFields,
+      dryhireHeaderFields,
+    ]);
+    const cleanupMessage =
+      cleanupFailures.length > 0
+        ? ` Cleanup also failed for: ${cleanupFailures.join("; ")}. Manual cleanup may be required.`
+        : " Created Flex elements were deleted because local folder rows could not be persisted.";
+
+    throw new Error(
+      `Failed to persist dryhire Flex folders for job ${job.id}: ${insertError.message}.${cleanupMessage}`
+    );
+  }
 };

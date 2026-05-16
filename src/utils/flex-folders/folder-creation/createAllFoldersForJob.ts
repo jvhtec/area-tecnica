@@ -1,10 +1,10 @@
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
+import type { CreateFoldersOptions } from "@/utils/flex-folders/types";
 
-import { createDryhireFolders } from "./createDryhireFolders";
-import { createStandardJobFolders } from "./createStandardJobFolders";
-import { createTourdateFolders } from "./createTourdateFolders";
-import type { CreateFoldersOptions } from "../types";
-import type { FlexFolderJob, FlexFolderRow } from "./types";
+import { createDryhireFolders } from "@/utils/flex-folders/folder-creation/createDryhireFolders";
+import { createStandardJobFolders } from "@/utils/flex-folders/folder-creation/createStandardJobFolders";
+import { createTourdateFolders } from "@/utils/flex-folders/folder-creation/createTourdateFolders";
+import type { FlexFolderJob, FlexFolderRow } from "@/utils/flex-folders/folder-creation/types";
 
 const buildExistingFolderMaps = (existingFolders: FlexFolderRow[] | null | undefined) => {
   const existingDepartmentMap = new Map<string, FlexFolderRow>();
@@ -78,6 +78,7 @@ export async function createAllFoldersForJob(
   if (job.job_type === "tourdate") {
     return createTourdateFolders({
       documentNumber,
+      existingFolders: typedExistingFolders,
       existingTourDateDepartmentMap,
       formattedEndDate,
       formattedStartDate,

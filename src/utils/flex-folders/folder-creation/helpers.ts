@@ -1,20 +1,20 @@
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 import type {
   CreateFoldersOptions,
   DepartmentKey,
   SubfolderKey,
-} from "../types";
-import { getSubfolderSelectionSummary } from "../types";
+} from "@/utils/flex-folders/types";
+import { getSubfolderSelectionSummary } from "@/utils/flex-folders/types";
 import type {
   FlexFolderJob,
   FlexFolderLocation,
   PullsheetMetadataEntry,
   PullsheetTemplate,
-} from "./types";
+} from "@/utils/flex-folders/folder-creation/types";
 
 const DEFAULT_FLEX_TIMEZONE = "Europe/Madrid";
 
@@ -115,7 +115,9 @@ export const getJobDepartments = async (jobId: string): Promise<string[]> => {
     return [];
   }
 
-  return data.map((departmentRow) => departmentRow.department);
+  return data
+    .map((departmentRow) => departmentRow.department)
+    .filter((department): department is string => department != null);
 };
 
 type TourJobDepartmentsRow = {
@@ -156,17 +158,20 @@ export const upsertCrewCall = async (
       .maybeSingle();
 
     if (existing?.id) {
-      await supabase
+      const { error: updateError } = await supabase
         .from("flex_crew_calls")
         .update({ flex_element_id: elementId })
         .eq("id", existing.id);
+      if (updateError) throw updateError;
     } else {
-      await supabase
+      const { error: insertError } = await supabase
         .from("flex_crew_calls")
         .insert({ job_id: jobId, department: dept, flex_element_id: elementId });
+      if (insertError) throw insertError;
     }
   } catch (err) {
     console.error("Failed to upsert flex_crew_calls:", { jobId, dept, elementId, err });
+    throw err;
   }
 };
 

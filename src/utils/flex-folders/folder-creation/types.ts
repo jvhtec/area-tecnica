@@ -1,5 +1,5 @@
-import type { CreateFoldersOptions } from "../types";
 import type { Database } from "@/integrations/supabase/types";
+import type { CreateFoldersOptions } from "@/utils/flex-folders/types";
 
 type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
 

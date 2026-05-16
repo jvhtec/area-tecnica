@@ -8,15 +8,7 @@ vi.mock("../api", () => ({
   createFlexFolder: createFlexFolderMock,
 }));
 
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: () => {
-      throw new Error("Unexpected use of integrations supabase client in test");
-    },
-  },
-}));
-
-vi.mock("@/lib/supabase", () => {
+vi.mock("@/integrations/supabase/client", () => {
   type SupabaseResult<T> = Promise<{ data: T; error: any }>;
 
   type QueryAction = "select" | "insert";
