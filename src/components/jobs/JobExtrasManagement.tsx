@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,8 @@ import { formatCurrency } from '@/lib/utils';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { isManagementRole } from '@/utils/permissions';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface JobExtrasManagementProps {
   jobId: string;
   isManager?: boolean;
@@ -50,10 +52,9 @@ export const JobExtrasManagement = ({
   );
 
   const { data: assignments, isLoading: assignmentsLoading } = useQuery({
-    queryKey: ['job-assignments', jobId, technicianId, visibleTechnicianIds?.join(',') ?? 'all'],
+    queryKey: queryKeys.scope('job-assignments', jobId, technicianId, visibleTechnicianIds?.join(',') ?? 'all'),
     queryFn: async () => {
-      let query = supabase
-        .from('job_assignments')
+      let query = dataLayerClient.from('job_assignments')
         .select(`
           technician_id,
           profiles:technician_id (
@@ -93,11 +94,10 @@ export const JobExtrasManagement = ({
   );
   const techIdsKey = techIds.join(',');
   const { data: customTravelRates, isLoading: customTravelRatesLoading } = useQuery({
-    queryKey: ['custom-travel-rates', jobId, techIdsKey],
+    queryKey: queryKeys.scope('custom-travel-rates', jobId, techIdsKey),
     queryFn: async () => {
       if (!techIds.length) return [];
-      const { data, error } = await supabase
-        .from('custom_tech_rates')
+      const { data, error } = await dataLayerClient.from('custom_tech_rates')
         .select('profile_id, travel_half_day_eur, travel_full_day_eur')
         .in('profile_id', techIds);
       if (error) throw error;

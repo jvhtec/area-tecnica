@@ -8,10 +8,12 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown } from "lucide-react";
 import { JobStatusBadge } from "./JobStatusBadge";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
+
+import { queryKeys } from "@/lib/react-query";
 type JobStatus = "Tentativa" | "Confirmado" | "Completado" | "Cancelado";
 
 interface JobStatusSelectorProps {
@@ -47,16 +49,15 @@ export const JobStatusSelector = ({
     onStatusChange?.(newStatus);
     
     try {
-      const { error } = await supabase
-        .from('jobs')
+      const { error } = await dataLayerClient.from('jobs')
         .update({ status: newStatus })
         .eq('id', jobId);
 
       if (error) throw error;
 
       // Invalidate and refetch job queries to trigger realtime updates
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
       
       toast({
         title: "Status updated",
@@ -67,7 +68,7 @@ export const JobStatusSelector = ({
       try {
         const type = newStatus === 'Confirmado' ? 'job.status.confirmed' : (newStatus === 'Cancelado' ? 'job.status.cancelled' : '')
         if (type) {
-          void supabase.functions.invoke('push', {
+          void dataLayerClient.functions.invoke('push', {
             body: { action: 'broadcast', type, job_id: jobId }
           })
         }
@@ -90,8 +91,7 @@ export const JobStatusSelector = ({
 	      const flexStatus = toFlexStatus(newStatus);
 	      if (flexStatus) {
 	        try {
-	          const { data: folders, error: foldersError } = await supabase
-	            .from('flex_folders')
+	          const { data: folders, error: foldersError } = await dataLayerClient.from('flex_folders')
 	            .select('id, parent_id, department, folder_type')
 	            .eq('job_id', jobId);
 
@@ -110,7 +110,7 @@ export const JobStatusSelector = ({
 	              return;
 	            }
 
-	            const { data: syncRes, error: syncErr } = await supabase.functions.invoke('apply-flex-status', {
+	            const { data: syncRes, error: syncErr } = await dataLayerClient.functions.invoke('apply-flex-status', {
 	              body: { folder_id: master.id, status: flexStatus, cascade: true }
 	            });
 

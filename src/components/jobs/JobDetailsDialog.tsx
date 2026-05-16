@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useTourRateSubscriptions } from "@/hooks/useTourRateSubscriptions";
 import { useJobExtras } from "@/hooks/useJobExtras";
@@ -24,6 +24,8 @@ import { useJobExpenses } from "@/hooks/useJobExpenses";
 import { canAccessExpenses, canAssignPersonnel, canManagePayouts, isManagementRole, isTechnicianRole } from "@/utils/permissions";
 import { getVisibleFinancialTechnicianIds } from "@/components/jobs/financialViewerScope";
 
+
+import { queryKeys } from "@/lib/react-query";
 export { enrichTimesheetsWithProfiles } from "./job-details-dialog/enrichTimesheetsWithProfiles";
 
 interface JobDetailsDialogProps {
@@ -49,10 +51,9 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
     isLoading: isJobLoading,
     error: jobDocumentsError,
   } = useQuery({
-    queryKey: ["job-details", job.id],
+    queryKey: queryKeys.scope("job-details", job.id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("jobs")
+      const { data, error } = await dataLayerClient.from("jobs")
         .select(
           `
           *,
@@ -175,10 +176,10 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
   useEffect(() => {
     if (open && job.id) {
       console.log("JobDetailsDialog: Job changed, invalidating queries for job", job.id);
-      queryClient.invalidateQueries({ queryKey: ["job-details", job.id] });
-      queryClient.invalidateQueries({ queryKey: ["job-artists", job.id] });
-      queryClient.invalidateQueries({ queryKey: ["job-restaurants", job.id] });
-      queryClient.invalidateQueries({ queryKey: ["job-rider-files", job.id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-details", job.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-artists", job.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-restaurants", job.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-rider-files", job.id) });
     }
   }, [job.id, open, queryClient]);
 

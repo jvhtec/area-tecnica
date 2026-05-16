@@ -14,11 +14,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { format as formatDate } from 'date-fns';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface MarkUnavailableDialogProps {
   open: boolean;
   onClose: () => void;
@@ -39,10 +41,9 @@ export const MarkUnavailableDialog = ({
 
   // Get technician details
   const { data: technician } = useQuery({
-    queryKey: ['technician', technicianId],
+    queryKey: queryKeys.scope('technician', technicianId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('first_name, last_name, department')
         .eq('id', technicianId)
         .single();
@@ -88,8 +89,7 @@ export const MarkUnavailableDialog = ({
         status: finalStatus,
       }));
 
-      const { error: upsertError } = await supabase
-        .from('technician_availability')
+      const { error: upsertError } = await dataLayerClient.from('technician_availability')
         .upsert(rows, { onConflict: 'technician_id,date' });
 
       if (upsertError) throw upsertError;

@@ -10,9 +10,11 @@ import { AssignmentStatusDialog } from './AssignmentStatusDialog';
 import { MarkUnavailableDialog } from './MarkUnavailableDialog';
 import { useJobAssignmentsRealtime } from '@/hooks/useJobAssignmentsRealtime';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { throttle } from '@/utils/throttle';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface AssignmentMatrixProps {
   technicians: Array<{
     id: string;
@@ -67,12 +69,11 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   
   // Fetch all assignments for jobs in the date range
   const { data: allAssignments = [] } = useQuery({
-    queryKey: ['matrix-assignments', jobIds],
+    queryKey: queryKeys.scope('matrix-assignments', jobIds),
     queryFn: async () => {
       if (jobIds.length === 0) return [];
       
-      const { data, error } = await supabase
-        .from('job_assignments')
+      const { data, error } = await dataLayerClient.from('job_assignments')
         .select(`
           *,
           profiles (
@@ -98,12 +99,11 @@ export const AssignmentMatrix = ({ technicians, dates, jobs }: AssignmentMatrixP
   });
 
   const { data: availabilityData = [] } = useQuery({
-    queryKey: ['matrix-availability', technicians.map(t => t.id), dates[0], dates[dates.length - 1]],
+    queryKey: queryKeys.scope('matrix-availability', technicians.map(t => t.id), dates[0], dates[dates.length - 1]),
     queryFn: async () => {
       if (technicians.length === 0 || dates.length === 0) return [];
       
-      const { data, error } = await supabase
-        .from('availability_schedules')
+      const { data, error } = await dataLayerClient.from('availability_schedules')
         .select('*')
         .in('user_id', technicians.map(t => t.id))
         .gte('date', format(dates[0], 'yyyy-MM-dd'))

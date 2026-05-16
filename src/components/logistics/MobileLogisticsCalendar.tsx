@@ -4,13 +4,15 @@ import { Calendar, ChevronLeft, ChevronRight, Plus, Printer } from "lucide-react
 import { format, addDays, subDays, isToday, isValid } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { LogisticsEventDialog } from "./LogisticsEventDialog";
 import { LogisticsEventCard } from "./LogisticsEventCard";
 import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
 import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface MobileLogisticsCalendarProps {
   date: Date;
   onDateSelect: (date: Date) => void;
@@ -34,10 +36,9 @@ export const MobileLogisticsCalendar: React.FC<MobileLogisticsCalendarProps> = (
   }, [date]);
 
   const { data: events, isLoading } = useQuery({
-    queryKey: ['logistics-events'],
+    queryKey: queryKeys.scope('logistics-events'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('logistics_events')
+      const { data, error } = await dataLayerClient.from('logistics_events')
         .select(`
           *,
           job:jobs(title),

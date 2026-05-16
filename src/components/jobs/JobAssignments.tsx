@@ -1,6 +1,6 @@
 
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Assignment } from "@/types/assignment";
 import { Department } from "@/types/department";
 import { User, X, RefreshCw } from "lucide-react";
@@ -12,6 +12,8 @@ import { useEffect, useState } from "react";
 import { labelForCode } from '@/utils/roles';
 import { format } from "date-fns";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface JobAssignmentsProps {
   jobId: string;
   department?: Department;
@@ -29,8 +31,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
 
     console.log(`Setting up assignments real-time for job ${jobId}`);
 
-    const channel = supabase
-      .channel(`job-assignments-${jobId}`)
+    const channel = dataLayerClient.channel(`job-assignments-${jobId}`)
       .on(
         'postgres_changes',
         {
@@ -43,7 +44,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
           console.log('Assignment changed for job, refreshing available technicians:', payload);
           // Invalidate available technicians queries when assignments change
           queryClient.invalidateQueries({
-            queryKey: ["available-technicians"]
+            queryKey: queryKeys.scope("available-technicians")
           });
         }
       )
@@ -51,7 +52,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
 
     return () => {
       console.log(`Cleaning up assignments subscription for job ${jobId}`);
-      supabase.removeChannel(channel);
+      dataLayerClient.removeChannel(channel);
     };
   }, [jobId, queryClient]);
 
@@ -59,8 +60,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
     if (userRole === 'logistics') return;
     
     try {
-      const { error } = await supabase
-        .from("job_assignments")
+      const { error } = await dataLayerClient.from("job_assignments")
         .delete()
         .eq("job_id", jobId)
         .eq("technician_id", technicianId);
@@ -69,10 +69,10 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
 
       // Refresh both assignments and jobs data
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["job-assignments", jobId] }),
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["available-technicians"] })
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-assignments", jobId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("available-technicians") })
       ]);
 
       toast.success("Assignment deleted successfully");
@@ -90,7 +90,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
     try {
       setIsSyncing(true);
       toast.info('Syncing crew to Flex…');
-      const { data, error } = await supabase.functions.invoke('sync-flex-crew-for-job', {
+      const { data, error } = await dataLayerClient.functions.invoke('sync-flex-crew-for-job', {
         body: { job_id: jobId, departments: [department] }
       });
       if (error) {

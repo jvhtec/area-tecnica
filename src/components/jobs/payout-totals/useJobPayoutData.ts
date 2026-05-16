@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import { useJobTechnicianPayoutOverrides } from '@/hooks/useJobPayoutOverride';
@@ -16,6 +16,8 @@ import type { TourJobRateQuote } from '@/types/tourRates';
 import { FLEX_UI_BASE_URL } from '@/utils/flexUrlResolver';
 import type { JobMetadata, JobPayoutData } from './types';
 import { NON_AUTONOMO_DEDUCTION_EUR } from './types';
+
+import { queryKeys } from "@/lib/react-query";
 const FIN_DOC_VIEW_ID = '8238f39c-f42e-11e0-a8de-00e08175e43e';
 type TimesheetRow = Pick<
   Database['public']['Tables']['timesheets']['Row'],
@@ -43,11 +45,10 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     isLoading: jobMetaLoading,
     error: jobMetaError,
   } = useQuery({
-    queryKey: ['job-payout-metadata', jobId],
+    queryKey: queryKeys.scope('job-payout-metadata', jobId),
     enabled: !!jobId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('id, title, start_time, end_time, timezone, tour_id, rates_approved, job_type, invoicing_company')
         .eq('id', jobId)
         .maybeSingle();
@@ -83,11 +84,10 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   /* ── Tour timesheet approvals ── */
   const { data: tourApprovals = new Map<string, boolean>() } = useQuery({
-    queryKey: ['job-tech-payout', jobId, 'tour-timesheet-data'],
+    queryKey: queryKeys.scope('job-tech-payout', jobId, 'tour-timesheet-data'),
     enabled: !!jobId && isTourDate,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('timesheets')
+      const { data, error } = await dataLayerClient.from('timesheets')
         .select('technician_id, date, approved_by_manager')
         .eq('job_id', jobId)
         .eq('is_active', true);
@@ -114,11 +114,10 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   });
 
   const { data: technicianTimesheetDatesMap = new Map<string, string[]>() } = useQuery({
-    queryKey: ['job-tech-timesheet-dates', jobId],
+    queryKey: queryKeys.scope('job-tech-timesheet-dates', jobId),
     enabled: !!jobId && isTourDate && !jobMetaLoading,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('timesheets')
+      const { data, error } = await dataLayerClient.from('timesheets')
         .select('technician_id, date')
         .eq('job_id', jobId)
         .eq('is_active', true);
@@ -143,11 +142,10 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   /* ── Standard tech days (approved + total) ── */
   const { data: techDaysMaps = { approved: new Map<string, number>(), total: new Map<string, number>() } } = useQuery({
-    queryKey: ['job-tech-days', jobId],
+    queryKey: queryKeys.scope('job-tech-days', jobId),
     enabled: !!jobId && !isTourDate && !jobMetaLoading,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('timesheets')
+      const { data, error } = await dataLayerClient.from('timesheets')
         .select('technician_id, date, approved_by_manager, status')
         .eq('job_id', jobId)
         .eq('is_active', true);
@@ -178,11 +176,10 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   /* ── Tour date expenses (fetched separately since tour quotes don't include expenses) ── */
   const { data: tourExpenseData = new Map<string, { total: number; breakdown: JobExpenseBreakdownItem[] }>() } = useQuery({
-    queryKey: ['job-tech-expenses', jobId],
+    queryKey: queryKeys.scope('job-tech-expenses', jobId),
     enabled: !!jobId && isTourDate,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('v_job_expense_summary')
+      const { data, error } = await dataLayerClient.from('v_job_expense_summary')
         .select('*')
         .eq('job_id', jobId);
       if (error) throw error;
@@ -258,11 +255,10 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   const error = jobMetaError ?? (isTourDate ? tourQuotesError : standardError);
 
   const { data: prepDaysMap = new Map<string, number>() } = useQuery({
-    queryKey: ['job-tech-prep-days', jobId],
+    queryKey: queryKeys.scope('job-tech-prep-days', jobId),
     enabled: !!jobId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('timesheets')
+      const { data, error } = await dataLayerClient.from('timesheets')
         .select('technician_id, amount_eur, amount_breakdown, approved_by_manager')
         .eq('job_id', jobId)
         .eq('is_active', true)
@@ -307,9 +303,9 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   /* ── Flex LPO data ── */
   const { data: lpoRows = [] } = useQuery({
-    queryKey: ['flex-work-orders-by-job', jobId, technicianId],
+    queryKey: queryKeys.scope('flex-work-orders-by-job', jobId, technicianId),
     queryFn: async () => {
-      let q = supabase.from('flex_work_orders').select('technician_id, lpo_number, flex_element_id').eq('job_id', jobId);
+      let q = dataLayerClient.from('flex_work_orders').select('technician_id, lpo_number, flex_element_id').eq('job_id', jobId);
       if (technicianId) q = q.eq('technician_id', technicianId);
       const { data, error } = await q;
       if (error) throw error;
@@ -334,11 +330,10 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     [payoutTotalsWithPrep]
   );
   const { data: profiles = [] } = useQuery({
-    queryKey: ['profiles-for-job-payout', jobId, techIds],
+    queryKey: queryKeys.scope('profiles-for-job-payout', jobId, techIds),
     enabled: techIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name, email, autonomo, department')
         .in('id', techIds);
       if (error) throw error;
@@ -366,14 +361,13 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   const { data: payoutOverrides = [] } = useJobTechnicianPayoutOverrides(jobId);
 
   const { data: overrideActorMap = new Map<string, { name: string; email: string | null }>() } = useQuery({
-    queryKey: ['job-tech-payout-overrides', jobId, 'actors'],
+    queryKey: queryKeys.scope('job-tech-payout-overrides', jobId, 'actors'),
     enabled: isManager && payoutOverrides.length > 0,
     queryFn: async () => {
       const actorIds = Array.from(new Set(payoutOverrides.map((o) => o.set_by).filter(Boolean))) as string[];
       if (!actorIds.length) return new Map();
 
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name, email')
         .in('id', actorIds);
       if (error) throw error;
@@ -403,18 +397,16 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   );
 
   const { data: jobTimesheetDates = [] } = useQuery({
-    queryKey: ['job-timesheet-dates', jobId],
+    queryKey: queryKeys.scope('job-timesheet-dates', jobId),
     enabled: !!jobId && !jobMetaLoading && isManager,
     queryFn: async () => {
-      const { data: scheduledRows, error: scheduledError } = await supabase
-        .from('job_date_types')
+      const { data: scheduledRows, error: scheduledError } = await dataLayerClient.from('job_date_types')
         .select('date')
         .eq('job_id', jobId);
 
       if (scheduledError) throw scheduledError;
 
-      const { data: timesheetRows, error } = await supabase
-        .from('timesheets')
+      const { data: timesheetRows, error } = await dataLayerClient.from('timesheets')
         .select('date')
         .eq('job_id', jobId)
         .eq('is_active', true);

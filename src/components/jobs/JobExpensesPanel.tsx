@@ -39,9 +39,11 @@ import {
   UploadCloud,
   XCircle,
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { formatCurrency } from '@/lib/utils';
 
+
+import { queryKeys } from "@/lib/react-query";
 export type ExpenseStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
 
 interface TechnicianOption {
@@ -175,10 +177,9 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
     data: expenseCategories = [],
     isLoading: isLoadingCategories,
   } = useQuery({
-    queryKey: ['expense-categories'],
+    queryKey: queryKeys.scope('expense-categories'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('expense_categories')
+      const { data, error } = await dataLayerClient.from('expense_categories')
         .select('slug,label_es,requires_receipt')
         .eq('is_active', true)
         .order('label_es', { ascending: true });
@@ -193,10 +194,9 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
     isLoading: isLoadingExpenses,
     refetch: refetchExpenses,
   } = useQuery({
-    queryKey: ['job-expenses', jobId],
+    queryKey: queryKeys.scope('job-expenses', jobId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_expenses')
+      const { data, error } = await dataLayerClient.from('job_expenses')
         .select(`
           id,
           job_id,
@@ -236,10 +236,9 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
     isLoading: isLoadingPermissions,
     refetch: refetchPermissions,
   } = useQuery({
-    queryKey: ['expense-permissions', jobId],
+    queryKey: queryKeys.scope('expense-permissions', jobId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('expense_permissions')
+      const { data, error } = await dataLayerClient.from('expense_permissions')
         .select(`
           id,
           job_id,
@@ -362,18 +361,18 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
 
   const invalidateExpenseContext = React.useCallback(async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['job-expenses', jobId] }),
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', jobId] }),
-      queryClient.invalidateQueries({ queryKey: ['job-totals', jobId] }),
-      queryClient.invalidateQueries({ queryKey: ['dashboard-expenses-summary'] }),
-      queryClient.invalidateQueries({ queryKey: ['expenses-page'] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-expenses', jobId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-tech-payout', jobId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-totals', jobId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('dashboard-expenses-summary') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('expenses-page') }),
     ]);
   }, [jobId, queryClient]);
 
   const handleApproveExpense = React.useCallback(
     async (expenseId: string) => {
       try {
-        const { error } = await supabase.rpc('approve_job_expense', {
+        const { error } = await dataLayerClient.rpc('approve_job_expense', {
           p_expense_id: expenseId,
           p_approved: true,
           p_rejection_reason: null,
@@ -392,7 +391,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
   const handleRejectExpense = React.useCallback(
     async (expenseId: string, reason?: string) => {
       try {
-        const { error } = await supabase.rpc('approve_job_expense', {
+        const { error } = await dataLayerClient.rpc('approve_job_expense', {
           p_expense_id: expenseId,
           p_approved: false,
           p_rejection_reason: reason ?? null,
@@ -416,7 +415,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
       }
       setViewReceiptState({ expenseId: expense.id, loading: true });
       try {
-        const { data, error } = await supabase.storage
+        const { data, error } = await dataLayerClient.storage
           .from('expense-receipts')
           .createSignedUrl(expense.receipt_path, 3600);
         if (error || !data?.signedUrl) {
@@ -457,7 +456,7 @@ export const JobExpensesPanel: React.FC<JobExpensesPanelProps> = ({
         return;
       }
       try {
-        const { error } = await supabase.rpc('set_expense_permission', {
+        const { error } = await dataLayerClient.rpc('set_expense_permission', {
           p_job_id: jobId,
           p_technician_id: permissionForm.technicianId,
           p_category_slug: permissionForm.categorySlug,

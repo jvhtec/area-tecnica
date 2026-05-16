@@ -10,7 +10,7 @@ import { es } from 'date-fns/locale';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { JobPayoutEmailContextResult } from '@/lib/job-payout-email';
 import { effectiveTotal } from '@/lib/job-payout-email';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 import { HOUSE_TECH_LABEL } from '@/utils/autonomo';
 
@@ -54,8 +54,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
     enabled: Boolean(jobId && technicianId),
     queryFn: async () => {
       if (!jobId || !technicianId) return null;
-      const { data, error } = await supabase
-        .from('job_technician_payout_overrides')
+      const { data, error } = await dataLayerClient.from('job_technician_payout_overrides')
         .select('override_amount_eur')
         .eq('job_id', jobId)
         .eq('technician_id', technicianId)

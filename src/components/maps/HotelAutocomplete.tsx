@@ -4,8 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MapPin, Building, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 // Remove conflicting global type declaration - using typed definitions from src/types/google-maps.d.ts
 
 interface HotelAutocompleteProps {
@@ -50,7 +49,7 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   useEffect(() => {
     const fetchApiKey = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+        const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
         
         if (error) {
           console.error('Failed to fetch Google Maps API key:', error);

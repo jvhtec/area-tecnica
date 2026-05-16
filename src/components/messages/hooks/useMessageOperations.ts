@@ -1,8 +1,10 @@
 import { Message } from "../types";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { toast as toastFunction } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useMessageOperations = (
   messages: Message[],
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
@@ -13,8 +15,7 @@ export const useMessageOperations = (
   const handleDeleteMessage = async (messageId: string) => {
     try {
       console.log("Deleting message:", messageId);
-      const { error } = await supabase
-        .from('messages')
+      const { error } = await dataLayerClient.from('messages')
         .delete()
         .eq('id', messageId);
 
@@ -39,8 +40,7 @@ export const useMessageOperations = (
   const handleMarkAsRead = async (messageId: string) => {
     try {
       console.log("Marking message as read:", messageId);
-      const { data: updated, error } = await supabase
-        .from('messages')
+      const { data: updated, error } = await dataLayerClient.from('messages')
         .update({ status: 'read' })
         .eq('id', messageId)
         .select('id');
@@ -80,12 +80,11 @@ export const useMessageOperations = (
       console.log("Granting SoundVision access for vacation request:", vacationRequestId);
       
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await dataLayerClient.auth.getUser();
       if (!user) throw new Error('User not authenticated');
 
       // First, get the vacation request to find the technician
-      const { data: vacationRequest, error: fetchError } = await supabase
-        .from('vacation_requests')
+      const { data: vacationRequest, error: fetchError } = await dataLayerClient.from('vacation_requests')
         .select('technician_id, status')
         .eq('id', vacationRequestId)
         .single();
@@ -104,16 +103,14 @@ export const useMessageOperations = (
       }
 
       // Update profile to enable SoundVision access
-      const { error: profileError } = await supabase
-        .from('profiles')
+      const { error: profileError } = await dataLayerClient.from('profiles')
         .update({ soundvision_access_enabled: true })
         .eq('id', vacationRequest.technician_id);
 
       if (profileError) throw profileError;
 
       // Update vacation request to approved
-      const { error: vacationError } = await supabase
-        .from('vacation_requests')
+      const { error: vacationError } = await dataLayerClient.from('vacation_requests')
         .update({
           status: 'approved',
           approved_by: user.id,
@@ -124,8 +121,7 @@ export const useMessageOperations = (
       if (vacationError) throw vacationError;
 
       // Mark message as read
-      const { error: messageError } = await supabase
-        .from('messages')
+      const { error: messageError } = await dataLayerClient.from('messages')
         .update({ status: 'read' })
         .eq('id', messageId);
 
@@ -137,8 +133,8 @@ export const useMessageOperations = (
       ));
 
       // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['messages'] });
-      queryClient.invalidateQueries({ queryKey: ['vacation_requests'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('messages') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('vacation_requests') });
 
       // Notify other UI
       try {

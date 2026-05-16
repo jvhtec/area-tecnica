@@ -7,11 +7,16 @@ import { Department } from "@/types/department";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Pencil, Trash2, Save } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import type { Database } from "@/integrations/supabase/types";
+
+
+import { queryKeys } from "@/lib/react-query";
+type MilestoneDefinitionInsert = Database["public"]["Tables"]["milestone_definitions"]["Insert"];
 
 interface ManageMilestonesDialogProps {
   open: boolean;
@@ -25,13 +30,18 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
   const [editingMilestone, setEditingMilestone] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
+  const availableDepartments: Department[] = ["sound", "lights", "video", "logistics", "production", "administrative"];
+  const normalizeDepartments = (departments: string[] | null | undefined): Department[] => (
+    departments?.filter((department): department is Department =>
+      availableDepartments.includes(department as Department)
+    ) ?? []
+  );
 
   const { data: definitions } = useQuery({
-    queryKey: ["milestone-definitions"],
+    queryKey: queryKeys.scope("milestone-definitions"),
     queryFn: async () => {
       console.log("Fetching milestone definitions...");
-      const { data, error } = await supabase
-        .from("milestone_definitions")
+      const { data, error } = await dataLayerClient.from("milestone_definitions")
         .select("*")
         .order("priority", { ascending: true });
 
@@ -50,8 +60,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
       console.log("Starting deletion process for milestone definition:", id);
       
       // First, delete any job_milestones that reference this definition
-      const { error: milestonesError } = await supabase
-        .from("job_milestones")
+      const { error: milestonesError } = await dataLayerClient.from("job_milestones")
         .delete()
         .eq("definition_id", id);
 
@@ -61,8 +70,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
       }
 
       // Then delete the milestone definition
-      const { error: definitionError } = await supabase
-        .from("milestone_definitions")
+      const { error: definitionError } = await dataLayerClient.from("milestone_definitions")
         .delete()
         .eq("id", id);
 
@@ -74,7 +82,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
       console.log("Successfully deleted milestone definition and related records");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["milestone-definitions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("milestone-definitions") });
       toast({
         title: "Success",
         description: "Milestone definition deleted successfully",
@@ -92,11 +100,14 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: async (milestone: Omit<any, 'id'>) => {
+    mutationFn: async (milestone: MilestoneDefinitionInsert) => {
       console.log("Creating milestone:", milestone);
-      const { data, error } = await supabase
-        .from("milestone_definitions")
-        .insert([{ ...milestone, department: selectedDepartments }])
+      const payload: MilestoneDefinitionInsert = {
+        ...milestone,
+        department: selectedDepartments,
+      };
+      const { data, error } = await dataLayerClient.from("milestone_definitions")
+        .insert(payload)
         .select()
         .single();
 
@@ -107,7 +118,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["milestone-definitions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("milestone-definitions") });
       toast({
         title: "Success",
         description: "Milestone definition created successfully",
@@ -122,8 +133,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
   const updateMutation = useMutation({
     mutationFn: async (milestone: any) => {
       console.log("Updating milestone:", milestone);
-      const { data, error } = await supabase
-        .from("milestone_definitions")
+      const { data, error } = await dataLayerClient.from("milestone_definitions")
         .update({ ...milestone, department: selectedDepartments })
         .eq("id", milestone.id)
         .select()
@@ -136,7 +146,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["milestone-definitions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("milestone-definitions") });
       toast({
         title: "Success",
         description: "Milestone definition updated successfully",
@@ -154,8 +164,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
       console.log("Saving milestones as default for job:", jobId);
       
       // First, get all milestones for the current job
-      const { data: jobMilestones, error: fetchError } = await supabase
-        .from("job_milestones")
+      const { data: jobMilestones, error: fetchError } = await dataLayerClient.from("job_milestones")
         .select(`
           *,
           definition:milestone_definitions(*)
@@ -181,8 +190,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
       console.log("Creating new milestone definitions:", updates);
       
       // Delete existing milestone definitions first - FIXED THIS PART
-      const { error: deleteError } = await supabase
-        .from("milestone_definitions")
+      const { error: deleteError } = await dataLayerClient.from("milestone_definitions")
         .delete();
 
       if (deleteError) {
@@ -191,8 +199,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
       }
 
       // Insert new milestone definitions
-      const { error: insertError } = await supabase
-        .from("milestone_definitions")
+      const { error: insertError } = await dataLayerClient.from("milestone_definitions")
         .insert(updates);
 
       if (insertError) {
@@ -201,7 +208,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["milestone-definitions"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("milestone-definitions") });
       toast({
         title: "Success",
         description: "Current milestones saved as default templates",
@@ -219,8 +226,6 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
       createMutation.mutate(newMilestone);
     }
   };
-
-  const availableDepartments: Department[] = ["sound", "lights", "video", "logistics", "production", "administrative"];
 
   const handleDepartmentToggle = (dept: Department) => {
     setSelectedDepartments(prev => 
@@ -389,7 +394,7 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
                           size="icon"
                           onClick={() => {
                             setEditingMilestone(definition);
-                            setSelectedDepartments(definition.department || []);
+                            setSelectedDepartments(normalizeDepartments(definition.department));
                             setIsEditing(true);
                           }}
                         >

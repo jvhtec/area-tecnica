@@ -6,7 +6,7 @@ import { MapPin, Truck } from "lucide-react";
 import { TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useJobDistance } from "@/hooks/useJobDistance";
 
 interface JobDetailsLocationTabProps {
@@ -52,7 +52,7 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
         // Ensure we have an API key (fetch from secrets if needed)
         let apiKey = googleStaticKey;
         if (!apiKey) {
-          const { data, error } = await supabase.functions.invoke("get-google-maps-key");
+          const { data, error } = await dataLayerClient.functions.invoke("get-google-maps-key");
           if (error || !data?.apiKey) {
             setMapPreviewUrl(null);
             setIsMapLoading(false);

@@ -5,10 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { supabase } from '@/integrations/supabase/client'
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
 import { Info } from 'lucide-react'
 
+
+import { queryKeys } from "@/lib/react-query";
 interface StaffingCandidateListProps {
   campaignId: string
   roleCode: string
@@ -76,10 +78,10 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
 
   // Fetch ranked candidates
   const { data: candidates, isLoading } = useQuery({
-    queryKey: ['staffing_candidates', jobId, department, roleCode],
+    queryKey: queryKeys.scope('staffing_candidates', jobId, department, roleCode),
     queryFn: async () => {
       try {
-        const { data, error } = await supabase.rpc('rank_staffing_candidates', {
+        const { data, error } = await dataLayerClient.rpc('rank_staffing_candidates', {
           p_job_id: jobId,
           p_department: department,
           p_role_code: roleCode,
@@ -103,11 +105,10 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   )
 
   const { data: profilePictures } = useQuery({
-    queryKey: ['candidate_profile_pictures', candidateIds],
+    queryKey: queryKeys.scope('candidate_profile_pictures', candidateIds),
     queryFn: async () => {
       if (candidateIds.length === 0) return {}
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, profile_picture_url')
         .in('id', candidateIds)
       if (error) {
@@ -124,12 +125,11 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   })
 
   const { data: rolelessConsultations = {} } = useQuery<Record<string, RolelessConsultation>>({
-    queryKey: ['staffing_roleless_consultations', jobId, candidateIds],
+    queryKey: queryKeys.scope('staffing_roleless_consultations', jobId, candidateIds),
     queryFn: async () => {
       if (candidateIds.length === 0) return {}
 
-      const { data, error } = await supabase
-        .from('staffing_requests')
+      const { data, error } = await dataLayerClient.from('staffing_requests')
         .select('profile_id, phase, status, target_date, single_day, updated_at')
         .eq('job_id', jobId)
         .in('profile_id', candidateIds)
@@ -168,7 +168,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
         throw new Error('Select at least one candidate')
       }
 
-      const token = (await supabase.auth.getSession()).data.session?.access_token
+      const token = (await dataLayerClient.auth.getSession()).data.session?.access_token
       if (!token) throw new Error('Not authenticated')
 
       const sendOne = async (profileId: string) => {
@@ -212,10 +212,10 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
         description: `Contacted ${data?.sent ?? selectedCandidates.size} candidates`
       })
       setSelectedCandidates(new Set())
-      queryClient.invalidateQueries({ queryKey: ['staffing_requests', jobId] })
-      queryClient.invalidateQueries({ queryKey: ['staffing_availability_responses', jobId] })
-      queryClient.invalidateQueries({ queryKey: ['staffing_candidates', jobId] })
-      queryClient.invalidateQueries({ queryKey: ['staffing_roleless_consultations', jobId] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_requests', jobId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_availability_responses', jobId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_candidates', jobId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_roleless_consultations', jobId) })
     },
     onError: (error: any) => {
       toast({

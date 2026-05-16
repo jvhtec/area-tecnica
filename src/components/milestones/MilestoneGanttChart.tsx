@@ -7,7 +7,7 @@ import { Department } from "@/types/department";
 import { useEffect, useRef, useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Check } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { DateType, getDateTypeMeta } from "@/constants/dateTypes";
 
@@ -56,8 +56,7 @@ export function MilestoneGanttChart({ milestones, startDate, jobId }: MilestoneG
 
   useEffect(() => {
     const fetchDateTypes = async () => {
-      const { data, error } = await supabase
-        .from('job_date_types')
+      const { data, error } = await dataLayerClient.from('job_date_types')
         .select('*')
         .eq('job_id', jobId)
         .order('date');
@@ -136,12 +135,11 @@ export function MilestoneGanttChart({ milestones, startDate, jobId }: MilestoneG
 
   const handleCompleteMilestone = async (milestoneId: string) => {
     try {
-      const { error } = await supabase
-        .from('job_milestones')
+      const { error } = await dataLayerClient.from('job_milestones')
         .update({
           completed: true,
           completed_at: new Date().toISOString(),
-          completed_by: (await supabase.auth.getUser()).data.user?.id
+          completed_by: (await dataLayerClient.auth.getUser()).data.user?.id
         })
         .eq('id', milestoneId);
 

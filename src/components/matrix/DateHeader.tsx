@@ -7,8 +7,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar, Clock, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
-
+import { dataLayerClient } from '@/services/dataLayerClient';
+import { queryKeys } from "@/lib/react-query";
 interface DateHeaderProps {
   date: Date;
   width: number;
@@ -29,7 +29,7 @@ interface DateHeaderProps {
 // Timesheets are the source of truth for actual scheduled assignments
 function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefined) {
   return useQuery({
-    queryKey: ['matrix-job-engagement-counts', jobId, (technicianIds || []).join(',')],
+    queryKey: queryKeys.scope('matrix-job-engagement-counts', jobId, (technicianIds || []).join(',')),
     queryFn: async () => {
       if (!jobId || !technicianIds?.length) return { invitations: 0, offers: 0, confirmations: 0 } as const;
 
@@ -50,8 +50,7 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
       let invitations = 0; // availability requested
       let offers = 0;      // offer sent
 
-      const { data: staffingData, error: staffingErr } = await supabase
-        .rpc('get_assignment_matrix_staffing_filtered', {
+      const { data: staffingData, error: staffingErr } = await dataLayerClient.rpc('get_assignment_matrix_staffing_filtered', {
           p_job_ids: [jobId],
           p_profile_ids: technicianIds,
         });
@@ -69,8 +68,7 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
 
       // Fallback to raw staffing_requests if RPC returned nothing (e.g., old rows without view coverage)
       if ((staffingErr || !(staffingData || []).length)) {
-        const { data: reqRows, error: reqErr } = await supabase
-          .from('staffing_requests')
+        const { data: reqRows, error: reqErr } = await dataLayerClient.from('staffing_requests')
           .select('job_id, profile_id, phase, status, updated_at')
           .eq('job_id', jobId)
           .in('profile_id', technicianIds);
@@ -96,8 +94,7 @@ function useJobEngagementCounts(jobId: string, technicianIds: string[] | undefin
 
       // Confirmed/scheduled technicians from timesheets (source of truth)
       // Count unique technicians with timesheets for this job
-      const { data: tsData, error: tsErr } = await supabase
-        .from('timesheets')
+      const { data: tsData, error: tsErr } = await dataLayerClient.from('timesheets')
         .select('technician_id')
         .eq('job_id', jobId)
         .eq('is_active', true)
@@ -140,13 +137,12 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
   // Timesheets are source of truth - only count technicians who are actually scheduled
   const jobIds = React.useMemo(() => (jobs || []).map(j => j.id), [jobs]);
   const { data: openSlots } = useQuery({
-    queryKey: ['matrix-open-slots', jobIds.join(',')],
+    queryKey: queryKeys.scope('matrix-open-slots', jobIds.join(',')),
     queryFn: async () => {
       if (!jobIds.length) return { required: 0, assigned: 0, open: 0 };
 
       // First get technicians with timesheets (actually scheduled)
-      const { data: timesheetData } = await supabase
-        .from('timesheets')
+      const { data: timesheetData } = await dataLayerClient.from('timesheets')
         .select('technician_id, job_id')
         .eq('is_active', true)
         .in('job_id', jobIds);
@@ -165,8 +161,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
 
       if (allScheduledTechs.size === 0) {
         // No scheduled technicians, just get required count
-        const { data: req } = await supabase
-          .from('job_required_roles_summary')
+        const { data: req } = await dataLayerClient.from('job_required_roles_summary')
           .select('total_required, job_id')
           .in('job_id', jobIds);
         const required = (req || []).reduce((acc: number, r: any) => acc + (Number(r.total_required || 0)), 0);
@@ -175,8 +170,8 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
 
       // Get requirements and assignments for scheduled technicians
       const [{ data: req }, { data: assignments }] = await Promise.all([
-        supabase.from('job_required_roles_summary').select('total_required, job_id').in('job_id', jobIds),
-        supabase.from('job_assignments')
+        dataLayerClient.from('job_required_roles_summary').select('total_required, job_id').in('job_id', jobIds),
+        dataLayerClient.from('job_assignments')
           .select('job_id, technician_id, sound_role, lights_role, video_role')
           .in('job_id', jobIds)
           .in('technician_id', Array.from(allScheduledTechs)),
@@ -354,13 +349,12 @@ function useDateConfirmedCount(date: Date, jobs: Array<{ id: string }>, technici
   const dateStr = format(date, 'yyyy-MM-dd');
   const jobIds = (jobs || []).map(j => j.id);
   return useQuery({
-    queryKey: ['matrix-date-confirmed-count', dateStr, jobIds.join(','), (technicianIds || []).join(',')],
+    queryKey: queryKeys.scope('matrix-date-confirmed-count', dateStr, jobIds.join(','), (technicianIds || []).join(',')),
     queryFn: async () => {
       if (!jobIds.length) return 0;
 
       // Query timesheets for the specific date and jobs (source of truth)
-      let query = supabase
-        .from('timesheets')
+      let query = dataLayerClient.from('timesheets')
         .select('technician_id')
         .eq('is_active', true)
         .in('job_id', jobIds)

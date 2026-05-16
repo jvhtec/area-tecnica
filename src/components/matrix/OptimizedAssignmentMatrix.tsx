@@ -7,7 +7,7 @@ import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { useStaffingRealtime } from '@/features/staffing/hooks/useStaffingRealtime';
 import { useSendStaffingEmail, ConflictError } from '@/features/staffing/hooks/useStaffing';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { checkTimeConflictEnhanced } from '@/utils/technicianAvailability';
 import { useStaffingMatrixStatuses } from '@/features/staffing/hooks/useStaffingMatrixStatuses';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
@@ -22,6 +22,8 @@ import { OptimizedAssignmentMatrixView } from './optimized-assignment-matrix/Opt
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps, TechSortMethod } from './optimized-assignment-matrix/types';
 import type { MatrixTimesheetAssignment } from '@/hooks/useOptimizedMatrixData';
 
+
+import { queryKeys } from "@/lib/react-query";
 // Drag scroll hook is used on mainScrollRef below for desktop users
 
 const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
@@ -157,7 +159,7 @@ export const OptimizedAssignmentMatrix = ({
 
   // When sorting by a job, fetch statuses for that job across all technicians (batched)
   const { data: sortJobStatuses } = useQuery({
-    queryKey: ['matrix-sort-job-statuses', sortJobId, allTechIds.join(',')],
+    queryKey: queryKeys.scope('matrix-sort-job-statuses', sortJobId, allTechIds.join(',')),
     queryFn: async () => {
       if (!sortJobId || !allTechIds.length) return new Map<string, { availability_status: string | null; offer_status: string | null }>();
       // Batch the call to RPC to avoid payload limits
@@ -169,8 +171,7 @@ export const OptimizedAssignmentMatrix = ({
       const batches = chunk(allTechIds, 30);
       const map = new Map<string, { availability_status: string | null; offer_status: string | null }>();
       for (const b of batches) {
-        const { data, error } = await supabase
-          .rpc('get_assignment_matrix_staffing_filtered', {
+        const { data, error } = await dataLayerClient.rpc('get_assignment_matrix_staffing_filtered', {
             p_job_ids: [sortJobId],
             p_profile_ids: b,
           });
@@ -193,11 +194,10 @@ export const OptimizedAssignmentMatrix = ({
 
   // Fetch residencia for all technicians for location-based sorting
   const { data: techResidencias } = useQuery({
-    queryKey: ['tech-residencias', allTechIds.join(',')],
+    queryKey: queryKeys.scope('tech-residencias', allTechIds.join(',')),
     queryFn: async () => {
       if (!allTechIds.length) return new Map<string, string | null>();
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, residencia')
         .in('id', allTechIds);
       if (error) {
@@ -219,15 +219,14 @@ export const OptimizedAssignmentMatrix = ({
   // This ensures medals are calculated per department fairly
   // Counts this year's active timesheets including scheduled gigs (draft status)
   const { data: techConfirmedCounts } = useQuery({
-    queryKey: ['tech-confirmed-counts-all-with-dept'],
+    queryKey: queryKeys.scope('tech-confirmed-counts-all-with-dept'),
     queryFn: async () => {
       // Get start of current year
       const now = new Date();
       const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
       const yearEnd = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
 
-      const { data: countRows, error: timesheetError } = await supabase
-        .rpc('get_active_timesheet_counts_by_technician', {
+      const { data: countRows, error: timesheetError } = await dataLayerClient.rpc('get_active_timesheet_counts_by_technician', {
           p_start_date: yearStart,
           p_end_date: yearEnd,
         });
@@ -256,7 +255,7 @@ export const OptimizedAssignmentMatrix = ({
   // Fetch last year's timesheet counts for ALL technicians with their departments
   // This ensures last year's medals are calculated per department fairly
   const { data: techLastYearCounts } = useQuery({
-    queryKey: ['tech-last-year-counts-all-with-dept'],
+    queryKey: queryKeys.scope('tech-last-year-counts-all-with-dept'),
     queryFn: async () => {
       // Get last year's date range
       const now = new Date();
@@ -264,8 +263,7 @@ export const OptimizedAssignmentMatrix = ({
       const yearStart = new Date(lastYear, 0, 1).toISOString().split('T')[0];
       const yearEnd = new Date(lastYear, 11, 31).toISOString().split('T')[0];
 
-      const { data: countRows, error: timesheetError } = await supabase
-        .rpc('get_active_timesheet_counts_by_technician', {
+      const { data: countRows, error: timesheetError } = await dataLayerClient.rpc('get_active_timesheet_counts_by_technician', {
           p_start_date: yearStart,
           p_end_date: yearEnd,
         });
@@ -304,7 +302,7 @@ export const OptimizedAssignmentMatrix = ({
   // Listen for staffing updates to refresh statuses
   useEffect(() => {
     const handler = () => {
-      qc.invalidateQueries({ queryKey: ['staffing-matrix'] });
+      qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') });
     };
     window.addEventListener('staffing-updated', handler);
     return () => window.removeEventListener('staffing-updated', handler);
@@ -546,7 +544,7 @@ export const OptimizedAssignmentMatrix = ({
     const dateStr = formatInTimeZone(date, 'Europe/Madrid', 'yyyy-MM-dd');
     const existing = getAvailabilityForCell(technicianId, date);
     if (existing) {
-      const { error } = await supabase.from('technician_availability')
+      const { error } = await dataLayerClient.from('technician_availability')
         .delete()
         .eq('technician_id', technicianId)
         .eq('date', dateStr);
@@ -557,7 +555,7 @@ export const OptimizedAssignmentMatrix = ({
       }
       toast({ title: 'Disponibilidad restaurada', description: `${dateStr} marcado como disponible.` });
     } else {
-      const { error } = await supabase.from('technician_availability')
+      const { error } = await dataLayerClient.from('technician_availability')
         .upsert([{ technician_id: technicianId, date: dateStr, status: 'day_off' }], { onConflict: 'technician_id,date' });
       if (error) {
         console.error('Error marking unavailable:', error);
@@ -1141,7 +1139,7 @@ export const OptimizedAssignmentMatrix = ({
   }, [allAssignments, staffingMaps]);
 
   const { data: profileNamesMap = EMPTY_PROFILE_NAMES_MAP } = useQuery({
-    queryKey: ['matrix-tooltip-profile-names', [...actorIdsForTooltip].sort().join(',')],
+    queryKey: queryKeys.scope('matrix-tooltip-profile-names', [...actorIdsForTooltip].sort().join(',')),
     queryFn: async () => {
       if (!actorIdsForTooltip.length) return EMPTY_PROFILE_NAMES_MAP;
       const chunk = <T,>(arr: T[], size: number) => {
@@ -1152,8 +1150,7 @@ export const OptimizedAssignmentMatrix = ({
       const batches = chunk(actorIdsForTooltip, 50);
       const map = new Map<string, string>();
       for (const batch of batches) {
-        const { data, error } = await supabase
-          .from('profiles')
+        const { data, error } = await dataLayerClient.from('profiles')
           .select('id, first_name, last_name, nickname')
           .in('id', batch);
         if (error) {

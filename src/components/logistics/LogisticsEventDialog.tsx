@@ -13,7 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Department } from "@/types/department";
@@ -31,13 +31,19 @@ import { Trash2 } from "lucide-react";
 import { endOfMonth, format, startOfMonth } from "date-fns";
 import { SimplifiedJobColorPicker } from "@/components/jobs/SimplifiedJobColorPicker";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
-import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
+import { TRANSPORT_PROVIDERS, type TransportProvider } from "@/constants/transportProviders";
 import {
   LOGISTICS_HOJA_CATEGORY_LABELS,
   LOGISTICS_HOJA_CATEGORY_MAX_SELECTION,
   LOGISTICS_HOJA_CATEGORY_OPTIONS,
   type LogisticsHojaCategory,
 } from "@/constants/logisticsHojaCategories";
+import type { Database } from "@/integrations/supabase/types";
+
+
+import { queryKeys } from "@/lib/react-query";
+type LogisticsTransportType = Database["public"]["Enums"]["transport_type"];
+type LogisticsEventPayload = Database["public"]["Tables"]["logistics_events"]["Insert"];
 
 // Available departments
 const departments: Department[] = [
@@ -53,7 +59,7 @@ interface LogisticsEventDialogProps {
   selectedEvent?: {
     id: string;
     event_type: "load" | "unload";
-    transport_type: string;
+    transport_type: LogisticsTransportType;
     event_time: string;
     event_date: string;
     loading_bay: string | null;
@@ -61,6 +67,8 @@ interface LogisticsEventDialogProps {
     license_plate: string | null;
     title?: string;
     color?: string;
+    transport_provider?: TransportProvider | null;
+    notes?: string | null;
     is_hoja_relevant?: boolean;
     hoja_categories?: LogisticsHojaCategory[];
     departments: { department: Department }[];
@@ -68,7 +76,7 @@ interface LogisticsEventDialogProps {
   // Optional initial values when creating a new event
   initialJobId?: string | null;
   initialDepartments?: Department[];
-  initialTransportType?: string;
+  initialTransportType?: LogisticsTransportType;
   initialEventType?: 'load' | 'unload';
   onCreated?: (details: { id: string; event_type: 'load' | 'unload'; event_date: string; event_time: string }) => void;
 }
@@ -85,14 +93,14 @@ export const LogisticsEventDialog = ({
   onCreated,
 }: LogisticsEventDialogProps) => {
   const [eventType, setEventType] = useState<"load" | "unload">("load");
-  const [transportType, setTransportType] = useState<string>("trailer");
+  const [transportType, setTransportType] = useState<LogisticsTransportType>("trailer");
   const [time, setTime] = useState("09:00");
   const [date, setDate] = useState(selectedDate ? format(selectedDate, "yyyy-MM-dd") : "");
   const [loadingBay, setLoadingBay] = useState("");
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [customTitle, setCustomTitle] = useState("");
   const [licensePlate, setLicensePlate] = useState("");
-  const [transportProvider, setTransportProvider] = useState<string | null>(null);
+  const [transportProvider, setTransportProvider] = useState<TransportProvider | null>(null);
   const [notes, setNotes] = useState<string>("");
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -147,8 +155,8 @@ export const LogisticsEventDialog = ({
       setSelectedJob(selectedEvent.job_id || null);
       setCustomTitle(selectedEvent.title || "");
       setLicensePlate(selectedEvent.license_plate || "");
-      setTransportProvider((selectedEvent as any).transport_provider || null);
-      setNotes((selectedEvent as any).notes || "");
+      setTransportProvider(selectedEvent.transport_provider || null);
+      setNotes(selectedEvent.notes || "");
       setSelectedDepartments((selectedEvent.departments || []).map((d) => d.department));
       setColor(selectedEvent.color || "#7E69AB");
       setIsHojaRelevant((selectedEvent as any).is_hoja_relevant ?? true);
@@ -183,14 +191,9 @@ export const LogisticsEventDialog = ({
   const monthEnd = endOfMonth(monthAnchor);
 
   const { data: jobs } = useQuery({
-    queryKey: [
-      "logistics-dialog-jobs",
-      monthStart.toISOString(),
-      monthEnd.toISOString(),
-    ],
+    queryKey: queryKeys.scope("logistics-dialog-jobs", monthStart.toISOString(), monthEnd.toISOString()),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("jobs")
+      const { data, error } = await dataLayerClient.from("jobs")
         .select("id, title, start_time, status, job_type")
         .in("status", ["Tentativa", "Confirmado"])
         .neq("job_type", "dryhire")
@@ -207,16 +210,14 @@ export const LogisticsEventDialog = ({
       if (!selectedEvent) return;
 
       // First delete any referencing rows in logistics_event_departments
-      const { error: deptError } = await supabase
-        .from("logistics_event_departments")
+      const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
         .delete()
         .eq("event_id", selectedEvent.id);
 
       if (deptError) throw deptError;
 
       // Then delete the main record from logistics_events
-      const { error: eventError } = await supabase
-        .from("logistics_events")
+      const { error: eventError } = await dataLayerClient.from("logistics_events")
         .delete()
         .eq("id", selectedEvent.id);
 
@@ -227,12 +228,12 @@ export const LogisticsEventDialog = ({
         description: "Evento de logística eliminado correctamente.",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["logistics-events"] });
-      queryClient.invalidateQueries({ queryKey: ["today-logistics"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") });
 
       const cancelledDepartments = (selectedEvent.departments || []).map((dept) => dept.department);
       try {
-        await supabase.functions.invoke("push", {
+        await dataLayerClient.functions.invoke("push", {
           body: {
             action: "broadcast",
             type: "logistics.event.cancelled",
@@ -298,7 +299,7 @@ export const LogisticsEventDialog = ({
         } = options;
 
         try {
-          await supabase.functions.invoke("push", {
+          await dataLayerClient.functions.invoke("push", {
             body: {
               action: "broadcast",
               type,
@@ -324,7 +325,7 @@ export const LogisticsEventDialog = ({
         }
       };
 
-      const eventData = {
+      const eventData: LogisticsEventPayload = {
         event_type: eventType,
         transport_type: transportType,
         transport_provider: transportProvider || null,
@@ -341,21 +342,18 @@ export const LogisticsEventDialog = ({
       };
 
       if (selectedEvent) {
-        const { error: updateError } = await supabase
-          .from("logistics_events")
+        const { error: updateError } = await dataLayerClient.from("logistics_events")
           .update(eventData)
           .eq("id", selectedEvent.id);
 
         if (updateError) throw updateError;
 
-        await supabase
-          .from("logistics_event_departments")
+        await dataLayerClient.from("logistics_event_departments")
           .delete()
           .eq("event_id", selectedEvent.id);
 
         if (selectedDepartments.length > 0) {
-          const { error: deptError } = await supabase
-            .from("logistics_event_departments")
+          const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
             .insert(
               selectedDepartments.map((dept) => ({
                 event_id: selectedEvent.id,
@@ -419,8 +417,7 @@ export const LogisticsEventDialog = ({
           description: "Evento de logística actualizado correctamente.",
         });
       } else {
-        const { data: newEvent, error } = await supabase
-          .from("logistics_events")
+        const { data: newEvent, error } = await dataLayerClient.from("logistics_events")
           .insert(eventData)
           .select()
           .single();
@@ -433,8 +430,7 @@ export const LogisticsEventDialog = ({
         } catch { }
 
         if (selectedDepartments.length > 0) {
-          const { error: deptError } = await supabase
-            .from("logistics_event_departments")
+          const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
             .insert(
               selectedDepartments.map((dept) => ({
                 event_id: newEvent.id,
@@ -447,15 +443,13 @@ export const LogisticsEventDialog = ({
         // Optional: create an unload event right after saving a load event
         if (alsoCreateUnload && eventType === 'load') {
           const unloadData = { ...eventData, event_type: 'unload' as const };
-          const { data: unloadEvent, error: unloadErr } = await supabase
-            .from('logistics_events')
+          const { data: unloadEvent, error: unloadErr } = await dataLayerClient.from('logistics_events')
             .insert(unloadData)
             .select()
             .single();
           if (unloadErr) throw unloadErr;
           if (selectedDepartments.length > 0) {
-            const { error: unloadDeptErr } = await supabase
-              .from('logistics_event_departments')
+            const { error: unloadDeptErr } = await dataLayerClient.from('logistics_event_departments')
               .insert(selectedDepartments.map((dept) => ({ event_id: unloadEvent.id, department: dept })));
             if (unloadDeptErr) throw unloadDeptErr;
           }
@@ -490,8 +484,8 @@ export const LogisticsEventDialog = ({
         });
       }
 
-      queryClient.invalidateQueries({ queryKey: ["logistics-events"] });
-      queryClient.invalidateQueries({ queryKey: ["today-logistics"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") });
       onOpenChange(false);
     } catch (error: any) {
       toast({
@@ -613,7 +607,7 @@ export const LogisticsEventDialog = ({
             {/* Transport Type */}
             <div className="space-y-2">
               <Label>Tipo de vehículo</Label>
-              <Select value={transportType} onValueChange={setTransportType}>
+              <Select value={transportType} onValueChange={(value) => setTransportType(value as LogisticsTransportType)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -642,7 +636,7 @@ export const LogisticsEventDialog = ({
               <Label>Transport Provider</Label>
               <Select
                 value={transportProvider || ""}
-                onValueChange={(value) => setTransportProvider(value || null)}
+                onValueChange={(value) => setTransportProvider((value || null) as TransportProvider | null)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select provider..." />

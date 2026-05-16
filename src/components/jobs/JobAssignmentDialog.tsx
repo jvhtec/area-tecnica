@@ -37,7 +37,7 @@ import { Job } from "@/types/job";
 import { User } from "@/types/user";
 import { useEffect, useState, useMemo } from "react";
 import { Loader2, RefreshCw, ExternalLink, CalendarIcon } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 import { useAvailableTechnicians } from "@/hooks/useAvailableTechnicians";
@@ -52,6 +52,8 @@ import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 import { isDepartmentManagementRole, isManagementRole } from '@/utils/permissions';
 
+
+import { queryKeys } from "@/lib/react-query";
 const MADRID_TIME_ZONE = 'Europe/Madrid';
 const formatMadridDateKey = (date: Date) => formatInTimeZone(date, MADRID_TIME_ZONE, "yyyy-MM-dd");
 const parseMadridDateKey = (dateKey: string) => fromZonedTime(`${dateKey}T00:00:00`, MADRID_TIME_ZONE);
@@ -90,8 +92,7 @@ interface Assignment {
 const syncTimesheetCategories = async (jobId: string, technicianId: string) => {
   try {
     // Fetch the current assignment to get all role fields
-    const { data: assignment, error: fetchError } = await supabase
-      .from('job_assignments')
+    const { data: assignment, error: fetchError } = await dataLayerClient.from('job_assignments')
       .select('sound_role, lights_role, video_role')
       .eq('job_id', jobId)
       .eq('technician_id', technicianId)
@@ -200,10 +201,9 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   // Fetch job data to get start/end times for availability checking
   const { data: jobData, isLoading: isLoadingJob } = useQuery({
-    queryKey: ["job", jobId],
+    queryKey: queryKeys.scope("job", jobId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("jobs")
+      const { data, error } = await dataLayerClient.from("jobs")
         .select("id, start_time, end_time, timezone, title, job_date_types(date, type)")
         .eq("id", jobId)
         .single();
@@ -477,7 +477,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     try {
       setIsSyncing(true);
       toast({ title: 'Syncing', description: 'Syncing crew to Flex…' });
-      const { data, error } = await supabase.functions.invoke('sync-flex-crew-for-job', {
+      const { data, error } = await dataLayerClient.functions.invoke('sync-flex-crew-for-job', {
         body: { job_id: jobId, departments: [dept] }
       });
       if (error) {
@@ -647,8 +647,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                             disabled={isClosureLocked}
                             onValueChange={async (newRole) => {
                               try {
-                                const { error } = await supabase
-                                  .from('job_assignments')
+                                const { error } = await dataLayerClient.from('job_assignments')
                                   .update({ sound_role: newRole === 'none' ? null : newRole })
                                   .eq('job_id', jobId)
                                   .eq('technician_id', assignment.technician_id);
@@ -700,8 +699,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                             disabled={isClosureLocked}
                             onValueChange={async (newRole) => {
                               try {
-                                const { error } = await supabase
-                                  .from('job_assignments')
+                                const { error } = await dataLayerClient.from('job_assignments')
                                   .update({ lights_role: newRole === 'none' ? null : newRole })
                                   .eq('job_id', jobId)
                                   .eq('technician_id', assignment.technician_id);
@@ -753,8 +751,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                             disabled={isClosureLocked}
                             onValueChange={async (newRole) => {
                               try {
-                                const { error } = await supabase
-                                  .from('job_assignments')
+                                const { error } = await dataLayerClient.from('job_assignments')
                                   .update({ video_role: newRole === 'none' ? null : newRole })
                                   .eq('job_id', jobId)
                                   .eq('technician_id', assignment.technician_id);

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, isValid, isToday } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Plus, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Printer } from "lucide-react";
@@ -13,6 +13,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { LogisticsCalendarPrintDialog } from "./LogisticsCalendarPrintDialog";
 import { generateLogisticsCalendarXLS, generateLogisticsCalendarPDF } from "@/utils/logisticsCalendarExport";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface LogisticsCalendarProps {
   onDateSelect?: (date: Date) => void;
 }
@@ -25,11 +27,10 @@ export const LogisticsCalendar = ({ onDateSelect }: LogisticsCalendarProps) => {
   const { toast } = useToast();
 
   const { data: events, isLoading } = useQuery({
-    queryKey: ['logistics-events'],
+    queryKey: queryKeys.scope('logistics-events'),
     queryFn: async () => {
       console.log('Fetching logistics events');
-      const { data, error } = await supabase
-        .from('logistics_events')
+      const { data, error } = await dataLayerClient.from('logistics_events')
         .select(`
           *,
           job:jobs(title),

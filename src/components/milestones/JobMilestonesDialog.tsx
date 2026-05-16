@@ -1,13 +1,17 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { format, addDays, subDays, min } from "date-fns";
 import { Settings, Calendar, MapPin, Clock } from "lucide-react";
 import { MilestoneGanttChart } from "./MilestoneGanttChart";
 import { useEffect, useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { ManageMilestonesDialog } from "./ManageMilestonesDialog";
+
+
+import { queryKeys } from "@/lib/react-query";
+type ChartMilestone = Parameters<typeof MilestoneGanttChart>[0]["milestones"][number];
 
 interface JobMilestonesDialogProps {
   open: boolean;
@@ -25,11 +29,10 @@ export function JobMilestonesDialog({
   const [manageMilestonesOpen, setManageMilestonesOpen] = useState(false);
 
   const { data: job } = useQuery({
-    queryKey: ["job-details", jobId],
+    queryKey: queryKeys.scope("job-details", jobId),
     queryFn: async () => {
       console.log("Fetching job details for:", jobId);
-      const { data, error } = await supabase
-        .from("jobs")
+      const { data, error } = await dataLayerClient.from("jobs")
         .select(`
           *,
           location:locations(name)
@@ -48,11 +51,10 @@ export function JobMilestonesDialog({
 
   // Fetch milestone definitions
   const { data: definitions } = useQuery({
-    queryKey: ["milestone-definitions"],
+    queryKey: queryKeys.scope("milestone-definitions"),
     queryFn: async () => {
       console.log("Fetching milestone definitions");
-      const { data, error } = await supabase
-        .from("milestone_definitions")
+      const { data, error } = await dataLayerClient.from("milestone_definitions")
         .select("*")
         .order("default_offset");
 
@@ -67,17 +69,17 @@ export function JobMilestonesDialog({
 
   // Fetch existing job milestones with department information
   const { data: milestones, isLoading } = useQuery({
-    queryKey: ["job-milestones", jobId],
+    queryKey: queryKeys.scope("job-milestones", jobId),
     queryFn: async () => {
       console.log("Fetching milestones for job:", jobId);
-      const { data, error } = await supabase
-        .from("job_milestones")
+      const { data, error } = await dataLayerClient.from("job_milestones")
         .select(`
           *,
           definition:milestone_definitions(
             name,
             category,
-            department
+            department,
+            priority
           ),
           completed_by:profiles(
             first_name,
@@ -92,16 +94,15 @@ export function JobMilestonesDialog({
         throw error;
       }
       console.log("Fetched milestones:", data);
-      return data;
+      return (data || []) as unknown as ChartMilestone[];
     },
   });
 
   // Fetch show dates to properly align milestones
   const { data: showDates } = useQuery({
-    queryKey: ["job-show-dates", jobId],
+    queryKey: queryKeys.scope("job-show-dates", jobId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("job_date_types")
+      const { data, error } = await dataLayerClient.from("job_date_types")
         .select("*")
         .eq("job_id", jobId)
         .eq("type", "show")
@@ -122,13 +123,12 @@ export function JobMilestonesDialog({
       definition_id: def.id,
       name: def.name,
       offset_days: def.default_offset,
-      due_date: addDays(firstShowDate, def.default_offset),
+      due_date: format(addDays(firstShowDate, def.default_offset), "yyyy-MM-dd"),
     }));
 
     console.log("Creating initial milestones:", milestonesToCreate);
 
-    const { error } = await supabase
-      .from("job_milestones")
+    const { error } = await dataLayerClient.from("job_milestones")
       .insert(milestonesToCreate);
 
     if (error) {

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ExternalLink, Link2, Save, Wand2, ClipboardPaste } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { buildFlexUrlByIntent } from '@/utils/flex-folders/urlBuilder';
 import { getFlexViewId } from '@/utils/flex-folders/config';
@@ -56,8 +56,7 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
 
   const loadExisting = async () => {
     if (!jobId) return;
-    const { data, error } = await supabase
-      .from('flex_crew_calls')
+    const { data, error } = await dataLayerClient.from('flex_crew_calls')
       .select('department, flex_element_id')
       .eq('job_id', jobId);
     if (error) {
@@ -100,21 +99,18 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
     try {
       setLoading(true);
       // Check if row exists
-      const { data: existing } = await supabase
-        .from('flex_crew_calls')
+      const { data: existing } = await dataLayerClient.from('flex_crew_calls')
         .select('id')
         .eq('job_id', jobId)
         .eq('department', dept)
         .maybeSingle();
       if (existing?.id) {
-        const { error } = await supabase
-          .from('flex_crew_calls')
+        const { error } = await dataLayerClient.from('flex_crew_calls')
           .update({ flex_element_id: id })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('flex_crew_calls')
+        const { error } = await dataLayerClient.from('flex_crew_calls')
           .insert({ job_id: jobId, department: dept, flex_element_id: id });
         if (error) throw error;
       }

@@ -3,11 +3,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { supabase } from '@/lib/supabase'
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { Play, Pause, Square, Zap } from 'lucide-react'
 
+
+import { queryKeys } from "@/lib/react-query";
 interface StaffingAutoModePanelProps {
   campaign: any
   campaignRoles: any[]
@@ -24,14 +26,14 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
   const [showEscalationWarning, setShowEscalationWarning] = useState(false)
 
   const getToken = async () => {
-    const token = (await supabase.auth.getSession()).data.session?.access_token
+    const token = (await dataLayerClient.auth.getSession()).data.session?.access_token
     if (!token) throw new Error('Not authenticated')
     return token
   }
 
   const invalidateAll = () => {
-    queryClient.invalidateQueries({ queryKey: ['staffing_campaign', campaign.job_id, campaign.department] })
-    queryClient.invalidateQueries({ queryKey: ['staffing_campaign_roles', campaign.id] })
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', campaign.job_id, campaign.department) })
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign_roles', campaign.id) })
     onStatusChange?.()
   }
 

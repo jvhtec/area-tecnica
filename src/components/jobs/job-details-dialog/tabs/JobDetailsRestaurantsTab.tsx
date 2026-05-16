@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { PlacesRestaurantService } from "@/utils/hoja-de-ruta/services/places-restaurant-service";
 import type { Restaurant } from "@/types/hoja-de-ruta";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface JobDetailsRestaurantsTabProps {
   open: boolean;
   jobId: string;
@@ -23,7 +25,7 @@ export const JobDetailsRestaurantsTab: React.FC<JobDetailsRestaurantsTabProps> =
   isJobLoading,
 }) => {
   const { data: restaurants = [], isLoading: isRestaurantsLoading } = useQuery({
-    queryKey: ["job-restaurants", jobId, jobDetails?.locations?.formatted_address],
+    queryKey: queryKeys.scope("job-restaurants", jobId, jobDetails?.locations?.formatted_address),
     queryFn: async () => {
       const locationData = jobDetails?.locations;
       const address = locationData?.formatted_address || locationData?.name;

@@ -70,6 +70,18 @@ vi.mock('@/integrations/supabase/client', () => ({
   },
 }));
 
+vi.mock('@/services/dataLayerClient', () => ({
+  dataLayerClient: {
+    from: fromMock,
+    auth: {
+      getUser: authGetUserMock,
+    },
+    functions: {
+      invoke: functionsInvokeMock,
+    },
+  },
+}));
+
 vi.mock('sonner', () => ({
   toast: toastFn,
 }));
