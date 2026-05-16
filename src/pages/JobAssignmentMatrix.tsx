@@ -10,7 +10,7 @@ import { StaffingOrchestratorPanel } from '@/components/matrix/StaffingOrchestra
 import { DateRangeExpander } from '@/components/matrix/DateRangeExpander';
 import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { SkillsFilter } from '@/components/matrix/SkillsFilter';
 import {
   Dialog,
@@ -41,6 +41,8 @@ import {
   type StaffingSummaryRow,
 } from './job-assignment-matrix/utils';
 
+
+import { queryKeys } from "@/lib/react-query";
 const HIDE_STAFFING_EMAIL_BUTTONS_STORAGE_KEY = 'job-assignment-matrix:hide-staffing-email-buttons';
 const HIDE_STAFFING_WHATSAPP_BUTTONS_STORAGE_KEY = 'job-assignment-matrix:hide-staffing-whatsapp-buttons';
 
@@ -214,9 +216,9 @@ export default function JobAssignmentMatrix() {
     isInitialLoading: isInitialLoadingTechnicians,
     isFetching: isFetchingTechnicians,
   } = useQuery<any[]>({
-    queryKey: ['optimized-matrix-technicians', selectedDepartment],
+    queryKey: queryKeys.scope('optimized-matrix-technicians', selectedDepartment),
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_profiles_with_skills');
+      const { data, error } = await dataLayerClient.rpc('get_profiles_with_skills');
 
       if (error) throw error;
 
@@ -250,11 +252,10 @@ export default function JobAssignmentMatrix() {
   // Fridge state for technicians currently in view
   const technicianIds = React.useMemo(() => technicians.map((t: any) => t.id), [technicians]);
   const { data: fridgeRows = [] } = useQuery({
-    queryKey: ['technician-fridge-status', technicianIds],
+    queryKey: queryKeys.scope('technician-fridge-status', technicianIds),
     queryFn: async () => {
       if (!technicianIds.length) return [] as Array<{ technician_id: string; in_fridge: boolean }>;
-      const { data, error } = await supabase
-        .from('technician_fridge')
+      const { data, error } = await dataLayerClient.from('technician_fridge')
         .select('technician_id, in_fridge')
         .in('technician_id', technicianIds);
       if (error) throw error;
@@ -280,13 +281,13 @@ export default function JobAssignmentMatrix() {
 
   // Realtime invalidation for fridge state
   React.useEffect(() => {
-    const ch = (supabase as any)
+    const ch = (dataLayerClient as any)
       .channel('rt-technician-fridge')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_fridge' }, () => {
-        qc.invalidateQueries({ queryKey: ['technician-fridge-status'] });
+        qc.invalidateQueries({ queryKey: queryKeys.scope('technician-fridge-status') });
       })
       .subscribe();
-    return () => { try { (supabase as any).removeChannel(ch); } catch { } };
+    return () => { try { (dataLayerClient as any).removeChannel(ch); } catch { } };
   }, [qc]);
 
   // Filter technicians based on search term
@@ -341,7 +342,7 @@ export default function JobAssignmentMatrix() {
     isInitialLoading: isInitialLoadingJobs,
     isFetching: isFetchingJobs,
   } = useQuery<any[]>({
-    queryKey: ['optimized-matrix-jobs', rangeInfo.startFormatted, rangeInfo.endFormatted, selectedDepartment],
+    queryKey: queryKeys.scope('optimized-matrix-jobs', rangeInfo.startFormatted, rangeInfo.endFormatted, selectedDepartment),
     queryFn: async () => {
       return fetchJobsForWindow(rangeInfo.start, rangeInfo.end, selectedDepartment);
     },
@@ -395,7 +396,7 @@ export default function JobAssignmentMatrix() {
 
       if (!cancelled && jobIds.length && technicianIds.length) {
         await qc.prefetchQuery({
-          queryKey: ['optimized-matrix-assignments', jobIds, technicianIds, startFormatted],
+          queryKey: queryKeys.scope('optimized-matrix-assignments', jobIds, technicianIds, startFormatted),
           queryFn: () => fetchAssignmentsForWindow(jobIds, technicianIds, jobsForWindow),
           staleTime: 30 * 1000,
           gcTime: 2 * 60 * 1000,
@@ -404,7 +405,7 @@ export default function JobAssignmentMatrix() {
 
       if (!cancelled && technicianIds.length) {
         await qc.prefetchQuery({
-          queryKey: ['optimized-matrix-availability', technicianIds, startFormatted, endFormatted],
+          queryKey: queryKeys.scope('optimized-matrix-availability', technicianIds, startFormatted, endFormatted),
           queryFn: () => fetchAvailabilityForWindow(technicianIds, start, end),
           staleTime: 60 * 1000,
           gcTime: 10 * 60 * 1000,
@@ -450,19 +451,17 @@ export default function JobAssignmentMatrix() {
   const jobIdsKey = React.useMemo(() => (jobIds.length ? jobIds.slice().sort().join(',') : 'none'), [jobIds]);
 
   const staffingReminderQuery = useQuery({
-    queryKey: ['matrix-staffing-summary', jobIdsKey],
+    queryKey: queryKeys.scope('matrix-staffing-summary', jobIdsKey),
     queryFn: async () => {
       if (!jobIds.length) {
         return { summaries: [] as StaffingSummaryRow[], assignments: [] as StaffingAssignmentRow[] };
       }
 
       const [summaryRes, assignmentsRes] = await Promise.all([
-        supabase
-          .from('job_required_roles_summary')
+        dataLayerClient.from('job_required_roles_summary')
           .select('job_id, department, roles')
           .in('job_id', jobIds),
-        supabase
-          .from('job_assignments')
+        dataLayerClient.from('job_assignments')
           .select('job_id, sound_role, lights_role, video_role, production_role, status')
           .in('job_id', jobIds),
       ]);

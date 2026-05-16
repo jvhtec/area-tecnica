@@ -26,6 +26,10 @@ vi.mock("@/lib/supabase", () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: mockSupabase,
+}));
+
 vi.mock("@/components/disponibilidad/StockCreationManager", async () => {
   const React = await vi.importActual<typeof import("react")>("react");
 

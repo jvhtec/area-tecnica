@@ -12,10 +12,11 @@ import { useJobSelection } from '@/hooks/useJobSelection';
 import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
+import type { Json } from '@/integrations/supabase/types';
 import type { Table, TableRow } from './consumos-tool/types';
 import { PowerTableCard } from './consumos-tool/components/PowerTableCard';
 import {
@@ -112,8 +113,7 @@ const ConsumosTool: React.FC = () => {
           setSelectedJob(found);
           return;
         }
-        const { data } = await supabase
-          .from('jobs')
+        const { data } = await dataLayerClient.from('jobs')
           .select('id, title, start_time, end_time, tour_date_id, date, location')
           .eq('id', jobIdFromUrl)
           .single();
@@ -215,8 +215,7 @@ const ConsumosTool: React.FC = () => {
 
   const savePowerRequirementTable = async (table: Table) => {
     try {
-      const { error } = await supabase
-        .from('power_requirement_tables')
+      const { error } = await dataLayerClient.from('power_requirement_tables')
         .insert({
           job_id: selectedJobId,
           department: 'sound',
@@ -227,7 +226,7 @@ const ConsumosTool: React.FC = () => {
           custom_pdu_type: table.customPduType,
           position: table.position || null,
           custom_position: table.customPosition || null,
-          table_data: { rows: table.rows },
+          table_data: { rows: table.rows } as unknown as Json,
           includes_hoist: table.includesHoist || false
         });
 
@@ -249,7 +248,7 @@ const ConsumosTool: React.FC = () => {
       const newDefaultTable = await _createTourDefaultTableInternal({
         set_id: setId,
         table_name: table.name,
-        table_data: { rows: table.rows, safetyMargin, pf, phaseMode, voltage },
+        table_data: { rows: table.rows, safetyMargin, pf, phaseMode, voltage } as unknown as Json,
         table_type: 'power',
         total_value: table.totalWatts || 0,
         metadata: {
@@ -411,7 +410,7 @@ const ConsumosTool: React.FC = () => {
         const newDefaultTable = await createTourDefaultTable({
           set_id: setId,
           table_name: table.name,
-          table_data: { rows: table.rows, safetyMargin, pf, phaseMode, voltage },
+          table_data: { rows: table.rows, safetyMargin, pf, phaseMode, voltage } as unknown as Json,
           table_type: 'power',
           total_value: table.totalWatts || 0,
           metadata: {
@@ -446,7 +445,7 @@ const ConsumosTool: React.FC = () => {
             updateTourDefaultTable({
               tableId: table.defaultTableId,
               updates: {
-                table_data: { rows: updatedTable.rows, safetyMargin, pf, phaseMode, voltage },
+                table_data: { rows: updatedTable.rows, safetyMargin, pf, phaseMode, voltage } as unknown as Json,
                 total_value: updatedTable.totalWatts || 0,
                 metadata: {
                   current_per_phase: updatedTable.currentPerPhase,
@@ -594,7 +593,7 @@ const ConsumosTool: React.FC = () => {
   useEffect(() => {
     const fetchTourInfo = async () => {
       if (tourId) {
-        const { data } = await supabase.from('tours').select('name').eq('id', tourId).single();
+        const { data } = await dataLayerClient.from('tours').select('name').eq('id', tourId).single();
         if (data) setTourName(data.name);
       }
     };

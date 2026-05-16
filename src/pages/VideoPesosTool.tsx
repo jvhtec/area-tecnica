@@ -11,7 +11,7 @@ import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { Badge } from '@/components/ui/badge';
@@ -87,8 +87,7 @@ const VideoPesosTool: React.FC = () => {
           setSelectedJob(found);
           return;
         }
-        const { data } = await supabase
-          .from('jobs')
+        const { data } = await dataLayerClient.from('jobs')
           .select('id, title, start_time')
           .eq('id', jobIdFromUrl)
           .single();

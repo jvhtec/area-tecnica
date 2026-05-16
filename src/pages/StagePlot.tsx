@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ArrowLeft, Save, FileDown, Printer } from "lucide-react";
 import { useJobs } from "@/hooks/useJobs";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { generateStagePlotPDF } from "@/utils/stage-plot/pdf-generator";
 
 export default function StagePlot() {
@@ -34,8 +34,7 @@ export default function StagePlot() {
     const loadPlotData = async () => {
       setIsLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('job_stage_plots')
+        const { data, error } = await dataLayerClient.from('job_stage_plots')
           .select('plot_data')
           .eq('job_id', selectedJobId)
           .single();
@@ -120,8 +119,7 @@ export default function StagePlot() {
       }
 
       try {
-        const { error } = await supabase
-          .from('job_stage_plots')
+        const { error } = await dataLayerClient.from('job_stage_plots')
           .upsert({
             job_id: jobIdToSave,
             plot_data: event.data.data,

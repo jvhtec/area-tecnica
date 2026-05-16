@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { Loader2, Calendar, ArrowLeft, Users, Briefcase, Home, Plane, Heart, Sun } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -23,6 +23,18 @@ type TimesheetWithRelations = {
     department: string;
     role: string;
   };
+};
+
+type AvailabilitySummaryRow = {
+  user_id: string;
+  source: string | null;
+  profile: {
+    first_name: string;
+    last_name: string;
+    nickname: string | null;
+    department: string;
+    role: string;
+  } | null;
 };
 
 type MorningSummaryData = {
@@ -80,8 +92,7 @@ export default function MorningSummary() {
 
       for (const dept of departments) {
         // Get assignments from timesheets (source of truth)
-        const { data: timesheetData } = await supabase
-          .from('timesheets')
+        const { data: timesheetData } = await dataLayerClient.from('timesheets')
           .select(`
             technician_id,
             job_id,
@@ -96,8 +107,7 @@ export default function MorningSummary() {
           .eq('profiles.warehouse_duty_exempt', false) as { data: TimesheetWithRelations[] | null };
 
         // Get unavailable
-      const { data: unavailable } = await supabase
-        .from('availability_schedules')
+      const { data: unavailable } = await dataLayerClient.from('availability_schedules')
         .select(`
           user_id,
           source,
@@ -110,20 +120,21 @@ export default function MorningSummary() {
         .eq('profile.warehouse_duty_exempt', false);
 
         // Get all house techs (population)
-      const { data: allTechs } = await supabase
-        .from('profiles')
+      const { data: allTechs } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name, nickname')
         .eq('department', dept)
         .eq('role', 'house_tech')
         .eq('warehouse_duty_exempt', false);
 
         // Legacy fallback: include legacy per-day marks so counts match the Personal calendar
-        let unavailableMerged = unavailable || [];
+        let unavailableMerged: AvailabilitySummaryRow[] = ((unavailable || []) as unknown as AvailabilitySummaryRow[]).map((row) => ({
+          ...row,
+          profile: Array.isArray(row.profile) ? row.profile[0] ?? null : row.profile,
+        }));
         try {
           const techIds = (allTechs || []).map(t => t.id);
           if (techIds.length) {
-            const { data: legacyRows } = await supabase
-              .from('technician_availability')
+            const { data: legacyRows } = await dataLayerClient.from('technician_availability')
               .select('technician_id, date, status')
               .in('technician_id', techIds)
               .eq('date', date)

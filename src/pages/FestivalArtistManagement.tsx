@@ -23,6 +23,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { buildReadableFilename, formatDateForFilename } from "@/utils/fileName";
 import { getEffectiveFestivalDateType } from "@/constants/dateTypes";
 
+
+import { queryKeys } from "@/lib/react-query";
 const DAY_START_HOUR = 7; // Festival day starts at 7:00 AM
 
 const FestivalArtistManagement = () => {
@@ -65,7 +67,7 @@ const FestivalArtistManagement = () => {
   const {
     data: festivalSettings
   } = useQuery({
-    queryKey: ['festival-settings', jobId],
+    queryKey: queryKeys.scope('festival-settings', jobId),
     queryFn: async () => {
       if (!jobId) return null;
       const {
@@ -103,7 +105,7 @@ const FestivalArtistManagement = () => {
     data: dateTypeData,
     refetch: refetchDateTypes
   } = useQuery({
-    queryKey: ['job-date-types', jobId],
+    queryKey: queryKeys.scope('job-date-types', jobId),
     queryFn: async () => {
       if (!jobId) return {};
       const {
@@ -129,7 +131,7 @@ const FestivalArtistManagement = () => {
   }, [dateTypeData]);
 
   const { data: stageNamesData } = useQuery({
-    queryKey: ['festival-stages', jobId],
+    queryKey: queryKeys.scope('festival-stages', jobId),
     queryFn: async () => {
       if (!jobId) return {};
       
@@ -161,7 +163,7 @@ const FestivalArtistManagement = () => {
   useRealtimeSubscription({
     table: "festival_artists",
     filter: `job_id=eq.${jobId}`,
-    queryKey: ["festival-artists", jobId, selectedDate]
+    queryKey: queryKeys.scope("festival-artists", jobId, selectedDate)
   });
 
   useEffect(() => {
@@ -217,7 +219,7 @@ const FestivalArtistManagement = () => {
   }, [selectedDate, setSearchParams]);
 
   const { data: logoData } = useQuery({
-    queryKey: ['festival-logo', jobId],
+    queryKey: queryKeys.scope('festival-logo', jobId),
     queryFn: async () => {
       if (!jobId) return null;
       

@@ -9,7 +9,7 @@ import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
@@ -22,6 +22,8 @@ import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isManagementRole } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 const Video = () => {
   const isMobile = useIsMobile();
   const [isJobDialogOpen, setIsJobDialogOpen] = useState(false);
@@ -122,8 +124,7 @@ const Video = () => {
     if (!window.confirm("Are you sure you want to delete this job?")) return;
 
     try {
-      const { error } = await supabase
-        .from('jobs')
+      const { error } = await dataLayerClient.from('jobs')
         .delete()
         .eq('id', jobId);
 
@@ -133,7 +134,7 @@ const Video = () => {
         title: "Job deleted",
         description: "The job has been successfully deleted.",
       });
-      await queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
     } catch (error: any) {
       toast({
         title: "Error deleting job",

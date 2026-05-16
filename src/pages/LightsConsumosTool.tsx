@@ -11,7 +11,7 @@ import { FileText, ArrowLeft, Check, ChevronsUpDown, Trash2, Save } from 'lucide
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -20,6 +20,7 @@ import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeade
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import type { Json } from '@/integrations/supabase/types';
 import {
   CUSTOM_POWER_POSITION_VALUE,
   getPowerPositionCustomValue,
@@ -28,6 +29,8 @@ import {
   POWER_POSITION_PRESETS,
 } from '@/utils/powerPositions';
 
+
+import { queryKeys } from "@/lib/react-query";
 type FixtureType = 'incandescent' | 'discharge' | 'led' | 'led-pro' | 'smoke' | 'consoles';
 
 const FIXTURE_PF: Record<FixtureType, { label: string; pf: number }> = {
@@ -225,9 +228,9 @@ const LightsConsumosTool: React.FC = () => {
 
   // Load tour name via React Query for caching and error handling
   const { data: tourName = '' } = useQuery({
-    queryKey: ['tour', tourId, 'name'],
+    queryKey: queryKeys.scope('tour', tourId, 'name'),
     queryFn: async () => {
-      const { data } = await supabase.from('tours').select('name').eq('id', tourId!).single();
+      const { data } = await dataLayerClient.from('tours').select('name').eq('id', tourId!).single();
       return data?.name || '';
     },
     enabled: isTourDefaults && !!tourId,
@@ -270,7 +273,7 @@ const LightsConsumosTool: React.FC = () => {
       const newDefaultTable = await createTourDefaultTable({
         set_id: setId,
         table_name: table.name,
-        table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
+        table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v } as unknown as Json,
         table_type: 'power',
         total_value: table.totalWatts || 0,
         metadata: {
@@ -324,7 +327,7 @@ const LightsConsumosTool: React.FC = () => {
         const newDefaultTable = await createTourDefaultTable({
           set_id: setId,
           table_name: table.name,
-          table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
+          table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v } as unknown as Json,
           table_type: 'power',
           total_value: table.totalWatts || 0,
           metadata: {
@@ -405,8 +408,7 @@ const LightsConsumosTool: React.FC = () => {
           setSelectedJob(found);
           return;
         }
-        const { data } = await supabase
-          .from('jobs')
+        const { data } = await dataLayerClient.from('jobs')
           .select('id, title, start_time')
           .eq('id', jobIdFromUrl)
           .single();
@@ -589,8 +591,7 @@ const LightsConsumosTool: React.FC = () => {
     if (!selectedJobId) return;
 
     try {
-      const { error } = await supabase
-        .from('power_requirement_tables')
+      const { error } = await dataLayerClient.from('power_requirement_tables')
         .insert({
           job_id: selectedJobId,
           department: 'lights',
@@ -602,7 +603,7 @@ const LightsConsumosTool: React.FC = () => {
           custom_pdu_type: table.customPduType,
           position: table.position || null,
           custom_position: table.customPosition || null,
-          table_data: { rows: table.rows },
+          table_data: { rows: table.rows } as unknown as Json,
         });
 
       if (error) throw error;
@@ -738,7 +739,7 @@ const LightsConsumosTool: React.FC = () => {
             updateTourDefaultTable({
               tableId: updatedTable.defaultTableId,
               updates: {
-                table_data: { rows: updatedTable.rows, safetyMargin: sm, phaseMode: pm, voltage: v },
+                table_data: { rows: updatedTable.rows, safetyMargin: sm, phaseMode: pm, voltage: v } as unknown as Json,
                 total_value: updatedTable.totalWatts || 0,
                 metadata: {
                   current_per_phase: updatedTable.currentPerPhase,

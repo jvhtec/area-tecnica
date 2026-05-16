@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PresetManagementDialog } from '@/components/equipment/PresetManagementDialog';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToast } from '@/hooks/use-toast';
 import { endOfDay, format, startOfDay } from 'date-fns';
@@ -21,6 +21,8 @@ import { cn } from '@/lib/utils';
 import { MobileAvailabilityView } from '@/components/disponibilidad/MobileAvailabilityView';
 import { canAccessDisponibilidad, isAdminRole, isDepartmentManagementRole } from '@/utils/permissions';
 
+
+import { queryKeys } from "@/lib/react-query";
 type DisponibilidadDepartment = 'sound' | 'lights';
 
 const DEPARTMENT_LABELS: Record<DisponibilidadDepartment, string> = {
@@ -79,12 +81,11 @@ export default function Disponibilidad() {
   const { data: jobsToday = [] } = useOptimizedJobs(department as any, dayStart, dayEnd);
 
   const { data: assignedPresets } = useQuery({
-    queryKey: ['preset-assignments', department, selectedDate],
+    queryKey: queryKeys.scope('preset-assignments', department, selectedDate),
     queryFn: async () => {
       if (!selectedDate) return null;
 
-      const { data, error } = await supabase
-        .from('day_preset_assignments')
+      const { data, error } = await dataLayerClient.from('day_preset_assignments')
         .select(`
           *,
           preset:presets!inner (

@@ -46,6 +46,10 @@ vi.mock("@/lib/supabase", () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: mockSupabase,
+}));
+
 vi.mock("@/components/disponibilidad/WeeklySummary", () => ({
   WeeklySummary: ({ selectedDate }: { selectedDate: Date }) => <div>Weekly summary {selectedDate.toISOString().slice(0, 10)}</div>,
 }));

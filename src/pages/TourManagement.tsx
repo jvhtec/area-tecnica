@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { TourRatesManagerDialog } from "@/components/tours/TourRatesManagerDialog";
 import { useTourRatesApproval } from "@/hooks/useTourRatesApproval";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "@/components/tours/TourManagementDialog";
@@ -53,6 +53,8 @@ import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { TourSchedulingDialog } from "@/components/tours/TourSchedulingDialog";
 import { useQuery } from "@tanstack/react-query";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface TourManagementProps {
   tour: any;
   tourJobId?: string | null;
@@ -100,12 +102,11 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   // Check if WhatsApp group already exists for selected date/department
   // First resolve the job_id from tour_date_id
   const { data: resolvedJobId } = useQuery({
-    queryKey: ['tour-date-job-id', waSelectedDateId],
+    queryKey: queryKeys.scope('tour-date-job-id', waSelectedDateId),
     enabled: !!waSelectedDateId,
     queryFn: async () => {
       if (!waSelectedDateId) return null;
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('id')
         .eq('tour_date_id', waSelectedDateId)
         .maybeSingle();
@@ -115,12 +116,11 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   });
 
   const { data: waGroup, refetch: refetchWaGroup } = useQuery({
-    queryKey: ['job-whatsapp-group', resolvedJobId, waDepartment, 0],
+    queryKey: queryKeys.scope('job-whatsapp-group', resolvedJobId, waDepartment, 0),
     enabled: !!resolvedJobId && !!waDepartment && isManagementUser,
     queryFn: async () => {
       if (!resolvedJobId) return null;
-      const { data, error } = await supabase
-        .from('job_whatsapp_groups')
+      const { data, error } = await dataLayerClient.from('job_whatsapp_groups')
         .select('id, wa_group_id')
         .eq('job_id', resolvedJobId)
         .eq('department', waDepartment)
@@ -132,12 +132,11 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
   });
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
-    queryKey: ['job-whatsapp-group-request', resolvedJobId, waDepartment, 0],
+    queryKey: queryKeys.scope('job-whatsapp-group-request', resolvedJobId, waDepartment, 0),
     enabled: !!resolvedJobId && !!waDepartment && isManagementUser,
     queryFn: async () => {
       if (!resolvedJobId) return null;
-      const { data, error } = await supabase
-        .from('job_whatsapp_group_requests')
+      const { data, error } = await dataLayerClient.from('job_whatsapp_group_requests')
         .select('id, created_at')
         .eq('job_id', resolvedJobId)
         .eq('department', waDepartment)
@@ -207,8 +206,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       }
       setIsCreatingWaGroup(true);
       // Resolve job for this tour date
-      const { data: jobRow, error: jobErr } = await supabase
-        .from('jobs')
+      const { data: jobRow, error: jobErr } = await dataLayerClient.from('jobs')
         .select('id, title, start_time, end_time')
         .eq('tour_date_id', waSelectedDateId)
         .maybeSingle();
@@ -219,8 +217,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       }
 
       // Optional pre-check: warn about missing phones for selected department
-      const { data: rows } = await supabase
-        .from('job_assignments')
+      const { data: rows } = await dataLayerClient.from('job_assignments')
         .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
         .eq('job_id', jobRow.id);
       const deptKey = waDepartment === 'sound' ? 'sound_role' : waDepartment === 'lights' ? 'lights_role' : 'video_role';
@@ -243,7 +240,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       }
 
       // Invoke the existing edge function
-      const { data: fnRes, error: fnErr } = await supabase.functions.invoke('create-whatsapp-group', {
+      const { data: fnRes, error: fnErr } = await dataLayerClient.functions.invoke('create-whatsapp-group', {
         body: { job_id: jobRow.id, department: waDepartment, stage_number: 0 }
       });
       if (fnErr) {
@@ -270,8 +267,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
     setIsCreatingWaGroup(true);
     try {
       // First resolve the job_id from the tour_date_id
-      const { data: jobData, error: jobError } = await supabase
-        .from('jobs')
+      const { data: jobData, error: jobError } = await dataLayerClient.from('jobs')
         .select('id')
         .eq('tour_date_id', waSelectedDateId)
         .maybeSingle();
@@ -289,7 +285,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
       const jobId = jobData.id;
 
       // Clear the failed request using RPC function with correct job_id
-      const { data: clearResult, error: clearError } = await supabase.rpc(
+      const { data: clearResult, error: clearError } = await dataLayerClient.rpc(
         'clear_whatsapp_group_request',
         { p_job_id: jobId, p_department: waDepartment, p_stage_number: 0 }
       );
@@ -873,8 +869,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                           className="w-full text-xs"
                           onClick={async (e) => {
                             e.stopPropagation();
-                            await supabase
-                              .from('tours')
+                            await dataLayerClient.from('tours')
                               .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
                               .eq('id', tour.id);
                             refetchApproval();
@@ -889,9 +884,8 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
                           className="w-full text-xs"
                           onClick={async (e) => {
                             e.stopPropagation();
-                            const { data: u } = await supabase.auth.getUser();
-                            await supabase
-                              .from('tours')
+                            const { data: u } = await dataLayerClient.auth.getUser();
+                            await dataLayerClient.from('tours')
                               .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: u?.user?.id || null } as any)
                               .eq('id', tour.id);
                             refetchApproval();

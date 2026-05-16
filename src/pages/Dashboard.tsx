@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useOptimizedJobs } from "@/hooks/useOptimizedJobs";
 import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { formatCurrency } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,8 @@ import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService
 import { useIsMobile } from "@/hooks/use-mobile";
 import { canAccessDashboard, canViewPendingExpenses, isManagementRole } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 const DashboardMobileHub = lazy(() =>
   import("@/components/dashboard/DashboardMobileHub").then((m) => ({ default: m.DashboardMobileHub }))
 );
@@ -96,11 +98,10 @@ const Dashboard = () => {
   const queryClient = useQueryClient();
 
   const { data: pendingExpensesSummary, isLoading: isLoadingPendingExpenses } = useQuery({
-    queryKey: ['dashboard-expenses-summary'],
+    queryKey: queryKeys.scope('dashboard-expenses-summary'),
     enabled: canViewPendingExpenses(userRole),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_expenses')
+      const { data, error } = await dataLayerClient.from('job_expenses')
         .select('amount_eur, job_id')
         .eq('status', 'submitted');
       if (error) throw error;
@@ -177,7 +178,7 @@ const Dashboard = () => {
         });
 
         // Invalidate queries to refresh the list
-        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }

@@ -20,6 +20,8 @@ import { DepartmentMobileHub } from "@/components/department/DepartmentMobileHub
 import { useIsMobile } from "@/hooks/use-mobile";
 import { isManagementRole } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 const Lights = () => {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
@@ -130,7 +132,7 @@ const Lights = () => {
           });
           
           // Invalidate queries to refresh the list
-          await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
         } else {
           throw new Error(result.error || "Unknown deletion error");
         }
