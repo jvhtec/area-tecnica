@@ -6,7 +6,7 @@ const autoTableCalls: any[] = [];
 
 vi.mock('jspdf-autotable', () => ({
   __esModule: true,
-  default: (doc: any, options: any) => {
+  autoTable: (doc: any, options: any) => {
     autoTableCalls.push(options);
     (doc as any).lastAutoTable = { finalY: (options.startY ?? 0) + 10 };
   },

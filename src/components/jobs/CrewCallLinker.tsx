@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { buildFlexUrlByIntent } from '@/utils/flex-folders/urlBuilder';
 import { getFlexViewId } from '@/utils/flex-folders/config';
 
-type Dept = 'sound' | 'lights';
+type Dept = 'sound' | 'lights' | 'video';
 
 interface Props {
   jobId: string;
@@ -28,8 +28,8 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  const [url, setUrl] = useState<Record<Dept, string>>({ sound: '', lights: '' });
-  const [elementId, setElementId] = useState<Record<Dept, string>>({ sound: '', lights: '' });
+  const [url, setUrl] = useState<Record<Dept, string>>({ sound: '', lights: '', video: '' });
+  const [elementId, setElementId] = useState<Record<Dept, string>>({ sound: '', lights: '', video: '' });
 
   const extractElementId = (raw: string): string | '' => {
     const s = (raw || '').trim();
@@ -64,10 +64,10 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
       console.error('Load crew calls error:', error);
       return;
     }
-    const next: Record<Dept, string> = { sound: '', lights: '' };
+    const next: Record<Dept, string> = { sound: '', lights: '', video: '' };
     for (const row of (data || []) as CrewCallRow[]) {
       const d = (row.department || '').toLowerCase();
-      if (d === 'sound' || d === 'lights') next[d] = row.flex_element_id || '';
+      if (d === 'sound' || d === 'lights' || d === 'video') next[d] = row.flex_element_id || '';
     }
     setElementId(next);
   };
@@ -178,6 +178,7 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
       <div className="space-y-4">
         <Row label="Sound Crew Call" dept="sound" />
         <Row label="Lights Crew Call" dept="lights" />
+        <Row label="Video Crew Call" dept="video" />
       </div>
     );
   }
@@ -192,6 +193,7 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
       <CardContent className="space-y-4">
         <Row label="Sound Crew Call" dept="sound" />
         <Row label="Lights Crew Call" dept="lights" />
+        <Row label="Video Crew Call" dept="video" />
       </CardContent>
     </Card>
   );

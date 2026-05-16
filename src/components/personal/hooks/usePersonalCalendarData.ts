@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { startOfMonth, endOfMonth, subDays, addDays } from 'date-fns';
 
-interface HouseTech {
+export interface HouseTech {
   id: string;
   first_name: string | null;
   last_name: string | null;

@@ -314,14 +314,14 @@ export const generateTourDaySheet = async (
       }
     }
 
-    // Load weather data
     const jobQuery = await supabase
       .from('jobs')
       .select('id')
       .eq('tour_date_id', tourDate.id)
       .maybeSingle();
 
-    if (jobQuery.data?.id && tourDate.location?.address) {
+    // Load weather data
+    if (tourDate.location?.address) {
       try {
         const weatherData = await getWeatherForJob({ address: tourDate.location.address }, tourDate.date);
 

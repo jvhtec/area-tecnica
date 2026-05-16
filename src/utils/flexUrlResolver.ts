@@ -240,8 +240,6 @@ function extractFlexField(value: unknown): string | undefined {
   return undefined;
 }
 
-const readRecordField = (record: Record<string, unknown>, key: string): unknown => record[key];
-
 async function fetchElementMetadata(elementId: string): Promise<SchemaMetadata | null> {
   try {
     console.log('[flexUrlResolver] Fetching element metadata', { elementId });
@@ -268,21 +266,21 @@ async function fetchElementMetadata(elementId: string): Promise<SchemaMetadata |
     const data = await response.json() as Record<string, unknown>;
     const metadata: SchemaMetadata = {
       domainId:
-        extractFlexField(readRecordField(data, 'domainId')) ||
-        extractFlexField(readRecordField(data, 'domainID')),
+        extractFlexField(data['domainId']) ||
+        extractFlexField(data['domainID']),
       definitionId:
-        extractFlexField(readRecordField(data, 'elementDefinitionId')) ||
-        extractFlexField(readRecordField(data, 'definitionId')),
+        extractFlexField(data['elementDefinitionId']) ||
+        extractFlexField(data['definitionId']),
       viewHint:
-        extractFlexField(readRecordField(data, 'viewHint')) ||
-        extractFlexField(readRecordField(data, 'view_hint')),
-      schemaId: extractFlexField(readRecordField(data, 'schemaId')),
+        extractFlexField(data['viewHint']) ||
+        extractFlexField(data['view_hint']),
+      schemaId: extractFlexField(data['schemaId']),
       documentNumber:
-        extractFlexField(readRecordField(data, 'documentNumber')) ||
-        extractFlexField(readRecordField(data, 'document_number')),
+        extractFlexField(data['documentNumber']) ||
+        extractFlexField(data['document_number']),
       displayName:
-        extractFlexField(readRecordField(data, 'displayName')) ||
-        extractFlexField(readRecordField(data, 'name')),
+        extractFlexField(data['displayName']) ||
+        extractFlexField(data['name']),
     };
 
     console.log('[flexUrlResolver] Retrieved element metadata', {

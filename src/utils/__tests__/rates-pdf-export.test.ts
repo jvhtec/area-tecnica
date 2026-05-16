@@ -26,7 +26,7 @@ vi.mock('jspdf', () => ({
 }));
 
 vi.mock('jspdf-autotable', () => ({
-  default: vi.fn(),
+  autoTable: vi.fn(),
 }));
 
 vi.mock('date-fns', () => ({

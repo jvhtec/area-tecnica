@@ -130,7 +130,7 @@ const parseLocalFolderStructure = (value: unknown): LocalFolderStructureItem[] |
     }
   }
 
-  return parsed;
+  return parsed.length > 0 ? parsed : null;
 };
 
 export interface JobCardNewProps {

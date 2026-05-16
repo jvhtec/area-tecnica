@@ -5,6 +5,15 @@ import type { Database } from '@/integrations/supabase/types';
 
 type TourJobRateQuoteRow = Database['public']['Views']['v_tour_job_rate_quotes_2025']['Row'];
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const normalizeExtras = (value: TourJobRateQuoteRow['extras']): TourJobRateQuote['extras'] | undefined =>
+  isRecord(value) ? value as TourJobRateQuote['extras'] : undefined;
+
+const normalizeBreakdown = (value: TourJobRateQuoteRow['breakdown']): TourJobRateQuote['breakdown'] =>
+  isRecord(value) ? value as TourJobRateQuote['breakdown'] : {};
+
 const normalizeTourJobRateQuote = (item: TourJobRateQuoteRow): TourJobRateQuote => ({
   job_id: item.job_id ?? '',
   technician_id: item.technician_id ?? '',
@@ -23,12 +32,12 @@ const normalizeTourJobRateQuote = (item: TourJobRateQuoteRow): TourJobRateQuote 
   iso_year: item.iso_year,
   iso_week: item.iso_week,
   total_eur: item.total_eur ?? 0,
-  extras: item.extras as unknown as TourJobRateQuote['extras'],
+  extras: normalizeExtras(item.extras),
   extras_total_eur: item.extras_total_eur ?? undefined,
   total_with_extras_eur: item.total_with_extras_eur ?? undefined,
   vehicle_disclaimer: item.vehicle_disclaimer ?? undefined,
   vehicle_disclaimer_text: item.vehicle_disclaimer_text ?? undefined,
-  breakdown: item.breakdown as unknown as TourJobRateQuote['breakdown'],
+  breakdown: normalizeBreakdown(item.breakdown),
   autonomo_discount_eur: item.autonomo_discount_eur ?? undefined,
   has_override: item.has_override ?? undefined,
   override_amount_eur: item.override_amount_eur ?? undefined,

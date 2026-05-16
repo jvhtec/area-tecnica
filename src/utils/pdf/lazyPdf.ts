@@ -14,7 +14,7 @@ export async function loadJsPDF() {
 export async function loadAutoTable(): Promise<AutoTableFn> {
   autoTablePromise ??= import('jspdf-autotable');
   const mod = await autoTablePromise;
-  return (mod.default ?? mod.autoTable) as AutoTableFn;
+  return mod.autoTable as AutoTableFn;
 }
 
 export async function loadPdfLibs() {

@@ -48,6 +48,7 @@ import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
+import { fromZonedTime } from "date-fns-tz";
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 import { isDepartmentManagementRole, isManagementRole } from '@/utils/permissions';
@@ -234,7 +235,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           return type !== 'off' && type !== 'travel';
         })
         .map((dt) => {
-          const d = new Date(`${dt.date}T00:00:00`);
+          const d = fromZonedTime(`${dt.date}T00:00:00`, 'Europe/Madrid');
           d.setHours(0, 0, 0, 0);
           return d;
         })

@@ -164,7 +164,7 @@ export const fetchMatrixTimesheetAssignments = async ({
     ...assignmentPromises,
   ]);
 
-  const assignmentMap = new Map<string, any>();
+  const assignmentMap = new Map<string, AssignmentMetadataRow>();
   // Process all assignment batch results
   for (const result of assignmentResults) {
     if (result.error) {
@@ -425,8 +425,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
           }
         });
       } catch (e: unknown) {
-        const code = getErrorCode(e);
-        if (code && code !== '42P01') throw e;
+        if (getErrorCode(e) !== '42P01') throw e;
       }
 
       return Array.from(perDay.values());

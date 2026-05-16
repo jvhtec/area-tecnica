@@ -1,5 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
-import { EventData, TravelArrangement, Accommodation, RoomAssignment } from '../core/pdf-types';
+import { EventData, TravelArrangement, Accommodation, RoomAssignment } from '@/utils/hoja-de-ruta/pdf/core/pdf-types';
 import { EventSection } from './event';
 import { VenueSection } from './venue';
 import { ContactsSection } from './contacts';

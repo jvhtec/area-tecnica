@@ -22,6 +22,7 @@ import { format, addDays, subDays, isToday, isSameDay, isWithinInterval } from "
 import { cn } from "@/lib/utils";
 import { TechContextMenu } from "./TechContextMenu";
 import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
+import type { HouseTech } from "./hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 import { TechDetailModal } from "./TechDetailModal";
 import { Theme } from "@/components/technician/types";
@@ -304,7 +305,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   const visibleTechs = houseTechs.filter(tech => shouldShowTechOnDay(tech, currentDate));
   const offTotal = personnelTotals.techsOnVacation + personnelTotals.techsOnDaysOff + personnelTotals.techsTravelling + personnelTotals.techsSick;
 
-  const getStatusMeta = (tech: any): {
+  const getStatusMeta = (tech: HouseTech): {
     key: string;
     label: string;
     badgeClass: string;

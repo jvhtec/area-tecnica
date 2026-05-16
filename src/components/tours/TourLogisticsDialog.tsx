@@ -144,7 +144,8 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
           const { error: uErr } = await supabase.from('transport_requests').update(payload).eq('id', requestId)
           if (uErr) throw uErr
           // replace items
-          await supabase.from('transport_request_items').delete().eq('request_id', requestId)
+          const { error: dErr } = await supabase.from('transport_request_items').delete().eq('request_id', requestId)
+          if (dErr) throw dErr
           const toInsert = items.filter(it => !!it.transport_type).map(it => ({
             request_id: requestId!,
             transport_type: it.transport_type,
