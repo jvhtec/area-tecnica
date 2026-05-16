@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Copy, Pencil, Trash2, Calculator } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast';
 import { PresetEditor } from '@/components/equipment/PresetEditor';
 import { PresetItem, PresetWithItems, mapPresetWithItemsRow } from '@/types/equipment';
@@ -13,6 +13,8 @@ import { Department } from '@/types/equipment';
 import { DepartmentProvider } from '@/contexts/DepartmentContext';
 import { AmplifierTool } from '@/components/sound/AmplifierTool';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -30,10 +32,9 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
   const [showCalculator, setShowCalculator] = useState(false);
 
   const { data: presets = [] } = useQuery({
-    queryKey: ['tour-presets', tourId, department],
+    queryKey: queryKeys.scope('tour-presets', tourId, department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('presets')
+      const { data, error } = await dataLayerClient.from('presets')
         .select(`
           *,
           items:preset_items (
@@ -52,20 +53,18 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
 
   const deletePresetMutation = useMutation({
     mutationFn: async (presetId: string) => {
-      const { error: itemsError } = await supabase
-        .from('preset_items')
+      const { error: itemsError } = await dataLayerClient.from('preset_items')
         .delete()
         .eq('preset_id', presetId);
       if (itemsError) throw itemsError;
 
-      const { error: presetError } = await supabase
-        .from('presets')
+      const { error: presetError } = await dataLayerClient.from('presets')
         .delete()
         .eq('id', presetId);
       if (presetError) throw presetError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-presets', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-presets', tourId) });
       toast({ title: 'Éxito', description: 'Preset eliminado' });
     },
     onError: (e: any) => {
@@ -76,41 +75,36 @@ export function TourPresetManagerDialog({ open, onOpenChange, tourId }: Props) {
   const handleSavePreset = async (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[], fixedTourId?: string | null) => {
     try {
       if (editingPreset) {
-        const { error: presetError } = await supabase
-          .from('presets')
+        const { error: presetError } = await dataLayerClient.from('presets')
           .update({ name })
           .eq('id', editingPreset.id);
         if (presetError) throw presetError;
 
-        const { error: delError } = await supabase
-          .from('preset_items')
+        const { error: delError } = await dataLayerClient.from('preset_items')
           .delete()
           .eq('preset_id', editingPreset.id);
         if (delError) throw delError;
 
         if (items.length > 0) {
-          const { error: itemsError } = await supabase
-            .from('preset_items')
+          const { error: itemsError } = await dataLayerClient.from('preset_items')
             .insert(items.map(i => ({ ...i, preset_id: editingPreset.id })));
           if (itemsError) throw itemsError;
         }
       } else {
-        const { data: created, error: createErr } = await supabase
-          .from('presets')
+        const { data: created, error: createErr } = await dataLayerClient.from('presets')
           .insert({ name, department, tour_id: tourId })
           .select()
           .single();
         if (createErr) throw createErr;
 
         if (items.length > 0) {
-          const { error: itemsError } = await supabase
-            .from('preset_items')
+          const { error: itemsError } = await dataLayerClient.from('preset_items')
             .insert(items.map(i => ({ ...i, preset_id: created.id })));
           if (itemsError) throw itemsError;
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['tour-presets', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-presets', tourId) });
       setEditingPreset(null);
       setCopyingPreset(null);
       setIsCreating(false);

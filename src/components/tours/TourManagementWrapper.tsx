@@ -1,12 +1,14 @@
 
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import TourManagement from "@/pages/TourManagement";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const TourManagementWrapper = () => {
   const { tourId } = useParams();
   const { user } = useOptimizedAuth();
@@ -16,12 +18,11 @@ export const TourManagementWrapper = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["tour", tourId],
+    queryKey: queryKeys.scope("tour", tourId),
     queryFn: async () => {
       if (!tourId) throw new Error("Tour ID is required");
 
-      const { data, error } = await supabase
-        .from("tours")
+      const { data, error } = await dataLayerClient.from("tours")
         .select(`
           *,
           tour_dates (
@@ -35,8 +36,7 @@ export const TourManagementWrapper = () => {
       if (error) throw error;
       if (!data) throw new Error("Tour not found");
 
-      const { data: jobData, error: jobError } = await supabase
-        .from("jobs")
+      const { data: jobData, error: jobError } = await dataLayerClient.from("jobs")
         .select("id")
         .eq("tour_id", tourId)
         .eq("job_type", "tour")

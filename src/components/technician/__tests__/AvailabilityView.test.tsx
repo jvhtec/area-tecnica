@@ -22,6 +22,8 @@ vi.mock("@/lib/supabase", () => ({
 
 import { AvailabilityView } from "../AvailabilityView";
 
+
+import { queryKeys } from "@/lib/react-query";
 const theme = {
   bg: "bg-slate-950",
   nav: "bg-slate-900",
@@ -118,7 +120,7 @@ describe("AvailabilityView", () => {
       );
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["my-unavailability"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.scope("my-unavailability") });
   });
 
   it("renders month-scoped blocks using string date comparisons", async () => {

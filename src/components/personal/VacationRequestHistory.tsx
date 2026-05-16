@@ -9,7 +9,7 @@ import { History, CheckCircle, XCircle, Clock, Download, Send, CalendarDays, Che
 import { Button } from "@/components/ui/button";
 import { downloadVacationRequestPDF } from "@/utils/vacationRequestPdfExport";
 import type { VacationRequest } from "@/lib/vacation-requests";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Theme } from "@/components/technician/types";
@@ -33,10 +33,10 @@ export const VacationRequestHistory: React.FC<VacationRequestHistoryProps> = ({ 
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await dataLayerClient.auth.getUser();
       let role: string | null = (user?.app_metadata as any)?.role || (user?.user_metadata as any)?.role || null;
       if (!role && user?.id) {
-        const { data: prof } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
+        const { data: prof } = await dataLayerClient.from('profiles').select('role').eq('id', user.id).maybeSingle();
         role = prof?.role ?? null;
       }
       if (!cancelled) setIsManager(isManagementRole(role));
@@ -55,7 +55,7 @@ export const VacationRequestHistory: React.FC<VacationRequestHistoryProps> = ({ 
   const handleResendEmail = async (request: VacationRequest) => {
     try {
       setSendingIds(prev => [...prev, request.id]);
-      const { error } = await supabase.functions.invoke('send-vacation-decision', {
+      const { error } = await dataLayerClient.functions.invoke('send-vacation-decision', {
         body: { request_id: request.id }
       });
       if (error) throw error;

@@ -27,6 +27,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: mockSupabase,
+}));
+
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: toastMock }),
 }));

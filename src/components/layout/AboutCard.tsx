@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Info, Edit3, Save, X, Clock, Plus, Trash2, Bell } from "lucide-react"
-import { supabase } from "@/lib/supabase"
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast"
 import { getChangelogVersionAutofill } from "@/lib/changelog-version"
 import { isAdminRole, isManagementRole } from "@/utils/permissions"
@@ -111,8 +111,7 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
   useEffect(() => {
     const load = async () => {
       try {
-        const { data, error } = await supabase
-          .from('app_changelog')
+        const { data, error } = await dataLayerClient.from('app_changelog')
           .select('id, version, entry_date, content, last_updated')
           .order('entry_date', { ascending: false })
           .order('last_updated', { ascending: false })
@@ -173,8 +172,7 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
         toast({ title: 'Invalid date', description: 'Use format YYYY-MM-DD', variant: 'destructive' })
         return
       }
-      const { data, error } = await supabase
-        .from('app_changelog')
+      const { data, error } = await dataLayerClient.from('app_changelog')
         .update({ content: editContent, version: editVersion || defaultVersion, entry_date: dateStr })
         .eq('id', editingEntry)
         .select('id, version, entry_date, content, last_updated')
@@ -189,7 +187,7 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
 
         // Send push notification about changelog update if broadcast is enabled
         if (sendBroadcast) {
-          void supabase.functions.invoke('push', {
+          void dataLayerClient.functions.invoke('push', {
             body: {
               action: 'broadcast',
               type: 'changelog.updated',
@@ -215,8 +213,7 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
     const proceed = window.confirm('Delete this changelog entry?')
     if (!proceed) return
     try {
-      const { error } = await supabase
-        .from('app_changelog')
+      const { error } = await dataLayerClient.from('app_changelog')
         .delete()
         .eq('id', id)
       if (error) throw error
@@ -237,8 +234,7 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
     try {
       const today = new Date()
       const yyyy_mm_dd = today.toISOString().slice(0,10)
-      const { data: latest, error: latestError } = await supabase
-        .from('app_changelog')
+      const { data: latest, error: latestError } = await dataLayerClient.from('app_changelog')
         .select('version')
         .order('entry_date', { ascending: false })
         .order('last_updated', { ascending: false })
@@ -247,8 +243,7 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
       if (latestError) throw latestError
 
       const ver = getChangelogVersionAutofill(latest?.version, '1.0.0')
-      const { data, error } = await supabase
-        .from('app_changelog')
+      const { data, error } = await dataLayerClient.from('app_changelog')
         .insert({ version: ver, entry_date: yyyy_mm_dd, content: '' })
         .select('id, version, entry_date, content, last_updated')
         .maybeSingle()

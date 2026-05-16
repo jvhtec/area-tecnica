@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import {
   Hotel,
   Plus,
@@ -111,8 +111,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
   const loadAccommodations = async () => {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('tour_accommodations' as any)
+      const { data, error } = await dataLayerClient.from('tour_accommodations' as any)
         .select('*')
         .eq('tour_id', tourId)
         .order('check_in', { ascending: true });
@@ -135,7 +134,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
   const loadStaff = async () => {
     try {
       // Load staff members from profiles who are active
-      const result = await (supabase as any)
+      const result = await (dataLayerClient as any)
         .from('profiles')
         .select('id, full_name, role')
         .eq('is_active', true)
@@ -218,8 +217,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
 
       if (editingAccommodation) {
         // Update existing accommodation
-        const { error } = await supabase
-          .from('tour_accommodations' as any)
+        const { error } = await dataLayerClient.from('tour_accommodations' as any)
           .update(accommodationData)
           .eq('id', editingAccommodation.id);
 
@@ -231,8 +229,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
         });
       } else {
         // Create new accommodation
-        const { error } = await supabase
-          .from('tour_accommodations' as any)
+        const { error } = await dataLayerClient.from('tour_accommodations' as any)
           .insert([accommodationData]);
 
         if (error) throw error;
@@ -273,8 +270,7 @@ export const TourAccommodationsManager: React.FC<TourAccommodationsManagerProps>
     }
 
     try {
-      const { error } = await supabase
-        .from('tour_accommodations' as any)
+      const { error } = await dataLayerClient.from('tour_accommodations' as any)
         .delete()
         .eq('id', accommodationId);
 

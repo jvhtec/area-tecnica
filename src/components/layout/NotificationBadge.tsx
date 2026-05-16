@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { useAppBadgeSource } from "@/hooks/useAppBadgeSource"
-import { supabase } from "@/lib/supabase"
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { cn } from "@/lib/utils"
 import { isDepartmentManagementRole } from "@/utils/permissions"
 
@@ -39,8 +39,7 @@ export const NotificationBadge = ({
     try {
       setIsLoading(true)
 
-      let deptQuery = supabase
-        .from("messages")
+      let deptQuery = dataLayerClient.from("messages")
         .select("id", { count: "exact", head: true })
         .eq("status", "unread")
 
@@ -50,8 +49,7 @@ export const NotificationBadge = ({
         deptQuery = deptQuery.eq("sender_id", userId)
       }
 
-      const directQuery = supabase
-        .from("direct_messages")
+      const directQuery = dataLayerClient.from("direct_messages")
         .select("id", { count: "exact", head: true })
         .eq("recipient_id", userId)
         .eq("status", "unread")

@@ -9,9 +9,11 @@ import { Button } from '@/components/ui/button';
 import { useExpensePermissions, isPermissionActive } from '@/hooks/useExpensePermissions';
 import { useJobExpenses } from '@/hooks/useJobExpenses';
 import { ExpenseForm, ExpenseList, ExpenseSummaryCard } from '@/components/expenses';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { JobCardProps } from './types';
 
+
+import { queryKeys } from "@/lib/react-query";
 export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techName, onOpenObliqueStrategy }: JobCardProps) => {
     const jobData = job.jobs || job;
     const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
@@ -66,11 +68,10 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
     const shouldFetchArtistCountFallback = jobData?.artist_count == null && Boolean(jobData?.id);
 
     const { data: artistCountFallback = 0 } = useQuery({
-        queryKey: ['tech-job-artist-count-fallback', jobData?.id],
+        queryKey: queryKeys.scope('tech-job-artist-count-fallback', jobData?.id),
         queryFn: async () => {
             if (!jobData?.id) return 0;
-            const { count, error } = await supabase
-                .from('festival_artists')
+            const { count, error } = await dataLayerClient.from('festival_artists')
                 .select('id', { count: 'exact', head: true })
                 .eq('job_id', jobData.id);
 

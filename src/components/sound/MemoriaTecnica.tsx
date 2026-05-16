@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Upload, File, FilePlus, FileCheck, Loader2, Image as ImageIcon, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -127,12 +127,12 @@ export const MemoriaTecnica = () => {
     let lastErr: Error | null = null;
     for (const bucket of STORAGE_BUCKET_CANDIDATES) {
       try {
-        const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await dataLayerClient.storage
           .from(bucket)
           .upload(safePath, file, { upsert: true });
         if (uploadError) throw uploadError;
 
-        const { data: signedUrlData, error: signUrlError } = await supabase.storage
+        const { data: signedUrlData, error: signUrlError } = await dataLayerClient.storage
           .from(bucket)
           .createSignedUrl(safePath, 3600);
         if (signUrlError) throw signUrlError;
@@ -219,7 +219,7 @@ export const MemoriaTecnica = () => {
 
       setProgress(60);
 
-      const response = await supabase.functions.invoke('generate-memoria-tecnica', {
+      const response = await dataLayerClient.functions.invoke('generate-memoria-tecnica', {
         body: { documentUrls, projectName, logoUrl, expiresIn: 3600 }
       });
 
@@ -230,8 +230,7 @@ export const MemoriaTecnica = () => {
 
       setProgress(80);
 
-      const { error: dbError } = await supabase
-        .from('memoria_tecnica_documents')
+      const { error: dbError } = await dataLayerClient.from('memoria_tecnica_documents')
         .insert({
           project_name: projectName,
           logo_url: logoUrl,

@@ -1,5 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 export interface CreateLaborPORequest {
   name: string;
   plannedStartDate: string;
@@ -104,8 +103,7 @@ let cachedToken: string | null = null;
 const getAuthToken = async () => {
   if (cachedToken) return cachedToken;
   
-  const { data: { X_AUTH_TOKEN }, error } = await supabase
-    .functions.invoke('get-secret', {
+  const { data: { X_AUTH_TOKEN }, error } = await dataLayerClient.functions.invoke('get-secret', {
       body: { secretName: 'X_AUTH_TOKEN' }
     });
     

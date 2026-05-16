@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
@@ -22,6 +22,8 @@ import type { TourDocument } from '@/hooks/useTourDocuments';
 import type { Restaurant, WeatherData } from '@/types/hoja-de-ruta';
 import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from '@/types/job';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface DetailsModalProps {
     theme: Theme;
     isDark: boolean;
@@ -144,11 +146,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch full job details with location
     const { data: jobDetails, isLoading: jobDetailsLoading } = useQuery({
-        queryKey: ['job-details-modal', job?.id],
+        queryKey: queryKeys.scope('job-details-modal', job?.id),
         queryFn: async () => {
             if (!job?.id) return null;
-            const { data, error } = await supabase
-                .from('jobs')
+            const { data, error } = await dataLayerClient.from('jobs')
                 .select(`
           *,
           locations(id, name, formatted_address, latitude, longitude)
@@ -167,11 +168,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch staff assignments for this job
     const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({
-        queryKey: ['job-staff', job?.id],
+        queryKey: queryKeys.scope('job-staff', job?.id),
         queryFn: async () => {
             if (!job?.id) return [];
-            const { data, error } = await supabase
-                .from('job_assignments')
+            const { data, error } = await dataLayerClient.from('job_assignments')
                 .select(`
           sound_role,
           lights_role,
@@ -181,18 +181,22 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                 .eq('job_id', job.id)
                 .eq('status', 'confirmed');
             if (error) throw error;
-            return data || [];
+            return ((data || []) as unknown as StaffAssignment[]).map((assignment) => ({
+                ...assignment,
+                technician: Array.isArray(assignment.technician)
+                    ? assignment.technician[0] ?? undefined
+                    : assignment.technician ?? undefined,
+            }));
         },
         enabled: !!job?.id,
     });
 
     // Fetch technician's assigned dates from timesheets
     const { data: assignedDates = [], isLoading: assignedDatesLoading } = useQuery({
-        queryKey: ['tech-assigned-dates', job?.id, user?.id],
+        queryKey: queryKeys.scope('tech-assigned-dates', job?.id, user?.id),
         queryFn: async () => {
             if (!job?.id || !user?.id) return [];
-            const { data, error } = await supabase
-                .from('timesheets')
+            const { data, error } = await dataLayerClient.from('timesheets')
                 .select('date')
                 .eq('job_id', job.id)
                 .eq('technician_id', user.id)
@@ -206,11 +210,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch stage names (if this job has festival stages configured)
     const { data: festivalStages = [] } = useQuery({
-        queryKey: ['technician-job-festival-stages', job?.id],
+        queryKey: queryKeys.scope('technician-job-festival-stages', job?.id),
         queryFn: async () => {
             if (!job?.id) return [];
-            const { data, error } = await supabase
-                .from('festival_stages')
+            const { data, error } = await dataLayerClient.from('festival_stages')
                 .select('number, name')
                 .eq('job_id', job.id);
             if (error) throw error;
@@ -221,12 +224,11 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch this technician's shift assignments for the job (used to enrich Info tab)
     const { data: techShiftAssignments = [], isLoading: techShiftAssignmentsLoading } = useQuery({
-        queryKey: ['technician-job-shift-assignments', job?.id, user?.id],
+        queryKey: queryKeys.scope('technician-job-shift-assignments', job?.id, user?.id),
         queryFn: async () => {
             if (!job?.id || !user?.id) return [];
 
-            const { data: shifts, error: shiftsError } = await supabase
-                .from('festival_shifts')
+            const { data: shifts, error: shiftsError } = await dataLayerClient.from('festival_shifts')
                 .select('id, job_id, date, name, start_time, end_time, stage, department')
                 .eq('job_id', job.id);
 
@@ -235,8 +237,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
             const shiftIds = (shifts || []).map((shift) => shift.id);
             if (shiftIds.length === 0) return [];
 
-            const { data: assignments, error: assignmentsError } = await supabase
-                .from('festival_shift_assignments')
+            const { data: assignments, error: assignmentsError } = await dataLayerClient.from('festival_shift_assignments')
                 .select('id, role, shift_id')
                 .eq('technician_id', user.id)
                 .in('shift_id', shiftIds);
@@ -263,11 +264,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch job date types for this job
     const { data: jobDateTypes = [], isLoading: jobDateTypesLoading } = useQuery({
-        queryKey: ['job-date-types', job?.id],
+        queryKey: queryKeys.scope('job-date-types', job?.id),
         queryFn: async () => {
             if (!job?.id) return [];
-            const { data, error } = await supabase
-                .from('job_date_types')
+            const { data, error } = await dataLayerClient.from('job_date_types')
                 .select('date, type')
                 .eq('job_id', job.id);
             if (error) throw error;
@@ -278,11 +278,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch tour documents (visible to technicians) when the job belongs to a tour
     const { data: tourDocuments = [], isLoading: tourDocumentsLoading } = useQuery({
-        queryKey: ['tour-documents-for-job', tourId],
+        queryKey: queryKeys.scope('tour-documents-for-job', tourId),
         queryFn: async () => {
             if (!tourId) return [];
-            const { data, error } = await supabase
-                .from('tour_documents')
+            const { data, error } = await dataLayerClient.from('tour_documents')
                 .select('id, file_name, file_path, uploaded_at, file_type')
                 .eq('tour_id', tourId)
                 .eq('visible_to_tech', true)
@@ -295,11 +294,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch artists linked to this job, then their rider files
     const { data: jobArtists = [], isLoading: isArtistsLoading, error: jobArtistsError } = useQuery({
-        queryKey: ['technician-job-artists', job?.id],
+        queryKey: queryKeys.scope('technician-job-artists', job?.id),
         queryFn: async () => {
             if (!job?.id) return [];
-            const { data, error } = await supabase
-                .from('festival_artists')
+            const { data, error } = await dataLayerClient.from('festival_artists')
                 .select('id, name, stage')
                 .eq('job_id', job.id);
             if (error) throw error;
@@ -313,11 +311,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
     const artistStageMap = useMemo(() => new Map(jobArtists.map((artist) => [artist.id, artist.stage])), [jobArtists]);
 
     const { data: riderFiles = [], isLoading: isRidersLoading, error: riderFilesError } = useQuery({
-        queryKey: ['technician-job-rider-files', job?.id, artistIdList],
+        queryKey: queryKeys.scope('technician-job-rider-files', job?.id, artistIdList),
         queryFn: async () => {
             if (artistIdList.length === 0) return [];
-            const { data, error } = await supabase
-                .from('festival_artist_files')
+            const { data, error } = await dataLayerClient.from('festival_artist_files')
                 .select('id, file_name, file_path, uploaded_at, artist_id')
                 .in('artist_id', artistIdList)
                 .order('uploaded_at', { ascending: false });
@@ -329,11 +326,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch hoja de ruta metadata (if linked to this job)
     const { data: hojaDeRutaMeta, isLoading: hojaDeRutaLoading } = useQuery({
-        queryKey: ['technician-hoja-de-ruta-meta', job?.id],
+        queryKey: queryKeys.scope('technician-hoja-de-ruta-meta', job?.id),
         queryFn: async () => {
             if (!job?.id) return null;
-            const { data, error } = await supabase
-                .from('hoja_de_ruta')
+            const { data, error } = await dataLayerClient.from('hoja_de_ruta')
                 .select('id')
                 .eq('job_id', job.id)
                 .maybeSingle();
@@ -352,11 +348,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch accommodations + rooming from hoja de ruta
     const { data: hojaAccommodations = [], isLoading: hojaAccommodationsLoading } = useQuery({
-        queryKey: ['technician-hoja-accommodations', hojaDeRutaId],
+        queryKey: queryKeys.scope('technician-hoja-accommodations', hojaDeRutaId),
         queryFn: async () => {
             if (!hojaDeRutaId) return [];
-            const { data, error } = await supabase
-                .from('hoja_de_ruta_accommodations')
+            const { data, error } = await dataLayerClient.from('hoja_de_ruta_accommodations')
                 .select(`
                     id,
                     hotel_name,
@@ -386,11 +381,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch travel arrangements from hoja de ruta
     const { data: hojaTravelArrangements = [], isLoading: hojaTravelLoading } = useQuery({
-        queryKey: ['technician-hoja-travel-arrangements', hojaDeRutaId],
+        queryKey: queryKeys.scope('technician-hoja-travel-arrangements', hojaDeRutaId),
         queryFn: async () => {
             if (!hojaDeRutaId) return [];
-            const { data, error } = await supabase
-                .from('hoja_de_ruta_travel_arrangements')
+            const { data, error } = await dataLayerClient.from('hoja_de_ruta_travel_arrangements')
                 .select(`
                     id,
                     transportation_type,
@@ -419,11 +413,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch logistics transport from hoja de ruta
     const { data: hojaTransportEntries = [], isLoading: hojaTransportLoading } = useQuery({
-        queryKey: ['technician-hoja-logistics-transport', hojaDeRutaId],
+        queryKey: queryKeys.scope('technician-hoja-logistics-transport', hojaDeRutaId),
         queryFn: async () => {
             if (!hojaDeRutaId) return [];
-            const { data, error } = await supabase
-                .from('hoja_de_ruta_transport')
+            const { data, error } = await dataLayerClient.from('hoja_de_ruta_transport')
                 .select(`
                     id,
                     transport_type,
@@ -452,7 +445,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
     // Fetch nearby restaurants using Google Places API
     const { data: restaurants = [], isLoading: isRestaurantsLoading } = useQuery({
-        queryKey: ['job-restaurants-modal', job?.id, jobDetails?.locations?.formatted_address],
+        queryKey: queryKeys.scope('job-restaurants-modal', job?.id, jobDetails?.locations?.formatted_address),
         queryFn: async () => {
             const locationData = jobDetails?.locations;
             const address = locationData?.formatted_address || locationData?.name;
@@ -518,7 +511,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
 
                 setIsMapLoading(true);
 
-                const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+                const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
                 if (error || !data?.apiKey) {
                     setMapPreviewUrl(null);
                     setIsMapLoading(false);
@@ -556,7 +549,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         const docId = doc.id;
         setDocumentLoading(prev => new Set(prev).add(docId));
         try {
-            const url = await createSignedUrl(supabase, doc.file_path, 60);
+            const url = await createSignedUrl(dataLayerClient, doc.file_path, 60);
             window.open(url, '_blank');
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Error desconocido';
@@ -570,7 +563,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         const docId = doc.id;
         setDocumentLoading(prev => new Set(prev).add(docId));
         try {
-            const url = await createSignedUrl(supabase, doc.file_path, 60);
+            const url = await createSignedUrl(dataLayerClient, doc.file_path, 60);
             const link = document.createElement('a');
             link.href = url;
             link.download = doc.file_name;
@@ -589,7 +582,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         const key = `tour:${doc.id}`;
         setDocumentLoading(prev => new Set(prev).add(key));
         try {
-            const { data, error } = await supabase.storage
+            const { data, error } = await dataLayerClient.storage
                 .from('tour-documents')
                 .createSignedUrl(doc.file_path, 60);
             if (error || !data?.signedUrl) {
@@ -608,7 +601,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         const key = `tour:${doc.id}`;
         setDocumentLoading(prev => new Set(prev).add(key));
         try {
-            const { data, error } = await supabase.storage
+            const { data, error } = await dataLayerClient.storage
                 .from('tour-documents')
                 .createSignedUrl(doc.file_path, 60);
             if (error || !data?.signedUrl) {
@@ -632,7 +625,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         const key = `rider:${file.id}`;
         setDocumentLoading(prev => new Set(prev).add(key));
         try {
-            const { data, error } = await supabase.storage
+            const { data, error } = await dataLayerClient.storage
                 .from('festival_artist_files')
                 .createSignedUrl(file.file_path, 60);
             if (error || !data?.signedUrl) {
@@ -651,7 +644,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
         const key = `rider:${file.id}`;
         setDocumentLoading(prev => new Set(prev).add(key));
         try {
-            const { data, error } = await supabase.storage
+            const { data, error } = await dataLayerClient.storage
                 .from('festival_artist_files')
                 .download(file.file_path);
             if (error || !data) {
@@ -822,11 +815,10 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
     );
 
     const { data: roomOccupantProfiles = [], isLoading: roomOccupantsLoading } = useQuery({
-        queryKey: ['technician-hoja-room-occupants', roomStaffProfileIds],
+        queryKey: queryKeys.scope('technician-hoja-room-occupants', roomStaffProfileIds),
         queryFn: async () => {
             if (roomStaffProfileIds.length === 0) return [];
-            const { data, error } = await supabase
-                .from('profiles')
+            const { data, error } = await dataLayerClient.from('profiles')
                 .select('id, first_name, last_name, nickname')
                 .in('id', roomStaffProfileIds);
 
@@ -1775,7 +1767,7 @@ export const DetailsModal = ({ theme, isDark, job, onClose }: DetailsModalProps)
                                                 tourId={tourId}
                                                 onSuccess={() => {
                                                     setIsUploadingTourDocument(false);
-                                                    queryClient.invalidateQueries({ queryKey: ['tour-documents-for-job', tourId] });
+                                                    queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents-for-job', tourId) });
                                                 }}
                                                 onCancel={() => setIsUploadingTourDocument(false)}
                                             />

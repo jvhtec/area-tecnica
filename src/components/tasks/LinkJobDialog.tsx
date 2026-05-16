@@ -6,10 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Combobox } from '@/components/ui/combobox';
 import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useQuery } from '@tanstack/react-query';
 import { getErrorMessage } from '@/utils/errorMessage';
 
+
+import { queryKeys } from "@/lib/react-query";
 type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 
 interface LinkJobDialogProps {
@@ -46,10 +48,9 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
   }, [open, currentJobId, currentTourId]);
 
   const { data: jobItems } = useQuery({
-    queryKey: ['jobs-for-linking'],
+    queryKey: queryKeys.scope('jobs-for-linking'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('id, title')
         .in('status', ['Tentativa', 'Confirmado'])
         .order('start_time', { ascending: false })
@@ -60,10 +61,9 @@ export const LinkJobDialog: React.FC<LinkJobDialogProps> = ({
   });
 
   const { data: tourItems } = useQuery({
-    queryKey: ['tours-for-linking'],
+    queryKey: queryKeys.scope('tours-for-linking'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('tours')
+      const { data, error } = await dataLayerClient.from('tours')
         .select('id, name')
         .order('created_at', { ascending: false })
         .limit(200);

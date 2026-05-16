@@ -10,13 +10,52 @@ import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSani
 import { memo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { TourManagementDialog } from "./TourManagementDialog";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { createTourRootFolders, createTourDateFolders, createTourRootFoldersManual } from "@/utils/tourFolders";
 import { useQueryClient } from "@tanstack/react-query";
 import { canUseCustomFolderStructure } from "@/utils/permissions";
+
+
+import { queryKeys } from "@/lib/react-query";
+
+type TourFolderConfig = string | {
+  name: string;
+  subfolders?: string[];
+};
+
+const normalizeTourFolderStructure = (value: unknown): TourFolderConfig[] | null => {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const folders = value.flatMap((folder): TourFolderConfig[] => {
+    if (typeof folder === 'string') {
+      return [folder];
+    }
+
+    if (!folder || typeof folder !== 'object' || Array.isArray(folder) || !('name' in folder)) {
+      return [];
+    }
+
+    const name = (folder as { name?: unknown }).name;
+    if (typeof name !== 'string') {
+      return [];
+    }
+
+    const subfolders = (folder as { subfolders?: unknown }).subfolders;
+    return [{
+      name,
+      subfolders: Array.isArray(subfolders)
+        ? subfolders.filter((subfolder): subfolder is string => typeof subfolder === 'string')
+        : [],
+    }];
+  });
+
+  return folders.length > 0 ? folders : null;
+};
 
 // File System Access API types
 declare global {
@@ -48,8 +87,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
     const fetchTourLogo = async () => {
       if (!tour.id) return;
 
-      const { data, error } = await supabase
-        .from('tour_logos')
+      const { data, error } = await dataLayerClient.from('tour_logos')
         .select('file_path')
         .eq('tour_id', tour.id)
         .maybeSingle();
@@ -57,8 +95,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
       if (!error && data?.file_path) {
         try {
           // Try signed URL first
-          const { data: signedUrlData } = await supabase
-            .storage
+          const { data: signedUrlData } = await dataLayerClient.storage
             .from('tour-logos')
             .createSignedUrl(data.file_path, 60 * 60); // 1 hour expiry
 
@@ -66,8 +103,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
             setLogoUrl(signedUrlData.signedUrl);
           } else {
             // Fallback to public URL
-            const { data: publicUrlData } = supabase
-              .storage
+            const { data: publicUrlData } = dataLayerClient.storage
               .from('tour-logos')
               .getPublicUrl(data.file_path);
 
@@ -77,8 +113,7 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
           }
         } catch (e) {
           // Fallback to public URL on error
-          const { data: publicUrlData } = supabase
-            .storage
+          const { data: publicUrlData } = dataLayerClient.storage
             .from('tour-logos')
             .getPublicUrl(data.file_path);
 
@@ -235,19 +270,18 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
       const rootDirHandle = await baseDirHandle.getDirectoryHandle(rootFolderName, { create: true });
 
       // Get current user's custom folder structure or use default
-      const { data: { user } } = await supabase.auth.getUser();
-      let folderStructure = null;
+      const { data: { user } } = await dataLayerClient.auth.getUser();
+      let folderStructure: TourFolderConfig[] | null = null;
 
       if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
+        const { data: profile } = await dataLayerClient.from('profiles')
           .select('custom_tour_folder_structure, role')
           .eq('id', user.id)
           .single();
 
         // Only use custom tour structure for management users
         if (profile && canUseCustomFolderStructure(profile.role) && profile.custom_tour_folder_structure) {
-          folderStructure = profile.custom_tour_folder_structure;
+          folderStructure = normalizeTourFolderStructure(profile.custom_tour_folder_structure);
         }
       }
 
@@ -411,16 +445,15 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
     const actionWord = newStatus === 'cancelled' ? 'cancel' : 'reactivate';
 
     try {
-      const { error } = await supabase
-        .from('tours')
+      const { error } = await dataLayerClient.from('tours')
         .update({ status: newStatus })
         .eq('id', tour.id);
 
       if (error) throw error;
 
       // Invalidate queries to refresh the UI
-      await queryClient.invalidateQueries({ queryKey: ['tours'] });
-      await queryClient.invalidateQueries({ queryKey: ['tour', tour.id] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope('tours') });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour', tour.id) });
 
       toast({
         title: "Success",

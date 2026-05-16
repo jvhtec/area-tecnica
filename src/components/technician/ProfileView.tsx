@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,8 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { ProfilePictureUpload } from '@/components/profile/ProfilePictureUpload';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/api-config';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface ProfileUser {
     id: string;
     email?: string;
@@ -94,8 +96,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
     useEffect(() => {
         const load = async () => {
             try {
-                const { data, error } = await supabase
-                    .from('app_changelog')
+                const { data, error } = await dataLayerClient.from('app_changelog')
                     .select('version')
                     .order('entry_date', { ascending: false })
                     .order('last_updated', { ascending: false })
@@ -135,7 +136,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
     const deptLabel = deptLabels[userProfile?.department?.toLowerCase()] || userProfile?.department || '';
 
     const handleSignOut = async () => {
-        await supabase.auth.signOut();
+        await dataLayerClient.auth.signOut();
         navigate('/');
     };
 
@@ -154,7 +155,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
         setPasswordLoading(true);
         try {
             // First verify the current password
-            const { error: signInError } = await supabase.auth.signInWithPassword({
+            const { error: signInError } = await dataLayerClient.auth.signInWithPassword({
                 email: user?.email || '',
                 password: passwordForm.currentPassword,
             });
@@ -165,7 +166,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
             }
 
             // Update the password
-            const { error: updateError } = await supabase.auth.updateUser({
+            const { error: updateError } = await dataLayerClient.auth.updateUser({
                 password: passwordForm.newPassword
             });
 
@@ -189,7 +190,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
 
     // Handle calendar token generation/rotation
     const generateCalendarToken = async (): Promise<string> => {
-        const { data, error } = await supabase.rpc('rotate_my_calendar_ics_token');
+        const { data, error } = await dataLayerClient.rpc('rotate_my_calendar_ics_token');
         if (error) throw error;
         const newToken = data as string;
 
@@ -264,8 +265,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                 residencia,
                 bg_color: selectedColor,
             };
-            const { data, error } = await supabase
-                .from('profiles')
+            const { data, error } = await dataLayerClient.from('profiles')
                 .update(updateData)
                 .eq('id', user.id)
                 .select()
@@ -281,7 +281,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                 ...data,
             }));
             // Also invalidate to ensure consistency
-            queryClient.invalidateQueries({ queryKey: ['user-profile', user?.id] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('user-profile', user?.id) });
         },
         onError: (err: unknown) => {
             const message = err instanceof Error ? err.message : 'Error desconocido';

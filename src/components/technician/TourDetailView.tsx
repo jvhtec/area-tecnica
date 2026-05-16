@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Theme } from './types';
 import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface TourDateLocation {
     id: string;
     name: string;
@@ -53,10 +55,9 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
 
     // Fetch tour details with correct schema
     const { data: tourData, isLoading: tourLoading } = useQuery({
-        queryKey: ['tour-detail-tech', tourId],
+        queryKey: queryKeys.scope('tour-detail-tech', tourId),
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('tours')
+            const { data, error } = await dataLayerClient.from('tours')
                 .select(`
           id, name, description, color, status, start_date, end_date,
           tour_dates (
@@ -83,10 +84,9 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
 
     // Fetch recent tour documents (correct schema - no document_type column)
     const { data: tourDocs = [] } = useQuery({
-        queryKey: ['tour-docs-tech', tourId],
+        queryKey: queryKeys.scope('tour-docs-tech', tourId),
         queryFn: async () => {
-            const { data, error } = await supabase
-                .from('tour_documents')
+            const { data, error } = await dataLayerClient.from('tour_documents')
                 .select('id, file_name, file_path, uploaded_at, file_type')
                 .eq('tour_id', tourId)
                 .order('uploaded_at', { ascending: false })
@@ -117,7 +117,10 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
         );
     }
 
-    const tourDates: TourDate[] = (tourData.tour_dates as TourDate[]) || [];
+    const tourDates: TourDate[] = ((tourData.tour_dates || []) as unknown as TourDate[]).map((date) => ({
+        ...date,
+        location: Array.isArray(date.location) ? date.location[0] ?? null : date.location ?? null,
+    }));
     const now = new Date();
     const completedDates = tourDates.filter((d) => new Date(d.date) < now);
     const upcomingDates = tourDates
@@ -145,7 +148,7 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
     const handleDownloadDoc = async (doc: TourDocument) => {
         try {
             // Tour documents use the tour-documents bucket, not job-documents
-            const { data, error } = await supabase.storage
+            const { data, error } = await dataLayerClient.storage
                 .from('tour-documents')
                 .createSignedUrl(doc.file_path, 60);
             if (error || !data?.signedUrl) throw error || new Error('Failed to generate URL');

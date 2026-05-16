@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertTriangle, Bell, RefreshCw } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { createQueryKey } from "@/lib/optimized-react-query";
 
@@ -20,7 +20,7 @@ const DEPARTMENTS = [
 type DepartmentKey = (typeof DEPARTMENTS)[number]["key"];
 
 // Keep this copy aligned with the scheduler declared in:
-// supabase/migrations/20260223100000_auto_timesheet_reminders.sql
+// dataLayerClient/migrations/20260223100000_auto_timesheet_reminders.sql
 const AUTO_REMINDER_SCHEDULE_COPY =
   "Programado diariamente mediante pg_cron.";
 
@@ -33,8 +33,7 @@ interface DeptSetting {
 // ─── Data helpers ─────────────────────────────────────────────────────────────
 
 async function fetchSettings(): Promise<DeptSetting[]> {
-  const { data, error } = await supabase
-    .from("timesheet_reminder_settings")
+  const { data, error } = await dataLayerClient.from("timesheet_reminder_settings")
     .select("department, auto_reminders_enabled, reminder_frequency_days");
   if (error) throw error;
   return (data ?? []) as DeptSetting[];
@@ -43,16 +42,15 @@ async function fetchSettings(): Promise<DeptSetting[]> {
 async function updateDeptSetting(patch: Partial<DeptSetting> & { department: DepartmentKey }): Promise<void> {
   // Use upsert so the call is idempotent: inserts when the row is missing
   // (e.g. a new department added after the seed) and updates otherwise.
-  const { error } = await supabase
-    .from("timesheet_reminder_settings")
+  const { error } = await dataLayerClient.from("timesheet_reminder_settings")
     .upsert({ ...patch }, { onConflict: "department" });
   if (error) throw error;
 }
 
 async function triggerManualBatch(): Promise<{ sent: number; failed: number; skipped_dept: number }> {
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { session } } = await dataLayerClient.auth.getSession();
   if (!session) throw new Error("Sin sesión activa");
-  const { data, error } = await supabase.functions.invoke("auto-send-timesheet-reminders", {
+  const { data, error } = await dataLayerClient.functions.invoke("auto-send-timesheet-reminders", {
     body: { triggered_by: "manual" },
   });
   if (error) throw error;

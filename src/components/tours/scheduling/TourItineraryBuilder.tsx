@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import {
   Calendar,
   Clock,
@@ -88,8 +88,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
     setLoading(true);
     try {
       // First, try to find existing hoja de ruta for this tour date
-      const { data: existingHoja, error: fetchError } = await supabase
-        .from('hoja_de_ruta')
+      const { data: existingHoja, error: fetchError } = await dataLayerClient.from('hoja_de_ruta')
         .select('*')
         .eq('tour_date_id', selectedDateId)
         .maybeSingle();
@@ -130,8 +129,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
     setSaving(true);
     try {
       // Get the job associated with this tour date
-      const { data: job, error: jobError } = await supabase
-        .from('jobs')
+      const { data: job, error: jobError } = await dataLayerClient.from('jobs')
         .select('id')
         .eq('tour_date_id', selectedDateId)
         .maybeSingle();
@@ -150,16 +148,14 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
 
       if (hojaDeRuta?.id) {
         // Update existing
-        const { error: updateError } = await supabase
-          .from('hoja_de_ruta')
+        const { error: updateError } = await dataLayerClient.from('hoja_de_ruta')
           .update(hojaData)
           .eq('id', hojaDeRuta.id);
 
         if (updateError) throw updateError;
       } else {
         // Create new
-        const { data: newHoja, error: insertError } = await supabase
-          .from('hoja_de_ruta')
+        const { data: newHoja, error: insertError } = await dataLayerClient.from('hoja_de_ruta')
           .insert(hojaData)
           .select()
           .single();
@@ -193,8 +189,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
     try {
       const promises = sortedDates.map(async (date) => {
         // Check if hoja de ruta exists
-        const result = await supabase
-          .from('hoja_de_ruta')
+        const result = await dataLayerClient.from('hoja_de_ruta')
           .select('id')
           .eq('tour_date_id', date.id)
           .maybeSingle();
@@ -206,8 +201,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
         if (existing) return; // Skip if already exists
 
         // Get job
-        const { data: job, error: jobError } = await supabase
-          .from('jobs')
+        const { data: job, error: jobError } = await dataLayerClient.from('jobs')
           .select('id')
           .eq('tour_date_id', date.id)
           .maybeSingle();
@@ -215,8 +209,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
         if (jobError) throw jobError;
 
         // Create hoja de ruta with empty schedule
-        const { error: insertError } = await supabase
-          .from('hoja_de_ruta')
+        const { error: insertError } = await dataLayerClient.from('hoja_de_ruta')
           .insert({
             job_id: job?.id || null,
             tour_date_id: date.id,

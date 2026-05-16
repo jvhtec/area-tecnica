@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import {
@@ -44,10 +44,12 @@ import {
   TOUR_DATE_TYPE_OPTIONS,
 } from "@/constants/dateTypes";
 
+
+import { queryKeys } from "@/lib/react-query";
 type TourDateTableType = Exclude<DateType, "prep_day">;
 type DynamicSupabaseClient = { from: (table: string) => any };
 
-const dynamicSupabase = supabase as unknown as DynamicSupabaseClient;
+const dynamicSupabase = dataLayerClient as unknown as DynamicSupabaseClient;
 const fromDynamicTable = (table: string) => dynamicSupabase.from(table);
 const toTourDateTableType = (type: DateType): TourDateTableType =>
   type === "prep_day" ? "show" : type;
@@ -103,7 +105,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   useEffect(() => {
     if (open && tourId) {
       console.log('Dialog opened, refreshing tour data');
-      queryClient.invalidateQueries({ queryKey: ['tour', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour', tourId) });
     }
   }, [open, tourId, queryClient]);
 
@@ -125,12 +127,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const [editLocationDetails, setEditLocationDetails] = useState<LocationDetails | null>(null);
 
   const { data: foldersExistenceMap } = useQuery({
-    queryKey: ["flex-folders-existence", tourDateIds],
+    queryKey: queryKeys.scope("flex-folders-existence", tourDateIds),
     queryFn: async () => {
       if (!tourDates.length) return {};
 
-      const { data, error } = await supabase
-        .from("flex_folders")
+      const { data, error } = await dataLayerClient.from("flex_folders")
         .select("tour_date_id")
         .in("tour_date_id", tourDateIds);
 
@@ -168,8 +169,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         locationId = await getOrCreateLocation(location);
       }
       console.log("Location ID:", locationId);
-      const { data: newTourDate, error: tourDateError } = await supabase
-        .from("tour_dates")
+      const { data: newTourDate, error: tourDateError } = await dataLayerClient.from("tour_dates")
         .insert({
           tour_id: tourId,
           date: startDate, // Keep for backward compatibility
@@ -201,8 +201,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       console.log("Tour date created:", newTourDate);
 
       // ... keep existing code (job creation and department assignment)
-      const { data: tourData, error: tourError } = await supabase
-        .from("tours")
+      const { data: tourData, error: tourError } = await dataLayerClient.from("tours")
         .select(`
           name,
           color,
@@ -221,8 +220,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw tourError;
       }
 
-      const { data: newJob, error: jobError } = await supabase
-        .from("jobs")
+      const { data: newJob, error: jobError } = await dataLayerClient.from("jobs")
         .insert({
           title: buildTourDateJobTitle(tourData.name, location, tourDateType),
           start_time: `${startDate}T06:00:00`,
@@ -249,8 +247,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         job_id: newJob.id,
         department,
       }));
-      const { error: deptError } = await supabase
-        .from("job_departments")
+      const { error: deptError } = await dataLayerClient.from("job_departments")
         .insert(jobDepartments);
       if (deptError) {
         console.error("Error creating job departments:", deptError);
@@ -264,8 +261,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         type: tourDateType,
       }));
 
-      const { error: dateTypeError } = await supabase
-        .from("job_date_types")
+      const { error: dateTypeError } = await dataLayerClient.from("job_date_types")
         .insert(jobDateTypes);
       if (dateTypeError) {
         console.error("Error creating job date types:", dateTypeError);
@@ -278,12 +274,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
       // Force refresh all related queries after successful creation
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
-        queryClient.invalidateQueries({ queryKey: ["tours"] }),
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["job-assignments"] }),
-        queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour", tourId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-assignments") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-folders-existence") }),
       ]);
 
       toast({
@@ -323,8 +319,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         locationId = await getOrCreateLocation(newLocation);
       }
 
-      const { data: tourData, error: tourError } = await supabase
-        .from("tours")
+      const { data: tourData, error: tourError } = await dataLayerClient.from("tours")
         .select("name")
         .eq("id", tourId)
         .single();
@@ -334,8 +329,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw tourError;
       }
 
-      const { data: updatedDate, error: dateError } = await supabase
-        .from("tour_dates")
+      const { data: updatedDate, error: dateError } = await dataLayerClient.from("tour_dates")
         .update({
           date: startDate,
           start_date: startDate,
@@ -368,7 +362,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       // Send push notification if tour date type changed
       if (editingTourDate && editingTourDate.tour_date_type !== tourDateType) {
         try {
-          void supabase.functions.invoke('push', {
+          void dataLayerClient.functions.invoke('push', {
             body: {
               action: 'broadcast',
               type: `tourdate.type.changed.${tourDateType}`,
@@ -386,8 +380,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         }
       }
 
-      const { data: jobs, error: jobsError } = await supabase
-        .from("jobs")
+      const { data: jobs, error: jobsError } = await dataLayerClient.from("jobs")
         .update({
           title: buildTourDateJobTitle(tourData.name, newLocation, tourDateType),
           start_time: `${startDate}T06:00:00`,
@@ -408,8 +401,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       if (jobs && jobs.length > 0) {
         for (const job of jobs) {
           // Delete existing job date types for this job
-          await supabase
-            .from("job_date_types")
+          await dataLayerClient.from("job_date_types")
             .delete()
             .eq("job_id", job.id);
 
@@ -421,8 +413,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           }));
 
           if (jobDateTypes.length > 0) {
-            const { error: dateTypeError } = await supabase
-              .from("job_date_types")
+            const { error: dateTypeError } = await dataLayerClient.from("job_date_types")
               .insert(jobDateTypes);
             if (dateTypeError) {
               console.error("Error updating job date types:", dateTypeError);
@@ -482,10 +473,10 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
       // Force refresh all related queries after successful edit
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
-        queryClient.invalidateQueries({ queryKey: ["tours"] }),
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour", tourId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
       ]);
 
       // Only show success toast if flex sync didn't have warnings or errors
@@ -516,8 +507,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
       // Step 1: Delete flex folders first
       console.log("Deleting flex folders...");
-      const { error: flexFoldersError } = await supabase
-        .from("flex_folders")
+      const { error: flexFoldersError } = await dataLayerClient.from("flex_folders")
         .delete()
         .eq("tour_date_id", dateId);
 
@@ -528,8 +518,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
       // Step 2: Get all jobs for this tour date
       console.log("Fetching jobs for tour date...");
-      const { data: jobs, error: jobsError } = await supabase
-        .from("jobs")
+      const { data: jobs, error: jobsError } = await dataLayerClient.from("jobs")
         .select("id")
         .eq("tour_date_id", dateId);
 
@@ -657,8 +646,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
         // Finally delete the jobs themselves
         console.log("Deleting jobs...");
-        const { error: jobsDeleteError } = await supabase
-          .from("jobs")
+        const { error: jobsDeleteError } = await dataLayerClient.from("jobs")
           .delete()
           .in("id", jobIds);
 
@@ -671,14 +659,13 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       // Step 4: Delete tour date overrides
       console.log("Deleting tour date overrides...");
       await Promise.all([
-        supabase.from("tour_date_power_overrides").delete().eq("tour_date_id", dateId),
-        supabase.from("tour_date_weight_overrides").delete().eq("tour_date_id", dateId)
+        dataLayerClient.from("tour_date_power_overrides").delete().eq("tour_date_id", dateId),
+        dataLayerClient.from("tour_date_weight_overrides").delete().eq("tour_date_id", dateId)
       ]);
 
       // Step 5: Finally delete the tour date itself
       console.log("Deleting tour date...");
-      const { error: dateError } = await supabase
-        .from("tour_dates")
+      const { error: dateError } = await dataLayerClient.from("tour_dates")
         .delete()
         .eq("id", dateId);
 
@@ -691,12 +678,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
       // Force refresh all related queries after successful deletion
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["tour", tourId] }),
-        queryClient.invalidateQueries({ queryKey: ["tours"] }),
-        queryClient.invalidateQueries({ queryKey: ["tours-with-dates"] }),
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["flex-folders-existence"] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour", tourId) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours-with-dates") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-folders-existence") }),
       ]);
 
       toast({

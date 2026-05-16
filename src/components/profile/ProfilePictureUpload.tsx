@@ -3,7 +3,7 @@ import { Camera, Upload, X, Loader2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import {
   optimizeProfilePicture,
   validateImageFile,
@@ -89,12 +89,12 @@ export function ProfilePictureUpload({
       if (previewUrl && previewUrl.includes('/profile-pictures/')) {
         const oldPath = previewUrl.split('/profile-pictures/')[1];
         if (oldPath) {
-          await supabase.storage.from('profile-pictures').remove([oldPath]);
+          await dataLayerClient.storage.from('profile-pictures').remove([oldPath]);
         }
       }
 
       // Upload to storage
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await dataLayerClient.storage
         .from('profile-pictures')
         .upload(fileName, optimizedFile, {
           cacheControl: '3600',
@@ -110,8 +110,7 @@ export function ProfilePictureUpload({
       const publicUrl = getProfilePictureUrl(supabaseUrl, fileName);
 
       // Update profile in database
-      const { error: updateError } = await supabase
-        .from('profiles')
+      const { error: updateError } = await dataLayerClient.from('profiles')
         .update({ profile_picture_url: publicUrl })
         .eq('id', userId);
 
@@ -154,7 +153,7 @@ export function ProfilePictureUpload({
       // Delete from storage
       const filePath = previewUrl.split('/profile-pictures/')[1];
       if (filePath) {
-        const { error: deleteError } = await supabase.storage
+        const { error: deleteError } = await dataLayerClient.storage
           .from('profile-pictures')
           .remove([filePath]);
 
@@ -164,8 +163,7 @@ export function ProfilePictureUpload({
       }
 
       // Update profile in database
-      const { error: updateError } = await supabase
-        .from('profiles')
+      const { error: updateError } = await dataLayerClient.from('profiles')
         .update({ profile_picture_url: null })
         .eq('id', userId);
 

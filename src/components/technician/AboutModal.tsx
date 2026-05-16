@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Info, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { Theme } from './types';
 
 // Get the version from Vite's env variables
@@ -59,8 +59,7 @@ export const AboutModal = ({ theme, isDark, onClose }: AboutModalProps) => {
   useEffect(() => {
     const load = async () => {
       try {
-        const { data, error } = await supabase
-          .from('app_changelog')
+        const { data, error } = await dataLayerClient.from('app_changelog')
           .select('id, version, entry_date, content, last_updated')
           .order('entry_date', { ascending: false })
           .order('last_updated', { ascending: false });

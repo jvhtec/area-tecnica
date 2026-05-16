@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { startOfMonth, endOfMonth, subDays, addDays } from 'date-fns';
 
 export interface HouseTech {
@@ -57,8 +57,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
         const startDate = subDays(startOfMonth(currentMonth), 7);
         const endDate = addDays(endOfMonth(currentMonth), 7);
 
-        const { data: techsData, error: techsError } = await supabase
-          .from('profiles')
+        const { data: techsData, error: techsError } = await dataLayerClient.from('profiles')
           .select('id, first_name, last_name, department, phone')
           .eq('role', 'house_tech')
           .eq('warehouse_duty_exempt', false)
@@ -74,8 +73,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
         if (techIds.length > 0) {
           // Query timesheets as source of truth, joined with jobs for timeline info
-          const { data: timesheetData, error: timesheetsError } = await supabase
-            .from('timesheets')
+          const { data: timesheetData, error: timesheetsError } = await dataLayerClient.from('timesheets')
             .select(`
               technician_id,
               job_id,
@@ -159,8 +157,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
           if (baseAssignments.length > 0) {
             const jobIds = Array.from(new Set(baseAssignments.map((assignment) => assignment.job.id)));
             if (jobIds.length > 0) {
-              const { data: jobAssignmentData, error: jobAssignmentsError } = await supabase
-                .from('job_assignments')
+              const { data: jobAssignmentData, error: jobAssignmentsError } = await dataLayerClient.from('job_assignments')
                 .select(`
                   technician_id,
                   job_id,
@@ -215,8 +212,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
         let vacationResults: VacationPeriod[] = [];
 
         if (techIds.length > 0) {
-          const { data: vacationData, error: vacationError } = await supabase
-            .from('availability_schedules')
+          const { data: vacationData, error: vacationError } = await dataLayerClient.from('availability_schedules')
             .select('user_id, date, source, notes')
             .in('user_id', techIds)
             .eq('status', 'unavailable')
@@ -262,8 +258,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
     fetchData();
 
-    const timesheetChannel = supabase
-      .channel('personal-calendar-timesheets')
+    const timesheetChannel = dataLayerClient.channel('personal-calendar-timesheets')
       .on(
         'postgres_changes',
         {
@@ -278,8 +273,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
       )
       .subscribe();
 
-    const assignmentChannel = supabase
-      .channel('personal-calendar-job-assignments')
+    const assignmentChannel = dataLayerClient.channel('personal-calendar-job-assignments')
       .on(
         'postgres_changes',
         {
@@ -299,8 +293,8 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
 
     return () => {
       isMounted = false;
-      supabase.removeChannel(timesheetChannel);
-      supabase.removeChannel(assignmentChannel);
+      dataLayerClient.removeChannel(timesheetChannel);
+      dataLayerClient.removeChannel(assignmentChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthKey]); // Only refetch when the month changes, not every day selection

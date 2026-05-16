@@ -7,8 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Plus, X } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-
+import { dataLayerClient } from '@/services/dataLayerClient';
 type Skill = { id: string; name: string; category: string | null };
 type ProfileSkill = { id: string; skill_id: string; name: string; category: string | null; proficiency: number | null; is_primary: boolean };
 
@@ -27,13 +26,13 @@ export const ProfileSkillsEditor: React.FC<ProfileSkillsEditorProps> = ({ profil
   const load = React.useCallback(async () => {
     setLoading(true);
     const [sres, psres, pres] = await Promise.all([
-      supabase.from('skills').select('id,name,category').eq('active', true).order('category').order('name'),
-      supabase.from('profile_skills')
+      dataLayerClient.from('skills').select('id,name,category').eq('active', true).order('category').order('name'),
+      dataLayerClient.from('profile_skills')
         .select('id,skill_id,proficiency,is_primary,skills:skill_id(name,category)')
         .eq('profile_id', profileId)
         .order('is_primary', { ascending: false })
         .order('proficiency', { ascending: false }),
-      supabase.from('profiles').select('department').eq('id', profileId).maybeSingle()
+      dataLayerClient.from('profiles').select('department').eq('id', profileId).maybeSingle()
     ]);
     if (!sres.error) setAllSkills(sres.data || []);
     if (!psres.error) {
@@ -63,8 +62,7 @@ export const ProfileSkillsEditor: React.FC<ProfileSkillsEditorProps> = ({ profil
   }, [availableAll, profileDepartment]);
 
   const addSkill = async (skill: Skill) => {
-    const { data, error } = await supabase
-      .from('profile_skills')
+    const { data, error } = await dataLayerClient.from('profile_skills')
       .insert({ profile_id: profileId, skill_id: skill.id, proficiency: 3, is_primary: false })
       .select('id')
       .maybeSingle();
@@ -75,8 +73,7 @@ export const ProfileSkillsEditor: React.FC<ProfileSkillsEditorProps> = ({ profil
   };
 
   const updateSkill = async (ps: ProfileSkill, patch: Partial<ProfileSkill>) => {
-    const { error } = await supabase
-      .from('profile_skills')
+    const { error } = await dataLayerClient.from('profile_skills')
       .update({
         proficiency: patch.proficiency ?? ps.proficiency,
         is_primary: patch.is_primary ?? ps.is_primary,
@@ -88,7 +85,7 @@ export const ProfileSkillsEditor: React.FC<ProfileSkillsEditorProps> = ({ profil
   };
 
   const removeSkill = async (ps: ProfileSkill) => {
-    const { error } = await supabase.from('profile_skills').delete().eq('id', ps.id);
+    const { error } = await dataLayerClient.from('profile_skills').delete().eq('id', ps.id);
     if (!error) setProfileSkills(prev => prev.filter(x => x.id !== ps.id));
   };
 
