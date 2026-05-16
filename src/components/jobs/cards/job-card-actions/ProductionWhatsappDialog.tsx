@@ -15,8 +15,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-
-import type { ProductionWhatsappState } from "./useProductionWhatsapp";
+import type { ProductionWhatsappState } from "@/components/jobs/cards/job-card-actions/useProductionWhatsapp";
 
 type ProductionWhatsappDialogProps = {
   state: ProductionWhatsappState;

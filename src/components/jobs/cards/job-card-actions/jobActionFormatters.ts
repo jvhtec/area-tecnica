@@ -1,9 +1,13 @@
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 
-import { MADRID_TIME_ZONE } from "@/components/jobs/cards/job-card-actions/types";
+import {
+  MADRID_TIME_ZONE,
+  type JobCardJob,
+  type JobCardLocation,
+} from "@/components/jobs/cards/job-card-actions/types";
 
-export const resolveJobLocation = (job: any): string => {
-  const pick = (loc: any): string | null => {
+export const resolveJobLocation = (job: JobCardJob): string => {
+  const pick = (loc: JobCardLocation): string | null => {
     if (!loc || typeof loc !== "object") return null;
     const name = typeof loc.name === "string" ? loc.name.trim() : "";
     const addr = typeof loc.formatted_address === "string" ? loc.formatted_address.trim() : "";
@@ -23,7 +27,7 @@ export const resolveJobLocation = (job: any): string => {
   return "sin ubicación";
 };
 
-export const resolveSuggestedCallTime = (job: any): string => {
+export const resolveSuggestedCallTime = (job: JobCardJob): string => {
   try {
     if (!job?.start_time) return "";
     return formatInTimeZone(new Date(job.start_time), MADRID_TIME_ZONE, "HH:mm");
@@ -41,7 +45,7 @@ export const formatDateGroupLabel = (date: string): string => {
 };
 
 export const buildProductionWhatsappTemplate = (
-  job: any,
+  job: JobCardJob,
   opts: { groupKey: string; callTime: string }
 ): string => {
   const jobName = job?.title || job?.name || job?.job_name || "Trabajo";

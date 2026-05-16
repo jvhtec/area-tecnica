@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Dialog,
   DialogContent,
@@ -8,8 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-
-import type { WarehouseWhatsappState } from "./useWarehouseWhatsapp";
+import type { WarehouseWhatsappState } from "@/components/jobs/cards/job-card-actions/useWarehouseWhatsapp";
 
 type WarehouseWhatsappDialogProps = {
   state: WarehouseWhatsappState;
@@ -26,8 +26,9 @@ export const WarehouseWhatsappDialog = ({ state }: WarehouseWhatsappDialogProps)
           <DialogDescription>Este mensaje se enviará al grupo de WhatsApp "Almacén sonido" desde tu endpoint WAHA.</DialogDescription>
         </DialogHeader>
         <div className="space-y-2">
-          <label className="text-sm font-medium">Mensaje</label>
+          <Label htmlFor="wa-almacen-message">Mensaje</Label>
           <Textarea
+            id="wa-almacen-message"
             value={state.waMessage}
             onChange={(e) => state.setWaMessage(e.target.value)}
             placeholder="Escribe tu mensaje…"

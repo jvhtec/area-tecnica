@@ -2,10 +2,11 @@ import React from "react";
 
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import type { JobCardJob } from "@/components/jobs/cards/job-card-actions/types";
 
 export type WarehouseWhatsappState = ReturnType<typeof useWarehouseWhatsapp>;
 
-export const useWarehouseWhatsapp = (job: any) => {
+export const useWarehouseWhatsapp = (job: JobCardJob) => {
   const { toast } = useToast();
   const [waAlmacenOpen, setWaAlmacenOpen] = React.useState(false);
   const [waMessage, setWaMessage] = React.useState<string>("");

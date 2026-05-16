@@ -55,6 +55,17 @@ type JobCardActionButtonsProps = JobCardActionsProps & {
   technicalPower: TechnicalPowerPackState;
 };
 
+const WAREHOUSE_LABEL_BY_DEPARTMENT: Partial<Record<NonNullable<JobCardActionsProps["department"]>, string>> = {
+  sound: "sonido",
+  lights: "iluminación",
+  video: "video",
+  production: "producción",
+};
+
+const getWarehouseDepartmentLabel = (department: JobCardActionsProps["department"]) => (
+  department ? WAREHOUSE_LABEL_BY_DEPARTMENT[department] ?? department : "sonido"
+);
+
 export const JobCardActionButtons = ({
   allowedJobType,
   canCreateFlexFolders,
@@ -167,7 +178,7 @@ export const JobCardActionButtons = ({
         size="sm"
         onClick={openWarehouseWhatsappDialog}
         className="gap-2"
-        title="Enviar mensaje a Almacén sonido"
+        title={`Enviar mensaje a Almacén ${getWarehouseDepartmentLabel(department)}`}
       >
         <MessageCircle className="h-4 w-4" />
         <span className="hidden sm:inline">Almacén</span>
@@ -461,11 +472,12 @@ export const JobCardActionButtons = ({
       <div className="relative">
         <input
           type="file"
+          aria-label="Subir documento"
           onChange={handleFileUpload}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           onClick={(ev) => ev.stopPropagation()}
         />
-        <Button variant="ghost" size="icon" className="hover:bg-accent/50">
+        <Button variant="ghost" size="icon" className="hover:bg-accent/50" title="Subir documento" aria-label="Subir documento">
           <Upload className="h-4 w-4" />
         </Button>
       </div>

@@ -1,11 +1,67 @@
 import type React from "react";
 
 import type { Department } from "@/types/department";
+import type { Job } from "@/types/job";
 import type { FlatElementNode } from "@/utils/flex-folders";
 import type { TechnicalPowerSummaryAvailability } from "@/utils/technicalPowerTypes";
 
+export type JobCardLocationObject = {
+  name?: string | null;
+  formatted_address?: string | null;
+};
+
+export type JobCardLocation = string | JobCardLocationObject | null | undefined;
+
+export type JobCardFlexFolder = {
+  department: string | null;
+  element_id: string;
+  elementId?: string | null;
+  folder_type: string;
+  id: string;
+  key?: string | null;
+  name?: string | null;
+};
+
+export interface JobCardJob extends Job {
+  date?: string | null;
+  dryhire_presupuesto_element_id?: string | null;
+  dryhirePresupuestoElementId?: string | null;
+  flex_budget_element_id?: string | null;
+  flexBudgetElementId?: string | null;
+  flex_folders?: JobCardFlexFolder[] | null;
+  flex_presupuesto_element_id?: string | null;
+  flexPresupuestoElementId?: string | null;
+  job_name?: string | null;
+  location?: JobCardLocation;
+  location_data?: JobCardLocationObject | null;
+  name?: string | null;
+  presupuesto_element_id?: string | null;
+  presupuestoElementId?: string | null;
+  tour?: {
+    id: string;
+    flex_main_folder_id?: string | null;
+    flex_sound_folder_id?: string | null;
+    flex_lights_folder_id?: string | null;
+    flex_video_folder_id?: string | null;
+    flex_production_folder_id?: string | null;
+    flex_personnel_folder_id?: string | null;
+  } | null;
+  tour_id?: string | null;
+}
+
+export type JobWhatsappGroup = {
+  id: string;
+  wa_group_id?: string | null;
+};
+
+export type JobWhatsappRequest = {
+  id: string;
+  created_at?: string | null;
+  status?: string | null;
+};
+
 export interface JobCardActionsProps {
-  job: any;
+  job: JobCardJob;
   userRole: string | null;
   foldersAreCreated: boolean;
   isProjectManagementPage: boolean;
@@ -41,8 +97,8 @@ export interface JobCardActionsProps {
   onCreateWhatsappGroup?: (e: React.MouseEvent) => void;
   onRetryWhatsappGroup?: (e: React.MouseEvent) => void;
   whatsappDisabled?: boolean;
-  whatsappGroup?: any;
-  whatsappRequest?: any;
+  whatsappGroup?: JobWhatsappGroup | null;
+  whatsappRequest?: JobWhatsappRequest | null;
 }
 
 export type JobAssignmentRow = {

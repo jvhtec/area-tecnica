@@ -2,6 +2,7 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { resolveJobLocation } from "@/components/jobs/cards/job-card-actions/jobActionFormatters";
+import type { JobCardJob } from "@/components/jobs/cards/job-card-actions/types";
 import { useToast } from "@/hooks/use-toast";
 import { createQueryKey } from "@/lib/optimized-react-query";
 import { queryKeys } from "@/lib/react-query";
@@ -24,7 +25,7 @@ import {
 } from "@/utils/technicalPowerTypes";
 
 type UseTechnicalPowerPackArgs = {
-  job: any;
+  job: JobCardJob;
   isProjectManagementPage: boolean;
   isManagementUser: boolean;
   allowedJobType: boolean;
@@ -38,7 +39,8 @@ export const useTechnicalPowerPack = ({
 }: UseTechnicalPowerPackArgs) => {
   const { toast } = useToast();
   const [isGeneratingTechnicalPowerPack, setIsGeneratingTechnicalPowerPack] = React.useState(false);
-  const canGenerateTechnicalPowerPack = isProjectManagementPage && isManagementUser;
+  const canGenerateTechnicalPowerPack =
+    isProjectManagementPage && isManagementUser && allowedJobType;
   const technicalPowerSummaryTitle = React.useMemo(
     () => job.title || job.name || job.job_name || "Trabajo",
     [job.job_name, job.name, job.title]
@@ -182,7 +184,7 @@ export const useTechnicalPowerPack = ({
   const handleGenerateTechnicalPowerPack = React.useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
 
-    if (isGeneratingTechnicalPowerPack) {
+    if (!canGenerateTechnicalPowerPack || isGeneratingTechnicalPowerPack) {
       return;
     }
 
@@ -274,6 +276,7 @@ export const useTechnicalPowerPack = ({
     }
   }, [
     downloadPdfBlob,
+    canGenerateTechnicalPowerPack,
     isGeneratingTechnicalPowerPack,
     job,
     technicalPowerSummaryJob,

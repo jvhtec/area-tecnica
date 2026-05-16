@@ -1,12 +1,15 @@
 import { FlexElementSelectorDialog } from "@/components/flex/FlexElementSelectorDialog";
-import type { FlexOpeningState } from "@/components/jobs/cards/job-card-actions/types";
+import type {
+  FlexOpeningState,
+  JobCardJob,
+} from "@/components/jobs/cards/job-card-actions/types";
 import { createTourdateFilterPredicate } from "@/utils/flex-folders";
 import type { Department } from "@/types/department";
 
 type FlexSelectorDialogHostProps = {
   department?: Department;
   flexOpening: FlexOpeningState;
-  job: any;
+  job: JobCardJob;
 };
 
 export const FlexSelectorDialogHost = ({
@@ -38,7 +41,7 @@ export const FlexSelectorDialogHost = ({
       mainElementId={selectorMainElementId}
       onSelect={flexOpening.handleFlexElementSelect}
       defaultElementId={
-        job.flex_folders?.find((folder: any) =>
+        job.flex_folders?.find((folder) =>
           folder.department?.toLowerCase() === department?.toLowerCase()
         )?.element_id || flexOpening.mainFlexInfo?.elementId
       }

@@ -9,6 +9,7 @@ import {
 } from "@/components/jobs/cards/job-card-actions/jobActionFormatters";
 import {
   MADRID_TIME_ZONE,
+  type JobCardJob,
   type JobAssignmentRow,
   type WaProdAssignment,
   type WaProdTimesheetRow,
@@ -24,7 +25,7 @@ import { isManagementRole } from "@/utils/permissions";
 export type ProductionWhatsappState = ReturnType<typeof useProductionWhatsapp>;
 
 type UseProductionWhatsappArgs = {
-  job: any;
+  job: JobCardJob;
   userRole: string | null;
   isProjectManagementPage: boolean;
   department?: Department;

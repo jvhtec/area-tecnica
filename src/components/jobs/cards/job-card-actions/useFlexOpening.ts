@@ -1,12 +1,18 @@
 import React from "react";
 
 import { mapViewHintToIntent } from "@/components/jobs/cards/job-card-actions/mapViewHintToIntent";
-import type { TourdateSelectorInfo } from "@/components/jobs/cards/job-card-actions/types";
+import type {
+  JobCardFlexFolder,
+  JobCardJob,
+  TourdateSelectorInfo,
+} from "@/components/jobs/cards/job-card-actions/types";
 import { useToast } from "@/hooks/use-toast";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import {
   FLEX_FOLDER_IDS,
   getElementTree,
+  type FlexElementNode,
+  type IntentDetectionContext,
   openFlexElement,
   type FlatElementNode,
 } from "@/utils/flex-folders";
@@ -19,8 +25,40 @@ type UseFlexOpeningArgs = {
   foldersAreCreated: boolean;
   isCreatingFolders: boolean;
   isProjectManagementPage: boolean;
-  job: any;
+  job: JobCardJob;
 };
+
+const getNonEmptyString = (value: unknown): string | null => (
+  typeof value === "string" && value.trim().length > 0 ? value : null
+);
+
+const getFolderElementId = (folder: JobCardFlexFolder | null | undefined): string | null => (
+  getNonEmptyString(folder?.element_id) ?? getNonEmptyString(folder?.elementId)
+);
+
+const getJobPresupuestoElementId = (job: JobCardJob): string | null => {
+  const candidateIds = [
+    job.dryhire_presupuesto_element_id,
+    job.dryhirePresupuestoElementId,
+    job.presupuesto_element_id,
+    job.presupuestoElementId,
+    job.flex_presupuesto_element_id,
+    job.flexPresupuestoElementId,
+    job.flex_budget_element_id,
+    job.flexBudgetElementId,
+  ];
+
+  for (const candidate of candidateIds) {
+    const elementId = getNonEmptyString(candidate);
+    if (elementId) return elementId;
+  }
+
+  return null;
+};
+
+const getFlexContextJobType = (jobType: JobCardJob["job_type"]): IntentDetectionContext["jobType"] => (
+  jobType === "tour" ? undefined : jobType
+);
 
 export const useFlexOpening = ({
   department,
@@ -41,25 +79,13 @@ export const useFlexOpening = ({
       return;
     }
 
-    const candidateIds = [
-      job?.dryhire_presupuesto_element_id,
-      job?.dryhirePresupuestoElementId,
-      job?.presupuesto_element_id,
-      job?.presupuestoElementId,
-      job?.flex_presupuesto_element_id,
-      job?.flexPresupuestoElementId,
-      job?.flex_budget_element_id,
-      job?.flexBudgetElementId,
-    ];
-
-    for (const candidate of candidateIds) {
-      if (typeof candidate === "string" && candidate.trim().length > 0) {
-        dryHirePresupuestoElementRef.current = candidate;
-        return;
-      }
+    const jobPresupuestoElementId = getJobPresupuestoElementId(job);
+    if (jobPresupuestoElementId) {
+      dryHirePresupuestoElementRef.current = jobPresupuestoElementId;
+      return;
     }
 
-    const matchingFolder = job.flex_folders?.find((folder: any) => {
+    const matchingFolder = job.flex_folders?.find((folder) => {
       const folderType = typeof folder?.folder_type === "string" ? folder.folder_type.toLowerCase() : "";
       const folderKey = typeof folder?.key === "string" ? folder.key.toLowerCase() : "";
       const folderName = typeof folder?.name === "string" ? folder.name.toLowerCase() : "";
@@ -75,14 +101,7 @@ export const useFlexOpening = ({
       );
     });
 
-    const storedElementId =
-      typeof matchingFolder?.element_id === "string" && matchingFolder.element_id.trim().length > 0
-        ? matchingFolder.element_id
-        : typeof matchingFolder?.elementId === "string" && matchingFolder.elementId.trim().length > 0
-          ? matchingFolder.elementId
-          : null;
-
-    dryHirePresupuestoElementRef.current = storedElementId;
+    dryHirePresupuestoElementRef.current = getFolderElementId(matchingFolder);
   }, [job]);
 
   const getFlexButtonTitle = React.useCallback(() => {
@@ -106,8 +125,14 @@ export const useFlexOpening = ({
       if (job.job_type === "tourdate") return true;
 
       if (job.job_type === "dryhire") {
-        const dryHireFolder = job.flex_folders?.find((folder: any) => folder.folder_type === "dryhire");
-        return !!dryHireFolder?.element_id;
+        const dryHireFolder = job.flex_folders?.find((folder) => folder.folder_type === "dryhire");
+        const savedPresupuesto = job.flex_folders?.find((folder) => folder.folder_type === "dryhire_presupuesto");
+        return Boolean(
+          dryHirePresupuestoElementRef.current ||
+          getJobPresupuestoElementId(job) ||
+          getFolderElementId(savedPresupuesto) ||
+          getFolderElementId(dryHireFolder)
+        );
       }
     }
 
@@ -124,10 +149,10 @@ export const useFlexOpening = ({
         isFlexLoading,
       });
       toast({
-        title: "Loading",
+        title: "Cargando",
         description: isCreatingFolders
-          ? "Creating Flex folders, please wait..."
-          : "Please wait while we load the Flex folder...",
+          ? "Creando carpetas de Flex, por favor espere..."
+          : "Por favor espere mientras cargamos la carpeta de Flex...",
       });
       return;
     }
@@ -146,8 +171,8 @@ export const useFlexOpening = ({
         if (!tourFolderId) {
           console.error("[JobCardActions] No tour folder found for tourdate job:", job.id);
           toast({
-            title: "Tour folders not found",
-            description: "Please ensure the parent tour has Flex folders created first.",
+            title: "Carpetas de gira no encontradas",
+            description: "Asegúrate de que la gira principal tenga carpetas Flex creadas.",
             variant: "destructive",
           });
           return;
@@ -157,8 +182,8 @@ export const useFlexOpening = ({
         if (!tourDate) {
           console.error("[JobCardActions] No start_time found for tourdate job:", job.id);
           toast({
-            title: "Date not found",
-            description: "Unable to determine tour date for filtering.",
+            title: "Fecha no encontrada",
+            description: "No se pudo determinar la fecha de gira para filtrar.",
             variant: "destructive",
           });
           return;
@@ -175,7 +200,7 @@ export const useFlexOpening = ({
         console.error("[JobCardActions] Error resolving tour folder:", error);
         toast({
           title: "Error",
-          description: "Failed to load tour folder information.",
+          description: "No se pudo cargar la información de la carpeta de gira.",
           variant: "destructive",
         });
         return;
@@ -183,28 +208,30 @@ export const useFlexOpening = ({
     }
 
     if (isProjectManagementPage && job.job_type === "dryhire") {
-      const dryHireFolder = job.flex_folders?.find((folder: any) => folder.folder_type === "dryhire");
-      const savedPresupuesto = job.flex_folders?.find((folder: any) => folder.folder_type === "dryhire_presupuesto");
+      const dryHireFolder = job.flex_folders?.find((folder) => folder.folder_type === "dryhire");
+      const savedPresupuesto = job.flex_folders?.find((folder) => folder.folder_type === "dryhire_presupuesto");
+      const dryHireFolderElementId = getFolderElementId(dryHireFolder);
+      const savedPresupuestoElementId = getFolderElementId(savedPresupuesto);
 
       let presupuestoElementId =
         typeof dryHirePresupuestoElementRef.current === "string"
           ? dryHirePresupuestoElementRef.current
           : null;
 
-      if (!presupuestoElementId && savedPresupuesto?.element_id) {
-        presupuestoElementId = savedPresupuesto.element_id;
+      if (!presupuestoElementId && savedPresupuestoElementId) {
+        presupuestoElementId = savedPresupuestoElementId;
         dryHirePresupuestoElementRef.current = presupuestoElementId;
       }
 
-      if (!presupuestoElementId && dryHireFolder?.element_id) {
+      if (!presupuestoElementId && dryHireFolderElementId) {
         try {
           console.log("[JobCardActions] Resolving dryhire presupuesto via element tree", {
             jobId: job.id,
-            dryHireFolderId: dryHireFolder.element_id,
+            dryHireFolderId: dryHireFolderElementId,
           });
 
-          const tree = await getElementTree(dryHireFolder.element_id);
-          const queue: any[] = Array.isArray(tree) ? [...tree] : [];
+          const tree = await getElementTree(dryHireFolderElementId);
+          const queue: FlexElementNode[] = Array.isArray(tree) ? [...tree] : [];
 
           while (queue.length > 0) {
             const node = queue.shift();
@@ -218,9 +245,7 @@ export const useFlexOpening = ({
             const nodeDisplayName =
               typeof node.displayName === "string"
                 ? node.displayName
-                : typeof node.name === "string"
-                  ? node.name
-                  : "";
+                : "";
 
             if (
               nodeElementId &&
@@ -245,11 +270,11 @@ export const useFlexOpening = ({
           console.error("[JobCardActions] Failed to resolve dryhire presupuesto element via tree:", {
             error,
             jobId: job.id,
-            dryHireFolderId: dryHireFolder.element_id,
+            dryHireFolderId: dryHireFolderElementId,
           });
           toast({
             title: "Error",
-            description: "Failed to load the dry-hire presupuesto from Flex.",
+            description: "No se pudo cargar el presupuesto de dry-hire desde Flex.",
             variant: "destructive",
           });
           return;
@@ -263,8 +288,8 @@ export const useFlexOpening = ({
           flexFoldersCount: job.flex_folders?.length || 0,
         });
         toast({
-          title: "Presupuesto not found",
-          description: "No presupuesto element was found for this dry-hire job.",
+          title: "Presupuesto no encontrado",
+          description: "No se encontró ningún elemento de presupuesto para este dry-hire.",
           variant: "destructive",
         });
         return;
@@ -273,7 +298,7 @@ export const useFlexOpening = ({
       await openFlexElement({
         elementId: presupuestoElementId,
         context: {
-          jobType: job.job_type,
+          jobType: getFlexContextJobType(job.job_type),
           folderType: "dryhire",
           definitionId: FLEX_FOLDER_IDS.presupuestoDryHire,
         },
@@ -281,14 +306,14 @@ export const useFlexOpening = ({
           console.error("[JobCardActions] Failed to open dryhire presupuesto element:", error);
           toast({
             title: "Error",
-            description: error.message || "Failed to open Flex",
+            description: error.message || "No se pudo abrir Flex",
             variant: "destructive",
           });
         },
         onWarning: (message) => {
           console.warn("[JobCardActions] Warning opening dryhire presupuesto element:", message);
           toast({
-            title: "Warning",
+            title: "Advertencia",
             description: message,
           });
         },
@@ -302,20 +327,20 @@ export const useFlexOpening = ({
       await openFlexElement({
         elementId: flexUuid,
         context: {
-          jobType: job.job_type,
+          jobType: getFlexContextJobType(job.job_type),
         },
         onError: (error) => {
           console.error("[JobCardActions] Failed to open Flex element:", error);
           toast({
             title: "Error",
-            description: error.message || "Failed to open Flex",
+            description: error.message || "No se pudo abrir Flex",
             variant: "destructive",
           });
         },
         onWarning: (message) => {
           console.warn("[JobCardActions] Warning opening Flex element:", message);
           toast({
-            title: "Warning",
+            title: "Advertencia",
             description: message,
           });
         },
@@ -337,8 +362,8 @@ export const useFlexOpening = ({
       toast({ title: "Error", description: flexError, variant: "destructive" });
     } else {
       toast({
-        title: "Flex folder not available",
-        description: "No valid Flex element found for this job. Please ensure folders are created.",
+        title: "Carpeta Flex no disponible",
+        description: "No se encontró un elemento Flex válido para este trabajo. Asegúrate de que las carpetas estén creadas.",
         variant: "destructive",
       });
     }
@@ -391,10 +416,10 @@ export const useFlexOpening = ({
       console.error("[JobCardActions] Telemetry: Missing element ID detected", errorDetails);
 
       toast({
-        title: "Invalid element",
+        title: "Elemento no válido",
         description: node?.displayName
-          ? `Cannot open "${node.displayName}" - invalid element ID.`
-          : "Invalid element ID received. Cannot navigate to Flex.",
+          ? `No se puede abrir "${node.displayName}": el ID del elemento no es válido.`
+          : "Se recibió un ID de elemento no válido. No se puede navegar a Flex.",
         variant: "destructive",
       });
       return;
@@ -407,7 +432,7 @@ export const useFlexOpening = ({
         domainId: node?.domainId,
         schemaId: node?.schemaId,
         viewHint: mapViewHintToIntent(node?.viewHint),
-        jobType: job.job_type,
+        jobType: getFlexContextJobType(job.job_type),
       },
       onError: (error) => {
         const errorDetails = {
@@ -421,8 +446,8 @@ export const useFlexOpening = ({
         };
         console.error("[JobCardActions] Failed to open Flex element from selector:", errorDetails);
         toast({
-          title: "Navigation error",
-          description: error instanceof Error ? error.message : "Failed to open Flex",
+          title: "Error de navegación",
+          description: error instanceof Error ? error.message : "No se pudo abrir Flex",
           variant: "destructive",
         });
       },
@@ -433,7 +458,7 @@ export const useFlexOpening = ({
           node,
           jobId: job.id,
         });
-        toast({ title: "Warning", description: message });
+        toast({ title: "Advertencia", description: message });
       },
     });
   }, [job.job_type, job.id, toast]);
