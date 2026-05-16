@@ -19,6 +19,8 @@ import { AssignmentStatusDialog } from "../AssignmentStatusDialog";
 import { MarkUnavailableDialog } from "../MarkUnavailableDialog";
 import { OfferDetailsDialog } from "../OfferDetailsDialog";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface OptimizedAssignmentMatrixViewProps {
   isFetching: boolean;
   isInitialLoading: boolean;
@@ -750,7 +752,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
           open={createUserOpen}
           onOpenChange={(open) => {
             if (!open) {
-              qc.invalidateQueries({ queryKey: ["optimized-matrix-technicians"] });
+              qc.invalidateQueries({ queryKey: queryKeys.scope("optimized-matrix-technicians") });
             }
             setCreateUserOpen(open);
           }}

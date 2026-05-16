@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { Send } from "lucide-react";
 import { Department } from "@/types/department";
@@ -23,7 +23,7 @@ export const SendMessage = ({ department }: SendMessageProps) => {
       setSending(true);
       console.log("Sending message...");
 
-      const { data: userData } = await supabase.auth.getUser();
+      const { data: userData } = await dataLayerClient.auth.getUser();
       if (!userData.user) throw new Error("No user found");
 
       // Validate that the department is one of the allowed values
@@ -31,8 +31,7 @@ export const SendMessage = ({ department }: SendMessageProps) => {
         throw new Error("Invalid department");
       }
 
-      const { error } = await supabase
-        .from('messages')
+      const { error } = await dataLayerClient.from('messages')
         .insert({
           content: message,
           sender_id: userData.user.id,

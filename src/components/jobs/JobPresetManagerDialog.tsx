@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Copy, Pencil, Trash2, Calculator } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast';
 import { PresetEditor } from '@/components/equipment/PresetEditor';
 import { PA_PRESET_ALLOWED_CATEGORIES, PresetItem, PresetWithItems, Department, mapPresetWithItemsRow } from '@/types/equipment';
@@ -14,6 +14,8 @@ import { format } from 'date-fns';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { AmplifierTool } from '@/components/sound/AmplifierTool';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,10 +35,9 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
 
   // Fetch job date range
   const { data: jobDates = [] } = useQuery({
-    queryKey: ['job-dates', jobId],
+    queryKey: queryKeys.scope('job-dates', jobId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('start_time, end_time')
         .eq('id', jobId)
         .single();
@@ -57,10 +58,9 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
 
   // Fetch presets for this job and selected department
   const { data: presets = [] } = useQuery({
-    queryKey: ['job-presets', jobId, department],
+    queryKey: queryKeys.scope('job-presets', jobId, department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('presets')
+      const { data, error } = await dataLayerClient.from('presets')
         .select(`
           *,
           items:preset_items (
@@ -82,8 +82,7 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
       // Choose sequential order per date
       const rows = await Promise.all(jobDates.map(async (dt) => {
         const dateStr = format(dt, 'yyyy-MM-dd');
-        const { data: existing } = await supabase
-          .from('day_preset_assignments')
+        const { data: existing } = await dataLayerClient.from('day_preset_assignments')
           .select('order')
           .eq('date', dateStr)
           .order('order', { ascending: false })
@@ -98,11 +97,11 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
           source_id: jobId
         };
       }));
-      const { error } = await supabase.from('day_preset_assignments').insert(rows);
+      const { error } = await dataLayerClient.from('day_preset_assignments').insert(rows);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['preset-assignments'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('preset-assignments') });
       toast({ title: 'Assigned', description: 'Preset assigned to job dates' });
     },
     onError: (error) => {
@@ -116,19 +115,17 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
 
   const deletePresetMutation = useMutation({
     mutationFn: async (presetId: string) => {
-      const { error: itemsError } = await supabase
-        .from('preset_items')
+      const { error: itemsError } = await dataLayerClient.from('preset_items')
         .delete()
         .eq('preset_id', presetId);
       if (itemsError) throw itemsError;
-      const { error: presetError } = await supabase
-        .from('presets')
+      const { error: presetError } = await dataLayerClient.from('presets')
         .delete()
         .eq('id', presetId);
       if (presetError) throw presetError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['presets', department] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('presets', department) });
       toast({ title: 'Preset deleted' });
     },
     onError: (error) =>
@@ -141,16 +138,14 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
 
   const handleSavePreset = async (name: string, items: Omit<PresetItem, 'id' | 'preset_id'>[]) => {
     try {
-      const { data: created, error: createErr } = await supabase
-        .from('presets')
+      const { data: created, error: createErr } = await dataLayerClient.from('presets')
         .insert({ name, department, job_id: jobId })
         .select()
         .single();
       if (createErr) throw createErr;
 
       if (items.length > 0) {
-        const { error: itemsError } = await supabase
-          .from('preset_items')
+        const { error: itemsError } = await dataLayerClient.from('preset_items')
           .insert(items.map(i => ({ ...i, preset_id: created.id })));
         if (itemsError) throw itemsError;
       }
@@ -159,8 +154,7 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
       if (jobDates.length > 0) {
         const rows = await Promise.all(jobDates.map(async (dt) => {
           const dateStr = format(dt, 'yyyy-MM-dd');
-          const { data: existing } = await supabase
-            .from('day_preset_assignments')
+          const { data: existing } = await dataLayerClient.from('day_preset_assignments')
             .select('order')
             .eq('date', dateStr)
             .order('order', { ascending: false })
@@ -175,7 +169,7 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
             source_id: jobId
           };
         }));
-        const { error: assignError } = await supabase.from('day_preset_assignments').insert(rows);
+        const { error: assignError } = await dataLayerClient.from('day_preset_assignments').insert(rows);
         if (assignError) {
           console.error('Error auto-assigning preset:', assignError);
           // Don't throw - preset was created successfully, just notify about assignment issue
@@ -184,16 +178,16 @@ export function JobPresetManagerDialog({ open, onOpenChange, jobId }: Props) {
             description: 'Preset created but could not auto-assign to dates',
             variant: 'default'
           });
-          queryClient.invalidateQueries({ queryKey: ['job-presets', jobId, department] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-presets', jobId, department) });
           setIsCreating(false);
           setEditingPreset(null);
           setCopyingPreset(null);
           return;
         }
-        queryClient.invalidateQueries({ queryKey: ['preset-assignments'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('preset-assignments') });
       }
 
-      queryClient.invalidateQueries({ queryKey: ['job-presets', jobId, department] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-presets', jobId, department) });
       setIsCreating(false);
       setEditingPreset(null);
       setCopyingPreset(null);

@@ -13,11 +13,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Calendar, Check, X } from 'lucide-react';
 import { format } from 'date-fns';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { labelForCode } from '@/utils/roles';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface AssignmentStatusDialogProps {
   open: boolean;
   onClose: () => void;
@@ -33,6 +35,16 @@ const ASSIGNMENT_QUERY_KEYS = [
   ['matrix-assignments'],
 ] as const;
 
+type AssignmentLifecycleResult = {
+  success?: boolean;
+  message?: string;
+  error?: string;
+};
+
+const readAssignmentLifecycleResult = (value: unknown): AssignmentLifecycleResult => (
+  value && typeof value === 'object' ? value as AssignmentLifecycleResult : {}
+);
+
 export const AssignmentStatusDialog = ({
   open,
   onClose,
@@ -46,10 +58,9 @@ export const AssignmentStatusDialog = ({
 
   // Get technician details
   const { data: technician } = useQuery({
-    queryKey: ['technician', technicianId],
+    queryKey: queryKeys.scope('technician', technicianId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('first_name, last_name, department')
         .eq('id', technicianId)
         .single();
@@ -74,7 +85,7 @@ export const AssignmentStatusDialog = ({
       isTourAssignment: boolean;
     }) => {
       // Use atomic RPC for transactional safety
-      const { data, error } = await supabase.rpc('manage_assignment_lifecycle', {
+      const { data, error } = await dataLayerClient.rpc('manage_assignment_lifecycle', {
         p_job_id: jobId,
         p_technician_id: techId,
         p_action: actionType,
@@ -87,22 +98,22 @@ export const AssignmentStatusDialog = ({
         throw new Error(error.message || 'Database operation failed');
       }
 
-      // Check RPC result
-      if (!data?.success) {
-        const errorMessage = data?.message || data?.error || 'Operation failed';
-        console.error('RPC returned failure:', data);
+      const result = readAssignmentLifecycleResult(data);
+      if (!result.success) {
+        const errorMessage = result.message || result.error || 'Operation failed';
+        console.error('RPC returned failure:', result);
         throw new Error(errorMessage);
       }
 
-      return data;
+      return result;
     },
 
     // Save previous cache state BEFORE mutation
     onMutate: async (variables) => {
       // Cancel any outgoing refetches to prevent race conditions
-      await queryClient.cancelQueries({ queryKey: ['optimized-matrix-assignments'] });
-      await queryClient.cancelQueries({ queryKey: ['matrix-assignments'] });
-      await queryClient.cancelQueries({ queryKey: ['job-assignments', variables.jobId] });
+      await queryClient.cancelQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
+      await queryClient.cancelQueries({ queryKey: queryKeys.scope('matrix-assignments') });
+      await queryClient.cancelQueries({ queryKey: queryKeys.scope('job-assignments', variables.jobId) });
 
       // Snapshot the previous values for rollback
       const previousData: Record<string, unknown> = {};
@@ -167,17 +178,17 @@ export const AssignmentStatusDialog = ({
       console.log('Assignment operation successful:', data);
 
       // Invalidate all relevant queries to ensure fresh data
-      queryClient.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] });
-      queryClient.invalidateQueries({ queryKey: ['matrix-assignments'] });
-      queryClient.invalidateQueries({ queryKey: ['job-assignments', variables.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job-details', variables.jobId] });
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('matrix-assignments') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments', variables.jobId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-details', variables.jobId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
 
       // Send push notification for confirmations
       if (variables.actionType === 'confirm') {
         const recipientName = `${technician?.first_name ?? ''} ${technician?.last_name ?? ''}`.trim();
-        supabase.functions.invoke('push', {
+        dataLayerClient.functions.invoke('push', {
           body: {
             action: 'broadcast',
             type: 'job.assignment.confirmed',
@@ -205,8 +216,7 @@ export const AssignmentStatusDialog = ({
     }
 
     // Check if tour assignment to determine delete mode
-    const { data: jobAssignment } = await supabase
-      .from('job_assignments')
+    const { data: jobAssignment } = await dataLayerClient.from('job_assignments')
       .select('assignment_source')
       .eq('job_id', assignment.job_id)
       .eq('technician_id', technicianId)

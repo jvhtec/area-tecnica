@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
-import { supabase } from '@/lib/supabase'
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { StaffingCampaignPanel } from './StaffingCampaignPanel'
 import { StaffingCandidateList } from './StaffingCandidateList'
 import { StaffingOfferList } from './StaffingOfferList'
@@ -13,6 +13,8 @@ import {
   useStaffingRequestsRealtime
 } from '@/hooks/useStaffingCampaignRealtime'
 
+
+import { queryKeys } from "@/lib/react-query";
 interface StaffingOrchestratorPanelProps {
   jobId: string
   department: string
@@ -47,10 +49,9 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
 
   // Fetch active campaign
   const { data: campaign, refetch: refetchCampaign } = useQuery({
-    queryKey: ['staffing_campaign', jobId, department],
+    queryKey: queryKeys.scope('staffing_campaign', jobId, department),
     queryFn: async () => {
-      const { data } = await supabase
-        .from('staffing_campaigns')
+      const { data } = await dataLayerClient.from('staffing_campaigns')
         .select('*')
         .eq('job_id', jobId)
         .eq('department', department)
@@ -65,11 +66,10 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
 
   // Fetch campaign roles if campaign exists
   const { data: campaignRoles } = useQuery({
-    queryKey: ['staffing_campaign_roles', campaign?.id],
+    queryKey: queryKeys.scope('staffing_campaign_roles', campaign?.id),
     queryFn: async () => {
       if (!campaign?.id) return []
-      const { data } = await supabase
-        .from('staffing_campaign_roles')
+      const { data } = await dataLayerClient.from('staffing_campaign_roles')
         .select('*')
         .eq('campaign_id', campaign.id)
         .order('role_code')

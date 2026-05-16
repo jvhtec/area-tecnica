@@ -1,16 +1,18 @@
 
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { Message } from '../types';
 import { useMessagesSubscription } from './useMessagesSubscription';
 import { isDepartmentManagementRole } from '@/utils/permissions';
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useMessagesQuery = (userRole: string | null, userDepartment: string | null) => {
   const [messages, setMessages] = useState<Message[]>([]);
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['messages', userRole, userDepartment],
+    queryKey: queryKeys.scope('messages', userRole, userDepartment),
     queryFn: async () => {
       console.log('Fetching messages for role:', userRole, 'department:', userDepartment);
       
@@ -19,8 +21,7 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
         return [];
       }
 
-      const query = supabase
-        .from('messages')
+      const query = dataLayerClient.from('messages')
         .select(`
           id,
           content,
@@ -40,7 +41,7 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
       if (isDepartmentManagementRole(userRole)) {
         query.eq('department', userDepartment);
       } else {
-        query.eq('sender_id', await supabase.auth.getUser().then(res => res.data.user?.id));
+        query.eq('sender_id', await dataLayerClient.auth.getUser().then(res => res.data.user?.id));
       }
 
       const { data, error } = await query;
@@ -84,7 +85,7 @@ export const useMessagesQuery = (userRole: string | null, userDepartment: string
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await dataLayerClient.auth.getUser();
       if (mounted) setCurrentUserId(user?.id);
     })();
     return () => { mounted = false; };

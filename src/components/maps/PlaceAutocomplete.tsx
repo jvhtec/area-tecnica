@@ -4,8 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, MapPin } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-
+import { dataLayerClient } from '@/services/dataLayerClient';
 interface PlaceAutocompleteResult {
   name: string;
   address: string;
@@ -55,7 +54,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   // Fetch Google Maps API key securely (with retry support)
   const fetchApiKey = async (): Promise<string | null> => {
     try {
-      const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+      const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
       if (error) {
         console.error('Failed to fetch Google Maps API key:', error);
         return null;

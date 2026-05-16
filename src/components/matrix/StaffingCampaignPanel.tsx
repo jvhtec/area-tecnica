@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { supabase } from '@/lib/supabase'
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 
+
+import { queryKeys } from "@/lib/react-query";
 interface StaffingCampaignPanelProps {
   jobId: string
   department: string
@@ -68,10 +70,9 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
 
   // Fetch active campaign for this job+department
   const { data: campaign } = useQuery({
-    queryKey: ['staffing_campaign', jobId, department],
+    queryKey: queryKeys.scope('staffing_campaign', jobId, department),
     queryFn: async () => {
-      const { data } = await supabase
-        .from('staffing_campaigns')
+      const { data } = await dataLayerClient.from('staffing_campaigns')
         .select('*')
         .eq('job_id', jobId)
         .eq('department', department)
@@ -100,11 +101,10 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
 
   // Fetch campaign roles if campaign exists
   const { data: campaignRoles } = useQuery({
-    queryKey: ['staffing_campaign_roles', campaign?.id],
+    queryKey: queryKeys.scope('staffing_campaign_roles', campaign?.id),
     queryFn: async () => {
       if (!campaign?.id) return []
-      const { data } = await supabase
-        .from('staffing_campaign_roles')
+      const { data } = await dataLayerClient.from('staffing_campaign_roles')
         .select('*')
         .eq('campaign_id', campaign.id)
         .order('role_code')
@@ -140,7 +140,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+            'Authorization': `Bearer ${(await dataLayerClient.auth.getSession()).data.session?.access_token}`
           },
           body: JSON.stringify({
             job_id: jobId,
@@ -166,7 +166,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         description: `${data.roles_created} roles initialized`
       })
       setShowStartDialog(false)
-      queryClient.invalidateQueries({ queryKey: ['staffing_campaign', jobId, department] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', jobId, department) })
     },
     onError: (error: any) => {
       toast({
@@ -202,8 +202,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         ? { next_run_at: new Date().toISOString() }
         : {}
 
-      const { data, error } = await supabase
-        .from('staffing_campaigns')
+      const { data, error } = await dataLayerClient.from('staffing_campaigns')
         .update({
           mode: formData.mode,
           policy,
@@ -220,7 +219,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     },
     onSuccess: () => {
       toast({ title: 'Settings updated' })
-      queryClient.invalidateQueries({ queryKey: ['staffing_campaign', jobId, department] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', jobId, department) })
     },
     onError: (error: any) => {
       toast({
@@ -240,7 +239,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+            'Authorization': `Bearer ${(await dataLayerClient.auth.getSession()).data.session?.access_token}`
           },
           body: JSON.stringify({ campaign_id: campaign?.id })
         }
@@ -250,7 +249,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     },
     onSuccess: () => {
       toast({ title: 'Campaign paused' })
-      queryClient.invalidateQueries({ queryKey: ['staffing_campaign', jobId, department] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', jobId, department) })
     }
   })
 
@@ -263,7 +262,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+            'Authorization': `Bearer ${(await dataLayerClient.auth.getSession()).data.session?.access_token}`
           },
           body: JSON.stringify({ campaign_id: campaign?.id })
         }
@@ -273,7 +272,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     },
     onSuccess: () => {
       toast({ title: 'Campaign resumed' })
-      queryClient.invalidateQueries({ queryKey: ['staffing_campaign', jobId, department] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', jobId, department) })
     }
   })
 
@@ -286,7 +285,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`
+            'Authorization': `Bearer ${(await dataLayerClient.auth.getSession()).data.session?.access_token}`
           },
           body: JSON.stringify({ campaign_id: campaign?.id })
         }
@@ -296,7 +295,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     },
     onSuccess: () => {
       toast({ title: 'Campaign stopped' })
-      queryClient.invalidateQueries({ queryKey: ['staffing_campaign', jobId, department] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', jobId, department) })
     }
   })
 

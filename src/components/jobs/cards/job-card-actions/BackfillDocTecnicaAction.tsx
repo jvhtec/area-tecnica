@@ -11,8 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 export interface BackfillDocTecnicaActionProps {
   job: any;
 }
@@ -51,7 +50,7 @@ export const BackfillDocTecnicaAction: React.FC<BackfillDocTecnicaActionProps> =
       if (uuidVideo.trim()) manual.push({ dept: "video", element_id: uuidVideo.trim() });
       if (uuidProduction.trim()) manual.push({ dept: "production", element_id: uuidProduction.trim() });
       if (manual.length) body.manual = manual;
-      const { data, error } = await supabase.functions.invoke("backfill-flex-doc-tecnica", { body });
+      const { data, error } = await dataLayerClient.functions.invoke("backfill-flex-doc-tecnica", { body });
       if (error) throw error;
       setResult(data);
       setMsg(`Inserted ${data?.inserted ?? 0}, already ${data?.already ?? 0}`);

@@ -5,8 +5,7 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-
+import { dataLayerClient } from '@/services/dataLayerClient';
 interface AddressAutocompleteProps {
   value: string;
   onChange: (address: string, coordinates?: { lat: number; lng: number }) => void;
@@ -56,7 +55,7 @@ const getGoogleMapsKeyMemoized = async (): Promise<string | null> => {
   }
 
   googleMapsKeyPromise = (async () => {
-    const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+    const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
 
     if (error) {
       throw error;

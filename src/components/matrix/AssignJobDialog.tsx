@@ -38,7 +38,7 @@ import {
 import { Loader2, Calendar as CalendarIcon, Clock, CalendarDays, CalendarRange } from 'lucide-react';
 import { format, startOfDay } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
@@ -47,6 +47,8 @@ import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface AssignJobDialogProps {
   open: boolean;
   onClose: () => void;
@@ -92,10 +94,9 @@ export const AssignJobDialog = ({
 
   // Get technician details
   const { data: technician } = useQuery({
-    queryKey: ['technician', technicianId],
+    queryKey: queryKeys.scope('technician', technicianId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('first_name, last_name, department')
         .eq('id', technicianId)
         .single();
@@ -127,11 +128,10 @@ export const AssignJobDialog = ({
   // Fetch existing timesheets for this job+technician.
   // This is needed even when existingAssignment is undefined (adding a new day to an existing job).
   const { data: existingTimesheets, isLoading: isLoadingExistingTimesheets } = useQuery({
-    queryKey: ['existing-timesheets', selectedJobId, technicianId],
+    queryKey: queryKeys.scope('existing-timesheets', selectedJobId, technicianId),
     enabled: open && !!selectedJobId && !!technicianId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('timesheets')
+      const { data, error } = await dataLayerClient.from('timesheets')
         .select('date')
         .eq('job_id', selectedJobId)
         .eq('technician_id', technicianId)
@@ -269,8 +269,7 @@ export const AssignJobDialog = ({
         const { deleted_assignment } = await removeTimesheetAssignment({ jobId: existingAssignment.job_id, technicianId });
 
         if (!deleted_assignment) {
-          const { error: deleteError } = await supabase
-            .from('job_assignments')
+          const { error: deleteError } = await dataLayerClient.from('job_assignments')
             .delete()
             .eq('job_id', existingAssignment.job_id)
             .eq('technician_id', technicianId);
@@ -285,7 +284,7 @@ export const AssignJobDialog = ({
         if (existingAssignment?.job_id && departmentsToRemove.length > 0) {
           await Promise.allSettled(departmentsToRemove.map(async (department) => {
             try {
-              const { error: flexError } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+              const { error: flexError } = await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
                 body: {
                   job_id: existingAssignment.job_id,
                   technician_id: technicianId,
@@ -310,7 +309,7 @@ export const AssignJobDialog = ({
         sound_role: soundRole !== 'none' ? soundRole : null,
         lights_role: lightsRole !== 'none' ? lightsRole : null,
         video_role: videoRole !== 'none' ? videoRole : null,
-        assigned_by: (await supabase.auth.getUser()).data.user?.id,
+        assigned_by: (await dataLayerClient.auth.getUser()).data.user?.id,
         assigned_at: new Date().toISOString(),
         status: assignAsConfirmed ? 'confirmed' : 'invited',
         response_time: assignAsConfirmed ? new Date().toISOString() : null,
@@ -318,8 +317,7 @@ export const AssignJobDialog = ({
       } as const;
 
       // Before writing, check if an assignment already exists for this job + technician
-      const { data: existingRow } = await supabase
-        .from('job_assignments')
+      const { data: existingRow } = await dataLayerClient.from('job_assignments')
         .select('job_id, technician_id, single_day, assignment_date, status')
         .eq('job_id', selectedJobId)
         .eq('technician_id', technicianId)
@@ -350,8 +348,7 @@ export const AssignJobDialog = ({
         };
 
         console.log('Updating existing assignment with data:', updatePayload);
-        const { error } = await supabase
-          .from('job_assignments')
+        const { error } = await dataLayerClient.from('job_assignments')
           .update(updatePayload)
           .eq('job_id', selectedJobId)
           .eq('technician_id', technicianId);
@@ -359,12 +356,11 @@ export const AssignJobDialog = ({
       } else {
         const row = { ...basePayload, single_day: desiredSingleDay, assignment_date: desiredAssignmentDate };
         console.log('Inserting assignment row:', row);
-        const { error: insErr } = await supabase.from('job_assignments').insert(row);
+        const { error: insErr } = await dataLayerClient.from('job_assignments').insert(row);
         if (insErr) {
           if (insErr.code === '23505') {
             console.warn('Duplicate on insert. Updating existing base row.');
-            const { error: updErr } = await supabase
-              .from('job_assignments')
+            const { error: updErr } = await dataLayerClient.from('job_assignments')
               .update({
                 sound_role: row.sound_role,
                 lights_role: row.lights_role,
@@ -389,8 +385,7 @@ export const AssignJobDialog = ({
       // Handle timesheet updates based on whether we're modifying the selected job
       let existingDates: string[] = [];
       if (isModifyingSelectedJob) {
-        const { data: freshTimesheets, error: freshTimesheetsError } = await supabase
-          .from('timesheets')
+        const { data: freshTimesheets, error: freshTimesheetsError } = await dataLayerClient.from('timesheets')
           .select('date')
           .eq('job_id', selectedJobId)
           .eq('technician_id', technicianId)
@@ -415,8 +410,7 @@ export const AssignJobDialog = ({
         }
         if (coverageMode === 'full') {
           // For full job coverage, get all dates from job start to end
-          const { data: jobData } = await supabase
-            .from('jobs')
+          const { data: jobData } = await dataLayerClient.from('jobs')
             .select('start_time, end_time')
             .eq('id', selectedJobId)
             .single();
@@ -513,8 +507,7 @@ export const AssignJobDialog = ({
       } else {
         // Not modifying same job - delete all existing and create new (current behavior)
         console.log('Different job or new assignment - replacing all timesheets');
-        const { error: deleteError } = await supabase
-          .from('timesheets')
+        const { error: deleteError } = await dataLayerClient.from('timesheets')
           .delete()
           .eq('job_id', selectedJobId)
           .eq('technician_id', technicianId);
@@ -547,8 +540,7 @@ export const AssignJobDialog = ({
       }
 
       // Verification: ensure at least one assignment row now exists for this job/tech
-      const verifyQuery = supabase
-        .from('job_assignments')
+      const verifyQuery = dataLayerClient.from('job_assignments')
         .select('job_id')
         .eq('job_id', selectedJobId)
         .eq('technician_id', technicianId)
@@ -576,7 +568,7 @@ export const AssignJobDialog = ({
 
       try {
         if (soundRole && soundRole !== 'none') {
-          const { error: flexError } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+          const { error: flexError } = await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
             body: {
               job_id: selectedJobId,
               technician_id: technicianId,
@@ -591,7 +583,7 @@ export const AssignJobDialog = ({
         }
 
         if (lightsRole && lightsRole !== 'none') {
-          const { error: flexError } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+          const { error: flexError } = await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
             body: {
               job_id: selectedJobId,
               technician_id: technicianId,
@@ -617,7 +609,7 @@ export const AssignJobDialog = ({
 
       const recipientName = `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim();
       try {
-        void supabase.functions.invoke('push', {
+        void dataLayerClient.functions.invoke('push', {
           body: {
             action: 'broadcast',
             type: 'job.assignment.direct',
@@ -668,8 +660,7 @@ export const AssignJobDialog = ({
       const { deleted_assignment } = await removeTimesheetAssignment({ jobId: existingAssignment.job_id, technicianId });
 
       if (!deleted_assignment) {
-        const { error } = await supabase
-          .from('job_assignments')
+        const { error } = await dataLayerClient.from('job_assignments')
           .delete()
           .eq('job_id', existingAssignment.job_id)
           .eq('technician_id', technicianId);
@@ -680,7 +671,7 @@ export const AssignJobDialog = ({
       if (existingAssignment?.job_id && departmentsToRemove.length > 0) {
         await Promise.allSettled(departmentsToRemove.map(async (department) => {
           try {
-            const { error: flexError } = await supabase.functions.invoke('manage-flex-crew-assignments', {
+            const { error: flexError } = await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
               body: {
                 job_id: existingAssignment.job_id,
                 technician_id: technicianId,

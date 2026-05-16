@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useQueryClient } from "@tanstack/react-query";
 import { createQueryKey } from "@/lib/optimized-react-query";
 import { useState, useCallback, useEffect } from "react";
@@ -184,14 +184,13 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         getOrCreateLocationWithDetails(values.location as LocationDetails),
         Promise.resolve(localInputToUTC(values.start_time, values.timezone)),
         Promise.resolve(localInputToUTC(values.end_time, values.timezone)),
-        supabase.auth.getSession()
+        dataLayerClient.auth.getSession()
       ]);
 
       console.log("CreateJobDialog: Location resolved and times converted");
 
       // Create job and departments in a single transaction-like approach
-      const { data: job, error: jobError } = await supabase
-        .from("jobs")
+      const { data: job, error: jobError } = await dataLayerClient.from("jobs")
         .insert([
           {
             title: values.title,
@@ -222,8 +221,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         department,
       }));
 
-      const { error: deptError } = await supabase
-        .from("job_departments")
+      const { error: deptError } = await dataLayerClient.from("job_departments")
         .insert(departmentInserts);
 
       if (deptError) {
@@ -242,7 +240,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
           }
         }
         if (rows.length > 0) {
-          const { error: reqErr } = await supabase.from('job_required_roles').insert(rows);
+          const { error: reqErr } = await dataLayerClient.from('job_required_roles').insert(rows);
           if (reqErr) {
             console.warn('CreateJobDialog: Failed to insert required roles', reqErr);
           }
@@ -259,7 +257,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
       // Broadcast push notification (fire-and-forget)
       try {
-        void supabase.functions.invoke('push', {
+        void dataLayerClient.functions.invoke('push', {
           body: { action: 'broadcast', type: 'job.created', job_id: job.id }
         });
       } catch { }

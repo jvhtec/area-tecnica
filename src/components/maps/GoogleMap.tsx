@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, MapPin } from 'lucide-react';
-import { supabase } from "@/integrations/supabase/client";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 interface GoogleMapProps {
   address?: string;
   coordinates?: { lat: number; lng: number };
@@ -35,7 +34,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
   useEffect(() => {
     const fetchApiKey = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+        const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
         
         if (error) {
           console.error('Failed to fetch Google Maps API key:', error);

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useState, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -30,6 +30,8 @@ import { useLocationManagement } from "@/hooks/useLocationManagement";
 import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
 import { syncFlexElementsForJobDateChange } from "@/utils/flex-folders/syncDateChange";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface EditJobDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -109,8 +111,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         // Fetch location data if job has a location_id
         if (currentJob.location_id) {
           try {
-            const { data: locationData, error } = await supabase
-              .from("locations")
+            const { data: locationData, error } = await dataLayerClient.from("locations")
               .select("*")
               .eq("id", currentJob.location_id)
               .single();
@@ -135,8 +136,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           setVenueData(null);
         }
 
-        const { data: prepDateTypes, error: prepDateTypesError } = await supabase
-          .from("job_date_types")
+        const { data: prepDateTypes, error: prepDateTypesError } = await dataLayerClient.from("job_date_types")
           .select("date")
           .eq("job_id", currentJob.id)
           .eq("type", "prep_day")
@@ -157,8 +157,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   // Fetch current departments when dialog opens
   useEffect(() => {
     const fetchDepartments = async () => {
-      const { data, error } = await supabase
-        .from("job_departments")
+      const { data, error } = await dataLayerClient.from("job_departments")
         .select("department")
         .eq("job_id", job.id);
 
@@ -253,8 +252,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         locationId = null;
       }
 
-      const { error: jobError } = await supabase
-        .from("jobs")
+      const { error: jobError } = await dataLayerClient.from("jobs")
         .update({
           title,
           description,
@@ -270,7 +268,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
       if (jobError) throw jobError;
 
-      const { error: prepErr } = await supabase.rpc("upsert_job_prep_days", {
+      const { error: prepErr } = await dataLayerClient.rpc("upsert_job_prep_days", {
         p_job_id: job.id,
         p_dates: targetPrepDates,
       });
@@ -278,8 +276,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       if (prepErr) throw prepErr;
 
       // Update departments
-      const { data: currentDepts, error: currentDeptsError } = await supabase
-        .from("job_departments")
+      const { data: currentDepts, error: currentDeptsError } = await dataLayerClient.from("job_departments")
         .select("department")
         .eq("job_id", job.id);
 
@@ -292,8 +289,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         (dept) => !selectedDepartments.includes(dept as Department)
       );
       if (toRemove.length > 0) {
-        const { error: deleteDeptError } = await supabase
-          .from("job_departments")
+        const { error: deleteDeptError } = await dataLayerClient.from("job_departments")
           .delete()
           .eq("job_id", job.id)
           .in("department", toRemove);
@@ -303,8 +299,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       // Add new departments
       const toAdd = selectedDepartments.filter((dept) => !currentDepartments.includes(dept));
       if (toAdd.length > 0) {
-        const { error: insertDeptError } = await supabase
-          .from("job_departments")
+        const { error: insertDeptError } = await dataLayerClient.from("job_departments")
           .insert(toAdd.map((department) => ({ job_id: job.id, department })));
         if (insertDeptError) throw insertDeptError;
       }
@@ -324,13 +319,13 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         if ((job.color || '') !== (color || '')) changes.color = { from: job.color, to: color };
 
         // Send general job.updated notification
-        void supabase.functions.invoke('push', {
+        void dataLayerClient.functions.invoke('push', {
           body: { action: 'broadcast', type: 'job.updated', job_id: job.id, changes }
         });
 
         // Send specific job type change notification if job type changed
         if (jobTypeChanged && job.job_type && jobType) {
-          void supabase.functions.invoke('push', {
+          void dataLayerClient.functions.invoke('push', {
             body: {
               action: 'broadcast',
               type: `job.type.changed.${jobType}`,
@@ -393,10 +388,10 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
       });
 
       // Refresh jobs and Hoja de Ruta that depends on the job location
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["job-tech-prep-days", job.id] });
-      queryClient.invalidateQueries({ queryKey: ["hoja-de-ruta", job.id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-tech-prep-days", job.id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("hoja-de-ruta", job.id) });
       onOpenChange(false);
     } catch (error: any) {
       console.error("Error updating job:", error);

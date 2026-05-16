@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/select";
 import { useEffect, useState } from "react";
 import { REQUEST_TRANSPORT_OPTIONS } from "@/constants/transportOptions";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 
 interface TransportRequestDialogProps {
@@ -41,8 +41,7 @@ export function TransportRequestDialog({
   useEffect(() => {
     const loadExisting = async () => {
       if (!requestId) return;
-      const { data, error } = await supabase
-        .from('transport_requests')
+      const { data, error } = await dataLayerClient.from('transport_requests')
         .select('id, note, description, items:transport_request_items(id, transport_type, leftover_space_meters)')
         .eq('id', requestId)
         .single();
@@ -66,7 +65,7 @@ export function TransportRequestDialog({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await dataLayerClient.auth.getUser();
       if (!user) throw new Error('Not authenticated');
 
       const payload = {
@@ -79,15 +78,13 @@ export function TransportRequestDialog({
       };
 
       if (requestId) {
-        const { error } = await supabase
-          .from('transport_requests')
+        const { error } = await dataLayerClient.from('transport_requests')
           .update(payload)
           .eq('id', requestId);
         if (error) throw error;
 
         // Replace items (do not ignore delete failures)
-        const { error: deleteItemsError } = await supabase
-          .from('transport_request_items')
+        const { error: deleteItemsError } = await dataLayerClient.from('transport_request_items')
           .delete()
           .eq('request_id', requestId);
         if (deleteItemsError) throw deleteItemsError;
@@ -100,12 +97,11 @@ export function TransportRequestDialog({
             leftover_space_meters: it.leftover_space_meters === '' ? null : it.leftover_space_meters,
           }));
         if (toInsert.length > 0) {
-          const { error: itemsErr } = await supabase.from('transport_request_items').insert(toInsert);
+          const { error: itemsErr } = await dataLayerClient.from('transport_request_items').insert(toInsert);
           if (itemsErr) throw itemsErr;
         }
       } else {
-        const { data: inserted, error } = await supabase
-          .from('transport_requests')
+        const { data: inserted, error } = await dataLayerClient.from('transport_requests')
           .insert(payload)
           .select('id')
           .single();
@@ -119,11 +115,11 @@ export function TransportRequestDialog({
             leftover_space_meters: it.leftover_space_meters === '' ? null : it.leftover_space_meters,
           }));
         if (toInsert.length > 0) {
-          const { error: itemsErr } = await supabase.from('transport_request_items').insert(toInsert);
+          const { error: itemsErr } = await dataLayerClient.from('transport_request_items').insert(toInsert);
           if (itemsErr) throw itemsErr;
         }
         try {
-          const { error: pushError } = await supabase.functions.invoke('push', {
+          const { error: pushError } = await dataLayerClient.functions.invoke('push', {
             body: {
               action: 'broadcast',
               type: 'logistics.transport.requested',
