@@ -2,10 +2,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 
+import { DocumentsTab, InfoTab, RestaurantsTab } from "@/components/technician/details-modal/DetailsModalTabs";
+import type { DetailsModalViewModel } from "@/components/technician/details-modal/useDetailsModalData";
 import { renderWithProviders } from "@/test/renderWithProviders";
-
-import { DocumentsTab, InfoTab } from "../DetailsModalTabs";
-import type { DetailsModalViewModel } from "../useDetailsModalData";
 
 const theme = {
   bg: "bg-slate-950",
@@ -202,5 +201,56 @@ describe("DetailsModal tabs", () => {
     expect(screen.getByText(/Artist One/)).toBeInTheDocument();
     expect(screen.getByText("Second Stage")).toBeInTheDocument();
     expect(screen.getByText("Tour book.pdf")).toBeInTheDocument();
+  });
+
+  it("renders restaurant website links only for safe http urls", () => {
+    const vm = createVm({
+      isRestaurantsLoading: false,
+      jobDetails: {
+        id: "job-1",
+        title: "Technician Job",
+        start_time: "2026-05-16T10:00:00Z",
+        end_time: "2026-05-16T12:00:00Z",
+        created_at: "2026-05-01T00:00:00Z",
+        job_type: "tourdate",
+        locations: {
+          id: "loc-1",
+          name: "Venue",
+          formatted_address: "Gran Via 1",
+          latitude: 40.4168,
+          longitude: -3.7038,
+        },
+      },
+      jobDetailsLoading: false,
+      restaurants: [
+        {
+          id: "safe-restaurant",
+          name: "Safe Restaurant",
+          address: "Gran Via 2",
+          rating: 4.5,
+          priceLevel: 1,
+          distance: 150,
+          website: "https://safe.example",
+          googlePlaceId: "place-safe",
+        },
+        {
+          id: "unsafe-restaurant",
+          name: "Unsafe Restaurant",
+          address: "Gran Via 3",
+          rating: 4.1,
+          priceLevel: 2,
+          distance: 300,
+          website: "javascript:alert(1)",
+          googlePlaceId: "place-unsafe",
+        },
+      ],
+    });
+
+    const { container } = renderWithProviders(<RestaurantsTab vm={vm} />);
+
+    expect(screen.getByText("Safe Restaurant")).toBeInTheDocument();
+    expect(screen.getByText("Unsafe Restaurant")).toBeInTheDocument();
+    expect(container.querySelector('a[href="https://safe.example/"]')).toBeInTheDocument();
+    expect(container.querySelector('a[href^="javascript:"]')).not.toBeInTheDocument();
   });
 });

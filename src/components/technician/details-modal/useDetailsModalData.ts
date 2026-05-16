@@ -1,20 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatInTimeZone } from "date-fns-tz";
 import { toast } from "sonner";
-
-import type { TourDocument } from "@/hooks/useTourDocuments";
-import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { useWeatherData } from "@/hooks/useWeatherData";
-import { dataLayerClient } from "@/services/dataLayerClient";
-import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from "@/types/job";
-import type { WeatherData } from "@/types/hoja-de-ruta";
-import { PlacesRestaurantService } from "@/utils/hoja-de-ruta/services/places-restaurant-service";
-import { isTechnicianRole } from "@/utils/permissions";
-import { labelForCode } from "@/utils/roles";
-import { queryKeys } from "@/lib/react-query";
 
 import {
   downloadJobDocument,
@@ -23,8 +12,8 @@ import {
   openJobDocument,
   openRider,
   openTourDocument,
-} from "./documentActions";
-import { isUuidLike } from "./formatters";
+} from "@/components/technician/details-modal/documentActions";
+import { isUuidLike } from "@/components/technician/details-modal/formatters";
 import type {
   DetailsModalProps,
   FestivalShiftAssignment,
@@ -39,7 +28,17 @@ import type {
   RoomOccupantProfile,
   TechShiftAssignmentDetail,
   TabId,
-} from "./types";
+} from "@/components/technician/details-modal/types";
+import type { TourDocument } from "@/hooks/useTourDocuments";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
+import { useWeatherData } from "@/hooks/useWeatherData";
+import { queryKeys } from "@/lib/react-query";
+import { dataLayerClient } from "@/services/dataLayerClient";
+import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from "@/types/job";
+import type { WeatherData } from "@/types/hoja-de-ruta";
+import { PlacesRestaurantService } from "@/utils/hoja-de-ruta/services/places-restaurant-service";
+import { isTechnicianRole } from "@/utils/permissions";
+import { labelForCode } from "@/utils/roles";
 
 type JobDetailsRow = JobWithLocationAndDocs & {
   tour_id?: string | null;
@@ -51,6 +50,7 @@ type JobDateType = {
 };
 
 const supabaseForDocuments = dataLayerClient as SupabaseClient;
+const madridTimeZone = "Europe/Madrid";
 
 export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModalProps) => {
   const { user, userRole } = useOptimizedAuth();
@@ -373,10 +373,12 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
     enabled: !!jobDetails?.locations && (!!jobDetails?.locations?.formatted_address || !!jobDetails?.locations?.name || (!!jobDetails?.locations?.latitude && !!jobDetails?.locations?.longitude)),
   });
 
-  const eventDatesString = (jobDetails?.start_time || job?.start_time) && (jobDetails?.end_time || job?.end_time)
-    ? new Date(jobDetails?.start_time || job?.start_time).toLocaleDateString("en-GB").split("/").join("/") +
-    (new Date(jobDetails?.start_time || job?.start_time).toDateString() !== new Date(jobDetails?.end_time || job?.end_time).toDateString()
-      ? " - " + new Date(jobDetails?.end_time || job?.end_time).toLocaleDateString("en-GB").split("/").join("/")
+  const startTime = jobDetails?.start_time || job?.start_time;
+  const endTime = jobDetails?.end_time || job?.end_time;
+  const eventDatesString = startTime && endTime
+    ? formatInTimeZone(startTime, madridTimeZone, "dd/MM/yyyy") +
+    (formatInTimeZone(startTime, madridTimeZone, "yyyy-MM-dd") !== formatInTimeZone(endTime, madridTimeZone, "yyyy-MM-dd")
+      ? " - " + formatInTimeZone(endTime, madridTimeZone, "dd/MM/yyyy")
       : "")
     : "";
 
@@ -494,21 +496,21 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
   const handleOpenMaps = useCallback(() => {
     const address = jobDetails?.locations?.formatted_address || jobDetails?.locations?.name || job?.location?.name || "";
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-    window.open(url, "_blank");
+    window.open(url, "_blank", "noopener,noreferrer");
   }, [job?.location?.name, jobDetails?.locations?.formatted_address, jobDetails?.locations?.name]);
 
   const handleOpenAddressInMaps = useCallback((address: string) => {
     if (!address) return;
     const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
-    window.open(url, "_blank");
+    window.open(url, "_blank", "noopener,noreferrer");
   }, []);
 
   const locationData = jobDetails?.locations || job?.location;
-  const jobStartDate = (jobDetails?.start_time || job?.start_time)
-    ? format(new Date(jobDetails?.start_time || job?.start_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
+  const jobStartDate = startTime
+    ? formatInTimeZone(startTime, madridTimeZone, "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
     : "Fecha no disponible";
-  const jobEndDate = (jobDetails?.end_time || job?.end_time)
-    ? format(new Date(jobDetails?.end_time || job?.end_time), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
+  const jobEndDate = endTime
+    ? formatInTimeZone(endTime, madridTimeZone, "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })
     : "Fecha no disponible";
 
   const getDepartmentFromAssignment = useCallback((assignment: StaffAssignment): string => {

@@ -3,8 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { TourDocument } from "@/hooks/useTourDocuments";
 import type { JobDocument } from "@/types/job";
 import { createSignedUrl } from "@/utils/jobDocuments";
-
-import type { RiderFile } from "./types";
+import type { RiderFile } from "@/components/technician/details-modal/types";
 
 const appendAndClickDownload = (href: string, fileName: string) => {
   const link = document.createElement("a");
@@ -17,7 +16,7 @@ const appendAndClickDownload = (href: string, fileName: string) => {
 
 export const openJobDocument = async (supabase: SupabaseClient, doc: JobDocument) => {
   const url = await createSignedUrl(supabase, doc.file_path, 60);
-  window.open(url, "_blank");
+  window.open(url, "_blank", "noopener,noreferrer");
 };
 
 export const downloadJobDocument = async (supabase: SupabaseClient, doc: JobDocument) => {
@@ -34,7 +33,7 @@ export const openTourDocument = async (supabase: SupabaseClient, doc: TourDocume
     throw error || new Error("No se pudo generar la URL");
   }
 
-  window.open(data.signedUrl, "_blank");
+  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
 };
 
 export const downloadTourDocument = async (supabase: SupabaseClient, doc: TourDocument) => {
@@ -58,7 +57,7 @@ export const openRider = async (supabase: SupabaseClient, file: RiderFile) => {
     throw error || new Error("No se pudo generar la URL");
   }
 
-  window.open(data.signedUrl, "_blank");
+  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
 };
 
 export const downloadRider = async (supabase: SupabaseClient, file: RiderFile) => {

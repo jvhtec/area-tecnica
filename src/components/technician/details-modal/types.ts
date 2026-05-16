@@ -1,7 +1,7 @@
 import type { TourDocument } from "@/hooks/useTourDocuments";
 import type { Restaurant, WeatherData } from "@/types/hoja-de-ruta";
 import type { JobWithLocationAndDocs } from "@/types/job";
-import type { Theme } from "../types";
+import type { Theme } from "@/components/technician/types";
 
 export interface DetailsModalProps {
   theme: Theme;

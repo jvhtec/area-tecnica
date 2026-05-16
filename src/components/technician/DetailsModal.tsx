@@ -2,7 +2,7 @@ import { Calendar as CalendarIcon, X } from "lucide-react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-import { DETAILS_MODAL_TABS } from "./details-modal/constants";
+import { DETAILS_MODAL_TABS } from "@/components/technician/details-modal/constants";
 import {
   DocumentsTab,
   InfoTab,
@@ -11,9 +11,9 @@ import {
   RestaurantsTab,
   TransportTab,
   WeatherTab,
-} from "./details-modal/DetailsModalTabs";
-import type { DetailsModalProps } from "./details-modal/types";
-import { useDetailsModalData } from "./details-modal/useDetailsModalData";
+} from "@/components/technician/details-modal/DetailsModalTabs";
+import type { DetailsModalProps } from "@/components/technician/details-modal/types";
+import { useDetailsModalData } from "@/components/technician/details-modal/useDetailsModalData";
 
 export const DetailsModal = (props: DetailsModalProps) => {
   const vm = useDetailsModalData(props);

@@ -1,4 +1,4 @@
-import { format, parseISO } from "date-fns";
+import { parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import type { ReactNode } from "react";
@@ -25,10 +25,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TourDocumentUploader } from "@/components/tours/TourDocumentUploader";
-import type { Restaurant } from "@/types/hoja-de-ruta";
-import type { JobDocument, StaffAssignment } from "@/types/job";
-import { labelForCode } from "@/utils/roles";
-
 import {
   formatCompanyLabel,
   formatDateTimeLabel,
@@ -40,11 +36,27 @@ import {
   getJobTypeLabel,
   getLogisticsTransportTypeLabel,
   getTravelTransportTypeLabel,
-} from "./formatters";
-import type { DetailsModalViewModel } from "./useDetailsModalData";
+} from "@/components/technician/details-modal/formatters";
+import type { DetailsModalViewModel } from "@/components/technician/details-modal/useDetailsModalData";
+import type { Restaurant } from "@/types/hoja-de-ruta";
+import type { JobDocument, StaffAssignment } from "@/types/job";
+import { labelForCode } from "@/utils/roles";
 
 type TabProps = {
   vm: DetailsModalViewModel;
+};
+
+const madridTimeZone = "Europe/Madrid";
+
+const getSafeHttpUrl = (value?: string | null): string | null => {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
 };
 
 export const InfoTab = ({ vm }: TabProps) => {
@@ -510,7 +522,7 @@ export const PersonnelTab = ({ vm }: TabProps) => {
                   </div>
                   {roomieNames.length > 0 && (
                     <div className="mt-2">
-                      <Badge variant="outline" className="text-[10px]">Roomie: {roomieNames.join(" · ")}</Badge>
+                      <Badge variant="outline" className="text-[10px]">Compañeros: {roomieNames.join(" · ")}</Badge>
                     </div>
                   )}
                 </div>
@@ -553,7 +565,7 @@ export const DocumentsTab = ({ vm }: TabProps) => {
     tourId,
   } = vm;
 
-  const visibleJobDocuments = (job.job_documents || []).filter((doc: JobDocument) => doc.visible_to_tech);
+  const visibleJobDocuments = (job?.job_documents ?? []).filter((doc: JobDocument) => doc.visible_to_tech);
 
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
@@ -739,7 +751,7 @@ const DocumentRow = ({
         </div>
         {metadata}
         <div className={`text-xs ${theme.textMuted}`}>
-          {uploadedAt && `Subido el ${format(new Date(uploadedAt), "d 'de' MMMM 'de' yyyy", { locale: es })}`}
+          {uploadedAt && `Subido el ${formatInTimeZone(uploadedAt, madridTimeZone, "d 'de' MMMM 'de' yyyy", { locale: es })}`}
         </div>
         {badges && <div className="flex gap-1 mt-1 flex-wrap">{badges}</div>}
       </div>
@@ -795,47 +807,51 @@ export const RestaurantsTab = ({ vm }: TabProps) => {
         </div>
       ) : restaurants && restaurants.length > 0 ? (
         <div className="space-y-3">
-          {restaurants.map((restaurant: Restaurant) => (
-            <div key={restaurant.id} className={`p-4 rounded-xl border ${theme.card}`}>
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0 pr-3">
-                  <p className={`font-bold text-sm ${theme.textMain} truncate`}>{restaurant.name}</p>
-                  <p className={`text-xs ${theme.textMuted} mt-1 line-clamp-2`}>{restaurant.address}</p>
+          {restaurants.map((restaurant: Restaurant) => {
+            const websiteUrl = getSafeHttpUrl(restaurant.website);
 
-                  <div className="flex items-center gap-2 mt-3 flex-wrap">
-                    {restaurant.rating && (
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-700"}`}>
-                        ⭐ {restaurant.rating}
-                      </span>
+            return (
+              <div key={restaurant.id} className={`p-4 rounded-xl border ${theme.card}`}>
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0 pr-3">
+                    <p className={`font-bold text-sm ${theme.textMain} truncate`}>{restaurant.name}</p>
+                    <p className={`text-xs ${theme.textMuted} mt-1 line-clamp-2`}>{restaurant.address}</p>
+
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      {restaurant.rating && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDark ? "bg-amber-500/20 text-amber-400" : "bg-amber-100 text-amber-700"}`}>
+                          ⭐ {restaurant.rating}
+                        </span>
+                      )}
+                      {restaurant.priceLevel !== undefined && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"}`}>
+                          {"€".repeat(restaurant.priceLevel + 1)}
+                        </span>
+                      )}
+                      {restaurant.distance && (
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700"}`}>
+                          A {Math.round(restaurant.distance)} m
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-1 shrink-0">
+                    {restaurant.phone && (
+                      <a href={`tel:${restaurant.phone}`} className={`p-2 rounded-lg border ${theme.divider} hover:bg-white/5`}>
+                        <Phone size={14} className={theme.textMuted} />
+                      </a>
                     )}
-                    {restaurant.priceLevel !== undefined && (
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDark ? "bg-emerald-500/20 text-emerald-400" : "bg-emerald-100 text-emerald-700"}`}>
-                        {"€".repeat(restaurant.priceLevel + 1)}
-                      </span>
-                    )}
-                    {restaurant.distance && (
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isDark ? "bg-blue-500/20 text-blue-400" : "bg-blue-100 text-blue-700"}`}>
-                        A {Math.round(restaurant.distance)} m
-                      </span>
+                    {websiteUrl && (
+                      <a href={websiteUrl} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-lg border ${theme.divider} hover:bg-white/5`}>
+                        <Globe size={14} className={theme.textMuted} />
+                      </a>
                     )}
                   </div>
                 </div>
-
-                <div className="flex gap-1 shrink-0">
-                  {restaurant.phone && (
-                    <a href={`tel:${restaurant.phone}`} className={`p-2 rounded-lg border ${theme.divider} hover:bg-white/5`}>
-                      <Phone size={14} className={theme.textMuted} />
-                    </a>
-                  )}
-                  {restaurant.website && (
-                    <a href={restaurant.website} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-lg border ${theme.divider} hover:bg-white/5`}>
-                      <Globe size={14} className={theme.textMuted} />
-                    </a>
-                  )}
-                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className={`h-48 border border-dashed ${theme.divider} rounded-xl flex flex-col items-center justify-center ${theme.textMuted}`}>
@@ -851,7 +867,7 @@ export const RestaurantsTab = ({ vm }: TabProps) => {
             className="mt-4"
             onClick={() => {
               const location = jobDetails?.locations?.formatted_address || jobDetails?.locations?.name || job?.location?.name || "";
-              window.open(`https://www.google.com/maps/search/restaurants+near+${encodeURIComponent(location)}`, "_blank");
+              window.open(`https://www.google.com/maps/search/restaurants+near+${encodeURIComponent(location)}`, "_blank", "noopener,noreferrer");
             }}
           >
             <Globe size={14} className="mr-2" /> Buscar en Google Maps
@@ -930,8 +946,7 @@ export const WeatherTab = ({ vm }: TabProps) => {
                       : "🌤️";
             const weatherDate = (() => {
               try {
-                const date = new Date(weather.date);
-                return date.toLocaleDateString("es-ES", { month: "long", day: "numeric" });
+                return formatInTimeZone(weather.date, madridTimeZone, "d 'de' MMMM", { locale: es });
               } catch {
                 return weather.date;
               }

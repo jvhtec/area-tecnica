@@ -1,4 +1,4 @@
-import type { TabId } from "./types";
+import type { TabId } from "@/components/technician/details-modal/types";
 
 export const JOB_TYPE_LABELS: Record<string, string> = {
   single: "Un solo día",

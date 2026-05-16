@@ -9,7 +9,7 @@ import {
   openJobDocument,
   openRider,
   openTourDocument,
-} from "../documentActions";
+} from "@/components/technician/details-modal/documentActions";
 
 const createStorageClient = () => {
   const createSignedUrl = vi.fn().mockResolvedValue({ data: { signedUrl: "https://signed.example/doc.pdf" }, error: null });
@@ -58,7 +58,7 @@ describe("technician details modal document actions", () => {
 
     expect(storage.from).toHaveBeenCalledWith("job_documents");
     expect(storage.createSignedUrl).toHaveBeenCalledWith("sound/Plan.pdf", 60);
-    expect(window.open).toHaveBeenCalledWith("https://signed.example/doc.pdf", "_blank");
+    expect(window.open).toHaveBeenCalledWith("https://signed.example/doc.pdf", "_blank", "noopener,noreferrer");
   });
 
   it("downloads job documents with the original file name", async () => {
@@ -92,7 +92,7 @@ describe("technician details modal document actions", () => {
 
     expect(storage.from).toHaveBeenCalledWith("tour-documents");
     expect(storage.createSignedUrl).toHaveBeenCalledWith("tour/Tour.pdf", 60);
-    expect(window.open).toHaveBeenCalledWith("https://signed.example/doc.pdf", "_blank");
+    expect(window.open).toHaveBeenCalledWith("https://signed.example/doc.pdf", "_blank", "noopener,noreferrer");
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledTimes(1);
   });
 

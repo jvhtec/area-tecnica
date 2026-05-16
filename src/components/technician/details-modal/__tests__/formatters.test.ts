@@ -12,7 +12,7 @@ import {
   getLogisticsTransportTypeLabel,
   getTravelTransportTypeLabel,
   isUuidLike,
-} from "../formatters";
+} from "@/components/technician/details-modal/formatters";
 
 describe("technician details modal formatters", () => {
   it("keeps legacy labels for job, date, room, and transport values", () => {

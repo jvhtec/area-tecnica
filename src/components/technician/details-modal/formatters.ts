@@ -1,7 +1,7 @@
-import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatInTimeZone } from "date-fns-tz";
 
-import { JOB_TYPE_LABELS } from "./constants";
+import { JOB_TYPE_LABELS } from "@/components/technician/details-modal/constants";
 
 export const getJobTypeLabel = (jobType?: string | null) =>
   jobType ? JOB_TYPE_LABELS[jobType] ?? "Un solo día" : "Un solo día";
@@ -24,7 +24,7 @@ export const formatDateTimeLabel = (value?: string | null): string => {
   try {
     const parsed = new Date(value);
     if (Number.isNaN(parsed.getTime())) return value;
-    return format(parsed, "d 'de' MMM yyyy, HH:mm", { locale: es });
+    return formatInTimeZone(parsed, "Europe/Madrid", "d 'de' MMM yyyy, HH:mm", { locale: es });
   } catch {
     return value;
   }
