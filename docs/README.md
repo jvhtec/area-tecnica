@@ -81,6 +81,7 @@ Detailed deep-dive docs for the full festival subsystem:
   - Phase 2 is complete as of 2026-05-16: component/page Supabase ownership is behind the shared data-layer boundary, generic query keys use `queryKeys`, the highest-use tour-management mutations share feedback/invalidation handling, and wallboard-sensitive calendar dates use Madrid timezone utilities with DST tests.
   - P3-01 technician details refactor is complete as of 2026-05-16: the modal shell is under 500 LOC with data loading, document actions, formatters, and tab sections split into `src/components/technician/details-modal/`.
   - P3-02 job card actions refactor is complete as of 2026-05-16: the `JobCardActions` shell is under 500 LOC with WhatsApp, Flex opening, technical power, dialogs, and button groups split into `src/components/jobs/cards/job-card-actions/`.
+  - P3-03 Flex folder creation refactor is complete as of 2026-05-16: `src/utils/flex-folders/folders.ts` is a compatibility entrypoint, while creation orchestration, dryhire handling, tourdate handling, standard job handling, commercial extras, helpers, and shared creation types live under `src/utils/flex-folders/folder-creation/`.
   - P6-03 source placeholder cleanup is complete as of 2026-05-15; deferred source work should reference a durable roadmap or issue ID rather than bare TODO/FIXME/HACK comments.
 - `migrations/` (migration notes)
 

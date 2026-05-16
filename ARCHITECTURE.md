@@ -228,6 +228,7 @@ area-tecnica/
 │   │
 │   └── utils/                        # Utility functions
 │       ├── flex-folders/             # Flex folder hierarchy management
+│       │   └── folder-creation/      # Folder creation orchestration and operation modules
 │       ├── hoja-de-ruta/             # Tour book utilities & PDF export
 │       ├── incident-report/          # Incident report utilities
 │       ├── pdf/                      # PDF generation engine (jsPDF + pdf-lib)
@@ -873,7 +874,7 @@ Based on the [Tech Debt Audit (2026-02-01)](/.claude/notes/2026-02-01-tech-debt-
 | Unsafe date handling (no timezone) | High | 68 files | `new Date()` without `Europe/Madrid` |
 | Duplicate job query hooks | High | 3 hooks | `useJobs`, `useOptimizedJobs`, `useJobsRealtime` |
 | `as any` type casts | Medium | 463 | Scattered across components and utilities |
-| Files exceeding 300 lines | Medium | 208 | Top file: 1,401 lines (`flex-folders/folders.ts`) |
+| Files exceeding 300 lines | Medium | 208 | Audit example `flex-folders/folders.ts` resolved in P3-03 |
 | Inconsistent toast patterns | Medium | 2 systems | `useToast` (73 files) vs. `sonner` (37 files) |
 | Duplicate utility functions | Medium | 4 | `hexToRgb()` implemented 4 times |
 | Code duplication across features | High | ~1,100 lines | Rate approval hooks, PDF setup, permission checks |
