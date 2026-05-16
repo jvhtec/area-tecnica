@@ -178,7 +178,7 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
       <div className="space-y-4">
         <Row label="Sound Crew Call" dept="sound" />
         <Row label="Lights Crew Call" dept="lights" />
-        <Row label="Video Crew Call" dept="video" />
+        <Row label="Llamada de equipo de vídeo" dept="video" />
       </div>
     );
   }
@@ -193,7 +193,7 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
       <CardContent className="space-y-4">
         <Row label="Sound Crew Call" dept="sound" />
         <Row label="Lights Crew Call" dept="lights" />
-        <Row label="Video Crew Call" dept="video" />
+        <Row label="Llamada de equipo de vídeo" dept="video" />
       </CardContent>
     </Card>
   );

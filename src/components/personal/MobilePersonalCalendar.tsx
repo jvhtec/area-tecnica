@@ -21,8 +21,8 @@ import {
 import { format, addDays, subDays, isToday, isSameDay, isWithinInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import { TechContextMenu } from "./TechContextMenu";
-import { usePersonalCalendarData } from "./hooks/usePersonalCalendarData";
-import type { HouseTech } from "./hooks/usePersonalCalendarData";
+import { usePersonalCalendarData } from "@/components/personal/hooks/usePersonalCalendarData";
+import type { HouseTech } from "@/components/personal/hooks/usePersonalCalendarData";
 import { useTechnicianAvailability } from "./hooks/useTechnicianAvailability";
 import { TechDetailModal } from "./TechDetailModal";
 import { Theme } from "@/components/technician/types";
@@ -37,6 +37,8 @@ interface MobilePersonalCalendarProps {
   theme: Theme;
   isDark: boolean;
 }
+
+type StatusKey = 'off' | 'warehouse' | 'job';
 
 export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   date,
@@ -306,7 +308,7 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   const offTotal = personnelTotals.techsOnVacation + personnelTotals.techsOnDaysOff + personnelTotals.techsTravelling + personnelTotals.techsSick;
 
   const getStatusMeta = (tech: HouseTech): {
-    key: string;
+    key: StatusKey;
     label: string;
     badgeClass: string;
     Icon: typeof Palmtree;

@@ -263,7 +263,11 @@ async function fetchElementMetadata(elementId: string): Promise<SchemaMetadata |
       return null;
     }
 
-    const data = await response.json() as Record<string, unknown>;
+    const payload: unknown = await response.json();
+    const data: Record<string, unknown> =
+      payload && typeof payload === 'object'
+        ? (payload as Record<string, unknown>)
+        : {};
     const metadata: SchemaMetadata = {
       domainId:
         extractFlexField(data['domainId']) ||
