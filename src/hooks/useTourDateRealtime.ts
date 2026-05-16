@@ -45,7 +45,7 @@ export const useTourDateRealtime = (tourId: string | null, tourDateIds: string[]
       // when the subscription is delivering timely updates.
       const fallbackIntervalMs = 15000;
       const interval = setInterval(() => {
-        const state = queryClient.getQueryState(['tour', tourId]);
+        const state = queryClient.getQueryState(queryKeys.scope('tour', tourId));
         const dataUpdatedAt = state?.dataUpdatedAt ?? 0;
         const isFresh = dataUpdatedAt > 0 && Date.now() - dataUpdatedAt < fallbackIntervalMs;
 

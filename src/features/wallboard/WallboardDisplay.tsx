@@ -266,10 +266,9 @@ export function WallboardDisplay({
       const now = new Date();
       const todayKey = formatMadridDateKey(now);
       const todayStart = fromMadridDateKey(todayKey);
-      const weekEnd = fromMadridDateKey(addMadridCalendarDays(todayKey, 6), '23:59:59.999');
+      const weekEndKey = addMadridCalendarDays(todayKey, 6);
+      const weekEnd = fromMadridDateKey(weekEndKey, '23:59:59.999');
       const calendarGrid = getMadridMonthGrid(now);
-      const weekStartISO = todayStart.toISOString();
-      const weekEndISO = weekEnd.toISOString();
       const calendarStartISO = calendarGrid.gridStart.toISOString();
       const calendarEndISO = calendarGrid.gridEnd.toISOString();
       const calendarRange = `[${calendarStartISO},${calendarEndISO}]`;
@@ -610,13 +609,11 @@ export function WallboardDisplay({
       }
 
       // 5) Logistics calendar (next 7 days)
-      const startDate = weekStartISO.slice(0, 10);
-      const endDate = weekEndISO.slice(0, 10);
       const { data: le, error: leErr } = await supabase
         .from('logistics_events')
         .select('id,event_date,event_time,title,transport_type,license_plate,job_id,event_type,loading_bay,color,logistics_event_departments(department)')
-        .gte('event_date', startDate)
-        .lte('event_date', endDate)
+        .gte('event_date', todayKey)
+        .lte('event_date', weekEndKey)
         .order('event_date', { ascending: true })
         .order('event_time', { ascending: true });
       if (leErr) {

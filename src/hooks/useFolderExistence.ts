@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { queryKeys } from "@/lib/react-query";
 export const useFolderExistence = (jobId: string, tourDateId?: string | null) => {
   return useQuery({
-    queryKey: queryKeys.scope("folder-existence", jobId),
+    queryKey: queryKeys.scope("folder-existence", jobId, tourDateId ?? null),
     queryFn: async () => {
       if (import.meta.env.DEV) {
         console.log("useFolderExistence: Checking folder existence for job:", jobId);

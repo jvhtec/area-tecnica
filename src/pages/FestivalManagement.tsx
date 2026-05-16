@@ -1,4 +1,4 @@
-import { FestivalManagementView } from "./festival-management/FestivalManagementView";
+import { FestivalManagementView } from "@/pages/festival-management/FestivalManagementView";
 import { useFestivalManagementVm } from "@/features/festival-management/useFestivalManagementVm";
 
 const FestivalManagement = () => {

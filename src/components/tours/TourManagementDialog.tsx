@@ -15,13 +15,23 @@ import { useState } from "react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
+import type { InvoicingCompany } from "@/types/job";
 
 
 import { queryKeys } from "@/lib/react-query";
+interface Tour {
+  id: string;
+  name: string;
+  status?: string | null;
+  color?: string | null;
+  description?: string | null;
+  invoicing_company?: InvoicingCompany | null;
+}
+
 interface TourManagementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  tour: any;
+  tour: Tour;
   tourDateId?: string; // Add optional tour date ID for override mode
 }
 
@@ -140,9 +150,7 @@ export const TourManagementDialog = ({
           .update({ status: 'Cancelado' })
           .eq('tour_id', tour.id)
           .eq('job_type', 'tourdate');
-        if (jobsErr) {
-          console.warn('Failed to mark tour jobs as Cancelado:', jobsErr);
-        }
+        if (jobsErr) throw jobsErr;
       }
 
       // Refresh tour data

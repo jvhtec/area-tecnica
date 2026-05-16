@@ -96,7 +96,7 @@ export function buildCalendarModel(
     });
   }
 
-  const monthFormatter = new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric', timeZone: MADRID_TIMEZONE });
+  const monthFormatter = new Intl.DateTimeFormat('es-ES', { month: 'long', year: 'numeric', timeZone: MADRID_TIMEZONE });
   const monthLabel = monthFormatter.format(fromMadridDateKey(grid.monthStartKey, '12:00:00'));
 
   const focusMonthKey = grid.monthStartKey.slice(0, 7);

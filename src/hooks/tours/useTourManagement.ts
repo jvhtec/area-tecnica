@@ -1,5 +1,5 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import { InvoicingCompany } from "@/types/job";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { queryKeys } from "@/lib/react-query";
@@ -10,7 +10,23 @@ const TOUR_LIST_KEY = queryKeys.scope("tours");
 const OPTIMIZED_JOBS_KEY = queryKeys.scope("optimized-jobs");
 const JOBS_KEY = queryKeys.scope("jobs");
 
-export const useTourManagement = (tour: any, onClose: () => void) => {
+type TourManagementTarget = {
+  id: string;
+  name?: string | null;
+  status?: string | null;
+  color?: string | null;
+  description?: string | null;
+  invoicing_company?: InvoicingCompany | null;
+};
+
+const throwIfSupabaseError = (results: Array<{ error: unknown }>) => {
+  const failedResult = results.find((result) => result.error);
+  if (failedResult?.error) {
+    throw failedResult.error;
+  }
+};
+
+export const useTourManagement = (tour: TourManagementTarget, onClose: () => void) => {
   const queryClient = useQueryClient();
   const runMutation = useMutationFeedback();
 
@@ -178,10 +194,11 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
           if (flexFoldersError) throw flexFoldersError;
 
           console.log("Deleting tour date overrides...");
-          await Promise.all([
+          const overrideDeletes = await Promise.all([
             supabase.from("tour_date_power_overrides").delete().in("tour_date_id", tourDateIds),
             supabase.from("tour_date_weight_overrides").delete().in("tour_date_id", tourDateIds)
           ]);
+          throwIfSupabaseError(overrideDeletes);
 
           console.log("Deleting tour dates...");
           const { error: tourDatesDeleteError } = await supabase
@@ -193,13 +210,14 @@ export const useTourManagement = (tour: any, onClose: () => void) => {
         }
 
         console.log("Deleting tour-related data...");
-        await Promise.all([
+        const tourRelatedDeletes = await Promise.all([
           supabase.from("tour_logos").delete().eq("tour_id", tour.id),
           supabase.from("tour_power_defaults").delete().eq("tour_id", tour.id),
           supabase.from("tour_weight_defaults").delete().eq("tour_id", tour.id),
           supabase.from("tour_default_sets").delete().eq("tour_id", tour.id),
           supabase.from("tour_assignments").delete().eq("tour_id", tour.id)
         ]);
+        throwIfSupabaseError(tourRelatedDeletes);
 
         console.log("Deleting the tour...");
         const { error: tourDeleteError } = await supabase

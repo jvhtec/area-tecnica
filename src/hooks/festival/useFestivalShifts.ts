@@ -28,8 +28,8 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
   const [isLoading, setIsLoading] = useState(true);
 
   // Set up real-time subscriptions for both tables
-  useTableSubscription('festival_shifts', ['festival_shifts', jobId, selectedDate]);
-  useTableSubscription('festival_shift_assignments', ['festival_shift_assignments', jobId, selectedDate]);
+  useTableSubscription('festival_shifts', queryKeys.scope('festival_shifts', jobId, selectedDate));
+  useTableSubscription('festival_shift_assignments', queryKeys.scope('festival_shift_assignments', jobId, selectedDate));
 
   const fetchShifts = useCallback(async () => {
     if (!selectedDate || !jobId) {

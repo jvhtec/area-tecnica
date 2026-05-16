@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Shared data-layer client for legacy component/page code that still owns query

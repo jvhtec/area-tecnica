@@ -89,8 +89,10 @@ export const useOptimisticJobManagement = (
     return jobsWithFilteredDocs;
   }, [selectedDepartment, startDate, endDate, isProjectManagementPage]);
 
+  const jobsQueryKey = queryKeys.scope("jobs", selectedDepartment, startDate, endDate);
+
   const { data: jobs, isLoading: jobsLoading } = useQuery({
-    queryKey: queryKeys.scope("jobs", selectedDepartment, startDate, endDate),
+    queryKey: jobsQueryKey,
     queryFn: fetchJobs,
     staleTime: 1000 * 30,
     refetchOnWindowFocus: true
@@ -157,7 +159,7 @@ export const useOptimisticJobManagement = (
       
       // Perform optimistic update - remove job from cache immediately
       queryClient.setQueryData(
-        ["jobs", selectedDepartment, startDate, endDate],
+        jobsQueryKey,
         (oldJobs: any[]) => {
           if (!oldJobs) return oldJobs;
           return oldJobs.filter(job => job.id !== jobId);

@@ -8,7 +8,7 @@ import { queryKeys } from "@/lib/react-query";
  */
 export const useOptimizedDateTypes = (jobIds: string[], dates: string[]) => {
   return useQuery({
-    queryKey: queryKeys.scope('date-types', jobIds.sort(), dates.sort()),
+    queryKey: queryKeys.scope('date-types', [...jobIds].sort(), [...dates].sort()),
     queryFn: async () => {
       if (!jobIds.length || !dates.length) {
         return {};
