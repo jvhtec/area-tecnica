@@ -17,6 +17,7 @@ import { ConsoleSetup, FestivalGearSetup } from "@/types/festival";
 import { ArtistSectionProps } from "@/types/artist-form";
 import { Download, Eye, FileText, Loader2, Printer, Trash2 } from "lucide-react";
 import { normalizeWirelessSystem, normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
+import { mapFestivalGearSetup } from "@/utils/festivalGearMappers";
 
 interface ArtistRequirementsFormProps {
   isBlank?: boolean;
@@ -254,12 +255,7 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
         if (cancelled) return;
         if (gearData) {
-          const normalizedGearData = gearData as unknown as FestivalGearSetup;
-          setGearSetup({
-            ...normalizedGearData,
-            wireless_systems: normalizeWirelessSystems(normalizedGearData.wireless_systems, "wireless"),
-            iem_systems: normalizeWirelessSystems(normalizedGearData.iem_systems, "iem"),
-          });
+          setGearSetup(mapFestivalGearSetup(gearData));
         }
 
         const { data: stagesData } = await supabase

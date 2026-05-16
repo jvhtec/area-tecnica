@@ -81,7 +81,7 @@ const createSupabaseBuilder = (response: { data: any; error: any }) => {
   return builder;
 };
 
-const createTechnicalPowerSummary = (missingDepartments: string[] = []) => ({
+const createTechnicalPowerSummary = (missingDepartments: string[] = []): any => ({
   departments: {
     sound: {
       department: 'sound',
@@ -170,7 +170,7 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
 });
 
 vi.mock('@/components/incident-reports/TechnicianIncidentReportDialog', () => ({
-  TechnicianIncidentReportDialog: () => null,
+  TechnicianIncidentReportDialog: (): null => null,
 }));
 
 vi.mock('@/components/flex/FlexElementSelectorDialog', () => ({
@@ -216,7 +216,7 @@ vi.mock('@/utils/pdf/logoUtils', () => ({
 }));
 
 describe('JobCardActions', () => {
-  const defaultProps = {
+  const defaultProps: any = {
     job: {
       id: 'test-job-id',
       job_type: 'single',

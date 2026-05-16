@@ -240,6 +240,8 @@ function extractFlexField(value: unknown): string | undefined {
   return undefined;
 }
 
+const readRecordField = (record: Record<string, unknown>, key: string): unknown => record[key];
+
 async function fetchElementMetadata(elementId: string): Promise<SchemaMetadata | null> {
   try {
     console.log('[flexUrlResolver] Fetching element metadata', { elementId });
@@ -263,24 +265,24 @@ async function fetchElementMetadata(elementId: string): Promise<SchemaMetadata |
       return null;
     }
 
-    const data = await response.json();
+    const data = await response.json() as Record<string, unknown>;
     const metadata: SchemaMetadata = {
       domainId:
-        extractFlexField((data as any)?.domainId) ||
-        extractFlexField((data as any)?.domainID),
+        extractFlexField(readRecordField(data, 'domainId')) ||
+        extractFlexField(readRecordField(data, 'domainID')),
       definitionId:
-        extractFlexField((data as any)?.elementDefinitionId) ||
-        extractFlexField((data as any)?.definitionId),
+        extractFlexField(readRecordField(data, 'elementDefinitionId')) ||
+        extractFlexField(readRecordField(data, 'definitionId')),
       viewHint:
-        extractFlexField((data as any)?.viewHint) ||
-        extractFlexField((data as any)?.view_hint),
-      schemaId: extractFlexField((data as any)?.schemaId),
+        extractFlexField(readRecordField(data, 'viewHint')) ||
+        extractFlexField(readRecordField(data, 'view_hint')),
+      schemaId: extractFlexField(readRecordField(data, 'schemaId')),
       documentNumber:
-        extractFlexField((data as any)?.documentNumber) ||
-        extractFlexField((data as any)?.document_number),
+        extractFlexField(readRecordField(data, 'documentNumber')) ||
+        extractFlexField(readRecordField(data, 'document_number')),
       displayName:
-        extractFlexField((data as any)?.displayName) ||
-        extractFlexField((data as any)?.name),
+        extractFlexField(readRecordField(data, 'displayName')) ||
+        extractFlexField(readRecordField(data, 'name')),
     };
 
     console.log('[flexUrlResolver] Retrieved element metadata', {

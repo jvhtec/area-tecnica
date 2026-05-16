@@ -230,7 +230,7 @@ const loadTourdateReferenceData = async ({
           .select('*')
           .in('set_id', defaultSetIds)
           .eq('table_type', 'power')
-      : { data: [] as TourDefaultTableRow[], error: null };
+      : { data: [] as TourDefaultTableRow[], error: null as null };
 
   if (defaultTablesResponse.error) throw defaultTablesResponse.error;
 

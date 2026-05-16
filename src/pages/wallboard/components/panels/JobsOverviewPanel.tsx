@@ -35,7 +35,7 @@ export const JobsOverviewPanel: React.FC<{
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {paginatedJobs.map((j) => {
-            const jt = (j as any).jobType || (j as any).job_type || '';
+            const jt = j.job_type || '';
             const jtKey = String(jt).toLowerCase();
             const dateTypeIcon = getDateTypeIcon(
               getDateTypeForJobOnDay({ id: j.id, job_type: jtKey, start_time: j.start_time, end_time: j.end_time }, new Date(j.start_time))
@@ -52,7 +52,7 @@ export const JobsOverviewPanel: React.FC<{
                       ? 'border-zinc-200'
                       : 'border-zinc-800'
                 }`}
-                style={{ backgroundColor: getJobCardBackground((j as any).color, theme) }}
+                style={{ backgroundColor: getJobCardBackground(j.color, theme) }}
               >
                 <div className="flex items-center justify-between">
                   <div className="text-38 font-medium truncate pr-2">{j.title}</div>
@@ -79,13 +79,13 @@ export const JobsOverviewPanel: React.FC<{
                       {formatJobTypeLabel(jt)}
                     </span>
                   )}
-                  {formatJobDateTypeLabel((j as any).start_time, (j as any).end_time) && (
+                  {formatJobDateTypeLabel(j.start_time, j.end_time) && (
                     <span
                       className={`px-2 py-0.5 rounded-full border ${
                         theme === 'light' ? 'bg-white/70 text-zinc-800 border-zinc-300' : 'bg-black/40 text-zinc-200 border-zinc-700/60'
                       }`}
                     >
-                      {formatJobDateTypeLabel((j as any).start_time, (j as any).end_time)}
+                      {formatJobDateTypeLabel(j.start_time, j.end_time)}
                     </span>
                   )}
                 </div>
@@ -101,7 +101,7 @@ export const JobsOverviewPanel: React.FC<{
                     <div key={d} className="flex items-center gap-2">
                       <span className="text-38">{d === 'sound' ? '🎧' : d === 'lights' ? '💡' : '📹'}</span>
                       <span className="tabular-nums">
-                        {(j.crewAssigned as any)[d] || 0}/{(j.crewNeeded as any)[d] ?? 0}
+                        {j.crewAssigned[d] || 0}/{j.crewNeeded[d] ?? 0}
                       </span>
                     </div>
                   ))}
@@ -120,4 +120,3 @@ export const JobsOverviewPanel: React.FC<{
     </AutoScrollWrapper>
   );
 };
-

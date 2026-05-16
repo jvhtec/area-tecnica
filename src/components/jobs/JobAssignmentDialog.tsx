@@ -61,6 +61,15 @@ interface JobAssignmentDialogProps {
   disableCategorySync?: boolean;
 }
 
+type JobDateTypeRow = {
+  date?: string | null;
+  type?: string | null;
+};
+
+type JobWithDateTypes = Job & {
+  job_date_types?: JobDateTypeRow[];
+};
+
 interface Assignment {
   technician_id: string;
   sound_role: string;
@@ -216,14 +225,15 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const jobDates = useMemo(() => {
     if (!jobData) return [] as Date[];
 
-    const typedDates = Array.isArray((jobData as any).job_date_types)
-      ? (jobData as any).job_date_types
-        .filter((dt: any) => dt?.date)
-        .filter((dt: any) => {
+    const dateTypeRows = (jobData as unknown as JobWithDateTypes).job_date_types;
+    const typedDates: Date[] = Array.isArray(dateTypeRows)
+      ? dateTypeRows
+        .filter((dt): dt is JobDateTypeRow & { date: string } => Boolean(dt?.date))
+        .filter((dt) => {
           const type = (dt?.type || '').toLowerCase();
           return type !== 'off' && type !== 'travel';
         })
-        .map((dt: any) => {
+        .map((dt) => {
           const d = new Date(`${dt.date}T00:00:00`);
           d.setHours(0, 0, 0, 0);
           return d;

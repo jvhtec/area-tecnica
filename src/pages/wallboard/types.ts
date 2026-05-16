@@ -2,6 +2,7 @@ import type { AnnouncementLevel } from '@/constants/announcementLevels';
 import type { DateType } from '@/constants/dateTypes';
 
 export type Dept = 'sound' | 'lights' | 'video';
+export type DeptCounts = Record<Dept, number> & { total?: number };
 
 export interface JobsOverviewFeed {
   jobs: Array<{
@@ -11,9 +12,9 @@ export interface JobsOverviewFeed {
     end_time: string;
     location: { name: string | null } | null;
     departments: Dept[];
-    crewAssigned: Record<string, number>;
-    crewNeeded: Record<string, number>;
-    docs: Record<string, { have: number; need: number }>;
+    crewAssigned: DeptCounts;
+    crewNeeded: DeptCounts;
+    docs: Partial<Record<Dept, { have: number; need: number }>>;
     status: 'green' | 'yellow' | 'red';
     color?: string | null;
     job_type?: string | null;
@@ -38,6 +39,7 @@ export interface CrewAssignmentsFeed {
     id: string;
     title: string;
     jobType?: string | null;
+    job_type?: string | null;
     start_time?: string;
     end_time?: string;
     color?: string | null;
@@ -55,6 +57,10 @@ export interface DocProgressFeed {
     id: string;
     title: string;
     color?: string | null;
+    jobType?: string | null;
+    job_type?: string | null;
+    start_time?: string;
+    end_time?: string;
     departments: Array<{ dept: Dept; have: number; need: number; missing: string[] }>;
   }>;
 }

@@ -76,7 +76,7 @@ const Lights = () => {
   const departmentJobs = useMemo(() => {
     if (!jobs) return [];
     return jobs.filter((job) => {
-      const isInDepartment = job.job_departments?.some(dept => 
+      const isInDepartment = job.job_departments?.some((dept: { department: string }) =>
         dept.department === currentDepartment
       );
       return isInDepartment;

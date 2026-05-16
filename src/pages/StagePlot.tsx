@@ -24,7 +24,7 @@ export default function StagePlot() {
 
   // Filter jobs to only sound department
   const soundJobs = jobs?.filter(job =>
-    job.job_departments?.some(dept => dept.department === 'sound')
+    job.job_departments?.some((dept: { department: string }) => dept.department === 'sound')
   ) || [];
 
   // Load plot data when job is selected

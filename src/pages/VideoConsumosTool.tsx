@@ -374,7 +374,7 @@ const VideoConsumosTool: React.FC = () => {
       totalVa,
       currentPerPhase: currentLine,
       pduType: pduSuggestion,
-      customPduType: undefined,
+      customPduType: undefined as string | undefined,
       position: currentTable.position,
       customPosition: currentTable.customPosition,
       includesHoist: false,

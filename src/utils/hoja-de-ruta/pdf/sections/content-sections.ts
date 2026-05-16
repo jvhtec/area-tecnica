@@ -1,5 +1,5 @@
 import { PDFDocument } from '../core/pdf-document';
-import { EventData, TravelArrangement, Accommodation } from '../core/pdf-types';
+import { EventData, TravelArrangement, Accommodation, RoomAssignment } from '../core/pdf-types';
 import { EventSection } from './event';
 import { VenueSection } from './venue';
 import { ContactsSection } from './contacts';
@@ -172,7 +172,7 @@ export class ContentSections {
         DataValidators.hasData(acc.address);
       const hasDates = DataValidators.hasData(acc.check_in) || DataValidators.hasData(acc.check_out);
       const hasRooms = Array.isArray(acc.rooms) && (
-        acc.rooms.some(room => DataValidators.hasMeaningfulRoomData(room)) || acc.rooms.length > 0
+        acc.rooms.some((room: RoomAssignment) => DataValidators.hasMeaningfulRoomData(room)) || acc.rooms.length > 0
       );
 
       return hasHotelInfo || hasDates || hasRooms;

@@ -255,6 +255,7 @@ export const FestivalGearSetupForm = ({
       // STEP 1: For primary stage (stage 1), always update the global setup
       if (isPrimaryStage) {
         const setupPayload = {
+          id: existingSetupId ?? undefined,
           job_id: jobId,
           max_stages: setup.max_stages,
           foh_consoles: setup.foh_consoles,
@@ -277,11 +278,6 @@ export const FestivalGearSetupForm = ({
           other_infrastructure: setup.other_infrastructure,
           notes: setup.notes
         };
-
-        // Add the ID for updates if we have an existing setup
-        if (existingSetupId) {
-          setupPayload['id'] = existingSetupId;
-        }
 
         console.log('=== PAYLOAD DEBUG ===');
         console.log('Payload for global setup save:', setupPayload);
@@ -355,6 +351,7 @@ export const FestivalGearSetupForm = ({
         
         // STEP 2: For non-primary stages, create/update stage-specific setup
         const stagePayload = {
+          id: stageSetupId ?? undefined,
           gear_setup_id: globalSetupId,
           stage_number: stageNumber,
           foh_consoles: setup.foh_consoles,
@@ -382,11 +379,6 @@ export const FestivalGearSetupForm = ({
           other_infrastructure: setup.other_infrastructure,
           notes: setup.notes
         };
-        
-        // Add ID if we're updating an existing stage setup
-        if (stageSetupId) {
-          stagePayload['id'] = stageSetupId;
-        }
         
         console.log('=== STAGE PAYLOAD DEBUG ===');
         console.log('Payload for stage setup save:', stagePayload);
@@ -466,7 +458,7 @@ export const FestivalGearSetupForm = ({
     rider_missing: false,
     isaftermidnight: false,
     mic_kit: "band" as const,
-    wired_mics: []
+    wired_mics: [] as GearSetupFormData["wired_mics"]
   });
 
   return (

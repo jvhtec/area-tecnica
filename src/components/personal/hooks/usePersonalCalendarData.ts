@@ -126,7 +126,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
             }
           });
 
-          const baseAssignments: Assignment[] = Array.from(assignmentsMap.values()).map((entry) => {
+          const baseAssignments: Assignment[] = Array.from(assignmentsMap.values()).map((entry): Assignment => {
             const jobData = entry.job;
             const locationValue = Array.isArray(jobData.locations)
               ? jobData.locations[0]

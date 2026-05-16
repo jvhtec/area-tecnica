@@ -12,3 +12,27 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+declare module "file-saver" {
+  export function saveAs(
+    data: Blob | File | string,
+    filename?: string,
+    options?: { autoBom?: boolean }
+  ): void;
+}
+
+declare module "qrcode" {
+  export interface QRCodeToDataURLOptions {
+    width?: number;
+    margin?: number;
+    color?: {
+      dark?: string;
+      light?: string;
+    };
+  }
+
+  export function toDataURL(
+    text: string,
+    options?: QRCodeToDataURLOptions
+  ): Promise<string>;
+}

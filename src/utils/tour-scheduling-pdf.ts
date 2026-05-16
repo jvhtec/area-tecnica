@@ -1,4 +1,3 @@
-// @ts-nocheck
 import type jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -11,6 +10,82 @@ import { buildReadableFilename } from '@/utils/fileName';
 const CORPORATE_RED: [number, number, number] = [125, 1, 1];
 const HEADER_HEIGHT = 30;
 const FOOTER_HEIGHT = 30;
+
+interface AutoTableDocument extends jsPDF {
+  lastAutoTable?: {
+    finalY?: number;
+  };
+}
+
+interface TourLocation {
+  name?: string | null;
+  address?: string | null;
+  formatted_address?: string | null;
+}
+
+interface TourData {
+  id: string;
+  name: string;
+  description?: string | null;
+  status?: string | null;
+}
+
+interface TourDateData {
+  id: string;
+  date: string;
+  notes?: string | null;
+  location?: TourLocation | null;
+}
+
+interface ProgramRow {
+  time?: string | null;
+  item?: string | null;
+  dept?: string | null;
+  notes?: string | null;
+}
+
+interface ProgramDay {
+  label?: string | null;
+  rows?: ProgramRow[];
+}
+
+interface CrewProfile {
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+}
+
+interface CrewAssignment {
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+  profiles?: CrewProfile | CrewProfile[] | null;
+}
+
+const getLastAutoTableY = (pdf: jsPDF, fallback: number): number =>
+  (pdf as AutoTableDocument).lastAutoTable?.finalY ?? fallback;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const asProgramDays = (value: unknown): ProgramDay[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(isRecord)
+    .map((day): ProgramDay => ({
+      label: typeof day.label === 'string' ? day.label : null,
+      rows: Array.isArray(day.rows)
+        ? day.rows.filter(isRecord).map((row): ProgramRow => ({
+            time: typeof row.time === 'string' ? row.time : null,
+            item: typeof row.item === 'string' ? row.item : null,
+            dept: typeof row.dept === 'string' ? row.dept : null,
+            notes: typeof row.notes === 'string' ? row.notes : null,
+          }))
+        : [],
+    }));
+};
+
+const asCrewAssignments = (value: unknown): CrewAssignment[] => (Array.isArray(value) ? (value as CrewAssignment[]) : []);
 
 /**
  * Load company logo as base64
@@ -118,8 +193,8 @@ const addPDFFooter = async (pdf: jsPDF, pageNum?: number) => {
  * Generate a single day sheet for a tour date
  */
 export const generateTourDaySheet = async (
-  tourData: any,
-  tourDate: any
+  tourData: TourData,
+  tourDate: TourDateData
 ) => {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF();
@@ -172,7 +247,7 @@ export const generateTourDaySheet = async (
     margin: { left: 10, right: 10 },
   });
 
-  currentY = (pdf as any).lastAutoTable.finalY + 15;
+  currentY = getLastAutoTableY(pdf, currentY) + 15;
 
   // Load hoja de ruta for this date
   try {
@@ -189,7 +264,7 @@ export const generateTourDaySheet = async (
       pdf.text('Programa del Día', 10, currentY);
       currentY += 10;
 
-      const schedule = hojaDeRuta.program_schedule_json;
+      const schedule = asProgramDays(hojaDeRuta.program_schedule_json);
 
       // Process all program days
       for (const day of schedule) {
@@ -203,7 +278,7 @@ export const generateTourDaySheet = async (
             currentY += 8;
           }
 
-          const scheduleData = day.rows.map((row: any) => [
+          const scheduleData = (day.rows ?? []).map((row) => [
             row.time || '',
             row.item || '',
             row.dept || '',
@@ -234,7 +309,7 @@ export const generateTourDaySheet = async (
             margin: { left: 10, right: 10 },
           });
 
-          currentY = (pdf as any).lastAutoTable.finalY + 10;
+          currentY = getLastAutoTableY(pdf, currentY) + 10;
         }
       }
     }
@@ -248,12 +323,7 @@ export const generateTourDaySheet = async (
 
     if (jobQuery.data?.id && tourDate.location?.address) {
       try {
-        const weatherData = await getWeatherForJob(
-          jobQuery.data.id,
-          tourDate.date,
-          tourDate.date,
-          tourDate.location.address
-        );
+        const weatherData = await getWeatherForJob({ address: tourDate.location.address }, tourDate.date);
 
         if (weatherData && weatherData.length > 0) {
           // Check if we need a new page
@@ -299,7 +369,7 @@ export const generateTourDaySheet = async (
             margin: { left: 10, right: 10 },
           });
 
-          currentY = (pdf as any).lastAutoTable.finalY + 10;
+          currentY = getLastAutoTableY(pdf, currentY) + 10;
         }
       } catch (weatherError) {
         console.warn('Could not load weather data:', weatherError);
@@ -333,7 +403,7 @@ export const generateTourDaySheet = async (
         pdf.text('Personal Asignado', 10, currentY);
         currentY += 10;
 
-        const crewData = assignments.map((a: any) => {
+        const crewData = asCrewAssignments(assignments).map((a) => {
           const profile = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
           const roles = [];
           if (a.sound_role) roles.push(`Sound: ${a.sound_role}`);
@@ -391,8 +461,8 @@ export const generateTourDaySheet = async (
  * Generate a comprehensive tour book for all tour dates
  */
 export const generateTourBook = async (
-  tourData: any,
-  tourDates: any[]
+  tourData: TourData,
+  tourDates: TourDateData[]
 ) => {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF();
@@ -588,7 +658,7 @@ export const generateTourBook = async (
       margin: { left: 10, right: 10 },
     });
 
-    currentY = (pdf as any).lastAutoTable.finalY + 15;
+    currentY = getLastAutoTableY(pdf, currentY) + 15;
 
     // Load and add schedule if available
     try {
@@ -604,11 +674,11 @@ export const generateTourBook = async (
         pdf.text('Programa', 10, currentY);
         currentY += 8;
 
-        const schedule = hojaDeRuta.program_schedule_json;
+        const schedule = asProgramDays(hojaDeRuta.program_schedule_json);
 
         for (const day of schedule) {
           if (day.rows && day.rows.length > 0) {
-            const scheduleData = day.rows.map((row: any) => [
+            const scheduleData = day.rows.map((row) => [
               row.time || '',
               row.item || '',
               row.dept || '',
@@ -637,7 +707,7 @@ export const generateTourBook = async (
               margin: { left: 10, right: 10 },
             });
 
-            currentY = (pdf as any).lastAutoTable.finalY + 5;
+            currentY = getLastAutoTableY(pdf, currentY) + 5;
           }
         }
       }

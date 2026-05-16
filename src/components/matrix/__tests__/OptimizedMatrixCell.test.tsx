@@ -58,7 +58,7 @@ vi.mock('@/features/staffing/hooks/useStaffing', () => ({
   }),
 }));
 
-const mockTechnician = {
+const mockTechnician: any = {
   id: 'tech-1',
   first_name: 'John',
   nickname: null,
@@ -68,7 +68,7 @@ const mockTechnician = {
 
 const mockDate = new Date('2024-05-15T00:00:00Z');
 
-const mockAssignment = {
+const mockAssignment: any = {
   job_id: 'job-1',
   status: 'confirmed',
   sound_role: 'foh',
@@ -270,7 +270,7 @@ describe('OptimizedMatrixCell', () => {
   });
 
   it('displays staffing availability status badge', () => {
-    const staffingStatus = {
+    const staffingStatus: any = {
       availability_status: 'confirmed',
       offer_status: null,
     };
@@ -292,7 +292,7 @@ describe('OptimizedMatrixCell', () => {
   });
 
   it('displays staffing offer status badge', () => {
-    const staffingStatus = {
+    const staffingStatus: any = {
       availability_status: null,
       offer_status: 'sent',
     };
@@ -331,7 +331,7 @@ describe('OptimizedMatrixCell', () => {
   });
 
   it('shows offer buttons when availability is confirmed', () => {
-    const staffingStatus = {
+    const staffingStatus: any = {
       availability_status: 'confirmed',
       offer_status: null,
     };
@@ -651,7 +651,7 @@ describe('OptimizedMatrixCell', () => {
 
   it('renders staffing tooltip metadata and degrades gracefully when sender is missing', async () => {
     const user = userEvent.setup();
-    const staffingStatus = {
+    const staffingStatus: any = {
       availability_status: ' Requested ',
       availability_requested_by: null,
       availability_created_at: '2026-04-08T09:15:00.000Z',

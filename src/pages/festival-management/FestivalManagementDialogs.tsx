@@ -385,7 +385,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
                   value={waStageNumber > 0 ? String(waStageNumber) : ""}
                   onChange={(e) => setWaStageNumber(Number.parseInt(e.target.value, 10))}
                 >
-                  {festivalWhatsappStageOptions.map((stage) => (
+                  {festivalWhatsappStageOptions.map((stage: { number: number; name: string }) => (
                     <option key={stage.number} value={stage.number}>
                       {stage.name}
                     </option>

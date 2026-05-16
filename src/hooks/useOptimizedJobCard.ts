@@ -20,6 +20,14 @@ type UseOptimizedJobCardOptions = {
   refreshAssignmentsOnMount?: boolean;
 };
 
+type JobDocumentRow = {
+  id: string;
+  file_name?: string | null;
+  file_path: string;
+  read_only?: boolean | null;
+  [key: string]: unknown;
+};
+
 export const useOptimizedJobCard = (
   job: any,
   department: string,
@@ -49,7 +57,7 @@ export const useOptimizedJobCard = (
   // Local state
   const [collapsed, setCollapsed] = useState(true);
   const [assignments, setAssignments] = useState(job.job_assignments || []);
-  const [documents, setDocuments] = useState(job.job_documents || []);
+  const [documents, setDocuments] = useState<JobDocumentRow[]>((job.job_documents || []) as JobDocumentRow[]);
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
   const [videoTaskDialogOpen, setVideoTaskDialogOpen] = useState(false);
@@ -61,7 +69,7 @@ export const useOptimizedJobCard = (
 
 
   useEffect(() => {
-    setDocuments(job.job_documents || []);
+    setDocuments((job.job_documents || []) as JobDocumentRow[]);
   }, [job.job_documents]);
 
   const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
@@ -338,7 +346,7 @@ export const useOptimizedJobCard = (
 
       // Update local documents state immediately
       if (inserted) {
-        setDocuments(prev => Array.isArray(prev) ? [...prev, inserted] : [inserted]);
+        setDocuments((prev) => Array.isArray(prev) ? [...prev, inserted as JobDocumentRow] : [inserted as JobDocumentRow]);
       }
 
       // Broadcast push: new document uploaded
@@ -375,7 +383,7 @@ export const useOptimizedJobCard = (
       if (dbError) throw dbError;
 
       // Update local documents state immediately
-      setDocuments(prev => Array.isArray(prev) ? prev.filter((d: any) => d.id !== doc.id) : prev);
+      setDocuments((prev) => Array.isArray(prev) ? prev.filter((d) => d.id !== doc.id) : prev);
 
       // Broadcast push: document deleted
       try {
@@ -398,7 +406,7 @@ export const useOptimizedJobCard = (
         .eq('job_id', job.id)
         .order('uploaded_at', { ascending: false });
       if (!error) {
-        setDocuments(data || []);
+        setDocuments((data || []) as JobDocumentRow[]);
       }
 
       void refreshAssignments();

@@ -9,6 +9,7 @@ type LightsTaskUpdate = Database['public']['Tables']['lights_job_tasks']['Update
 type VideoTaskUpdate = Database['public']['Tables']['video_job_tasks']['Update'];
 type ProductionTaskUpdate = Database['public']['Tables']['production_job_tasks']['Update'];
 type AdministrativeTaskUpdate = Database['public']['Tables']['administrative_job_tasks']['Update'];
+type TaskDocumentsRow = Database['public']['Tables']['task_documents']['Row'];
 type TaskUpdate =
   | SoundTaskUpdate
   | LightsTaskUpdate
@@ -16,7 +17,63 @@ type TaskUpdate =
   | ProductionTaskUpdate
   | AdministrativeTaskUpdate;
 
-const TASK_TABLE: Record<Dept, string> = {
+type TaskTableName =
+  | 'sound_job_tasks'
+  | 'lights_job_tasks'
+  | 'video_job_tasks'
+  | 'production_job_tasks'
+  | 'administrative_job_tasks';
+
+type DynamicTableName = TaskTableName | 'task_documents';
+
+interface SupabaseErrorLike {
+  message: string;
+  code?: string;
+}
+
+interface QueryResult<TData> {
+  data: TData;
+  error: SupabaseErrorLike | null;
+}
+
+type RowFromArray<TData> = TData extends Array<infer TRow> ? TRow : TData;
+
+interface TaskFilterBuilder<TData> extends PromiseLike<QueryResult<TData>> {
+  eq(column: string, value: unknown): this;
+  neq(column: string, value: unknown): this;
+  in(column: string, values: unknown[]): this;
+  is(column: string, value: null): this;
+  limit(count: number): this;
+  select<TNext = TData>(columns?: string): TaskFilterBuilder<TNext>;
+  single<TSingle = RowFromArray<TData>>(): PromiseLike<QueryResult<TSingle>>;
+  maybeSingle<TSingle = RowFromArray<TData>>(): PromiseLike<QueryResult<TSingle | null>>;
+}
+
+interface TaskTableBuilder {
+  select<TData = unknown[]>(columns?: string): TaskFilterBuilder<TData>;
+  update<TData = unknown[]>(values: Record<string, unknown>): TaskFilterBuilder<TData>;
+  insert<TData = unknown[]>(values: Record<string, unknown> | Array<Record<string, unknown>>): TaskFilterBuilder<TData>;
+  delete<TData = unknown[]>(): TaskFilterBuilder<TData>;
+}
+
+interface TaskMutationRow {
+  id: string;
+  task_type: string | null;
+  assigned_to: string | null;
+  created_by: string | null;
+  job_id: string | null;
+  tour_id: string | null;
+}
+
+interface TaskDocumentRow {
+  id: string;
+  file_name: string;
+  file_path: string;
+  job_id?: string | null;
+  tour_id?: string | null;
+}
+
+const TASK_TABLE: Record<Dept, TaskTableName> = {
   sound: 'sound_job_tasks',
   lights: 'lights_job_tasks',
   video: 'video_job_tasks',
@@ -33,11 +90,11 @@ const DOC_FK: Record<Dept, string> = {
 };
 
 type DynamicSupabaseClient = {
-  from: (table: string) => any;
+  from: (table: DynamicTableName) => TaskTableBuilder;
 };
 
 const dynamicSupabase = supabase as unknown as DynamicSupabaseClient;
-const fromDynamicTable = (table: string) => dynamicSupabase.from(table);
+const fromDynamicTable = (table: DynamicTableName) => dynamicSupabase.from(table);
 
 /**
  * Returns the current UTC instant as an ISO string for timestamptz columns.
@@ -102,7 +159,7 @@ export function useGlobalTaskMutations(department: Dept) {
    * Centralizes validation + created_by population to keep behavior consistent
    * between createTask and createTaskForDepartment.
    */
-  const createTaskInTable = async (targetTable: string, params: {
+  const createTaskInTable = async (targetTable: TaskTableName, params: {
     task_type: string;
     description?: string | null;
     assigned_to?: string | null;
@@ -135,7 +192,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     const { data, error } = await fromDynamicTable(targetTable)
       .insert(payload)
-      .select()
+      .select<TaskMutationRow[]>()
       .single();
     if (error) throw error;
 
@@ -187,15 +244,15 @@ export function useGlobalTaskMutations(department: Dept) {
     const targetTable = TASK_TABLE[targetDept];
     const { data, payload, userId } = await createTaskInTable(targetTable, params);
 
-    if ((payload as any).assigned_to && userId) {
+    if (payload.assigned_to && userId) {
       try {
         await supabase.functions.invoke('push', {
           body: {
             action: 'broadcast',
             type: 'task.assigned',
-            recipient_id: (payload as any).assigned_to,
-            user_ids: [userId, (payload as any).assigned_to],
-            task_id: (data as any).id,
+            recipient_id: payload.assigned_to,
+            user_ids: [userId, payload.assigned_to],
+            task_id: data.id,
             task_type: params.task_type,
           },
         });
@@ -251,7 +308,7 @@ export function useGlobalTaskMutations(department: Dept) {
     if (params.tour_id) payloadBase.tour_id = params.tour_id;
 
     let existingQuery = fromDynamicTable(table)
-      .select('assigned_to')
+      .select<Array<Pick<TaskMutationRow, 'assigned_to'>>>('assigned_to')
       .eq('task_type', params.task_type)
       .in('assigned_to', normalizedAssigneeIds);
 
@@ -266,7 +323,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     const existingAssignees = new Set(
       (existingTasks || [])
-        .map((row: any) => row.assigned_to)
+        .map((row) => row.assigned_to)
         .filter((id: string | null) => Boolean(id))
     );
 
@@ -282,7 +339,7 @@ export function useGlobalTaskMutations(department: Dept) {
       assigned_to: assigneeId,
     }));
 
-    const { data, error } = await fromDynamicTable(table).insert(payloads).select('id, assigned_to');
+    const { data, error } = await fromDynamicTable(table).insert(payloads).select<Array<Pick<TaskMutationRow, 'id' | 'assigned_to'>>>('id, assigned_to');
     if (error) throw error;
 
     return { created: data || [], skippedAssigneeIds };
@@ -299,13 +356,13 @@ export function useGlobalTaskMutations(department: Dept) {
 
     // First, get the task to know job_id/tour_id for mirror cleanup
     const { data: task } = await fromDynamicTable(table)
-      .select('job_id, tour_id')
+      .select<Pick<TaskMutationRow, 'job_id' | 'tour_id'>[]>('job_id, tour_id')
       .eq('id', id)
       .maybeSingle();
 
     // Fetch all attachments for this task
     const { data: docs } = await fromDynamicTable('task_documents')
-      .select('id, file_path')
+      .select<Array<Pick<TaskDocumentRow, 'id' | 'file_path'>>>('id, file_path')
       .eq(docFk, id);
 
     // Delete each attachment (storage files + mirrored copies)
@@ -382,7 +439,7 @@ export function useGlobalTaskMutations(department: Dept) {
     const assignerId = authData?.user?.id ?? null;
 
     const { data: currentTask, error: currentTaskError } = await fromDynamicTable(table)
-      .select('id, task_type, job_id, tour_id, assigned_to, created_by')
+      .select<TaskMutationRow[]>('id, task_type, job_id, tour_id, assigned_to, created_by')
       .eq('id', id)
       .maybeSingle();
     if (currentTaskError) throw currentTaskError;
@@ -394,7 +451,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     if (userId) {
       let conflictQuery = fromDynamicTable(table)
-        .select('id')
+        .select<Array<Pick<TaskMutationRow, 'id'>>>('id')
         .eq('task_type', currentTask.task_type)
         .eq('assigned_to', userId)
         .neq('id', id)
@@ -422,7 +479,7 @@ export function useGlobalTaskMutations(department: Dept) {
     const { data, error } = await fromDynamicTable(table)
       .update({ assigned_to: userId, updated_at: nowUTC() })
       .eq('id', id)
-      .select('id, task_type, created_by')
+      .select<Array<Pick<TaskMutationRow, 'id' | 'task_type' | 'created_by'>>>('id, task_type, created_by')
       .maybeSingle();
     if (error) {
       if (userId && isTaskAssigneeUniqueConflict(error)) {
@@ -469,7 +526,7 @@ export function useGlobalTaskMutations(department: Dept) {
     const userId = authData?.user?.id ?? null;
 
     const { data: task } = await fromDynamicTable(table)
-      .select('id, task_type, assigned_to, created_by, job_id, tour_id')
+      .select<TaskMutationRow[]>('id, task_type, assigned_to, created_by, job_id, tour_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -537,7 +594,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     // Get the previous link state so we can clean up old mirrors
     const { data: prevTask } = await fromDynamicTable(table)
-      .select('job_id, tour_id')
+      .select<Pick<TaskMutationRow, 'job_id' | 'tour_id'>[]>('job_id, tour_id')
       .eq('id', id)
       .maybeSingle();
 
@@ -548,7 +605,7 @@ export function useGlobalTaskMutations(department: Dept) {
 
     // Fetch existing task documents
     const { data: taskDocs } = await fromDynamicTable('task_documents')
-      .select('id, file_name, file_path')
+      .select<Array<Pick<TaskDocumentRow, 'id' | 'file_name' | 'file_path'>>>('id, file_name, file_path')
       .eq(docFk, id);
 
     const docs = taskDocs || [];

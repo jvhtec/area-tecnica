@@ -37,6 +37,12 @@ interface LightsTaskDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type TaskDocumentRow = {
+  id: string;
+  file_name: string;
+  file_path: string;
+};
+
 export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialogProps) => {
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -491,7 +497,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                         </TableCell>
                         <TableCell>
                           <div className="max-h-[60px] overflow-y-auto">
-                            {task?.task_documents?.map((doc) => (
+                            {task?.task_documents?.map((doc: TaskDocumentRow) => (
                               <div
                                 key={doc.id}
                                 className="flex items-center justify-between p-1 text-xs"

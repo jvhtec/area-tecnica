@@ -20,6 +20,7 @@ import type {
   CalendarFeed,
   CrewAssignmentsFeed,
   Dept,
+  DeptCounts,
   DocProgressFeed,
   JobsOverviewFeed,
   JobsOverviewJob,
@@ -43,6 +44,52 @@ import {
   AlienLogisticsPanel,
   AlienPendingPanel,
 } from './components/alien/AlienPanels';
+
+type WallboardJobRow = {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  status: string | null;
+  location_id: string | null;
+  job_type: string | null;
+  tour_id: string | null;
+  timezone?: string | null;
+  color?: string | null;
+};
+
+type TourMetaRow = { id: string; status: string | null };
+type DepartmentRow = { job_id: string; department: string | null };
+type AssignmentRow = {
+  job_id: string;
+  technician_id: string | null;
+  sound_role: string | null;
+  lights_role: string | null;
+  video_role: string | null;
+};
+type RequiredRoleRow = { job_id: string; department: string | null; total_required: number | null };
+type LocationRow = { id: string; name: string | null };
+type DocCountRow = { job_id: string; department: string | null; have: number | null };
+type DocRequirementRow = { department: string | null; need: number | null };
+type ProfileRow = { id: string; first_name: string | null; last_name: string | null; department: string | null };
+type LogisticsEventRow = {
+  id: string;
+  event_date: string;
+  event_time: string;
+  title: string | null;
+  transport_type: string | null;
+  license_plate: string | null;
+  job_id: string | null;
+  event_type: string | null;
+  loading_bay: string | null;
+  color?: string | null;
+  logistics_event_departments?: Array<{ department: string | null }> | null;
+};
+type CrewDraft = CrewAssignmentsFeed['jobs'][number]['crew'][number] & { technician_id: string };
+type CrewJobDraft = Omit<CrewAssignmentsFeed['jobs'][number], 'crew'> & { crew: CrewDraft[] };
+
+const isDept = (value: string | null | undefined): value is Dept =>
+  value === 'sound' || value === 'lights' || value === 'video';
 
 export function WallboardDisplay({
   presetSlug: propPresetSlug,
@@ -227,12 +274,12 @@ export function WallboardDisplay({
       const calendarStartMs = calendarGridStart.getTime();
       const calendarEndMs = calendarGridEnd.getTime();
 
-      const jobOverlapsWeek = (j: any) => {
+      const jobOverlapsWeek = (j: WallboardJobRow) => {
         const startTime = new Date(j.start_time).getTime();
         const endTime = new Date(j.end_time).getTime();
         return endTime >= weekStartMs && startTime <= weekEndMs;
       };
-      const jobWithinCalendarWindow = (j: any) => {
+      const jobWithinCalendarWindow = (j: WallboardJobRow) => {
         const startTime = new Date(j.start_time).getTime();
         const endTime = new Date(j.end_time).getTime();
         return endTime >= calendarStartMs && startTime <= calendarEndMs;
@@ -248,46 +295,47 @@ export function WallboardDisplay({
         .order('start_time', { ascending: true });
       if (jobsError)
         console.error('Wallboard jobs query error:', jobsError?.message || jobsError, { calendarStartISO, calendarEndISO });
-      let jobArr = jobs || [];
+      let jobArr: WallboardJobRow[] = jobs || [];
 
       // Exclude jobs whose parent tour is cancelled (some entries may still be Confirmado)
-      const tourIds = Array.from(new Set(jobArr.map((j: any) => j.tour_id).filter(Boolean)));
+      const tourIds = Array.from(new Set(jobArr.map((j) => j.tour_id).filter((id): id is string => Boolean(id))));
       if (tourIds.length) {
         const { data: toursMeta, error: toursErr } = await supabase.from('tours').select('id,status').in('id', tourIds);
         if (toursErr) {
           console.warn('Wallboard tours meta error:', toursErr);
         } else if (toursMeta && toursMeta.length) {
-          const cancelledTours = new Set((toursMeta as any[]).filter((t) => t.status === 'cancelled').map((t) => t.id));
+          const cancelledTours = new Set((toursMeta as TourMetaRow[]).filter((t) => t.status === 'cancelled').map((t) => t.id));
           if (cancelledTours.size) {
-            jobArr = jobArr.filter((j: any) => !j.tour_id || !cancelledTours.has(j.tour_id));
+            jobArr = jobArr.filter((j) => !j.tour_id || !cancelledTours.has(j.tour_id));
           }
         }
       }
       const jobIds = jobArr.map((j) => j.id);
-      const detailJobSet = new Set(jobArr.filter(jobOverlapsWeek).map((j: any) => j.id));
+      const detailJobSet = new Set(jobArr.filter(jobOverlapsWeek).map((j) => j.id));
       const detailJobIds = Array.from(detailJobSet);
-      const dryhireIds = new Set<string>(jobArr.filter((j: any) => j.job_type === 'dryhire').map((j: any) => j.id));
-      const locationIds = Array.from(new Set(jobArr.map((j: any) => j.location_id).filter(Boolean)));
+      const dryhireIds = new Set<string>(jobArr.filter((j) => j.job_type === 'dryhire').map((j) => j.id));
+      const locationIds = Array.from(new Set(jobArr.map((j) => j.location_id).filter((id): id is string => Boolean(id))));
 
       // 2) Fetch departments for these jobs
       const { data: deptRows, error: deptErr } = jobIds.length
         ? await supabase.from('job_departments').select('job_id,department').in('job_id', jobIds)
-        : ({ data: [], error: null } as any);
+        : { data: [] as DepartmentRow[], error: null };
       if (deptErr) console.error('Wallboard job_departments error:', deptErr);
       const deptsByJob = new Map<string, Dept[]>();
-      (deptRows || []).forEach((r: any) => {
+      ((deptRows || []) as DepartmentRow[]).forEach((r) => {
+        if (!isDept(r.department)) return;
         const list = deptsByJob.get(r.job_id) ?? [];
         list.push(r.department);
-        deptsByJob.set(r.job_id, list as Dept[]);
+        deptsByJob.set(r.job_id, list);
       });
 
       // 3) Fetch assignments for crew counts (restrict to detail window)
       const { data: assignRows, error: assignErr } = detailJobIds.length
         ? await supabase.from('job_assignments').select('job_id,technician_id,sound_role,lights_role,video_role').in('job_id', detailJobIds)
-        : ({ data: [], error: null } as any);
+        : { data: [] as AssignmentRow[], error: null };
       if (assignErr) console.error('Wallboard job_assignments error:', assignErr);
-      const assignsByJob = new Map<string, any[]>();
-      (assignRows || []).forEach((a: any) => {
+      const assignsByJob = new Map<string, AssignmentRow[]>();
+      ((assignRows || []) as AssignmentRow[]).forEach((a) => {
         const list = assignsByJob.get(a.job_id) ?? [];
         list.push(a);
         assignsByJob.set(a.job_id, list);
@@ -296,20 +344,20 @@ export function WallboardDisplay({
       // Fetch required-role summaries for these jobs
       const { data: reqRows, error: reqErr } = detailJobIds.length
         ? await supabase.from('job_required_roles_summary').select('job_id, department, total_required').in('job_id', detailJobIds)
-        : ({ data: [], error: null } as any);
+        : { data: [] as RequiredRoleRow[], error: null };
       if (reqErr) console.error('Wallboard job_required_roles_summary error:', reqErr);
       const needByJobDept = new Map<string, number>();
-      (reqRows || []).forEach((r: any) => {
-        needByJobDept.set(`${r.job_id}:${r.department}`, Number(r.total_required || 0));
+      ((reqRows || []) as RequiredRoleRow[]).forEach((r) => {
+        if (r.department) needByJobDept.set(`${r.job_id}:${r.department}`, Number(r.total_required || 0));
       });
 
       // 4) Fetch locations for names
       const { data: locRows, error: locErr } = locationIds.length
         ? await supabase.from('locations').select('id,name').in('id', locationIds)
-        : ({ data: [], error: null } as any);
+        : { data: [] as LocationRow[], error: null };
       if (locErr) console.error('Wallboard locations error:', locErr);
       const locById = new Map<string, string>();
-      (locRows || []).forEach((l: any) => locById.set(l.id, l.name));
+      ((locRows || []) as LocationRow[]).forEach((l) => locById.set(l.id, l.name || ''));
 
       // Timesheet statuses via view
       const tsByJobTech = new Map<string, Map<string, string>>();
@@ -324,25 +372,27 @@ export function WallboardDisplay({
 
       // Doc counts and requirements
       const [{ data: counts }, { data: reqs }] = await Promise.all([
-        detailJobIds.length ? supabase.from('wallboard_doc_counts').select('job_id,department,have').in('job_id', detailJobIds) : Promise.resolve({ data: [] as any }),
+        detailJobIds.length ? supabase.from('wallboard_doc_counts').select('job_id,department,have').in('job_id', detailJobIds) : Promise.resolve({ data: [] as DocCountRow[] }),
         supabase.from('wallboard_doc_requirements').select('department,need'),
       ]);
 
-      const needByDept = new Map<string, number>((reqs || []).map((r) => [r.department, r.need]));
+      const needByDept = new Map<string, number>(((reqs || []) as DocRequirementRow[]).filter((r) => Boolean(r.department)).map((r) => [r.department as string, Number(r.need ?? 0)]));
       const haveByJobDept = new Map<string, number>();
-      (counts || []).forEach((c: any) => haveByJobDept.set(`${c.job_id}:${c.department}`, c.have));
+      ((counts || []) as DocCountRow[]).forEach((c) => {
+        if (c.department) haveByJobDept.set(`${c.job_id}:${c.department}`, Number(c.have ?? 0));
+      });
 
-      const mapJob = (j: any): JobsOverviewJob => {
-        const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
+      const mapJob = (j: WallboardJobRow): JobsOverviewJob => {
+        const deptsAll: Dept[] = deptsByJob.get(j.id) ?? [];
         const depts: Dept[] = deptsAll.filter((d) => d !== 'video');
-        const crewAssigned: Record<string, number> = { sound: 0, lights: 0, video: 0 };
+        const crewAssigned: DeptCounts = { sound: 0, lights: 0, video: 0 };
         const assignmentRows = detailJobSet.has(j.id) ? assignsByJob.get(j.id) ?? [] : [];
-        assignmentRows.forEach((a: any) => {
+        assignmentRows.forEach((a) => {
           if (a.sound_role) crewAssigned.sound++;
           if (a.lights_role) crewAssigned.lights++;
           if (a.video_role) crewAssigned.video++;
         });
-        const crewNeeded: Record<string, number> = { sound: 0, lights: 0, video: 0 };
+        const crewNeeded: DeptCounts = { sound: 0, lights: 0, video: 0 };
         depts.forEach((d) => {
           crewNeeded[d] = detailJobSet.has(j.id) ? needByJobDept.get(`${j.id}:${d}`) || 0 : 0;
         });
@@ -392,13 +442,13 @@ export function WallboardDisplay({
       };
 
       const calendarJobs: JobsOverviewJob[] = jobArr
-        .filter((j: any) => !dryhireIds.has(j.id))
+        .filter((j) => !dryhireIds.has(j.id))
         .filter(jobWithinCalendarWindow)
         .map(mapJob)
         .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
 
       const jobsForWeek: JobsOverviewJob[] = jobArr
-        .filter((j: any) => !dryhireIds.has(j.id))
+        .filter((j) => !dryhireIds.has(j.id))
         .filter(jobOverlapsWeek)
         .map(mapJob)
         .sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
@@ -438,60 +488,75 @@ export function WallboardDisplay({
 
       // Crew assignments
       const assignedTechsByJob = new Map<string, string[]>();
-      const crewPayload: CrewAssignmentsFeed = {
-        jobs: jobArr
-          .filter((j: any) => !dryhireIds.has(j.id))
-          .filter(jobOverlapsWeek)
-          .map((j: any) => {
-            const crew = (assignsByJob.get(j.id) ?? [])
-              // Hide video crew
-              .filter((a: any) => a.video_role == null)
-              .map((a: any) => {
-                const dept: Dept | null = a.sound_role ? 'sound' : a.lights_role ? 'lights' : null;
-                const role = a.sound_role || a.lights_role || 'assigned';
-                const list = assignedTechsByJob.get(j.id) ?? [];
-                list.push(a.technician_id);
-                assignedTechsByJob.set(j.id, list);
-                return { name: '', role, dept, timesheetStatus: 'missing' as TimesheetStatus, technician_id: a.technician_id } as any;
-              });
-            return { id: j.id, title: j.title, jobType: j.job_type, start_time: j.start_time, end_time: j.end_time, color: j.color ?? null, crew };
-          }),
-      } as any;
+      const crewDraftJobs: CrewJobDraft[] = jobArr
+        .filter((j) => !dryhireIds.has(j.id))
+        .filter(jobOverlapsWeek)
+        .map((j) => {
+          const crew = (assignsByJob.get(j.id) ?? [])
+            // Hide video crew
+            .filter((a) => a.video_role == null && typeof a.technician_id === 'string')
+            .map((a): CrewDraft => {
+              const dept: Dept | null = a.sound_role ? 'sound' : a.lights_role ? 'lights' : null;
+              const role = a.sound_role || a.lights_role || 'assigned';
+              const technicianId = a.technician_id || '';
+              const list = assignedTechsByJob.get(j.id) ?? [];
+              list.push(technicianId);
+              assignedTechsByJob.set(j.id, list);
+              return { name: '', role, dept, timesheetStatus: 'missing' as TimesheetStatus, technician_id: technicianId };
+            });
+          return { id: j.id, title: j.title, jobType: j.job_type, job_type: j.job_type, start_time: j.start_time, end_time: j.end_time, color: j.color ?? null, crew };
+        });
 
       // Fill names in one request
-      const techIds = Array.from(new Set(crewPayload.jobs.flatMap((j) => j.crew.map((c: any) => c.technician_id))));
+      const techIds = Array.from(new Set(crewDraftJobs.flatMap((j) => j.crew.map((c) => c.technician_id))));
+      const profileById = new Map<string, ProfileRow>();
       if (techIds.length) {
         const { data: profs } = await supabase.from('wallboard_profiles').select('id,first_name,last_name,department').in('id', techIds);
-        const byId = new Map<string, any>((profs || []).map((p) => [p.id, p]));
-        crewPayload.jobs.forEach((j) => {
-          j.crew.forEach((c: any) => {
-            const p = byId.get(c.technician_id);
-            c.name = [p?.first_name, p?.last_name].filter(Boolean).join(' ') || '';
-            const s = tsByJobTech.get(j.id)?.get(c.technician_id) as any;
-            const inPast = new Date(jobArr.find((x) => x.id === j.id)?.end_time || Date.now()) < new Date();
-            const normalizedStatus = s === 'rejected' ? 'rejected' : s;
-            c.timesheetStatus = inPast && normalizedStatus === 'approved' ? 'approved' : normalizedStatus || 'missing';
-            delete c.technician_id;
-          });
-        });
+        ((profs || []) as ProfileRow[]).forEach((profile) => profileById.set(profile.id, profile));
       }
+
+      const crewPayload: CrewAssignmentsFeed = {
+        jobs: crewDraftJobs.map((job) => ({
+          ...job,
+          crew: job.crew.map((crewMember) => {
+            const profile = profileById.get(crewMember.technician_id);
+            const name = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || '';
+            const status = tsByJobTech.get(job.id)?.get(crewMember.technician_id);
+            const inPast = new Date(jobArr.find((x) => x.id === job.id)?.end_time || Date.now()) < new Date();
+            const normalizedStatus: TimesheetStatus =
+              status === 'approved' || status === 'submitted' || status === 'draft' || status === 'rejected'
+                ? status
+                : 'missing';
+            return {
+              name,
+              role: crewMember.role,
+              dept: crewMember.dept,
+              timesheetStatus: inPast && normalizedStatus === 'approved' ? 'approved' : normalizedStatus,
+            };
+          }),
+        })),
+      };
 
       // Doc progress
       const docPayload: DocProgressFeed = {
         jobs: jobArr
-          .filter((j: any) => !dryhireIds.has(j.id))
+          .filter((j) => !dryhireIds.has(j.id))
           .filter(jobOverlapsWeek)
-          .map((j: any) => {
-            const deptsAll: Dept[] = (deptsByJob.get(j.id) ?? []) as Dept[];
+          .map((j) => {
+            const deptsAll: Dept[] = deptsByJob.get(j.id) ?? [];
             return {
               id: j.id,
               title: j.title,
               color: j.color ?? null,
+              jobType: j.job_type,
+              job_type: j.job_type,
+              start_time: j.start_time,
+              end_time: j.end_time,
               departments: deptsAll.map((d: Dept) => ({
                 dept: d,
                 have: haveByJobDept.get(`${j.id}:${d}`) ?? 0,
                 need: needByDept.get(d) ?? 0,
-                missing: [],
+                missing: [] as string[],
               })),
             };
           }),
@@ -505,8 +570,8 @@ export function WallboardDisplay({
         j.departments
           .filter((d) => d !== 'video')
           .forEach((d: Dept) => {
-            const need = (j.crewNeeded as any)[d] || 0;
-            const have = (j.crewAssigned as any)[d] || 0;
+            const need = j.crewNeeded[d] || 0;
+            const have = j.crewAssigned[d] || 0;
             if (need > 0 && have < need) {
               const startsInMs = new Date(j.start_time).getTime() - Date.now();
               const within24h = startsInMs <= 24 * 3600 * 1000;
@@ -554,16 +619,16 @@ export function WallboardDisplay({
       if (leErr) {
         console.error('Wallboard logistics_events error:', leErr);
       }
-      const evts = le || [];
-      const evtJobIds = Array.from(new Set(evts.map((e: any) => e.job_id).filter(Boolean)));
+      const evts = (le || []) as LogisticsEventRow[];
+      const evtJobIds = Array.from(new Set(evts.map((e) => e.job_id).filter((id): id is string => Boolean(id))));
       const titlesByJob = new Map<string, string>();
       if (evtJobIds.length) {
         const { data: trows } = await supabase.from('jobs').select('id,title').in('id', evtJobIds);
-        (trows || []).forEach((r: any) => titlesByJob.set(r.id, r.title));
+        ((trows || []) as Array<{ id: string; title: string }>).forEach((r) => titlesByJob.set(r.id, r.title));
       }
-      const logisticsItemsBase: LogisticsItem[] = evts.map((e: any) => {
+      const logisticsItemsBase: LogisticsItem[] = evts.map((e) => {
         const departments: string[] = Array.isArray(e.logistics_event_departments)
-          ? (e.logistics_event_departments as any[]).map((dep) => dep?.department).filter(Boolean)
+          ? e.logistics_event_departments.map((dep) => dep?.department).filter((department): department is string => Boolean(department))
           : [];
         return {
           id: e.id,

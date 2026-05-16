@@ -315,8 +315,8 @@ const loadSignatures = async (timesheets: Timesheet[]) => {
     if (timesheet.signature_data) {
       signaturePromises.push(
         loadSignatureImage(timesheet.signature_data)
-          .then(image => ({ timesheetId: timesheet.id, image }))
-          .catch(error => {
+          .then((image): { timesheetId: string; image: HTMLImageElement } => ({ timesheetId: timesheet.id, image }))
+          .catch((error): null => {
             console.error(`Failed to load signature for timesheet ${timesheet.id}:`, error);
             return null;
           })

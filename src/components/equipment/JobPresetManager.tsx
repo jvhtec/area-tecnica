@@ -252,8 +252,8 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
     try {
       // Convert preset items to EquipmentItem format
       const equipmentItems: EquipmentItem[] = preset.items
-        .filter(item => item.equipment?.resource_id && item.quantity > 0)
-        .map(item => ({
+        .filter((item: { equipment?: { resource_id?: string | null }; quantity: number }) => item.equipment?.resource_id && item.quantity > 0)
+        .map((item: { equipment: { resource_id?: string | null; name: string; category: string }; quantity: number }) => ({
           resourceId: item.equipment.resource_id!,
           quantity: item.quantity,
           name: item.equipment.name,

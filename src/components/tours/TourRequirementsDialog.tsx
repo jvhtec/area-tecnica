@@ -97,7 +97,7 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
             department: dept,
             role_code: r.role_code,
             quantity: Math.max(0, Math.floor(r.quantity || 0)),
-            notes: null,
+            notes: null as string | null,
           }))
         )
         if (rows.length) {
@@ -176,4 +176,3 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
     </Dialog>
   )
 }
-

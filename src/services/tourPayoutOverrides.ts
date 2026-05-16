@@ -78,7 +78,7 @@ export async function attachPayoutOverridesToTourQuotes(
     });
   });
 
-  return quotes.map((q) => {
+  return quotes.map((q): TourJobRateQuote => {
     const override = map.get(q.technician_id);
     if (override == null || !Number.isFinite(override.amount)) {
       return {

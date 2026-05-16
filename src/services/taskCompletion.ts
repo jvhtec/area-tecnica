@@ -52,7 +52,48 @@ interface BulkCompleteTasksResult {
   error?: string;
 }
 
-const TASK_TABLE: Record<Department, string> = {
+type TaskTableName =
+  | 'sound_job_tasks'
+  | 'lights_job_tasks'
+  | 'video_job_tasks'
+  | 'production_job_tasks'
+  | 'administrative_job_tasks';
+
+interface SupabaseErrorLike {
+  message: string;
+  code?: string;
+}
+
+interface QueryResult<TData> {
+  data: TData;
+  error: SupabaseErrorLike | null;
+}
+
+type RowFromArray<TData> = TData extends Array<infer TRow> ? TRow : TData;
+
+interface TaskFilterBuilder<TData> extends PromiseLike<QueryResult<TData>> {
+  eq(column: string, value: unknown): this;
+  neq(column: string, value: unknown): this;
+  in(column: string, values: unknown[]): this;
+  select<TNext = TData>(columns?: string): TaskFilterBuilder<TNext>;
+  maybeSingle<TSingle = RowFromArray<TData>>(): PromiseLike<QueryResult<TSingle | null>>;
+}
+
+interface TaskTableBuilder {
+  select<TData = unknown[]>(columns?: string): TaskFilterBuilder<TData>;
+  update<TData = unknown[]>(values: Record<string, unknown>): TaskFilterBuilder<TData>;
+}
+
+interface TaskLookupRow {
+  id: string;
+  task_type: string | null;
+  assigned_to: string | null;
+  job_id: string | null;
+  tour_id: string | null;
+  status?: string | null;
+}
+
+const TASK_TABLE: Record<Department, TaskTableName> = {
   sound: 'sound_job_tasks',
   lights: 'lights_job_tasks',
   video: 'video_job_tasks',
@@ -61,11 +102,11 @@ const TASK_TABLE: Record<Department, string> = {
 };
 
 type DynamicSupabaseClient = {
-  from: (table: string) => any;
+  from: (table: TaskTableName) => TaskTableBuilder;
 };
 
 const dynamicSupabase = supabase as unknown as DynamicSupabaseClient;
-const fromTaskTable = (table: string) => dynamicSupabase.from(table);
+const fromTaskTable = (table: TaskTableName) => dynamicSupabase.from(table);
 
 /**
  * Mark a single task as completed.
@@ -105,7 +146,7 @@ export async function completeTask(
 
     // Fetch task details for push notification
     const { data: task, error: fetchError } = await fromTaskTable(tableName)
-      .select('id, task_type, assigned_to, job_id, tour_id')
+      .select<TaskLookupRow[]>('id, task_type, assigned_to, job_id, tour_id')
       .eq('id', taskId)
       .maybeSingle();
 
@@ -277,7 +318,7 @@ export async function bulkCompleteTasks(
       try {
         // Build the query based on whether we have jobId or tourId
         let query = fromTaskTable(tableName)
-          .select('id, task_type, status, assigned_to, job_id, tour_id')
+          .select<TaskLookupRow[]>('id, task_type, status, assigned_to, job_id, tour_id')
           .eq('task_type', taskType)
           .neq('status', 'completed');
 

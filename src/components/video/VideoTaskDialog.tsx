@@ -37,6 +37,12 @@ interface VideoTaskDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type TaskDocumentRow = {
+  id: string;
+  file_name: string;
+  file_path: string;
+};
+
 export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogProps) => {
   const { toast } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -491,7 +497,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                         </TableCell>
                         <TableCell>
                           <div className="max-h-[60px] overflow-y-auto">
-                            {task?.task_documents?.map((doc) => (
+                            {task?.task_documents?.map((doc: TaskDocumentRow) => (
                               <div
                                 key={doc.id}
                                 className="flex items-center justify-between p-1 text-xs"

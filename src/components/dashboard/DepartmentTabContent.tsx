@@ -41,7 +41,7 @@ export const DepartmentTabContent = ({
 
   const handleJobClick = (_jobId: string) => {};
 
-  const getTaskDialog = () => null;
+  const getTaskDialog = (): null => null;
 
   return (
     <div className="space-y-4">

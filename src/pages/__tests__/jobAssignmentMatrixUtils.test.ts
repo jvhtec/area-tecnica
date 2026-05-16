@@ -10,7 +10,7 @@ vi.mock("@/lib/supabase", () => ({
 
 describe("job assignment matrix utils", () => {
   it("counts cancelled-job assignments only for the selected department", () => {
-    const assignments = [
+    const assignments: Array<{ status: string; sound_role: string | null; lights_role: string | null }> = [
       { status: "confirmed", sound_role: null, lights_role: "LGT-OP" },
       { status: "confirmed", sound_role: "SND-FOH", lights_role: null },
       { status: "declined", sound_role: "SND-MON", lights_role: null },

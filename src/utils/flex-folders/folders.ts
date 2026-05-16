@@ -1,7 +1,6 @@
 import { format } from "date-fns";
 import { toZonedTime } from "date-fns-tz";
 import { supabase } from "@/lib/supabase";
-import { Department } from "@/types/department";
 import {
   CreateFoldersOptions,
   DepartmentKey,
@@ -449,9 +448,9 @@ export async function createAllFoldersForJob(
         plannedStartDate: formattedStartDate,
         plannedEndDate: formattedEndDate,
         locationId: FLEX_FOLDER_IDS.location,
-        departmentId: DEPARTMENT_IDS[extra.dept as Department],
+        departmentId: DEPARTMENT_IDS[extra.dept],
         documentNumber: `${parentDoc}${extra.suffix}`,
-        personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept as Department],
+        personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept],
       };
 
       let presupuestoParentId = parentElementId; // Default: create presupuesto directly in comercial folder
@@ -545,12 +544,12 @@ export async function createAllFoldersForJob(
             plannedStartDate: entry?.plannedStartDate || formattedStartDate,
             plannedEndDate: entry?.plannedEndDate || formattedEndDate,
             locationId: FLEX_FOLDER_IDS.location,
-            departmentId: DEPARTMENT_IDS[extra.dept as Department],
+            departmentId: DEPARTMENT_IDS[extra.dept],
             documentNumber:
               presupuestoEntries.length > 1
                 ? `${sharedPayload.documentNumber}PR${String(index + 1).padStart(2, "0")}`
                 : sharedPayload.documentNumber,
-            personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept as Department],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[extra.dept],
           };
 
           const presupuestoResponse = await createFlexFolder(childPayload);
@@ -591,20 +590,21 @@ export async function createAllFoldersForJob(
       return;
     }
 
-    const department = job.job_departments[0]?.department;
-    if (!department || !["sound", "lights"].includes(department)) {
+    const departmentCandidate = job.job_departments[0]?.department;
+    if (departmentCandidate !== "sound" && departmentCandidate !== "lights") {
       throw new Error("Invalid department for dryhire job");
     }
+    const department: "sound" | "lights" = departmentCandidate;
 
     const dryhireSchedule = getDryhireFlexSchedule(job);
     const { year, monthKey } = dryhireSchedule;
-    const parentFolderId = await getDryhireParentFolderId(year, department as "sound" | "lights", monthKey);
+    const parentFolderId = await getDryhireParentFolderId(year, department, monthKey);
 
     if (!parentFolderId) {
       throw new Error(`No parent folder found for ${year}/${monthKey}. Please create dryhire folders for ${year} in Settings.`);
     }
 
-    const parentDocumentNumber = `${dryhireSchedule.documentNumber}${DEPARTMENT_SUFFIXES[department as Department]}`;
+    const parentDocumentNumber = `${dryhireSchedule.documentNumber}${DEPARTMENT_SUFFIXES[department]}`;
     const dryHireFolderPayload = {
       definitionId: FLEX_FOLDER_IDS.subFolder,
       parentElementId: parentFolderId,
@@ -614,9 +614,9 @@ export async function createAllFoldersForJob(
       plannedStartDate: dryhireSchedule.plannedStartDate,
       plannedEndDate: dryhireSchedule.plannedEndDate,
       locationId: FLEX_FOLDER_IDS.location,
-      departmentId: DEPARTMENT_IDS[department as Department],
+      departmentId: DEPARTMENT_IDS[department],
       documentNumber: parentDocumentNumber,
-      personResponsibleId: RESPONSIBLE_PERSON_IDS[department as Department],
+      personResponsibleId: RESPONSIBLE_PERSON_IDS[department],
     };
 
     console.log("Creating dryhire folder with payload:", dryHireFolderPayload);
@@ -729,7 +729,8 @@ export async function createAllFoldersForJob(
         flex_lights_folder_id,
         flex_video_folder_id,
         flex_production_folder_id,
-        flex_personnel_folder_id
+        flex_personnel_folder_id,
+        flex_comercial_folder_id
       `)
       .eq("id", job.tour_id)
       .single();
@@ -850,7 +851,7 @@ export async function createAllFoldersForJob(
 
       const deptLabel = dept.charAt(0).toUpperCase() + dept.slice(1);
       const tourDateFolderName = `${locationName} - ${formattedDate} - ${deptLabel}`;
-      const tourDateDocumentNumber = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
+      const tourDateDocumentNumber = `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}`;
 
       let deptFolderId = existingTourDateDepartmentMap.get(dept)?.element_id ?? null;
       let deptFolderRowId = existingTourDateDepartmentMap.get(dept)?.id ?? null;
@@ -865,9 +866,9 @@ export async function createAllFoldersForJob(
           plannedStartDate: formattedStartDate,
           plannedEndDate: formattedEndDate,
           locationId: FLEX_FOLDER_IDS.location,
-          departmentId: DEPARTMENT_IDS[dept as Department],
+          departmentId: DEPARTMENT_IDS[dept],
           documentNumber: tourDateDocumentNumber,
-          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
         };
 
         console.log(`Creating tour date folder for ${dept}:`, tourDateFolderPayload);
@@ -930,9 +931,9 @@ export async function createAllFoldersForJob(
           plannedStartDate: formattedStartDate,
           plannedEndDate: formattedEndDate,
           locationId: FLEX_FOLDER_IDS.location,
-          departmentId: DEPARTMENT_IDS[dept as Department],
-          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${hojaInfoSuffix}`,
-          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          departmentId: DEPARTMENT_IDS[dept],
+          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${hojaInfoSuffix}`,
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
         };
 
         console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
@@ -998,9 +999,9 @@ export async function createAllFoldersForJob(
             plannedStartDate: formattedStartDate,
             plannedEndDate: formattedEndDate,
             locationId: FLEX_FOLDER_IDS.location,
-            departmentId: DEPARTMENT_IDS[dept as Department],
-            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
-            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+            departmentId: DEPARTMENT_IDS[dept],
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
           };
 
           const subFolderResponse = await createFlexFolder(subPayload);
@@ -1082,7 +1083,7 @@ export async function createAllFoldersForJob(
             fallbackNameForIndex
           );
 
-          const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
+          const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}`;
 
           for (const template of templates) {
             const pullsheetPayload = {
@@ -1094,9 +1095,9 @@ export async function createAllFoldersForJob(
               plannedStartDate: template.plannedStartDate,
               plannedEndDate: template.plannedEndDate,
               locationId: FLEX_FOLDER_IDS.location,
-              departmentId: DEPARTMENT_IDS[dept as Department],
+              departmentId: DEPARTMENT_IDS[dept],
               documentNumber: `${documentPrefix}${template.suffix}`,
-              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+              personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
             };
 
             const pullsheetResponse = await createFlexFolder(pullsheetPayload);
@@ -1154,9 +1155,9 @@ export async function createAllFoldersForJob(
             plannedStartDate: formattedStartDate,
             plannedEndDate: formattedEndDate,
             locationId: FLEX_FOLDER_IDS.location,
-            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
-            departmentId: DEPARTMENT_IDS[dept as Department],
-            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
+            departmentId: DEPARTMENT_IDS[dept],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
           };
 
           await createFlexFolder(subPayload);
@@ -1180,9 +1181,9 @@ export async function createAllFoldersForJob(
             plannedStartDate: formattedStartDate,
             plannedEndDate: formattedEndDate,
             locationId: FLEX_FOLDER_IDS.location,
-            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
-            departmentId: DEPARTMENT_IDS[dept as Department],
-            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+            documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
+            departmentId: DEPARTMENT_IDS[dept],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
           };
 
           const cc = await createFlexFolder(subPayload);
@@ -1263,9 +1264,9 @@ export async function createAllFoldersForJob(
       plannedStartDate: formattedStartDate,
       plannedEndDate: formattedEndDate,
       locationId: FLEX_FOLDER_IDS.location,
-      departmentId: DEPARTMENT_IDS[dept as Department],
-      documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`,
-      personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+      departmentId: DEPARTMENT_IDS[dept],
+      documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}`,
+      personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
     };
 
     let deptFolderId = existingDepartmentMap.get(dept)?.element_id ?? null;
@@ -1327,9 +1328,9 @@ export async function createAllFoldersForJob(
         plannedStartDate: formattedStartDate,
         plannedEndDate: formattedEndDate,
         locationId: FLEX_FOLDER_IDS.location,
-        departmentId: DEPARTMENT_IDS[dept as Department],
+        departmentId: DEPARTMENT_IDS[dept],
         documentNumber: `${documentNumber}${hojaInfoSuffix}`,
-        personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+        personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
       };
 
       console.log(`Creating hojaInfo element for ${dept}:`, hojaInfoPayload);
@@ -1401,7 +1402,7 @@ export async function createAllFoldersForJob(
           fallbackNameForIndex
         );
 
-        const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}`;
+        const documentPrefix = `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}`;
 
         for (const template of templates) {
           const pullsheetPayload = {
@@ -1413,9 +1414,9 @@ export async function createAllFoldersForJob(
             plannedStartDate: template.plannedStartDate,
             plannedEndDate: template.plannedEndDate,
             locationId: FLEX_FOLDER_IDS.location,
-            departmentId: DEPARTMENT_IDS[dept as Department],
+            departmentId: DEPARTMENT_IDS[dept],
             documentNumber: `${documentPrefix}${template.suffix}`,
-            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+            personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
           };
 
           const pullsheetResponse = await createFlexFolder(pullsheetPayload);
@@ -1476,9 +1477,9 @@ export async function createAllFoldersForJob(
           plannedStartDate: formattedStartDate,
           plannedEndDate: formattedEndDate,
           locationId: FLEX_FOLDER_IDS.location,
-          departmentId: DEPARTMENT_IDS[dept as Department],
-          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
-          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          departmentId: DEPARTMENT_IDS[dept],
+          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
         };
 
         const created = await createFlexFolder(subPayload);
@@ -1567,9 +1568,9 @@ export async function createAllFoldersForJob(
           plannedStartDate: formattedStartDate,
           plannedEndDate: formattedEndDate,
           locationId: FLEX_FOLDER_IDS.location,
-          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept as Department]}${sf.suffix}`,
-          departmentId: DEPARTMENT_IDS[dept as Department],
-          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept as Department],
+          documentNumber: `${documentNumber}${DEPARTMENT_SUFFIXES[dept]}${sf.suffix}`,
+          departmentId: DEPARTMENT_IDS[dept],
+          personResponsibleId: RESPONSIBLE_PERSON_IDS[dept],
         };
 
         const created = await createFlexFolder(subPayload);

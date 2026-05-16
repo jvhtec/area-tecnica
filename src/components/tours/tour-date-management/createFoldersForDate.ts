@@ -59,7 +59,7 @@ export async function createFoldersForDate(
     const formattedDate = format(new Date(dateObj.date), "MMM d, yyyy");
     const locationName = dateObj.location?.name || "No Location";
 
-    const departments: (keyof typeof DEPARTMENT_IDS)[] = ["sound", "lights", "video", "production", "personnel"];
+    const departments = ["sound", "lights", "video", "production", "personnel"] as const;
 
     for (const dept of departments) {
       const parentFolderId = tourData[`flex_${dept}_folder_id`];
@@ -324,4 +324,3 @@ export async function createFoldersForDate(
     throw error;
   }
 }
-

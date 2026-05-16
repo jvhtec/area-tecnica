@@ -65,9 +65,9 @@ export function CrewCallLinker({ jobId, dialogMode = false }: Props) {
       return;
     }
     const next: Record<Dept, string> = { sound: '', lights: '' };
-    for (const row of (data || []) as any[]) {
+    for (const row of (data || []) as CrewCallRow[]) {
       const d = (row.department || '').toLowerCase();
-      if (d === 'sound' || d === 'lights' || d === 'video') next[d] = row.flex_element_id || '';
+      if (d === 'sound' || d === 'lights') next[d] = row.flex_element_id || '';
     }
     setElementId(next);
   };

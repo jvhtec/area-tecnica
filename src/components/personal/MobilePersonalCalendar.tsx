@@ -304,7 +304,13 @@ export const MobilePersonalCalendar: React.FC<MobilePersonalCalendarProps> = ({
   const visibleTechs = houseTechs.filter(tech => shouldShowTechOnDay(tech, currentDate));
   const offTotal = personnelTotals.techsOnVacation + personnelTotals.techsOnDaysOff + personnelTotals.techsTravelling + personnelTotals.techsSick;
 
-  const getStatusMeta = (tech: any) => {
+  const getStatusMeta = (tech: any): {
+    key: string;
+    label: string;
+    badgeClass: string;
+    Icon: typeof Palmtree;
+    jobTitle?: string;
+  } => {
     const techAssignment = dayAssignments.find(
       assignment => assignment.technician_id === tech.id
     );

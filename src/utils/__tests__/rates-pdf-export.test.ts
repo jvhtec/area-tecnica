@@ -140,7 +140,7 @@ describe('rates-pdf-export', () => {
         {
           technician_id: 'tech-2',
           expenses_total_eur: 0,
-          expenses_breakdown: [],
+          expenses_breakdown: [] as unknown[],
         },
       ];
 

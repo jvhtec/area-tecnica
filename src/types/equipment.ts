@@ -163,7 +163,9 @@ export const LIGHTS_MODEL_CATEGORIES = [
   { value: 'controles', label: 'Controles' }
 ] as const;
 
-export const getModelCategoriesForDepartment = (department: Department) => {
+type ModelCategoryOption = { readonly value: string; readonly label: string };
+
+export const getModelCategoriesForDepartment = (department: Department): readonly ModelCategoryOption[] => {
   switch (department) {
     case 'sound':
       return SOUND_MODEL_CATEGORIES;

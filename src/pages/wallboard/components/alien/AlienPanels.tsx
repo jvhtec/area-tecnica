@@ -1,5 +1,5 @@
 import React from 'react';
-import { TRANSPORT_PROVIDERS } from '@/constants/transportProviders';
+import { TRANSPORT_PROVIDERS, type TransportProvider } from '@/constants/transportProviders';
 import type {
   CalendarFeed,
   CrewAssignmentsFeed,
@@ -10,6 +10,9 @@ import type {
 } from '../../types';
 import { buildCalendarModel } from '../../calendar';
 import { AlienShell } from './AlienShell';
+
+const isTransportProvider = (value: unknown): value is TransportProvider =>
+  typeof value === 'string' && value in TRANSPORT_PROVIDERS;
 
 export const AlienCalendarPanel: React.FC<{ data: CalendarFeed | null; highlightIds?: Set<string> }> = ({ data, highlightIds }) => {
   const { dayNames, monthLabel, cells } = buildCalendarModel(data, highlightIds);
@@ -217,11 +220,15 @@ export const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }> = (
               )}
             </div>
           </div>
-          {ev.transport_provider && TRANSPORT_PROVIDERS[ev.transport_provider] && TRANSPORT_PROVIDERS[ev.transport_provider].icon && (
+          {(() => {
+            const providerConfig = isTransportProvider(ev.transport_provider)
+              ? TRANSPORT_PROVIDERS[ev.transport_provider]
+              : null;
+            return providerConfig?.icon ? (
             <div className="flex-shrink-0 ml-4">
               <img
-                src={TRANSPORT_PROVIDERS[ev.transport_provider].icon}
-                alt={TRANSPORT_PROVIDERS[ev.transport_provider].label}
+                src={providerConfig.icon}
+                alt={providerConfig.label}
                 width={128}
                 height={128}
                 loading="lazy"
@@ -232,7 +239,8 @@ export const AlienLogisticsPanel: React.FC<{ data: LogisticsItem[] | null }> = (
                 }}
               />
             </div>
-          )}
+            ) : null;
+          })()}
         </div>
       ))}
       {(!data || data.length === 0) && <div className="text-amber-300">NO HAY LOGÍSTICA EN VENTANA</div>}

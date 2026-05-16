@@ -35,7 +35,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     return value;
   };
 
-  const normalizeTaskValue = (field: string, value: any) => {
+  const normalizeTaskValue = (field: string, value: any): any => {
     if (value === undefined) return undefined;
     if (value === null) return null;
 

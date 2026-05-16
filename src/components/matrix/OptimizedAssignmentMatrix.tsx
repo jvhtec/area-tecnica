@@ -20,10 +20,48 @@ import { isManagementRole } from '@/utils/permissions';
 
 import { OptimizedAssignmentMatrixView } from './optimized-assignment-matrix/OptimizedAssignmentMatrixView';
 import type { CellAction, OptimizedAssignmentMatrixExtendedProps, TechSortMethod } from './optimized-assignment-matrix/types';
+import type { MatrixTimesheetAssignment } from '@/hooks/useOptimizedMatrixData';
 
 // Drag scroll hook is used on mainScrollRef below for desktop users
 
 const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
+
+type SortJobStatusRow = {
+  profile_id: string;
+  availability_status: string | null;
+  offer_status: string | null;
+};
+
+type TechResidenciaRow = {
+  id: string;
+  residencia: string | null;
+};
+
+type ProfileNameRow = {
+  id: string;
+  first_name: string | null;
+  nickname: string | null;
+  last_name: string | null;
+};
+
+type TimesheetCountRow = {
+  technician_id: string;
+  timesheet_count: number | null;
+  department: string | null;
+};
+
+type StaffingEmailPayload = {
+  job_id: string;
+  profile_id: string;
+  phase: 'availability' | 'offer';
+  role?: string | null;
+  message?: string | null;
+  channel?: 'email' | 'whatsapp';
+  target_date?: string | null;
+  single_day?: boolean;
+  dates?: string[];
+  override_conflicts?: boolean;
+};
 
 export const OptimizedAssignmentMatrix = ({
   technicians,
@@ -76,6 +114,8 @@ export const OptimizedAssignmentMatrix = ({
   const [scrollAttempts, setScrollAttempts] = useState(0);
   const syncInProgressRef = useRef(false);
   const lastKnownScrollRef = useRef({ left: 0, top: 0 });
+  const previousMainScrollLeftRef = useRef<number | null>(null);
+  const lastEdgeTriggerRef = useRef({ t: 0 });
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const { userRole } = useOptimizedAuth();
   const isManagementUser = isManagementRole(userRole);
@@ -138,7 +178,7 @@ export const OptimizedAssignmentMatrix = ({
           console.warn('Sort job statuses RPC error', error);
           continue;
         }
-        (data || []).forEach((r: any) => {
+        ((data || []) as SortJobStatusRow[]).forEach((r) => {
           const av = r.availability_status === 'pending' ? 'requested' : (r.availability_status === 'expired' ? null : r.availability_status);
           const of = r.offer_status === 'pending' ? 'sent' : (r.offer_status === 'expired' ? null : r.offer_status);
           map.set(r.profile_id, { availability_status: av, offer_status: of });
@@ -165,7 +205,7 @@ export const OptimizedAssignmentMatrix = ({
         return new Map<string, string | null>();
       }
       const map = new Map<string, string | null>();
-      (data || []).forEach((r: any) => {
+      ((data || []) as TechResidenciaRow[]).forEach((r) => {
         map.set(r.id, r.residencia);
       });
       return map;
@@ -199,7 +239,7 @@ export const OptimizedAssignmentMatrix = ({
 
       const countMap = new Map<string, number>();
       const departmentMap = new Map<string, string>();
-      (countRows || []).forEach(row => {
+      ((countRows || []) as TimesheetCountRow[]).forEach((row) => {
         countMap.set(row.technician_id, Number(row.timesheet_count || 0));
         if (row.department) {
           departmentMap.set(row.technician_id, row.department);
@@ -237,7 +277,7 @@ export const OptimizedAssignmentMatrix = ({
 
       const countMap = new Map<string, number>();
       const departmentMap = new Map<string, string>();
-      (countRows || []).forEach(row => {
+      ((countRows || []) as TimesheetCountRow[]).forEach((row) => {
         countMap.set(row.technician_id, Number(row.timesheet_count || 0));
         if (row.department) {
           departmentMap.set(row.technician_id, row.department);
@@ -341,7 +381,7 @@ export const OptimizedAssignmentMatrix = ({
   // Build declined job sets per technician for targeted staffing blocking
   const declinedJobsByTech = React.useMemo(() => {
     const map = new Map<string, Set<string>>();
-    (allAssignments as any[])?.forEach((a: any) => {
+    allAssignments?.forEach((a) => {
       if (a?.status === 'declined' && a.technician_id && a.job_id) {
         if (!map.has(a.technician_id)) map.set(a.technician_id, new Set());
         map.get(a.technician_id)!.add(a.job_id);
@@ -381,10 +421,7 @@ export const OptimizedAssignmentMatrix = ({
     const scrollLeft = e.currentTarget.scrollLeft;
     const scrollTop = e.currentTarget.scrollTop;
 
-    const previousScrollLeftRef =
-      (handleMainScrollCore as any)._previousScrollLeftRef ||
-      ((handleMainScrollCore as any)._previousScrollLeftRef = { value: null as number | null });
-    const previousScrollLeft = previousScrollLeftRef.value;
+    const previousScrollLeft = previousMainScrollLeftRef.current;
     const horizontalDelta = previousScrollLeft === null ? 0 : scrollLeft - previousScrollLeft;
     const movedHorizontally = previousScrollLeft !== null && horizontalDelta !== 0;
 
@@ -395,7 +432,7 @@ export const OptimizedAssignmentMatrix = ({
       return;
     }
 
-    previousScrollLeftRef.value = scrollLeft;
+    previousMainScrollLeftRef.current = scrollLeft;
 
     const movingTowardLeftEdge = movedHorizontally && horizontalDelta < 0;
     const movingTowardRightEdge = movedHorizontally && horizontalDelta > 0;
@@ -412,7 +449,7 @@ export const OptimizedAssignmentMatrix = ({
     // Trigger expansion if we're near an edge and can expand
     // Edge expansion throttled to avoid repeated triggers
     const now = performance.now();
-    const lastEdgeRef = (handleMainScrollCore as any)._lastEdgeRef || ((handleMainScrollCore as any)._lastEdgeRef = { t: 0 });
+    const lastEdgeRef = lastEdgeTriggerRef.current;
     if (movedHorizontally && now - lastEdgeRef.t > 300) {
       if (movingTowardLeftEdge && nearLeftEdge && canExpandBefore && onNearEdgeScroll) {
         onNearEdgeScroll('before');
@@ -460,9 +497,7 @@ export const OptimizedAssignmentMatrix = ({
 
   useEffect(() => {
     return () => {
-      if ((handleMainScroll as any)?.cancel) (handleMainScroll as any).cancel();
-      if ((handleDateHeadersScroll as any)?.cancel) (handleDateHeadersScroll as any).cancel();
-      if ((handleTechnicianScroll as any)?.cancel) (handleTechnicianScroll as any).cancel();
+      handleDateHeadersScroll.cancel();
     };
   }, [handleDateHeadersScroll, handleMainScroll, handleTechnicianScroll]);
 
@@ -474,8 +509,8 @@ export const OptimizedAssignmentMatrix = ({
   // Conflict dialog state
   const [conflictDialog, setConflictDialog] = useState<{
     open: boolean;
-    details: any;
-    originalPayload: any;
+    details: unknown;
+    originalPayload: StaffingEmailPayload;
   } | null>(null);
 
   const forcedStaffingAction = useMemo<undefined | 'availability' | 'offer'>(() => {
@@ -826,10 +861,7 @@ export const OptimizedAssignmentMatrix = ({
     lastKnownScrollRef.current.left = targetLeft;
     lastKnownScrollRef.current.top = lastTop;
 
-    const previousScrollLeftRef =
-      (handleMainScrollCore as any)._previousScrollLeftRef ||
-      ((handleMainScrollCore as any)._previousScrollLeftRef = { value: null as number | null });
-    previousScrollLeftRef.value = targetLeft;
+    previousMainScrollLeftRef.current = targetLeft;
 
     prevDatesRef.current = dates.slice();
   }, [dates, CELL_WIDTH]);
@@ -873,7 +905,7 @@ export const OptimizedAssignmentMatrix = ({
       // Build engagement scores for current sort job
       const scoreMap = new Map<string, number>();
       // Prefer using allAssignments (confirmed assignment) for the job
-      (allAssignments as any[])?.forEach((a: any) => {
+      allAssignments?.forEach((a) => {
         if (a.job_id !== sortJobId) return;
         const cur = scoreMap.get(a.technician_id) || 0;
         const status = (a.status || '').toLowerCase();
@@ -1098,10 +1130,10 @@ export const OptimizedAssignmentMatrix = ({
   const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, allJobsLite, dates);
   const actorIdsForTooltip = useMemo(() => {
     const ids = new Set<string>();
-    allAssignments.forEach((assignment: any) => {
+    allAssignments.forEach((assignment) => {
       if (assignment?.assigned_by) ids.add(assignment.assigned_by);
     });
-    staffingMaps?.byDate?.forEach((status: any) => {
+    staffingMaps?.byDate?.forEach((status) => {
       if (status?.availability_requested_by) ids.add(status.availability_requested_by);
       if (status?.offer_requested_by) ids.add(status.offer_requested_by);
     });
@@ -1128,7 +1160,7 @@ export const OptimizedAssignmentMatrix = ({
           console.warn('Failed loading tooltip profile names', error);
           continue;
         }
-        (data || []).forEach((profile: any) => {
+        ((data || []) as ProfileNameRow[]).forEach((profile) => {
           const fullName = formatUserName(profile.first_name, profile.nickname, profile.last_name) || 'Usuario';
           if (profile.id) map.set(profile.id, fullName);
         });
@@ -1155,7 +1187,7 @@ export const OptimizedAssignmentMatrix = ({
   const [availabilityMultiDates, setAvailabilityMultiDates] = useState<Date[]>([]);
 
   // Helper to handle conflict errors
-  const handleEmailError = (error: any, payload: any) => {
+  const handleEmailError = (error: unknown, payload: StaffingEmailPayload) => {
     setAvailabilitySending(false);
     if (error instanceof ConflictError) {
       // Show conflict dialog with details and option to override
@@ -1168,7 +1200,7 @@ export const OptimizedAssignmentMatrix = ({
       // Show regular error toast
       toast({
         title: 'Error al enviar',
-        description: error.message || 'No se pudo enviar la solicitud de staffing',
+        description: error instanceof Error ? error.message : 'No se pudo enviar la solicitud de staffing',
         variant: 'destructive'
       });
     }

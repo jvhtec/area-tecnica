@@ -34,6 +34,105 @@ import {
   isManagementRole,
 } from "@/utils/permissions";
 
+type ProfileContact = {
+  first_name?: string | null;
+  nickname?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+};
+
+type AssignmentWithProfile = {
+  technician_id?: string | null;
+  profiles?: ProfileContact | ProfileContact[] | null;
+};
+
+type AssignmentRoleKey = "sound_role" | "lights_role" | "video_role";
+
+type JobAssignmentContactRow = {
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+  profiles?: ProfileContact | ProfileContact[] | null;
+};
+
+type CreateWhatsappGroupResult = {
+  wa_group_id?: string | null;
+  note?: string | null;
+  warnings?: {
+    missing?: unknown[];
+    invalid?: unknown[];
+  };
+};
+
+type ClearWhatsappGroupResult = {
+  success?: boolean;
+  error?: string;
+  message?: string;
+  can_retry?: boolean;
+};
+
+type LogisticsEventWithDepartments = {
+  id?: string;
+  event_type?: string | null;
+  logistics_event_departments?: Array<{ department?: string | null }> | null;
+};
+
+type FlexFolderRow = {
+  id: string;
+  parent_id?: string | null;
+  department?: string | null;
+  folder_type?: string | null;
+};
+
+type FlexStatusCascade = {
+  attempted?: number;
+  succeeded?: number;
+  failed?: number;
+};
+
+type FlexStatusResponse = {
+  success?: boolean;
+  error?: string;
+  response?: {
+    exceptionMessage?: string;
+    primaryMessage?: string;
+    message?: string;
+  };
+  cascade?: FlexStatusCascade;
+};
+
+type LocalFolderStructureItem =
+  | string
+  | {
+      name: string;
+      subfolders?: string[];
+    };
+
+const parseLocalFolderStructure = (value: unknown): LocalFolderStructureItem[] | null => {
+  if (!Array.isArray(value)) return null;
+
+  const parsed: LocalFolderStructureItem[] = [];
+  for (const item of value) {
+    if (typeof item === "string") {
+      parsed.push(item);
+      continue;
+    }
+
+    if (item && typeof item === "object" && !Array.isArray(item) && "name" in item) {
+      const candidate = item as { name?: unknown; subfolders?: unknown };
+      if (typeof candidate.name !== "string") continue;
+      parsed.push({
+        name: candidate.name,
+        subfolders: Array.isArray(candidate.subfolders)
+          ? candidate.subfolders.filter((subfolder): subfolder is string => typeof subfolder === "string")
+          : undefined,
+      });
+    }
+  }
+
+  return parsed;
+};
+
 export interface JobCardNewProps {
   job: any;
   onEditClick: (job: any) => void;
@@ -257,9 +356,10 @@ function JobCardNewFull({
     const currentUserId = user?.id;
     if (!currentUserId) return "";
 
+    const assignmentRows = Array.isArray(assignments) ? (assignments as AssignmentWithProfile[]) : [];
     const match =
-      (Array.isArray(assignments) ? assignments : []).find((a: any) => a?.technician_id === currentUserId && a?.profiles) ||
-      (Array.isArray(assignments) ? assignments : []).find((a: any) => a?.profiles);
+      assignmentRows.find((a) => a?.technician_id === currentUserId && a?.profiles) ||
+      assignmentRows.find((a) => a?.profiles);
 
     const profile = match?.profiles ? (Array.isArray(match.profiles) ? match.profiles[0] : match.profiles) : null;
     if (!profile) return "";
@@ -478,8 +578,9 @@ function JobCardNewFull({
         .from('job_assignments')
         .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
         .eq('job_id', job.id);
-      const deptKey = department === 'sound' ? 'sound_role' : department === 'lights' ? 'lights_role' : 'video_role';
-      const crew = (rows || []).filter((r: any) => !!r[deptKey]);
+      const deptKey: AssignmentRoleKey = department === 'sound' ? 'sound_role' : department === 'lights' ? 'lights_role' : 'video_role';
+      const assignmentRows = (rows || []) as JobAssignmentContactRow[];
+      const crew = assignmentRows.filter((r) => !!r[deptKey]);
       const missing: string[] = [];
       let validPhones = 0;
       for (const r of crew) {
@@ -498,18 +599,19 @@ function JobCardNewFull({
       }
 
       const { data, error } = await supabase.functions.invoke('create-whatsapp-group', {
-        body: { job_id: job.id as string, department: department as any, stage_number: 0 }
+        body: { job_id: job.id as string, department, stage_number: 0 }
       });
       if (error) {
         // Even on error, lock may have been recorded. We'll refetch lock and inform user.
         toast({ title: 'Grupo solicitado', description: 'Se ha solicitado la creación del grupo. El botón quedará bloqueado.', });
       } else {
-        const warnings = (data as any)?.warnings;
+        const result = data as CreateWhatsappGroupResult | null;
+        const warnings = result?.warnings;
         toast({
-          title: (data as any)?.wa_group_id ? 'Grupo creado' : 'Grupo solicitado',
+          title: result?.wa_group_id ? 'Grupo creado' : 'Grupo solicitado',
           description: warnings && (warnings.missing?.length || warnings.invalid?.length)
             ? `Avisos: sin teléfono ${warnings.missing?.length || 0}, inválidos ${warnings.invalid?.length || 0}`
-            : ((data as any)?.note || 'Operación realizada.')
+            : (result?.note || 'Operación realizada.')
         });
       }
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
@@ -545,7 +647,7 @@ function JobCardNewFull({
         return;
       }
 
-      const result = clearResult as any;
+      const result = clearResult as ClearWhatsappGroupResult;
 
       if (!result.success) {
         toast({
@@ -586,8 +688,9 @@ function JobCardNewFull({
         .select('id, event_type, logistics_event_departments(department)')
         .eq('job_id', job.id)
         .eq('logistics_event_departments.department', departmentForReq);
-      const hasLoad = !!events?.some((e: any) => e.event_type === 'load');
-      const hasUnload = !!events?.some((e: any) => e.event_type === 'unload');
+      const logisticsEvents = (events || []) as LogisticsEventWithDepartments[];
+      const hasLoad = logisticsEvents.some((e) => e.event_type === 'load');
+      const hasUnload = logisticsEvents.some((e) => e.event_type === 'unload');
       if (hasLoad && hasUnload) {
         await supabase.from('transport_requests').update({ status: 'fulfilled' }).eq('id', requestId);
         queryClient.invalidateQueries({ queryKey: ['transport-request', job.id, departmentForReq] });
@@ -627,9 +730,10 @@ function JobCardNewFull({
 	        toast({ title: 'No Flex folders', description: 'Create Flex folders before syncing status.', variant: 'destructive' });
 	        return;
 	      }
+	      const folderRows = (folders || []) as FlexFolderRow[];
 	      const master =
-	        folders.find((f: any) => !f.parent_id && String(f.folder_type || '').toLowerCase() === 'main_event')
-	        || folders.find((f: any) => !f.parent_id)
+	        folderRows.find((f) => !f.parent_id && String(f.folder_type || '').toLowerCase() === 'main_event')
+	        || folderRows.find((f) => !f.parent_id)
 	        || null;
 
 	      if (!master?.id) {
@@ -640,16 +744,17 @@ function JobCardNewFull({
 	      const { data: res, error } = await supabase.functions.invoke('apply-flex-status', {
 	        body: { folder_id: master.id, status: flexStatus, cascade: true }
 	      });
-	      if (error || !res?.success) {
+	      const result = res as FlexStatusResponse | null;
+	      if (error || !result?.success) {
 	        const msg =
-	          (res as any)?.error
-	          || (res as any)?.response?.exceptionMessage
-	          || (res as any)?.response?.primaryMessage
-	          || (res as any)?.response?.message
+	          result?.error
+	          || result?.response?.exceptionMessage
+	          || result?.response?.primaryMessage
+	          || result?.response?.message
 	          || undefined;
 	        toast({ title: 'Flex sync failed', description: msg || 'See logs for details.', variant: 'destructive' });
 	      } else {
-	        const cascade = (res as any)?.cascade as any;
+	        const cascade = result?.cascade;
 	        const attempted = typeof cascade?.attempted === 'number' ? cascade.attempted : null;
 	        const succeeded = typeof cascade?.succeeded === 'number' ? cascade.succeeded : null;
 	        const failed = typeof cascade?.failed === 'number' ? cascade.failed : null;
@@ -915,7 +1020,7 @@ function JobCardNewFull({
 
       // Get current user's custom folder structure or use default
       const { data: { user } } = await supabase.auth.getUser();
-      let folderStructure = null;
+      let folderStructure: LocalFolderStructureItem[] | null = null;
 
       if (user) {
         const { data: profile } = await supabase
@@ -926,7 +1031,7 @@ function JobCardNewFull({
 
         // Only use custom structure for management users
         if (profile && canUseCustomFolderStructure(profile.role) && profile.custom_folder_structure) {
-          folderStructure = profile.custom_folder_structure;
+          folderStructure = parseLocalFolderStructure(profile.custom_folder_structure);
         }
       }
 

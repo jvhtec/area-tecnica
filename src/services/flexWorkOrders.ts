@@ -84,7 +84,7 @@ async function createWorkOrderElement(options: {
   });
 
   if (!response.ok) {
-    const errorPayload = await response.json().catch(() => null);
+    const errorPayload = await response.json().catch((): null => null);
     const message = errorPayload?.exceptionMessage || response.statusText || 'Failed to create work order';
     throw new Error(message);
   }
@@ -106,7 +106,7 @@ async function fetchDocumentNumber(documentId: string, token: string): Promise<s
   try {
     const res = await fetch(url, { headers: { 'Content-Type': 'application/json', 'X-Auth-Token': token, 'apikey': token } });
     if (!res.ok) return null;
-    const j = await res.json().catch(() => null) as any;
+    const j = await res.json().catch((): null => null) as any;
     const docNum = j?.documentNumber?.data || j?.documentNumber || null;
     return (typeof docNum === 'string' && docNum.trim()) ? docNum : null;
   } catch (_) {
@@ -135,7 +135,7 @@ async function addResourceLineItem(options: {
     try {
       const res = await fetch(`${baseUrl}?${query.toString()}`, init);
       if (!res.ok) return null;
-      return await res.json().catch(() => null);
+      return await res.json().catch((): null => null);
     } catch (err) {
       console.error('[FlexWorkOrders] Failed to add resource line item', err);
       return null;
@@ -638,7 +638,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
     });
     
     if (!flexResponse.ok) {
-      const errorData = await flexResponse.json().catch(() => null);
+      const errorData = await flexResponse.json().catch((): null => null);
       throw new Error(`Failed to create work orders folder in Flex: ${errorData?.exceptionMessage || flexResponse.statusText}`);
     }
     

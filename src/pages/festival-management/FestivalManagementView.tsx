@@ -409,7 +409,7 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                         <SelectValue placeholder="Department" />
                       </SelectTrigger>
                       <SelectContent>
-                        {departmentOptions.map((dept) => (
+                        {departmentOptions.map((dept: Department) => (
                           <SelectItem key={dept} value={dept}>
                             {humanizeDepartment(dept)}
                           </SelectItem>
@@ -748,7 +748,14 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                     </h4>
                     {jobDocuments.length > 0 ? (
                       <div className="space-y-2">
-                        {jobDocuments.map((doc) => {
+                        {jobDocuments.map((doc: {
+                          id: string;
+                          file_name: string;
+                          uploaded_at: string;
+                          template_type?: string | null;
+                          read_only?: boolean | null;
+                          file_path?: string | null;
+                        }) => {
                           const isTemplate = doc.template_type === "soundvision";
                           const isReadOnly = Boolean(doc.read_only);
                           return (
@@ -812,11 +819,27 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                     </h4>
                     {groupedRiderFiles.length > 0 ? (
                       <div className="space-y-4">
-                        {groupedRiderFiles.map((artist) => (
+                        {groupedRiderFiles.map((artist: {
+                          artistId: string;
+                          artistName: string;
+                          files: Array<{
+                            id: string;
+                            file_name: string;
+                            uploaded_at?: string | null;
+                            created_at?: string | null;
+                            file_path?: string | null;
+                          }>;
+                        }) => (
                           <div key={artist.artistId} className="space-y-2">
                             <div className="text-xs md:text-sm font-medium text-foreground">{artist.artistName}</div>
                             <div className="space-y-2">
-                              {artist.files.map((file) => (
+                              {artist.files.map((file: {
+                                id: string;
+                                file_name: string;
+                                uploaded_at?: string | null;
+                                created_at?: string | null;
+                                file_path?: string | null;
+                              }) => (
                                 <div
                                   key={file.id}
                                   className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md border bg-accent/20 p-3"

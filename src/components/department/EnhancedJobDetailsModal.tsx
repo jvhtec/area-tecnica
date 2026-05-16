@@ -640,7 +640,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                 </div>
 
                                 {(() => {
-                                    const visibleDocs = (job?.job_documents || []).filter((d: JobDocument) =>
+                                    const visibleDocs: JobDocument[] = (job?.job_documents || []).filter((d: JobDocument) =>
                                         canViewAllDocs ? true : d.visible_to_tech
                                     );
                                     return visibleDocs.length > 0 ? (

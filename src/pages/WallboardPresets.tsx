@@ -321,7 +321,7 @@ export default function WallboardPresets() {
     const payload = {
       name,
       slug,
-      description: null,
+      description: null as string | null,
       display_url: url,
       panel_order: [...DEFAULT_ORDER],
       panel_durations: (Object.keys(PANEL_LABELS) as PanelKey[]).reduce<Record<string, number>>((acc, key) => {

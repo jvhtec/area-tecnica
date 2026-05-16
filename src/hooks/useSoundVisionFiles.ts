@@ -139,7 +139,7 @@ export const useSoundVisionFiles = (
         }
 
         userDownloadsMap = new Map(
-          (downloadData || []).map(download => [download.file_id, download.downloaded_at])
+          (downloadData || []).map((download: { file_id: string; downloaded_at: string }) => [download.file_id, download.downloaded_at])
         );
       }
 

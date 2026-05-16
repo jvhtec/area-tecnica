@@ -322,7 +322,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
                             onRemove={() => {
                                 queryClient.setQueryData(['user-profile', user.id], (old: UserProfile | undefined) => ({
                                     ...(old ?? {}),
-                                    profile_picture_url: null
+                                    profile_picture_url: null as string | null
                                 }));
                             }}
                             size="lg"

@@ -24,7 +24,7 @@ const toast = Object.assign(vi.fn(), {
 
 vi.mock("sonner", () => ({
   toast,
-  Toaster: () => null,
+  Toaster: (): null => null,
 }));
 
 const createUnexpectedFetchError = (input?: RequestInfo | URL) => {
@@ -83,7 +83,7 @@ if (typeof window !== "undefined") {
   global.IntersectionObserver = class IntersectionObserver {
     disconnect() {}
     observe() {}
-    takeRecords() {
+    takeRecords(): IntersectionObserverEntry[] {
       return [];
     }
     unobserve() {}

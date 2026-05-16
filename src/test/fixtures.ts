@@ -71,7 +71,7 @@ export const createRouteShellAuthState = (
   });
 };
 
-export const createJob = (overrides: Record<string, unknown> = {}) => ({
+export const createJob = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: "job-1",
   title: "Test Job",
   job_type: "single",
@@ -82,7 +82,7 @@ export const createJob = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-export const createAssignment = (overrides: Record<string, unknown> = {}) => ({
+export const createAssignment = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: "assignment-1",
   job_id: "job-1",
   technician_id: "tech-1",
@@ -107,7 +107,7 @@ export const createTimesheet = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-export const createTask = (overrides: Record<string, unknown> = {}) => ({
+export const createTask = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: "task-1",
   job_id: "job-1",
   tour_id: null,
@@ -118,7 +118,7 @@ export const createTask = (overrides: Record<string, unknown> = {}) => ({
   ...overrides,
 });
 
-export const createExpense = (overrides: Record<string, unknown> = {}) => ({
+export const createExpense = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: "expense-1",
   job_id: "job-1",
   technician_id: "tech-1",
@@ -191,7 +191,7 @@ export const createVacationRequest = (overrides: Record<string, unknown> = {}) =
   ...overrides,
 });
 
-export const createTour = (overrides: Record<string, unknown> = {}) => ({
+export const createTour = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({
   id: "tour-1",
   name: "Test Tour",
   description: "Wave two test tour",

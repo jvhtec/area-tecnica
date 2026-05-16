@@ -11,6 +11,15 @@ interface UseFestivalShiftsParams {
   selectedDate: string;
 }
 
+type ShiftProfile = {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+  department: string | null;
+  role: string | null;
+};
+
 export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsParams) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -68,7 +77,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
         .filter(assignment => assignment.technician_id)
         .map(assignment => assignment.technician_id);
 
-      let profilesData = {};
+      let profilesData: Record<string, ShiftProfile> = {};
       
       if (technicianIds.length > 0) {
         const { data: profiles, error: profilesError } = await supabase
@@ -82,7 +91,7 @@ export function useFestivalShifts({ jobId, selectedDate }: UseFestivalShiftsPara
         }
 
         // Create a map of profiles by ID for easier lookup
-        profilesData = profiles.reduce((acc, profile) => ({
+        profilesData = profiles.reduce<Record<string, ShiftProfile>>((acc, profile) => ({
           ...acc,
           [profile.id]: profile
         }), {});

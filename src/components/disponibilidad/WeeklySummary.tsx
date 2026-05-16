@@ -292,7 +292,7 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
     if (!dayAssignments?.length) return 0;
 
     return dayAssignments.reduce((total, assignment) => {
-      const item = assignment.preset.items.find(item =>
+      const item = assignment.preset.items.find((item: { equipment_id: string; quantity?: number }) =>
         item.equipment_id === equipmentId
       );
       return total + (item?.quantity || 0);

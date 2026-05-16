@@ -95,7 +95,7 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
         .eq('job_id', jobId);
       if (error) throw error;
       const list = (payouts || []) as Array<{ job_id: string; technician_id: string; timesheets_total_eur: number; extras_total_eur: number; total_eur: number }>;
-      return list.map((p) => ({
+      return list.map((p): TourJobRateQuote => ({
         job_id: p.job_id,
         technician_id: p.technician_id,
         start_time: new Date().toISOString(),
@@ -117,7 +117,7 @@ export function useManagerJobQuotes(jobId?: string, jobType?: string, tourId?: s
         extras_total_eur: Number(p.extras_total_eur || 0),
         total_with_extras_eur: Number(p.total_eur || 0), // Total including extras
         breakdown: {},
-      })) as TourJobRateQuote[];
+      }));
     },
     staleTime: 30 * 1000,
   });

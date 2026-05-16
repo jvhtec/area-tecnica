@@ -1,4 +1,6 @@
-export type Dept = 'sound' | 'lights' | 'video';
+import type { Dept, DeptCounts } from '@/pages/wallboard/types';
+
+export type { Dept };
 
 export interface JobsOverviewFeed {
   jobs: Array<{
@@ -8,9 +10,9 @@ export interface JobsOverviewFeed {
     end_time: string;
     location: { name: string | null } | null;
     departments: Dept[];
-    crewAssigned: Record<string, number>;
-    crewNeeded: Record<string, number>;
-    docs: Record<string, { have: number; need: number }>;
+    crewAssigned: DeptCounts;
+    crewNeeded: DeptCounts;
+    docs: Partial<Record<Dept, { have: number; need: number }>>;
     status: 'green' | 'yellow' | 'red';
     color?: string | null;
     job_type?: string | null;
@@ -21,6 +23,11 @@ export interface CrewAssignmentsFeed {
   jobs: Array<{
     id: string;
     title: string;
+    jobType?: string | null;
+    job_type?: string | null;
+    start_time?: string;
+    end_time?: string;
+    color?: string | null;
     crew: Array<{
       name: string;
       role: string;
@@ -34,6 +41,11 @@ export interface DocProgressFeed {
   jobs: Array<{
     id: string;
     title: string;
+    color?: string | null;
+    jobType?: string | null;
+    job_type?: string | null;
+    start_time?: string;
+    end_time?: string;
     departments: Array<{
       dept: Dept;
       have: number;

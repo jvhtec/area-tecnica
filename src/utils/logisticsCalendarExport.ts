@@ -253,7 +253,7 @@ export const generateLogisticsCalendarPDF = async (
     img.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
     img.onload = () => resolve(img);
     img.onerror = (err) => reject(err);
-  }).catch(() => null);
+  }).catch((): null => null);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const logoWidth = 50;
