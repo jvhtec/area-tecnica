@@ -3,10 +3,12 @@ import { useState } from "react";
 import { Department } from "@/types/department";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { useTourDates } from "./hooks/useTourDates";
-import { useTourDepartments } from "./hooks/useTourDepartments";
-import { useTourCreationMutation } from "./hooks/useTourCreationMutation";
+import { useTourDates } from "@/hooks/tours/useTourDates";
+import { useTourDepartments } from "@/hooks/tours/useTourDepartments";
+import { useTourCreationMutation } from "@/hooks/tours/useTourCreationMutation";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useTourCreation = (
   currentDepartment: Department,
   onSuccess: () => void
@@ -67,9 +69,9 @@ export const useTourCreation = (
       });
       console.log("Tour created successfully");
 
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") });
 
       toast({
         title: "Success",

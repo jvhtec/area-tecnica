@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface JobApprovalStatus {
   jobId: string;
   totalTimesheets: number;
@@ -14,7 +16,7 @@ export interface JobApprovalStatus {
 
 export function useJobApprovalStatus(jobId?: string) {
   return useQuery({
-    queryKey: ['job-approval-status', jobId],
+    queryKey: queryKeys.scope('job-approval-status', jobId),
     enabled: Boolean(jobId),
     queryFn: async (): Promise<JobApprovalStatus> => {
       if (!jobId) {

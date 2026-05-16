@@ -3,6 +3,8 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Hook for managing realtime subscriptions to the tours table
  */
@@ -25,7 +27,7 @@ export const useTourSubscription = () => {
           console.log('Tours table change detected:', payload);
           
           // Invalidate tours query to refresh the data
-          queryClient.invalidateQueries({ queryKey: ['tours'] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope('tours') });
         }
       )
       .subscribe();

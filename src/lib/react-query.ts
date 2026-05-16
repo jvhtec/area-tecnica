@@ -16,6 +16,30 @@ export const setupReactQuery = () => {
 // Re-export optimized utilities
 export { createQueryKey, optimizedInvalidation };
 
+type QueryKeyPart = unknown;
+
+function scopedQueryKey<Scope extends string>(scope: Scope, ...parts: string[]): string[];
+function scopedQueryKey(scope: string, ...parts: QueryKeyPart[]): QueryKeyPart[];
+function scopedQueryKey(scope: string, ...parts: QueryKeyPart[]): QueryKeyPart[] {
+  return [scope, ...parts];
+}
+
+function customQueryKey(...parts: string[]): string[];
+function customQueryKey(...parts: QueryKeyPart[]): QueryKeyPart[];
+function customQueryKey(...parts: QueryKeyPart[]): QueryKeyPart[] {
+  return parts;
+}
+
+/**
+ * Generic query-key factory used while migrating legacy inline keys toward
+ * domain-specific factories. It preserves existing key shapes and gives static
+ * scans one canonical creation point.
+ */
+export const queryKeys = {
+  scope: scopedQueryKey,
+  custom: customQueryKey,
+};
+
 // Factory function to create a new optimized QueryClient
 export const createQueryClient = createOptimizedQueryClient;
 

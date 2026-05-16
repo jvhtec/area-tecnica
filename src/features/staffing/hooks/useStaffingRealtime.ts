@@ -2,17 +2,19 @@ import { useEffect } from 'react'
 import { supabase } from '@/integrations/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
 
+
+import { queryKeys } from "@/lib/react-query";
 export function useStaffingRealtime() {
   const qc = useQueryClient()
-  
+
   useEffect(() => {
     console.log('🚀 Setting up staffing realtime subscriptions')
     // Listen to both staffing_requests and staffing_events tables
     const staffingRequestsChannel = supabase.channel('staffing-requests')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'staffing_requests' 
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'staffing_requests'
       }, (payload) => {
         console.log('Staffing requests realtime update:', payload)
         handleStaffingUpdate(payload)
@@ -20,10 +22,10 @@ export function useStaffingRealtime() {
       .subscribe()
 
     const staffingEventsChannel = supabase.channel('staffing-events')
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'staffing_events' 
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'staffing_events'
       }, (payload) => {
         console.log('Staffing events realtime update:', payload)
         handleStaffingUpdate(payload)
@@ -41,10 +43,10 @@ export function useStaffingRealtime() {
           if (typeof code === 'string' && code.startsWith('staffing.')) {
             console.log('Activity staffing event:', code, rec)
             // We don't know job/profile here, but invalidate broad keys
-            qc.invalidateQueries({ queryKey: ['staffing'] })
-            qc.invalidateQueries({ queryKey: ['staffing-by-date'] })
-            qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
-            qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
+            qc.invalidateQueries({ queryKey: queryKeys.scope('staffing') })
+            qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-by-date') })
+            qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') })
+            qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
           }
         } catch (e) {
           console.warn('Activity staffing event handling error', e)
@@ -58,11 +60,11 @@ export function useStaffingRealtime() {
         eventType: payload.eventType,
         record: payload.new || payload.old
       })
-      
+
       const record = payload.new || payload.old
       let jobId = null
       let profileId = null
-      
+
       if (record && typeof record === 'object') {
         // Handle staffing_requests updates (have job_id and profile_id directly)
         if ('job_id' in record && 'profile_id' in record) {
@@ -77,7 +79,7 @@ export function useStaffingRealtime() {
               .select('job_id, profile_id')
               .eq('id', record.staffing_request_id)
               .single()
-            
+
             if (requestData) {
               jobId = requestData.job_id
               profileId = requestData.profile_id
@@ -86,28 +88,28 @@ export function useStaffingRealtime() {
             console.warn('Failed to fetch related staffing request data:', error)
           }
         }
-        
+
         // Invalidate specific staffing queries if we have the IDs
         if (jobId && profileId) {
           console.log('🎯 Invalidating specific query:', ['staffing', jobId, profileId])
-          qc.invalidateQueries({ 
-            queryKey: ['staffing', jobId, profileId] 
+          qc.invalidateQueries({
+            queryKey: queryKeys.scope('staffing', jobId, profileId)
           })
           // Also invalidate date-based queries for this profile
-          qc.invalidateQueries({ 
-            queryKey: ['staffing-by-date', profileId] 
+          qc.invalidateQueries({
+            queryKey: queryKeys.scope('staffing-by-date', profileId)
           })
         }
       }
-      
+
       // Always invalidate broader matrix queries for safety
       console.log('🔄 Invalidating matrix queries')
-      qc.invalidateQueries({ queryKey: ['assignment-matrix'] })
-      qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
-      qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('assignment-matrix') })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') })
     }
-      
-    return () => { 
+
+    return () => {
       supabase.removeChannel(staffingRequestsChannel)
       supabase.removeChannel(staffingEventsChannel)
       supabase.removeChannel(activityChannel)

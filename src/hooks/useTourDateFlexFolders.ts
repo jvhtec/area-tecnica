@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { createAllFoldersForJob } from "@/utils/flex-folders/folders";
 import { toast } from "sonner";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useTourDateFlexFolders = (tourId: string) => {
   const [creatingAll, setCreatingAll] = useState(false);
   const [creatingIndividual, setCreatingIndividual] = useState<Set<string>>(new Set());
@@ -59,9 +61,9 @@ export const useTourDateFlexFolders = (tourId: string) => {
     },
     onSuccess: (data) => {
       toast.success(`Flex folders created successfully for ${new Date(data.tourDate.date).toLocaleDateString()}`);
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['tour-dates', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-dates', tourId) });
     },
     onError: (error: any) => {
       console.error('Error creating Flex folders:', error);

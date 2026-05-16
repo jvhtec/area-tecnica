@@ -3,10 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { EventData } from "@/types/hoja-de-ruta";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useJobIntegration = (jobId: string) => {
   // Fetch job details
   const { data: jobDetails, isLoading: isLoadingJob } = useQuery({
-    queryKey: ['job-details', jobId],
+    queryKey: queryKeys.scope('job-details', jobId),
     queryFn: async () => {
       if (!jobId) return null;
       

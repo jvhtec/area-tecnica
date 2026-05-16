@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface TourDatePowerOverride {
   id: string;
   tour_date_id: string;
@@ -41,7 +43,7 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
 
   // Fetch power overrides
   const { data: powerOverrides = [], isLoading: powerLoading } = useQuery({
-    queryKey: ["tour-date-power-overrides", tourDateId],
+    queryKey: queryKeys.scope("tour-date-power-overrides", tourDateId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tour_date_power_overrides")
@@ -57,7 +59,7 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
 
   // Fetch weight overrides
   const { data: weightOverrides = [], isLoading: weightLoading } = useQuery({
-    queryKey: ["tour-date-weight-overrides", tourDateId],
+    queryKey: queryKeys.scope("tour-date-weight-overrides", tourDateId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tour_date_weight_overrides")
@@ -84,7 +86,7 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-date-power-overrides", tourDateId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-power-overrides", tourDateId) });
     },
   });
 
@@ -101,7 +103,7 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-date-weight-overrides", tourDateId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-weight-overrides", tourDateId) });
     },
   });
 
@@ -119,7 +121,7 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
       return result;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-date-power-overrides", tourDateId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-power-overrides", tourDateId) });
     },
   });
 
@@ -137,9 +139,9 @@ export const useTourDateOverrides = (tourDateId: string, type: 'power' | 'weight
     },
     onSuccess: ({ table }) => {
       if (table === 'power') {
-        queryClient.invalidateQueries({ queryKey: ["tour-date-power-overrides", tourDateId] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-power-overrides", tourDateId) });
       } else {
-        queryClient.invalidateQueries({ queryKey: ["tour-date-weight-overrides", tourDateId] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-date-weight-overrides", tourDateId) });
       }
     },
   });

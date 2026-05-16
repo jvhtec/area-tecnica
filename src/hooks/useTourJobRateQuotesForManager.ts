@@ -3,13 +3,15 @@ import { supabase } from '@/integrations/supabase/client'
 import type { TourJobRateQuote } from '@/types/tourRates'
 import { attachPayoutOverridesToTourQuotes } from '@/services/tourPayoutOverrides'
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Manager-only hook: returns rate quotes for all assigned technicians on a tour date.
  * Bypasses the auth-scoped view by computing quotes via RPC for each tour assignment.
  */
 export function useTourJobRateQuotesForManager(jobId?: string, tourId?: string) {
   return useQuery({
-    queryKey: ['tour-job-rate-quotes-manager', jobId, tourId],
+    queryKey: queryKeys.scope('tour-job-rate-quotes-manager', jobId, tourId),
     enabled: !!jobId && !!tourId,
     queryFn: async (): Promise<TourJobRateQuote[]> => {
       if (!jobId || !tourId) return []

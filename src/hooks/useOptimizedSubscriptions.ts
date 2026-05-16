@@ -2,6 +2,8 @@ import { useEffect, useCallback } from 'react';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { createQueryKey } from '@/lib/optimized-react-query';
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Optimized hook for managing table subscriptions with batching
  */
@@ -39,14 +41,14 @@ export const useOptimizedTableSubscriptions = (
  */
 export const useOptimizedDashboardSubscriptions = () => {
   const subscriptions = [
-    { table: 'jobs', queryKey: [...createQueryKey.jobs.all], priority: 'high' as const },
-    { table: 'job_assignments', queryKey: [...createQueryKey.assignments.all], priority: 'medium' as const },
-    { table: 'job_documents', queryKey: [...createQueryKey.jobs.all], priority: 'medium' as const },
-    { table: 'sound_job_tasks', queryKey: [...createQueryKey.tasks.all], priority: 'medium' as const },
-    { table: 'lights_job_tasks', queryKey: [...createQueryKey.tasks.all], priority: 'low' as const },
-    { table: 'video_job_tasks', queryKey: [...createQueryKey.tasks.all], priority: 'low' as const },
-    { table: 'production_job_tasks', queryKey: [...createQueryKey.tasks.all], priority: 'low' as const },
-    { table: 'administrative_job_tasks', queryKey: [...createQueryKey.tasks.all], priority: 'low' as const },
+    { table: 'jobs', queryKey: queryKeys.custom(...createQueryKey.jobs.all), priority: 'high' as const },
+    { table: 'job_assignments', queryKey: queryKeys.custom(...createQueryKey.assignments.all), priority: 'medium' as const },
+    { table: 'job_documents', queryKey: queryKeys.custom(...createQueryKey.jobs.all), priority: 'medium' as const },
+    { table: 'sound_job_tasks', queryKey: queryKeys.custom(...createQueryKey.tasks.all), priority: 'medium' as const },
+    { table: 'lights_job_tasks', queryKey: queryKeys.custom(...createQueryKey.tasks.all), priority: 'low' as const },
+    { table: 'video_job_tasks', queryKey: queryKeys.custom(...createQueryKey.tasks.all), priority: 'low' as const },
+    { table: 'production_job_tasks', queryKey: queryKeys.custom(...createQueryKey.tasks.all), priority: 'low' as const },
+    { table: 'administrative_job_tasks', queryKey: queryKeys.custom(...createQueryKey.tasks.all), priority: 'low' as const },
   ];
 
   return useOptimizedTableSubscriptions(subscriptions);
@@ -57,10 +59,10 @@ export const useOptimizedDashboardSubscriptions = () => {
  */
 export const useOptimizedJobSubscriptions = (jobId: string) => {
   const subscriptions = [
-    { table: 'job_assignments', queryKey: [...createQueryKey.assignments.byJob(jobId)], priority: 'high' as const },
-    { table: 'job_documents', queryKey: [...createQueryKey.jobs.detail(jobId)], priority: 'medium' as const },
-    { table: 'sound_job_tasks', queryKey: [...createQueryKey.tasks.byJob(jobId)], priority: 'medium' as const },
-    { table: 'sound_job_personnel', queryKey: [...createQueryKey.tasks.byDepartment('sound', jobId)], priority: 'low' as const },
+    { table: 'job_assignments', queryKey: queryKeys.custom(...createQueryKey.assignments.byJob(jobId)), priority: 'high' as const },
+    { table: 'job_documents', queryKey: queryKeys.custom(...createQueryKey.jobs.detail(jobId)), priority: 'medium' as const },
+    { table: 'sound_job_tasks', queryKey: queryKeys.custom(...createQueryKey.tasks.byJob(jobId)), priority: 'medium' as const },
+    { table: 'sound_job_personnel', queryKey: queryKeys.custom(...createQueryKey.tasks.byDepartment('sound', jobId)), priority: 'low' as const },
   ];
 
   return useOptimizedTableSubscriptions(subscriptions);
@@ -74,8 +76,8 @@ export const useOptimizedMessagesSubscriptions = (userId: string) => {
 
   const subscribeToMessages = useCallback(() => {
     const subscriptions = [
-      { table: 'messages', queryKey: ['messages', userId], priority: 'low' as const },
-      { table: 'direct_messages', queryKey: ['direct_messages', userId], priority: 'medium' as const },
+      { table: 'messages', queryKey: queryKeys.scope('messages', userId), priority: 'low' as const },
+      { table: 'direct_messages', queryKey: queryKeys.scope('direct_messages', userId), priority: 'medium' as const },
     ];
 
     forceSubscribe(subscriptions);

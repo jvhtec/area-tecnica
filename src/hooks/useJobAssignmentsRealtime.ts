@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface AssignmentInsertOptions {
   singleDay?: boolean;
   singleDayDate?: string | null;
@@ -346,8 +348,8 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
       toast.success("Assignment added successfully");
       // Invalidate jobs so JobCard lists refresh assignments relation
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
     } catch (error: any) {
       console.error('Error in addAssignment:', error);
       toast.error("Failed to add assignment");
@@ -412,8 +414,8 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
       toast.success("Assignment removed successfully");
       // Invalidate jobs so JobCard lists refresh assignments relation
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
     } catch (error: any) {
       console.error('Error in removeAssignment:', error);
       toast.error("Failed to remove assignment");

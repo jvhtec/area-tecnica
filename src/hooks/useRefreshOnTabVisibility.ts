@@ -2,6 +2,8 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
+
+import { queryKeys } from "@/lib/react-query";
 type RefreshCallback = () => void;
 
 export const useRefreshOnTabVisibility = (
@@ -25,7 +27,7 @@ export const useRefreshOnTabVisibility = (
       } else if (Array.isArray(queryKeysOrCallback)) {
         // If it's an array of query keys, invalidate them
         queryKeysOrCallback.forEach(key => {
-          queryClient.invalidateQueries({ queryKey: [key] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.custom(key) });
         });
       }
       lastRefreshTime = Date.now();
@@ -41,7 +43,7 @@ export const useRefreshOnTabVisibility = (
           } else if (Array.isArray(queryKeysOrCallback)) {
             // If it's an array of query keys, invalidate them
             queryKeysOrCallback.forEach(key => {
-              queryClient.invalidateQueries({ queryKey: [key] });
+              queryClient.invalidateQueries({ queryKey: queryKeys.custom(key) });
             });
           }
           lastRefreshTime = now;

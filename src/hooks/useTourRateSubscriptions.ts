@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Hook for managing realtime subscriptions to tour rate related tables
  */
@@ -53,8 +55,8 @@ export const useTourRateSubscriptions = () => {
             console.log('Tour job change detected:', payload);
             
             // Invalidate all tour rate queries
-            queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
-            queryClient.invalidateQueries({ queryKey: ['technician-tour-rate-quotes'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes') });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('technician-tour-rate-quotes') });
           }
         )
         .subscribe();
@@ -73,8 +75,8 @@ export const useTourRateSubscriptions = () => {
             console.log('Job assignment change detected:', payload);
             
             // Invalidate tour rate queries
-            queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
-            queryClient.invalidateQueries({ queryKey: ['technician-tour-rate-quotes'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes') });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('technician-tour-rate-quotes') });
           }
         )
         .subscribe();
@@ -93,8 +95,8 @@ export const useTourRateSubscriptions = () => {
             console.log('House tech rates change detected:', payload);
             
             // Invalidate tour rate queries
-            queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
-            queryClient.invalidateQueries({ queryKey: ['technician-tour-rate-quotes'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes') });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('technician-tour-rate-quotes') });
           }
         )
         .subscribe();
@@ -113,11 +115,11 @@ export const useTourRateSubscriptions = () => {
             console.log('Job rate extras change detected:', payload);
             
             // Invalidate tour rate and payout queries
-            queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
-            queryClient.invalidateQueries({ queryKey: ['technician-tour-rate-quotes'] });
-            queryClient.invalidateQueries({ queryKey: ['job-extras'] });
-            queryClient.invalidateQueries({ queryKey: ['job-tech-payout'] });
-            queryClient.invalidateQueries({ queryKey: ['my-job-payout-totals'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes') });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('technician-tour-rate-quotes') });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-extras') });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-tech-payout') });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('my-job-payout-totals') });
           }
         )
         .subscribe();

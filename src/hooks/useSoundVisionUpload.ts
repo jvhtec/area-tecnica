@@ -5,6 +5,8 @@ import { toast } from 'sonner';
 import { validateFile, generateStoragePath } from '@/utils/soundvisionFileValidation';
 import { VenueMetadata, useUpsertVenue } from './useVenues';
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface UploadData {
   file: File;
   venueData: VenueMetadata;
@@ -87,7 +89,7 @@ export const useSoundVisionUpload = () => {
 
         if (reviewError) throw reviewError;
 
-        queryClient.invalidateQueries({ queryKey: ['soundvision-file-reviews', fileRecord.id] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('soundvision-file-reviews', fileRecord.id) });
       }
 
       // Invoke push notification for file upload
@@ -124,8 +126,8 @@ export const useSoundVisionUpload = () => {
       return { fileRecord, notificationResult };
     },
     onSuccess: ({ notificationResult }) => {
-      queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
-      queryClient.invalidateQueries({ queryKey: ['venues'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('soundvision-files') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('venues') });
       
       if (notificationResult.success) {
         toast.success('Archivo subido correctamente');

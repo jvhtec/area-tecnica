@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface JobRequiredRoleRow {
   id: string
   job_id: string
@@ -65,7 +67,7 @@ function parseSummaryRow(row: any): RequiredRoleSummaryItem | null {
 
 export function useJobRequiredRoles(jobId: string) {
   return useQuery<JobRequiredRoleRow[]>({
-    queryKey: ['job-required-roles', jobId],
+    queryKey: queryKeys.scope('job-required-roles', jobId),
     queryFn: async () => {
       if (!jobId) return []
       const { data, error } = await supabase
@@ -84,7 +86,7 @@ export function useJobRequiredRoles(jobId: string) {
 
 export function useRequiredRoleSummary(jobId: string, enabled: boolean = true) {
   const q = useQuery<RequiredRoleSummaryItem[]>({
-    queryKey: ['job-required-summary', jobId],
+    queryKey: queryKeys.scope('job-required-summary', jobId),
     queryFn: async () => {
       if (!jobId) return []
       const { data, error } = await supabase
@@ -233,10 +235,10 @@ export function useSaveJobRequirements() {
       return { jobId, inserted, updated, deleted: deletes }
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['job-required-roles', result.jobId] })
-      queryClient.invalidateQueries({ queryKey: ['job-required-summary', result.jobId] })
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] })
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-required-roles', result.jobId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-required-summary', result.jobId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') })
 
       void broadcastJobRequirementsUpdate(result.jobId, result)
     },

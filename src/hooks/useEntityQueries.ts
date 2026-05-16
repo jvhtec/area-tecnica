@@ -1,6 +1,6 @@
 
 import { useQuery, useMutation, UseQueryOptions, UseMutationOptions } from "@tanstack/react-query";
-import { queryClient } from "@/lib/react-query";
+import { queryKeys, queryClient } from "@/lib/react-query";
 import { ApiService } from "@/lib/api-service";
 
 // Create custom hooks for specific data types with appropriate overrides
@@ -12,7 +12,7 @@ export const useEntityQuery = <T>(
   const apiService = ApiService.getInstance();
   
   return useQuery({
-    queryKey: [entityType, id],
+    queryKey: queryKeys.custom(entityType, id),
     queryFn: () => apiService.get<T>(`/api/${entityType}/${id}`),
     ...options,
   });
@@ -34,7 +34,7 @@ export const useEntityListQuery = <T>(
     : '';
   
   return useQuery({
-    queryKey: [entityType, 'list', filters],
+    queryKey: queryKeys.custom(entityType, 'list', filters),
     queryFn: () => apiService.get<T[]>(`/api/${entityType}${queryString}`),
     ...options,
   });
@@ -72,7 +72,7 @@ export const useEntityMutation = <T, TVariables extends object>(
     },
     onMutate: async (variables): Promise<MutationContext<T>> => {
       if (options?.optimisticUpdate) {
-        await queryClient.cancelQueries({ queryKey: [entityType] });
+        await queryClient.cancelQueries({ queryKey: queryKeys.custom(entityType) });
         
         // Get the current data and type cast it
         const previousData = queryClient.getQueryData<T>([entityType]);
@@ -100,11 +100,11 @@ export const useEntityMutation = <T, TVariables extends object>(
       // Invalidate relevant queries
       if (options?.onSuccessInvalidation) {
         options.onSuccessInvalidation.forEach(key => {
-          queryClient.invalidateQueries({ queryKey: [key] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.custom(key) });
         });
       } else {
         // Default invalidation
-        queryClient.invalidateQueries({ queryKey: [entityType] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.custom(entityType) });
       }
       
       // Call the original onSuccess if it exists

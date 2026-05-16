@@ -6,6 +6,8 @@ import { Department } from "@/types/department";
 import { sanitizeLogData } from "@/lib/enhanced-security-config";
 import { OPS_JOB_TYPES_NO_DRYHIRE, OPS_JOB_TYPES_WITH_DRYHIRE } from "@/utils/jobType";
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Optimized jobs hook that consolidates multiple queries and subscriptions
  * Replaces multiple individual hooks with a single, efficient query
@@ -22,13 +24,13 @@ export const useOptimizedJobs = (
 ) => {
   // Subscribe only to tables that affect this hook's query results
   useMultiTableSubscription([
-    { table: 'jobs', queryKey: ['optimized-jobs'], priority: 'high' },
-    { table: 'job_assignments', queryKey: ['optimized-jobs'], priority: 'high' },
-    { table: 'job_departments', queryKey: ['optimized-jobs'], priority: 'medium' },
-    { table: 'job_documents', queryKey: ['optimized-jobs'], priority: 'low' },
-    { table: 'flex_folders', queryKey: ['optimized-jobs'], priority: 'low' },
-    { table: 'locations', queryKey: ['optimized-jobs'], priority: 'low' },
-    { table: 'tours', queryKey: ['optimized-jobs'], priority: 'low' },
+    { table: 'jobs', queryKey: queryKeys.scope('optimized-jobs'), priority: 'high' },
+    { table: 'job_assignments', queryKey: queryKeys.scope('optimized-jobs'), priority: 'high' },
+    { table: 'job_departments', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' },
+    { table: 'job_documents', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
+    { table: 'flex_folders', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
+    { table: 'locations', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
+    { table: 'tours', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
   ]);
 
   const fetchOptimizedJobs = async () => {
@@ -185,7 +187,7 @@ export const useOptimizedJobs = (
   };
 
   return useQuery({
-    queryKey: ['optimized-jobs', department, startDate?.toISOString(), endDate?.toISOString(), includeDryhire],
+    queryKey: queryKeys.scope('optimized-jobs', department, startDate?.toISOString(), endDate?.toISOString(), includeDryhire),
     queryFn: fetchOptimizedJobs,
     staleTime: 1000 * 60 * 5, // 5 minutes - increased for better caching
     gcTime: 1000 * 60 * 10, // 10 minutes - cache jobs longer

@@ -1,9 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 
+
+import { queryKeys } from "@/lib/react-query";
 export function useStaffingStatus(jobId: string, profileId: string) {
   return useQuery({
-    queryKey: ['staffing', jobId, profileId],
+    queryKey: queryKeys.scope('staffing', jobId, profileId),
     queryFn: async () => {
       console.log('🔍 Fetching staffing status (view) for:', { jobId, profileId })
 
@@ -115,11 +117,11 @@ export function useSendStaffingEmail() {
       return data
     },
     onSuccess: (_data, vars) => {
-      qc.invalidateQueries({ queryKey: ['staffing', vars.job_id, vars.profile_id] })
-      qc.invalidateQueries({ queryKey: ['staffing-by-date', vars.profile_id] })
-      qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
-      qc.invalidateQueries({ queryKey: ['assignment-matrix'] })
-      qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('staffing', vars.job_id, vars.profile_id) })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-by-date', vars.profile_id) })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('assignment-matrix') })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
       try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
       // Fan out push notification (fire-and-forget)
       try {
@@ -182,14 +184,14 @@ export function useCancelStaffingRequest() {
       console.log('🔴 CANCEL STAFFING: onSuccess, invalidating queries')
 
       // Invalidate all related queries
-      qc.invalidateQueries({ queryKey: ['staffing', vars.job_id, vars.profile_id] })
-      qc.invalidateQueries({ queryKey: ['staffing-by-date', vars.profile_id] })
-      qc.invalidateQueries({ queryKey: ['staffing-matrix'] })
-      qc.invalidateQueries({ queryKey: ['optimized-matrix-assignments'] })
-      qc.invalidateQueries({ queryKey: ['assignment-matrix'] })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('staffing', vars.job_id, vars.profile_id) })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-by-date', vars.profile_id) })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('assignment-matrix') })
 
       // Also refetch to ensure fresh data
-      qc.refetchQueries({ queryKey: ['staffing-matrix'], type: 'active' })
+      qc.refetchQueries({ queryKey: queryKeys.scope('staffing-matrix'), type: 'active' })
 
       try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
       // Push broadcast: cancellation

@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface JobTotals {
   job_id: string;
   total_approved_eur: number;
@@ -24,7 +26,7 @@ export interface JobTotals {
 
 export function useJobTotals(jobId: string) {
   return useQuery({
-    queryKey: ['job-totals', jobId],
+    queryKey: queryKeys.scope('job-totals', jobId),
     queryFn: async (): Promise<JobTotals | null> => {
       if (!jobId) return null;
 

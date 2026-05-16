@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface TourAssignment {
   id: string;
   tour_id: string;
@@ -24,7 +26,7 @@ export const useTourAssignments = (tourId: string) => {
   const queryClient = useQueryClient();
 
   const { data: assignments = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['tour-assignments', tourId],
+    queryKey: queryKeys.scope('tour-assignments', tourId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tour_assignments')
@@ -65,9 +67,9 @@ export const useTourAssignments = (tourId: string) => {
     },
     onSuccess: () => {
       toast.success('Assignment created successfully - automatically applied to all tour jobs');
-      queryClient.invalidateQueries({ queryKey: ['tour-assignments', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-assignments', tourId) });
       // Also invalidate job assignments since they're automatically synced
-      queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') });
     },
     onError: (error: any) => {
       toast.error(`Failed to create assignment: ${error.message}`);
@@ -85,9 +87,9 @@ export const useTourAssignments = (tourId: string) => {
     },
     onSuccess: () => {
       toast.success('Assignment removed successfully - automatically removed from all tour jobs');
-      queryClient.invalidateQueries({ queryKey: ['tour-assignments', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-assignments', tourId) });
       // Also invalidate job assignments since they're automatically synced
-      queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') });
     },
     onError: (error: any) => {
       toast.error(`Failed to remove assignment: ${error.message}`);
@@ -108,7 +110,7 @@ export const useTourAssignments = (tourId: string) => {
     },
     onSuccess: () => {
       toast.success('Assignment updated successfully');
-      queryClient.invalidateQueries({ queryKey: ['tour-assignments', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-assignments', tourId) });
     },
     onError: (error: any) => {
       toast.error(`Failed to update assignment: ${error.message}`);

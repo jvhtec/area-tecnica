@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
 import { VacationRequest } from '@/lib/vacation-requests';
 
+
+import { queryKeys } from "@/lib/react-query";
 const SOUNDVISION_REQUEST_PREFIX = '[SoundVision Access]';
 
 interface SoundVisionAccessRequestParams {
@@ -24,7 +26,7 @@ export const useSoundVisionAccessRequest = () => {
 
   // Fetch existing SoundVision access requests for current user
   const soundVisionRequestsQuery = useQuery({
-    queryKey: ['soundvision-access-requests', 'user'],
+    queryKey: queryKeys.scope('soundvision-access-requests', 'user'),
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User not authenticated');
@@ -147,10 +149,10 @@ export const useSoundVisionAccessRequest = () => {
     },
     onSuccess: () => {
       // Invalidate queries
-      queryClient.invalidateQueries({ queryKey: ['soundvision-access-requests'] });
-      queryClient.invalidateQueries({ queryKey: ['vacation-requests'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('soundvision-access-requests') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('vacation-requests') });
       // Invalidate all messages queries (will invalidate for all roles/departments)
-      queryClient.invalidateQueries({ queryKey: ['messages'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('messages') });
 
       // Dispatch local invalidation events for cross-tab coordination
       try {

@@ -15,6 +15,8 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { isAuxiliaryMachineryType } from "@/constants/hojaDeRutaAuxiliaryNeeds";
 
 
+
+import { queryKeys } from "@/lib/react-query";
 const PARTIAL_ISO_NO_TZ_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
 const ISO_WITH_TZ_REGEX = /([zZ]|[+-]\d{2}:\d{2})$/;
 const MADRID_TIMEZONE = "Europe/Madrid";
@@ -112,7 +114,7 @@ export const useHojaDeRutaPersistence = (
 
   // Fetch existing hoja de ruta data with new structure
   const { data: hojaDeRuta, isLoading, error: fetchError } = useQuery({
-    queryKey: ['hoja-de-ruta', jobId],
+    queryKey: queryKeys.scope('hoja-de-ruta', jobId),
     queryFn: async () => {
       if (!jobId) return null;
 
@@ -462,7 +464,7 @@ export const useHojaDeRutaPersistence = (
     },
     onSuccess: (data) => {
       console.log("🎉 SAVE: Success callback - invalidating queries");
-      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta', jobId) });
       onSuccess?.();
     },
     onError: (error) => {
@@ -551,7 +553,7 @@ export const useHojaDeRutaPersistence = (
     },
     onSuccess: () => {
       console.log("🎉 SAVE TRAVEL: Success - invalidating queries");
-      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta', jobId) });
     },
     onError: (error) => {
       console.error("💥 SAVE TRAVEL: Error:", error);
@@ -659,7 +661,7 @@ export const useHojaDeRutaPersistence = (
     },
     onSuccess: () => {
       console.log("🎉 SAVE ACCOMMODATION: Success - invalidating queries");
-      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta', jobId) });
     },
     onError: (error) => {
       console.error("💥 SAVE ACCOMMODATION: Error:", error);
@@ -727,7 +729,7 @@ export const useHojaDeRutaPersistence = (
     },
     onSuccess: () => {
       console.log("🎉 SAVE IMAGES: Success - invalidating queries");
-      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta', jobId) });
     },
     onError: (error) => {
       console.error("💥 SAVE IMAGES: Error:", error);
@@ -739,7 +741,7 @@ export const useHojaDeRutaPersistence = (
   const refreshData = useCallback(() => {
     if (jobId) {
       console.log("🔄 REFRESH: Manually refreshing data for job:", jobId);
-      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta', jobId) });
     }
   }, [jobId, queryClient]);
 

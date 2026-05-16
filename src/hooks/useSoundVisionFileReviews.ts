@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { PostgrestError } from '@supabase/supabase-js';
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface SoundVisionFileReview {
   id: string;
   file_id: string;
@@ -52,7 +54,7 @@ export const useSoundVisionFileReviews = (fileId: string | null | undefined) => 
   };
 
   const query = useQuery<ReviewsQueryResult>({
-    queryKey: ['soundvision-file-reviews', fileId],
+    queryKey: queryKeys.scope('soundvision-file-reviews', fileId),
     enabled: Boolean(fileId),
     queryFn: async () => {
       if (!fileId) {
@@ -98,8 +100,8 @@ export const useSoundVisionFileReviews = (fileId: string | null | undefined) => 
 
   const invalidateCaches = (fileIdToInvalidate?: string) => {
     if (!fileIdToInvalidate) return;
-    queryClient.invalidateQueries({ queryKey: ['soundvision-file-reviews', fileIdToInvalidate] });
-    queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('soundvision-file-reviews', fileIdToInvalidate) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('soundvision-files') });
   };
 
   const createReview = useMutation({

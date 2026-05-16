@@ -14,6 +14,8 @@ import {
   canUploadDocuments as canUploadDocumentsForRole,
 } from '@/utils/permissions';
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -81,7 +83,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
   const shouldFetchSoundData = department === "sound" && !job.tasks?.sound && !isJobBeingDeleted;
   
   const { data: fallbackSoundTasks } = useQuery({
-    queryKey: ["sound-tasks", job.id],
+    queryKey: queryKeys.scope("sound-tasks", job.id),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sound_job_tasks")
@@ -104,7 +106,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
   });
 
   const { data: fallbackPersonnel } = useQuery({
-    queryKey: ["sound-personnel", job.id],
+    queryKey: queryKeys.scope("sound-personnel", job.id),
     queryFn: async () => {
       const { data: existingData, error: fetchError } = await supabase
         .from("sound_job_personnel")
@@ -143,9 +145,9 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
     }
   });
 
@@ -200,8 +202,8 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
         });
       } catch {}
 
-      queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
 
       toast({
         title: "Document uploaded",
@@ -249,7 +251,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
         throw dbError;
       }
 
-      queryClient.invalidateQueries({ queryKey: ["jobs"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
 
       toast({
         title: "Document deleted",
@@ -276,10 +278,10 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     e.stopPropagation();
     if (isJobBeingDeleted) return; // Don't refresh if job is being deleted
     
-    await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-    await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-    await queryClient.invalidateQueries({ queryKey: ["sound-tasks", job.id] });
-    await queryClient.invalidateQueries({ queryKey: ["sound-personnel", job.id] });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.scope("sound-tasks", job.id) });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.scope("sound-personnel", job.id) });
 
     toast({
       title: "Data refreshed",
