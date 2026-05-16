@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { JobCardActions } from '../JobCardActions';
 import { buildTechnicalPowerSummaryPackFilename } from '@/utils/pdf/technicalPowerSummaryPack';
@@ -19,6 +19,7 @@ const {
   generateTechnicalPowerSummaryPackMock,
   loadTechnicalPowerSummaryDataMock,
   fetchJobLogoMock,
+  dataLayerFunctionsInvokeMock,
   useQueryMock,
   jobDepartmentsQueryState,
   technicalPowerSummaryQueryState,
@@ -32,6 +33,7 @@ const {
   generateTechnicalPowerSummaryPackMock: vi.fn(),
   loadTechnicalPowerSummaryDataMock: vi.fn(),
   fetchJobLogoMock: vi.fn(),
+  dataLayerFunctionsInvokeMock: vi.fn(),
   useQueryMock: vi.fn(),
   jobDepartmentsQueryState: {
     data: ['sound', 'lights', 'video'] as any,
@@ -157,7 +159,7 @@ vi.mock('@/integrations/supabase/client', () => ({
       getUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: null })),
     },
     functions: {
-      invoke: vi.fn(() => Promise.resolve({ data: null, error: null })),
+      invoke: dataLayerFunctionsInvokeMock,
     },
   },
 }));
@@ -169,7 +171,7 @@ vi.mock('@/services/dataLayerClient', () => ({
       getUser: vi.fn(() => Promise.resolve({ data: { user: null }, error: null })),
     },
     functions: {
-      invoke: vi.fn(() => Promise.resolve({ data: null, error: null })),
+      invoke: dataLayerFunctionsInvokeMock,
     },
   },
 }));
@@ -324,6 +326,7 @@ describe('JobCardActions', () => {
     });
     loadTechnicalPowerSummaryDataMock.mockResolvedValue(createTechnicalPowerSummary());
     fetchJobLogoMock.mockResolvedValue(undefined);
+    dataLayerFunctionsInvokeMock.mockResolvedValue({ data: null, error: null });
     Object.defineProperty(window.URL, 'createObjectURL', {
       writable: true,
       value: vi.fn(() => 'blob:mock'),
@@ -802,6 +805,82 @@ describe('JobCardActions', () => {
         btn => btn.querySelector('svg')?.getAttribute('class')?.includes('lucide-trash')
       );
       expect(deleteButton).toBeTruthy();
+    });
+
+    it('renders transport, document, and upload actions after the action-group split', async () => {
+      const user = userEvent.setup();
+      const onTransportClick = vi.fn();
+      const handleFileUpload = vi.fn();
+      const props = {
+        ...defaultProps,
+        canUploadDocuments: true,
+        handleFileUpload,
+        onTransportClick,
+        showUpload: true,
+        transportButtonLabel: 'Transporte',
+      };
+
+      const { container } = render(<JobCardActions {...props} />);
+
+      await user.click(screen.getByRole('button', { name: 'Transporte' }));
+      expect(onTransportClick).toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: /Archivar/i })).toBeTruthy();
+      expect(screen.getByTitle('Rellenar Doc Técnica')).toBeTruthy();
+
+      const uploadInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+      expect(uploadInput).toBeTruthy();
+      const file = new File(['plan'], 'plan.pdf', { type: 'application/pdf' });
+      fireEvent.change(uploadInput, { target: { files: [file] } });
+      expect(handleFileUpload).toHaveBeenCalled();
+    });
+
+    it('opens and sends the warehouse WhatsApp dialog from the split action group', async () => {
+      const user = userEvent.setup();
+      const props = {
+        ...defaultProps,
+        department: 'sound',
+      };
+
+      render(<JobCardActions {...props} />);
+
+      await user.click(screen.getByRole('button', { name: /Almacén/i }));
+      expect(screen.getByRole('dialog')).toHaveTextContent('Enviar a Almacén sonido');
+
+      await user.click(screen.getByRole('button', { name: 'Enviar' }));
+
+      await waitFor(() => {
+        expect(dataLayerFunctionsInvokeMock).toHaveBeenCalledWith(
+          'send-warehouse-message',
+          expect.objectContaining({
+            body: expect.objectContaining({
+              job_id: 'test-job-id',
+              message: expect.stringContaining('Test Job'),
+            }),
+          })
+        );
+      });
+    });
+
+    it('opens the production WhatsApp dialog with the generated job template', async () => {
+      const user = userEvent.setup();
+      const props = {
+        ...defaultProps,
+        department: 'production',
+        job: {
+          ...defaultProps.job,
+          end_time: '2026-04-08T18:00:00.000Z',
+          location_data: { name: 'Arena', formatted_address: 'Madrid' },
+          start_time: '2026-04-08T08:00:00.000Z',
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      await user.click(screen.getByRole('button', { name: /Aviso WA/i }));
+
+      expect(screen.getByRole('dialog')).toHaveTextContent('Enviar WhatsApp');
+      expect(screen.getByDisplayValue(/Para el trabajo “Test Job”/)).toBeTruthy();
+      expect(screen.getByDisplayValue(/Ubicación: Arena — Madrid/)).toBeTruthy();
     });
 
     it('should render the technical power summary button for project management managers', () => {
