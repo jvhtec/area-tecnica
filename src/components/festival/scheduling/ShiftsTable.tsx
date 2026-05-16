@@ -13,7 +13,7 @@ import { Trash2, FileDown, Edit, Users, Copy } from "lucide-react";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { useToast } from "@/hooks/use-toast";
 import { exportShiftsTablePDF, ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { EditShiftDialog } from "./EditShiftDialog";
 import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
 import { CopyShiftsDialog } from "./CopyShiftsDialog";
@@ -53,8 +53,7 @@ export const ShiftsTable = ({
       if (!jobId) return;
       
       try {
-        const { data: jobData, error: jobError } = await supabase
-          .from("jobs")
+        const { data: jobData, error: jobError } = await dataLayerClient.from("jobs")
           .select("title")
           .eq("id", jobId)
           .single();
@@ -65,19 +64,18 @@ export const ShiftsTable = ({
           setJobTitle(jobData.title);
         }
         
-        const { data, error } = await supabase
-          .from("festival_settings")
-          .select("logo_url")
+        const { data, error } = await dataLayerClient.from("festival_logos")
+          .select("file_path")
           .eq("job_id", jobId)
-          .single();
+          .maybeSingle();
           
         if (error) {
           console.error("Error fetching festival logo:", error);
           return;
         }
         
-        if (data?.logo_url) {
-          const logoPath = data.logo_url;
+        if (data?.file_path) {
+          const logoPath = data.file_path;
           console.log("Retrieved logo path:", logoPath);
           
           if (logoPath.startsWith('http')) {
@@ -85,7 +83,7 @@ export const ShiftsTable = ({
           } 
           else {
             try {
-              let bucket = 'festival-assets';
+              let bucket = 'festival-logos';
               let path = logoPath;
               
               if (logoPath.includes('/')) {
@@ -95,7 +93,17 @@ export const ShiftsTable = ({
               }
               
               console.log(`Getting public URL for bucket: ${bucket}, path: ${path}`);
-              const { data: publicUrlData } = supabase.storage
+              const { data: signedUrlData } = await dataLayerClient.storage
+                .from(bucket)
+                .createSignedUrl(path, 60 * 60);
+
+              if (signedUrlData?.signedUrl) {
+                console.log("Generated signed URL:", signedUrlData.signedUrl);
+                setLogoUrl(signedUrlData.signedUrl);
+                return;
+              }
+
+              const { data: publicUrlData } = dataLayerClient.storage
                 .from(bucket)
                 .getPublicUrl(path);
                 

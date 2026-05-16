@@ -9,8 +9,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useIncidentReports } from "@/hooks/useIncidentReports";
 import { IncidentReportsNotificationBadge } from "./IncidentReportsNotificationBadge";
-import { supabase } from "@/integrations/supabase/client";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 export const IncidentReportsManagement = () => {
   const { reports, isLoading, deleteReport, isDeleting, downloadReport } = useIncidentReports();
   const [searchTerm, setSearchTerm] = useState("");
@@ -26,10 +25,9 @@ export const IncidentReportsManagement = () => {
   // Get user role for notifications
   React.useEffect(() => {
     const getUserRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await dataLayerClient.auth.getUser();
       if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
+        const { data: profile } = await dataLayerClient.from('profiles')
           .select('role')
           .eq('id', user.id)
           .single();

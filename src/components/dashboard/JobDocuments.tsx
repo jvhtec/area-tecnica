@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Download, Trash2, FileText } from "lucide-react";
 import { format } from "date-fns";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { toast } from "@/hooks/use-toast";
 import { Department } from "@/types/department";
 import { SubscriptionIndicator } from "../ui/subscription-indicator";
@@ -48,7 +48,7 @@ export const JobDocuments = ({
       console.log('Starting download for document:', jobDocument.file_name);
 
       const { bucket, path } = resolveJobDocLocation(jobDocument.file_path);
-      const { data, error } = await supabase.storage
+      const { data, error } = await dataLayerClient.storage
         .from(bucket)
         .download(path);
 
@@ -82,7 +82,7 @@ export const JobDocuments = ({
       console.log('Starting view for document:', jobDocument.file_name);
       
       const { bucket, path } = resolveJobDocLocation(jobDocument.file_path);
-      const { data: { signedUrl }, error } = await supabase.storage
+      const { data: { signedUrl }, error } = await dataLayerClient.storage
         .from(bucket)
         .createSignedUrl(path, 60 * 60);
 

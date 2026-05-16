@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -80,7 +80,7 @@ export const CreateShiftDialog = ({
       
       console.log("Submitting shift data:", shiftData);
       
-      const { data, error } = await supabase.from("festival_shifts").insert(shiftData).select();
+      const { data, error } = await dataLayerClient.from("festival_shifts").insert(shiftData).select();
 
       if (error) {
         console.error("Error creating shift:", error);

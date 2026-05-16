@@ -4,7 +4,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { Download, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { loadJsPDF } from "@/utils/pdf/lazyPdf";
@@ -40,8 +40,7 @@ export const ArtistFormSubmissionDialog = ({
       setIsLoading(true);
       try {
         // First get the form ID
-        const { data: formData } = await supabase
-          .from('festival_artist_forms')
+        const { data: formData } = await dataLayerClient.from('festival_artist_forms')
           .select('id')
           .eq('artist_id', artistId)
           .order('created_at', { ascending: false })
@@ -49,8 +48,7 @@ export const ArtistFormSubmissionDialog = ({
           .maybeSingle();
 
         if (formData?.id) {
-          const { data: submissionData } = await supabase
-            .from('festival_artist_form_submissions')
+          const { data: submissionData } = await dataLayerClient.from('festival_artist_form_submissions')
             .select('*')
             .eq('form_id', formData.id)
             .order('submitted_at', { ascending: false })

@@ -4,11 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Receipt, ArrowRight, Clock } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { formatCurrency } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface ExpenseResponse {
   job_id: string;
   amount_eur: number | null;
@@ -28,12 +30,11 @@ export const PendingExpensesSummary: React.FC = () => {
   const navigate = useNavigate();
 
   const { data: pendingExpenses = [], isLoading } = useQuery({
-    queryKey: ['pending-expenses-summary', user?.id],
+    queryKey: queryKeys.scope('pending-expenses-summary', user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const { data, error } = await supabase
-        .from('job_expenses')
+      const { data, error } = await dataLayerClient.from('job_expenses')
         .select(`
           job_id,
           amount_eur,
@@ -45,9 +46,14 @@ export const PendingExpensesSummary: React.FC = () => {
 
       if (error) throw error;
 
+      const expenses = ((data || []) as unknown as ExpenseResponse[]).map((expense) => ({
+        ...expense,
+        job: Array.isArray(expense.job) ? expense.job[0] ?? null : expense.job,
+      }));
+
       // Group by job
       const grouped = new Map<string, PendingExpense>();
-      (data || []).forEach((expense: ExpenseResponse) => {
+      expenses.forEach((expense) => {
         const existing = grouped.get(expense.job_id) || {
           job_id: expense.job_id,
           job_title: expense.job?.title || 'Sin título',

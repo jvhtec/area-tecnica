@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useState } from "react";
 import { Download, Mail } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { exportMissingRiderReportPDF, MissingRiderReportData } from "@/utils/missingRiderReportPdfExport";
 import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdfExport";
 import { exportShiftsTablePDF, ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
@@ -251,8 +251,7 @@ export const PrintOptionsDialog = ({
     console.log('Generating Missing Rider Report for job:', jobId);
     
     // Fetch festival artists
-    const { data: artists, error } = await supabase
-      .from('festival_artists')
+    const { data: artists, error } = await dataLayerClient.from('festival_artists')
       .select('*')
       .eq('job_id', jobId);
 
@@ -266,8 +265,7 @@ export const PrintOptionsDialog = ({
       Boolean(artist.rider_missing)
     ) || [];
 
-    const { data: stageRows } = await supabase
-      .from('festival_stages')
+    const { data: stageRows } = await dataLayerClient.from('festival_stages')
       .select('number, name')
       .eq('job_id', jobId);
     const stageNameByNumber = new Map<number, string>(
@@ -359,7 +357,7 @@ export const PrintOptionsDialog = ({
         </p>
       `;
 
-      const { data, error } = await supabase.functions.invoke("send-corporate-email", {
+      const { data, error } = await dataLayerClient.functions.invoke("send-corporate-email", {
         body: {
           subject: `Reporte Riders Faltantes - ${jobTitle}`,
           bodyHtml,
@@ -458,8 +456,7 @@ export const PrintOptionsDialog = ({
       
       const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
 
-      const { data: shifts, error } = await supabase
-        .from('festival_shifts')
+      const { data: shifts, error } = await dataLayerClient.from('festival_shifts')
         .select('id, job_id, name, date, start_time, end_time, department, stage')
         .eq('job_id', jobId)
         .order('date')
@@ -475,8 +472,7 @@ export const PrintOptionsDialog = ({
       }
 
       const shiftIds = filteredShifts.map((shift) => shift.id);
-      const { data: assignments, error: assignmentsError } = await supabase
-        .from('festival_shift_assignments')
+      const { data: assignments, error: assignmentsError } = await dataLayerClient.from('festival_shift_assignments')
         .select('id, shift_id, technician_id, external_technician_name, role')
         .in('shift_id', shiftIds);
 
@@ -500,8 +496,7 @@ export const PrintOptionsDialog = ({
       }>();
 
       if (technicianIds.length > 0) {
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
+        const { data: profiles, error: profilesError } = await dataLayerClient.from('profiles')
           .select('id, first_name, last_name, email, department, role')
           .in('id', technicianIds);
         if (profilesError) throw profilesError;
@@ -567,8 +562,7 @@ export const PrintOptionsDialog = ({
       const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
       
       // Fetch artists data
-      const { data: artists, error } = await supabase
-        .from('festival_artists')
+      const { data: artists, error } = await dataLayerClient.from('festival_artists')
         .select('*')
         .eq('job_id', jobId)
         .in('stage', options.artistTableStages)
@@ -583,8 +577,7 @@ export const PrintOptionsDialog = ({
       }
 
       const sortedArtists = sortArtistsChronologically(artists);
-      const { data: stageRows, error: stageError } = await supabase
-        .from('festival_stages')
+      const { data: stageRows, error: stageError } = await dataLayerClient.from('festival_stages')
         .select('number, name')
         .eq('job_id', jobId);
       if (stageError) throw stageError;
@@ -655,8 +648,7 @@ export const PrintOptionsDialog = ({
       const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
       
       // Fetch artists data
-      const { data: artists, error } = await supabase
-        .from('festival_artists')
+      const { data: artists, error } = await dataLayerClient.from('festival_artists')
         .select('*')
         .eq('job_id', jobId)
         .in('stage', options.rfIemTableStages)
@@ -710,8 +702,7 @@ export const PrintOptionsDialog = ({
       const logoUrl = (await fetchJobLogo(jobId)) || (await fetchLogoUrl(jobId));
       
       // Fetch artists data
-      const { data: artists, error } = await supabase
-        .from('festival_artists')
+      const { data: artists, error } = await dataLayerClient.from('festival_artists')
         .select('*')
         .eq('job_id', jobId)
         .in('stage', options.infrastructureTableStages)
@@ -765,8 +756,7 @@ export const PrintOptionsDialog = ({
       const logoUrl = await fetchLogoUrl(jobId);
       
       // Fetch artists data
-      const { data: artists, error } = await supabase
-        .from('festival_artists')
+      const { data: artists, error } = await dataLayerClient.from('festival_artists')
         .select('*')
         .eq('job_id', jobId)
         .in('stage', options.wiredMicNeedsStages)

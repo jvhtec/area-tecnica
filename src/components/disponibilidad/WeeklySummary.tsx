@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, ChevronsUpDown, Download, Filter } from 'luc
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, subWeeks } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { SUPABASE_URL } from '@/lib/api-config';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -26,6 +26,8 @@ import { safeGetJSON, safeSetJSON } from '@/lib/storage';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface WeeklySummaryProps {
   selectedDate: Date;
   onDateChange: (date: Date) => void;
@@ -64,7 +66,7 @@ function FlexImage({
 
     const fetchImage = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await dataLayerClient.auth.getSession();
         if (!session?.access_token) {
           setError(true);
           return;
@@ -157,20 +159,19 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
 
   // Realtime: subscribe to tables that affect stock and assignments
   useOptimizedTableSubscriptions([
-    { table: 'current_stock_levels', queryKey: ['equipment-with-stock', department], priority: 'high' },
-    { table: 'equipment', queryKey: ['equipment-with-stock', department], priority: 'medium' },
-    { table: 'sub_rentals', queryKey: ['equipment-with-stock', department], priority: 'high' },
-    { table: 'day_preset_assignments', queryKey: ['week-preset-assignments', department, format(currentWeekStart, 'yyyy-MM-dd')], priority: 'high' },
-    { table: 'preset_items', queryKey: ['week-preset-assignments', department, format(currentWeekStart, 'yyyy-MM-dd')], priority: 'medium' },
-    { table: 'presets', queryKey: ['week-preset-assignments', department, format(currentWeekStart, 'yyyy-MM-dd')], priority: 'low' },
+    { table: 'current_stock_levels', queryKey: queryKeys.scope('equipment-with-stock', department), priority: 'high' },
+    { table: 'equipment', queryKey: queryKeys.scope('equipment-with-stock', department), priority: 'medium' },
+    { table: 'sub_rentals', queryKey: queryKeys.scope('equipment-with-stock', department), priority: 'high' },
+    { table: 'day_preset_assignments', queryKey: queryKeys.scope('week-preset-assignments', department, format(currentWeekStart, 'yyyy-MM-dd')), priority: 'high' },
+    { table: 'preset_items', queryKey: queryKeys.scope('week-preset-assignments', department, format(currentWeekStart, 'yyyy-MM-dd')), priority: 'medium' },
+    { table: 'presets', queryKey: queryKeys.scope('week-preset-assignments', department, format(currentWeekStart, 'yyyy-MM-dd')), priority: 'low' },
   ]);
 
   // Fetch base stock (without per-day rentals). We use the view but only read base_quantity.
   const { data: stockWithEquipment = [], refetch: refetchStock } = useQuery({
-    queryKey: ['equipment-with-stock', department],
+    queryKey: queryKeys.scope('equipment-with-stock', department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('equipment_availability_with_rentals')
+      const { data, error } = await dataLayerClient.from('equipment_availability_with_rentals')
         .select(`
           *
         `)
@@ -202,10 +203,9 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
   const weekEnd = endOfWeek(currentWeekStart);
 
   const { data: weekSubRentals = [], refetch: refetchSubRentals } = useQuery({
-    queryKey: ['sub-rentals-week', department, weekStart.toISOString()],
+    queryKey: queryKeys.scope('sub-rentals-week', department, weekStart.toISOString()),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sub_rentals')
+      const { data, error } = await dataLayerClient.from('sub_rentals')
         .select('equipment_id, quantity, start_date, end_date, department, notes')
         .eq('department', department)
         .lte('start_date', format(weekEnd, 'yyyy-MM-dd'))
@@ -243,13 +243,12 @@ export function WeeklySummary({ selectedDate, onDateChange }: WeeklySummaryProps
 
   // Fetch all assignments for the week (removed user_id filter for department-wide view)
   const { data: weekAssignments, refetch: refetchAssignments } = useQuery({
-    queryKey: ['week-preset-assignments', department, currentWeekStart],
+    queryKey: queryKeys.scope('week-preset-assignments', department, currentWeekStart),
     queryFn: async () => {
       const assignments = [];
 
       for (const date of weekDates) {
-        const { data, error } = await supabase
-          .from('day_preset_assignments')
+        const { data, error } = await dataLayerClient.from('day_preset_assignments')
           .select(`
             *,
             preset:presets!inner (

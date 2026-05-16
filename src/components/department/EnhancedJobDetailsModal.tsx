@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -24,6 +24,8 @@ import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { canManagePayouts, isManagementRole } from '@/utils/permissions';
 import { getVisibleFinancialTechnicianIds } from '@/components/jobs/financialViewerScope';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface EnhancedJobDetailsModalProps {
     theme: {
         bg: string;
@@ -73,11 +75,10 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
     // Fetch full job details with location
     const { data: jobDetails, isLoading: jobDetailsLoading } = useQuery({
-        queryKey: ['job-details-modal', job?.id],
+        queryKey: queryKeys.scope('job-details-modal', job?.id),
         queryFn: async () => {
             if (!job?.id) return null;
-            const { data, error } = await supabase
-                .from('jobs')
+            const { data, error } = await dataLayerClient.from('jobs')
                 .select(`
           *,
           locations(id, name, formatted_address, latitude, longitude)
@@ -101,11 +102,10 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
     // Fetch staff assignments
     const { data: staffAssignments = [], isLoading: staffLoading } = useQuery({
-        queryKey: ['job-staff', job?.id],
+        queryKey: queryKeys.scope('job-staff', job?.id),
         queryFn: async () => {
             if (!job?.id) return [];
-            const { data, error } = await supabase
-                .from('job_assignments')
+            const { data, error } = await dataLayerClient.from('job_assignments')
                 .select(`
           sound_role,
           lights_role,
@@ -115,14 +115,19 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                 .eq('job_id', job.id)
                 .eq('status', 'confirmed');
             if (error) throw error;
-            return data || [];
+            return ((data || []) as unknown as StaffAssignment[]).map((assignment) => ({
+                ...assignment,
+                technician: Array.isArray(assignment.technician)
+                    ? assignment.technician[0] ?? null
+                    : assignment.technician ?? null,
+            }));
         },
         enabled: !!job?.id,
     });
 
     // Fetch restaurants
     const { data: restaurants = [], isLoading: isRestaurantsLoading } = useQuery({
-        queryKey: ['job-restaurants-modal', job?.id, jobDetails?.locations?.formatted_address],
+        queryKey: queryKeys.scope('job-restaurants-modal', job?.id, jobDetails?.locations?.formatted_address),
         queryFn: async () => {
             const locationData = jobDetails?.locations;
             const address = locationData?.formatted_address || locationData?.name;
@@ -192,12 +197,12 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
     const invalidateJobQueries = () => {
         if (!resolvedJobId) return;
-        queryClient.invalidateQueries({ queryKey: ['job-details-modal', resolvedJobId] });
-        queryClient.invalidateQueries({ queryKey: ['job-approval-status', resolvedJobId] });
-        queryClient.invalidateQueries({ queryKey: ['job-rates-approval', resolvedJobId] });
-        queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
-        queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
-        queryClient.invalidateQueries({ queryKey: ['jobs'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-details-modal', resolvedJobId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-approval-status', resolvedJobId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-rates-approval', resolvedJobId) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-rates-approval-map') });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
     };
 
     const handleApproveRates = async () => {
@@ -210,9 +215,8 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
         setIsApproving(true);
         try {
-            const { data: u } = await supabase.auth.getUser();
-            const { error } = await supabase
-                .from('jobs')
+            const { data: u } = await dataLayerClient.auth.getUser();
+            const { error } = await dataLayerClient.from('jobs')
                 .update({
                     rates_approved: true,
                     rates_approved_at: new Date().toISOString(),
@@ -234,8 +238,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         if (!resolvedJobId || isApproving) return;
         setIsApproving(true);
         try {
-            const { error } = await supabase
-                .from('jobs')
+            const { error } = await dataLayerClient.from('jobs')
                 .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
                 .eq('id', resolvedJobId);
             if (error) throw error;
@@ -264,7 +267,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
                 setIsMapLoading(true);
 
-                const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+                const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
                 if (error || !data?.apiKey) {
                     setMapPreviewUrl(null);
                     setIsMapLoading(false);
@@ -302,7 +305,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         const docId = doc.id;
         setDocumentLoading(prev => new Set(prev).add(docId));
         try {
-            const url = await createSignedUrl(supabase, doc.file_path, 60);
+            const url = await createSignedUrl(dataLayerClient, doc.file_path, 60);
             window.open(url, '_blank');
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : 'Error desconocido';
@@ -316,7 +319,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         const docId = doc.id;
         setDocumentLoading(prev => new Set(prev).add(docId));
         try {
-            const url = await createSignedUrl(supabase, doc.file_path, 60);
+            const url = await createSignedUrl(dataLayerClient, doc.file_path, 60);
             const link = document.createElement('a');
             link.href = url;
             link.download = doc.file_name;

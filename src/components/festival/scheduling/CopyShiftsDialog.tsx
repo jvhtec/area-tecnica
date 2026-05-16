@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 interface CopyShiftsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -38,8 +37,7 @@ export const CopyShiftsDialog = ({
       console.log(`Starting copy operation from ${sourceDate} to ${targetDate} for job ${jobId}`);
 
       // Fetch source shifts and their assignments
-      const { data: shifts, error: shiftsError } = await supabase
-        .from("festival_shifts")
+      const { data: shifts, error: shiftsError } = await dataLayerClient.from("festival_shifts")
         .select(`
           id,
           name,
@@ -68,8 +66,7 @@ export const CopyShiftsDialog = ({
       for (const shift of shifts) {
         console.log(`Copying shift: ${shift.name} (ID: ${shift.id})`);
         
-        const { data: newShift, error: newShiftError } = await supabase
-          .from("festival_shifts")
+        const { data: newShift, error: newShiftError } = await dataLayerClient.from("festival_shifts")
           .insert({
             name: shift.name,
             start_time: shift.start_time,
@@ -91,8 +88,7 @@ export const CopyShiftsDialog = ({
         console.log(`Created new shift with ID: ${newShift.id}`);
 
         // Get assignments for the source shift
-        const { data: assignments, error: assignmentsError } = await supabase
-          .from("festival_shift_assignments")
+        const { data: assignments, error: assignmentsError } = await dataLayerClient.from("festival_shift_assignments")
           .select("*")
           .eq("shift_id", shift.id);
 
@@ -114,8 +110,7 @@ export const CopyShiftsDialog = ({
 
           console.log("Creating new assignments:", newAssignments);
 
-          const { error: insertError } = await supabase
-            .from("festival_shift_assignments")
+          const { error: insertError } = await dataLayerClient.from("festival_shift_assignments")
             .insert(newAssignments);
 
           if (insertError) {

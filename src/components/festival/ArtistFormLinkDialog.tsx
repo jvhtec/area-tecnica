@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Copy, Mail, Printer, RefreshCcw } from "lucide-react";
 import { useState, useEffect } from "react";
 import { addDays } from "date-fns";
@@ -82,8 +82,7 @@ export const ArtistFormLinkDialog = ({
     setIsLoading(true);
     try {
       // First, mark any existing pending forms for THIS ARTIST as expired
-      const { error: updateError } = await supabase
-        .from('festival_artist_forms')
+      const { error: updateError } = await dataLayerClient.from('festival_artist_forms')
         .update({
           status: 'expired',
           expires_at: new Date().toISOString() // Expire immediately
@@ -99,8 +98,7 @@ export const ArtistFormLinkDialog = ({
       // Create a new form entry that expires in 7 days
       const expiresAt = addDays(new Date(), 7);
       
-      const { data, error } = await supabase
-        .from('festival_artist_forms')
+      const { data, error } = await dataLayerClient.from('festival_artist_forms')
         .insert({
           artist_id: artistId,
           expires_at: expiresAt.toISOString(),
@@ -189,8 +187,7 @@ export const ArtistFormLinkDialog = ({
       throw new Error("Se requiere el ID del artista");
     }
 
-    const { data: artistData, error: artistError } = await supabase
-      .from("festival_artists")
+    const { data: artistData, error: artistError } = await dataLayerClient.from("festival_artists")
       .select("name, stage, date, show_start, show_end, soundcheck, soundcheck_start, soundcheck_end")
       .eq("id", artistId)
       .maybeSingle();
@@ -204,8 +201,7 @@ export const ArtistFormLinkDialog = ({
     let publicFormQrDataUrl = "";
 
     if (!publicFormUrl) {
-      const { data: existingForm, error: existingFormError } = await supabase
-        .from("festival_artist_forms")
+      const { data: existingForm, error: existingFormError } = await dataLayerClient.from("festival_artist_forms")
         .select("token")
         .eq("artist_id", artistId)
         .eq("status", "pending")
@@ -302,8 +298,7 @@ export const ArtistFormLinkDialog = ({
 
   const saveArtistLanguage = async (nextLanguage: "es" | "en") => {
     setArtistLanguage(nextLanguage);
-    const { error } = await supabase
-      .from("festival_artists")
+    const { error } = await dataLayerClient.from("festival_artists")
       .update({ form_language: nextLanguage })
       .eq("id", artistId);
 
@@ -399,7 +394,7 @@ export const ArtistFormLinkDialog = ({
         </p>
       `;
 
-      const { data, error } = await supabase.functions.invoke("send-corporate-email", {
+      const { data, error } = await dataLayerClient.functions.invoke("send-corporate-email", {
         body: {
           subject:
             artistLanguage === "en"
@@ -483,8 +478,7 @@ export const ArtistFormLinkDialog = ({
       // Check for existing unexpired form link for THIS SPECIFIC ARTIST
       const checkExistingLink = async () => {
         try {
-          const { data: artistData, error: artistError } = await supabase
-            .from("festival_artists")
+          const { data: artistData, error: artistError } = await dataLayerClient.from("festival_artists")
             .select("form_language")
             .eq("id", artistId)
             .maybeSingle();
@@ -497,8 +491,7 @@ export const ArtistFormLinkDialog = ({
             setArtistLanguage("es");
           }
 
-          const { data, error } = await supabase
-            .from('festival_artist_forms')
+          const { data, error } = await dataLayerClient.from('festival_artist_forms')
             .select('token, expires_at')
             .eq('artist_id', artistId) // Only check THIS artist's forms
             .eq('status', 'pending')

@@ -4,13 +4,15 @@ import { Card } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { PresetWithItems, mapPresetWithItemsRow } from "@/types/equipment";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format, isValid } from "date-fns";
 import { Calendar, Loader2, Trash2 } from "lucide-react";
 import { useDepartment } from '@/contexts/DepartmentContext';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface QuickPresetAssignmentProps {
   selectedDate: Date;
   onAssign?: () => void;
@@ -28,12 +30,11 @@ export function QuickPresetAssignment({ selectedDate, onAssign, className }: Qui
 
   // Fetch presets with their items
   const { data: presets = [] } = useQuery({
-    queryKey: ['presets', department],
+    queryKey: queryKeys.scope('presets', department),
     queryFn: async () => {
       if (!session?.user?.id) return [];
       
-      const { data, error } = await supabase
-        .from('presets')
+      const { data, error } = await dataLayerClient.from('presets')
         .select(`
           *,
           items:preset_items (
@@ -52,12 +53,11 @@ export function QuickPresetAssignment({ selectedDate, onAssign, className }: Qui
 
   // Fetch current assignments
   const { data: currentAssignments = [] } = useQuery({
-    queryKey: ['preset-assignments', department, selectedDate],
+    queryKey: queryKeys.scope('preset-assignments', department, selectedDate),
     queryFn: async () => {
       if (!isValidDate) return [];
 
-      const { data, error } = await supabase
-        .from('day_preset_assignments')
+      const { data, error } = await dataLayerClient.from('day_preset_assignments')
         .select('*, preset:presets!inner(name, department)')
         .eq('preset.department', department)
         .eq('date', format(selectedDate, 'yyyy-MM-dd'))
@@ -78,8 +78,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign, className }: Qui
       const maxOrder = currentAssignments?.reduce((max, assignment) => 
         Math.max(max, assignment.order || 0), -1) || -1;
 
-      const { error } = await supabase
-        .from('day_preset_assignments')
+      const { error } = await dataLayerClient.from('day_preset_assignments')
         .insert({
           date: format(selectedDate, 'yyyy-MM-dd'),
           preset_id: presetId,
@@ -90,7 +89,7 @@ export function QuickPresetAssignment({ selectedDate, onAssign, className }: Qui
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['preset-assignments'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('preset-assignments') });
       toast({
         title: "Success",
         description: "Preset assigned successfully"
@@ -111,15 +110,14 @@ export function QuickPresetAssignment({ selectedDate, onAssign, className }: Qui
       if (!session?.user?.id) throw new Error('Must be logged in');
       if (!isValidDate) throw new Error('Invalid date selected');
 
-      const { error } = await supabase
-        .from('day_preset_assignments')
+      const { error } = await dataLayerClient.from('day_preset_assignments')
         .delete()
         .eq('id', assignmentId);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['preset-assignments'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('preset-assignments') });
       toast({
         title: "Success",
         description: "Preset assignment removed"

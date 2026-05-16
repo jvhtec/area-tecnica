@@ -7,6 +7,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface DepartmentScheduleProps {
   name: Department;
   icon: LucideIcon;
@@ -37,7 +39,7 @@ export const DepartmentSchedule = ({
       console.log(`Refreshing ${name} department schedule...`);
       // Invalidate and refetch the jobs query
       await queryClient.invalidateQueries({
-        queryKey: ["jobs"],
+        queryKey: queryKeys.scope("jobs"),
         refetchType: "active",
         exact: false
       });

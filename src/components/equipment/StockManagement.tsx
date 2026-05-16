@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Equipment } from '@/types/equipment';
@@ -9,6 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Minus } from 'lucide-react';
 import { StockMovementDialog } from './StockMovementDialog';
 
+
+import { queryKeys } from "@/lib/react-query";
 export function StockManagement() {
   const { session } = useOptimizedAuth();
   const { toast } = useToast();
@@ -18,10 +20,9 @@ export function StockManagement() {
 
   // Fetch equipment list and current stock levels from the view
   const { data: equipmentWithStock } = useQuery({
-    queryKey: ['current-stock-levels'],
+    queryKey: queryKeys.scope('current-stock-levels'),
     queryFn: async () => {
-      const { data: stockLevels, error } = await supabase
-        .from('current_stock_levels')
+      const { data: stockLevels, error } = await dataLayerClient.from('current_stock_levels')
         .select('*')
         .order('equipment_name');
 

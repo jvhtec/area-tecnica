@@ -5,7 +5,7 @@ import { Plus, FileDown, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { FestivalDateNavigation } from "@/components/festival/FestivalDateNavigation";
 import { ShiftsList } from "./ShiftsList";
@@ -13,6 +13,8 @@ import { CreateShiftDialog } from "./CreateShiftDialog";
 import { ShiftsTable } from "./ShiftsTable";
 import { useQuery } from "@tanstack/react-query";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface FestivalSchedulingProps {
   jobId: string;
   jobDates: Date[];
@@ -40,12 +42,11 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
 
   // Fetch festival settings for day start time
   const { data: festivalSettings } = useQuery({
-    queryKey: ['festival-settings', jobId],
+    queryKey: queryKeys.scope('festival-settings', jobId),
     queryFn: async () => {
       if (!jobId) return null;
 
-      const { data: existingSettings, error: fetchError } = await supabase
-        .from('festival_settings')
+      const { data: existingSettings, error: fetchError } = await dataLayerClient.from('festival_settings')
         .select('*')
         .eq('job_id', jobId)
         .maybeSingle();
@@ -68,12 +69,11 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
 
   // Fetch date types for navigation
   const { data: dateTypeData, refetch: refetchDateTypes } = useQuery({
-    queryKey: ['job-date-types', jobId],
+    queryKey: queryKeys.scope('job-date-types', jobId),
     queryFn: async () => {
       if (!jobId) return {};
 
-      const { data, error } = await supabase
-        .from('job_date_types')
+      const { data, error } = await dataLayerClient.from('job_date_types')
         .select('*')
         .eq('job_id', jobId);
 
@@ -149,13 +149,11 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
       setIsRefreshing(true);
       
       // Delete shift assignments first to avoid foreign key constraints
-      await supabase
-        .from("festival_shift_assignments")
+      await dataLayerClient.from("festival_shift_assignments")
         .delete()
         .eq("shift_id", shiftId);
 
-      const { error } = await supabase
-        .from("festival_shifts")
+      const { error } = await dataLayerClient.from("festival_shifts")
         .delete()
         .eq("id", shiftId);
 

@@ -1,6 +1,6 @@
 
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import {
   Table,
   TableBody,
@@ -11,9 +11,12 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface StockMovement {
   id: string;
   equipment_id: string;
+  user_id: string;
   quantity: number;
   movement_type: 'addition' | 'subtraction';
   notes: string | null;
@@ -29,19 +32,47 @@ interface StockMovement {
 
 export function StockMovementHistory() {
   const { data: movements, isLoading } = useQuery({
-    queryKey: ['stock-movements'],
+    queryKey: queryKeys.scope('stock-movements'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('stock_movements')
+      const { data, error } = await dataLayerClient.from('stock_movements')
         .select(`
           *,
-          equipment (name),
-          profiles (first_name, last_name)
+          equipment (name)
         `)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data as StockMovement[];
+
+      const rows = (data || []) as Array<Omit<StockMovement, 'profiles'> & {
+        equipment: { name: string } | null;
+      }>;
+      const userIds = Array.from(new Set(rows.map((movement) => movement.user_id).filter(Boolean)));
+
+      let profiles: Array<{ id: string; first_name: string | null; last_name: string | null }> = [];
+      if (userIds.length) {
+        const { data: profileRows, error: profilesError } = await dataLayerClient.from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', userIds);
+
+        if (profilesError) throw profilesError;
+        profiles = profileRows || [];
+      }
+
+      const profilesById = new Map(
+        (profiles || []).map((profile) => [
+          profile.id,
+          {
+            first_name: profile.first_name || '',
+            last_name: profile.last_name || '',
+          },
+        ])
+      );
+
+      return rows.map((movement) => ({
+        ...movement,
+        equipment: movement.equipment || { name: '-' },
+        profiles: profilesById.get(movement.user_id) || { first_name: '', last_name: '' },
+      }));
     }
   });
 

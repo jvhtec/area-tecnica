@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PresetEditor } from './PresetEditor';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,8 @@ import { endOfDay, startOfDay } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AmplifierTool } from '@/components/sound/AmplifierTool';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface PresetCreationManagerProps {
   onClose?: () => void;
   selectedDate?: Date;
@@ -40,12 +42,11 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
   }, [selectedDate]);
 
   const { data: jobsForSelectedDate = [] } = useQuery({
-    queryKey: ['jobs-for-preset-push', department, dayRange?.start, dayRange?.end],
+    queryKey: queryKeys.scope('jobs-for-preset-push', department, dayRange?.start, dayRange?.end),
     queryFn: async () => {
       if (!department || !dayRange) return [];
 
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select(
           `
             id,
@@ -87,12 +88,11 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
 
   // Fetch all presets for the department (shared access)
   const { data: presets } = useQuery({
-    queryKey: ['presets', department],
+    queryKey: queryKeys.scope('presets', department),
     queryFn: async () => {
       if (!session?.user?.id) return [];
       
-      const { data, error } = await supabase
-        .from('presets')
+      const { data, error } = await dataLayerClient.from('presets')
         .select(`
           *,
           items:preset_items (
@@ -113,23 +113,21 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
   const deletePresetMutation = useMutation({
     mutationFn: async (presetId: string) => {
       // Delete preset items first
-      const { error: itemsError } = await supabase
-        .from('preset_items')
+      const { error: itemsError } = await dataLayerClient.from('preset_items')
         .delete()
         .eq('preset_id', presetId);
 
       if (itemsError) throw itemsError;
 
       // Then delete the preset
-      const { error: presetError } = await supabase
-        .from('presets')
+      const { error: presetError } = await dataLayerClient.from('presets')
         .delete()
         .eq('id', presetId);
 
       if (presetError) throw presetError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['presets', department] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('presets', department) });
       toast({
         title: "Success",
         description: "Preset deleted successfully"
@@ -151,16 +149,14 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
 
       if (editingPreset) {
         // Update existing preset
-        const { error: presetError } = await supabase
-          .from('presets')
+        const { error: presetError } = await dataLayerClient.from('presets')
           .update({ name, tour_id: tourId ?? null })
           .eq('id', editingPreset.id);
 
         if (presetError) throw presetError;
 
         // Delete existing items
-        const { error: deleteError } = await supabase
-          .from('preset_items')
+        const { error: deleteError } = await dataLayerClient.from('preset_items')
           .delete()
           .eq('preset_id', editingPreset.id);
 
@@ -168,8 +164,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
 
         // Insert updated items
         if (items.length > 0) {
-          const { error: itemsError } = await supabase
-            .from('preset_items')
+          const { error: itemsError } = await dataLayerClient.from('preset_items')
             .insert(
               items.map(item => ({
                 ...item,
@@ -181,8 +176,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         }
       } else {
         // Create new preset (now using created_by, user_id is nullable for shared presets)
-        const { data: preset, error: presetError } = await supabase
-          .from('presets')
+        const { data: preset, error: presetError } = await dataLayerClient.from('presets')
           .insert({
             name,
             created_by: session.user.id,
@@ -198,8 +192,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
 
         // Insert new items
         if (items.length > 0) {
-          const { error: itemsError } = await supabase
-            .from('preset_items')
+          const { error: itemsError } = await dataLayerClient.from('preset_items')
             .insert(
               items.map(item => ({
                 ...item,
@@ -211,7 +204,7 @@ export function PresetCreationManager({ onClose, selectedDate }: PresetCreationM
         }
       }
 
-      queryClient.invalidateQueries({ queryKey: ['presets', department] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('presets', department) });
       setEditingPreset(null);
       setCopyingPreset(null);
       setIsCreating(false);

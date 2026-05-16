@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 interface FestivalLogoManagerProps {
@@ -26,8 +26,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         return;
       }
 
-      const { data, error } = await supabase
-        .from('festival_logos')
+      const { data, error } = await dataLayerClient.from('festival_logos')
         .select('file_path')
         .eq('job_id', jobId)
         .maybeSingle();
@@ -41,7 +40,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       if (data?.file_path) {
         try {
           // Try signed URL first for private bucket
-          const { data: signedUrlData } = await supabase.storage
+          const { data: signedUrlData } = await dataLayerClient.storage
             .from('festival-logos')
             .createSignedUrl(data.file_path, 60 * 60); // 1 hour expiry
             
@@ -50,8 +49,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
             setLogoUrl(signedUrlData.signedUrl);
           } else {
             // Fallback to public URL
-            const { data: publicUrlData } = supabase
-              .storage
+            const { data: publicUrlData } = dataLayerClient.storage
               .from('festival-logos')
               .getPublicUrl(data.file_path);
               
@@ -105,7 +103,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       console.log("Authenticated user:", userId);
       
       // Check auth status before proceeding
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } = await dataLayerClient.auth.getSession();
       if (sessionError || !sessionData.session) {
         throw new Error("Authentication error: " + (sessionError?.message || "Session not found"));
       }
@@ -114,8 +112,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       const filePath = `${jobId}.${fileExt}`;
 
       // First, delete any existing logo
-      const { data: existingLogo, error: fetchError } = await supabase
-        .from('festival_logos')
+      const { data: existingLogo, error: fetchError } = await dataLayerClient.from('festival_logos')
         .select('file_path')
         .eq('job_id', jobId)
         .maybeSingle();
@@ -127,7 +124,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
 
       if (existingLogo?.file_path) {
         console.log("Removing existing logo from storage:", existingLogo.file_path);
-        const { error: removeError } = await supabase.storage
+        const { error: removeError } = await dataLayerClient.storage
           .from('festival-logos')
           .remove([existingLogo.file_path]);
           
@@ -139,7 +136,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
 
       // Upload new logo
       console.log("Uploading new logo to storage:", filePath);
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await dataLayerClient.storage
         .from('festival-logos')
         .upload(filePath, file, {
           upsert: true,
@@ -152,8 +149,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       }
 
       // Update or insert logo record
-      const { error: dbError } = await supabase
-        .from('festival_logos')
+      const { error: dbError } = await dataLayerClient.from('festival_logos')
         .upsert({
           job_id: jobId,
           file_path: filePath,
@@ -169,7 +165,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       }
 
       // Get signed URL for private bucket
-      const { data: signedUrlData } = await supabase.storage
+      const { data: signedUrlData } = await dataLayerClient.storage
         .from('festival-logos')
         .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
 
@@ -178,8 +174,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         setLogoUrl(signedUrlData.signedUrl);
       } else {
         // Fallback to public URL
-        const { data: { publicUrl } } = supabase
-          .storage
+        const { data: { publicUrl } } = dataLayerClient.storage
           .from('festival-logos')
           .getPublicUrl(filePath);
         console.log("Uploaded new festival logo, public URL:", publicUrl);
@@ -221,13 +216,12 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
       console.log("Deleting logo as user:", userId);
       
       // Check auth status before proceeding
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } = await dataLayerClient.auth.getSession();
       if (sessionError || !sessionData.session) {
         throw new Error("Authentication error: " + (sessionError?.message || "Session not found"));
       }
       
-      const { data, error: fetchError } = await supabase
-        .from('festival_logos')
+      const { data, error: fetchError } = await dataLayerClient.from('festival_logos')
         .select('file_path')
         .eq('job_id', jobId)
         .maybeSingle();
@@ -239,7 +233,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
 
       if (data?.file_path) {
         console.log("Removing logo from storage:", data.file_path);
-        const { error: storageError } = await supabase.storage
+        const { error: storageError } = await dataLayerClient.storage
           .from('festival-logos')
           .remove([data.file_path]);
 
@@ -249,8 +243,7 @@ export const FestivalLogoManager = ({ jobId }: FestivalLogoManagerProps) => {
         }
 
         console.log("Deleting logo record from database");
-        const { error: dbError } = await supabase
-          .from('festival_logos')
+        const { error: dbError } = await dataLayerClient.from('festival_logos')
           .delete()
           .eq('job_id', jobId);
 

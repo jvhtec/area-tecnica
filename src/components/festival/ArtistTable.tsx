@@ -10,7 +10,7 @@ import { ArtistFileDialog } from "./ArtistFileDialog";
 import { exportArtistPDF, ArtistPdfData } from "@/utils/artistPdfExport";
 import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
@@ -168,8 +168,7 @@ export const ArtistTable = ({
     const fetchStageNames = async () => {
       if (!jobId) return;
       
-      const { data: stages, error } = await supabase
-        .from('festival_stages')
+      const { data: stages, error } = await dataLayerClient.from('festival_stages')
         .select('number, name')
         .eq('job_id', jobId);
         
@@ -195,8 +194,7 @@ export const ArtistTable = ({
 
       try {
         // Fetch main festival gear setup
-        const { data: mainSetup, error: mainError } = await supabase
-          .from('festival_gear_setups')
+        const { data: mainSetup, error: mainError } = await dataLayerClient.from('festival_gear_setups')
           .select('*')
           .eq('job_id', jobId)
           .single();
@@ -210,8 +208,7 @@ export const ArtistTable = ({
 
         // Fetch stage-specific setups if main setup exists
         if (mainSetup) {
-          const { data: stageSetups, error: stageError } = await supabase
-            .from('festival_stage_gear_setups')
+          const { data: stageSetups, error: stageError } = await dataLayerClient.from('festival_stage_gear_setups')
             .select('*')
             .eq('gear_setup_id', mainSetup.id);
 
@@ -305,7 +302,7 @@ export const ArtistTable = ({
       await Promise.all(
         artistsWithPlot.map(async (artist) => {
           if (!artist.stage_plot_file_path) return;
-          const { data, error } = await supabase.storage
+          const { data, error } = await dataLayerClient.storage
             .from("festival_artist_files")
             .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
 
@@ -344,7 +341,7 @@ export const ArtistTable = ({
       const fileExtension = file.name.split(".").pop() || "jpg";
       const nextFilePath = `${artist.id}/stage-plots/${Date.now()}-${crypto.randomUUID()}.${fileExtension}`;
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await dataLayerClient.storage
         .from("festival_artist_files")
         .upload(nextFilePath, file, {
           contentType: file.type,
@@ -355,8 +352,7 @@ export const ArtistTable = ({
         throw uploadError;
       }
 
-      const { error: updateError } = await supabase
-        .from("festival_artists")
+      const { error: updateError } = await dataLayerClient.from("festival_artists")
         .update({
           stage_plot_file_path: nextFilePath,
           stage_plot_file_name: file.name,
@@ -366,7 +362,7 @@ export const ArtistTable = ({
         .eq("id", artist.id);
 
       if (updateError) {
-        await supabase.storage.from("festival_artist_files").remove([nextFilePath]);
+        await dataLayerClient.storage.from("festival_artist_files").remove([nextFilePath]);
         throw updateError;
       }
 
@@ -374,7 +370,7 @@ export const ArtistTable = ({
         artist.stage_plot_file_path &&
         artist.stage_plot_file_path !== nextFilePath
       ) {
-        await supabase.storage
+        await dataLayerClient.storage
           .from("festival_artist_files")
           .remove([artist.stage_plot_file_path]);
       }
@@ -458,8 +454,7 @@ export const ArtistTable = ({
     try {
       const currentPath = artist.stage_plot_file_path;
 
-      const { error: updateError } = await supabase
-        .from("festival_artists")
+      const { error: updateError } = await dataLayerClient.from("festival_artists")
         .update({
           stage_plot_file_path: null,
           stage_plot_file_name: null,
@@ -472,7 +467,7 @@ export const ArtistTable = ({
         throw updateError;
       }
 
-      await supabase.storage.from("festival_artist_files").remove([currentPath]);
+      await dataLayerClient.storage.from("festival_artist_files").remove([currentPath]);
 
       setStagePlotUrls((previous) => {
         const updated = { ...previous };
@@ -612,7 +607,7 @@ export const ArtistTable = ({
 
     if (artist.stage_plot_file_path) {
       try {
-        const { data: stagePlotData, error: stagePlotError } = await supabase.storage
+        const { data: stagePlotData, error: stagePlotError } = await dataLayerClient.storage
           .from("festival_artist_files")
           .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
 

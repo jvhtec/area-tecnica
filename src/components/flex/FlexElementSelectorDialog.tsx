@@ -29,6 +29,8 @@ import {
   type TreeFilterPredicate,
 } from "@/utils/flex-folders";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface FlexElementSelectorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -63,7 +65,7 @@ export const FlexElementSelectorDialog: React.FC<
     error,
     refetch,
   } = useQuery<FlexElementNode[], Error>({
-    queryKey: ["flexElementTree", mainElementId],
+    queryKey: queryKeys.scope("flexElementTree", mainElementId),
     queryFn: () => getElementTree(mainElementId),
     enabled: open && !!mainElementId,
     retry: 1,
