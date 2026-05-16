@@ -4,6 +4,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DateType, isSingleDayDateType } from "@/constants/dateTypes";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useTourDates = (tourId?: string) => {
   const [dates, setDates] = useState<{ 
     date: string; 
@@ -18,7 +20,7 @@ export const useTourDates = (tourId?: string) => {
 
   // Query for fetching tour dates
   const { data: tourDates = [], isLoading } = useQuery({
-    queryKey: ['tour-dates', tourId],
+    queryKey: queryKeys.scope('tour-dates', tourId),
     queryFn: async () => {
       if (!tourId) return [];
       
@@ -53,9 +55,9 @@ export const useTourDates = (tourId?: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-dates', tourId] });
-      queryClient.invalidateQueries({ queryKey: ['tours'] });
-      queryClient.invalidateQueries({ queryKey: ['my-tours'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-dates', tourId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tours') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('my-tours') });
     }
   });
 

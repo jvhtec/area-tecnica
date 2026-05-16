@@ -4,9 +4,11 @@ import { JobExtra, JobExtraType } from '@/types/jobExtras';
 import { RATES_QUERY_KEYS } from '@/constants/ratesQueryKeys';
 import { toast } from 'sonner';
 
+
+import { queryKeys } from "@/lib/react-query";
 export function useJobExtras(jobId: string, technicianId?: string) {
   return useQuery({
-    queryKey: ['job-extras', jobId, technicianId],
+    queryKey: queryKeys.scope('job-extras', jobId, technicianId),
     queryFn: async (): Promise<JobExtra[]> => {
       let query = supabase
         .from('job_rate_extras')
@@ -36,11 +38,11 @@ interface UpsertJobExtraPayload {
 }
 
 const invalidateJobExtrasContext = (queryClient: ReturnType<typeof useQueryClient>, jobId: string) => {
-  queryClient.invalidateQueries({ queryKey: ['job-extras', jobId] });
-  queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
-  queryClient.invalidateQueries({ queryKey: ['technician-tour-rate-quotes'] });
-  queryClient.invalidateQueries({ queryKey: ['job-tech-payout', jobId] });
-  queryClient.invalidateQueries({ queryKey: ['job-approval-status', jobId] });
+  queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-extras', jobId) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes') });
+  queryClient.invalidateQueries({ queryKey: queryKeys.scope('technician-tour-rate-quotes') });
+  queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-tech-payout', jobId) });
+  queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-approval-status', jobId) });
   queryClient.invalidateQueries({ queryKey: RATES_QUERY_KEYS.approvals });
 };
 

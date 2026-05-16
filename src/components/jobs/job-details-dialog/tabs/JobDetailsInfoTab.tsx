@@ -13,7 +13,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { syncFlexWorkOrdersForJob } from "@/services/flexWorkOrders";
 import { mergePDFs } from "@/utils/pdf/pdfMerge";
 import { generateTimesheetPDF } from "@/utils/timesheet-pdf";
@@ -27,6 +27,8 @@ import { attachPayoutOverridesToTourQuotes } from "@/services/tourPayoutOverride
 
 import { enrichTimesheetsWithProfiles } from "../enrichTimesheetsWithProfiles";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface JobDetailsInfoTabProps {
   open: boolean;
   job: any;
@@ -58,11 +60,10 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
   const { data: approvalStatus, isLoading: approvalStatusLoading } = useJobApprovalStatus(resolvedJobId);
 
   const { data: creatorProfile } = useQuery({
-    queryKey: ["profile-minimal", jobDetails?.created_by],
+    queryKey: queryKeys.scope("profile-minimal", jobDetails?.created_by),
     enabled: !!jobDetails?.created_by,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
+      const { data, error } = await dataLayerClient.from("profiles")
         .select("first_name, last_name")
         .eq("id", jobDetails.created_by)
         .maybeSingle();
@@ -85,7 +86,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
       if (!jobId || isSendingPayoutEmails) return;
       setIsSendingPayoutEmails(true);
       try {
-        const result = await sendJobPayoutEmails({ jobId, supabase });
+        const result = await sendJobPayoutEmails({ jobId, supabase: dataLayerClient });
 
         if (result.error) {
           console.error("[JobDetailsDialog] Error sending payout emails", result.error);
@@ -129,14 +130,13 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
   // Flex Work Orders progress (manager-only)
   const [isSyncingWorkOrders, setIsSyncingWorkOrders] = useState(false);
   const { data: workOrdersFolder } = useQuery({
-    queryKey: ["flex-workorders-folder", resolvedJobId, jobDetails?.job_type, jobDetails?.tour_date_id],
+    queryKey: queryKeys.scope("flex-workorders-folder", resolvedJobId, jobDetails?.job_type, jobDetails?.tour_date_id),
     enabled: open && isManager && !!resolvedJobId,
     queryFn: async () => {
       const isTourDateJob = (jobDetails?.job_type || job?.job_type) === "tourdate";
       const tourDateId = jobDetails?.tour_date_id || job?.tour_date_id || null;
 
-      let query = supabase
-        .from("flex_folders")
+      let query = dataLayerClient.from("flex_folders")
         .select("element_id, job_id, tour_date_id, created_at")
         .eq("folder_type", "work_orders")
         .eq("department", "personnel");
@@ -165,11 +165,10 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
   });
 
   const { data: existingWorkOrders = [] } = useQuery({
-    queryKey: ["flex-workorders-rows", resolvedJobId],
+    queryKey: queryKeys.scope("flex-workorders-rows", resolvedJobId),
     enabled: open && isManager && !!resolvedJobId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("flex_work_orders")
+      const { data, error } = await dataLayerClient.from("flex_work_orders")
         .select(
           `
           technician_id,
@@ -271,14 +270,13 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     disabled={isClosureLocked}
                     onClick={async () => {
                       if (!resolvedJobId || isClosureLocked) return;
-                      await supabase
-                        .from("jobs")
+                      await dataLayerClient.from("jobs")
                         .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
                         .eq("id", resolvedJobId);
-                      queryClient.invalidateQueries({ queryKey: ["job-details", resolvedJobId] });
-                      queryClient.invalidateQueries({ queryKey: ["job-rates-approval", resolvedJobId] });
-                      queryClient.invalidateQueries({ queryKey: ["job-rates-approval-map"] });
-                      queryClient.invalidateQueries({ queryKey: ["job-approval-status", resolvedJobId] });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-details", resolvedJobId) });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-rates-approval", resolvedJobId) });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-rates-approval-map") });
+                      queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-approval-status", resolvedJobId) });
                     }}
                   >
                     Revocar
@@ -300,9 +298,8 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       }
                       let approvalSucceeded = false;
                       try {
-                        const { data: u } = await supabase.auth.getUser();
-                        const { error: approvalError } = await supabase
-                          .from("jobs")
+                        const { data: u } = await dataLayerClient.auth.getUser();
+                        const { error: approvalError } = await dataLayerClient.from("jobs")
                           .update({
                             rates_approved: true,
                             rates_approved_at: new Date().toISOString(),
@@ -329,10 +326,10 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                         console.error("[JobDetailsDialog] Job rates approval failed", err);
                         toast.error("No se pudieron aprobar las tarifas del trabajo.");
                       } finally {
-                        queryClient.invalidateQueries({ queryKey: ["job-details", resolvedJobId] });
-                        queryClient.invalidateQueries({ queryKey: ["job-rates-approval", resolvedJobId] });
-                        queryClient.invalidateQueries({ queryKey: ["job-rates-approval-map"] });
-                        queryClient.invalidateQueries({ queryKey: ["job-approval-status", resolvedJobId] });
+                        queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-details", resolvedJobId) });
+                        queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-rates-approval", resolvedJobId) });
+                        queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-rates-approval-map") });
+                        queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-approval-status", resolvedJobId) });
                         if (approvalSucceeded) {
                           toast.success("Tarifas aprobadas", {
                             description: canManagePayouts
@@ -426,8 +423,8 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                   toast.error(`No se pudo sincronizar con Flex: ${(e as Error).message}`);
                 } finally {
                   setIsSyncingWorkOrders(false);
-                  queryClient.invalidateQueries({ queryKey: ["flex-workorders-folder", resolvedJobId] });
-                  queryClient.invalidateQueries({ queryKey: ["flex-workorders-rows", resolvedJobId] });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-workorders-folder", resolvedJobId) });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-workorders-rows", resolvedJobId) });
                 }
               }}
               disabled={isSyncingWorkOrders}
@@ -452,8 +449,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     const isTourDateJob = (jobDetails?.job_type || job?.job_type) === "tourdate";
 
                     // 1) Fetch timesheets for this job (tourdate is fixed-rate and doesn't require approvals)
-                    let tsQuery = supabase
-                      .from("timesheets")
+                    let tsQuery = dataLayerClient.from("timesheets")
                       .select("*")
                       .eq("job_id", resolvedJobId)
                       .eq("is_active", true);
@@ -466,7 +462,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     // Fallback to visibility function when RLS blocks
                     let timesheets = ts || [];
                     if (!timesheets.length) {
-                      const { data: visible } = await supabase.rpc("get_timesheet_amounts_visible");
+                      const { data: visible } = await dataLayerClient.rpc("get_timesheet_amounts_visible");
                       timesheets =
                         (visible as any[] | null)?.filter(
                           (r) =>
@@ -477,7 +473,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     }
 
                     const { timesheets: enrichedTimesheets, profileMap } = await enrichTimesheetsWithProfiles(
-                      supabase,
+                      dataLayerClient,
                       timesheets as any[]
                     );
 
@@ -504,8 +500,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     }
 
                     // 3) Build inputs for payout PDF (tourdate uses rate quotes, others use payout totals)
-                    const { data: lpoRows } = await supabase
-                      .from("flex_work_orders")
+                    const { data: lpoRows } = await dataLayerClient.from("flex_work_orders")
                       .select("technician_id, lpo_number")
                       .eq("job_id", resolvedJobId);
                     const lpoMap = new Map((lpoRows || []).map((r: any) => [r.technician_id, r.lpo_number || null]));
@@ -535,8 +530,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     let payoutBlob: Blob;
                     if (isTourDateJob) {
                       // Compute quotes via RPC per technician for this tour date job
-                      const { data: jobAssignments, error: jaErr } = await supabase
-                        .from("job_assignments")
+                      const { data: jobAssignments, error: jaErr } = await dataLayerClient.from("job_assignments")
                         .select("technician_id")
                         .eq("job_id", resolvedJobId);
                       if (jaErr) {
@@ -550,7 +544,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                       if (techIdsForQuotes.length > 0) {
                         quotes = await Promise.all(
                           techIdsForQuotes.map(async (techId: string) => {
-                            const { data, error } = await supabase.rpc("compute_tour_job_rate_quote_2025", {
+                            const { data, error } = await dataLayerClient.rpc("compute_tour_job_rate_quote_2025", {
                               _job_id: resolvedJobId,
                               _tech_id: techId,
                             });
@@ -590,8 +584,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                         (id): id is string => typeof id === "string" && !profileMap.has(id)
                       );
                       if (missingProfileIds.length) {
-                        const { data: extraProfiles, error: extraProfilesError } = await supabase
-                          .from("profiles")
+                        const { data: extraProfiles, error: extraProfilesError } = await dataLayerClient.from("profiles")
                           .select("id, first_name, last_name, department, autonomo")
                           .in("id", missingProfileIds);
                         if (extraProfilesError) {
@@ -625,7 +618,7 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                     } else {
                       const payoutData = await prepareJobPayoutData({
                         jobId: resolvedJobId,
-                        supabase,
+                        supabase: dataLayerClient,
                         jobDetails: {
                           id: jobObj.id,
                           title: jobObj.title,

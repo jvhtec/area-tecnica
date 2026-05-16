@@ -27,6 +27,8 @@ vi.mock("@/lib/supabase", () => ({
 
 import TechnicianUnavailability from "../TechnicianUnavailability";
 
+
+import { queryKeys } from "@/lib/react-query";
 describe("TechnicianUnavailability", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -127,7 +129,7 @@ describe("TechnicianUnavailability", () => {
       );
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["my-unavailability"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.scope("my-unavailability") });
   });
 
   it("deletes a single block and invalidates my-unavailability", async () => {
@@ -157,6 +159,6 @@ describe("TechnicianUnavailability", () => {
       expect(deleteBuilder.eq).toHaveBeenCalledWith("id", "block-1");
     });
 
-    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["my-unavailability"] });
+    expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: queryKeys.scope("my-unavailability") });
   });
 });

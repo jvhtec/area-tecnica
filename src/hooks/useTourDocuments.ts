@@ -10,6 +10,8 @@ import {
   isManagementRole,
 } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface TourDocument {
   id: string;
   tour_id: string;
@@ -30,7 +32,7 @@ export const useTourDocuments = (tourId: string) => {
   const canManageVisibility = isManagementRole(userRole);
 
   const { data: documents = [], isLoading, error } = useQuery({
-    queryKey: ['tour-documents', tourId],
+    queryKey: queryKeys.scope('tour-documents', tourId),
     queryFn: async () => {
       console.log('Fetching tour documents for tour:', tourId);
       const { data, error } = await supabase
@@ -99,7 +101,7 @@ export const useTourDocuments = (tourId: string) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-documents', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
       toast.success('Document uploaded successfully');
     },
     onError: (error: any) => {
@@ -122,7 +124,7 @@ export const useTourDocuments = (tourId: string) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-documents', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
       toast.success('Visibility updated');
     },
     onError: (error: any) => {
@@ -168,7 +170,7 @@ export const useTourDocuments = (tourId: string) => {
       console.log('Document deleted successfully');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-documents', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
       toast.success('Document deleted successfully');
     },
     onError: (error: any) => {

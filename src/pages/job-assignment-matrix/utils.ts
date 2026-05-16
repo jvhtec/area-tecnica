@@ -1,7 +1,6 @@
 import { addDays } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
-import { supabase } from "@/lib/supabase";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 const MADRID_TIMEZONE = "Europe/Madrid";
 
 function toMadridDateKey(date: Date): string {
@@ -65,8 +64,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
   const windowRange = `[${start.toISOString()},${end.toISOString()}]`;
   const allowedJobTypes = ["single", "festival", "ciclo", "tourdate", "evento"];
 
-  let overlapQuery = supabase
-    .from("jobs")
+  let overlapQuery = dataLayerClient.from("jobs")
     .select(
       `
       id, title, start_time, end_time, color, status, job_type, job_date_types(date, type),
@@ -82,8 +80,7 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
     overlapQuery = overlapQuery.eq("job_departments.department", department);
   }
 
-  let typedQuery = supabase
-    .from("job_date_types")
+  let typedQuery = dataLayerClient.from("job_date_types")
     .select(
       `
       job_id,
@@ -157,8 +154,7 @@ export async function fetchAssignmentsForWindow(jobIds: string[], technicianIds:
   for (let i = 0; i < jobIds.length; i += batchSize) {
     const jobBatch = jobIds.slice(i, i + batchSize);
     promises.push(
-      supabase
-        .from("job_assignments")
+      dataLayerClient.from("job_assignments")
         .select(
           `
           job_id,
@@ -226,8 +222,7 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
   const endDateKey = toMadridDateKey(end);
 
   for (const batch of techBatches) {
-    const { data: schedRows, error: schedErr } = await supabase
-      .from("availability_schedules")
+    const { data: schedRows, error: schedErr } = await dataLayerClient.from("availability_schedules")
       .select("user_id, date, status, notes, source")
       .in("user_id", batch)
       .gte("date", startDateKey)
@@ -248,8 +243,7 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
   }
 
   try {
-    const { data: legacyRows, error: legacyErr } = await supabase
-      .from("technician_availability")
+    const { data: legacyRows, error: legacyErr } = await dataLayerClient.from("technician_availability")
       .select("technician_id, date, status")
       .in("technician_id", technicianIds)
       .gte("date", startDateKey)
@@ -275,8 +269,7 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
       vacBatches.push(technicianIds.slice(i, i + vacBatchSize));
     }
     for (const batch of vacBatches) {
-      const { data: vacs, error: vacErr } = await supabase
-        .from("vacation_requests")
+      const { data: vacs, error: vacErr } = await dataLayerClient.from("vacation_requests")
         .select("technician_id, start_date, end_date, status")
         .eq("status", "approved")
         .in("technician_id", batch)

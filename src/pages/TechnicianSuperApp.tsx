@@ -6,7 +6,7 @@ import { useMyTours } from '@/hooks/useMyTours';
 import { useRealtimeQuery } from '@/hooks/useRealtimeQuery';
 import { useTechnicianDashboardSubscriptions } from '@/hooks/useMobileRealtimeSubscriptions';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { format, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -57,6 +57,8 @@ import { TechnicianArtistReadOnlyModal } from '@/components/technician/Technicia
 import { TechnicianRfTableModal } from '@/components/technician/TechnicianRfTableModal';
 import type { JobWithLocationAndDocs } from '@/types/job';
 
+
+import { queryKeys } from "@/lib/react-query";
 // --- TYPE DEFINITIONS ---
 interface TechnicianJobData extends JobWithLocationAndDocs {
   id: string;
@@ -151,11 +153,10 @@ export default function TechnicianSuperApp() {
 
   // Fetch user profile
   const { data: userProfile } = useQuery({
-    queryKey: ['user-profile', user?.id],
+    queryKey: queryKeys.scope('user-profile', user?.id),
     queryFn: async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('first_name, last_name, nickname, phone, residencia, dni, bg_color, profile_picture_url, role, department, calendar_ics_token')
         .eq('id', user.id)
         .single();
@@ -176,8 +177,7 @@ export default function TechnicianSuperApp() {
       const endDate = addMonths(new Date(), 3);
 
       // First, fetch job_assignments for this technician to get roles and status
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('job_assignments')
+      const { data: assignmentsData, error: assignmentsError } = await dataLayerClient.from('job_assignments')
         .select('job_id, sound_role, lights_role, video_role, status, assigned_at')
         .eq('technician_id', user.id)
         .eq('status', 'confirmed');
@@ -195,8 +195,7 @@ export default function TechnicianSuperApp() {
       const jobIds = assignmentsData.map(a => a.job_id);
 
       // Then fetch timesheets and jobs for those job IDs
-      const { data: timesheetData, error } = await supabase
-        .from('timesheets')
+      const { data: timesheetData, error } = await dataLayerClient.from('timesheets')
         .select(`
           job_id,
           technician_id,
@@ -255,8 +254,7 @@ export default function TechnicianSuperApp() {
 
       if (dedupedJobIds.length > 0) {
         try {
-          const { data: artistRows, error: artistsError } = await supabase
-            .from('festival_artists')
+          const { data: artistRows, error: artistsError } = await dataLayerClient.from('festival_artists')
             .select('job_id')
             .in('job_id', dedupedJobIds);
 

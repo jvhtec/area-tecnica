@@ -14,6 +14,8 @@ import {
   canUploadDocuments as canUploadDocumentsForRole,
 } from '@/utils/permissions';
 
+
+import { queryKeys } from "@/lib/react-query";
 type UseOptimizedJobCardOptions = {
   enableRoleSummary?: boolean;
   enableSoundTasks?: boolean;
@@ -412,7 +414,7 @@ export const useOptimizedJobCard = (
       void refreshAssignments();
 
       // Invalidate broader queries so the card and list re-fetch
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
     } catch (err) {
       console.error('Refresh error:', err);
     }

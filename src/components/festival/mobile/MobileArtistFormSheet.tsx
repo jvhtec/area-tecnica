@@ -10,7 +10,7 @@ import { ExtraRequirementsSection } from "../form/sections/ExtraRequirementsSect
 import { InfrastructureSection } from "../form/sections/InfrastructureSection";
 import { NotesSection } from "../form/sections/NotesSection";
 import { useCombinedGearSetup } from "@/hooks/useCombinedGearSetup";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import type { LucideIcon } from "lucide-react";
 
 type FormSection = 'hub' | 'consoles' | 'wireless' | 'microphones' | 'monitors' | 'infrastructure' | 'notes';
@@ -181,8 +181,7 @@ export const MobileArtistFormSheet = ({
     setIsLoading(true);
     const fetchArtist = async () => {
       try {
-        const { data, error } = await supabase
-          .from("festival_artists")
+        const { data, error } = await dataLayerClient.from("festival_artists")
           .select("*")
           .eq("id", artist.id)
           .single();

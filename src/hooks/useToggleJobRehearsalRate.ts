@@ -1,7 +1,7 @@
 import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
-import { optimizedInvalidation } from '@/lib/react-query';
+import { queryKeys, optimizedInvalidation } from '@/lib/react-query';
 import { toast } from 'sonner';
 
 type RehearsalDateRow = Tables<'job_rehearsal_dates'>;
@@ -17,7 +17,7 @@ export function useJobRehearsalDates(jobId: string, options: UseJobRehearsalDate
   const { enabled = true } = options;
 
   return useQuery({
-    queryKey: ['job-rehearsal-dates', jobId],
+    queryKey: queryKeys.scope('job-rehearsal-dates', jobId),
     enabled: !!jobId && enabled,
     queryFn: async (): Promise<RehearsalDateRow[]> => {
       const { data, error } = await supabase

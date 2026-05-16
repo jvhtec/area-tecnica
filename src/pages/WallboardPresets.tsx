@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 import { MANAGEMENT_ALLOWED_ROLES } from '@/utils/permissions';
 import { Button } from '@/components/ui/button';
@@ -112,8 +112,7 @@ export default function WallboardPresets() {
   useEffect(() => {
     const fetchPresets = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('wallboard_presets')
+      const { data, error } = await dataLayerClient.from('wallboard_presets')
         .select(
           'id, slug, name, description, display_url, panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds, created_at, updated_at'
         )
@@ -221,8 +220,7 @@ export default function WallboardPresets() {
     };
 
     try {
-      const { error } = await supabase
-        .from('wallboard_presets')
+      const { error } = await dataLayerClient.from('wallboard_presets')
         .update(payload)
         .eq('id', activePreset.id);
 
@@ -334,8 +332,7 @@ export default function WallboardPresets() {
     };
 
     try {
-      const { data, error } = await supabase
-        .from('wallboard_presets')
+      const { data, error } = await dataLayerClient.from('wallboard_presets')
         .insert(payload)
         .select(
           'id, slug, name, description, display_url, panel_order, panel_durations, rotation_fallback_seconds, highlight_ttl_seconds, ticker_poll_interval_seconds, created_at, updated_at'
@@ -380,7 +377,7 @@ export default function WallboardPresets() {
 
     setDeletingId(preset.id);
     try {
-      const { error } = await supabase.from('wallboard_presets').delete().eq('id', preset.id);
+      const { error } = await dataLayerClient.from('wallboard_presets').delete().eq('id', preset.id);
 
       if (error) {
         console.error('Failed to delete wallboard preset', error);

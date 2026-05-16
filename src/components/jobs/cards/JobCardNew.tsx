@@ -14,7 +14,7 @@ import { useOptimizedJobCard } from '@/hooks/useOptimizedJobCard';
 import { useDeletionState } from '@/hooks/useDeletionState';
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useSelectedJobStore } from '@/stores/useSelectedJobStore';
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { format } from "date-fns";
@@ -34,6 +34,8 @@ import {
   isManagementRole,
 } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 type ProfileContact = {
   first_name?: string | null;
   nickname?: string | null;
@@ -246,11 +248,10 @@ function JobCardNewFull({
 
   // Load artists then rider files (2-step RLS-friendly)
   const { data: cardArtists = [] } = useQuery({
-    queryKey: ['jobcard-artists', job.id],
+    queryKey: queryKeys.scope('jobcard-artists', job.id),
     enabled: !!job?.id && isFestivalLike,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('festival_artists')
+      const { data, error } = await dataLayerClient.from('festival_artists')
         .select('id, name')
         .eq('job_id', job.id);
       if (error) throw error;
@@ -261,11 +262,10 @@ function JobCardNewFull({
   const cardArtistIds = React.useMemo(() => cardArtists.map(a => a.id), [cardArtists]);
   const cardArtistNameMap = React.useMemo(() => new Map(cardArtists.map(a => [a.id, a.name])), [cardArtists]);
   const { data: riderFiles = [] } = useQuery({
-    queryKey: ['jobcard-rider-files', job.id, cardArtistIds],
+    queryKey: queryKeys.scope('jobcard-rider-files', job.id, cardArtistIds),
     enabled: !!job?.id && cardArtistIds.length > 0,
     queryFn: async () => {
-      let query = supabase
-        .from('festival_artist_files')
+      let query = dataLayerClient.from('festival_artist_files')
         .select('id, file_name, file_path, uploaded_at, artist_id')
         .order('uploaded_at', { ascending: false });
       if (cardArtistIds.length === 1) {
@@ -281,14 +281,14 @@ function JobCardNewFull({
   });
 
   const viewRider = async (file: { file_path: string }) => {
-    const { data } = await supabase.storage
+    const { data } = await dataLayerClient.storage
       .from('festival_artist_files')
       .createSignedUrl(file.file_path, 3600);
     if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
   };
 
   const downloadRider = async (file: { file_path: string; file_name: string }) => {
-    const { data } = await supabase.storage
+    const { data } = await dataLayerClient.storage
       .from('festival_artist_files')
       .download(file.file_path);
     if (!data) return;
@@ -399,11 +399,10 @@ function JobCardNewFull({
 
   // Queries for transport requests and logistics events
   const { data: myTransportRequest } = useQuery({
-    queryKey: ['transport-request', job.id, currentUserDepartment],
+    queryKey: queryKeys.scope('transport-request', job.id, currentUserDepartment),
     queryFn: async () => {
       if (!currentUserDepartment || !['sound', 'lights', 'video'].includes(currentUserDepartment)) return null;
-      const { data, error } = await supabase
-        .from('transport_requests')
+      const { data, error } = await dataLayerClient.from('transport_requests')
         .select('id, department, status, note, description, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
         .eq('job_id', job.id)
         .eq('department', currentUserDepartment)
@@ -417,10 +416,9 @@ function JobCardNewFull({
   });
 
   const { data: allRequests = [], isLoading: isAllRequestsLoading } = useQuery({
-    queryKey: ['transport-requests-all', job.id],
+    queryKey: queryKeys.scope('transport-requests-all', job.id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('transport_requests')
+      const { data, error } = await dataLayerClient.from('transport_requests')
         .select('id, department, status, note, description, created_at, items:transport_request_items(id, transport_type, leftover_space_meters)')
         .eq('job_id', job.id)
         .eq('status', 'requested')
@@ -432,10 +430,9 @@ function JobCardNewFull({
   });
 
   const { data: jobEvents = [] } = useQuery({
-    queryKey: ['logistics-events-for-job', job.id],
+    queryKey: queryKeys.scope('logistics-events-for-job', job.id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('logistics_events')
+      const { data, error } = await dataLayerClient.from('logistics_events')
         .select('id')
         .eq('job_id', job.id);
       if (error) return [];
@@ -452,7 +449,7 @@ function JobCardNewFull({
   const handleCancelTransportRequest = React.useCallback(
     async (requestId: string) => {
       if (!requestId) return;
-      const { error } = await supabase.from("transport_requests").update({ status: "cancelled" }).eq("id", requestId);
+      const { error } = await dataLayerClient.from("transport_requests").update({ status: "cancelled" }).eq("id", requestId);
       if (error) {
         console.error("[JobCardNew] Failed to cancel transport request:", error);
         toast({
@@ -467,7 +464,7 @@ function JobCardNewFull({
         title: "Solicitud cancelada",
         description: "La solicitud de transporte se ha cancelado correctamente",
       });
-      queryClient.invalidateQueries({ queryKey: ["transport-requests-all", job.id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-requests-all", job.id) });
     },
     [job.id, queryClient, toast]
   );
@@ -504,11 +501,10 @@ function JobCardNewFull({
 
   // WhatsApp group existence for this job + department (for management only)
   const { data: waGroup, refetch: refetchWaGroup } = useQuery({
-    queryKey: ['job-whatsapp-group', job.id, department, 0],
+    queryKey: queryKeys.scope('job-whatsapp-group', job.id, department, 0),
     enabled: !!job?.id && !!department && isManagementUser,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_whatsapp_groups')
+      const { data, error } = await dataLayerClient.from('job_whatsapp_groups')
         .select('id, wa_group_id')
         .eq('job_id', job.id)
         .eq('department', department)
@@ -520,11 +516,10 @@ function JobCardNewFull({
   });
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
-    queryKey: ['job-whatsapp-group-request', job.id, department, 0],
+    queryKey: queryKeys.scope('job-whatsapp-group-request', job.id, department, 0),
     enabled: !!job?.id && !!department && isManagementUser,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_whatsapp_group_requests')
+      const { data, error } = await dataLayerClient.from('job_whatsapp_group_requests')
         .select('id, created_at')
         .eq('job_id', job.id)
         .eq('department', department)
@@ -542,10 +537,9 @@ function JobCardNewFull({
 
   // Fetch timesheet statuses per technician for this job (for badge color coding)
   const { data: jobTimesheets } = useQuery({
-    queryKey: ["job-timesheets-status", job.id],
+    queryKey: queryKeys.scope("job-timesheets-status", job.id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('timesheets')
+      const { data, error } = await dataLayerClient.from('timesheets')
         .select('technician_id, status')
         .eq('job_id', job.id)
         .eq('is_active', true);
@@ -561,17 +555,16 @@ function JobCardNewFull({
     if (!hasAssignedTechnicians) return;
     if (job.job_type === 'dryhire' || job.job_type === 'tourdate') return;
 
-    const channel = supabase
-      .channel(`job-timesheets-${job.id}`)
+    const channel = dataLayerClient.channel(`job-timesheets-${job.id}`)
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'timesheets', filter: `job_id=eq.${job.id}` },
         () => {
-          queryClient.invalidateQueries({ queryKey: ["job-timesheets-status", job.id] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.scope("job-timesheets-status", job.id) });
         }
       )
       .subscribe();
 
-    return () => { supabase.removeChannel(channel); };
+    return () => { dataLayerClient.removeChannel(channel); };
   }, [hasAssignedTechnicians, job.id, job.job_type, queryClient]);
 
   // Core group creation logic (shared by initial creation and retry)
@@ -579,8 +572,7 @@ function JobCardNewFull({
     if (!isManagementUser) return;
     try {
       // Pre-check: warn for missing phones
-      const { data: rows } = await supabase
-        .from('job_assignments')
+      const { data: rows } = await dataLayerClient.from('job_assignments')
         .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
         .eq('job_id', job.id);
       const deptKey = ASSIGNMENT_ROLE_BY_DEPARTMENT[department];
@@ -607,7 +599,7 @@ function JobCardNewFull({
         if (!proceed) return;
       }
 
-      const { data, error } = await supabase.functions.invoke('create-whatsapp-group', {
+      const { data, error } = await dataLayerClient.functions.invoke('create-whatsapp-group', {
         body: { job_id: job.id as string, department, stage_number: 0 }
       });
       if (error) {
@@ -642,7 +634,7 @@ function JobCardNewFull({
 
     try {
       // Clear the failed request using RPC function
-      const { data: clearResult, error: clearError } = await supabase.rpc(
+      const { data: clearResult, error: clearError } = await dataLayerClient.rpc(
         'clear_whatsapp_group_request',
         { p_job_id: job.id, p_department: department, p_stage_number: 0 }
       );
@@ -692,8 +684,7 @@ function JobCardNewFull({
   // Auto-fulfill request when both load and unload exist for the request's department
   const checkAndFulfillRequest = async (requestId: string, departmentForReq: string) => {
     try {
-      const { data: events } = await supabase
-        .from('logistics_events')
+      const { data: events } = await dataLayerClient.from('logistics_events')
         .select('id, event_type, logistics_event_departments(department)')
         .eq('job_id', job.id)
         .eq('logistics_event_departments.department', departmentForReq);
@@ -701,9 +692,9 @@ function JobCardNewFull({
       const hasLoad = logisticsEvents.some((e) => e.event_type === 'load');
       const hasUnload = logisticsEvents.some((e) => e.event_type === 'unload');
       if (hasLoad && hasUnload) {
-        await supabase.from('transport_requests').update({ status: 'fulfilled' }).eq('id', requestId);
-        queryClient.invalidateQueries({ queryKey: ['transport-request', job.id, departmentForReq] });
-        queryClient.invalidateQueries({ queryKey: ['transport-requests-all', job.id] });
+        await dataLayerClient.from('transport_requests').update({ status: 'fulfilled' }).eq('id', requestId);
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('transport-request', job.id, departmentForReq) });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('transport-requests-all', job.id) });
       }
     } catch (err) {
       console.error('checkAndFulfillRequest failed', err);
@@ -731,8 +722,7 @@ function JobCardNewFull({
         toast({ title: 'Not applicable', description: 'Only Tentativa/Confirmado/Cancelado are synced to Flex.' });
         return;
       }
-      const { data: folders, error: fErr } = await supabase
-        .from('flex_folders')
+      const { data: folders, error: fErr } = await dataLayerClient.from('flex_folders')
         .select('id, parent_id, department, folder_type')
         .eq('job_id', job.id);
 	      if (fErr || !folders || folders.length === 0) {
@@ -750,7 +740,7 @@ function JobCardNewFull({
 	        return;
 	      }
 
-	      const { data: res, error } = await supabase.functions.invoke('apply-flex-status', {
+	      const { data: res, error } = await dataLayerClient.functions.invoke('apply-flex-status', {
 	        body: { folder_id: master.id, status: flexStatus, cascade: true }
 	      });
 	      const result = res as FlexStatusResponse | null;
@@ -830,8 +820,8 @@ function JobCardNewFull({
 
         onDeleteClick(job.id);
 
-        await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-        await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
       } else {
         throw new Error(result.error || "Unknown deletion error");
       }
@@ -907,8 +897,7 @@ function JobCardNewFull({
 
       if (mode === 'create') {
         // Double-check folders don't exist (create-only)
-        const existingFoldersQuery = supabase
-          .from("flex_folders")
+        const existingFoldersQuery = dataLayerClient.from("flex_folders")
           .select("id")
           .limit(1);
 
@@ -946,8 +935,7 @@ function JobCardNewFull({
       await createAllFoldersForJob(job, formattedStartDate, formattedEndDate, documentNumber, options);
 
       // Ensure the job is marked as having Flex folders (idempotent).
-      const { error: updateError } = await supabase
-        .from('jobs')
+      const { error: updateError } = await dataLayerClient.from('jobs')
         .update({ flex_folders_created: true })
         .eq('id', job.id);
 
@@ -955,7 +943,7 @@ function JobCardNewFull({
 
       // Broadcast push notification: Flex folders created for job
       try {
-        void supabase.functions.invoke('push', {
+        void dataLayerClient.functions.invoke('push', {
           body: { action: 'broadcast', type: 'flex.folders.created', job_id: job.id }
         });
       } catch (pushError) {
@@ -971,10 +959,10 @@ function JobCardNewFull({
       });
 
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] }),
-        queryClient.invalidateQueries({ queryKey: ["folder-existence", job.id] }),
-        queryClient.invalidateQueries({ queryKey: ["folder-existence"] }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("folder-existence", job.id) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("folder-existence") }),
       ]);
 
     } catch (error: any) {
@@ -1028,12 +1016,11 @@ function JobCardNewFull({
       const rootDirHandle = await baseDirHandle.getDirectoryHandle(rootFolderName, { create: true });
 
       // Get current user's custom folder structure or use default
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await dataLayerClient.auth.getUser();
       let folderStructure: LocalFolderStructureItem[] | null = null;
 
       if (user) {
-        const { data: profile } = await supabase
-          .from('profiles')
+        const { data: profile } = await dataLayerClient.from('profiles')
           .select('custom_folder_structure, role')
           .eq('id', user.id)
           .single();

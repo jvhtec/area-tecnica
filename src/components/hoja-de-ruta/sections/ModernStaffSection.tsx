@@ -8,8 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Users, Plus, Trash2, User, IdCard, Briefcase } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
 import { ProfileAutocomplete } from "../components/ProfileAutocomplete";
-import { supabase } from "@/integrations/supabase/client";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 interface ModernStaffSectionProps {
   eventData: EventData;
   onStaffChange: (index: number, field: string, value: string) => void;
@@ -42,8 +41,7 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
     if (!dni && profile.id) {
       // Fallback: fetch full profile to ensure DNI is loaded
       try {
-        const { data: p, error } = await supabase
-          .from('profiles')
+        const { data: p, error } = await dataLayerClient.from('profiles')
           .select('dni, role, first_name, last_name')
           .eq('id', profile.id)
           .maybeSingle();

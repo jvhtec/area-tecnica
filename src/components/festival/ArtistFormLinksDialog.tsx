@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Loader2, Copy, RefreshCcw, Printer } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { addDays, format, isAfter } from "date-fns";
@@ -48,8 +48,7 @@ export const ArtistFormLinksDialog = ({
   const fetchArtistLinks = useCallback(async () => {
     setIsLoading(true);
     try {
-      const { data: artistsData, error: artistsError } = await supabase
-        .from('festival_artists')
+      const { data: artistsData, error: artistsError } = await dataLayerClient.from('festival_artists')
         .select('id, name, stage, date, form_language')
         .eq('job_id', jobId)
         .not('date', 'is', null)
@@ -66,8 +65,7 @@ export const ArtistFormLinksDialog = ({
 
       const artistIds = artistsData.map((artist) => artist.id);
 
-      const { data: formsData, error: formsError } = await supabase
-        .from('festival_artist_forms')
+      const { data: formsData, error: formsError } = await dataLayerClient.from('festival_artist_forms')
         .select('artist_id, token, expires_at, status, updated_at, created_at')
         .in('artist_id', artistIds)
         .order('updated_at', { ascending: false, nullsFirst: false })
@@ -159,8 +157,7 @@ export const ArtistFormLinksDialog = ({
       for (const artist of filteredArtistLinks) {
         if (!artist.token || 
             (artist.expires_at && !isAfter(new Date(artist.expires_at), new Date()))) {
-          await supabase
-            .from('festival_artist_forms')
+          await dataLayerClient.from('festival_artist_forms')
             .update({
               status: 'expired',
               expires_at: new Date().toISOString()
@@ -169,8 +166,7 @@ export const ArtistFormLinksDialog = ({
             .eq('status', 'pending');
 
           const expiresAt = addDays(new Date(), 7);
-          await supabase
-            .from('festival_artist_forms')
+          await dataLayerClient.from('festival_artist_forms')
             .insert({
               artist_id: artist.artistId,
               expires_at: expiresAt.toISOString(),

@@ -4,13 +4,15 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { HojaDeRutaTemplate, EventData } from "@/types/hoja-de-ruta";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useHojaDeRutaTemplates = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   // Fetch templates
   const { data: templates = [], isLoading: isLoadingTemplates } = useQuery({
-    queryKey: ['hoja-de-ruta-templates'],
+    queryKey: queryKeys.scope('hoja-de-ruta-templates'),
     queryFn: async () => {
       console.log("📋 TEMPLATES: Fetching templates");
       
@@ -58,7 +60,7 @@ export const useHojaDeRutaTemplates = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['hoja-de-ruta-templates'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('hoja-de-ruta-templates') });
       toast({
         title: "📋 Plantilla creada",
         description: "La plantilla se ha creado correctamente.",

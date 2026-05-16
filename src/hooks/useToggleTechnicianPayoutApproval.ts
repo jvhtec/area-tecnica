@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+
+import { queryKeys } from "@/lib/react-query";
 export function useToggleTechnicianPayoutApproval() {
   const queryClient = useQueryClient();
 
@@ -24,8 +26,8 @@ export function useToggleTechnicianPayoutApproval() {
       if (error) throw error;
     },
     onSuccess: (_, { jobId, technicianId }) => {
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', jobId, technicianId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-tech-payout', jobId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-tech-payout', jobId, technicianId) });
       toast.success('Estado de aprobación actualizado');
     },
     onError: (error) => {

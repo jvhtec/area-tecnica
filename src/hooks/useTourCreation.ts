@@ -5,6 +5,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useQueryClient } from "@tanstack/react-query";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useTourCreation = (
   currentDepartment: Department,
   onSuccess: () => void
@@ -90,9 +92,9 @@ export const useTourCreation = (
       await createTour();
       console.log("Tour created successfully");
 
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") });
 
       toast({
         title: "Success",

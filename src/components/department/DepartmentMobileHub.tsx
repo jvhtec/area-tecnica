@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Badge } from "@/components/ui/badge";
 import { isManagementRole } from "@/utils/permissions";
 
@@ -113,11 +113,10 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   useEffect(() => {
     const loadUserPreferences = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await dataLayerClient.auth.getSession();
         if (!session?.user?.id) return;
 
-        const { data: profile, error } = await supabase
-          .from("profiles")
+        const { data: profile, error } = await dataLayerClient.from("profiles")
           .select("selected_job_types, selected_job_statuses")
           .eq("id", session.user.id)
           .single();
@@ -143,15 +142,14 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
   // Save user preferences to profiles
   const saveUserPreferences = async (types: string[], statuses?: string[]) => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await dataLayerClient.auth.getSession();
       if (!session?.user?.id) return;
 
       const updateData = statuses !== undefined
         ? { selected_job_types: types, selected_job_statuses: statuses }
         : { selected_job_types: types };
 
-      const { error } = await supabase
-        .from("profiles")
+      const { error } = await dataLayerClient.from("profiles")
         .update(updateData)
         .eq("id", session.user.id);
 

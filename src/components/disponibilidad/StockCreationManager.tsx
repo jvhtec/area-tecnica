@@ -7,13 +7,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Plus, Trash2, Pencil, Search, ChevronDown, ChevronRight, Check, X, Loader2, Link, ClipboardPaste, Download, Settings2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
+
+import { queryKeys } from "@/lib/react-query";
 // UUID regex for extracting Flex resource IDs
 const UUID_REGEX = /[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}/;
 
@@ -123,7 +125,7 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
         setIsFetchingFlex(true);
       }
 
-      const { data, error } = await supabase.functions.invoke('fetch-flex-inventory-model', {
+      const { data, error } = await dataLayerClient.functions.invoke('fetch-flex-inventory-model', {
         body: { model_id: idToFetch }
       });
 
@@ -191,10 +193,9 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
 
   // Fetch equipment list
   const { data: equipmentList = [], refetch: refetchEquipment } = useQuery<Equipment[]>({
-    queryKey: ['equipment', department],
+    queryKey: queryKeys.scope('equipment', department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('equipment')
+      const { data, error } = await dataLayerClient.from('equipment')
         .select('*')
         .in('category', categories)
         .order('category')
@@ -207,10 +208,9 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
 
   // Fetch current stock levels
   const { data: currentStockLevels = [] } = useQuery({
-    queryKey: ['current-stock-levels', department],
+    queryKey: queryKeys.scope('current-stock-levels', department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('current_stock_levels')
+      const { data, error } = await dataLayerClient.from('current_stock_levels')
         .select('*')
         .in('category', categories);
 
@@ -269,8 +269,7 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
       if (!newName.trim()) throw new Error('Name is required');
 
       // Create equipment
-      const { data: equipment, error: eqError } = await supabase
-        .from('equipment')
+      const { data: equipment, error: eqError } = await dataLayerClient.from('equipment')
         .insert({
           name: newName.trim(),
           category: newCategory,
@@ -285,8 +284,7 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
 
       // Create stock entry if quantity > 0
       if (newQuantity > 0) {
-        const { error: stockError } = await supabase
-          .from('global_stock_entries')
+        const { error: stockError } = await dataLayerClient.from('global_stock_entries')
           .insert({
             equipment_id: equipment.id,
             base_quantity: newQuantity
@@ -298,8 +296,8 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
       return equipment;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment', department] });
-      queryClient.invalidateQueries({ queryKey: ['current-stock-levels', department] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('equipment', department) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('current-stock-levels', department) });
       resetAddForm();
       toast({ title: 'Equipo creado correctamente' });
     },
@@ -311,15 +309,14 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
   // Update equipment mutation (inline quick edit)
   const updateEquipmentMutation = useMutation({
     mutationFn: async ({ id, name, category }: { id: string; name: string; category: string }) => {
-      const { error } = await supabase
-        .from('equipment')
+      const { error } = await dataLayerClient.from('equipment')
         .update({ name, category })
         .eq('id', id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment', department] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('equipment', department) });
       setEditingItemId(null);
       toast({ title: 'Equipo actualizado' });
     },
@@ -333,8 +330,7 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
     mutationFn: async () => {
       if (!advancedEditItem) throw new Error('No item selected');
 
-      const { error } = await supabase
-        .from('equipment')
+      const { error } = await dataLayerClient.from('equipment')
         .update({
           name: advEditName.trim(),
           category: advEditCategory,
@@ -347,7 +343,7 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment', department] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('equipment', department) });
       closeAdvancedEdit();
       toast({ title: 'Equipo actualizado' });
     },
@@ -360,24 +356,22 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (id: string) => {
       // Delete dependent rows first (do not ignore failures)
-      const { error: stockEntriesError } = await supabase
-        .from('global_stock_entries')
+      const { error: stockEntriesError } = await dataLayerClient.from('global_stock_entries')
         .delete()
         .eq('equipment_id', id);
       if (stockEntriesError) throw stockEntriesError;
 
-      const { error: stockMovementsError } = await supabase
-        .from('stock_movements')
+      const { error: stockMovementsError } = await dataLayerClient.from('stock_movements')
         .delete()
         .eq('equipment_id', id);
       if (stockMovementsError) throw stockMovementsError;
 
-      const { error } = await supabase.from('equipment').delete().eq('id', id);
+      const { error } = await dataLayerClient.from('equipment').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment', department] });
-      queryClient.invalidateQueries({ queryKey: ['current-stock-levels', department] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('equipment', department) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('current-stock-levels', department) });
       setDeletingItemId(null);
       toast({ title: 'Equipo eliminado' });
     },
@@ -392,27 +386,24 @@ export const StockCreationManager = ({ stock, onStockUpdate, department }: Stock
       setSavingQuantityId(equipmentId);
 
       // Get existing stock entry
-      const { data: existing } = await supabase
-        .from('global_stock_entries')
+      const { data: existing } = await dataLayerClient.from('global_stock_entries')
         .select('id')
         .eq('equipment_id', equipmentId)
         .maybeSingle();
 
       if (existing) {
-        const { error } = await supabase
-          .from('global_stock_entries')
+        const { error } = await dataLayerClient.from('global_stock_entries')
           .update({ base_quantity: quantity })
           .eq('id', existing.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from('global_stock_entries')
+        const { error } = await dataLayerClient.from('global_stock_entries')
           .insert({ equipment_id: equipmentId, base_quantity: quantity });
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['current-stock-levels', department] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('current-stock-levels', department) });
       setSavingQuantityId(null);
     },
     onError: (error) => {

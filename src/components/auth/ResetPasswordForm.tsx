@@ -6,8 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/lib/supabase";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 interface ResetPasswordFormProps {
   onSuccess: () => void;
 }
@@ -34,7 +33,7 @@ export const ResetPasswordForm = ({ onSuccess }: ResetPasswordFormProps) => {
         if (href.includes('code=')) {
           console.log('[ResetPassword] Exchanging code for session...');
           try {
-            await supabase.auth.exchangeCodeForSession(href);
+            await dataLayerClient.auth.exchangeCodeForSession(href);
             console.log('[ResetPassword] Code exchange successful');
           } catch (ex) {
             console.warn('[ResetPassword] Code exchange failed:', ex);
@@ -50,14 +49,14 @@ export const ResetPasswordForm = ({ onSuccess }: ResetPasswordFormProps) => {
         if (accessToken && refreshToken) {
           console.log('[ResetPassword] Found tokens in URL, setting session...');
           try {
-            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+            await dataLayerClient.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
           } catch (ex) {
             console.warn('[ResetPassword] setSession failed:', ex);
           }
         }
 
         // 3) Check session now
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await dataLayerClient.auth.getSession();
         if (session) {
           console.log('[ResetPassword] Valid session found');
           resolved = true;
@@ -67,7 +66,7 @@ export const ResetPasswordForm = ({ onSuccess }: ResetPasswordFormProps) => {
 
         // 4) Wait briefly for async auth url detection
         console.log('[ResetPassword] Waiting for auth state change...');
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sess) => {
+        const { data: { subscription } } = dataLayerClient.auth.onAuthStateChange((_event, sess) => {
           if (sess && !resolved) {
             console.log('[ResetPassword] Session arrived via onAuthStateChange');
             resolved = true;
@@ -79,7 +78,7 @@ export const ResetPasswordForm = ({ onSuccess }: ResetPasswordFormProps) => {
         // Give it a short window then fail
         setTimeout(async () => {
           if (resolved) return;
-          const { data: { session: s2 } } = await supabase.auth.getSession();
+          const { data: { session: s2 } } = await dataLayerClient.auth.getSession();
           if (s2) {
             resolved = true;
             setHasValidSession(true);

@@ -2,6 +2,8 @@ import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Hook to subscribe to realtime updates for a staffing campaign
  */
@@ -20,7 +22,7 @@ export function useStaffingCampaignRealtime(jobId: string, department: string) {
           const row = payload.new ?? payload.old
           if (row?.department !== department) return
           queryClient.invalidateQueries({
-            queryKey: ['staffing_campaign', jobId, department]
+            queryKey: queryKeys.scope('staffing_campaign', jobId, department)
           })
         }
       )
@@ -48,7 +50,7 @@ export function useStaffingCampaignRolesRealtime(campaignId?: string) {
         { event: '*', schema: 'public', table: 'staffing_campaign_roles', filter: `campaign_id=eq.${campaignId}` },
         () => {
           queryClient.invalidateQueries({
-            queryKey: ['staffing_campaign_roles', campaignId]
+            queryKey: queryKeys.scope('staffing_campaign_roles', campaignId)
           })
         }
       )
@@ -76,16 +78,16 @@ export function useStaffingRequestsRealtime(jobId: string) {
         { event: '*', schema: 'public', table: 'staffing_requests', filter: `job_id=eq.${jobId}` },
         () => {
           queryClient.invalidateQueries({
-            queryKey: ['staffing_availability_responses', jobId]
+            queryKey: queryKeys.scope('staffing_availability_responses', jobId)
           })
           queryClient.invalidateQueries({
-            queryKey: ['staffing_requests', jobId]
+            queryKey: queryKeys.scope('staffing_requests', jobId)
           })
           queryClient.invalidateQueries({
-            queryKey: ['staffing_candidates', jobId]
+            queryKey: queryKeys.scope('staffing_candidates', jobId)
           })
           queryClient.invalidateQueries({
-            queryKey: ['staffing_roleless_consultations', jobId]
+            queryKey: queryKeys.scope('staffing_roleless_consultations', jobId)
           })
         }
       )
@@ -113,7 +115,7 @@ export function useStaffingEventsRealtime(campaignId?: string) {
         { event: 'INSERT', schema: 'public', table: 'staffing_campaign_events', filter: `campaign_id=eq.${campaignId}` },
         () => {
           queryClient.invalidateQueries({
-            queryKey: ['staffing_campaign_events', campaignId]
+            queryKey: queryKeys.scope('staffing_campaign_events', campaignId)
           })
         }
       )

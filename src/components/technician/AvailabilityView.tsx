@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -12,6 +12,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Theme } from './types';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface AvailabilityBlock {
     id: string;
     technician_id: string;
@@ -36,11 +38,10 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
 
     // Fetch unavailability blocks
     const { data: blocks = [], isLoading } = useQuery<AvailabilityBlock[]>({
-        queryKey: ['my-unavailability', user?.id],
+        queryKey: queryKeys.scope('my-unavailability', user?.id),
         queryFn: async () => {
             if (!user?.id) return [];
-            const { data, error } = await supabase
-                .from('technician_availability')
+            const { data, error } = await dataLayerClient.from('technician_availability')
                 .select('id, technician_id, date, status, created_at')
                 .eq('technician_id', user.id)
                 .order('date', { ascending: true });
@@ -72,14 +73,13 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
                 const dateStr = spanishDateFormatter.format(d);
                 rows.push({ technician_id: user.id, date: dateStr, status: 'day_off' });
             }
-            const { error } = await supabase
-                .from('technician_availability')
+            const { error } = await dataLayerClient.from('technician_availability')
                 .upsert(rows, { onConflict: 'technician_id,date' });
             if (error) throw error;
         },
         onSuccess: () => {
             toast.success('Fechas marcadas como no disponibles');
-            queryClient.invalidateQueries({ queryKey: ['my-unavailability'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('my-unavailability') });
             setShowAddSheet(false);
             setStartDate('');
             setEndDate('');
@@ -93,7 +93,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
     // Delete mutation
     const deleteMutation = useMutation({
         mutationFn: async (id: string) => {
-            const { error } = await supabase.from('technician_availability').delete().eq('id', id);
+            const { error } = await dataLayerClient.from('technician_availability').delete().eq('id', id);
             if (error) throw error;
         },
         onMutate: (id) => {
@@ -101,7 +101,7 @@ export const AvailabilityView = ({ theme, isDark }: AvailabilityViewProps) => {
         },
         onSuccess: () => {
             toast.success('Disponibilidad restaurada');
-            queryClient.invalidateQueries({ queryKey: ['my-unavailability'] });
+            queryClient.invalidateQueries({ queryKey: queryKeys.scope('my-unavailability') });
         },
         onError: (e: unknown) => {
             const message = e instanceof Error ? e.message : 'No se pudo eliminar';

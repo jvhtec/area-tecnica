@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { toast } from "@/hooks/use-toast";
 import { HouseTechRateEditor } from "@/components/settings/HouseTechRateEditor";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
@@ -120,7 +120,7 @@ export const EditUserDialog = ({ user, onOpenChange, onSave }: EditUserDialogPro
     }
     try {
       setIsSendingOnboarding(true);
-      const { error } = await supabase.functions.invoke('send-onboarding-email', {
+      const { error } = await dataLayerClient.functions.invoke('send-onboarding-email', {
         body: {
           email: user.email,
           firstName: user.first_name || undefined,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { MessageCard } from "./MessageCard";
 import { useMessagesQuery } from "./hooks/useMessagesQuery";
@@ -37,11 +37,10 @@ export const MessagesList = ({ theme, isDark = false }: MessagesListProps) => {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await dataLayerClient.auth.getUser();
         if (!user) return;
 
-        const { data: profile } = await supabase
-          .from('profiles')
+        const { data: profile } = await dataLayerClient.from('profiles')
           .select('role, department')
           .eq('id', user.id)
           .single();

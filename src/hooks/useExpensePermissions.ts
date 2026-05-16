@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useOptimizedAuth } from './useOptimizedAuth';
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface ExpensePermission {
   id: string;
   job_id: string;
@@ -37,7 +39,7 @@ export const useExpensePermissions = (jobId: string | null | undefined) => {
   const { user } = useOptimizedAuth();
 
   return useQuery({
-    queryKey: ['expense-permissions', jobId, user?.id],
+    queryKey: queryKeys.scope('expense-permissions', jobId, user?.id),
     queryFn: async () => {
       if (!jobId || !user?.id) {
         return [];
@@ -79,7 +81,7 @@ export const useExpensePermissions = (jobId: string | null | undefined) => {
  */
 export const useExpenseCategories = () => {
   return useQuery({
-    queryKey: ['expense-categories'],
+    queryKey: queryKeys.scope('expense-categories'),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('expense_categories')

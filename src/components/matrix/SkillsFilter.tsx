@@ -5,8 +5,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Filter } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-
+import { dataLayerClient } from '@/services/dataLayerClient';
 type Skill = { id: string; name: string; category: string | null };
 
 interface SkillsFilterProps {
@@ -35,8 +34,7 @@ export const SkillsFilter: React.FC<SkillsFilterProps> = ({ selected, onChange, 
   React.useEffect(() => {
     let mounted = true;
     (async () => {
-      const { data, error } = await supabase
-        .from('skills')
+      const { data, error } = await dataLayerClient.from('skills')
         .select('id,name,category')
         .eq('active', true)
         .order('category', { ascending: true })

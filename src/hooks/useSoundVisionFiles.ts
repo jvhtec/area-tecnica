@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import type { PostgrestError } from '@supabase/supabase-js';
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface SoundVisionFile {
   id: string;
   venue_id: string;
@@ -61,7 +63,7 @@ export const useSoundVisionFiles = (
   options?: UseSoundVisionFilesOptions
 ) => {
   return useQuery({
-    queryKey: ['soundvision-files', filters],
+    queryKey: queryKeys.scope('soundvision-files', filters),
     enabled: options?.enabled ?? true,
     queryFn: async () => {
       const { error: accessError } = await supabase.rpc('assert_soundvision_access');
@@ -220,7 +222,7 @@ export const useDeleteSoundVisionFile = () => {
       if (dbError) throw dbError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('soundvision-files') });
       toast.success('Archivo eliminado correctamente');
     },
     onError: (error) => {
@@ -315,7 +317,7 @@ export const useDownloadSoundVisionFile = () => {
       return { downloadRecordError, pushNotificationResult };
     },
     onSuccess: ({ downloadRecordError, pushNotificationResult }) => {
-      queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('soundvision-files') });
 
       const hasRecordError = !!downloadRecordError;
       const hasPushError = !pushNotificationResult.success;

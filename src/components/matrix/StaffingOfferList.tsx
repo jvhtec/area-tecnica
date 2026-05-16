@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { supabase } from '@/lib/supabase'
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 
+
+import { queryKeys } from "@/lib/react-query";
 interface StaffingOfferListProps {
   campaignId: string
   roleCode: string
@@ -36,11 +38,10 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
 
   // Fetch availability responses for this role
   const { data: responses, isLoading } = useQuery({
-    queryKey: ['staffing_availability_responses', jobId, roleCode],
+    queryKey: queryKeys.scope('staffing_availability_responses', jobId, roleCode),
     queryFn: async () => {
       // Role information is stored in staffing_events.meta.role (from send-staffing-email).
-      const { data: sentEvents, error: sentError } = await supabase
-        .from('staffing_events')
+      const { data: sentEvents, error: sentError } = await dataLayerClient.from('staffing_events')
         .select('staffing_request_id')
         .in('event', ['email_sent', 'whatsapp_sent'])
         .contains('meta', { phase: 'availability', role: roleCode })
@@ -55,8 +56,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
 
       if (requestIds.length === 0) return [] as AvailabilityResponse[]
 
-      const { data, error } = await supabase
-        .from('staffing_requests')
+      const { data, error } = await dataLayerClient.from('staffing_requests')
         .select('id, profile_id, status, created_at, updated_at, profiles(first_name,last_name,nickname)')
         .in('id', requestIds)
         .eq('job_id', jobId)
@@ -91,7 +91,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
         throw new Error('Select at least one candidate')
       }
 
-      const token = (await supabase.auth.getSession()).data.session?.access_token
+      const token = (await dataLayerClient.auth.getSession()).data.session?.access_token
       if (!token) throw new Error('Not authenticated')
 
       const sendOne = async (profileId: string) => {
@@ -136,8 +136,8 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
         description: `Sent offers to ${data?.sent ?? selectedForOffer.size} candidates`
       })
       setSelectedForOffer(new Set())
-      queryClient.invalidateQueries({ queryKey: ['staffing_availability_responses', jobId, roleCode] })
-      queryClient.invalidateQueries({ queryKey: ['staffing_requests', jobId] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_availability_responses', jobId, roleCode) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_requests', jobId) })
     },
     onError: (error: any) => {
       toast({

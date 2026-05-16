@@ -4,6 +4,8 @@ import type { Tables } from '@/integrations/supabase/types';
 import { toast } from 'sonner';
 import { invalidateRehearsalRateQueries, recalculateTimesheets } from '@/hooks/useToggleJobRehearsalRate';
 
+
+import { queryKeys } from "@/lib/react-query";
 export type TechnicianDateRateMode = 'inherit' | 'rehearsal' | 'standard';
 
 type TechnicianRateModeRow = Tables<'job_technician_rate_mode_dates'>;
@@ -19,7 +21,7 @@ export function useJobTechnicianRateModeDates(
   const { enabled = true } = options;
 
   return useQuery({
-    queryKey: ['job-technician-rate-mode-dates', jobId],
+    queryKey: queryKeys.scope('job-technician-rate-mode-dates', jobId),
     enabled: !!jobId && enabled,
     queryFn: async (): Promise<TechnicianRateModeRow[]> => {
       const { data, error } = await supabase
@@ -89,7 +91,7 @@ export function useSetTechnicianDateRateMode() {
     },
     onSuccess: (result) => {
       invalidateRehearsalRateQueries(queryClient, result.jobId);
-      queryClient.invalidateQueries({ queryKey: ['job-technician-rate-mode-dates', result.jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-technician-rate-mode-dates', result.jobId) });
     },
     onError: (error) => {
       console.error('[useSetTechnicianDateRateMode] Error:', error);

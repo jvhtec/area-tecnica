@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { PresetWithItems, Equipment, PresetItem, PresetSubsystem, resolveSubsystemForEquipment } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { Save, X, Upload, Search } from 'lucide-react';
 import { PushPresetToFlexDialog } from './PushPresetToFlexDialog';
 import {
@@ -19,6 +19,8 @@ import {
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useDepartment } from '@/contexts/DepartmentContext';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface PresetEditorProps {
   preset?: PresetWithItems;
   isCopy?: boolean;
@@ -54,10 +56,9 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
   });
 
   const { data: equipmentList } = useQuery({
-    queryKey: ['equipment', department],
+    queryKey: queryKeys.scope('equipment', department),
     queryFn: async () => {
-      const { data: equipment, error } = await supabase
-        .from('equipment')
+      const { data: equipment, error } = await dataLayerClient.from('equipment')
         .select('*')
         .eq('department', department)
         .order('name');
@@ -83,10 +84,9 @@ export const PresetEditor = ({ preset, isCopy = false, onSave, onCancel, fixedTo
 
   // Fetch tours when no fixed tour is enforced
   const { data: tours } = useQuery({
-    queryKey: ['tours'],
+    queryKey: queryKeys.scope('tours'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('tours')
+      const { data, error } = await dataLayerClient.from('tours')
         .select('id, name, status')
         .order('name');
       if (error) throw error;

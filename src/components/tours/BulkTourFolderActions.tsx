@@ -6,8 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { FolderPlus, Loader2, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { createTourRootFolders } from "@/utils/tourFolders";
-import { supabase } from "@/lib/supabase";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 interface BulkTourFolderActionsProps {
   tours: any[];
   onRefresh: () => void;
@@ -61,8 +60,7 @@ export const BulkTourFolderActions = ({
         if (tour.flex_main_folder_id) {
           console.log(`Tour ${tour.name} has main folder ID: ${tour.flex_main_folder_id}, updating flag`);
 
-          const { error } = await supabase
-            .from('tours')
+          const { error } = await dataLayerClient.from('tours')
             .update({ flex_folders_created: true })
             .eq('id', tour.id);
 

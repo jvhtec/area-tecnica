@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { completeTask, Department } from '@/services/taskCompletion';
 
+
+import { queryKeys } from "@/lib/react-query";
 // Re-export Department type for consumers
 export type { Department } from '@/services/taskCompletion';
 
@@ -58,7 +60,7 @@ export function useCompleteTask() {
       });
 
       // Invalidate queries to refresh the pending tasks list
-      queryClient.invalidateQueries({ queryKey: ['pending-tasks'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('pending-tasks') });
     },
 
     onError: (error) => {

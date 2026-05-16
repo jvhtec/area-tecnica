@@ -6,6 +6,8 @@ import { useTourDates } from "./useTourDates";
 import { useTourDepartments } from "./useTourDepartments";
 import { useTourCreationMutation } from "./useTourCreationMutation";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useTourCreation = (
   currentDepartment: Department,
   onSuccess: () => void
@@ -56,9 +58,9 @@ export const useTourCreation = (
       });
       console.log("Tour created successfully");
 
-      await queryClient.invalidateQueries({ queryKey: ["optimized-jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["jobs"] });
-      await queryClient.invalidateQueries({ queryKey: ["tours"] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope("tours") });
 
       toast({
         title: "Success",

@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { getAvailableTechnicians } from "@/utils/technicianAvailability";
 import { toast } from "sonner";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface Technician {
   id: string;
   first_name: string;
@@ -35,7 +37,7 @@ export function useAvailableTechnicians({
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ["available-technicians", department, jobId, jobStartTime, jobEndTime, assignmentDate ?? null],
+    queryKey: queryKeys.scope("available-technicians", department, jobId, jobStartTime, jobEndTime, assignmentDate ?? null),
     queryFn: async () => {
       if (!department || !jobId || !jobStartTime || !jobEndTime) {
         return [];
@@ -86,7 +88,7 @@ export function useAvailableTechnicians({
           console.log('Job assignment changed, refreshing available technicians:', payload);
           // Invalidate and refetch the available technicians query
           queryClient.invalidateQueries({
-            queryKey: ["available-technicians", department, jobId, jobStartTime, jobEndTime]
+            queryKey: queryKeys.scope("available-technicians", department, jobId, jobStartTime, jobEndTime)
           });
         }
       )
@@ -101,7 +103,7 @@ export function useAvailableTechnicians({
           console.log('Job changed, refreshing available technicians:', payload);
           // Invalidate and refetch when job dates might have changed
           queryClient.invalidateQueries({
-            queryKey: ["available-technicians"]
+            queryKey: queryKeys.scope("available-technicians")
           });
         }
       )

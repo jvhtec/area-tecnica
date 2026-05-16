@@ -3,6 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useFlexCrewAssignments = () => {
   const { toast } = useToast();
 
@@ -68,7 +70,7 @@ export const useFlexCrewAssignments = () => {
 
   const useCrewCallData = (jobId: string, department: string) => {
     return useQuery({
-      queryKey: ['crew-call-data', jobId, department],
+      queryKey: queryKeys.scope('crew-call-data', jobId, department),
       queryFn: async () => {
         if (!jobId || !department) return null;
         

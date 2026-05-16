@@ -9,13 +9,15 @@ import { Badge } from "@/components/ui/badge";
 import { Trash2, Plus, Users, Eye, Info, Target, Send } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { toast } from "sonner";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 import { TourRequirementsDialog } from '@/components/tours/TourRequirementsDialog';
 import { RequestTourAvailabilityDialog } from '@/components/tours/RequestTourAvailabilityDialog';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface TourAssignment {
   id: string;
   tour_id: string;
@@ -75,10 +77,9 @@ export const TourAssignmentDialog = ({
 
   // Fetch existing tour assignments
   const { data: assignments = [], refetch } = useQuery({
-    queryKey: ['tour-assignments', tourId],
+    queryKey: queryKeys.scope('tour-assignments', tourId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('tour_assignments')
+      const { data, error } = await dataLayerClient.from('tour_assignments')
         .select(`
           *,
           profiles:technician_id (
@@ -98,12 +99,11 @@ export const TourAssignmentDialog = ({
 
   // Fetch available technicians for selected department
   const { data: technicians = [] } = useQuery({
-    queryKey: ['technicians', selectedDepartment],
+    queryKey: queryKeys.scope('technicians', selectedDepartment),
     queryFn: async () => {
       if (!selectedDepartment) return [];
       
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name, email, department, role, assignable_as_tech')
         .eq('department', selectedDepartment)
         .or('role.in.(technician,house_tech),and(role.eq.management,assignable_as_tech.eq.true)')
@@ -118,8 +118,7 @@ export const TourAssignmentDialog = ({
   // Create assignment mutation
   const createAssignmentMutation = useMutation({
     mutationFn: async (assignmentData: any) => {
-      const { error } = await supabase
-        .from('tour_assignments')
+      const { error } = await dataLayerClient.from('tour_assignments')
         .insert({
           tour_id: tourId,
           technician_id: assignmentType === 'internal' ? selectedTechnician : null,
@@ -137,7 +136,7 @@ export const TourAssignmentDialog = ({
       refetch();
       resetForm();
       // Invalidate job assignments as they're automatically synced
-      queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') });
     },
     onError: (error: any) => {
       toast.error(`Failed to create assignment: ${error.message}`);
@@ -147,8 +146,7 @@ export const TourAssignmentDialog = ({
   // Delete assignment mutation
   const deleteAssignmentMutation = useMutation({
     mutationFn: async (assignmentId: string) => {
-      const { error } = await supabase
-        .from('tour_assignments')
+      const { error } = await dataLayerClient.from('tour_assignments')
         .delete()
         .eq('id', assignmentId);
 
@@ -158,10 +156,10 @@ export const TourAssignmentDialog = ({
       toast.success('Assignment removed successfully - automatically removed from all tour jobs');
       refetch();
       // Invalidate job assignments and job details as they're automatically synced
-      queryClient.invalidateQueries({ queryKey: ['job-assignments'] });
-      queryClient.invalidateQueries({ queryKey: ['job-details'] });
-      queryClient.invalidateQueries({ queryKey: ['jobs'] });
-      queryClient.invalidateQueries({ queryKey: ['optimized-jobs'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-details') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
     },
     onError: (error: any) => {
       toast.error(`Failed to remove assignment: ${error.message}`);

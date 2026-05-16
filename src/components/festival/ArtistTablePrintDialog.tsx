@@ -15,7 +15,7 @@ import { exportArtistTablePDF, ArtistTablePdfData } from "@/utils/artistTablePdf
 import { sortArtistsChronologically } from "@/utils/artistSorting";
 import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements, calculateEquipmentNeeds } from "@/utils/gearComparisonService";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -167,8 +167,7 @@ export const ArtistTablePrintDialog = ({
 
       if (jobId) {
         try {
-          const { data: mainSetup, error: mainError } = await supabase
-            .from('festival_gear_setups')
+          const { data: mainSetup, error: mainError } = await dataLayerClient.from('festival_gear_setups')
             .select('*')
             .eq('job_id', jobId)
             .single();
@@ -179,8 +178,7 @@ export const ArtistTablePrintDialog = ({
             festivalGearSetup = mapFestivalGearSetup(mainSetup);
 
             if (mainSetup) {
-              const { data: stageSetups, error: stageError } = await supabase
-                .from('festival_stage_gear_setups')
+              const { data: stageSetups, error: stageError } = await dataLayerClient.from('festival_stage_gear_setups')
                 .select('*')
                 .eq('gear_setup_id', mainSetup.id);
 

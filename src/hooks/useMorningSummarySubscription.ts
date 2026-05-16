@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 
+
+import { queryKeys } from "@/lib/react-query";
 export type MorningSummarySubscription = {
   id: string;
   user_id: string;
@@ -19,7 +21,7 @@ export function useMorningSummarySubscription() {
   const userId = user?.id;
 
   const { data: subscription, isLoading, error } = useQuery({
-    queryKey: ['morning-summary-subscription', userId],
+    queryKey: queryKeys.scope('morning-summary-subscription', userId),
     queryFn: async () => {
       if (!userId) return null;
 
@@ -56,7 +58,7 @@ export function useMorningSummarySubscription() {
       return data as unknown as MorningSummarySubscription;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['morning-summary-subscription', userId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('morning-summary-subscription', userId) });
       toast({
         title: 'Suscripción actualizada',
         description: 'Tus preferencias de resumen diario se han guardado correctamente.',

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 import { MANAGEMENT_ALLOWED_ROLES } from '@/utils/permissions';
 import { Button } from '@/components/ui/button';
@@ -55,8 +55,7 @@ export default function Announcements() {
 
   const fetchAll = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('announcements')
+    const { data, error } = await dataLayerClient.from('announcements')
       .select('id, message, level, active, created_at, created_by')
       .order('created_at', { ascending: false })
       .limit(50);
@@ -75,10 +74,9 @@ export default function Announcements() {
 
   const createAnnouncement = async () => {
     if (!newMsg.trim()) return;
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData } = await dataLayerClient.auth.getUser();
     const created_by = userData.user?.id ?? null;
-    const { error } = await supabase
-      .from('announcements')
+    const { error } = await dataLayerClient.from('announcements')
       .insert({ message: newMsg.trim(), level: newLevel, active: newActive, created_by });
     if (error) {
       toast({ title: 'Create failed', description: error.message, variant: 'destructive' });
@@ -98,8 +96,7 @@ export default function Announcements() {
   };
 
   const saveEdit = async (id: string) => {
-    const { error } = await supabase
-      .from('announcements')
+    const { error } = await dataLayerClient.from('announcements')
       .update({ message: editMsg, level: editLevel })
       .eq('id', id);
     if (error) {
@@ -112,8 +109,7 @@ export default function Announcements() {
   };
 
   const setActive = async (id: string, active: boolean) => {
-    const { error } = await supabase
-      .from('announcements')
+    const { error } = await dataLayerClient.from('announcements')
       .update({ active })
       .eq('id', id);
     if (error) {
@@ -125,8 +121,7 @@ export default function Announcements() {
 
   const remove = async (id: string) => {
     if (!confirm('Delete this announcement?')) return;
-    const { error } = await supabase
-      .from('announcements')
+    const { error } = await dataLayerClient.from('announcements')
       .delete()
       .eq('id', id);
     if (error) {

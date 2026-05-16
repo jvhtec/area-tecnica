@@ -21,7 +21,7 @@ import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
 import { VideoTaskDialog } from "@/components/video/VideoTaskDialog";
 import { FlexFolderPicker } from "@/components/flex/FlexFolderPicker";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Department } from "@/types/department";
 
 import { JobCardActions } from "../JobCardActions";
@@ -32,6 +32,8 @@ import { JobCardProgress } from "../JobCardProgress";
 import { ConfettiBurst } from "@/components/ui/celebration/ConfettiBurst";
 import { isManagementRole } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface JobCardNewViewProps {
   job: any;
   department: Department;
@@ -573,8 +575,8 @@ export function JobCardNewView({
               department={userDepartment}
               requestId={myTransportRequest?.id || null}
               onSubmitted={() => {
-                queryClient.invalidateQueries({ queryKey: ["transport-request", job.id, userDepartment] });
-                queryClient.invalidateQueries({ queryKey: ["transport-requests-all", job.id] });
+                queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-request", job.id, userDepartment) });
+                queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-requests-all", job.id) });
               }}
             />
           )}
@@ -615,8 +617,8 @@ export function JobCardNewView({
                                 className="px-3 py-1 text-sm rounded border hover:bg-accent"
                                 onClick={async (ev) => {
                                   ev.stopPropagation();
-                                  await supabase.from("transport_requests").update({ status: "cancelled" }).eq("id", req.id);
-                                  queryClient.invalidateQueries({ queryKey: ["transport-requests-all", job.id] });
+                                  await dataLayerClient.from("transport_requests").update({ status: "cancelled" }).eq("id", req.id);
+                                  queryClient.invalidateQueries({ queryKey: queryKeys.scope("transport-requests-all", job.id) });
                                 }}
                               >
                                 Cancel Request
@@ -662,8 +664,8 @@ export function JobCardNewView({
                 setLogisticsDialogOpen(open);
                 if (!open) {
                   setSelectedTransportRequest(null);
-                  queryClient.invalidateQueries({ queryKey: ["logistics-events-for-job", job.id] });
-                  queryClient.invalidateQueries({ queryKey: ["today-logistics"] });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events-for-job", job.id) });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") });
                 }
               }}
               selectedDate={new Date(job.start_time)}

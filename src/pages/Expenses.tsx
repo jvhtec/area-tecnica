@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { formatCurrency } from '@/lib/utils';
 import { canAccessExpenses, isManagementRole } from '@/utils/permissions';
@@ -49,6 +49,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import type { ExpenseStatus } from '@/components/jobs/JobExpensesPanel';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface ExpenseRow {
   id: string;
   job_id: string;
@@ -112,10 +114,9 @@ const ExpensesPage: React.FC = () => {
   }, [canAccess, isLoading, navigate, userRole]);
 
   const { data: filterData = [], isLoading: isLoadingFilterOptions } = useQuery({
-    queryKey: ['expenses-filter-options'],
+    queryKey: queryKeys.scope('expenses-filter-options'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_expenses')
+      const { data, error } = await dataLayerClient.from('job_expenses')
         .select(`
           job_id,
           technician_id,
@@ -157,11 +158,10 @@ const ExpensesPage: React.FC = () => {
   }, [filterData]);
 
   const { data: expenses = [], isLoading: isLoadingExpenses, refetch } = useQuery({
-    queryKey: ['expenses-page', statusFilter, technicianFilter, jobFilter, fromDate, toDate, searchTerm],
+    queryKey: queryKeys.scope('expenses-page', statusFilter, technicianFilter, jobFilter, fromDate, toDate, searchTerm),
     enabled: canAccess,
     queryFn: async () => {
-      let query = supabase
-        .from('job_expenses')
+      let query = dataLayerClient.from('job_expenses')
         .select(`
           id,
           job_id,
@@ -252,11 +252,11 @@ const ExpensesPage: React.FC = () => {
 
   const invalidateExpenseContext = React.useCallback(async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['job-expenses'] }),
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout'] }),
-      queryClient.invalidateQueries({ queryKey: ['job-totals'] }),
-      queryClient.invalidateQueries({ queryKey: ['dashboard-expenses-summary'] }),
-      queryClient.invalidateQueries({ queryKey: ['expenses-page'] }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-expenses') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-tech-payout') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-totals') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('dashboard-expenses-summary') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('expenses-page') }),
     ]);
   }, [queryClient]);
 
@@ -268,7 +268,7 @@ const ExpensesPage: React.FC = () => {
       }
       setViewReceiptState({ expenseId: expense.id, loading: true });
       try {
-        const { data, error } = await supabase.storage
+        const { data, error } = await dataLayerClient.storage
           .from('expense-receipts')
           .createSignedUrl(expense.receipt_path, 3600);
         if (error || !data?.signedUrl) {
@@ -287,7 +287,7 @@ const ExpensesPage: React.FC = () => {
 
   const approveExpense = React.useCallback(
     async (expenseId: string, approved: boolean, reason?: string) => {
-      const { error } = await supabase.rpc('approve_job_expense', {
+      const { error } = await dataLayerClient.rpc('approve_job_expense', {
         p_expense_id: expenseId,
         p_approved: approved,
         p_rejection_reason: approved ? null : reason ?? null,
@@ -299,8 +299,7 @@ const ExpensesPage: React.FC = () => {
 
   const deleteExpense = React.useCallback(
     async (expenseId: string) => {
-      const { error } = await supabase
-        .from('job_expenses')
+      const { error } = await dataLayerClient.from('job_expenses')
         .delete()
         .eq('id', expenseId);
       if (error) throw error;

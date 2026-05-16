@@ -8,7 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Equipment, PresetItem } from '@/types/equipment';
 import { useToast } from '@/hooks/use-toast';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { Plus, Minus, Save, Upload } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,6 +19,8 @@ import { pushEquipmentToPullsheet, EquipmentItem, getJobPullsheetsWithFlexApi, J
 import { extractFlexElementId, isFlexUrl } from '@/utils/flexUrlParser';
 
 
+
+import { queryKeys } from "@/lib/react-query";
 interface JobPresetManagerProps {
   jobId: string;
 }
@@ -42,10 +44,9 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
 
   // Fetch job preset and items
   const { data: preset } = useQuery({
-    queryKey: ['job-preset', jobId],
+    queryKey: queryKeys.scope('job-preset', jobId),
     queryFn: async () => {
-      const { data: presetData, error: presetError } = await supabase
-        .from('job_equipment_presets')
+      const { data: presetData, error: presetError } = await dataLayerClient.from('job_equipment_presets')
         .select('*')
         .eq('job_id', jobId)
         .single();
@@ -53,8 +54,7 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
       if (presetError) throw presetError;
 
       if (presetData) {
-        const { data: items, error: itemsError } = await supabase
-          .from('job_preset_items')
+        const { data: items, error: itemsError } = await dataLayerClient.from('job_preset_items')
           .select(`
             *,
             equipment:equipment (*)
@@ -75,10 +75,9 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
 
   // Fetch available equipment
   const { data: equipmentList = [] } = useQuery<Equipment[]>({
-    queryKey: ['equipment'],
+    queryKey: queryKeys.scope('equipment'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('equipment')
+      const { data, error } = await dataLayerClient.from('equipment')
         .select('*')
         .order('category')
         .order('name');
@@ -105,8 +104,7 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
       // Create preset if it doesn't exist
       let presetId = preset?.id;
       if (!presetId) {
-        const { data: newPreset, error: presetError } = await supabase
-          .from('job_equipment_presets')
+        const { data: newPreset, error: presetError } = await dataLayerClient.from('job_equipment_presets')
           .insert({ job_id: jobId })
           .select()
           .single();
@@ -126,22 +124,20 @@ export const JobPresetManager = ({ jobId }: JobPresetManagerProps) => {
       }));
 
       // Delete existing items
-      const { error: deleteError } = await supabase
-        .from('job_preset_items')
+      const { error: deleteError } = await dataLayerClient.from('job_preset_items')
         .delete()
         .eq('preset_id', presetId);
 
       if (deleteError) throw deleteError;
 
       // Insert new items
-      const { error: insertError } = await supabase
-        .from('job_preset_items')
+      const { error: insertError } = await dataLayerClient.from('job_preset_items')
         .insert(items);
 
       if (insertError) throw insertError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['job-preset'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-preset') });
       toast({
         title: "Success",
         description: "Preset saved successfully"

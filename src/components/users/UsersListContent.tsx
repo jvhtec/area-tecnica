@@ -4,7 +4,7 @@ import { Profile } from "./types";
 import { UserCard } from "./UserCard";
 import { EditUserDialog } from "./EditUserDialog";
 import { DeleteUserDialog } from "./DeleteUserDialog";
-import { useUserManagement } from "./hooks/useUserManagement";
+import { useUserManagement } from "@/hooks/users/useUserManagement";
 import { Badge } from "@/components/ui/badge";
 import {
   Accordion,

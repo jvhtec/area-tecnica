@@ -1,9 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
+
+import { queryKeys } from "@/lib/react-query";
 export const useLocations = () => {
   return useQuery({
-    queryKey: ["locations"],
+    queryKey: queryKeys.scope("locations"),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("locations")

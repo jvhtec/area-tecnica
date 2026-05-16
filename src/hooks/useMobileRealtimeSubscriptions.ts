@@ -1,6 +1,8 @@
 import { useEffect } from 'react';
 import { useMultiTableSubscription } from '@/hooks/useSubscription';
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Specialized hook for mobile components that need comprehensive realtime subscriptions
  */
@@ -68,7 +70,7 @@ export const useTechnicianDashboardSubscriptions = () => {
     includeJobs: true,
     includeAssignments: true,
     includeDepartments: true,
-    queryKey: ['assignments'],
+    queryKey: queryKeys.scope('assignments'),
     priority: 'high'
   });
 };
@@ -81,7 +83,7 @@ export const useMobileDayCalendarSubscriptions = () => {
     includeJobs: true,
     includeDateTypes: true,
     includeDepartments: true,
-    queryKey: ['optimized-jobs'],
+    queryKey: queryKeys.scope('optimized-jobs'),
     priority: 'high'
   });
 };
@@ -92,7 +94,7 @@ export const useMobileDayCalendarSubscriptions = () => {
 export const useAssignmentsListSubscriptions = () => {
   return useMobileRealtimeSubscriptions({
     includeJobs: true,
-    queryKey: ['assignments'],
+    queryKey: queryKeys.scope('assignments'),
     priority: 'medium'
   });
 };

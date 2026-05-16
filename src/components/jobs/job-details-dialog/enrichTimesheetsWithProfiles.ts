@@ -1,5 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 interface TechnicianProfile {
   id: string;
   first_name?: string | null;
@@ -8,7 +7,7 @@ interface TechnicianProfile {
   autonomo?: boolean | null;
 }
 
-type SupabaseClientLike = typeof supabase;
+type SupabaseClientLike = typeof dataLayerClient;
 
 export const enrichTimesheetsWithProfiles = async (
   client: SupabaseClientLike,

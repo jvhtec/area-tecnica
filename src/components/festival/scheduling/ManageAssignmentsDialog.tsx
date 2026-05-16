@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -21,6 +21,8 @@ import { Department } from "@/types/department";
 import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 import { Switch } from "@/components/ui/switch";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface ManageAssignmentsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -70,13 +72,12 @@ export const ManageAssignmentsDialog = ({
   }, [open, shift.department]);
 
   const { data: technicians, isLoading: isLoadingTechnicians, error: techniciansError } = useQuery({
-    queryKey: ["job-technicians", shift.job_id, shift.department],
+    queryKey: queryKeys.scope("job-technicians", shift.job_id, shift.department),
     queryFn: async () => {
       const departmentFilter = shift.department || "sound";
       
       // First, get assigned technicians for this job and department
-      const { data, error } = await supabase
-        .from("job_assignments")
+      const { data, error } = await dataLayerClient.from("job_assignments")
         .select(`
           technician_id,
           profiles (
@@ -140,8 +141,7 @@ export const ManageAssignmentsDialog = ({
         throw new Error("Shift ID is required");
       }
 
-      const { data, error } = await supabase
-        .from("festival_shift_assignments")
+      const { data, error } = await dataLayerClient.from("festival_shift_assignments")
         .insert([assignment]);
 
       if (error) {
@@ -151,7 +151,7 @@ export const ManageAssignmentsDialog = ({
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["festivalShifts"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("festivalShifts") });
       onAssignmentsUpdated();
       toast({
         title: "Éxito",
@@ -170,8 +170,7 @@ export const ManageAssignmentsDialog = ({
 
   const removeAssignmentMutation = useMutation({
     mutationFn: async (assignmentId: string) => {
-      const { data, error } = await supabase
-        .from("festival_shift_assignments")
+      const { data, error } = await dataLayerClient.from("festival_shift_assignments")
         .delete()
         .eq("id", assignmentId);
 
@@ -182,7 +181,7 @@ export const ManageAssignmentsDialog = ({
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["festivalShifts"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("festivalShifts") });
       onAssignmentsUpdated();
       toast({
         title: "Éxito",

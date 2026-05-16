@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ManageSkillsDialog } from '@/components/users/ManageSkillsDialog';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subYears } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { formatUserName } from '@/utils/userName';
@@ -20,6 +20,8 @@ import { CityAutocomplete } from '@/components/maps/CityAutocomplete';
 import { isAdminRole, isManagementRole } from '@/utils/permissions';
 import type { UserRole } from '@/types/user';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface TechnicianRowProps {
   technician: {
     id: string;
@@ -101,8 +103,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
 
       // Count all active timesheets (individual work dates)
       const countTotalInRange = async (fromDate: string, toDate: string) => {
-        const { count, error } = await supabase
-          .from('timesheets')
+        const { count, error } = await dataLayerClient.from('timesheets')
           .select('*', { count: 'exact', head: true })
           .eq('technician_id', technician.id)
           .eq('is_active', true)
@@ -117,8 +118,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
 
       // Count upcoming/draft timesheets
       const countUpcomingInRange = async (fromDate: string, toDate: string) => {
-        const { count, error } = await supabase
-          .from('timesheets')
+        const { count, error } = await dataLayerClient.from('timesheets')
           .select('*', { count: 'exact', head: true })
           .eq('technician_id', technician.id)
           .eq('is_active', true)
@@ -157,8 +157,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   const loadProfileResidencia = React.useCallback(async () => {
     try {
       setResidenciaLoading(true);
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('residencia, home_latitude, home_longitude')
         .eq('id', technician.id)
         .single();
@@ -184,8 +183,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   const handleSaveEdit = async () => {
     try {
       setIsSaving(true);
-      const { error } = await supabase
-        .from('profiles')
+      const { error } = await dataLayerClient.from('profiles')
         .update({
           first_name: editedData.first_name,
           nickname: editedData.nickname || null,
@@ -210,7 +208,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
       setHomeLongitude(editedData.home_longitude);
 
       // Invalidate queries to refresh data
-      await qc.invalidateQueries({ queryKey: ['optimized-matrix-technicians'] });
+      await qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-technicians') });
 
       toast({ title: 'Usuario actualizado', description: 'Cambios guardados correctamente.' });
       setIsEditing(false);
@@ -261,7 +259,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
   const handleSkillsOpenChange = (open: boolean) => {
     if (!open) {
       // Invalidate technicians list so skills refresh
-      qc.invalidateQueries({ queryKey: ['optimized-matrix-technicians'] });
+      qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-technicians') });
     }
     setSkillsOpen(open);
   };
@@ -281,12 +279,11 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
     try {
       setTogglingFridge(true);
       const next = !isFridge;
-      const { error } = await supabase
-        .from('technician_fridge')
+      const { error } = await dataLayerClient.from('technician_fridge')
         .upsert({ technician_id: technician.id, in_fridge: next }, { onConflict: 'technician_id' });
       if (error) throw error;
       // Invalidate fridge queries so UI updates across matrix
-      await qc.invalidateQueries({ queryKey: ['technician-fridge-status'] });
+      await qc.invalidateQueries({ queryKey: queryKeys.scope('technician-fridge-status') });
     } catch (e: any) {
       console.warn('Fridge toggle error', e);
     } finally {
@@ -762,7 +759,7 @@ const TechnicianRowComp = ({ technician, height, isFridge = false, compact = fal
                         if (!technician.email) return;
                         try {
                           setSendingOnboarding(true);
-                          const { data, error } = await supabase.functions.invoke('send-onboarding-email', {
+                          const { data, error } = await dataLayerClient.functions.invoke('send-onboarding-email', {
                             body: {
                               email: technician.email,
                               firstName: technician.first_name,

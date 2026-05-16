@@ -3,13 +3,15 @@ import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { SubscriptionManager } from '@/lib/subscription-manager';
 
+
+import { queryKeys } from "@/lib/react-query";
 /**
  * Hook to refresh queries when tab becomes visible
  * @param queryKeys Array of query keys to invalidate when tab becomes visible
  * @param options Optional configuration
  */
 export const useTabVisibility = (
-  queryKeys: string[],
+  queryKeyNames: string[],
   options?: {
     minTimeBetweenRefreshes?: number;
   }
@@ -28,10 +30,10 @@ export const useTabVisibility = (
       if (document.visibilityState === 'visible') {
         const now = Date.now();
         if (now - lastRefreshTime >= minTimeBetweenRefreshes) {
-          console.log('Tab became visible, refreshing data for:', queryKeys.join(', '));
+          console.log('Tab became visible, refreshing data for:', queryKeyNames.join(', '));
           
-          queryKeys.forEach(key => {
-            queryClient.invalidateQueries({ queryKey: [key] });
+          queryKeyNames.forEach(key => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.custom(key) });
           });
           
           lastRefreshTime = now;
@@ -44,5 +46,5 @@ export const useTabVisibility = (
     return () => {
       window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [queryClient, queryKeys, minTimeBetweenRefreshes]);
+  }, [queryClient, queryKeyNames, minTimeBetweenRefreshes]);
 };

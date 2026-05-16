@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Save, Upload } from "lucide-react";
 import { GearSetupFormData } from "@/types/festival-gear";
 import { StageGearSetup } from "@/types/festival";
@@ -75,8 +75,7 @@ export const FestivalGearSetupForm = ({
         setIsLoading(true);
         
         // Fetch the main gear setup (no date filter needed)
-        const { data: setupData, error: setupError } = await supabase
-          .from('festival_gear_setups')
+        const { data: setupData, error: setupError } = await dataLayerClient.from('festival_gear_setups')
           .select('*')
           .eq('job_id', jobId)
           .single();
@@ -105,8 +104,7 @@ export const FestivalGearSetupForm = ({
           
           // For non-primary stages, check for stage-specific setup
           if (!isPrimaryStage) {
-            const { data: stageSetupData, error: stageError } = await supabase
-              .from('festival_stage_gear_setups')
+            const { data: stageSetupData, error: stageError } = await dataLayerClient.from('festival_stage_gear_setups')
               .select('*')
               .eq('gear_setup_id', setupData.id)
               .eq('stage_number', stageNumber)
@@ -286,8 +284,7 @@ export const FestivalGearSetupForm = ({
         console.log('Payload wired_mics serialized:', JSON.stringify(setupPayload.wired_mics, null, 2));
 
         // Upsert the global setup
-        const { data: globalData, error: globalError } = await supabase
-          .from('festival_gear_setups')
+        const { data: globalData, error: globalError } = await dataLayerClient.from('festival_gear_setups')
           .upsert(setupPayload, { 
             onConflict: 'job_id' 
           })
@@ -319,8 +316,7 @@ export const FestivalGearSetupForm = ({
             max_stages: Math.max(setup.max_stages, stageNumber || 1)
           };
           
-          const { data: newGlobalSetup, error: newGlobalError } = await supabase
-            .from('festival_gear_setups')
+          const { data: newGlobalSetup, error: newGlobalError } = await dataLayerClient.from('festival_gear_setups')
             .upsert(basicGlobalSetup, { 
               onConflict: 'job_id' 
             })
@@ -336,8 +332,7 @@ export const FestivalGearSetupForm = ({
           setGlobalSetup(newGlobalSetup[0]);
         } else {
           // Update only the max_stages on the global setup if needed
-          const { error: updateMaxStagesError } = await supabase
-            .from('festival_gear_setups')
+          const { error: updateMaxStagesError } = await dataLayerClient.from('festival_gear_setups')
             .update({
               max_stages: Math.max(globalSetup?.max_stages || 1, stageNumber)
             })
@@ -386,8 +381,7 @@ export const FestivalGearSetupForm = ({
         console.log('Stage payload wired_mics type:', typeof stagePayload.wired_mics);
         
         // Upsert the stage setup
-        const { data: stageData, error: stageError } = await supabase
-          .from('festival_stage_gear_setups')
+        const { data: stageData, error: stageError } = await dataLayerClient.from('festival_stage_gear_setups')
           .upsert(stagePayload)
           .select();
         

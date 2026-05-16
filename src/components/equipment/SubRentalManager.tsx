@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -28,6 +28,8 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface SubRental {
   id: string;
   batch_id?: string;
@@ -66,15 +68,14 @@ export function SubRentalManager() {
 
   // Realtime: refresh sub-rentals list and stock view when changes occur elsewhere
   useOptimizedTableSubscriptions([
-    { table: 'sub_rentals', queryKey: ['sub-rentals', department], priority: 'high' },
-    { table: 'sub_rentals', queryKey: ['equipment-with-stock', department], priority: 'medium' },
+    { table: 'sub_rentals', queryKey: queryKeys.scope('sub-rentals', department), priority: 'high' },
+    { table: 'sub_rentals', queryKey: queryKeys.scope('equipment-with-stock', department), priority: 'medium' },
   ]);
 
   const { data: equipmentList } = useQuery({
-    queryKey: ['equipment', department],
+    queryKey: queryKeys.scope('equipment', department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('equipment')
+      const { data, error } = await dataLayerClient.from('equipment')
         .select('*')
         .eq('department', department)
         .order('name');
@@ -86,10 +87,9 @@ export function SubRentalManager() {
 
   // Query for jobs that are available (not archived/cancelled) for linking
   const { data: availableJobs } = useQuery({
-    queryKey: ['jobs-for-subrental', department],
+    queryKey: queryKeys.scope('jobs-for-subrental', department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('id, title, event_date, locations(name)')
         .gte('event_date', format(new Date(), 'yyyy-MM-dd'))
         .order('event_date', { ascending: true })
@@ -101,10 +101,9 @@ export function SubRentalManager() {
   });
 
   const { data: subRentals = [] } = useQuery({
-    queryKey: ['sub-rentals', department],
+    queryKey: queryKeys.scope('sub-rentals', department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('sub_rentals')
+      const { data, error } = await dataLayerClient.from('sub_rentals')
         .select(`
           *,
           equipment:equipment!inner (
@@ -166,8 +165,7 @@ export function SubRentalManager() {
         is_stock_extension: isStockExtension,
       }));
 
-      const { data: insertedRentals, error } = await supabase
-        .from('sub_rentals')
+      const { data: insertedRentals, error } = await dataLayerClient.from('sub_rentals')
         .insert(payload)
         .select('id');
 
@@ -179,7 +177,7 @@ export function SubRentalManager() {
           const vendor_name = notes || 'Vendor';
           const description = `Subrental pickup: ${vendor_name}`;
 
-          const { error: transportErr } = await supabase.functions.invoke('create-transport-request', {
+          const { error: transportErr } = await dataLayerClient.functions.invoke('create-transport-request', {
             body: {
               job_id: jobId,
               subrental_id: insertedRentals[0].id, // Use first item as reference
@@ -210,10 +208,10 @@ export function SubRentalManager() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sub-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['sub-rentals-week'] });
-      queryClient.invalidateQueries({ queryKey: ['equipment-with-stock'] });
-      queryClient.invalidateQueries({ queryKey: ['transport-requests-all'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('sub-rentals') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('sub-rentals-week') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('equipment-with-stock') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('transport-requests-all') });
       // Only show success toast if we didn't already show one in the mutation
       if (!autoCreateTransport || !jobId) {
         toast({
@@ -243,17 +241,16 @@ export function SubRentalManager() {
   // Delete sub-rental mutation
   const deleteSubRentalMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('sub_rentals')
+      const { error } = await dataLayerClient.from('sub_rentals')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['sub-rentals'] });
-      queryClient.invalidateQueries({ queryKey: ['sub-rentals-week'] });
-      queryClient.invalidateQueries({ queryKey: ['equipment-with-stock'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('sub-rentals') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('sub-rentals-week') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('equipment-with-stock') });
       toast({
         title: "Success",
         description: "Sub-rental removed"

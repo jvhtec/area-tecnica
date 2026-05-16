@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Map, MapPin, Home, Loader2, AlertCircle } from "lucide-react";
 
 interface TourMapViewProps {
@@ -31,7 +31,7 @@ export const TourMapView: React.FC<TourMapViewProps> = ({
   useEffect(() => {
     const fetchApiKey = async () => {
       try {
-        const { data, error } = await supabase.functions.invoke('get-google-maps-key');
+        const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
 
         if (error) {
           console.error('Failed to fetch Google Maps API key:', error);

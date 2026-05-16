@@ -1,5 +1,5 @@
 import { DirectMessage } from "../types";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
 type Toast = {
@@ -17,8 +17,7 @@ export const useDirectMessageOperations = (
   const handleDeleteMessage = async (messageId: string) => {
     try {
       console.log("Deleting direct message:", messageId);
-      const { data: deleted, error } = await supabase
-        .from("direct_messages")
+      const { data: deleted, error } = await dataLayerClient.from("direct_messages")
         .delete()
         .eq("id", messageId)
         .select("id");
@@ -52,8 +51,7 @@ export const useDirectMessageOperations = (
   const handleMarkAsRead = async (messageId: string) => {
     try {
       console.log("Marking direct message as read:", messageId);
-      const { data: updated, error } = await supabase
-        .from('direct_messages')
+      const { data: updated, error } = await dataLayerClient.from('direct_messages')
         .update({ status: 'read' })
         .eq('id', messageId)
         .select('id');

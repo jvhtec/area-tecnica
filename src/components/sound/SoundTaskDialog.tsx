@@ -19,7 +19,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Upload, Download, Trash2, Table, X } from "lucide-react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect } from "react";
 import { TASK_TYPES } from "@/constants/taskTypes";
@@ -32,6 +32,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface SoundTaskDialogProps {
   jobId: string;
   open: boolean;
@@ -73,11 +75,10 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
 
   // Fetch jobDetails from jobs table
   const { data: jobData } = useQuery({
-    queryKey: ['job-details', jobId],
+    queryKey: queryKeys.scope('job-details', jobId),
     queryFn: async () => {
       if (!jobId) return null;
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('*')
         .eq('id', jobId)
         .single();
@@ -95,11 +96,10 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
 
   // Fetch personnel details from sound_job_personnel table
   const { data: personnelData } = useQuery({
-    queryKey: ['job-personnel', jobId],
+    queryKey: queryKeys.scope('job-personnel', jobId),
     queryFn: async () => {
       if (!jobId) return null;
-      const { data, error } = await supabase
-        .from('sound_job_personnel')
+      const { data, error } = await dataLayerClient.from('sound_job_personnel')
         .select('*')
         .eq('job_id', jobId)
         .single();
@@ -121,10 +121,9 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
   }, [personnelData]);
 
   const { data: managementUsers } = useQuery({
-    queryKey: ['management-users'],
+    queryKey: queryKeys.scope('management-users'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name')
         .in('role', ['management', 'admin', 'oscar']);
       if (error) throw error;
@@ -133,11 +132,10 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
   });
 
   const { data: tasks, refetch: refetchTasks } = useQuery({
-    queryKey: ['sound-tasks', jobId],
+    queryKey: queryKeys.scope('sound-tasks', jobId),
     queryFn: async () => {
       if (!jobId) return null;
-      const { data, error } = await supabase
-        .from('sound_job_tasks')
+      const { data, error } = await dataLayerClient.from('sound_job_tasks')
         .select(`
           *,
           assigned_to (
@@ -156,8 +154,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
 
   const updateFolderStatusMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase
-        .from('jobs')
+      const { error } = await dataLayerClient.from('jobs')
         .update({ flex_folders_created: true })
         .eq('id', jobId);
       if (error) throw error;
@@ -189,7 +186,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
         description: "Flex folders have been created successfully.",
       });
 
-      queryClient.invalidateQueries({ queryKey: ['job-details', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-details', jobId) });
 
     } catch (error: any) {
       console.error('Error creating folders:', error);
@@ -208,7 +205,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
       const timestamp = new Date().getTime();
       const filePath = `${taskId}/${timestamp}_${sanitizedFileName}`;
 
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await dataLayerClient.storage
         .from('task_documents')
         .upload(filePath, file, {
           cacheControl: '3600',
@@ -216,18 +213,16 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
         });
       if (uploadError) throw uploadError;
 
-      const { error: dbError } = await supabase
-        .from('task_documents')
+      const { error: dbError } = await dataLayerClient.from('task_documents')
         .insert({
           sound_task_id: taskId,
           file_name: file.name,
           file_path: filePath,
-          uploaded_by: (await supabase.auth.getUser()).data.user?.id
+          uploaded_by: (await dataLayerClient.auth.getUser()).data.user?.id
         });
       if (dbError) throw dbError;
 
-      await supabase
-        .from('sound_job_tasks')
+      await dataLayerClient.from('sound_job_tasks')
         .update({ 
           status: 'completed',
           progress: 100,
@@ -254,19 +249,17 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
 
   const handleDeleteFile = async (taskId: string, docId: string, filePath: string) => {
     try {
-      const { error: storageError } = await supabase.storage
+      const { error: storageError } = await dataLayerClient.storage
         .from('task_documents')
         .remove([filePath]);
       if (storageError) throw storageError;
 
-      const { error: dbError } = await supabase
-        .from('task_documents')
+      const { error: dbError } = await dataLayerClient.from('task_documents')
         .delete()
         .eq('id', docId);
       if (dbError) throw dbError;
 
-      await supabase
-        .from('sound_job_tasks')
+      await dataLayerClient.from('sound_job_tasks')
         .update({ 
           status: 'in_progress',
           progress: 50 
@@ -294,8 +287,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
 
   const updatePersonnelField = async (field: string, value: number) => {
     try {
-      const { error } = await supabase
-        .from('sound_job_personnel')
+      const { error } = await dataLayerClient.from('sound_job_personnel')
         .update({ [field]: value })
         .eq('job_id', jobId);
       if (error) throw error;
@@ -333,8 +325,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
   const updateTaskStatus = async (taskId: string, status: string) => {
     try {
       const progress = status === 'completed' ? 100 : status === 'in_progress' ? 50 : 0;
-      const { error } = await supabase
-        .from('sound_job_tasks')
+      const { error } = await dataLayerClient.from('sound_job_tasks')
         .update({ 
           status,
           progress,
@@ -358,7 +349,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
 
   const handleDownload = async (filePath: string, fileName: string) => {
     try {
-      const { data, error } = await supabase.storage
+      const { data, error } = await dataLayerClient.storage
         .from('task_documents')
         .download(filePath);
       if (error) throw error;
@@ -502,8 +493,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
                               value={task?.assigned_to?.id || ""}
                               onValueChange={async (value) => {
                                 if (!task) {
-                                  const { error } = await supabase
-                                    .from('sound_job_tasks')
+                                  const { error } = await dataLayerClient.from('sound_job_tasks')
                                     .insert({
                                       job_id: jobId,
                                       task_type: taskType,
@@ -511,8 +501,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
                                     });
                                   if (error) throw error;
                                 } else {
-                                  const { error } = await supabase
-                                    .from('sound_job_tasks')
+                                  const { error } = await dataLayerClient.from('sound_job_tasks')
                                     .update({ assigned_to: value })
                                     .eq('id', task.id);
                                   if (error) throw error;

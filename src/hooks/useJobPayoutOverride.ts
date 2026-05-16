@@ -2,6 +2,8 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface SetTechnicianPayoutOverrideParams {
   jobId: string;
   technicianId: string;
@@ -86,8 +88,8 @@ export function useSetTechnicianPayoutOverride() {
     },
     onSuccess: (data) => {
       // Invalidate relevant queries to refresh the UI
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', data.job_id] });
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout-overrides', data.job_id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-tech-payout', data.job_id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-tech-payout-overrides', data.job_id) });
 
       if (data.job_type === 'ciclo') {
         toast.success(`Pago fijo guardado para ${data.technician_name}`);
@@ -160,8 +162,8 @@ export function useRemoveTechnicianPayoutOverride() {
       return result;
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout', data.job_id] });
-      queryClient.invalidateQueries({ queryKey: ['job-tech-payout-overrides', data.job_id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-tech-payout', data.job_id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-tech-payout-overrides', data.job_id) });
       toast.success(data.job_type === 'ciclo'
         ? `Pago fijo removido para ${data.technician_name}`
         : `Override removido para ${data.technician_name}`);
@@ -176,7 +178,7 @@ export function useRemoveTechnicianPayoutOverride() {
 // Hook to fetch overrides for a job
 export function useJobTechnicianPayoutOverrides(jobId: string) {
   return useQuery({
-    queryKey: ['job-tech-payout-overrides', jobId],
+    queryKey: queryKeys.scope('job-tech-payout-overrides', jobId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('job_technician_payout_overrides')

@@ -8,12 +8,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Combobox, ComboboxGroup } from '@/components/ui/combobox';
 import { useGlobalTaskMutations } from '@/hooks/useGlobalTaskMutations';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useQuery } from '@tanstack/react-query';
 import { fromZonedTime } from 'date-fns-tz';
 import { type Dept } from '@/utils/tasks';
 import { TASK_TYPES } from '@/constants/taskTypes';
 
+
+import { queryKeys } from "@/lib/react-query";
 const ASSIGN_ALL_DEPARTMENT = '__all_department__';
 const ASSIGN_ALL_DEPARTMENT_HOUSE_TECH = '__all_department_house_tech__';
 const ASSIGN_SELECTED_DEPARTMENTS = '__selected_departments__';
@@ -66,10 +68,9 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
 
   // All eligible users, grouped by department-first vs others
   const { data: usersData } = useQuery<{ groups: ComboboxGroup[]; users: EligibleUser[] }>({
-    queryKey: ['assignable-users-grouped', userDepartment],
+    queryKey: queryKeys.scope('assignable-users-grouped', userDepartment),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name, role, department')
         .order('first_name');
       if (error) throw error;
@@ -94,10 +95,9 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   const eligibleUsers = usersData?.users || [];
 
   const { data: departmentUsers } = useQuery<Array<{ id: string; role: string | null }>>({
-    queryKey: ['department-users-global-task', department],
+    queryKey: queryKeys.scope('department-users-global-task', department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, role')
         .eq('department', department);
       if (error) throw error;
@@ -106,10 +106,9 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   });
 
   const { data: jobItems } = useQuery({
-    queryKey: ['jobs-for-linking'],
+    queryKey: queryKeys.scope('jobs-for-linking'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('id, title')
         .in('status', ['Tentativa', 'Confirmado'])
         .order('start_time', { ascending: false })
@@ -120,10 +119,9 @@ export const CreateGlobalTaskDialog: React.FC<CreateGlobalTaskDialogProps> = ({
   });
 
   const { data: tourItems } = useQuery({
-    queryKey: ['tours-for-linking'],
+    queryKey: queryKeys.scope('tours-for-linking'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('tours')
+      const { data, error } = await dataLayerClient.from('tours')
         .select('id, name')
         .order('created_at', { ascending: false })
         .limit(200);

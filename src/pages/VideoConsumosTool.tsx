@@ -8,7 +8,7 @@ import { FileText, ArrowLeft, Trash2 } from 'lucide-react';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
@@ -130,8 +130,7 @@ const VideoConsumosTool: React.FC = () => {
           setSelectedJob(found);
           return;
         }
-        const { data } = await supabase
-          .from('jobs')
+        const { data } = await dataLayerClient.from('jobs')
           .select('id, title, start_time')
           .eq('id', jobIdFromUrl)
           .single();
@@ -306,8 +305,7 @@ const VideoConsumosTool: React.FC = () => {
     }
 
     try {
-      const { error } = await supabase
-        .from('power_requirement_tables')
+      const { error } = await dataLayerClient.from('power_requirement_tables')
         .insert({
           job_id: selectedJobId,
           department: 'video',
@@ -587,8 +585,7 @@ const VideoConsumosTool: React.FC = () => {
   useEffect(() => {
     const fetchTourInfo = async () => {
       if (tourId) {
-        const { data } = await supabase
-          .from('tours')
+        const { data } = await dataLayerClient.from('tours')
           .select('name')
           .eq('id', tourId)
           .single();

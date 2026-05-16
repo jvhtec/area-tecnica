@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Upload, Download, Trash2, Table } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { TASK_TYPES } from "@/constants/taskTypes";
@@ -31,6 +31,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface LightsTaskDialogProps {
   jobId: string;
   open: boolean;
@@ -49,10 +51,9 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
   const queryClient = useQueryClient();
 
   const { data: managementUsers } = useQuery({
-    queryKey: ['management-users'],
+    queryKey: queryKeys.scope('management-users'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name')
         .in('role', ['management', 'admin']);
       
@@ -62,12 +63,11 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
   });
 
   const { data: tasks, refetch: refetchTasks } = useQuery({
-    queryKey: ['lights-tasks', jobId],
+    queryKey: queryKeys.scope('lights-tasks', jobId),
     queryFn: async () => {
       if (!jobId) return null;
       
-      const { data, error } = await supabase
-        .from('lights_job_tasks')
+      const { data, error } = await dataLayerClient.from('lights_job_tasks')
         .select(`
           *,
           assigned_to (
@@ -85,12 +85,11 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
   });
 
   const { data: personnel } = useQuery({
-    queryKey: ['lights-personnel', jobId],
+    queryKey: queryKeys.scope('lights-personnel', jobId),
     queryFn: async () => {
       if (!jobId) return null;
 
-      const { data: existingData, error: fetchError } = await supabase
-        .from('lights_job_personnel')
+      const { data: existingData, error: fetchError } = await dataLayerClient.from('lights_job_personnel')
         .select('*')
         .eq('job_id', jobId)
         .maybeSingle();
@@ -98,8 +97,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
       if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
 
       if (!existingData) {
-        const { data: newData, error: insertError } = await supabase
-          .from('lights_job_personnel')
+        const { data: newData, error: insertError } = await dataLayerClient.from('lights_job_personnel')
           .insert({
             job_id: jobId,
             lighting_designers: 0,
@@ -124,14 +122,13 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
       setUploading(true);
       const filePath = `${taskId}/${crypto.randomUUID()}-${file.name}`;
       
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await dataLayerClient.storage
         .from('task_documents')
         .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      const { error: dbError } = await supabase
-        .from('task_documents')
+      const { error: dbError } = await dataLayerClient.from('task_documents')
         .insert({
           lights_task_id: taskId, // Updated to use lights_task_id
           file_name: file.name,
@@ -140,8 +137,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
 
       if (dbError) throw dbError;
 
-      await supabase
-        .from('lights_job_tasks')
+      await dataLayerClient.from('lights_job_tasks')
         .update({ 
           status: 'completed',
           progress: 100 
@@ -167,7 +163,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
 
   const handleDownload = async (filePath: string, fileName: string) => {
     try {
-      const { data, error } = await supabase.storage
+      const { data, error } = await dataLayerClient.storage
         .from('task_documents')
         .download(filePath);
 
@@ -192,7 +188,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
 
   const handleDeleteFile = async (taskId: string, documentId: string, filePath: string) => {
     try {
-      const { error: storageError } = await supabase.storage
+      const { error: storageError } = await dataLayerClient.storage
         .from('task_documents')
         .remove([filePath]);
   
@@ -200,8 +196,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
         throw new Error(`Failed to delete file from storage: ${storageError.message}`);
       }
   
-      const { error: dbError } = await supabase
-        .from('task_documents')
+      const { error: dbError } = await dataLayerClient.from('task_documents')
         .delete()
         .eq('id', documentId);
   
@@ -209,8 +204,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
         throw new Error(`Failed to delete file record: ${dbError.message}`);
       }
   
-      const { error: taskError } = await supabase
-        .from('lights_job_tasks')
+      const { error: taskError } = await dataLayerClient.from('lights_job_tasks')
         .update({ 
           status: 'in_progress',
           progress: 50 
@@ -240,8 +234,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
     try {
       const progress = status === 'completed' ? 100 : status === 'in_progress' ? 50 : 0;
       
-      const { error } = await supabase
-        .from('lights_job_tasks')
+      const { error } = await dataLayerClient.from('lights_job_tasks')
         .update({ 
           status,
           progress,
@@ -313,8 +306,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 min="0"
                 value={personnel?.lighting_designers || 0}
                 onChange={async (e) => {
-                  const { error } = await supabase
-                    .from('lights_job_personnel')
+                  const { error } = await dataLayerClient.from('lights_job_personnel')
                     .update({ lighting_designers: parseInt(e.target.value) })
                     .eq('id', personnel?.id);
                   
@@ -325,7 +317,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                       variant: "destructive",
                     });
                   }
-                  queryClient.invalidateQueries({ queryKey: ['lights-personnel', jobId] });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.scope('lights-personnel', jobId) });
                 }}
               />
             </div>
@@ -336,8 +328,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 min="0"
                 value={personnel?.lighting_techs || 0}
                 onChange={async (e) => {
-                  const { error } = await supabase
-                    .from('lights_job_personnel')
+                  const { error } = await dataLayerClient.from('lights_job_personnel')
                     .update({ lighting_techs: parseInt(e.target.value) })
                     .eq('id', personnel?.id);
                   
@@ -348,7 +339,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                       variant: "destructive",
                     });
                   }
-                  queryClient.invalidateQueries({ queryKey: ['lights-personnel', jobId] });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.scope('lights-personnel', jobId) });
                 }}
               />
             </div>
@@ -359,8 +350,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 min="0"
                 value={personnel?.spot_ops || 0}
                 onChange={async (e) => {
-                  const { error } = await supabase
-                    .from('lights_job_personnel')
+                  const { error } = await dataLayerClient.from('lights_job_personnel')
                     .update({ spot_ops: parseInt(e.target.value) })
                     .eq('id', personnel?.id);
                   
@@ -371,7 +361,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                       variant: "destructive",
                     });
                   }
-                  queryClient.invalidateQueries({ queryKey: ['lights-personnel', jobId] });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.scope('lights-personnel', jobId) });
                 }}
               />
             </div>
@@ -382,8 +372,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                 min="0"
                 value={personnel?.riggers || 0}
                 onChange={async (e) => {
-                  const { error } = await supabase
-                    .from('lights_job_personnel')
+                  const { error } = await dataLayerClient.from('lights_job_personnel')
                     .update({ riggers: parseInt(e.target.value) })
                     .eq('id', personnel?.id);
                   
@@ -394,7 +383,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                       variant: "destructive",
                     });
                   }
-                  queryClient.invalidateQueries({ queryKey: ['lights-personnel', jobId] });
+                  queryClient.invalidateQueries({ queryKey: queryKeys.scope('lights-personnel', jobId) });
                 }}
               />
             </div>
@@ -437,8 +426,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                             value={task?.assigned_to?.id || ""}
                             onValueChange={async (value) => {
                               if (!task) {
-                                const { error } = await supabase
-                                  .from('lights_job_tasks')
+                                const { error } = await dataLayerClient.from('lights_job_tasks')
                                   .insert({
                                     job_id: jobId,
                                     task_type: taskType,
@@ -446,8 +434,7 @@ export const LightsTaskDialog = ({ jobId, open, onOpenChange }: LightsTaskDialog
                                   });
                                 if (error) throw error;
                               } else {
-                                const { error } = await supabase
-                                  .from('lights_job_tasks')
+                                const { error } = await dataLayerClient.from('lights_job_tasks')
                                   .update({ assigned_to: value })
                                   .eq('id', task.id);
                                 if (error) throw error;

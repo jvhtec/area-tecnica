@@ -1,7 +1,7 @@
 import { DateType, DATE_TYPE_OPTIONS, getDateTypeMeta, isNonWorkingDateType } from "@/constants/dateTypes";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { ExternalLink, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { toast } from "@/hooks/use-toast";
 import { format, startOfDay } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,8 @@ import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { openFlexElement } from "@/utils/flex-folders";
 import type { ReactNode } from "react";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface DateTypeContextMenuProps {
   children: ReactNode;
   jobId: string;
@@ -43,8 +45,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         return { ...old, [key]: { type, job_id: jobId, date: formattedDate } };
       });
 
-      const { error } = await supabase
-        .from('job_date_types')
+      const { error } = await dataLayerClient.from('job_date_types')
         .upsert({
           job_id: jobId,
           date: formattedDate,
@@ -58,8 +59,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
       // Void timesheets when marking date as 'off' or 'travel'
       // This hides them from all users while the date type is set
       if (isNonWorkingDateType(type)) {
-        const { error: voidError } = await supabase
-          .from('timesheets')
+        const { error: voidError } = await dataLayerClient.from('timesheets')
           .update({ is_active: false })
           .eq('job_id', jobId)
           .eq('date', formattedDate);
@@ -70,8 +70,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         }
       } else {
         // Restore timesheets when changing from 'off'/'travel' to another type
-        const { error: restoreError } = await supabase
-          .from('timesheets')
+        const { error: restoreError } = await dataLayerClient.from('timesheets')
           .update({ is_active: true })
           .eq('job_id', jobId)
           .eq('date', formattedDate)
@@ -85,7 +84,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
 
       // Broadcast push: job date type changed (per-job, per-day)
       try {
-        void supabase.functions.invoke('push', {
+        void dataLayerClient.functions.invoke('push', {
           body: {
             action: 'broadcast',
             type: `jobdate.type.changed.${type}`,
@@ -115,7 +114,7 @@ export const DateTypeContextMenu = ({ children, jobId, date, onTypeChange }: Dat
         description: "Failed to set date type",
         variant: "destructive",
       });
-      queryClient.invalidateQueries({ queryKey: ['job-date-types', jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-date-types', jobId) });
       queryClient.invalidateQueries({
         predicate: (q) => Array.isArray(q.queryKey) && q.queryKey[0] === 'date-types'
       });

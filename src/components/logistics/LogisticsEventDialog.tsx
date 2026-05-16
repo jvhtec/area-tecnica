@@ -13,7 +13,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Department } from "@/types/department";
@@ -39,6 +39,8 @@ import {
   type LogisticsHojaCategory,
 } from "@/constants/logisticsHojaCategories";
 
+
+import { queryKeys } from "@/lib/react-query";
 // Available departments
 const departments: Department[] = [
   "sound",
@@ -183,14 +185,9 @@ export const LogisticsEventDialog = ({
   const monthEnd = endOfMonth(monthAnchor);
 
   const { data: jobs } = useQuery({
-    queryKey: [
-      "logistics-dialog-jobs",
-      monthStart.toISOString(),
-      monthEnd.toISOString(),
-    ],
+    queryKey: queryKeys.scope("logistics-dialog-jobs", monthStart.toISOString(), monthEnd.toISOString()),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("jobs")
+      const { data, error } = await dataLayerClient.from("jobs")
         .select("id, title, start_time, status, job_type")
         .in("status", ["Tentativa", "Confirmado"])
         .neq("job_type", "dryhire")
@@ -207,16 +204,14 @@ export const LogisticsEventDialog = ({
       if (!selectedEvent) return;
 
       // First delete any referencing rows in logistics_event_departments
-      const { error: deptError } = await supabase
-        .from("logistics_event_departments")
+      const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
         .delete()
         .eq("event_id", selectedEvent.id);
 
       if (deptError) throw deptError;
 
       // Then delete the main record from logistics_events
-      const { error: eventError } = await supabase
-        .from("logistics_events")
+      const { error: eventError } = await dataLayerClient.from("logistics_events")
         .delete()
         .eq("id", selectedEvent.id);
 
@@ -227,12 +222,12 @@ export const LogisticsEventDialog = ({
         description: "Evento de logística eliminado correctamente.",
       });
 
-      queryClient.invalidateQueries({ queryKey: ["logistics-events"] });
-      queryClient.invalidateQueries({ queryKey: ["today-logistics"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") });
 
       const cancelledDepartments = (selectedEvent.departments || []).map((dept) => dept.department);
       try {
-        await supabase.functions.invoke("push", {
+        await dataLayerClient.functions.invoke("push", {
           body: {
             action: "broadcast",
             type: "logistics.event.cancelled",
@@ -298,7 +293,7 @@ export const LogisticsEventDialog = ({
         } = options;
 
         try {
-          await supabase.functions.invoke("push", {
+          await dataLayerClient.functions.invoke("push", {
             body: {
               action: "broadcast",
               type,
@@ -341,21 +336,18 @@ export const LogisticsEventDialog = ({
       };
 
       if (selectedEvent) {
-        const { error: updateError } = await supabase
-          .from("logistics_events")
+        const { error: updateError } = await dataLayerClient.from("logistics_events")
           .update(eventData)
           .eq("id", selectedEvent.id);
 
         if (updateError) throw updateError;
 
-        await supabase
-          .from("logistics_event_departments")
+        await dataLayerClient.from("logistics_event_departments")
           .delete()
           .eq("event_id", selectedEvent.id);
 
         if (selectedDepartments.length > 0) {
-          const { error: deptError } = await supabase
-            .from("logistics_event_departments")
+          const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
             .insert(
               selectedDepartments.map((dept) => ({
                 event_id: selectedEvent.id,
@@ -419,8 +411,7 @@ export const LogisticsEventDialog = ({
           description: "Evento de logística actualizado correctamente.",
         });
       } else {
-        const { data: newEvent, error } = await supabase
-          .from("logistics_events")
+        const { data: newEvent, error } = await dataLayerClient.from("logistics_events")
           .insert(eventData)
           .select()
           .single();
@@ -433,8 +424,7 @@ export const LogisticsEventDialog = ({
         } catch { }
 
         if (selectedDepartments.length > 0) {
-          const { error: deptError } = await supabase
-            .from("logistics_event_departments")
+          const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
             .insert(
               selectedDepartments.map((dept) => ({
                 event_id: newEvent.id,
@@ -447,15 +437,13 @@ export const LogisticsEventDialog = ({
         // Optional: create an unload event right after saving a load event
         if (alsoCreateUnload && eventType === 'load') {
           const unloadData = { ...eventData, event_type: 'unload' as const };
-          const { data: unloadEvent, error: unloadErr } = await supabase
-            .from('logistics_events')
+          const { data: unloadEvent, error: unloadErr } = await dataLayerClient.from('logistics_events')
             .insert(unloadData)
             .select()
             .single();
           if (unloadErr) throw unloadErr;
           if (selectedDepartments.length > 0) {
-            const { error: unloadDeptErr } = await supabase
-              .from('logistics_event_departments')
+            const { error: unloadDeptErr } = await dataLayerClient.from('logistics_event_departments')
               .insert(selectedDepartments.map((dept) => ({ event_id: unloadEvent.id, department: dept })));
             if (unloadDeptErr) throw unloadDeptErr;
           }
@@ -490,8 +478,8 @@ export const LogisticsEventDialog = ({
         });
       }
 
-      queryClient.invalidateQueries({ queryKey: ["logistics-events"] });
-      queryClient.invalidateQueries({ queryKey: ["today-logistics"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("logistics-events") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("today-logistics") });
       onOpenChange(false);
     } catch (error: any) {
       toast({

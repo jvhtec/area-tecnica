@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { Loader2, RefreshCw } from 'lucide-react';
 
 interface FlexSyncLogDialogProps {
@@ -22,15 +22,13 @@ export const FlexSyncLogDialog: React.FC<FlexSyncLogDialogProps> = ({ jobId, ope
   const loadData = async () => {
     setLoading(true);
     try {
-      const { data: f, error: fErr } = await supabase
-        .from('flex_folders')
+      const { data: f, error: fErr } = await dataLayerClient.from('flex_folders')
         .select('id, parent_id, current_status')
         .eq('job_id', jobId);
       if (!fErr) setFolders(f || []);
 
       if (f && f.length) {
-        const { data: l, error: lErr } = await supabase
-          .from('flex_status_log')
+        const { data: l, error: lErr } = await dataLayerClient.from('flex_status_log')
           .select('id, folder_id, previous_status, new_status, action_type, processed_by, processed_at, success, flex_response, error')
           .in('folder_id', f.map((x: any) => x.id))
           .order('processed_at', { ascending: false })

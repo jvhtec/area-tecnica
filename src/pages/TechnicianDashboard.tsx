@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useTheme } from 'next-themes';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { addWeeks, addMonths } from 'date-fns';
 import {
@@ -132,8 +132,7 @@ const TechnicianDashboard = () => {
     ['user-profile', user?.id],
     async () => {
       if (!user?.id) return null;
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('first_name, last_name, nickname, phone, residencia, dni, bg_color, profile_picture_url, role, department')
         .eq('id', user.id)
         .single();
@@ -156,8 +155,7 @@ const TechnicianDashboard = () => {
       const endDate = addMonths(new Date(), 3);
 
       // Step 1: Fetch confirmed job assignments to get role/status info
-      const { data: assignmentsData, error: assignmentsError } = await supabase
-        .from('job_assignments')
+      const { data: assignmentsData, error: assignmentsError } = await dataLayerClient.from('job_assignments')
         .select('job_id, sound_role, lights_role, video_role, status, assigned_at')
         .eq('technician_id', user.id)
         .eq('status', 'confirmed');
@@ -179,8 +177,7 @@ const TechnicianDashboard = () => {
       const jobIds = Array.from(new Set(assignmentsData.map((assignment) => assignment.job_id)));
 
       // Step 2: Fetch timesheets (with jobs) for those assignments
-      const { data: timesheetData, error } = await supabase
-        .from('timesheets')
+      const { data: timesheetData, error } = await dataLayerClient.from('timesheets')
         .select(`
           job_id,
           technician_id,
@@ -234,8 +231,7 @@ const TechnicianDashboard = () => {
 
       if (dedupedJobIds.length > 0) {
         try {
-          const { data: artistRows, error: artistsError } = await supabase
-            .from('festival_artists')
+          const { data: artistRows, error: artistsError } = await dataLayerClient.from('festival_artists')
             .select('job_id')
             .in('job_id', dedupedJobIds);
 
@@ -256,8 +252,11 @@ const TechnicianDashboard = () => {
       }
 
       return jobAssignments
-        .filter(row => row.jobs)
         .map(row => {
+          const job = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs;
+          if (!job) return null;
+          const location = Array.isArray(job.location) ? job.location[0] ?? null : job.location ?? null;
+
           let department = "unknown";
           const assignment = assignmentsByJobId.get(row.job_id);
           if (assignment?.sound_role) department = "sound";
@@ -281,11 +280,13 @@ const TechnicianDashboard = () => {
             lights_role: assignment?.lights_role,
             video_role: assignment?.video_role,
             jobs: {
-              ...row.jobs,
+              ...job,
+              location,
               artist_count: artistCountByJob.get(row.job_id) || 0
-            }
+            } as unknown as TechnicianJobData
           };
-        });
+        })
+        .filter(Boolean) as TechnicianAssignment[];
     },
     'timesheets',
     {

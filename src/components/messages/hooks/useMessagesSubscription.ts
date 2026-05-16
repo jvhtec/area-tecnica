@@ -1,7 +1,6 @@
 
 import { useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
-
+import { dataLayerClient } from '@/services/dataLayerClient';
 export const useMessagesSubscription = (
   currentUserId: string | undefined,
   onUpdate: () => void
@@ -11,8 +10,7 @@ export const useMessagesSubscription = (
 
     console.log('Setting up direct messages subscription for user:', currentUserId);
 
-    const channel = supabase
-      .channel('direct-messages-changes')
+    const channel = dataLayerClient.channel('direct-messages-changes')
       .on(
         'postgres_changes',
         {
@@ -36,7 +34,7 @@ export const useMessagesSubscription = (
 
     return () => {
       console.log('Cleaning up direct messages subscription');
-      supabase.removeChannel(channel);
+      dataLayerClient.removeChannel(channel);
     };
   }, [currentUserId, onUpdate]);
 };

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StockEntry, getCategoriesForDepartment } from '@/types/equipment';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { StockCreationManager } from '@/components/disponibilidad/StockCreationManager';
 import { AlertCircle, Box } from 'lucide-react';
@@ -16,6 +16,8 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog";
 
+
+import { queryKeys } from "@/lib/react-query";
 export function InventoryManagementDialog() {
     const [open, setOpen] = useState(false);
     const auth = useOptimizedAuth();
@@ -24,14 +26,13 @@ export function InventoryManagementDialog() {
 
     // Fetch current stock entries filtered by user department categories
     const { data: stockEntries = [], error: stockError } = useQuery({
-        queryKey: ['stock-entries', userDepartment],
+        queryKey: queryKeys.scope('stock-entries', userDepartment),
         queryFn: async () => {
             if (!session?.user?.id || !userDepartment) return [];
 
             const categories = getCategoriesForDepartment(userDepartment as any);
 
-            const { data, error } = await supabase
-                .from('global_stock_entries')
+            const { data, error } = await dataLayerClient.from('global_stock_entries')
                 .select('*, equipment!inner(category)')
                 .in('equipment.category', categories);
 

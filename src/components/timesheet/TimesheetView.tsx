@@ -20,7 +20,7 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { sendTimesheetReminder } from "@/lib/timesheet-reminder-email";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import {
   AlertDialog,
@@ -72,8 +72,7 @@ export const TimesheetView = ({
     queryKey: createQueryKey.jobs.meta(jobId),
     enabled: !!jobId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('id, end_time, timezone')
         .eq('id', jobId)
         .maybeSingle();

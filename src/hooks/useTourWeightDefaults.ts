@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface TourWeightDefault {
   id: string;
   tour_id: string;
@@ -20,7 +22,7 @@ export const useTourWeightDefaults = (tourId: string) => {
   const queryClient = useQueryClient();
 
   const { data: weightDefaults = [], isLoading, error } = useQuery({
-    queryKey: ["tour-weight-defaults", tourId],
+    queryKey: queryKeys.scope("tour-weight-defaults", tourId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tour_weight_defaults")
@@ -46,7 +48,7 @@ export const useTourWeightDefaults = (tourId: string) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["tour-weight-defaults", tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-weight-defaults", tourId) });
       toast({
         title: "Success",
         description: "Weight default created successfully",
@@ -78,7 +80,7 @@ export const useTourWeightDefaults = (tourId: string) => {
       return weightDefault;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-weight-defaults', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-weight-defaults', tourId) });
     },
   });
 
@@ -93,7 +95,7 @@ export const useTourWeightDefaults = (tourId: string) => {
       return id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-weight-defaults', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-weight-defaults', tourId) });
     },
   });
 

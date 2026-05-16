@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -81,7 +81,7 @@ function EditEquipmentDialog({ equipment, open, onOpenChange, onSave }: EditEqui
 
     try {
       setIsFetchingFlex(true);
-      const { data, error } = await supabase.functions.invoke('fetch-flex-inventory-model', {
+      const { data, error } = await dataLayerClient.functions.invoke('fetch-flex-inventory-model', {
         body: { model_id: idToFetch }
       });
 
@@ -279,7 +279,7 @@ export function EquipmentCreationManager({ onEquipmentChange, department: propDe
 
     try {
       setIsFetchingFlex(true);
-      const { data, error } = await supabase.functions.invoke('fetch-flex-inventory-model', {
+      const { data, error } = await dataLayerClient.functions.invoke('fetch-flex-inventory-model', {
         body: { model_id: idToFetch }
       });
 
@@ -313,8 +313,7 @@ export function EquipmentCreationManager({ onEquipmentChange, department: propDe
   const { data: equipmentList } = useQuery({
     queryKey: department ? ['equipment', department] : ['equipment'],
     queryFn: async () => {
-      let query = supabase
-        .from('equipment')
+      let query = dataLayerClient.from('equipment')
         .select('*');
 
       if (department) {
@@ -336,8 +335,7 @@ export function EquipmentCreationManager({ onEquipmentChange, department: propDe
       if (!session?.user?.id) throw new Error('Must be logged in');
       if (!equipmentName.trim()) throw new Error('Equipment name is required');
 
-      const { data: equipment, error } = await supabase
-        .from('equipment')
+      const { data: equipment, error } = await dataLayerClient.from('equipment')
         .insert({
           name: equipmentName,
           category: category,
@@ -379,8 +377,7 @@ export function EquipmentCreationManager({ onEquipmentChange, department: propDe
     mutationFn: async (equipment: Partial<Equipment>) => {
       if (!equipment.id) throw new Error('Equipment ID is required');
 
-      const { error } = await supabase
-        .from('equipment')
+      const { error } = await dataLayerClient.from('equipment')
         .update({
           name: equipment.name,
           category: equipment.category,
@@ -411,8 +408,7 @@ export function EquipmentCreationManager({ onEquipmentChange, department: propDe
 
   const deleteEquipmentMutation = useMutation({
     mutationFn: async (equipmentId: string) => {
-      const { error } = await supabase
-        .from('equipment')
+      const { error } = await dataLayerClient.from('equipment')
         .delete()
         .eq('id', equipmentId);
 

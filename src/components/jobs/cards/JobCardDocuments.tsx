@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Download, Trash2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
 import { isManagementRole } from "@/utils/permissions";
 
@@ -42,7 +42,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
     try {
       console.log("Attempting to view document:", doc);
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data, error } = await supabase.storage
+      const { data, error } = await dataLayerClient.storage
         .from(bucket)
         .createSignedUrl(path, 60 * 60);
 
@@ -64,7 +64,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
       console.log('Starting download for document:', doc.file_name);
 
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data, error } = await supabase.storage.from(bucket).download(path);
+      const { data, error } = await dataLayerClient.storage.from(bucket).download(path);
       if (error) {
         console.error('Error downloading document:', error, { bucket, path });
         throw error;
@@ -91,15 +91,14 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
     }
     try {
       const next = !doc.visible_to_tech;
-      const { error } = await supabase
-        .from('job_documents')
+      const { error } = await dataLayerClient.from('job_documents')
         .update({ visible_to_tech: next })
         .eq('id', doc.id);
       if (error) throw error;
       // Realtime subscription in parent hook will refresh the list
       try {
         // Notify assigned technicians about document visibility updates
-        void supabase.functions.invoke('push', {
+        void dataLayerClient.functions.invoke('push', {
           body: {
             action: 'broadcast',
             type: next ? 'document.tech_visible.enabled' : 'document.tech_visible.disabled',

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useNavigate } from "react-router-dom";
 import { useAppBadgeSource } from "@/hooks/useAppBadgeSource";
 import { isManagementRole } from "@/utils/permissions";
@@ -30,8 +30,7 @@ export const IncidentReportsNotificationBadge = ({
       setIsLoading(true);
       console.log("Checking for new incident reports...");
 
-      let query = supabase
-        .from('job_documents')
+      let query = dataLayerClient.from('job_documents')
         .select('id, uploaded_at')
         .like('file_path', 'incident-reports/%');
 
@@ -79,8 +78,7 @@ export const IncidentReportsNotificationBadge = ({
     }, 1000);
 
     // Set up real-time subscription for job_documents changes
-    const channel = supabase
-      .channel('incident-reports-notifications')
+    const channel = dataLayerClient.channel('incident-reports-notifications')
       .on(
         'postgres_changes',
         { 
@@ -102,7 +100,7 @@ export const IncidentReportsNotificationBadge = ({
     return () => {
       clearTimeout(timeoutId);
       console.log("Cleaning up incident reports subscription");
-      supabase.removeChannel(channel);
+      dataLayerClient.removeChannel(channel);
     };
   }, [fetchNewIncidentReports, isEligibleForBadge]);
 

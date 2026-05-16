@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { BasicInfoSection } from "./form/sections/BasicInfoSection";
 import { ConsoleSetupSection } from "./form/sections/ConsoleSetupSection";
 import { WirelessSetupSection } from "./form/sections/WirelessSetupSection";
@@ -150,8 +150,7 @@ export const ArtistManagementForm = ({
       setIsLoading(true);
       const fetchArtist = async () => {
         try {
-          const { data, error } = await supabase
-            .from("festival_artists")
+          const { data, error } = await dataLayerClient.from("festival_artists")
             .select("*")
             .eq("id", artist.id)
             .single();

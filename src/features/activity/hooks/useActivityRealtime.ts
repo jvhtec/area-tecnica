@@ -6,6 +6,8 @@ import type { ActivityCatalogEntry, ActivityLogEntry, ActivityPreferences, Activ
 import { getActivityMeta } from '../catalog';
 import { getActivityPreferences } from '../api';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface UseActivityRealtimeOptions {
   jobId?: string;
   userId?: string;
@@ -125,7 +127,7 @@ export function useActivityRealtime(options: UseActivityRealtimeOptions = {}): v
         if (seen.current.has(row.id)) return;
         seen.current.add(row.id);
 
-        queryClient.invalidateQueries({ queryKey: ['activity', jobId ?? 'all'] });
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('activity', jobId ?? 'all') });
 
         if (!autoToasts) return;
 

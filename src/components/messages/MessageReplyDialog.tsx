@@ -8,7 +8,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
 
@@ -31,8 +31,7 @@ export const MessageReplyDialog = ({ message, open, onOpenChange }: MessageReply
       console.log("Sending reply...");
 
       // Mark original message as read
-      const { data: updated, error: updateError } = await supabase
-        .from('messages')
+      const { data: updated, error: updateError } = await dataLayerClient.from('messages')
         .update({ status: 'read' })
         .eq('id', message.id)
         .select('id');
@@ -44,13 +43,12 @@ export const MessageReplyDialog = ({ message, open, onOpenChange }: MessageReply
       try { window.dispatchEvent(new Event('messages_invalidated')); } catch {}
 
       // Send reply message
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await dataLayerClient.auth.getSession();
       if (!session?.user?.id) {
         throw new Error('No authenticated user');
       }
 
-      const { error: sendError } = await supabase
-        .from('messages')
+      const { error: sendError } = await dataLayerClient.from('messages')
         .insert({
           content: reply,
           department: message.department,

@@ -3,9 +3,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+
+import { queryKeys } from "@/lib/react-query";
 const DAYS_OF_WEEK = [
   'Sunday',
   'Monday',
@@ -32,12 +34,11 @@ export function PresetManagement() {
   const queryClient = useQueryClient();
 
   const { data: presets, isLoading } = useQuery({
-    queryKey: ['availability-presets', session?.user?.id, userDepartment],
+    queryKey: queryKeys.scope('availability-presets', session?.user?.id, userDepartment),
     queryFn: async () => {
       if (!session?.user?.id || !userDepartment) return null;
 
-      const { data, error } = await supabase
-        .from('availability_preferences')
+      const { data, error } = await dataLayerClient.from('availability_preferences')
         .select('*')
         .eq('user_id', session.user.id)
         .eq('department', userDepartment);
@@ -62,8 +63,7 @@ export function PresetManagement() {
         throw new Error('User not authenticated');
       }
 
-      const { data, error } = await supabase
-        .from('availability_preferences')
+      const { data, error } = await dataLayerClient.from('availability_preferences')
         .upsert({
           user_id: session.user.id,
           department: userDepartment,
@@ -78,7 +78,7 @@ export function PresetManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['availability-presets', session?.user?.id, userDepartment]
+        queryKey: queryKeys.scope('availability-presets', session?.user?.id, userDepartment)
       });
       toast({
         title: "Success",
@@ -101,8 +101,7 @@ export function PresetManagement() {
         throw new Error('User not authenticated');
       }
 
-      const { error } = await supabase
-        .from('availability_preferences')
+      const { error } = await dataLayerClient.from('availability_preferences')
         .delete()
         .eq('user_id', session.user.id)
         .eq('department', userDepartment)
@@ -112,7 +111,7 @@ export function PresetManagement() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['availability-presets', session?.user?.id, userDepartment]
+        queryKey: queryKeys.scope('availability-presets', session?.user?.id, userDepartment)
       });
       toast({
         title: "Success",

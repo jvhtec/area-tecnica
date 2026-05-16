@@ -65,6 +65,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: mockSupabase,
+}));
+
 vi.mock("react-router-dom", async () => {
   const actual = await vi.importActual<typeof import("react-router-dom")>("react-router-dom");
 

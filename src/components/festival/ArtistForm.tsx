@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { ArtistWirelessSetupSection } from "./form/sections/ArtistWirelessSetupSection";
 import { MicKitSection } from "./form/sections/MicKitSection";
 import { ArtistFormData } from "@/types/festival";
@@ -105,8 +105,7 @@ export const ArtistForm = () => {
     setIsLoading(true);
     try {
       // First verify the form token is valid and get the form details
-      const { data: formInfo, error: formError } = await supabase
-        .from('festival_artist_forms')
+      const { data: formInfo, error: formError } = await dataLayerClient.from('festival_artist_forms')
         .select('id, artist_id, status, expires_at')
         .eq('token', token)
         .single();
@@ -138,8 +137,7 @@ export const ArtistForm = () => {
       console.log('Submitting form data:', submissionData);
 
       // Create form submission using the actual form ID
-      const { error: submissionError } = await supabase
-        .from('festival_artist_form_submissions')
+      const { error: submissionError } = await dataLayerClient.from('festival_artist_form_submissions')
         .insert({
           form_id: formInfo.id,
           artist_id: formInfo.artist_id,
@@ -154,8 +152,7 @@ export const ArtistForm = () => {
       }
 
       // Update the artist record with the form data (only fields that exist in the table)
-      const { error: updateError } = await supabase
-        .from('festival_artists')
+      const { error: updateError } = await dataLayerClient.from('festival_artists')
         .update({
           name: formData.name,
           stage: formData.stage,
@@ -208,8 +205,7 @@ export const ArtistForm = () => {
       }
 
       // Mark the form as completed
-      const { error: updateFormError } = await supabase
-        .from('festival_artist_forms')
+      const { error: updateFormError } = await dataLayerClient.from('festival_artist_forms')
         .update({ status: 'completed' })
         .eq('id', formInfo.id);
 

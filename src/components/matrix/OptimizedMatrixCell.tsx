@@ -12,7 +12,7 @@ import { es } from 'date-fns/locale';
 import { formatInTimeZone } from 'date-fns-tz';
 import { cn } from '@/lib/utils';
 import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
@@ -180,8 +180,7 @@ export const OptimizedMatrixCell = memo(({
 
     try {
       // Get all timesheets for this job/technician combination
-      const { data: timesheets, error: timesheetError } = await supabase
-        .from('timesheets')
+      const { data: timesheets, error: timesheetError } = await dataLayerClient.from('timesheets')
         .select('date')
         .eq('job_id', assignment.job_id)
         .eq('technician_id', technician.id)
@@ -223,7 +222,7 @@ export const OptimizedMatrixCell = memo(({
     try {
       if (removeAll || multiDateRemoval.otherDatesCount === 0) {
         // Remove entire assignment + all timesheets
-        const { data, error } = await supabase.rpc('manage_assignment_lifecycle', {
+        const { data, error } = await dataLayerClient.rpc('manage_assignment_lifecycle', {
           p_job_id: assignment.job_id,
           p_technician_id: technician.id,
           p_action: 'cancel',
@@ -238,7 +237,7 @@ export const OptimizedMatrixCell = memo(({
         if (flexDepartments.length > 0) {
           await Promise.allSettled(flexDepartments.map(async (department) => {
             try {
-              await supabase.functions.invoke('manage-flex-crew-assignments', {
+              await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
                 body: {
                   job_id: assignment.job_id,
                   technician_id: technician.id,
@@ -254,7 +253,7 @@ export const OptimizedMatrixCell = memo(({
 
         // Send push notification
         try {
-          void supabase.functions.invoke('push', {
+          void dataLayerClient.functions.invoke('push', {
             body: {
               action: 'broadcast',
               type: 'assignment.removed',
@@ -273,8 +272,7 @@ export const OptimizedMatrixCell = memo(({
         toast.success(message);
       } else {
         // Remove only the current date's timesheet, keep assignment active
-        const { error } = await supabase
-          .from('timesheets')
+        const { error } = await dataLayerClient.from('timesheets')
           .delete()
           .eq('job_id', assignment.job_id)
           .eq('technician_id', technician.id)

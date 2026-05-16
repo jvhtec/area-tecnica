@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface EquipmentModel {
   id: string;
   name: string;
@@ -24,7 +26,7 @@ export const useEquipmentModels = () => {
     isLoading,
     error
   } = useQuery({
-    queryKey: ['equipment-models'],
+    queryKey: queryKeys.scope('equipment-models'),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('equipment')
@@ -50,7 +52,7 @@ export const useEquipmentModels = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment-models'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('equipment-models') });
       toast({
         title: "Success",
         description: "Equipment model created successfully",
@@ -79,7 +81,7 @@ export const useEquipmentModels = () => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment-models'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('equipment-models') });
       toast({
         title: "Success",
         description: "Equipment model updated successfully",
@@ -105,7 +107,7 @@ export const useEquipmentModels = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['equipment-models'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('equipment-models') });
       toast({
         title: "Success",
         description: "Equipment model deleted successfully",

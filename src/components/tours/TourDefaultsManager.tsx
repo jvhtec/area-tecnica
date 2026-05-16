@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FileText, Weight, Calculator, Trash2, Download, Calendar } from "lucide-react";
 import { exportToPDF } from "@/utils/pdfExport";
 import { fetchTourLogo } from "@/utils/pdf/logoUtils";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Database } from "@/integrations/supabase/types";
 import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
 import { useTourWeightDefaults } from "@/hooks/useTourWeightDefaults";
@@ -202,8 +202,7 @@ export const TourDefaultsManager = ({
     const fetchTourDates = async () => {
       if (!tour?.id) return;
       
-      const { data, error } = await supabase
-        .from('tour_dates')
+      const { data, error } = await dataLayerClient.from('tour_dates')
         .select(`
           id,
           date,
@@ -596,8 +595,7 @@ export const TourDefaultsManager = ({
 
     // Check for any overrides for this tour date
     const overrideTable = type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';
-    const { data: overrides, error: overridesError } = await supabase
-      .from(overrideTable)
+    const { data: overrides, error: overridesError } = await dataLayerClient.from(overrideTable)
       .select('*')
       .eq('tour_date_id', tourDate.id)
       .eq('department', department);

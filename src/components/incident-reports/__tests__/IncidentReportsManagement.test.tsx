@@ -21,6 +21,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: mockSupabase,
+}));
+
 vi.mock("../IncidentReportsNotificationBadge", () => ({
   IncidentReportsNotificationBadge: ({ userRole }: { userRole: string }) => {
     badgeMock(userRole);

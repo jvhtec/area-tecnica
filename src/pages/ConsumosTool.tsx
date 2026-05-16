@@ -12,7 +12,7 @@ import { useJobSelection } from '@/hooks/useJobSelection';
 import { useTourPowerDefaults } from '@/hooks/useTourPowerDefaults';
 import { useTourDateOverrides } from '@/hooks/useTourDateOverrides';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
@@ -112,8 +112,7 @@ const ConsumosTool: React.FC = () => {
           setSelectedJob(found);
           return;
         }
-        const { data } = await supabase
-          .from('jobs')
+        const { data } = await dataLayerClient.from('jobs')
           .select('id, title, start_time, end_time, tour_date_id, date, location')
           .eq('id', jobIdFromUrl)
           .single();
@@ -215,8 +214,7 @@ const ConsumosTool: React.FC = () => {
 
   const savePowerRequirementTable = async (table: Table) => {
     try {
-      const { error } = await supabase
-        .from('power_requirement_tables')
+      const { error } = await dataLayerClient.from('power_requirement_tables')
         .insert({
           job_id: selectedJobId,
           department: 'sound',
@@ -594,7 +592,7 @@ const ConsumosTool: React.FC = () => {
   useEffect(() => {
     const fetchTourInfo = async () => {
       if (tourId) {
-        const { data } = await supabase.from('tours').select('name').eq('id', tourId).single();
+        const { data } = await dataLayerClient.from('tours').select('name').eq('id', tourId).single();
         if (data) setTourName(data.name);
       }
     };

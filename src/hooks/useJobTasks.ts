@@ -3,6 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { Department } from '@/types/department';
 
+
+import { queryKeys } from "@/lib/react-query";
 const TASK_TABLE: Record<'sound'|'lights'|'video', string> = {
   sound: 'sound_job_tasks',
   lights: 'lights_job_tasks',
@@ -14,7 +16,7 @@ export function useJobTasks(jobId?: string, department?: 'sound'|'lights'|'video
   const contextId = tourId || jobId;
 
   const query = useQuery({
-    queryKey: ['job-tasks', jobId, tourId, department],
+    queryKey: queryKeys.scope('job-tasks', jobId, tourId, department),
     enabled: !!contextId,
     queryFn: async () => {
       let queryBuilder = supabase

@@ -29,7 +29,7 @@ import {
   Save,
   X,
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { resolveTaskDocBucket } from '@/hooks/useGlobalTaskMutations';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +43,8 @@ import {
 } from '@/utils/timezoneUtils';
 import { getErrorMessage } from '@/utils/errorMessage';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface DeptUser {
   id: string;
   first_name: string | null;
@@ -78,10 +80,9 @@ const STATUS_LABELS: Record<string, string> = {
 
 function useAllEligibleUsers(userDepartment: string | null) {
   return useQuery<{ flat: DeptUser[]; groups: ComboboxGroup[]; items: ComboboxItem[] }>({
-    queryKey: ['all-eligible-users', userDepartment],
+    queryKey: queryKeys.scope('all-eligible-users', userDepartment),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name, department')
         .order('first_name');
       if (error) throw error;
@@ -262,7 +263,7 @@ export default function GlobalTasks() {
   const viewDoc = async (doc: { file_path: string }) => {
     try {
       const bucket = resolveTaskDocBucket(doc.file_path);
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(doc.file_path, 3600);
+      const { data, error } = await dataLayerClient.storage.from(bucket).createSignedUrl(doc.file_path, 3600);
       if (error) {
         console.error('[GlobalTasks] createSignedUrl error:', error);
         toast({ title: 'Error', description: 'No se pudo abrir el archivo', variant: 'destructive' });

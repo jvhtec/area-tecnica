@@ -7,10 +7,12 @@ import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { formatCurrency } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { isTechnicianRole } from '@/utils/permissions';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface MyJobTotalProps {
   jobId: string;
   filterTechnicianId?: string;
@@ -25,10 +27,9 @@ export function MyJobTotal({ jobId, filterTechnicianId }: MyJobTotalProps) {
 
   // For management, fetch names to display in selector
   const { data: assignments = [] } = useQuery({
-    queryKey: ['job-assignments-names', jobId],
+    queryKey: queryKeys.scope('job-assignments-names', jobId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_assignments')
+      const { data, error } = await dataLayerClient.from('job_assignments')
         .select(`technician_id, profiles:technician_id ( first_name, last_name )`)
         .eq('job_id', jobId);
       if (error) throw error;

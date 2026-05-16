@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useDeleteSoundVisionFile, useDownloadSoundVisionFile, SoundVisionFile } from '@/hooks/useSoundVisionFiles';
 import { canDeleteSoundVisionFiles, isManagementRole } from '@/utils/permissions';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { formatDistanceToNow } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -29,6 +29,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { StarRating } from './StarRating';
 import { SoundVisionReviewDialog } from './SoundVisionReviewDialog';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface SoundVisionFilesListProps {
   files: SoundVisionFile[];
 }
@@ -38,13 +40,12 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
   const [selectedFile, setSelectedFile] = useState<SoundVisionFile | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { data: profile } = useQuery({
-    queryKey: ['current-user-profile'],
+    queryKey: queryKeys.scope('current-user-profile'),
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await dataLayerClient.auth.getUser();
       if (!user) return null;
       
-      const { data } = await supabase
-        .from('profiles')
+      const { data } = await dataLayerClient.from('profiles')
         .select('role')
         .eq('id', user.id)
         .single();
@@ -72,8 +73,8 @@ export const SoundVisionFilesList = ({ files }: SoundVisionFilesListProps) => {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
-    await queryClient.refetchQueries({ queryKey: ['soundvision-files'] });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.scope('soundvision-files') });
+    await queryClient.refetchQueries({ queryKey: queryKeys.scope('soundvision-files') });
     setTimeout(() => setIsRefreshing(false), 500);
   };
 

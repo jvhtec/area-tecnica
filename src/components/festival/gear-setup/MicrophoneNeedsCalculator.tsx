@@ -6,11 +6,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Calculator, Download, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { WiredMic } from "./WiredMicConfig";
 import { exportWiredMicrophoneMatrixPDF, WiredMicrophoneMatrixData, organizeArtistsByDateAndStage } from "@/utils/wiredMicrophoneNeedsPdfExport";
 import { buildReadableFilename } from "@/utils/fileName";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface MicrophoneNeedsCalculatorProps {
   jobId: string;
 }
@@ -19,10 +21,9 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
   const [open, setOpen] = useState(false);
 
   const { data: artists = [], isLoading } = useQuery({
-    queryKey: ['festival-artists-mics', jobId],
+    queryKey: queryKeys.scope('festival-artists-mics', jobId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('festival_artists')
+      const { data, error } = await dataLayerClient.from('festival_artists')
         .select('id, name, stage, date, show_start, show_end, wired_mics, mic_kit')
         .eq('job_id', jobId)
         .in('mic_kit', ['festival', 'mixed'])
@@ -36,18 +37,16 @@ export const MicrophoneNeedsCalculator = ({ jobId }: MicrophoneNeedsCalculatorPr
 
   // Query for job details to get title and logo for PDF export
   const { data: jobDetails } = useQuery({
-    queryKey: ['job-details', jobId],
+    queryKey: queryKeys.scope('job-details', jobId),
     queryFn: async () => {
-      const { data: job, error: jobError } = await supabase
-        .from('jobs')
+      const { data: job, error: jobError } = await dataLayerClient.from('jobs')
         .select('title')
         .eq('id', jobId)
         .single();
       
       if (jobError) throw jobError;
 
-      const { data: logo, error: logoError } = await supabase
-        .from('festival_logos')
+      const { data: logo, error: logoError } = await dataLayerClient.from('festival_logos')
         .select('file_path')
         .eq('job_id', jobId)
         .maybeSingle();

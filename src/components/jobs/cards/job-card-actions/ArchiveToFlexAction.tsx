@@ -11,8 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
-
+import { dataLayerClient } from "@/services/dataLayerClient";
 export interface ArchiveToFlexActionProps {
   job: any;
 }
@@ -37,7 +36,7 @@ export const ArchiveToFlexAction: React.FC<ArchiveToFlexActionProps> = ({ job })
     setError(null);
     setResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke("archive-to-flex", {
+      const { data, error } = await dataLayerClient.functions.invoke("archive-to-flex", {
         body: {
           job_id: job.id,
           mode,

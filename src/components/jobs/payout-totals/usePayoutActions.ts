@@ -1,6 +1,6 @@
 import React from 'react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import {
   useSetTechnicianPayoutOverride,
   useRemoveTechnicianPayoutOverride,
@@ -115,7 +115,7 @@ export function usePayoutActions({
   const prepareStandardContext = React.useCallback(async (payouts: JobPayoutTotals[]) => {
     const context = await prepareJobPayoutEmailContext({
       jobId,
-      supabase,
+      supabase: dataLayerClient,
       payouts,
       profiles: profilesWithEmail,
       lpoMap,
@@ -195,7 +195,7 @@ export function usePayoutActions({
       try {
         const result = await sendTourJobEmails({
           jobId,
-          supabase,
+          supabase: dataLayerClient,
           quotes: visibleTourQuotes,
           profiles: profilesWithEmail as (TechnicianProfile & { email?: string | null })[],
           technicianIds: technicianId ? [technicianId] : undefined,
@@ -240,7 +240,7 @@ export function usePayoutActions({
     try {
       const result = await sendJobPayoutEmails({
         jobId,
-        supabase,
+        supabase: dataLayerClient,
         payouts: approvedPayouts,
         profiles: profilesWithEmail,
         lpoMap,
@@ -300,7 +300,7 @@ export function usePayoutActions({
 
         const tourContext = await prepareTourJobEmailContext({
           jobId,
-          supabase,
+          supabase: dataLayerClient,
           quotes: visibleTourQuotes,
           profiles: profilesWithEmail as (TechnicianProfile & { email?: string | null })[],
         });
@@ -380,7 +380,7 @@ export function usePayoutActions({
 
       const context = await prepareJobPayoutEmailContext({
         jobId,
-        supabase,
+        supabase: dataLayerClient,
         payouts: approvedPayouts,
         profiles: profilesWithEmail,
         lpoMap,
@@ -424,7 +424,7 @@ export function usePayoutActions({
           }
           const result = await sendTourJobEmails({
             jobId,
-            supabase,
+            supabase: dataLayerClient,
             quotes: quotesForTech,
             profiles: profilesWithEmail as (TechnicianProfile & { email?: string | null })[],
             technicianIds: [techId],
@@ -458,7 +458,7 @@ export function usePayoutActions({
       try {
         const result = await sendJobPayoutEmails({
           jobId,
-          supabase,
+          supabase: dataLayerClient,
           payouts: standardPayoutTotals.filter((p) => p.technician_id === techId),
           profiles: profilesWithEmail.filter((p) => p.id === techId),
           lpoMap,

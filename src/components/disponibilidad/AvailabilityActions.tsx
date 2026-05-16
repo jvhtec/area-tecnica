@@ -9,11 +9,13 @@ import {
 } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import type { AvailabilityStatus } from '@/types/availability';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 
+
+import { queryKeys } from "@/lib/react-query";
 interface AvailabilityActionsProps {
   selectedDate?: Date;
 }
@@ -29,8 +31,7 @@ export function AvailabilityActions({ selectedDate }: AvailabilityActionsProps) 
         throw new Error('Missing required data');
       }
 
-      const { data, error } = await supabase
-        .from('availability_schedules')
+      const { data, error } = await dataLayerClient.from('availability_schedules')
         .upsert({
           user_id: session.user.id,
           department: userDepartment,
@@ -45,7 +46,7 @@ export function AvailabilityActions({ selectedDate }: AvailabilityActionsProps) 
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ['availability', session?.user?.id, userDepartment]
+        queryKey: queryKeys.scope('availability', session?.user?.id, userDepartment)
       });
       toast({
         title: "Success",

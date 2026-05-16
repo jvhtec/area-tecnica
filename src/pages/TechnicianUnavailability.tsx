@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,6 +13,8 @@ import { CalendarDays, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 
+
+import { queryKeys } from "@/lib/react-query";
 export default function TechnicianUnavailability() {
   const { user } = useOptimizedAuth();
   const qc = useQueryClient();
@@ -40,11 +42,10 @@ export default function TechnicianUnavailability() {
   };
 
   const { data: blocks = [], isLoading } = useQuery({
-    queryKey: ['my-unavailability', user?.id],
+    queryKey: queryKeys.scope('my-unavailability', user?.id),
     queryFn: async () => {
       if (!user?.id) return [] as any[];
-      const { data, error } = await supabase
-        .from('technician_availability')
+      const { data, error } = await dataLayerClient.from('technician_availability')
         .select('id, technician_id, date, status, created_at, updated_at')
         .eq('technician_id', user.id)
         .order('date', { ascending: false });
@@ -73,14 +74,13 @@ export default function TechnicianUnavailability() {
       for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
         rows.push({ technician_id: user.id, date: spanishDateFormatter.format(d), status: payload.status });
       }
-      const { error } = await supabase
-        .from('technician_availability')
+      const { error } = await dataLayerClient.from('technician_availability')
         .upsert(rows, { onConflict: 'technician_id,date' });
       if (error) throw error;
     },
     onSuccess: () => {
       toast.success('Bloqueo de disponibilidad creado');
-      qc.invalidateQueries({ queryKey: ['my-unavailability'] });
+      qc.invalidateQueries({ queryKey: queryKeys.scope('my-unavailability') });
       setOpen(false);
       setStart('');
       setEnd('');
@@ -92,7 +92,7 @@ export default function TechnicianUnavailability() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('technician_availability').delete().eq('id', id);
+      const { error } = await dataLayerClient.from('technician_availability').delete().eq('id', id);
       if (error) throw error;
     },
     onMutate: (id) => {
@@ -100,7 +100,7 @@ export default function TechnicianUnavailability() {
     },
     onSuccess: () => {
       toast.success('Bloqueo eliminado');
-      qc.invalidateQueries({ queryKey: ['my-unavailability'] });
+      qc.invalidateQueries({ queryKey: queryKeys.scope('my-unavailability') });
     },
     onError: (e: any) => toast.error(e?.message || 'No se pudo eliminar el bloqueo'),
     onSettled: () => {

@@ -1,12 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { LogisticsEventCard } from "./LogisticsEventCard";
 import { LogisticsEventDialog } from "./LogisticsEventDialog";
 import { useState } from "react";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface TodayLogisticsProps {
   selectedDate: Date;
 }
@@ -18,11 +20,10 @@ export const TodayLogistics = ({ selectedDate }: TodayLogisticsProps) => {
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
   const { data: events, isLoading } = useQuery({
-    queryKey: ['today-logistics', formattedDate],
+    queryKey: queryKeys.scope('today-logistics', formattedDate),
     queryFn: async () => {
       console.log('Fetching logistics events for:', formattedDate);
-      const { data, error } = await supabase
-        .from('logistics_events')
+      const { data, error } = await dataLayerClient.from('logistics_events')
         .select(`
           *,
           job:jobs(id, title),

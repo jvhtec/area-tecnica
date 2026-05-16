@@ -16,10 +16,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { createQueryKey } from "@/lib/optimized-react-query";
 import { canManagePayouts } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 const MADRID_TIMEZONE = "Europe/Madrid";
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LOOKAHEAD_DAYS = 120;
@@ -374,8 +376,7 @@ async function fetchFortnightPayoutsDue({
   const windowFrom = subDays(safePayoutFrom, PAYOUT_TO_SERVICE_LOOKBACK_DAYS);
   const windowTo = addDays(safePayoutTo, PAYOUT_TO_SERVICE_LOOKAHEAD_DAYS);
 
-  const { data: jobsData, error: jobsError } = await supabase
-    .from("jobs")
+  const { data: jobsData, error: jobsError } = await dataLayerClient.from("jobs")
     .select("id, title, start_time")
     .gte("start_time", windowFrom.toISOString())
     .lte("start_time", windowTo.toISOString());
@@ -389,8 +390,7 @@ async function fetchFortnightPayoutsDue({
 
   const jobIds = jobs.map((job) => job.id);
   const payouts = await fetchInChunks<PayoutLite>(jobIds, async (jobIdChunk) => {
-    const { data: payoutsData, error: payoutsError } = await supabase
-      .from("v_job_tech_payout_2025")
+    const { data: payoutsData, error: payoutsError } = await dataLayerClient.from("v_job_tech_payout_2025")
       .select("job_id, technician_id, total_eur")
       .in("job_id", jobIdChunk)
       .gt("total_eur", 0);
@@ -422,8 +422,7 @@ async function fetchFortnightPayoutsDue({
 
   const [timesheetsRaw, profiles, assignmentsRaw] = await Promise.all([
     fetchInChunks<TimesheetLite>(relevantJobIds, async (jobIdChunk) => {
-      let query = supabase
-        .from("timesheets")
+      let query = dataLayerClient.from("timesheets")
         .select("job_id, technician_id, date")
         .in("job_id", jobIdChunk)
         .eq("approved_by_manager", true);
@@ -437,8 +436,7 @@ async function fetchFortnightPayoutsDue({
       return (timesheetsData ?? []) as TimesheetLite[];
     }),
     fetchInChunks<ProfileLite>(technicianIds, async (techIdChunk) => {
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
+      const { data: profilesData, error: profilesError } = await dataLayerClient.from("profiles")
         .select("id, first_name, last_name, department, role, autonomo")
         .in("id", techIdChunk);
 
@@ -446,8 +444,7 @@ async function fetchFortnightPayoutsDue({
       return (profilesData ?? []) as ProfileLite[];
     }),
     fetchInChunks<JobAssignmentInvoiceLite>(relevantJobIds, async (jobIdChunk) => {
-      let query = supabase
-        .from("job_assignments")
+      let query = dataLayerClient.from("job_assignments")
         .select("job_id, technician_id, invoice_received_at, invoice_received_by")
         .in("job_id", jobIdChunk);
       if (shouldFilterTechniciansInQuery) {
@@ -589,7 +586,7 @@ export default function PayoutsDueFortnights() {
     error,
     refetch,
   } = useQuery({
-    queryKey: [...createQueryKey.payoutDueFortnights.all, queryFromInput, queryToInput],
+    queryKey: queryKeys.custom(...createQueryKey.payoutDueFortnights.all, queryFromInput, queryToInput),
     queryFn: () =>
       fetchFortnightPayoutsDue({
         payoutFromInput: queryFromInput,
@@ -612,8 +609,7 @@ export default function PayoutsDueFortnights() {
       const receivedAt = received ? new Date().toISOString() : null;
       const receivedBy = received ? user?.id ?? null : null;
 
-      const { data: updatedRows, error: updateError } = await supabase
-        .from("job_assignments")
+      const { data: updatedRows, error: updateError } = await dataLayerClient.from("job_assignments")
         .update({
           invoice_received_at: receivedAt,
           invoice_received_by: receivedBy,

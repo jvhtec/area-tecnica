@@ -2,9 +2,11 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+
+import { queryKeys } from "@/lib/react-query";
 export function useJobRatesApproval(jobId?: string) {
   return useQuery({
-    queryKey: ['job-rates-approval', jobId],
+    queryKey: queryKeys.scope('job-rates-approval', jobId),
     enabled: !!jobId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -21,7 +23,7 @@ export function useJobRatesApproval(jobId?: string) {
 export function useJobRatesApprovalMap(jobIds: string[]) {
   const unique = useMemo(() => Array.from(new Set(jobIds.filter(Boolean))), [jobIds]);
   return useQuery({
-    queryKey: ['job-rates-approval-map', unique],
+    queryKey: queryKeys.scope('job-rates-approval-map', unique),
     enabled: unique.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase

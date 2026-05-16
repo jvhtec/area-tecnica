@@ -45,6 +45,8 @@ import { ExternalLink, Trash2, Edit, CheckCircle, Eye } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
+
+import { queryKeys } from "@/lib/react-query";
 type BugReport = {
   id: string;
   title: string;
@@ -114,7 +116,7 @@ export function AdminPanel() {
 
   // Fetch bug reports (excluding heavy fields for list view)
   const { data: bugReports = [], isLoading: loadingBugs } = useQuery({
-    queryKey: ["bug_reports"],
+    queryKey: queryKeys.scope("bug_reports"),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("bug_reports")
@@ -127,7 +129,7 @@ export function AdminPanel() {
 
   // Fetch feature requests
   const { data: featureRequests = [], isLoading: loadingFeatures } = useQuery({
-    queryKey: ["feature_requests"],
+    queryKey: queryKeys.scope("feature_requests"),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("feature_requests")
@@ -140,7 +142,7 @@ export function AdminPanel() {
 
   // Fetch full bug report details when dialog opens (including heavy fields)
   const { data: fullBugDetails, isLoading: loadingFullBug } = useQuery({
-    queryKey: ["bug_report", selectedBug?.id],
+    queryKey: queryKeys.scope("bug_report", selectedBug?.id),
     queryFn: async () => {
       if (!selectedBug?.id) return null;
       const { data, error } = await supabase
@@ -218,7 +220,7 @@ export function AdminPanel() {
     },
     onSettled: () => {
       // Always refetch to ensure UI is in sync with server
-      queryClient.invalidateQueries({ queryKey: ["bug_reports"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("bug_reports") });
     },
     onSuccess: () => {
       toast({ title: "Bug report updated successfully" });
@@ -233,7 +235,7 @@ export function AdminPanel() {
     },
     onMutate: async ({ id, updates }) => {
       // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ["feature_requests"] });
+      await queryClient.cancelQueries({ queryKey: queryKeys.scope("feature_requests") });
 
       // Snapshot the current state before mutation
       const previousFeature = selectedFeature;
@@ -260,7 +262,7 @@ export function AdminPanel() {
     },
     onSettled: () => {
       // Always refetch to ensure UI is in sync with server
-      queryClient.invalidateQueries({ queryKey: ["feature_requests"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("feature_requests") });
     },
     onSuccess: () => {
       toast({ title: "Feature request updated successfully" });
@@ -274,7 +276,7 @@ export function AdminPanel() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["bug_reports"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("bug_reports") });
       toast({ title: "Bug report deleted successfully" });
       setShowBugDialog(false);
     },
@@ -294,7 +296,7 @@ export function AdminPanel() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["feature_requests"] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("feature_requests") });
       toast({ title: "Feature request deleted successfully" });
       setShowFeatureDialog(false);
     },

@@ -7,6 +7,8 @@ import { useSoundVisionFiles } from '@/hooks/useSoundVisionFiles';
 import { Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 
+
+import { queryKeys } from "@/lib/react-query";
 export const SoundVisionDatabaseDialog = () => {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('browse');
@@ -34,8 +36,8 @@ export const SoundVisionDatabaseDialog = () => {
 
   const handleUploadComplete = async () => {
     // Wait for queries to refresh before switching tabs
-    await queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
-    await queryClient.refetchQueries({ queryKey: ['soundvision-files'] });
+    await queryClient.invalidateQueries({ queryKey: queryKeys.scope('soundvision-files') });
+    await queryClient.refetchQueries({ queryKey: queryKeys.scope('soundvision-files') });
     
     // Small delay to ensure UI updates
     setTimeout(() => {

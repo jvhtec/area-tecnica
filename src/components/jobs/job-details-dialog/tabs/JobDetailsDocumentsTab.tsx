@@ -10,9 +10,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface JobDetailsDocumentsTabProps {
   open: boolean;
   jobId: string;
@@ -29,10 +31,10 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
   jobDocumentsError,
 }) => {
   const { data: jobArtists = [], isLoading: isArtistsLoading, error: artistsError } = useQuery({
-    queryKey: ["job-artists", jobId],
+    queryKey: queryKeys.scope("job-artists", jobId),
     enabled: open && !!jobId,
     queryFn: async () => {
-      const { data, error } = await supabase.from("festival_artists").select("id, name").eq("job_id", jobId);
+      const { data, error } = await dataLayerClient.from("festival_artists").select("id, name").eq("job_id", jobId);
       if (error) {
         console.error("[JobDetailsDialog] Error fetching artists:", error);
         throw error;
@@ -51,12 +53,11 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
   const artistNameMap = useMemo(() => new Map(jobArtists.map((a) => [a.id, a.name])), [jobArtists]);
 
   const { data: riderFiles = [], isLoading: isRidersLoading, error: ridersError } = useQuery({
-    queryKey: ["job-rider-files", jobId, artistIdList],
+    queryKey: queryKeys.scope("job-rider-files", jobId, artistIdList),
     enabled: open && !!jobId && artistIdList.length > 0,
     queryFn: async () => {
       console.log("[JobDetailsDialog] Fetching rider files for artists:", artistIdList);
-      let query = supabase
-        .from("festival_artist_files")
+      let query = dataLayerClient.from("festival_artist_files")
         .select("id, file_name, file_path, uploaded_at, artist_id")
         .order("uploaded_at", { ascending: false });
       if (artistIdList.length === 1) {
@@ -78,7 +79,7 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
   const viewRider = async (file: { file_path: string; file_name: string }) => {
     try {
       console.log("[JobDetailsDialog] Viewing rider:", file.file_path);
-      const { data, error } = await supabase.storage.from("festival_artist_files").createSignedUrl(file.file_path, 3600);
+      const { data, error } = await dataLayerClient.storage.from("festival_artist_files").createSignedUrl(file.file_path, 3600);
 
       if (error) throw error;
 
@@ -96,7 +97,7 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
   const downloadRider = async (file: { file_path: string; file_name: string }) => {
     try {
       console.log("[JobDetailsDialog] Downloading rider:", file.file_path);
-      const { data, error } = await supabase.storage.from("festival_artist_files").download(file.file_path);
+      const { data, error } = await dataLayerClient.storage.from("festival_artist_files").download(file.file_path);
 
       if (error) throw error;
 
@@ -118,7 +119,7 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
   const handleDownloadDocument = async (doc: any) => {
     try {
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+      const { data, error } = await dataLayerClient.storage.from(bucket).createSignedUrl(path, 3600);
 
       if (error) throw error;
 
@@ -142,7 +143,7 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
   const handleViewDocument = async (doc: any) => {
     try {
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
-      const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
+      const { data, error } = await dataLayerClient.storage.from(bucket).createSignedUrl(path, 3600);
 
       if (error) throw error;
 

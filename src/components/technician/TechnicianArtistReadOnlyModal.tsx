@@ -4,7 +4,7 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import { ChevronDown, Loader2, SlidersHorizontal, Users, X } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -144,8 +144,7 @@ export function TechnicianArtistReadOnlyModal({
   const { data: artists = [], isLoading: artistsLoading } = useQuery({
     queryKey: createQueryKey.technician.technicianReadonlyArtists(job?.id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("festival_artists")
+      const { data, error } = await dataLayerClient.from("festival_artists")
         .select("*")
         .eq("job_id", job?.id)
         .order("date", { ascending: true });
@@ -164,8 +163,7 @@ export function TechnicianArtistReadOnlyModal({
   const { data: festivalStages = [] } = useQuery({
     queryKey: createQueryKey.technician.technicianReadonlyFestivalStages(job?.id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("festival_stages")
+      const { data, error } = await dataLayerClient.from("festival_stages")
         .select("number, name")
         .eq("job_id", job?.id);
       if (error) {
@@ -200,7 +198,7 @@ export function TechnicianArtistReadOnlyModal({
       await Promise.all(
         artistsWithPlot.map(async (artist) => {
           if (!artist.stage_plot_file_path) return;
-          const { data, error } = await supabase.storage
+          const { data, error } = await dataLayerClient.storage
             .from("festival_artist_files")
             .createSignedUrl(artist.stage_plot_file_path, 60 * 60);
 
@@ -233,8 +231,7 @@ export function TechnicianArtistReadOnlyModal({
         return;
       }
 
-      let query = supabase
-        .from("festival_artist_files")
+      let query = dataLayerClient.from("festival_artist_files")
         .select("id, file_name, file_path, uploaded_at, artist_id")
         .order("uploaded_at", { ascending: false });
 
@@ -276,7 +273,7 @@ export function TechnicianArtistReadOnlyModal({
 
   const handleDownloadRiderFile = async (file: { file_path: string; file_name: string }) => {
     try {
-      const { data, error } = await supabase.storage.from("festival_artist_files").download(file.file_path);
+      const { data, error } = await dataLayerClient.storage.from("festival_artist_files").download(file.file_path);
       if (error || !data) {
         toast.error("Error al descargar el archivo", { description: error?.message || "No se pudo obtener el archivo" });
         return;

@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { DirectMessage } from "./types";
 import { DirectMessageCard } from "./DirectMessageCard";
@@ -42,7 +42,7 @@ export const DirectMessagesList = ({ theme, isDark = false }: DirectMessagesList
   useEffect(() => {
     const getCurrentUser = async () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
+        const { data: { user }, error } = await dataLayerClient.auth.getUser();
         if (error) {
           console.error("Error getting current user:", error);
           return;
@@ -65,8 +65,7 @@ export const DirectMessagesList = ({ theme, isDark = false }: DirectMessagesList
       setLoading(true);
 
       const [receivedMessages, sentMessages] = await Promise.all([
-        supabase
-          .from('direct_messages')
+        dataLayerClient.from('direct_messages')
           .select(`
             *,
             sender:profiles!direct_messages_sender_id_fkey(id, first_name, last_name),
@@ -75,8 +74,7 @@ export const DirectMessagesList = ({ theme, isDark = false }: DirectMessagesList
           .eq('recipient_id', userId)
           .order('created_at', { ascending: false }),
 
-        supabase
-          .from('direct_messages')
+        dataLayerClient.from('direct_messages')
           .select(`
             *,
             sender:profiles!direct_messages_sender_id_fkey(id, first_name, last_name),

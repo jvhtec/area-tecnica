@@ -9,7 +9,7 @@ import { Loader2, CheckCircle2, XCircle, AlertTriangle, Upload } from 'lucide-re
 import { GearSetupFormData } from '@/types/festival-gear';
 import { extractFlexElementId } from '@/utils/flexUrlParser';
 import { pushEquipmentToPullsheet, EquipmentItem, getJobPullsheetsWithFlexApi, JobPullsheet } from '@/services/flexPullsheets';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
@@ -171,8 +171,7 @@ export function PushToFlexPullsheetDialog({
     const loadPaPresets = async () => {
       setIsLoadingPaPresets(true);
       try {
-        const { data, error } = await supabase
-          .from('presets')
+        const { data, error } = await dataLayerClient.from('presets')
           .select('id, name, job_id')
           .eq('department', 'sound')
           .or(`job_id.eq.${jobId},job_id.is.null`)
@@ -297,8 +296,7 @@ export function PushToFlexPullsheetDialog({
     const lookupEquipment = async () => {
       setIsLookingUp(true);
       try {
-        const { data, error } = await supabase
-          .from('equipment')
+        const { data, error } = await dataLayerClient.from('equipment')
           .select('name, resource_id, department, id')
           .in('name', allModelNames)
           .not('resource_id', 'is', null);
@@ -408,8 +406,7 @@ export function PushToFlexPullsheetDialog({
     const lookupPaPreset = async () => {
       setIsLookingUpPaPreset(true);
       try {
-        const { data, error } = await supabase
-          .from('preset_items')
+        const { data, error } = await dataLayerClient.from('preset_items')
           .select('quantity, subsystem, equipment:equipment(id, name, category, resource_id)')
           .eq('preset_id', selectedPaPresetId);
 

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ACTIVE_DEPARTMENTS, DEPARTMENT_LABELS } from "@/types/department";
@@ -81,7 +81,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
       // Optionally send onboarding email
       if (created && sendOnboarding) {
         try {
-          const { data, error } = await supabase.functions.invoke('send-onboarding-email', {
+          const { data, error } = await dataLayerClient.functions.invoke('send-onboarding-email', {
             body: {
               email: formData.email,
               firstName: formData.firstName,
@@ -301,7 +301,7 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
                 onClick={async () => {
                   try {
                     setIsFetchingFlex(true);
-                    const { data, error } = await supabase.functions.invoke('fetch-flex-contact-info', {
+                    const { data, error } = await dataLayerClient.functions.invoke('fetch-flex-contact-info', {
                       body: formData.flexResourceId
                         ? { contact_id: formData.flexResourceId }
                         : { url: formData.flexUrl }

@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
+
+import { queryKeys } from "@/lib/react-query";
 export function useRecalcTimesheet() {
   const qc = useQueryClient()
   return useMutation({
@@ -16,8 +18,8 @@ export function useRecalcTimesheet() {
       return res.json()
     },
     onSuccess: (_data, timesheetId) => {
-      qc.invalidateQueries({ queryKey: ['timesheet', timesheetId] })
-      qc.invalidateQueries({ queryKey: ['timesheets'] })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('timesheet', timesheetId) })
+      qc.invalidateQueries({ queryKey: queryKeys.scope('timesheets') })
     }
   })
 }

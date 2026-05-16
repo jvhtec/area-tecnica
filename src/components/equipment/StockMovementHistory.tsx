@@ -1,6 +1,6 @@
 
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import {
   Table,
   TableBody,
@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/table";
 import { format } from "date-fns";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface StockMovement {
   id: string;
   equipment_id: string;
@@ -29,10 +31,9 @@ interface StockMovement {
 
 export function StockMovementHistory() {
   const { data: movements, isLoading } = useQuery({
-    queryKey: ['stock-movements'],
+    queryKey: queryKeys.scope('stock-movements'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('stock_movements')
+      const { data, error } = await dataLayerClient.from('stock_movements')
         .select(`
           *,
           equipment (name),

@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
+
+import { queryKeys } from "@/lib/react-query";
 type Dept = 'sound' | 'lights' | 'video' | 'production' | 'administrative';
 
 const TASK_TABLE: Record<Dept, string> = {
@@ -86,7 +88,7 @@ export function useGlobalTasks(department: Dept | undefined, filters?: GlobalTas
   const docFk = DOC_FK[dept];
 
   const query = useQuery({
-    queryKey: ['global-tasks', dept, filters],
+    queryKey: queryKeys.scope('global-tasks', dept, filters),
     queryFn: async () => {
       let q = dynamicSupabase
         .from(table)

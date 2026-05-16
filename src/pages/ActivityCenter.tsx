@@ -8,6 +8,8 @@ import { getDashboardPath } from '@/utils/roleBasedRouting';
 import { isManagementRole } from '@/utils/permissions';
 import type { UserRole } from '@/types/user';
 
+
+import { queryKeys } from "@/lib/react-query";
 export default function ActivityCenter() {
   const navigate = useNavigate();
   const { userRole, isLoading: authLoading } = useOptimizedAuth();
@@ -24,7 +26,7 @@ export default function ActivityCenter() {
   }, [userRole, authLoading, isManagementUser, navigate]);
 
   const { data = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['activity', 'all'],
+    queryKey: queryKeys.scope('activity', 'all'),
     queryFn: () => listActivity({ limit: 50 }),
     enabled: !authLoading && Boolean(userRole) && isManagementUser,
   });

@@ -157,8 +157,7 @@ area-tecnica/
 │   │   ├── ui/                       # shadcn/ui primitives (30+)
 │   │   ├── users/                    # User management
 │   │   │   └── import/               # Bulk user import
-│   │   ├── video/                    # Video department
-│   │   └── wallboard/                # Digital signage
+│   │   └── video/                    # Video department
 │   │
 │   ├── constants/                    # Application constants
 │   ├── contexts/                     # React Context providers
@@ -166,14 +165,18 @@ area-tecnica/
 │   │
 │   ├── features/                     # Feature modules (co-located logic)
 │   │   ├── activity/                 # Activity feed & notifications
+│   │   ├── festival-management/      # Festival management view model
 │   │   ├── lights/                   # Lighting department logic
 │   │   ├── rates/                    # Rate management
 │   │   ├── staffing/                 # Crew staffing logic
-│   │   └── timesheets/              # Timesheet calculations
+│   │   ├── timesheets/               # Timesheet calculations
+│   │   └── wallboard/                # Digital signage display
 │   │
 │   ├── hooks/                        # Custom React hooks (100+)
 │   │   ├── festival/                 # Festival-specific hooks
 │   │   ├── hoja-de-ruta/             # Tour book hooks
+│   │   ├── tours/                    # Tour workflow hooks
+│   │   ├── users/                    # User management hooks
 │   │   ├── useOptimizedAuth.tsx      # Auth provider (core)
 │   │   ├── usePushNotifications.ts   # Push notification hooks
 │   │   └── use*.ts                   # Domain-specific hooks
@@ -203,14 +206,13 @@ area-tecnica/
 │   │   ├── Timesheets.tsx            # Timesheet management
 │   │   ├── JobAssignmentMatrix.tsx   # Crew assignment matrix
 │   │   ├── EquipmentManagement.tsx   # Equipment catalog
-│   │   ├── festival-management/      # Festival management (multi-file)
-│   │   ├── wallboard/                # Wallboard pages
+│   │   ├── festival-management/      # Festival management route shell
 │   │   ├── consumos-tool/            # Power consumption calculator
 │   │   └── ...
 │   │
 │   ├── providers/                    # React providers
 │   ├── routes/                       # Routing configuration
-│   ├── services/                     # Business logic services
+│   ├── services/                     # Business logic services + data-layer boundary
 │   ├── stores/                       # Zustand global state
 │   │   ├── useSelectedJobStore.ts    # Selected job card state
 │   │   ├── useSelectedCellStore.ts   # Matrix cell selection

@@ -22,7 +22,7 @@ import { TechnicianIncidentReportDialog } from "@/components/incident-reports/Te
 import { Department, getDepartmentLabel } from "@/types/department";
 import { useQuery } from "@tanstack/react-query";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -61,6 +61,8 @@ import {
   isTechnicianRole,
 } from "@/utils/permissions";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface JobCardActionsProps {
   job: any;
   userRole: string | null;
@@ -242,8 +244,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   const { data: waProdAssignments = [], isLoading: waProdAssignmentsLoading } = useQuery({
     queryKey: createQueryKey.whatsapp.prodAssignmentsByJob(job.id),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_assignments')
+      const { data, error } = await dataLayerClient.from('job_assignments')
         .select('id, technician_id, single_day, assignment_date, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
         .eq('job_id', job.id);
       if (error) throw error;
@@ -284,8 +285,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     queryFn: async () => {
       // Source of truth: timesheets (active) determine which dates each tech actually works.
       // Note: we intentionally do NOT scope by technician_id here; job_id is the stable filter.
-      const { data, error } = await supabase
-        .from('timesheets')
+      const { data, error } = await dataLayerClient.from('timesheets')
         .select('technician_id,date')
         .eq('job_id', job.id)
         .eq('is_active', true);
@@ -423,7 +423,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
       }
 
       setWaProdSending(true);
-      const { data, error } = await supabase.functions.invoke<WaSendResult>('send-job-whatsapp-message', {
+      const { data, error } = await dataLayerClient.functions.invoke<WaSendResult>('send-job-whatsapp-message', {
         body: {
           job_id: job?.id,
           message: trimmed,
@@ -552,12 +552,11 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     isLoading: isTechnicalPowerDepartmentsLoading,
     isError: isTechnicalPowerDepartmentsError,
   } = useQuery<TechnicalPowerDepartment[]>({
-    queryKey: [...createQueryKey.jobs.detail(job.id), 'technical-power-job-departments'],
+    queryKey: queryKeys.custom(...createQueryKey.jobs.detail(job.id), 'technical-power-job-departments'),
     enabled: canGenerateTechnicalPowerPack && allowedJobType,
     staleTime: 60 * 1000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('job_departments')
+      const { data, error } = await dataLayerClient.from('job_departments')
         .select('department')
         .eq('job_id', job.id)
         .in('department', [...TECHNICAL_POWER_DEPARTMENTS]);
@@ -579,13 +578,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     isLoading: isTechnicalPowerSummaryPreviewLoading,
     isError: isTechnicalPowerSummaryPreviewError,
   } = useQuery({
-    queryKey: [
-      ...createQueryKey.jobs.detail(job.id),
-      'technical-power-summary',
-      job.job_type ?? null,
-      job.tour_id ?? null,
-      job.tour_date_id ?? null,
-    ],
+    queryKey: queryKeys.custom(...createQueryKey.jobs.detail(job.id), 'technical-power-summary', job.job_type ?? null, job.tour_id ?? null, job.tour_date_id ?? null),
     enabled:
       canGenerateTechnicalPowerPack &&
       allowedJobType &&
@@ -594,7 +587,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     queryFn: async () =>
       loadTechnicalPowerSummaryData({
         job: technicalPowerSummaryJob,
-        supabase,
+        supabase: dataLayerClient,
       }),
   });
 
@@ -715,8 +708,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
     setIsGeneratingTechnicalPowerPack(true);
 
     try {
-      const { data: freshJobDepartments, error: jobDepartmentsError } = await supabase
-        .from('job_departments')
+      const { data: freshJobDepartments, error: jobDepartmentsError } = await dataLayerClient.from('job_departments')
         .select('department')
         .eq('job_id', job.id)
         .in('department', [...TECHNICAL_POWER_DEPARTMENTS]);
@@ -740,7 +732,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
 
       const summary = await loadTechnicalPowerSummaryData({
         job: technicalPowerSummaryJob,
-        supabase,
+        supabase: dataLayerClient,
       });
 
       const summaryStatus = getTechnicalPowerSummaryAvailability(
@@ -816,19 +808,17 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
   // Show tour defaults indicator on buttons if defaults exist for this tour and department
   const tourId: string | undefined = job?.tour_id || job?.tour?.id || undefined;
   const { data: defaultsInfo } = useQuery<{ weight: boolean; power: boolean }>({
-    queryKey: ['tour-default-exists', tourId, department],
+    queryKey: queryKeys.scope('tour-default-exists', tourId, department),
     enabled: Boolean(tourId && department && canViewCalculators && allowedJobType),
     queryFn: async () => {
-      const { data: sets, error: err1 } = await supabase
-        .from('tour_default_sets')
+      const { data: sets, error: err1 } = await dataLayerClient.from('tour_default_sets')
         .select('id')
         .eq('tour_id', tourId!)
         .eq('department', department!);
       if (err1) throw err1;
       if (!sets || sets.length === 0) return { weight: false, power: false };
       const setIds = sets.map(s => s.id);
-      const { data: tables, error: err2 } = await supabase
-        .from('tour_default_tables')
+      const { data: tables, error: err2 } = await dataLayerClient.from('tour_default_tables')
         .select('id, table_type')
         .in('set_id', setIds);
       if (err2) throw err2;
@@ -1800,8 +1790,7 @@ export const JobCardActions: React.FC<JobCardActionsProps> = ({
                   const trimmed = (waMessage || '').trim();
                   const finalMsg = trimmed || defaultMsg;
                   const isDefault = finalMsg.trim().toLowerCase() === defaultMsg.trim().toLowerCase();
-                  const { error } = await supabase
-                    .functions.invoke('send-warehouse-message', { body: { message: finalMsg, job_id: job?.id, highlight: isDefault } });
+                  const { error } = await dataLayerClient.functions.invoke('send-warehouse-message', { body: { message: finalMsg, job_id: job?.id, highlight: isDefault } });
                   if (error) {
                     toast({ title: 'Error al enviar', description: error.message, variant: 'destructive' });
                   } else {

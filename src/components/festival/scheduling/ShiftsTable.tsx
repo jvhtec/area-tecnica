@@ -13,7 +13,7 @@ import { Trash2, FileDown, Edit, Users, Copy } from "lucide-react";
 import { ShiftWithAssignments } from "@/types/festival-scheduling";
 import { useToast } from "@/hooks/use-toast";
 import { exportShiftsTablePDF, ShiftsTablePdfData } from "@/utils/shiftsTablePdfExport";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { EditShiftDialog } from "./EditShiftDialog";
 import { ManageAssignmentsDialog } from "./ManageAssignmentsDialog";
 import { CopyShiftsDialog } from "./CopyShiftsDialog";
@@ -53,8 +53,7 @@ export const ShiftsTable = ({
       if (!jobId) return;
       
       try {
-        const { data: jobData, error: jobError } = await supabase
-          .from("jobs")
+        const { data: jobData, error: jobError } = await dataLayerClient.from("jobs")
           .select("title")
           .eq("id", jobId)
           .single();
@@ -65,8 +64,7 @@ export const ShiftsTable = ({
           setJobTitle(jobData.title);
         }
         
-        const { data, error } = await supabase
-          .from("festival_settings")
+        const { data, error } = await dataLayerClient.from("festival_settings")
           .select("logo_url")
           .eq("job_id", jobId)
           .single();
@@ -95,7 +93,7 @@ export const ShiftsTable = ({
               }
               
               console.log(`Getting public URL for bucket: ${bucket}, path: ${path}`);
-              const { data: publicUrlData } = supabase.storage
+              const { data: publicUrlData } = dataLayerClient.storage
                 .from(bucket)
                 .getPublicUrl(path);
                 

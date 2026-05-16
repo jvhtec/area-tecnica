@@ -1,10 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useOptimizedAuth } from './useOptimizedAuth';
 import { expenseCopy } from '@/components/expenses/expenseCopy';
 import type { ExpenseStatus } from '@/components/expenses/ExpenseStatusBadge';
 import { isManagementRole, isTechnicianRole } from '@/utils/permissions';
+import { queryKeys } from "@/lib/react-query";
 
 export interface JobExpense {
   id: string;
@@ -68,7 +70,7 @@ export const useJobExpenses = (
   const selfServiceOnly = options.selfServiceOnly === true;
 
   return useQuery({
-    queryKey: ['job-expenses', jobId, user?.id, { selfServiceOnly }],
+    queryKey: queryKeys.scope('job-expenses', jobId, user?.id, { selfServiceOnly }),
     queryFn: async () => {
       if (!jobId || !user?.id) {
         return [];
@@ -143,7 +145,7 @@ export const useJobExpenseMutations = () => {
       return expense;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['job-expenses', variables.job_id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-expenses', variables.job_id) });
       toast.success(expenseCopy.success.saved);
     },
     onError: (error) => {
@@ -169,7 +171,7 @@ export const useJobExpenseMutations = () => {
       return expense;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['job-expenses', variables.jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-expenses', variables.jobId) });
       toast.success(expenseCopy.success.saved);
     },
     onError: (error) => {
@@ -197,8 +199,8 @@ export const useJobExpenseMutations = () => {
       return expense;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['job-expenses', variables.job_id] });
-      queryClient.invalidateQueries({ queryKey: ['job-totals'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-expenses', variables.job_id) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-totals') });
       toast.success(expenseCopy.success.submitted);
     },
     onError: (error: Error) => {
@@ -219,7 +221,7 @@ export const useJobExpenseMutations = () => {
       if (error) throw error;
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['job-expenses', variables.jobId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-expenses', variables.jobId) });
       toast.success(expenseCopy.success.deleted);
     },
     onError: (error) => {
@@ -293,7 +295,7 @@ export const useJobApprovedExpenses = (jobId: string | null | undefined) => {
   const isManager = isManagementRole(userRole);
 
   return useQuery({
-    queryKey: ['job-approved-expenses', jobId],
+    queryKey: queryKeys.scope('job-approved-expenses', jobId),
     enabled: !!jobId,
     queryFn: async () => {
       if (!jobId) {
@@ -362,10 +364,7 @@ export const useJobApprovedExpenses = (jobId: string | null | undefined) => {
       });
 
       return groupedExpenses;
-    },
+   },
     staleTime: 60 * 1000,
   });
 };
-
-// Need to import React for useState
-import React from 'react';

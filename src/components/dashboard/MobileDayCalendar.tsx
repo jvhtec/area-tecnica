@@ -18,7 +18,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { DateTypeContextMenu } from "./DateTypeContextMenu";
 import { MobileJobCard } from "./MobileJobCard";
 import { Department } from "@/types/department";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { PrintDialog, PrintSettings } from "./PrintDialog";
 import {
   format,
@@ -52,6 +52,8 @@ import { formatInJobTimezone, isJobOnDate } from "@/utils/timezoneUtils";
 import { useMobileDayCalendarSubscriptions } from "@/hooks/useMobileRealtimeSubscriptions";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface MobileDayCalendarProps {
   date: Date | undefined;
   onDateSelect: (date: Date | undefined) => void;
@@ -100,7 +102,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 }) => {
   const [currentDate, setCurrentDate] = useState(date);
   const queryClient = useQueryClient();
-  
+
   // Set up realtime subscriptions for all mobile calendar data
   useMobileDayCalendarSubscriptions();
   const [showPrintDialog, setShowPrintDialog] = useState(false);
@@ -152,7 +154,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
 
   // Use realtime query for date types instead of manual fetch
   const { data: dateTypes = {} } = useQuery({
-    queryKey: ['job_date_types', format(currentDate, 'yyyy-MM-dd')],
+    queryKey: queryKeys.scope('job_date_types', format(currentDate, 'yyyy-MM-dd')),
     queryFn: async () => {
       const dayJobs = getJobsForDate(currentDate);
       const jobIds = dayJobs.map(job => job.id);
@@ -162,8 +164,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
         return {};
       }
 
-      const { data, error } = await supabase
-        .from("job_date_types")
+      const { data, error } = await dataLayerClient.from("job_date_types")
         .select("*")
         .in("job_id", jobIds)
         .eq("date", formattedDate);
@@ -226,8 +227,8 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
         date={currentDate}
         onTypeChange={() => {
           // Invalidate and refetch date types query
-          queryClient.invalidateQueries({ 
-            queryKey: ['job_date_types', format(currentDate, 'yyyy-MM-dd')] 
+          queryClient.invalidateQueries({
+            queryKey: queryKeys.scope('job_date_types', format(currentDate, 'yyyy-MM-dd'))
           });
           // Also call the parent callback
           onDateTypeChange();
@@ -240,8 +241,8 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           dateTypes={dateTypes}
           onDateTypeChange={() => {
             // Invalidate and refetch date types query
-            queryClient.invalidateQueries({ 
-              queryKey: ['job_date_types', format(currentDate, 'yyyy-MM-dd')] 
+            queryClient.invalidateQueries({
+              queryKey: queryKeys.scope('job_date_types', format(currentDate, 'yyyy-MM-dd'))
             });
             // Also call the parent callback
             onDateTypeChange();
@@ -262,7 +263,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
           <Button variant="ghost" size="sm" onClick={navigateToPrevious} className="p-2">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          
+
           <div className="text-center flex-1">
             <div className="text-lg font-semibold">
               {format(currentDate, 'EEEE')}
@@ -274,12 +275,12 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
               {format(currentDate, 'MMM d, yyyy')}
             </div>
           </div>
-          
+
           <div className="flex gap-1">
             <Button variant="outline" size="sm" onClick={navigateToToday}>
               <Target className="h-4 w-4" />
             </Button>
-            
+
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm">
@@ -302,7 +303,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
               </PopoverContent>
             </Popover>
           </div>
-          
+
           <Button variant="ghost" size="sm" onClick={navigateToNext} className="p-2">
             <ChevronRight className="h-4 w-4" />
           </Button>
@@ -324,8 +325,8 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent 
-                  align="start" 
+                <DropdownMenuContent
+                  align="start"
                   className="w-48 z-50 bg-background border shadow-lg"
                   sideOffset={4}
                 >
@@ -356,8 +357,8 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
                     )}
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent 
-                  align="start" 
+                <DropdownMenuContent
+                  align="start"
                   className="w-48 z-50 bg-background border shadow-lg"
                   sideOffset={4}
                 >
@@ -375,7 +376,7 @@ export const MobileDayCalendar: React.FC<MobileDayCalendarProps> = ({
               </DropdownMenu>
             ) : null}
           </div>
-          
+
           <Button variant="outline" size="sm" onClick={() => setShowPrintDialog(true)}>
             <Printer className="h-4 w-4 mr-1" />
             Print

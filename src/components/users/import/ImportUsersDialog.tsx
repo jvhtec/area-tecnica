@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Loader2, Download } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -51,7 +51,7 @@ export const ImportUsersDialog = ({ open, onOpenChange }: ImportUsersDialogProps
       const formData = new FormData();
       formData.append("file", file);
 
-      const { data, error: uploadError } = await supabase.functions.invoke("import-users", {
+      const { data, error: uploadError } = await dataLayerClient.functions.invoke("import-users", {
         body: formData,
       });
 

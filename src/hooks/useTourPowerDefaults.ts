@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface TourPowerDefault {
   id: string;
   tour_id: string;
@@ -31,7 +33,7 @@ export const useTourPowerDefaults = (tourId: string) => {
   const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ['tour-power-defaults', tourId],
+    queryKey: queryKeys.scope('tour-power-defaults', tourId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from('tour_power_defaults')
@@ -54,7 +56,7 @@ export const useTourPowerDefaults = (tourId: string) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-power-defaults', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-power-defaults', tourId) });
     },
   });
 
@@ -79,7 +81,7 @@ export const useTourPowerDefaults = (tourId: string) => {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-power-defaults', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-power-defaults', tourId) });
     },
   });
 
@@ -94,7 +96,7 @@ export const useTourPowerDefaults = (tourId: string) => {
       return id;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-power-defaults', tourId] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-power-defaults', tourId) });
     },
   });
 

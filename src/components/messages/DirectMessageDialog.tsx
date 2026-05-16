@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useToast } from "@/hooks/use-toast";
 import { MessageSquare } from "lucide-react";
 
@@ -48,8 +48,7 @@ export const DirectMessageDialog = ({
   useEffect(() => {
     const fetchProfiles = async () => {
       console.log("Fetching profiles for direct message dialog");
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name')
         .order('first_name');
 
@@ -72,13 +71,12 @@ export const DirectMessageDialog = ({
       setSending(true);
       console.log("Sending direct message to:", selectedRecipientId);
 
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await dataLayerClient.auth.getSession();
       if (!session?.user) {
         throw new Error("No authenticated user found");
       }
 
-      const { error } = await supabase
-        .from('direct_messages')
+      const { error } = await dataLayerClient.from('direct_messages')
         .insert({
           sender_id: session.user.id,
           recipient_id: selectedRecipientId,

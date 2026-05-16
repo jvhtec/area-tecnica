@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Map as MapboxMap, Marker as MapboxMarker } from 'mapbox-gl';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import type { SoundVisionFile } from '@/hooks/useSoundVisionFiles';
@@ -47,7 +47,7 @@ export const SoundVisionMap = ({ files }: SoundVisionMapProps) => {
         if (!isMounted) return;
         mapboxglRef.current = mapboxgl;
 
-        const { data, error: tokenError } = await supabase.functions.invoke('get-mapbox-token');
+        const { data, error: tokenError } = await dataLayerClient.functions.invoke('get-mapbox-token');
 
         if (tokenError) {
           console.error('Token fetch error:', tokenError);
