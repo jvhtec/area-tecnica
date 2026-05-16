@@ -1,6 +1,6 @@
 # ARCHITECTURE.md — Area Tecnica (Sector Pro)
 
-> **Last updated**: 2026-03-18
+> **Last updated**: 2026-05-16
 > **Repository**: github.com/jvhtec/area-tecnica
 > **Team**: Sector Pro Engineering
 > **Platform**: sector-pro.work
@@ -150,6 +150,7 @@ area-tecnica/
 │   │   ├── soundvision/              # SoundVision file management
 │   │   ├── tasks/                    # Task management
 │   │   ├── technician/               # Technician-specific views
+│   │   │   └── details-modal/        # Split modal data, document actions, formatters, and tabs
 │   │   ├── timesheet/                # Timesheet entry & approval
 │   │   ├── tours/                    # Tour management
 │   │   │   ├── scheduling/
