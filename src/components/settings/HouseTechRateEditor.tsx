@@ -8,8 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Euro, Info, Save } from 'lucide-react';
 import { useHouseTechRate, useSaveHouseTechRate, useLogRateActivity } from '@/hooks/useHouseTechRates';
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-
+import { dataLayerClient } from '@/services/dataLayerClient';
+import { queryKeys } from "@/lib/react-query";
 interface HouseTechRateEditorProps {
   profileId: string;
   profileName: string;
@@ -47,10 +47,9 @@ export function HouseTechRateEditor({ profileId, profileName, category = 'tecnic
 
   // Get category defaults for context
   const { data: categoryDefaultsMap } = useQuery({
-    queryKey: ['rate-card-defaults', 'tecnico-especialista-responsable'],
+    queryKey: queryKeys.scope('rate-card-defaults', 'tecnico-especialista-responsable'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('rate_cards_2025')
+      const { data, error } = await dataLayerClient.from('rate_cards_2025')
         .select('category, base_day_eur, plus_10_12_eur, overtime_hour_eur')
         .in('category', RATE_CATEGORIES);
 

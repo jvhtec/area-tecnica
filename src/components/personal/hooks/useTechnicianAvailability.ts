@@ -1,18 +1,17 @@
 
 import { useState, useEffect, useCallback, useRef, useSyncExternalStore } from 'react';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
 interface TechnicianAvailability {
-  id: string;
+  id: number;
   technician_id: string;
   date: string;
-  status: 'vacation' | 'travel' | 'sick' | 'day_off';
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-  created_by?: string;
+  status: string;
+  created_at: string | null;
+  updated_at: string | null;
+  created_by: string | null;
 }
 
 interface AvailabilitySchedule {
@@ -29,6 +28,18 @@ interface AvailabilitySchedule {
 }
 
 type AvailabilityStatus = 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse';
+
+const legacyAvailabilityStatuses = new Set<AvailabilityStatus>([
+  'vacation',
+  'travel',
+  'sick',
+  'day_off',
+  'unavailable',
+  'warehouse',
+]);
+
+const isAvailabilityStatus = (status: string): status is AvailabilityStatus =>
+  legacyAvailabilityStatuses.has(status as AvailabilityStatus);
 
 interface AvailabilityStore {
   data: Record<string, AvailabilityStatus>;
@@ -92,8 +103,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         const endOfMonthFormatted = format(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 0), 'yyyy-MM-dd');
 
         // Fetch technician_availability (legacy)
-        const { data: availabilityDataRaw, error: availabilityError } = await supabase
-          .from('technician_availability')
+        const { data: availabilityDataRaw, error: availabilityError } = await dataLayerClient.from('technician_availability')
           .select('*')
           .gte('date', startOfMonthFormatted)
           .lte('date', endOfMonthFormatted);
@@ -104,8 +114,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         }
 
         // Fetch availability_schedules (new system with vacation integration)
-        const { data: schedulesData, error: schedulesError } = await supabase
-          .from('availability_schedules')
+        const { data: schedulesData, error: schedulesError } = await dataLayerClient.from('availability_schedules')
           .select('*')
           .gte('date', startOfMonthFormatted)
           .lte('date', endOfMonthFormatted);
@@ -123,7 +132,9 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         // Process legacy technician_availability data
         availabilityDataRaw?.forEach((item: TechnicianAvailability) => {
           const key = `${item.technician_id}-${item.date}`;
-          availabilityMap[key] = item.status;
+          if (isAvailabilityStatus(item.status)) {
+            availabilityMap[key] = item.status;
+          }
         });
 
         // Process new availability_schedules data (includes vacation-based unavailability)
@@ -165,8 +176,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
     };
 
     // Set up real-time subscription for both tables
-    const availabilityChannel = supabase
-      .channel('technician-availability-updates')
+    const availabilityChannel = dataLayerClient.channel('technician-availability-updates')
       .on(
         'postgres_changes',
         {
@@ -181,8 +191,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
       )
       .subscribe();
 
-    const schedulesChannel = supabase
-      .channel('availability-schedules-updates')
+    const schedulesChannel = dataLayerClient.channel('availability-schedules-updates')
       .on(
         'postgres_changes',
         {
@@ -197,8 +206,7 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
       )
       .subscribe();
 
-    const vacationRequestsChannel = supabase
-      .channel('vacation-requests-updates')
+    const vacationRequestsChannel = dataLayerClient.channel('vacation-requests-updates')
       .on(
         'postgres_changes',
         {
@@ -215,9 +223,9 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
 
     return () => {
       clearTimeout(refetchTimeout);
-      supabase.removeChannel(availabilityChannel);
-      supabase.removeChannel(schedulesChannel);
-      supabase.removeChannel(vacationRequestsChannel);
+      dataLayerClient.removeChannel(availabilityChannel);
+      dataLayerClient.removeChannel(schedulesChannel);
+      dataLayerClient.removeChannel(vacationRequestsChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [monthKey]); // Only refetch when month boundary changes
@@ -232,14 +240,12 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
       // Handle warehouse status by inserting into availability_schedules
       if (status === 'warehouse') {
         // Get user's department
-        const { data: profile } = await supabase
-          .from('profiles')
+        const { data: profile } = await dataLayerClient.from('profiles')
           .select('department')
           .eq('id', techId)
           .single();
 
-        const { error: scheduleError } = await supabase
-          .from('availability_schedules')
+        const { error: scheduleError } = await dataLayerClient.from('availability_schedules')
           .upsert({
             user_id: techId,
             department: profile?.department || 'unknown',
@@ -263,13 +269,12 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
         }
       } else {
         // Handle other statuses with legacy table
-        const { error } = await supabase
-          .from('technician_availability')
+        const { error } = await dataLayerClient.from('technician_availability')
           .upsert({
             technician_id: techId,
             date: dateStr,
             status,
-            created_by: (await supabase.auth.getUser()).data.user?.id
+            created_by: (await dataLayerClient.auth.getUser()).data.user?.id
           }, {
             onConflict: 'technician_id,date'
           });
@@ -313,14 +318,12 @@ export const useTechnicianAvailability = (currentMonth: Date) => {
       // No optimistic update here - handled in HouseTechBadge component
 
       // Remove from both tables to ensure cleanup
-      const { error: legacyError } = await supabase
-        .from('technician_availability')
+      const { error: legacyError } = await dataLayerClient.from('technician_availability')
         .delete()
         .eq('technician_id', techId)
         .eq('date', dateStr);
 
-      const { error: scheduleError } = await supabase
-        .from('availability_schedules')
+      const { error: scheduleError } = await dataLayerClient.from('availability_schedules')
         .delete()
         .eq('user_id', techId)
         .eq('date', dateStr)

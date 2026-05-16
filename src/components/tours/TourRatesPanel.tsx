@@ -11,7 +11,7 @@ import { useManagerJobQuotes } from "@/hooks/useManagerJobQuotes";
 import { useToggleTechnicianPayoutApproval } from "@/hooks/useToggleTechnicianPayoutApproval";
 import { TourJobRateQuote } from "@/types/tourRates";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { calculateQuoteTotal, formatMultiplier, getPerJobMultiplier, shouldDisplayMultiplier } from "@/lib/tourRateMath";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import { getAutonomoBadgeLabel } from "@/utils/autonomo";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import type { TechnicianProfile } from "@/utils/rates-pdf-export";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface TourRatesPanelProps {
   jobId: string;
   jobType?: string | null;
@@ -68,11 +70,10 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({
   const toggleApprovalMutation = useToggleTechnicianPayoutApproval();
 
   const { data: jobMeta } = useQuery({
-    queryKey: ['tour-rates-job-meta', jobId],
+    queryKey: queryKeys.scope('tour-rates-job-meta', jobId),
     enabled: !!jobId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('id, title, start_time, end_time, timezone, tour_id, job_type, rates_approved')
         .eq('id', jobId)
         .maybeSingle();
@@ -126,13 +127,12 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({
   type ProfileWithEmail = TechnicianProfile & { email?: string | null };
 
   const { data: profiles = [] } = useQuery({
-    queryKey: ['profiles-for-tour-rates', quotes.map(q => q.technician_id)],
+    queryKey: queryKeys.scope('profiles-for-tour-rates', quotes.map(q => q.technician_id)),
     queryFn: async () => {
       if (!quotes.length) return [];
 
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name, role, email, autonomo')
         .in('id', techIds);
 
@@ -155,11 +155,10 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({
   );
 
   const { data: approvalMap = new Map<string, boolean>() } = useQuery({
-    queryKey: ['tour-rates-approvals', jobIds],
+    queryKey: queryKeys.scope('tour-rates-approvals', jobIds),
     enabled: jobIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('timesheets')
+      const { data, error } = await dataLayerClient.from('timesheets')
         .select('job_id, technician_id, approved_by_manager')
         .in('job_id', jobIds);
 
@@ -285,7 +284,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({
                 setIsSendingEmails(true);
                 const result = await sendTourJobEmails({
                   jobId,
-                  supabase,
+                  supabase: dataLayerClient,
                   quotes: approvedQuotes,
                   profiles: typedProfiles
                 });
@@ -460,7 +459,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({
 
                               const result = await sendTourJobEmails({
                                 jobId,
-                                supabase,
+                                supabase: dataLayerClient,
                                 quotes: approvedQuotesForTech,
                                 profiles: typedProfiles,
                                 technicianIds: [quote.technician_id],

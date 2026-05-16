@@ -15,7 +15,7 @@ import {
   Wifi,
   X,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Tables } from "@/integrations/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -488,8 +488,7 @@ export function TechnicianRfTableModal({
     queryKey: createQueryKey.technician.rfTableArtists(job?.id),
     queryFn: async () => {
       if (!job?.id) return [];
-      const { data, error } = await supabase
-        .from("festival_artists")
+      const { data, error } = await dataLayerClient.from("festival_artists")
         .select("*")
         .eq("job_id", job?.id)
         .order("date", { ascending: true });
@@ -503,8 +502,7 @@ export function TechnicianRfTableModal({
     queryKey: createQueryKey.technician.rfTableStages(job?.id),
     queryFn: async () => {
       if (!job?.id) return [];
-      const { data, error } = await supabase
-        .from("festival_stages")
+      const { data, error } = await dataLayerClient.from("festival_stages")
         .select("number, name")
         .eq("job_id", job?.id);
       if (error) return [];

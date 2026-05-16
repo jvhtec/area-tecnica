@@ -11,7 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Euro, AlertTriangle, Calendar, Users, ShieldCheck, ShieldX, FileDown, Info } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
@@ -33,6 +33,8 @@ import { isManagementRole } from '@/utils/permissions';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import type { Database } from '@/integrations/supabase/types';
 
+
+import { queryKeys } from "@/lib/react-query";
 type TourRatesManagerDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -57,10 +59,9 @@ const isTimesheetCategory = (value: string): value is TimesheetCategory =>
 export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRatesManagerDialogProps) {
   // Fetch tour jobs (include tour dates + single/festival; exclude dryhire)
   const { data: tourJobs = [] } = useQuery<TourRatesJob[]>({
-    queryKey: ['tour-jobs-for-rates', tourId],
+    queryKey: queryKeys.scope('tour-jobs-for-rates', tourId),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('id, title, start_time, end_time, timezone, job_type, tour_id')
         .eq('tour_id', tourId)
         .neq('job_type', 'dryhire')
@@ -93,12 +94,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
 
   // Fetch profiles for names
   const { data: profiles = [] } = useQuery<RateProfile[]>({
-    queryKey: ['profiles-for-rates-manager', quotes.map(q => q.technician_id)],
+    queryKey: queryKeys.scope('profiles-for-rates-manager', quotes.map(q => q.technician_id)),
     queryFn: async () => {
       if (!quotes.length) return [];
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name, email, default_timesheet_category, role, assignable_as_tech')
         .in('id', techIds);
       if (error) throw error;
@@ -161,12 +161,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
 
   // House rates in bulk (to show current values when fixing)
   const { data: houseRates = [] } = useQuery({
-    queryKey: ['house-tech-rates-bulk', quotes.map(q => q.technician_id)],
+    queryKey: queryKeys.scope('house-tech-rates-bulk', quotes.map(q => q.technician_id)),
     queryFn: async () => {
       if (!quotes.length) return [] as HouseRateRow[];
       const techIds = [...new Set(quotes.map(q => q.technician_id))];
-      const { data, error } = await supabase
-        .from('custom_tech_rates')
+      const { data, error } = await dataLayerClient.from('custom_tech_rates')
         .select('profile_id, base_day_eur, travel_half_day_eur, travel_full_day_eur')
         .in('profile_id', techIds);
       if (error) throw error;
@@ -185,16 +184,15 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   const saveHouseRate = useSaveHouseTechRate();
   const fixCategoryMutation = useMutation({
     mutationFn: async ({ technicianId, category }: { technicianId: string; category: 'tecnico' | 'especialista' | 'responsable' }) => {
-      const { error } = await supabase
-        .from('profiles')
+      const { error } = await dataLayerClient.from('profiles')
         .update({ default_timesheet_category: category })
         .eq('id', technicianId);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['profiles-for-rates-manager'] });
-      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
-      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('profiles-for-rates-manager') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes-manager') });
     }
   });
 
@@ -217,10 +215,9 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
       }
 
       if (approve) {
-        const { data: user } = await supabase.auth.getUser();
+        const { data: user } = await dataLayerClient.auth.getUser();
         const approver = user?.user?.id || null;
-        const { error } = await supabase
-          .from('jobs')
+        const { error } = await dataLayerClient.from('jobs')
           .update({
             rates_approved: true,
             rates_approved_at: new Date().toISOString(),
@@ -238,8 +235,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
         }
         return { jobId, approve, syncResult, syncError };
       } else {
-        const { error } = await supabase
-          .from('jobs')
+        const { error } = await dataLayerClient.from('jobs')
           .update({
             rates_approved: false,
             rates_approved_at: null,
@@ -252,11 +248,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     },
     onSuccess: (data, { jobId }) => {
       invalidateRatesContext(queryClient);
-      queryClient.invalidateQueries({ queryKey: ['job-rates-approval', jobId] });
-      queryClient.invalidateQueries({ queryKey: ['job-rates-approval-map'] });
-      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager', jobId] });
-      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager', jobId, tourId] });
-      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-rates-approval', jobId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-rates-approval-map') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes-manager', jobId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes-manager', jobId, tourId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes-manager') });
       if (data?.approve) {
         if (data?.syncResult?.created) {
           toast.success(`Órdenes de trabajo creadas en Flex: ${data.syncResult.created}`);
@@ -293,15 +289,13 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                 onClick={async () => {
                   setExportingTour(true);
                   try {
-                    const { data: tourData } = await supabase
-                      .from('tours')
+                    const { data: tourData } = await dataLayerClient.from('tours')
                       .select('name')
                       .eq('id', tourId)
                       .single();
 
                     // Fetch all eligible jobs for export (include 'single'/'festival' linked to this tour; exclude dryhire)
-                    const { data: allJobs, error: jobsError } = await supabase
-                      .from('jobs')
+                    const { data: allJobs, error: jobsError } = await dataLayerClient.from('jobs')
                       .select('id, title, start_time, end_time, job_type')
                       .eq('tour_id', tourId)
                       .order('start_time', { ascending: true });
@@ -348,8 +342,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   variant="outline"
                   size="sm"
                   onClick={async () => {
-                    const { error } = await supabase
-                      .from('tours')
+                    const { error } = await dataLayerClient.from('tours')
                       .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null })
                       .eq('id', tourId);
                     if (!error) {
@@ -365,10 +358,9 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   variant="default"
                   size="sm"
                   onClick={async () => {
-                    const { data: user } = await supabase.auth.getUser();
+                    const { data: user } = await dataLayerClient.auth.getUser();
                     const approver = user?.user?.id || null;
-                    const { error } = await supabase
-                      .from('tours')
+                    const { error } = await dataLayerClient.from('tours')
                       .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: approver })
                       .eq('id', tourId);
                     if (!error) {
@@ -434,8 +426,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                       const job = tourJobs.find((j) => j.id === selectedJobId);
                       if (!job) return;
                       
-                      const { data: lpoRows } = await supabase
-                        .from('flex_work_orders')
+                      const { data: lpoRows } = await dataLayerClient.from('flex_work_orders')
                         .select('technician_id, lpo_number')
                         .eq('job_id', selectedJobId);
                       
@@ -460,7 +451,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                       try {
                         const result = await sendTourJobEmails({
                           jobId: selectedJobId,
-                          supabase,
+                          supabase: dataLayerClient,
                           quotes,
                           profiles,
                         });
@@ -556,7 +547,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                               try {
                                 const result = await sendTourJobEmails({
                                   jobId: selectedJobId,
-                                  supabase,
+                                  supabase: dataLayerClient,
                                   quotes: quotes.filter(qq => qq.technician_id === q.technician_id),
                                   profiles,
                                   technicianIds: [q.technician_id],
@@ -635,8 +626,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                                     const val = parseFloat((e.target as HTMLInputElement).value);
                                     if (!isNaN(val)) {
                                       await saveHouseRate.mutateAsync({ profile_id: q.technician_id, base_day_eur: val, plus_10_12_eur: null, overtime_hour_eur: null });
-                                      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
-                                      queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager'] });
+                                      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes') });
+                                      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes-manager') });
                                     }
                                   }
                                 }}
@@ -646,8 +637,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                                 const val = parseFloat(el?.value || '');
                                 if (!isNaN(val)) {
                                   await saveHouseRate.mutateAsync({ profile_id: q.technician_id, base_day_eur: val, plus_10_12_eur: null, overtime_hour_eur: null });
-                                  queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes'] });
-                                  queryClient.invalidateQueries({ queryKey: ['tour-job-rate-quotes-manager'] });
+                                  queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes') });
+                                  queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-job-rate-quotes-manager') });
                                 }
                               }}>Guardar</Button>
                               {houseRateMap[q.technician_id] !== undefined && (

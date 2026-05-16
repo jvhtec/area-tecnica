@@ -7,11 +7,13 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { REQUEST_TRANSPORT_OPTIONS } from '@/constants/transportOptions'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '@/lib/supabase'
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { format } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
 import type { Database, Json } from '@/integrations/supabase/types'
 
+
+import { queryKeys } from "@/lib/react-query";
 type Department = 'sound' | 'lights' | 'video'
 type JobRow = Database['public']['Tables']['jobs']['Row']
 type TransportRequestRow = Database['public']['Tables']['transport_requests']['Row']
@@ -62,11 +64,10 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
 
   // Load tour jobs (tour dates)
   const { data: tourJobs = [] } = useQuery({
-    queryKey: ['tour-logistics-jobs', tourId],
+    queryKey: queryKeys.scope('tour-logistics-jobs', tourId),
     enabled: open && !!tourId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('jobs')
+      const { data, error } = await dataLayerClient.from('jobs')
         .select('id, title, start_time, job_type, status')
         .eq('tour_id', tourId)
         .eq('job_type', 'tourdate')
@@ -80,11 +81,10 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
 
   // Load existing requests for current department
   const { data: existingReqs = [], refetch: refetchRequests } = useQuery({
-    queryKey: ['tour-logistics-requests', tourId, department, jobIds.join(',')],
+    queryKey: queryKeys.scope('tour-logistics-requests', tourId, department, jobIds.join(',')),
     enabled: open && jobIds.length > 0,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('transport_requests')
+      const { data, error } = await dataLayerClient.from('transport_requests')
         .select('id, job_id, department, note, status, created_by, items:transport_request_items(transport_type, leftover_space_meters)')
         .in('job_id', jobIds)
         .eq('department', department)
@@ -137,7 +137,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
   const saveAll = async () => {
     try {
       // Ensure we have auth
-      const { data: userData } = await supabase.auth.getUser()
+      const { data: userData } = await dataLayerClient.auth.getUser()
       const userId = userData.user?.id
       if (!userId) throw new Error('Not authenticated')
 
@@ -147,7 +147,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
 
         // Find existing request for job+department
         const existing = existingReqs.find(r => r.job_id === jobId)
-        const { error } = await supabase.rpc('replace_transport_request_with_items', {
+        const { error } = await dataLayerClient.rpc('replace_transport_request_with_items', {
           p_request_id: existing?.id || null,
           p_job_id: jobId,
           p_department: department,

@@ -8,10 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Progress } from '@/components/ui/progress';
 import { Upload, Download, Trash2, Plus } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { TASK_TYPES } from '@/constants/taskTypes';
+
+import { queryKeys } from "@/lib/react-query";
 const DEPARTMENT_NAME: Record<'sound' | 'lights' | 'video', string> = {
   sound: 'sonido',
   lights: 'luces',
@@ -54,7 +56,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
 
   React.useEffect(() => {
     (async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data } = await dataLayerClient.auth.getUser();
       setCurrentUserId(data.user?.id || null);
     })();
   }, []);
@@ -363,10 +365,9 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
 
 function useManagementUsers() {
   return useQuery({
-    queryKey: ['management-users'],
+    queryKey: queryKeys.scope('management-users'),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name')
         .in('role', ['management', 'admin', 'logistics', 'oscar']);
       if (error) throw error;
@@ -377,10 +378,9 @@ function useManagementUsers() {
 
 function useDepartmentUsers(department: Dept) {
   return useQuery({
-    queryKey: ['department-users', department],
+    queryKey: queryKeys.scope('department-users', department),
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
+      const { data, error } = await dataLayerClient.from('profiles')
         .select('id, first_name, last_name, role')
         .eq('department', department);
       if (error) throw error;
@@ -390,7 +390,7 @@ function useDepartmentUsers(department: Dept) {
 }
 
 async function viewDoc(doc: { file_path: string; file_name: string }) {
-  const { data } = await supabase.storage.from('task_documents').createSignedUrl(doc.file_path, 3600);
+  const { data } = await dataLayerClient.storage.from('task_documents').createSignedUrl(doc.file_path, 3600);
   if (data?.signedUrl) {
     window.open(data.signedUrl, '_blank', 'noopener');
   }

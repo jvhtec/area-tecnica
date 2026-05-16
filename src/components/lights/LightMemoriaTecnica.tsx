@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Upload, File, FilePlus, FileCheck, Loader2, Image as ImageIcon, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Progress } from "@/components/ui/progress";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -120,13 +120,13 @@ export const LightMemoriaTecnica = () => {
   };
 
   const uploadToStorage = async (file: File, path: string) => {
-    const { error: uploadError, data } = await supabase.storage
+    const { error: uploadError, data } = await dataLayerClient.storage
       .from('lights-memoria-tecnica')
       .upload(path, file);
 
     if (uploadError) throw uploadError;
 
-    const { data: { publicUrl } } = supabase.storage
+    const { data: { publicUrl } } = dataLayerClient.storage
       .from('lights-memoria-tecnica')
       .getPublicUrl(path);
 
@@ -207,7 +207,7 @@ export const LightMemoriaTecnica = () => {
 
       setProgress(60);
 
-      const response = await supabase.functions.invoke('generate-lights-memoria-tecnica', {
+      const response = await dataLayerClient.functions.invoke('generate-lights-memoria-tecnica', {
         body: { documentUrls, projectName, logoUrl }
       });
 
@@ -218,8 +218,7 @@ export const LightMemoriaTecnica = () => {
 
       setProgress(80);
 
-      const { error: dbError } = await supabase
-        .from('lights_memoria_tecnica_documents')
+      const { error: dbError } = await dataLayerClient.from('lights_memoria_tecnica_documents')
         .insert({
           project_name: projectName,
           logo_url: logoUrl,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -245,7 +245,7 @@ export function PushNotificationMatrix() {
     try {
       if (next) {
         // create if not present
-        const { error } = await supabase.from('push_notification_routes').insert({
+        const { error } = await dataLayerClient.from('push_notification_routes').insert({
           event_code: ev,
           recipient_type: type,
           target_id: target,
@@ -255,8 +255,7 @@ export function PushNotificationMatrix() {
         toast({ title: 'Saved', description: 'Routing updated.' });
       } else {
         // delete matching rows
-        let q = supabase
-          .from('push_notification_routes')
+        let q = dataLayerClient.from('push_notification_routes')
           .delete()
           .eq('event_code', ev)
           .eq('recipient_type', type);
@@ -287,7 +286,7 @@ export function PushNotificationMatrix() {
 
     try {
       if (next) {
-        const { error } = await supabase.from('push_notification_routes').insert({
+        const { error } = await dataLayerClient.from('push_notification_routes').insert({
           event_code: ev,
           recipient_type: 'natural',
           target_id: null,
@@ -297,15 +296,13 @@ export function PushNotificationMatrix() {
         toast({ title: 'Enabled', description: 'Natural recipients will be included.' });
       } else {
         // remove any 'natural' rows and also clear include_natural flags on other rows for this event
-        const { error: delErr } = await supabase
-          .from('push_notification_routes')
+        const { error: delErr } = await dataLayerClient.from('push_notification_routes')
           .delete()
           .eq('event_code', ev)
           .eq('recipient_type', 'natural');
         if (delErr) throw delErr;
         // best-effort: set include_natural_recipients=false on remaining rows
-        await supabase
-          .from('push_notification_routes')
+        await dataLayerClient.from('push_notification_routes')
           .update({ include_natural_recipients: false })
           .eq('event_code', ev);
         toast({ title: 'Disabled', description: 'Natural recipients excluded for this event.' });
@@ -322,16 +319,13 @@ export function PushNotificationMatrix() {
     setRefreshing(true);
     try {
       const [usersRes, eventsRes, routesRes] = await Promise.all([
-        supabase
-          .from('profiles')
+        dataLayerClient.from('profiles')
           .select('id, first_name, last_name, nickname, email, department, role')
           .in('role', ['admin', 'management', 'oscar']),
-        supabase
-          .from('activity_catalog')
+        dataLayerClient.from('activity_catalog')
           .select('code, label')
           .order('code', { ascending: true }),
-        supabase
-          .from('push_notification_routes')
+        dataLayerClient.from('push_notification_routes')
           .select('id, event_code, recipient_type, target_id, include_natural_recipients'),
       ]);
 

@@ -1,4 +1,5 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase as runtimeSupabase } from "@/lib/supabase";
+import type { supabase as typedSupabase } from "@/integrations/supabase/client";
 
 /**
  * Shared data-layer client for legacy component/page code that still owns query
@@ -6,4 +7,4 @@ import { supabase } from "@/integrations/supabase/client";
  * boundary removes direct Supabase client ownership from UI modules while Phase
  * 2 migration continues across the largest surfaces.
  */
-export const dataLayerClient: typeof supabase = supabase;
+export const dataLayerClient: typeof typedSupabase = runtimeSupabase as typeof typedSupabase;

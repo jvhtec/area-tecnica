@@ -1,12 +1,14 @@
 
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 
+
+import { queryKeys } from "@/lib/react-query";
 interface TourDateFormProps {
   tourId: string;
   initialData?: any;
@@ -30,8 +32,7 @@ export const TourDateForm = ({
 
       // Create or find location if name is provided
       if (locationName.trim()) {
-        const { data: existingLocation } = await supabase
-          .from('locations')
+        const { data: existingLocation } = await dataLayerClient.from('locations')
           .select('id')
           .eq('name', locationName.trim())
           .single();
@@ -39,8 +40,7 @@ export const TourDateForm = ({
         if (existingLocation) {
           locationId = existingLocation.id;
         } else {
-          const { data: newLocation, error: locationError } = await supabase
-            .from('locations')
+          const { data: newLocation, error: locationError } = await dataLayerClient.from('locations')
             .insert({
               name: locationName.trim(),
               formatted_address: locationName.trim()
@@ -55,10 +55,11 @@ export const TourDateForm = ({
 
       if (initialData?.id) {
         // Update existing tour date
-        const { error } = await supabase
-          .from('tour_dates')
+        const { error } = await dataLayerClient.from('tour_dates')
           .update({
             date,
+            start_date: date,
+            end_date: date,
             location_id: locationId
           })
           .eq('id', initialData.id);
@@ -66,11 +67,12 @@ export const TourDateForm = ({
         if (error) throw error;
       } else {
         // Create new tour date
-        const { error } = await supabase
-          .from('tour_dates')
+        const { error } = await dataLayerClient.from('tour_dates')
           .insert({
             tour_id: tourId,
             date,
+            start_date: date,
+            end_date: date,
             location_id: locationId
           });
 
@@ -78,9 +80,9 @@ export const TourDateForm = ({
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tour-dates', tourId] });
-      queryClient.invalidateQueries({ queryKey: ['tours'] });
-      queryClient.invalidateQueries({ queryKey: ['my-tours'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-dates', tourId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tours') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('my-tours') });
       toast.success(initialData ? 'Tour date updated successfully' : 'Tour date created successfully');
       onSuccess();
     },

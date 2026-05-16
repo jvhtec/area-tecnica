@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { labelForCode } from '@/utils/roles';
 import { createSignedUrl } from '@/utils/jobDocuments';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { OBLIQUE_STRATEGIES } from "./obliqueStrategies";
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 
@@ -123,7 +123,7 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
     const docId = doc.id;
     setDocumentLoading(prev => new Set(prev).add(docId));
     try {
-      const url = await createSignedUrl(supabase, doc.file_path, 60);
+      const url = await createSignedUrl(dataLayerClient, doc.file_path, 60);
       window.open(url, '_blank');
     } catch (err: any) {
       toast({ title: 'Error', description: `No se pudo abrir el documento: ${err.message}`, variant: 'destructive' });
@@ -136,7 +136,7 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
     const docId = doc.id;
     setDocumentLoading(prev => new Set(prev).add(docId));
     try {
-      const url = await createSignedUrl(supabase, doc.file_path, 60);
+      const url = await createSignedUrl(dataLayerClient, doc.file_path, 60);
       const link = document.createElement('a');
       link.href = url;
       link.download = doc.file_name;

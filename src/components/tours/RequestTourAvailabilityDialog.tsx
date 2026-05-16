@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { buildTourSchedulePdfBlob } from '@/lib/tourPdfExport';
 import { uploadTourPdfWithRecord } from '@/utils/tourDocumentsUpload';
 import { isDepartmentManagementRole, isTechnicianRole } from '@/utils/permissions';
@@ -31,7 +31,7 @@ export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenCha
     // Load technicians using the same RPC as the matrix to keep consistency
     (async () => {
       try {
-        const { data, error } = await supabase.rpc('get_profiles_with_skills');
+        const { data, error } = await dataLayerClient.rpc('get_profiles_with_skills');
         if (error) throw error;
         const filtered = (data || [])
           .filter((t: any) => isTechnicianRole(t.role) || (isDepartmentManagementRole(t.role) && t.assignable_as_tech))
@@ -47,8 +47,7 @@ export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenCha
     (async () => {
       try {
         if (tourDates && tourDates.length) { setDates(tourDates); return; }
-        const { data, error } = await supabase
-          .from('tour_dates')
+        const { data, error } = await dataLayerClient.from('tour_dates')
           .select('id, date, is_tour_pack_only, location:locations(name)')
           .eq('tour_id', tourId)
           .order('date', { ascending: true });
@@ -69,7 +68,7 @@ export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenCha
     setLoading(true);
     try {
       // Fetch tour name
-      const { data: tourRow, error: tourErr } = await supabase.from('tours').select('id,name').eq('id', tourId).maybeSingle();
+      const { data: tourRow, error: tourErr } = await dataLayerClient.from('tours').select('id,name').eq('id', tourId).maybeSingle();
       if (tourErr || !tourRow) throw tourErr || new Error('Tour not found');
 
       // Build PDF blob
@@ -81,7 +80,7 @@ export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenCha
       const { file_path } = await uploadTourPdfWithRecord(tourId, pdfBlob, suggestedName);
 
       // Send a single tour‑wide availability inquiry (no per‑date staffing requests)
-      const { data, error: fnErr } = await supabase.functions.invoke('send-tour-availability', {
+      const { data, error: fnErr } = await dataLayerClient.functions.invoke('send-tour-availability', {
         body: { tour_id: tourId, profile_id: selectedTechId, channel, tour_pdf_path: file_path }
       });
       if (fnErr || (data && (data as any).error)) {

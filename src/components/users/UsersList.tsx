@@ -1,6 +1,6 @@
 
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Profile } from "./types";
 import { UsersListContent } from "./UsersListContent";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
@@ -24,6 +24,10 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 
+
+import { queryKeys } from "@/lib/react-query";
+import type { Database } from "@/integrations/supabase/types";
+import type { Department } from "@/types/department";
 interface UsersListProps {
   searchQuery?: string;
   roleFilter?: string;
@@ -35,6 +39,8 @@ interface QueryResult {
   data: Profile[];
   count: number;
 }
+
+type UserRole = Database["public"]["Enums"]["user_role"];
 
 const PAGE_SIZE = 10;
 
@@ -53,10 +59,10 @@ export const UsersList = ({
 
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await dataLayerClient.auth.getSession();
       setIsAuthenticated(!!session);
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const { data: { subscription } } = dataLayerClient.auth.onAuthStateChange((_event, session) => {
         setIsAuthenticated(!!session);
       });
 
@@ -67,7 +73,7 @@ export const UsersList = ({
   }, []);
 
   const { data: users, isLoading, error, isFetching, refetch } = useQuery<QueryResult>({
-    queryKey: ['profiles', searchQuery, roleFilter, departmentFilter, currentPage, sortBy, sortOrder],
+    queryKey: queryKeys.scope('profiles', searchQuery, roleFilter, departmentFilter, currentPage, sortBy, sortOrder),
     queryFn: async () => {
       if (!isAuthenticated) {
         console.log("Not authenticated, skipping profiles fetch");
@@ -79,13 +85,12 @@ export const UsersList = ({
       });
       
       try {
-        let query = supabase
-          .from('profiles')
+        let query = dataLayerClient.from('profiles')
           .select('id, first_name, nickname, last_name, email, role, phone, department, dni, residencia, assignable_as_tech, warehouse_duty_exempt, flex_resource_id, soundvision_access_enabled, autonomo', { count: 'exact' });
 
         // Apply filters
         if (roleFilter) {
-          query = query.eq('role', roleFilter);
+          query = query.eq('role', roleFilter as UserRole);
         }
 
         if (departmentFilter) {
@@ -119,7 +124,13 @@ export const UsersList = ({
           return { data: [], count: 0 };
         }
 
-        const validProfiles = profileData.filter(profile => profile && profile.id);
+        const validProfiles: Profile[] = profileData
+          .filter(profile => profile && profile.id)
+          .map(profile => ({
+            ...profile,
+            role: profile.role,
+            department: profile.department as Department | null,
+          }));
         console.log("Profiles fetch successful:", validProfiles);
         return { data: validProfiles, count: count || 0 };
       } catch (error) {

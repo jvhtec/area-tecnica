@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createQueryKey } from '@/lib/optimized-react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { dataLayerClient } from '@/services/dataLayerClient';
 import {
     Loader2,
     Search,
@@ -44,6 +44,8 @@ import type { Map as MapboxMap } from 'mapbox-gl';
 import { Theme } from '@/components/technician/types';
 import { isManagementRole } from '@/utils/permissions';
 
+
+import { queryKeys } from "@/lib/react-query";
 export interface SoundVisionInteractiveMapProps {
     theme: Theme;
     isDark: boolean;
@@ -96,10 +98,9 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
     const { data: profile } = useQuery({
         queryKey: createQueryKey.profiles.currentUser,
         queryFn: async () => {
-            const { data: { user } } = await supabase.auth.getUser();
+            const { data: { user } } = await dataLayerClient.auth.getUser();
             if (!user) return null;
-            const { data } = await supabase
-                .from('profiles')
+            const { data } = await dataLayerClient.from('profiles')
                 .select('role')
                 .eq('id', user.id)
                 .single();
@@ -489,7 +490,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                 setMapLoading(true);
                 setMapError(null);
 
-                const { data, error: tokenError } = await supabase.functions.invoke('get-mapbox-token');
+                const { data, error: tokenError } = await dataLayerClient.functions.invoke('get-mapbox-token');
 
                 if (tokenError) {
                     throw new Error(`Error al obtener el token de Mapbox: ${tokenError.message}`);
@@ -833,8 +834,8 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
 
     const handleUploadComplete = async () => {
         // Refresh file list + venues so filters/markers update.
-        await queryClient.invalidateQueries({ queryKey: ['soundvision-files'] });
-        await queryClient.invalidateQueries({ queryKey: ['venues'] });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.scope('soundvision-files') });
+        await queryClient.invalidateQueries({ queryKey: queryKeys.scope('venues') });
         await refetch();
         setUploadOpen(false);
     };

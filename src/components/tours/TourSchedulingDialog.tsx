@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import {
   Calendar,
   Clock,
@@ -81,8 +81,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
     setIsLoading(true);
     try {
       // Load tour with dates and locations
-      const { data: tour, error: tourError } = await supabase
-        .from('tours')
+      const { data: tour, error: tourError } = await dataLayerClient.from('tours')
         .select(`
           *,
           tour_dates (
@@ -97,16 +96,14 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
 
       // Load hoja de ruta records for each tour date
       const dateIds = tour.tour_dates?.map((d: any) => d.id) || [];
-      const { data: hojaDeRutaRecords, error: hojaError } = await supabase
-        .from('hoja_de_ruta' as any)
+      const { data: hojaDeRutaRecords, error: hojaError } = await dataLayerClient.from('hoja_de_ruta' as any)
         .select('*')
         .in('tour_date_id', dateIds);
 
       if (hojaError) throw hojaError;
 
       // Load accommodations for the tour
-      const { data: accommodationsData, error: accommodationsError } = await supabase
-        .from('tour_accommodations' as any)
+      const { data: accommodationsData, error: accommodationsError } = await dataLayerClient.from('tour_accommodations' as any)
         .select('*')
         .eq('tour_id', tourId);
 
@@ -117,7 +114,7 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
       }
 
       // Fetch Mapbox token
-      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('get-mapbox-token');
+      const { data: tokenData, error: tokenError } = await dataLayerClient.functions.invoke('get-mapbox-token');
       if (tokenError) {
         console.error('Error fetching Mapbox token:', tokenError);
       } else if (tokenData?.token) {

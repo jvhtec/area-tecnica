@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import {
   Route,
   MapPin,
@@ -302,8 +302,7 @@ export const EnhancedTourTravelPlanner: React.FC<
 
     setIsSaving(true);
     try {
-      const { error } = await supabase
-        .from("tours")
+      const { error } = await dataLayerClient.from("tours")
         .update({ travel_plan: travelPlan } as any)
         .eq("id", tourId);
 

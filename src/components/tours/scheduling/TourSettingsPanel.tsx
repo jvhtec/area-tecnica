@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import {
   Home,
@@ -121,8 +121,7 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
         defaultReturnTime: settings.defaultReturnTime,
       };
 
-      const { error } = await supabase
-        .from("tours")
+      const { error } = await dataLayerClient.from("tours")
         .update({ tour_settings: tourSettings } as any)
         .eq("id", tourId);
 

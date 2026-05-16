@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { roleOptionsForDiscipline } from '@/types/roles'
-import { supabase } from '@/lib/supabase'
+import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
 import type { Json } from '@/integrations/supabase/types'
 
@@ -69,8 +69,7 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
       }
 
       // 1) Fetch all jobs for this tour
-      const { data: jobs, error: jobsErr } = await supabase
-        .from('jobs')
+      const { data: jobs, error: jobsErr } = await dataLayerClient.from('jobs')
         .select('id')
         .eq('tour_id', tourId)
 
@@ -92,7 +91,7 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
           }))
         )
 
-        const { error: replaceErr } = await supabase.rpc('replace_job_required_roles', {
+        const { error: replaceErr } = await dataLayerClient.rpc('replace_job_required_roles', {
           p_job_id: jobId,
           p_departments: selectedDepts,
           p_rows: rows as unknown as Json,

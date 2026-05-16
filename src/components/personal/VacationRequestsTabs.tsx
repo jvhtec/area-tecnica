@@ -5,7 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useVacationRequests } from "@/hooks/useVacationRequests";
 import { format } from "date-fns";
@@ -109,8 +109,7 @@ export const VacationRequestsTabs: React.FC<VacationRequestsTabsProps> = ({
       try {
         const startRange = new Date(`${request.start_date}T00:00:00`);
         const endRange = new Date(`${request.end_date}T23:59:59.999`);
-        const { data, error } = await supabase
-          .from('job_assignments')
+        const { data, error } = await dataLayerClient.from('job_assignments')
           .select(`
             jobs!inner (
               id,

@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getElementTree, ElementTreeNode } from "./apiService";
-import { supabase } from "@/integrations/supabase/client";
-
-vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
+import { dataLayerClient } from "@/services/dataLayerClient";
+vi.mock("@/services/dataLayerClient", () => ({
+  dataLayerClient: {
     functions: {
       invoke: vi.fn(),
     },
@@ -22,7 +21,7 @@ describe("getElementTree", () => {
   });
 
   it("should throw error when auth token retrieval fails", async () => {
-    vi.mocked(supabase.functions.invoke).mockResolvedValueOnce({
+    vi.mocked(dataLayerClient.functions.invoke).mockResolvedValueOnce({
       data: { X_AUTH_TOKEN: null },
       error: { message: "Failed to get secret" } as any,
     } as any);
@@ -33,7 +32,7 @@ describe("getElementTree", () => {
   });
 
   it("should fetch element tree successfully with happy path data", async () => {
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(dataLayerClient.functions.invoke).mockResolvedValue({
       data: { X_AUTH_TOKEN: "test-token" },
       error: null,
     });
@@ -82,7 +81,7 @@ describe("getElementTree", () => {
   });
 
   it("should return empty array when API returns non-array data", async () => {
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(dataLayerClient.functions.invoke).mockResolvedValue({
       data: { X_AUTH_TOKEN: "test-token" },
       error: null,
     });
@@ -103,7 +102,7 @@ describe("getElementTree", () => {
   });
 
   it("should handle empty tree response", async () => {
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(dataLayerClient.functions.invoke).mockResolvedValue({
       data: { X_AUTH_TOKEN: "test-token" },
       error: null,
     });
@@ -120,7 +119,7 @@ describe("getElementTree", () => {
   });
 
   it("should throw error on 404 response", async () => {
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(dataLayerClient.functions.invoke).mockResolvedValue({
       data: { X_AUTH_TOKEN: "test-token" },
       error: null,
     });
@@ -138,7 +137,7 @@ describe("getElementTree", () => {
   });
 
   it("should throw error on 500 response", async () => {
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(dataLayerClient.functions.invoke).mockResolvedValue({
       data: { X_AUTH_TOKEN: "test-token" },
       error: null,
     });
@@ -156,7 +155,7 @@ describe("getElementTree", () => {
   });
 
   it("should throw error on 401 unauthorized response", async () => {
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(dataLayerClient.functions.invoke).mockResolvedValue({
       data: { X_AUTH_TOKEN: "test-token" },
       error: null,
     });
@@ -174,7 +173,7 @@ describe("getElementTree", () => {
   });
 
   it("should handle network errors gracefully", async () => {
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(dataLayerClient.functions.invoke).mockResolvedValue({
       data: { X_AUTH_TOKEN: "test-token" },
       error: null,
     });
@@ -187,7 +186,7 @@ describe("getElementTree", () => {
   });
 
   it("should handle complex nested tree structures", async () => {
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(dataLayerClient.functions.invoke).mockResolvedValue({
       data: { X_AUTH_TOKEN: "test-token" },
       error: null,
     });
@@ -245,7 +244,7 @@ describe("getElementTree", () => {
   });
 
   it("should make multiple fetch calls with the same auth token", async () => {
-    vi.mocked(supabase.functions.invoke).mockResolvedValue({
+    vi.mocked(dataLayerClient.functions.invoke).mockResolvedValue({
       data: { X_AUTH_TOKEN: "test-token" },
       error: null,
     });

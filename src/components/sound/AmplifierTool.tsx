@@ -9,7 +9,7 @@ import { FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { generateAmplifierPdf } from "@/utils/amplifierCalculationPdf";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useQueryClient } from "@tanstack/react-query";
 import { soundComponentDatabase, sectionSpeakers, speakerAmplifierConfig, isTFSpeaker } from "./amplifier-tool/constants";
 import type { AmplifierResults, SpeakerConfig, SpeakerSection } from "./amplifier-tool/types";
@@ -55,8 +55,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
     const loadPresets = async () => {
       setIsLoadingPresets(true);
       try {
-        const { data, error } = await supabase
-          .from('presets')
+        const { data, error } = await dataLayerClient.from('presets')
           .select('id, name')
           .eq('department', 'sound')
           .order('name');
@@ -85,8 +84,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
     const loadAmpEquipment = async () => {
       setIsLoadingAmpOptions(true);
       try {
-        const { data, error } = await supabase
-          .from('equipment')
+        const { data, error } = await dataLayerClient.from('equipment')
           .select('id, name, category')
           .eq('department', 'sound')
           .in('category', ['pa_amp', 'amplificacion']);
@@ -127,8 +125,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
 
     const loadSpeakerEquipment = async () => {
       try {
-        const { data, error } = await supabase
-          .from('equipment')
+        const { data, error } = await dataLayerClient.from('equipment')
           .select('id, name')
           .eq('department', 'sound');
 
@@ -415,7 +412,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
   };
 
   const cleanupNewlyCreatedPreset = async (presetId: string) => {
-    await supabase.from('presets').delete().eq('id', presetId);
+    await dataLayerClient.from('presets').delete().eq('id', presetId);
     setPresetOptions(prev => prev.filter(p => p.id !== presetId));
     setSelectedPresetId('');
     setCreateNewPreset(false);
@@ -496,13 +493,12 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
 
       // Create new preset if in create mode
       if (createNewPreset) {
-        const { data: session, error: sessionError } = await supabase.auth.getSession();
+        const { data: session, error: sessionError } = await dataLayerClient.auth.getSession();
         if (sessionError || !session?.session?.user?.id) {
           throw new Error('Usuario no autenticado');
         }
 
-        const { data: newPreset, error: createError } = await supabase
-          .from('presets')
+        const { data: newPreset, error: createError } = await dataLayerClient.from('presets')
           .insert({
             name: newPresetName.trim(),
             created_by: session.session.user.id,
@@ -525,8 +521,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
         setNewPresetName('');
 
         // Refresh preset list
-        const { data: updatedPresets } = await supabase
-          .from('presets')
+        const { data: updatedPresets } = await dataLayerClient.from('presets')
           .select('id, name')
           .eq('department', 'sound')
           .order('name');
@@ -535,8 +530,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
         }
       }
 
-      const { data: previousItems, error: fetchError } = await supabase
-        .from('preset_items')
+      const { data: previousItems, error: fetchError } = await dataLayerClient.from('preset_items')
         .select('preset_id, equipment_id, quantity, subsystem, source, notes')
         .eq('preset_id', targetPresetId)
         .eq('source', 'amp_calculator');
@@ -549,8 +543,7 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
         throw fetchError;
       }
 
-      const { error: deleteError } = await supabase
-        .from('preset_items')
+      const { error: deleteError } = await dataLayerClient.from('preset_items')
         .delete()
         .eq('preset_id', targetPresetId)
         .eq('source', 'amp_calculator');
@@ -641,13 +634,13 @@ export const AmplifierTool = ({ jobId, tourId }: AmplifierToolProps = {}) => {
       }
 
       if (itemsToInsert.length > 0) {
-        const { error: insertError } = await supabase.from('preset_items').insert(itemsToInsert);
+        const { error: insertError } = await dataLayerClient.from('preset_items').insert(itemsToInsert);
         if (insertError) {
           let errorMessage = 'No se pudieron guardar los items en el preset.';
 
           // Attempt to restore previous items to avoid losing data
           if (previousItems && previousItems.length > 0) {
-            const { error: restoreError } = await supabase.from('preset_items').insert(
+            const { error: restoreError } = await dataLayerClient.from('preset_items').insert(
               previousItems.map((item) => ({
                 preset_id: item.preset_id,
                 equipment_id: item.equipment_id,

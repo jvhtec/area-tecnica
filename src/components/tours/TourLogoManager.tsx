@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Image, Upload, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
 interface TourLogoManagerProps {
@@ -26,8 +26,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
         return;
       }
       
-      const { data, error } = await supabase
-        .from('tour_logos')
+      const { data, error } = await dataLayerClient.from('tour_logos')
         .select('file_path')
         .eq('tour_id', tourId)
         .maybeSingle();
@@ -40,8 +39,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
 
       if (data?.file_path) {
         try {
-          const { data: signedUrlData } = await supabase
-            .storage
+          const { data: signedUrlData } = await dataLayerClient.storage
             .from('tour-logos')
             .createSignedUrl(data.file_path, 60 * 60); // 1 hour expiry
             
@@ -50,8 +48,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
             setLogoUrl(signedUrlData.signedUrl);
           } else {
             // Fallback to public URL
-            const { data: publicUrlData } = supabase
-              .storage
+            const { data: publicUrlData } = dataLayerClient.storage
               .from('tour-logos')
               .getPublicUrl(data.file_path);
               
@@ -105,7 +102,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       console.log("Authenticated user:", userId);
       
       // Check auth status before proceeding
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } = await dataLayerClient.auth.getSession();
       if (sessionError || !sessionData.session) {
         throw new Error("Authentication error: " + (sessionError?.message || "Session not found"));
       }
@@ -115,8 +112,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
 
       console.log("Checking for existing logo in database");
       // First, check if there's an existing logo
-      const { data: existingLogo, error: fetchError } = await supabase
-        .from('tour_logos')
+      const { data: existingLogo, error: fetchError } = await dataLayerClient.from('tour_logos')
         .select('file_path')
         .eq('tour_id', tourId)
         .maybeSingle();
@@ -129,7 +125,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       // If there's an existing logo, remove it from storage
       if (existingLogo?.file_path) {
         console.log("Removing existing logo from storage:", existingLogo.file_path);
-        const { error: removeError } = await supabase.storage
+        const { error: removeError } = await dataLayerClient.storage
           .from('tour-logos')
           .remove([existingLogo.file_path]);
           
@@ -141,7 +137,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
 
       // Upload new logo
       console.log("Uploading new logo to storage:", filePath);
-      const { error: uploadError } = await supabase.storage
+      const { error: uploadError } = await dataLayerClient.storage
         .from('tour-logos')
         .upload(filePath, file, {
           upsert: true,
@@ -155,8 +151,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
 
       // Insert or update the database record
       console.log("Updating tour_logos table");
-      const { error: dbError } = await supabase
-        .from('tour_logos')
+      const { error: dbError } = await dataLayerClient.from('tour_logos')
         .upsert({
           tour_id: tourId,
           file_path: filePath,
@@ -172,13 +167,11 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       }
 
       // Get signed URL for uploaded logo
-      const { data: signedUrlData } = await supabase
-        .storage
+      const { data: signedUrlData } = await dataLayerClient.storage
         .from('tour-logos')
         .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
 
-      const logoUrl = signedUrlData?.signedUrl || supabase
-        .storage
+      const logoUrl = signedUrlData?.signedUrl || dataLayerClient.storage
         .from('tour-logos')
         .getPublicUrl(filePath).data.publicUrl;
 
@@ -221,13 +214,12 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
       console.log("Deleting logo as user:", userId);
       
       // Check auth status before proceeding
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const { data: sessionData, error: sessionError } = await dataLayerClient.auth.getSession();
       if (sessionError || !sessionData.session) {
         throw new Error("Authentication error: " + (sessionError?.message || "Session not found"));
       }
       
-      const { data, error: fetchError } = await supabase
-        .from('tour_logos')
+      const { data, error: fetchError } = await dataLayerClient.from('tour_logos')
         .select('file_path')
         .eq('tour_id', tourId)
         .maybeSingle();
@@ -239,7 +231,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
 
       if (data?.file_path) {
         console.log("Removing logo from storage:", data.file_path);
-        const { error: storageError } = await supabase.storage
+        const { error: storageError } = await dataLayerClient.storage
           .from('tour-logos')
           .remove([data.file_path]);
 
@@ -249,8 +241,7 @@ export const TourLogoManager = ({ tourId }: TourLogoManagerProps) => {
         }
 
         console.log("Deleting logo record from database");
-        const { error: dbError } = await supabase
-          .from('tour_logos')
+        const { error: dbError } = await dataLayerClient.from('tour_logos')
           .delete()
           .eq('tour_id', tourId);
 
