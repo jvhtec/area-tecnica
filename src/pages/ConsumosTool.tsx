@@ -512,8 +512,6 @@ const ConsumosTool: React.FC = () => {
       // Read saved electrical metadata from table.metadata or table.table_data
       const savedPf = table.metadata?.pf ?? table.table_data?.pf ?? pf;
       const savedSafetyMargin = table.metadata?.safetyMargin ?? table.table_data?.safetyMargin ?? safetyMargin;
-      const savedPhaseMode = table.metadata?.phaseMode ?? table.table_data?.phaseMode ?? phaseMode;
-      const savedVoltage = table.metadata?.voltage ?? table.table_data?.voltage ?? voltage;
 
       // Compute electrical values using saved metadata
       const adjW = (table.total_value || 0) * (1 + savedSafetyMargin / 100);
@@ -541,8 +539,6 @@ const ConsumosTool: React.FC = () => {
     // Read saved electrical metadata from def.metadata or def (legacy structure)
     const savedPf = def.metadata?.pf ?? def.pf ?? pf;
     const savedSafetyMargin = def.metadata?.safetyMargin ?? def.safetyMargin ?? safetyMargin;
-    const savedPhaseMode = def.metadata?.phaseMode ?? def.phaseMode ?? phaseMode;
-    const savedVoltage = def.metadata?.voltage ?? def.voltage ?? voltage;
 
     // Compute electrical values using saved metadata
     const adjW = (def.total_watts || 0) * (1 + savedSafetyMargin / 100);
@@ -571,8 +567,6 @@ const ConsumosTool: React.FC = () => {
     // Read saved electrical metadata from override.override_data
     const savedPf = override.override_data?.pf ?? pf;
     const savedSafetyMargin = override.override_data?.safetyMargin ?? safetyMargin;
-    const savedPhaseMode = override.override_data?.phaseMode ?? phaseMode;
-    const savedVoltage = override.override_data?.voltage ?? voltage;
 
     // Compute electrical values using saved metadata
     const adjW = (override.total_watts || 0) * (1 + savedSafetyMargin / 100);

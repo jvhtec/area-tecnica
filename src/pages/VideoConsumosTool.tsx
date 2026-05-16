@@ -499,7 +499,7 @@ const VideoConsumosTool: React.FC = () => {
       
       setDefaultTables(powerDefaults);
     }
-  }, [isOverrideMode, overrideData]);
+  }, [isOverrideMode, overrideData, safetyMargin, pf]);
 
   // Load tour name for display
   useEffect(() => {

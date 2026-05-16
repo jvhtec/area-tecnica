@@ -387,7 +387,7 @@ const LightsConsumosTool: React.FC = () => {
 
       setDefaultTables(powerDefaults);
     }
-  }, [isOverrideMode, overrideData]);
+  }, [isOverrideMode, overrideData, safetyMargin]);
 
   // Preselect job from query param and fetch details if not in the list
   useEffect(() => {

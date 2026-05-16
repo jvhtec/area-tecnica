@@ -72,7 +72,8 @@ export const PowerTableControls = <Table extends PowerTable>({
   table,
   tableId = table.id ?? table.name,
 }: PowerTableControlsProps<Table>) => {
-  const pduSelectValue = table.customPduType
+  const hasCustomPdu = table.customPduType !== undefined && table.customPduType !== null;
+  const pduSelectValue = hasCustomPdu
     ? pduTypes.includes(table.customPduType)
       ? table.customPduType
       : customPduSelectValue
@@ -121,7 +122,7 @@ export const PowerTableControls = <Table extends PowerTable>({
               <SelectItem value={customPduSelectValue}>{labels.customPduOption}</SelectItem>
             </SelectContent>
           </Select>
-          {table.customPduType !== undefined && !pduTypes.includes(table.customPduType || "") && (
+          {hasCustomPdu && !pduTypes.includes(table.customPduType || "") && (
             <Input
               placeholder={labels.customPduPlaceholder}
               value={table.customPduType || ""}

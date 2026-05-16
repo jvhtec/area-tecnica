@@ -25,6 +25,34 @@ describe("technical power calculations", () => {
     expect(totals.currentLine).toBeCloseTo(12, 3);
   });
 
+  it("guards invalid voltage and power factor without returning infinite current", () => {
+    const invalidPowerFactorTotals = calculateElectricalTotals({
+      settings: {
+        phaseMode: "three",
+        powerFactor: 0,
+        safetyMargin: 20,
+        voltage: 400,
+      },
+      totalWatts: 1000,
+    });
+
+    expect(invalidPowerFactorTotals.totalVa).toBe(1200);
+    expect(invalidPowerFactorTotals.currentLine).toBe(0);
+
+    const invalidVoltageTotals = calculateElectricalTotals({
+      rawApparentPowerVa: 900,
+      settings: {
+        phaseMode: "single",
+        safetyMargin: 10,
+        voltage: 0,
+      },
+      totalWatts: 800,
+    });
+
+    expect(invalidVoltageTotals.totalVa).toBeCloseTo(990, 3);
+    expect(invalidVoltageTotals.currentLine).toBe(0);
+  });
+
   it("recommends department-specific PDU sizes using the shared planning limit", () => {
     expect(recommendPowerPdu(12, getPowerPduOptions("sound", "three"))).toBe("CEE16A 3P+N+G");
     expect(recommendPowerPdu(12, getPowerPduOptions("lights", "three"))).toBe("CEE32A 3P+N+G");

@@ -46,4 +46,17 @@ describe("PowerTableControls", () => {
     expect(screen.getByText("Anulación de Tipo de PDU:")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Ingrese un tipo de PDU personalizado")).toHaveValue("Rack distro");
   });
+
+  it("keeps an empty custom PDU value in custom mode", () => {
+    render(
+      <PowerTableControls
+        table={{ ...table, customPduType: "" }}
+        pduTypes={["CEE32A 3P+N+G"]}
+        onUpdateSettings={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("Enter custom PDU type")).toHaveValue("");
+    expect(screen.getByText("Custom PDU Type")).toBeInTheDocument();
+  });
 });

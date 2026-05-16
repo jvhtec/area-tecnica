@@ -75,9 +75,14 @@ export const calculateElectricalTotals = ({
 }) => {
   const adjustedWatts = totalWatts * (1 + settings.safetyMargin / 100);
   const powerFactor = settings.powerFactor ?? 1;
+  const hasValidVoltage = settings.voltage > 0;
 
   if (rawApparentPowerVa !== undefined) {
     const adjustedVa = rawApparentPowerVa * (1 + settings.safetyMargin / 100);
+    if (!hasValidVoltage) {
+      return { adjustedWatts, adjustedVa, currentLine: 0, totalVa: adjustedVa };
+    }
+
     const currentLine =
       settings.phaseMode === "single"
         ? adjustedVa / settings.voltage
@@ -86,11 +91,15 @@ export const calculateElectricalTotals = ({
     return { adjustedWatts, adjustedVa, currentLine, totalVa: adjustedVa };
   }
 
+  const totalVa = powerFactor > 0 ? adjustedWatts / powerFactor : adjustedWatts;
+  if (!hasValidVoltage || powerFactor <= 0) {
+    return { adjustedWatts, adjustedVa: totalVa, currentLine: 0, totalVa };
+  }
+
   const currentLine =
     settings.phaseMode === "single"
       ? adjustedWatts / (settings.voltage * powerFactor)
       : adjustedWatts / (SQRT3 * settings.voltage * powerFactor);
-  const totalVa = powerFactor > 0 ? adjustedWatts / powerFactor : adjustedWatts;
 
   return { adjustedWatts, adjustedVa: totalVa, currentLine, totalVa };
 };

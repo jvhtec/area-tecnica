@@ -763,15 +763,11 @@ const PesosTool: React.FC = () => {
       let completedTasksCount = 0;
 
       // Upload PDF first - only auto-complete tasks if upload succeeds
-      try {
-        completedTasksCount = await uploadWeightReportAndCompleteTasks({
-          fileName,
-          jobId: selectedJobId,
-          pdfBlob,
-        });
-      } catch (uploadErr) {
-        throw uploadErr;
-      }
+      completedTasksCount = await uploadWeightReportAndCompleteTasks({
+        fileName,
+        jobId: selectedJobId,
+        pdfBlob,
+      });
 
       if (completedTasksCount > 0) {
         console.log(`Auto-completed ${completedTasksCount} Pesos task(s)`);
