@@ -20,15 +20,40 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { MultiDayScheduleBuilder } from "@/components/schedule/MultiDayScheduleBuilder";
 import { ProgramDay } from "@/types/hoja-de-ruta";
+import type { Database, Json } from "@/integrations/supabase/types";
+
+type HojaDeRutaRow = Database["public"]["Tables"]["hoja_de_ruta"]["Row"];
+type HojaDeRutaInsert = Database["public"]["Tables"]["hoja_de_ruta"]["Insert"];
+
+interface TourDateOption {
+  id: string;
+  date: string;
+  location?: {
+    name?: string | null;
+  } | null;
+}
+
+interface TourItineraryData {
+  hojaDeRutaRecords?: Array<{ tour_date_id: string | null }>;
+}
 
 interface TourItineraryBuilderProps {
-  tourData: any;
-  tourDates: any[];
+  tourData: TourItineraryData | null | undefined;
+  tourDates: TourDateOption[];
   selectedDateId: string | null;
   onDateSelect: (dateId: string) => void;
   canEdit: boolean;
   onSave: () => void;
 }
+
+const defaultProgramSchedule = (): ProgramDay[] => [{ label: 'Día 1', rows: [] }];
+
+const isProgramSchedule = (value: unknown): value is ProgramDay[] =>
+  Array.isArray(value) && value.every((day) => {
+    if (!day || typeof day !== "object") return false;
+    const maybeDay = day as Partial<ProgramDay>;
+    return Array.isArray(maybeDay.rows);
+  });
 
 export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
   tourData,
@@ -41,10 +66,8 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [hojaDeRuta, setHojaDeRuta] = useState<any>(null);
-  const [programSchedule, setProgramSchedule] = useState<ProgramDay[]>([
-    { label: 'Día 1', rows: [] }
-  ]);
+  const [hojaDeRuta, setHojaDeRuta] = useState<HojaDeRutaRow | null>(null);
+  const [programSchedule, setProgramSchedule] = useState<ProgramDay[]>(defaultProgramSchedule);
 
   const sortedDates = [...tourDates].sort(
     (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
@@ -66,7 +89,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
     try {
       // First, try to find existing hoja de ruta for this tour date
       const { data: existingHoja, error: fetchError } = await supabase
-        .from('hoja_de_ruta' as any)
+        .from('hoja_de_ruta')
         .select('*')
         .eq('tour_date_id', selectedDateId)
         .maybeSingle();
@@ -76,20 +99,20 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
       }
 
       if (existingHoja) {
-        setHojaDeRuta(existingHoja as any);
+        setHojaDeRuta(existingHoja);
 
         // Load program schedule
-        if ((existingHoja as any).program_schedule_json) {
-          setProgramSchedule((existingHoja as any).program_schedule_json as any);
+        if (isProgramSchedule(existingHoja.program_schedule_json)) {
+          setProgramSchedule(existingHoja.program_schedule_json);
         } else {
-          setProgramSchedule([{ label: 'Día 1', rows: [] }]);
+          setProgramSchedule(defaultProgramSchedule());
         }
       } else {
         // No hoja de ruta exists yet
         setHojaDeRuta(null);
-        setProgramSchedule([{ label: 'Día 1', rows: [] }]);
+        setProgramSchedule(defaultProgramSchedule());
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error loading hoja de ruta:', error);
       toast({
         title: "Error",
@@ -117,10 +140,10 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
         throw jobError;
       }
 
-      const hojaData = {
+      const hojaData: HojaDeRutaInsert = {
         job_id: job?.id || null,
         tour_date_id: selectedDateId,
-        program_schedule_json: programSchedule as any,
+        program_schedule_json: programSchedule as unknown as Json,
         status: 'draft',
         last_modified: new Date().toISOString(),
       };
@@ -129,7 +152,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
         // Update existing
         const { error: updateError } = await supabase
           .from('hoja_de_ruta')
-          .update(hojaData as any)
+          .update(hojaData)
           .eq('id', hojaDeRuta.id);
 
         if (updateError) throw updateError;
@@ -137,7 +160,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
         // Create new
         const { data: newHoja, error: insertError } = await supabase
           .from('hoja_de_ruta')
-          .insert(hojaData as any)
+          .insert(hojaData)
           .select()
           .single();
 
@@ -151,7 +174,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
       });
 
       onSave();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving itinerary:', error);
       toast({
         title: "Error",
@@ -170,32 +193,38 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
     try {
       const promises = sortedDates.map(async (date) => {
         // Check if hoja de ruta exists
-        const result = await (supabase as any)
+        const result = await supabase
           .from('hoja_de_ruta')
           .select('id')
           .eq('tour_date_id', date.id)
           .maybeSingle();
+
+        if (result.error) throw result.error;
         
         const { data: existing } = result;
 
         if (existing) return; // Skip if already exists
 
         // Get job
-        const { data: job } = await supabase
+        const { data: job, error: jobError } = await supabase
           .from('jobs')
           .select('id')
           .eq('tour_date_id', date.id)
           .maybeSingle();
 
+        if (jobError) throw jobError;
+
         // Create hoja de ruta with empty schedule
-        await supabase
+        const { error: insertError } = await supabase
           .from('hoja_de_ruta')
           .insert({
             job_id: job?.id || null,
             tour_date_id: date.id,
-            program_schedule_json: [{ label: 'Día 1', rows: [] }],
+            program_schedule_json: defaultProgramSchedule() as unknown as Json,
             status: 'draft',
           });
+
+        if (insertError) throw insertError;
       });
 
       await Promise.all(promises);
@@ -207,7 +236,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
 
       onSave();
       loadHojaDeRuta();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating itineraries:', error);
       toast({
         title: "Error",
@@ -236,7 +265,7 @@ export const TourItineraryBuilder: React.FC<TourItineraryBuilderProps> = ({
                 {sortedDates.map((date, index) => {
                   const isSelected = selectedDateId === date.id;
                   const hasItinerary = tourData?.hojaDeRutaRecords?.some(
-                    (h: any) => h.tour_date_id === date.id
+                    (h) => h.tour_date_id === date.id
                   );
 
                   return (

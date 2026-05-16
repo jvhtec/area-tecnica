@@ -8,6 +8,8 @@ import { Calendar, User, X, Plus, Check, AlertCircle, Ban } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { labelForCode } from '@/utils/roles';
 
+type AssignmentStatus = 'invited' | 'confirmed' | 'declined';
+
 interface MatrixCellProps {
   technician: {
     id: string;
@@ -46,7 +48,13 @@ export const MatrixCell = ({
   const isWeekendCell = isWeekend(date);
 
   // Assignment status - only valid if there's actually a job
-  const assignmentStatus = assignment?.jobs ? (assignment?.status || 'invited') : null;
+  const rawAssignmentStatus = assignment?.jobs ? assignment?.status : null;
+  const assignmentStatus: AssignmentStatus | null =
+    rawAssignmentStatus === 'confirmed' || rawAssignmentStatus === 'declined' || rawAssignmentStatus === 'invited'
+      ? rawAssignmentStatus
+      : assignment?.jobs
+        ? 'invited'
+        : null;
   const isInvited = assignmentStatus === 'invited';
   const isConfirmed = assignmentStatus === 'confirmed';
   const isDeclined = assignmentStatus === 'declined';
@@ -75,13 +83,13 @@ export const MatrixCell = ({
   const getStatusBadge = () => {
     if (!isAssigned) return null;
     
-    const statusConfig = {
+    const statusConfig: Record<AssignmentStatus, { label: string; variant: 'secondary' | 'default' | 'destructive'; color: string }> = {
       invited: { label: 'Invited', variant: 'secondary', color: 'text-yellow-700 dark:text-yellow-300' },
       confirmed: { label: 'Confirmed', variant: 'default', color: 'text-green-700 dark:text-green-300' },
       declined: { label: 'Declined', variant: 'destructive', color: 'text-red-700 dark:text-red-300' }
     };
     
-    const config = statusConfig[assignmentStatus] || statusConfig.invited;
+    const config = assignmentStatus ? statusConfig[assignmentStatus] : statusConfig.invited;
     
     return (
       <Badge variant={config.variant} className={`text-xs px-1 py-0 h-4 ${config.color}`}>

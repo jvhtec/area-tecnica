@@ -310,7 +310,7 @@ const Settings = () => {
                   <div className="grid grid-cols-2 gap-2">
                     <Button
                       onClick={() => {
-                        void enable().catch(() => undefined);
+                        void enable().catch((): undefined => undefined);
                       }}
                       disabled={!showEnableButton || isEnabling}
                       className="w-full text-xs sm:text-sm"
@@ -321,7 +321,7 @@ const Settings = () => {
                     <Button
                       variant="outline"
                       onClick={() => {
-                        void disable().catch(() => undefined);
+                        void disable().catch((): undefined => undefined);
                       }}
                       disabled={!hasSubscription || isDisabling || isInitializing}
                       className="w-full text-xs sm:text-sm"

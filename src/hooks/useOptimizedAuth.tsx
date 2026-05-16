@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useContext, createContext, ReactNode 
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Session } from "@supabase/supabase-js";
+import type { Session, User } from "@supabase/supabase-js";
 import { TokenManager } from "@/lib/token-manager";
 import { useSubscriptionContext } from "@/providers/SubscriptionProvider";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
@@ -12,7 +12,7 @@ import { canAccessSoundVision } from "@/utils/permissions";
 
 interface AuthContextType {
   session: Session | null;
-  user: any | null;
+  user: AuthUser | null;
   userRole: string | null;
   userDepartment: string | null;
   hasSoundVisionAccess: boolean;
@@ -23,7 +23,7 @@ interface AuthContextType {
   error: string | null;
   login: (email: string, password: string) => Promise<void>;
   signUp: (userData: SignUpData) => Promise<void>;
-  createUserAsAdmin: (userData: Omit<SignUpData, 'password'> & { role?: string }) => Promise<{ id: string; email: string } | null>;
+  createUserAsAdmin: (userData: Omit<SignUpData, 'password'> & { role?: string; flex_resource_id?: string }) => Promise<{ id: string; email: string } | null>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<Session | null>;
   setUserRole: (role: string | null) => void;
@@ -55,6 +55,10 @@ interface CachedProfile {
   timestamp: number;
 }
 
+type AuthUser = User & {
+  department?: string | null;
+};
+
 interface ProfileData {
   role: string | null;
   department: string | null;
@@ -68,6 +72,30 @@ interface ProfileQueryResult {
   soundvision_access?: boolean;
   assignable_as_tech?: boolean;
 }
+
+interface SupabaseErrorLike {
+  message?: string;
+  code?: string;
+}
+
+const getErrorMessage = (error: unknown, fallback = "Unknown error"): string =>
+  error instanceof Error
+    ? error.message
+    : typeof error === "string"
+      ? error
+      : typeof error === "object" && error !== null && "message" in error && typeof (error as { message?: unknown }).message === "string"
+        ? (error as { message: string }).message
+        : fallback;
+
+const getErrorCode = (error: unknown): string | undefined =>
+  typeof error === "object" && error !== null && "code" in error && typeof (error as { code?: unknown }).code === "string"
+    ? (error as { code: string }).code
+    : undefined;
+
+const getMetadataString = (metadata: Record<string, unknown>, key: string): string | null => {
+  const value = metadata[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -97,7 +125,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const { toast } = useToast();
   const { refreshSubscriptions, invalidateQueries } = useSubscriptionContext();
   const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<any | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [soundVisionAccessFlag, setSoundVisionAccessFlag] = useState(false);
@@ -177,7 +205,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       console.log('🔄 Fetching fresh profile data...');
       setIsProfileLoading(true);
 
-      const selectProfile = async (columns: string): Promise<{ data: ProfileQueryResult | null; error: any }> => {
+      const selectProfile = async (columns: string): Promise<{ data: ProfileQueryResult | null; error: SupabaseErrorLike | null }> => {
         const { data, error } = await supabase
           .from('profiles')
           .select(columns)
@@ -192,7 +220,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         'role, department, soundvision_access:soundvision_access_enabled, assignable_as_tech',
       );
 
-      if (error && (error as any)?.code === '42703') {
+      if (error && getErrorCode(error) === '42703') {
         // Column missing - fallback to base columns only and default new fields to false
         console.warn(
           'profiles columns missing (soundvision_access_enabled or assignable_as_tech). Falling back to role/department only.',
@@ -216,32 +244,33 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         const authUser = authUserData?.user ?? null;
 
         if (!authUserError && authUser && authUser.id === userId) {
-          const email = authUser.email ?? (authUser.user_metadata as any)?.email ?? null;
+          const metadata = authUser.user_metadata;
+          const email = authUser.email ?? getMetadataString(metadata, 'email');
           if (email) {
-            const roleCandidate = (authUser.user_metadata as any)?.role;
-            const role = VALID_USER_ROLES.has(roleCandidate) ? (roleCandidate as UserRole) : null;
+            const roleCandidate = getMetadataString(metadata, 'role');
+            const role = roleCandidate && VALID_USER_ROLES.has(roleCandidate as UserRole) ? (roleCandidate as UserRole) : null;
 
             const { error: insertError } = await supabase.from('profiles').insert({
               id: authUser.id,
               email,
-              first_name: (authUser.user_metadata as any)?.first_name ?? null,
-              nickname: (authUser.user_metadata as any)?.nickname ?? null,
-              last_name: (authUser.user_metadata as any)?.last_name ?? null,
-              phone: (authUser.user_metadata as any)?.phone ?? null,
-              department: (authUser.user_metadata as any)?.department ?? null,
-              dni: (authUser.user_metadata as any)?.dni ?? null,
-              residencia: (authUser.user_metadata as any)?.residencia ?? null,
+              first_name: getMetadataString(metadata, 'first_name'),
+              nickname: getMetadataString(metadata, 'nickname'),
+              last_name: getMetadataString(metadata, 'last_name'),
+              phone: getMetadataString(metadata, 'phone'),
+              department: getMetadataString(metadata, 'department'),
+              dni: getMetadataString(metadata, 'dni'),
+              residencia: getMetadataString(metadata, 'residencia'),
               ...(role ? { role } : {}),
             });
 
-            if (insertError && (insertError as any)?.code !== '23505') {
+            if (insertError && getErrorCode(insertError) !== '23505') {
               console.error('Error creating missing profile row:', insertError);
             } else {
               ({ data, error } = await selectProfile(
                 'role, department, soundvision_access:soundvision_access_enabled, assignable_as_tech',
               ));
 
-              if (error && (error as any)?.code === '42703') {
+              if (error && getErrorCode(error) === '42703') {
                 const fallback = await selectProfile('role, department');
                 data = fallback.data;
                 error = fallback.error;
@@ -476,10 +505,10 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           { accessToken: data.session?.access_token },
         );
         const profile = await fetchUserProfile(data.user.id, false); // Fresh fetch on login
-        let roleForNavigation = null;
+        let roleForNavigation: UserRole | null = null;
 
         if (profile) {
-          roleForNavigation = profile.role;
+          roleForNavigation = profile.role as UserRole;
         }
 
         toast({
@@ -490,15 +519,16 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         const dashboardPath = getDashboardPath(roleForNavigation);
         navigate(dashboardPath);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
       void logAuthEvent(null, "login", false, {
         email: email.toLowerCase(),
-        error: error.message,
+        error: errorMessage,
       });
-      setError(error.message);
+      setError(errorMessage);
       toast({
         title: "Login failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -545,10 +575,10 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         await new Promise(resolve => setTimeout(resolve, 1000));
 
         const profile = await fetchUserProfile(data.user.id, false); // Fresh fetch on signup
-        let roleForNavigation = null;
+        let roleForNavigation: UserRole | null = null;
 
         if (profile) {
-          roleForNavigation = profile.role;
+          roleForNavigation = profile.role as UserRole;
         }
 
         toast({
@@ -559,11 +589,12 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         const dashboardPath = getDashboardPath(roleForNavigation);
         navigate(dashboardPath);
       }
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
+      setError(errorMessage);
       toast({
         title: "Signup failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -608,8 +639,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
           department: userData.department,
           dni: userData.dni,
           residencia: userData.residencia,
-          role: (userData as any).role,
-          flex_resource_id: (userData as any).flex_resource_id,
+          role: userData.role,
+          flex_resource_id: userData.flex_resource_id,
         }
       });
       if (error) {
@@ -620,7 +651,7 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       }
       toast({ title: 'User created', description: `${data?.email || userData.email} has been created.` });
       return data as { id: string; email: string };
-    } catch (e: any) {
+    } catch (e: unknown) {
       const msg = await getFunctionErrorMessage(e, 'Failed to create user');
       setError(msg);
       toast({ title: 'Create user failed', description: msg, variant: 'destructive' });
@@ -651,14 +682,15 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       });
 
       navigate('/auth');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error);
       void logAuthEvent(currentUserId, "logout", false, {
-        error: error.message,
+        error: errorMessage,
       });
-      setError(error.message);
+      setError(errorMessage);
       toast({
         title: "Logout failed",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
       navigate('/auth');
@@ -698,8 +730,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
         title: "Password Reset Email Sent",
         description: "If an account with that email exists, a password reset link has been sent.",
       });
-    } catch (error: any) {
-      const errorMessage = error.message || "Failed to send password reset email";
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, "Failed to send password reset email");
       void logSecurityEvent({
         action: "password_reset_request",
         resource: "authentication",
@@ -755,8 +787,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       // Navigate to dashboard after successful password reset
       const dashboardPath = getDashboardPath(userRole as UserRole);
       navigate(dashboardPath);
-    } catch (error: any) {
-      const errorMessage = error.message || "Failed to update password";
+    } catch (error: unknown) {
+      const errorMessage = getErrorMessage(error, "Failed to update password");
       void logSecurityEvent({
         user_id: currentUserId,
         action: "password_reset_complete",

@@ -161,7 +161,7 @@ describe("FlexElementSelectorDialog - Tree Processing", () => {
     });
 
     it("should handle undefined default element", () => {
-      const defaultElementId = undefined;
+      const defaultElementId: string | undefined = undefined;
       const node = {
         elementId: "child-1",
         displayName: "Test Node",

@@ -285,12 +285,12 @@ export async function buildTourRatesExportPayload(
 
       if (payoutError) {
         // Fallback to zeroed quotes on error to keep row in PDF
-        filteredQuotes = techIds.map((techId) => ({
+        filteredQuotes = techIds.map((techId): TourJobRateQuote => ({
           job_id: job.id,
           technician_id: techId,
           start_time: job.start_time,
           end_time: job.end_time ?? job.start_time,
-          job_type: (job.job_type as any) || 'single',
+          job_type: job.job_type || 'single',
           tour_id: tourId,
           title: job.title,
           is_house_tech: false,

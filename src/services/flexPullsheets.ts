@@ -84,12 +84,12 @@ async function addResourceLineItem(options: {
     });
 
     if (!res.ok) {
-      const errorText = await res.text().catch(() => '');
+      const errorText = await res.text().catch((): string => '');
       console.error('[FlexPullsheets] API error:', res.status, errorText);
       return { success: false, error: `API error: ${res.status}` };
     }
 
-    const payload = await res.json().catch(() => null) as {
+    const payload = await res.json().catch((): null => null) as {
       addedResourceLineIds?: string[];
     } | null;
 

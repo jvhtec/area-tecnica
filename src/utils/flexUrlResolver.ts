@@ -263,24 +263,28 @@ async function fetchElementMetadata(elementId: string): Promise<SchemaMetadata |
       return null;
     }
 
-    const data = await response.json();
+    const payload: unknown = await response.json();
+    const data: Record<string, unknown> =
+      payload && typeof payload === 'object'
+        ? (payload as Record<string, unknown>)
+        : {};
     const metadata: SchemaMetadata = {
       domainId:
-        extractFlexField((data as any)?.domainId) ||
-        extractFlexField((data as any)?.domainID),
+        extractFlexField(data['domainId']) ||
+        extractFlexField(data['domainID']),
       definitionId:
-        extractFlexField((data as any)?.elementDefinitionId) ||
-        extractFlexField((data as any)?.definitionId),
+        extractFlexField(data['elementDefinitionId']) ||
+        extractFlexField(data['definitionId']),
       viewHint:
-        extractFlexField((data as any)?.viewHint) ||
-        extractFlexField((data as any)?.view_hint),
-      schemaId: extractFlexField((data as any)?.schemaId),
+        extractFlexField(data['viewHint']) ||
+        extractFlexField(data['view_hint']),
+      schemaId: extractFlexField(data['schemaId']),
       documentNumber:
-        extractFlexField((data as any)?.documentNumber) ||
-        extractFlexField((data as any)?.document_number),
+        extractFlexField(data['documentNumber']) ||
+        extractFlexField(data['document_number']),
       displayName:
-        extractFlexField((data as any)?.displayName) ||
-        extractFlexField((data as any)?.name),
+        extractFlexField(data['displayName']) ||
+        extractFlexField(data['name']),
     };
 
     console.log('[flexUrlResolver] Retrieved element metadata', {

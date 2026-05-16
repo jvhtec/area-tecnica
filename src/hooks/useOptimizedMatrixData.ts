@@ -73,6 +73,39 @@ interface FetchMatrixTimesheetArgs {
   endDate?: Date;
 }
 
+type SupabaseQueryResult<TData> = PromiseLike<{ data: TData; error: { message?: string; code?: string } | null }>;
+
+interface TimesheetAssignmentRow {
+  job_id: string;
+  technician_id: string;
+  date: string;
+  is_schedule_only: boolean | null;
+  source: string | null;
+}
+
+type AssignmentMetadataRow = Pick<
+  MatrixTimesheetAssignment,
+  'job_id' | 'technician_id' | 'sound_role' | 'lights_role' | 'video_role' | 'single_day' | 'assignment_date' | 'status' | 'assigned_at' | 'assigned_by'
+>;
+
+type StaffingSummaryRow = {
+  job_id: string;
+  assigned_count: number | null;
+  worked_count: number | null;
+  total_cost_eur: number | null;
+  approved_cost_eur: number | null;
+};
+
+type AvailabilityScheduleRow = { user_id: string; date: string; status: string; notes?: string | null; source?: string | null };
+type LegacyAvailabilityRow = { technician_id: string; date: string; status: string };
+type VacationRequestRow = { technician_id: string; start_date: string; end_date: string; status: string };
+type AvailabilityDay = { user_id: string; date: string; status: string; notes?: string };
+
+const getErrorCode = (error: unknown): string | undefined =>
+  typeof error === 'object' && error !== null && 'code' in error && typeof (error as { code?: unknown }).code === 'string'
+    ? (error as { code: string }).code
+    : undefined;
+
 export const fetchMatrixTimesheetAssignments = async ({
   jobIds,
   technicianIds,
@@ -86,7 +119,7 @@ export const fetchMatrixTimesheetAssignments = async ({
   const endIso = endDate ? toMadridDateKey(endDate) : null;
 
   const batchSize = 50;
-  const promises: Promise<any>[] = [];
+  const promises: Array<SupabaseQueryResult<TimesheetAssignmentRow[]>> = [];
 
   for (let i = 0; i < jobIds.length; i += batchSize) {
     const jobBatch = jobIds.slice(i, i + batchSize);
@@ -110,7 +143,7 @@ export const fetchMatrixTimesheetAssignments = async ({
 
   // Batch job_assignments query to avoid URL length limits
   const assignmentBatchSize = 100;
-  const assignmentPromises: Promise<any>[] = [];
+  const assignmentPromises: Array<SupabaseQueryResult<AssignmentMetadataRow[]>> = [];
 
   for (let i = 0; i < jobIds.length; i += assignmentBatchSize) {
     const jobBatch = jobIds.slice(i, i + assignmentBatchSize);
@@ -131,13 +164,13 @@ export const fetchMatrixTimesheetAssignments = async ({
     ...assignmentPromises,
   ]);
 
-  const assignmentMap = new Map<string, any>();
+  const assignmentMap = new Map<string, AssignmentMetadataRow>();
   // Process all assignment batch results
   for (const result of assignmentResults) {
     if (result.error) {
       console.error('Assignment metadata query error:', result.error);
     } else {
-      (result.data || []).forEach((row: any) => {
+      (result.data || []).forEach((row) => {
         assignmentMap.set(`${row.job_id}:${row.technician_id}`, row);
       });
     }
@@ -147,7 +180,7 @@ export const fetchMatrixTimesheetAssignments = async ({
   if (staffingResult.error) {
     console.warn('Staffing summary view error:', staffingResult.error);
   } else {
-    (staffingResult.data || []).forEach((row: any) => {
+    ((staffingResult.data || []) as StaffingSummaryRow[]).forEach((row) => {
       staffingMap.set(row.job_id, {
         assigned_count: row.assigned_count ?? 0,
         worked_count: row.worked_count ?? 0,
@@ -165,7 +198,7 @@ export const fetchMatrixTimesheetAssignments = async ({
       return;
     }
 
-    (result.data || []).forEach((row: any) => {
+    (result.data || []).forEach((row) => {
       const job = jobsById.get(row.job_id);
       if (!job) return;
       const meta = assignmentMap.get(`${row.job_id}:${row.technician_id}`);
@@ -271,7 +304,7 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       const dateEnd = toMadridDateKey(dateRange.end);
 
       // Build per-day unavailable marks in the visible range
-      const perDay: Map<string, { user_id: string; date: string; status: string; notes?: string }> = new Map();
+      const perDay: Map<string, AvailabilityDay> = new Map();
       const startDay = new Date(dateRange.start);
       startDay.setHours(0,0,0,0);
       const endDay = new Date(dateRange.end);
@@ -314,12 +347,12 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
             .lte('date', dateEnd)
             .or(`status.eq.unavailable,source.eq.vacation`);
           if (error) throw error;
-          return (data || []) as any[];
+          return (data || []) as AvailabilityScheduleRow[];
         },
         3
       );
 
-      schedRows.forEach((row: any) => {
+      schedRows.forEach((row) => {
         const key = `${row.user_id}-${row.date}`;
         // If interval already marked the day, keep it; otherwise add schedule mark
         if (!perDay.has(key)) {
@@ -344,18 +377,18 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
               .lte('date', dateEnd)
               .in('status', ['vacation','travel','sick','day_off']);
             if (error) throw error;
-            return (data || []) as any[];
+            return (data || []) as LegacyAvailabilityRow[];
           },
           3
         );
 
-        legacyRows.forEach((row: any) => {
+        legacyRows.forEach((row) => {
           const key = `${row.technician_id}-${row.date}`;
           if (!perDay.has(key)) perDay.set(key, { user_id: row.technician_id, date: row.date, status: 'unavailable' });
         });
-      } catch (e: any) {
+      } catch (e: unknown) {
         // Ignore if table not present
-        if (e?.code !== '42P01') throw e;
+        if (getErrorCode(e) !== '42P01') throw e;
       }
 
       // 3) Final fallback: read approved vacation_requests directly and mark dates unavailable
@@ -375,12 +408,12 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
               .lte('start_date', dateEnd)
               .gte('end_date', dateStart);
             if (error) throw error;
-            return (data || []) as any[];
+            return (data || []) as VacationRequestRow[];
           },
           3
         );
 
-        vacs.forEach((r: any) => {
+        vacs.forEach((r) => {
           const s = new Date(r.start_date);
           const e = new Date(r.end_date);
           const clampStart = new Date(Math.max(startDay.getTime(), new Date(s.getFullYear(), s.getMonth(), s.getDate()).getTime()));
@@ -391,8 +424,8 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
             if (!perDay.has(key)) perDay.set(key, { user_id: r.technician_id, date: dateKey, status: 'unavailable' });
           }
         });
-      } catch (e: any) {
-        if (e?.code && e.code !== '42P01') throw e;
+      } catch (e: unknown) {
+        if (getErrorCode(e) !== '42P01') throw e;
       }
 
       return Array.from(perDay.values());
@@ -406,28 +439,28 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   // Realtime invalidation for availability changes
   useEffect(() => {
     if (!technicianIds.length) return;
-    const ch2 = (supabase as any)
+    const ch2 = supabase
       .channel('rt-availability-schedules')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'availability_schedules' }, () => {
         queryClient.invalidateQueries({ queryKey: ['optimized-matrix-availability'] });
       })
       .subscribe();
-    const ch3 = (supabase as any)
+    const ch3 = supabase
       .channel('rt-technician-availability')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'technician_availability' }, () => {
         queryClient.invalidateQueries({ queryKey: ['optimized-matrix-availability'] });
       })
       .subscribe();
-    const ch4 = (supabase as any)
+    const ch4 = supabase
       .channel('rt-vacation-requests')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'vacation_requests' }, () => {
         queryClient.invalidateQueries({ queryKey: ['optimized-matrix-availability'] });
       })
       .subscribe();
     return () => {
-      try { (supabase as any).removeChannel(ch2); } catch {}
-      try { (supabase as any).removeChannel(ch3); } catch {}
-      try { (supabase as any).removeChannel(ch4); } catch {}
+      try { supabase.removeChannel(ch2); } catch {}
+      try { supabase.removeChannel(ch3); } catch {}
+      try { supabase.removeChannel(ch4); } catch {}
     };
   }, [queryClient, technicianIds.length]);
 
@@ -500,10 +533,10 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
   // Optimistic update functions
   const updateAssignmentOptimistically = (technicianId: string, jobId: string, newStatus: string) => {
     // Update all cached assignment queries to reflect the new status immediately
-    queryClient.setQueriesData({ queryKey: ['optimized-matrix-assignments'] }, (old: any) => {
+    queryClient.setQueriesData<MatrixTimesheetAssignment[]>({ queryKey: ['optimized-matrix-assignments'] }, (old) => {
       if (!old) return old;
       try {
-        return (old as any[]).map((assignment: any) => {
+        return old.map((assignment) => {
           if (assignment.technician_id === technicianId && assignment.job_id === jobId) {
             return { ...assignment, status: newStatus, response_time: new Date().toISOString() };
           }

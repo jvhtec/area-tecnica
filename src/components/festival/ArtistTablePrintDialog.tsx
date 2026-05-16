@@ -17,6 +17,7 @@ import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements, calculateEquipmentNeeds } from "@/utils/gearComparisonService";
 import { supabase } from "@/lib/supabase";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
+import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
 import { Checkbox } from "@/components/ui/checkbox";
 import { buildReadableFilename } from "@/utils/fileName";
 
@@ -175,7 +176,7 @@ export const ArtistTablePrintDialog = ({
           if (mainError && mainError.code !== 'PGRST116') {
             console.error('Error fetching festival gear setup:', mainError);
           } else {
-            festivalGearSetup = mainSetup;
+            festivalGearSetup = mapFestivalGearSetup(mainSetup);
 
             if (mainSetup) {
               const { data: stageSetups, error: stageError } = await supabase
@@ -186,9 +187,7 @@ export const ArtistTablePrintDialog = ({
               if (stageError) {
                 console.error('Error fetching stage gear setups:', stageError);
               } else {
-                stageSetups?.forEach(setup => {
-                  stageGearSetups[setup.stage_number] = setup;
-                });
+                Object.assign(stageGearSetups, mapStageGearSetups(stageSetups));
               }
             }
           }

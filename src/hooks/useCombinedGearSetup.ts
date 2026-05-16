@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
-import { CombinedGearSetup, FestivalGearSetup, StageGearSetup } from "@/types/festival";
+import { CombinedGearSetup, StageGearSetup } from "@/types/festival";
+import { mapFestivalGearSetup, mapStageGearSetup } from "@/utils/festivalGearMappers";
 
 export const useCombinedGearSetup = (
   jobId: string, 
@@ -50,16 +51,16 @@ export const useCombinedGearSetup = (
             throw new Error(`Error fetching stage setup: ${stageError.message}`);
           }
           
-          stageSetup = stageData;
+          stageSetup = mapStageGearSetup(stageData);
         }
         
         setCombinedSetup({
-          globalSetup: globalSetup as FestivalGearSetup,
+          globalSetup: mapFestivalGearSetup(globalSetup),
           stageSetup: stageSetup
         });
       } catch (err) {
         console.error('Error in useCombinedGearSetup:', err);
-        setError(err.message);
+        setError(err instanceof Error ? err.message : String(err));
       } finally {
         setIsLoading(false);
       }

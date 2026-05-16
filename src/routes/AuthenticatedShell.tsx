@@ -8,14 +8,14 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { AchievementBanner } from "@/components/achievements/AchievementBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
-function ActivityPushFallbackInit() {
+function ActivityPushFallbackInit(): null {
   useActivityPushFallback();
   return null;
 }
 
 // Redirect 'technician' role to /tech-app (house_tech can access Layout routes).
 // Allow-list a small set of technician-accessible routes outside /tech-app (e.g. tools like SysCalc).
-function TechnicianRouteGuard() {
+function TechnicianRouteGuard(): null {
   const { userRole, isLoading, isProfileLoading } = useOptimizedAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -40,7 +40,7 @@ function TechnicianRouteGuard() {
   return null;
 }
 
-function OscarRouteGuard() {
+function OscarRouteGuard(): null {
   const { userRole, isLoading, isProfileLoading } = useOptimizedAuth();
   const location = useLocation();
   const navigate = useNavigate();

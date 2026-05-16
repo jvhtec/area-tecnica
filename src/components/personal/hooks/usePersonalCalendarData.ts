@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { startOfMonth, endOfMonth, subDays, addDays } from 'date-fns';
 
-interface HouseTech {
+export interface HouseTech {
   id: string;
   first_name: string | null;
   last_name: string | null;
@@ -126,7 +126,7 @@ export const usePersonalCalendarData = (currentMonth: Date) => {
             }
           });
 
-          const baseAssignments: Assignment[] = Array.from(assignmentsMap.values()).map((entry) => {
+          const baseAssignments: Assignment[] = Array.from(assignmentsMap.values()).map((entry): Assignment => {
             const jobData = entry.job;
             const locationValue = Array.isArray(jobData.locations)
               ? jobData.locations[0]

@@ -1,18 +1,122 @@
-// @ts-nocheck
 import type jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { getWeatherForJob } from '@/utils/weather/weatherApi';
-import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { loadPdfLibs, type AutoTableFn } from '@/utils/pdf/lazyPdf';
 import { buildReadableFilename } from '@/utils/fileName';
 
 const CORPORATE_RED: [number, number, number] = [125, 1, 1];
 const HEADER_HEIGHT = 30;
 
-let jsPDFConstructor: any | null = null;
-let autoTable: any | null = null;
+type JsPDFConstructor = new () => jsPDF;
+
+interface AutoTableDocument extends jsPDF {
+  lastAutoTable?: {
+    finalY?: number;
+  };
+}
+
+interface TourContact {
+  name?: string | null;
+  role?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  isPrimary?: boolean | null;
+}
+
+interface TourLocation {
+  name?: string | null;
+  formatted_address?: string | null;
+  city?: string | null;
+  state?: string | null;
+}
+
+interface TourData {
+  id: string;
+  name: string;
+  tour_settings?: {
+    homeBase?: {
+      name?: string | null;
+    } | null;
+  } | null;
+  tour_contacts?: TourContact[] | null;
+}
+
+interface TourDateData {
+  id: string;
+  date: string;
+  call_time?: string | null;
+  showtime?: string | null;
+  location?: TourLocation | null;
+}
+
+interface TravelSegment {
+  fromDateId?: string | null;
+  fromType?: string | null;
+  toDateId?: string | null;
+  toType?: string | null;
+  transportType?: string | null;
+  departureTime?: string | null;
+  arrivalTime?: string | null;
+  distance?: number | null;
+  duration?: number | null;
+  notes?: string | null;
+}
+
+interface ProgramRow {
+  time?: string | null;
+  item?: string | null;
+  dept?: string | null;
+  notes?: string | null;
+}
+
+interface ProgramDay {
+  label?: string | null;
+  rows?: ProgramRow[];
+}
+
+interface CrewProfile {
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
+}
+
+interface CrewAssignment {
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+  profiles?: CrewProfile | CrewProfile[] | null;
+}
+
+let jsPDFConstructor: JsPDFConstructor | null = null;
+let autoTable: AutoTableFn | null = null;
+
+const getLastAutoTableY = (pdf: jsPDF, fallback: number): number =>
+  (pdf as AutoTableDocument).lastAutoTable?.finalY ?? fallback;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+
+const asProgramDays = (value: unknown): ProgramDay[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(isRecord)
+    .map((day): ProgramDay => ({
+      label: typeof day.label === 'string' ? day.label : null,
+      rows: Array.isArray(day.rows)
+        ? day.rows.filter(isRecord).map((row): ProgramRow => ({
+            time: typeof row.time === 'string' ? row.time : null,
+            item: typeof row.item === 'string' ? row.item : null,
+            dept: typeof row.dept === 'string' ? row.dept : null,
+            notes: typeof row.notes === 'string' ? row.notes : null,
+          }))
+        : [],
+    }));
+};
+
+const asCrewAssignments = (value: unknown): CrewAssignment[] => (Array.isArray(value) ? (value as CrewAssignment[]) : []);
 
 const ensurePdfLibs = async () => {
   if (jsPDFConstructor && autoTable) {
@@ -20,8 +124,8 @@ const ensurePdfLibs = async () => {
   }
 
   const libs = await loadPdfLibs();
-  jsPDFConstructor = libs.jsPDF as any;
-  autoTable = libs.autoTable as any;
+  jsPDFConstructor = libs.jsPDF;
+  autoTable = libs.autoTable;
   return { jsPDF: jsPDFConstructor, autoTable };
 };
 
@@ -122,7 +226,7 @@ const addPDFFooter = async (pdf: jsPDF, pageNum?: number) => {
  */
 const addTourContactsSection = (
   pdf: jsPDF,
-  tourContacts: any[],
+  tourContacts: TourContact[],
   startY: number
 ): number => {
   if (!tourContacts || tourContacts.length === 0) return startY;
@@ -168,16 +272,16 @@ const addTourContactsSection = (
     margin: { left: 10, right: 10 },
   });
 
-  return (pdf as any).lastAutoTable.finalY + 10;
+  return getLastAutoTableY(pdf, startY) + 10;
 };
 
 /**
  * Generate Travel Day Sheet (to or from venue)
  */
 export const generateTravelDaySheet = async (
-  tourData: any,
-  travelSegment: any,
-  tourDate: any,
+  tourData: TourData,
+  travelSegment: TravelSegment,
+  tourDate: TourDateData,
   direction: 'to' | 'from'
 ) => {
   const { jsPDF } = await ensurePdfLibs();
@@ -234,7 +338,7 @@ export const generateTravelDaySheet = async (
     margin: { left: 10, right: 10 },
   });
 
-  currentY = (pdf as any).lastAutoTable.finalY + 15;
+  currentY = getLastAutoTableY(pdf, currentY) + 15;
 
   // Route Details
   if (direction === 'to') {
@@ -267,7 +371,7 @@ export const generateTravelDaySheet = async (
       margin: { left: 10, right: 10 },
     });
 
-    currentY = (pdf as any).lastAutoTable.finalY + 15;
+    currentY = getLastAutoTableY(pdf, currentY) + 15;
   }
 
   // Tour Contacts
@@ -310,7 +414,7 @@ export const generateTravelDaySheet = async (
         pdf.setTextColor(0, 0, 0);
         currentY += 10;
 
-        const crewData = assignments.map((a: any) => {
+        const crewData = asCrewAssignments(assignments).map((a) => {
           const profile = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
           const roles = [];
           if (a.sound_role) roles.push(`Sound: ${a.sound_role}`);
@@ -347,7 +451,7 @@ export const generateTravelDaySheet = async (
           margin: { left: 10, right: 10 },
         });
 
-        currentY = (pdf as any).lastAutoTable.finalY + 10;
+        currentY = getLastAutoTableY(pdf, currentY) + 10;
       }
     }
   } catch (error) {
@@ -390,8 +494,8 @@ export const generateTravelDaySheet = async (
  * Generate Enhanced Event Day Sheet with hotels, rooming, and restaurants
  */
 export const generateEnhancedEventDaySheet = async (
-  tourData: any,
-  tourDate: any
+  tourData: TourData,
+  tourDate: TourDateData
 ) => {
   const { jsPDF } = await ensurePdfLibs();
   const pdf = new jsPDF();
@@ -443,7 +547,7 @@ export const generateEnhancedEventDaySheet = async (
     margin: { left: 10, right: 10 },
   });
 
-  currentY = (pdf as any).lastAutoTable.finalY + 15;
+  currentY = getLastAutoTableY(pdf, currentY) + 15;
 
   // Program Schedule
   try {
@@ -461,7 +565,7 @@ export const generateEnhancedEventDaySheet = async (
       pdf.setTextColor(0, 0, 0);
       currentY += 10;
 
-      const schedule = hojaDeRuta.program_schedule_json;
+      const schedule = asProgramDays(hojaDeRuta.program_schedule_json);
 
       for (const day of schedule) {
         if (day.rows && day.rows.length > 0) {
@@ -472,7 +576,7 @@ export const generateEnhancedEventDaySheet = async (
             currentY += 8;
           }
 
-          const scheduleData = day.rows.map((row: any) => [
+          const scheduleData = day.rows.map((row) => [
             row.time || '',
             row.item || '',
             row.dept || '',
@@ -503,7 +607,7 @@ export const generateEnhancedEventDaySheet = async (
             margin: { left: 10, right: 10 },
           });
 
-          currentY = (pdf as any).lastAutoTable.finalY + 10;
+          currentY = getLastAutoTableY(pdf, currentY) + 10;
         }
       }
     }
@@ -525,7 +629,8 @@ export const generateEnhancedEventDaySheet = async (
 
       pdf.setFontSize(10);
       pdf.setFont(undefined, 'normal');
-      const hotelText = pdf.splitTextToSize(hojaDeRuta.hotel_info, 190);
+      const hotelInfo = typeof hojaDeRuta.hotel_info === 'string' ? hojaDeRuta.hotel_info : String(hojaDeRuta.hotel_info);
+      const hotelText = pdf.splitTextToSize(hotelInfo, 190);
       pdf.text(hotelText, 10, currentY);
       currentY += hotelText.length * 5 + 10;
     }
@@ -547,7 +652,9 @@ export const generateEnhancedEventDaySheet = async (
 
       pdf.setFontSize(10);
       pdf.setFont(undefined, 'normal');
-      const restaurantText = pdf.splitTextToSize(hojaDeRuta.restaurants_info, 190);
+      const restaurantsInfo =
+        typeof hojaDeRuta.restaurants_info === 'string' ? hojaDeRuta.restaurants_info : String(hojaDeRuta.restaurants_info);
+      const restaurantText = pdf.splitTextToSize(restaurantsInfo, 190);
       pdf.text(restaurantText, 10, currentY);
       currentY += restaurantText.length * 5 + 10;
     }
@@ -557,19 +664,8 @@ export const generateEnhancedEventDaySheet = async (
 
   // Weather
   try {
-    const jobQuery = await supabase
-      .from('jobs')
-      .select('id')
-      .eq('tour_date_id', tourDate.id)
-      .maybeSingle();
-
-    if (jobQuery.data?.id && tourDate.location?.formatted_address) {
-      const weatherData = await getWeatherForJob(
-        jobQuery.data.id,
-        tourDate.date,
-        tourDate.date,
-        tourDate.location.formatted_address
-      );
+    if (tourDate.location?.formatted_address) {
+      const weatherData = await getWeatherForJob({ address: tourDate.location.formatted_address }, tourDate.date);
 
       if (weatherData && weatherData.length > 0) {
         if (currentY > 230) {
@@ -610,7 +706,7 @@ export const generateEnhancedEventDaySheet = async (
           margin: { left: 10, right: 10 },
         });
 
-        currentY = (pdf as any).lastAutoTable.finalY + 10;
+        currentY = getLastAutoTableY(pdf, currentY) + 10;
       }
     }
   } catch (error) {
@@ -663,7 +759,7 @@ export const generateEnhancedEventDaySheet = async (
         pdf.setTextColor(0, 0, 0);
         currentY += 10;
 
-        const crewData = assignments.map((a: any) => {
+        const crewData = asCrewAssignments(assignments).map((a) => {
           const profile = Array.isArray(a.profiles) ? a.profiles[0] : a.profiles;
           const roles = [];
           if (a.sound_role) roles.push(`Sound: ${a.sound_role}`);
@@ -714,9 +810,9 @@ export const generateEnhancedEventDaySheet = async (
  * Generate complete set of day sheets for a tour date
  */
 export const generateCompleteDaySheetSet = async (
-  tourData: any,
-  tourDate: any,
-  travelPlan: any[]
+  tourData: TourData,
+  tourDate: TourDateData,
+  travelPlan: TravelSegment[]
 ) => {
   // Find travel segments for this date
   const travelToVenue = travelPlan.find(

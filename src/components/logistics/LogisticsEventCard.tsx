@@ -2,8 +2,11 @@ import { Badge } from "@/components/ui/badge";
 import { Package, PackageCheck, Truck, MessageSquare } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
-import { TRANSPORT_PROVIDERS } from "@/constants/transportProviders";
+import { TRANSPORT_PROVIDERS, type TransportProvider } from "@/constants/transportProviders";
 import { memo } from "react";
+
+const isTransportProvider = (value: unknown): value is TransportProvider =>
+  typeof value === "string" && value in TRANSPORT_PROVIDERS;
 
 interface LogisticsEventCardProps {
   event: any;
@@ -23,6 +26,10 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
   // Default colors based on event type
   const defaultColor = event.event_type === 'load' ? 'rgb(191, 219, 254)' : 'rgb(187, 247, 208)';
   const borderColor = event.color || defaultColor;
+  const transportProvider = event.transport_provider;
+  const providerConfig = isTransportProvider(transportProvider)
+    ? TRANSPORT_PROVIDERS[transportProvider]
+    : null;
 
   // Create a slightly transparent version of the color for the background
   const getBgColor = () => {
@@ -97,11 +104,11 @@ export const LogisticsEventCard = memo(function LogisticsEventCard({
               </div>
             </div>
 
-            {event.transport_provider && TRANSPORT_PROVIDERS[event.transport_provider] && TRANSPORT_PROVIDERS[event.transport_provider].icon && (
+            {providerConfig?.icon && (
               <div className="flex-shrink-0">
                 <img
-                  src={TRANSPORT_PROVIDERS[event.transport_provider].icon}
-                  alt={TRANSPORT_PROVIDERS[event.transport_provider].label}
+                  src={providerConfig.icon}
+                  alt={providerConfig.label}
                   width={96}
                   height={96}
                   loading="lazy"

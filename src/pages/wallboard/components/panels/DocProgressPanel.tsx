@@ -31,14 +31,14 @@ export const DocProgressPanel: React.FC<{
             <div
               key={job.id}
               className={`rounded-lg p-4 border ${theme === 'light' ? 'border-zinc-200' : 'border-zinc-800'}`}
-              style={{ backgroundColor: getJobCardBackground((job as any).color, theme) }}
+              style={{ backgroundColor: getJobCardBackground(job.color, theme) }}
             >
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div className="text-38 font-medium">{job.title}</div>
                 {getDateTypeIcon(
                   getDateTypeForJobOnDay(
-                    { id: job.id, job_type: (job as any).jobType, start_time: (job as any).start_time || '', end_time: (job as any).end_time || '' },
-                    new Date((job as any).start_time || '')
+                    { id: job.id, job_type: job.jobType ?? job.job_type, start_time: job.start_time || '', end_time: job.end_time || '' },
+                    new Date(job.start_time || '')
                   )
                 ) && (
                   <div
@@ -48,8 +48,8 @@ export const DocProgressPanel: React.FC<{
                   >
                     {getDateTypeIcon(
                       getDateTypeForJobOnDay(
-                        { id: job.id, job_type: (job as any).jobType, start_time: (job as any).start_time || '', end_time: (job as any).end_time || '' },
-                        new Date((job as any).start_time || '')
+                        { id: job.id, job_type: job.jobType ?? job.job_type, start_time: job.start_time || '', end_time: job.end_time || '' },
+                        new Date(job.start_time || '')
                       )
                     )}
                   </div>
@@ -87,4 +87,3 @@ export const DocProgressPanel: React.FC<{
     </AutoScrollWrapper>
   );
 };
-

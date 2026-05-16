@@ -18,6 +18,11 @@ export const IncidentReportsManagement = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [userRole, setUserRole] = useState<string>('');
 
+  const getSortValue = (report: (typeof reports)[number]): string => {
+    if (sortField === 'job_title') return report.job?.title ?? '';
+    return String(report[sortField] ?? '');
+  };
+
   // Get user role for notifications
   React.useEffect(() => {
     const getUserRole = async () => {
@@ -47,8 +52,10 @@ export const IncidentReportsManagement = () => {
       );
     })
     .sort((a, b) => {
-      const aValue = a[sortField];
-      const bValue = b[sortField];
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
+
+      if (aValue === bValue) return 0;
       
       if (sortDirection === "asc") {
         return aValue > bValue ? 1 : -1;

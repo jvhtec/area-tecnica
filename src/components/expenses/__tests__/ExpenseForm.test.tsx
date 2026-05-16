@@ -7,6 +7,25 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const useExpensePermissionsMock = vi.fn();
 
+type ExpensePermissionMock = {
+  id: string;
+  job_id: string;
+  technician_id: string;
+  category_slug: string;
+  valid_from: string | null;
+  valid_to: string | null;
+  daily_cap_eur: number;
+  total_cap_eur: number;
+  notes: string | null;
+  category: {
+    slug: string;
+    label_es: string;
+    requires_receipt: boolean;
+    default_daily_cap_eur: number;
+    default_total_cap_eur: number;
+  };
+};
+
 vi.mock('@/hooks/useExpensePermissions', () => ({
   useExpensePermissions: (...args: any[]) => useExpensePermissionsMock(...args),
   isPermissionActive: () => true,
@@ -71,7 +90,7 @@ describe('ExpenseForm', () => {
   });
 
   it('displays Spanish validation error when amount is missing', async () => {
-    const mockPermissions = [
+    const mockPermissions: ExpensePermissionMock[] = [
       {
         id: 'perm-1',
         job_id: 'job-1',
@@ -112,7 +131,7 @@ describe('ExpenseForm', () => {
   });
 
   it('displays Spanish error when category is not selected', async () => {
-    const mockPermissions = [
+    const mockPermissions: ExpensePermissionMock[] = [
       {
         id: 'perm-1',
         job_id: 'job-1',
@@ -165,7 +184,7 @@ describe('ExpenseForm', () => {
   });
 
   it('shows receipt required indicator for categories that require receipts', async () => {
-    const mockPermissions = [
+    const mockPermissions: ExpensePermissionMock[] = [
       {
         id: 'perm-1',
         job_id: 'job-1',

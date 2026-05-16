@@ -171,7 +171,7 @@ export const generatePersonalCalendarPDF = async (
     img.src = "/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png";
     img.onload = () => resolve(img);
     img.onerror = (err) => reject(err);
-  }).catch(() => null);
+  }).catch((): null => null);
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -316,12 +316,12 @@ export const generatePersonalCalendarPDF = async (
     const monthDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
     const firstDayOfWeek = 1;
 
-    function getDayIndex(d: Date) {
+    function getDayIndex(d: Date): number {
       return firstDayOfWeek === 1 ? (d.getDay() + 6) % 7 : d.getDay();
     }
 
     const offset = getDayIndex(monthStart);
-    const offsetDays = Array.from({ length: offset }, () => null);
+    const offsetDays = Array.from({ length: offset }, (): null => null);
     const allMonthDays = [...offsetDays, ...monthDays];
     const weeks: Array<Array<Date | null>> = [];
 
@@ -565,10 +565,10 @@ export const generatePersonalCalendarXLS = async (
     }
 
     // Build weeks
-    function getDayIndex(d: Date) { return (d.getDay() + 6) % 7; }
+    function getDayIndex(d: Date): number { return (d.getDay() + 6) % 7; }
     const offset = getDayIndex(monthStart);
     const allDays: Array<Date | null> = [
-      ...Array.from({ length: offset }, () => null),
+      ...Array.from({ length: offset }, (): null => null),
       ...monthDays,
     ];
     const weeks: Array<Array<Date | null>> = [];

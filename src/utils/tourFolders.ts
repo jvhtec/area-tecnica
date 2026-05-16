@@ -128,7 +128,7 @@ export async function createTourRootFoldersManual(tourId: string): Promise<TourF
 
     const mainFolderPayload = {
       definitionId: FLEX_FOLDER_IDS.mainFolder,
-      parentElementId: null,
+      parentElementId: null as string | null,
       open: true,
       locked: false,
       name: tour.name,

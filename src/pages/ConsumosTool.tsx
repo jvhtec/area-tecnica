@@ -647,7 +647,7 @@ const ConsumosTool: React.FC = () => {
     return {
       id: `legacy-default-${def.id}`,
       name: def.table_name,
-      rows: [],
+      rows: [] as Table['rows'],
       totalWatts: def.total_watts,
       adjustedWatts: adjW,
       totalVa: totalVa,

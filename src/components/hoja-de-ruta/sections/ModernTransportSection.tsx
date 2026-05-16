@@ -129,7 +129,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       }
 
       // Map logistics events to Transport objects
-      const importedTransports: Transport[] = logisticsEvents.map((event) => {
+      const importedTransports: Transport[] = logisticsEvents.map((event): Transport => {
         // Combine event_date and event_time for datetime-local (no timezone conversion)
         const time = event.event_time ? String(event.event_time).slice(0, 5) : "00:00";
         const dateTime = `${event.event_date}T${time}`; // YYYY-MM-DDTHH:mm

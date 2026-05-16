@@ -17,7 +17,7 @@ const calculateBackoff = (attempt: number, baseMs: number = 1000, maxMs: number 
 /**
  * Inner component that requires router context
  */
-function AppInitWithRouter() {
+function AppInitWithRouter(): null {
   const queryClient = useQueryClient();
   const location = useLocation();
   const multiTabCoordinator = useMemo(() => MultiTabCoordinator.getInstance(queryClient), [queryClient]);

@@ -71,11 +71,11 @@ describe('buildFlexUrl', () => {
   });
 
   it('should throw error for null elementId', () => {
-    expect(() => buildFlexUrl(null as any, FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
+    expect(() => buildFlexUrl(null as unknown as string, FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
   });
 
   it('should throw error for undefined elementId', () => {
-    expect(() => buildFlexUrl(undefined as any, FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
+    expect(() => buildFlexUrl(undefined as unknown as string, FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
   });
 
   it('should throw error for whitespace-only elementId', () => {
@@ -139,10 +139,10 @@ describe('getElementDetails', () => {
       documentNumber: { data: 'DOC-123' },
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
-    });
+    } as unknown as Response);
 
     const details = await getElementDetails('test-element-id', 'test-token');
 
@@ -167,10 +167,10 @@ describe('getElementDetails', () => {
   });
 
   it('should handle fetch failure gracefully', async () => {
-    (global.fetch as any).mockResolvedValueOnce({
+    vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: false,
       statusText: 'Not Found',
-    });
+    } as unknown as Response);
 
     const details = await getElementDetails('test-element-id', 'test-token');
 
@@ -180,7 +180,7 @@ describe('getElementDetails', () => {
   });
 
   it('should handle network error gracefully', async () => {
-    (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+    vi.mocked(global.fetch).mockRejectedValueOnce(new Error('Network error'));
 
     const details = await getElementDetails('test-element-id', 'test-token');
 
@@ -245,10 +245,10 @@ describe('buildFlexUrlWithTypeDetection', () => {
       elementDefinitionId: { data: FLEX_FOLDER_IDS.presupuesto },
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
-    });
+    } as unknown as Response);
 
     const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token');
 
@@ -257,7 +257,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
   });
 
   it('should fallback to simple-element URL when API call fails', async () => {
-    (global.fetch as any).mockRejectedValueOnce(new Error('API error'));
+    vi.mocked(global.fetch).mockRejectedValueOnce(new Error('API error'));
 
     const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token');
 
@@ -269,10 +269,10 @@ describe('buildFlexUrlWithTypeDetection', () => {
       elementDefinitionId: { data: FLEX_FOLDER_IDS.mainFolder },
     };
 
-    (global.fetch as any).mockResolvedValueOnce({
+    vi.mocked(global.fetch).mockResolvedValueOnce({
       ok: true,
       json: async () => mockResponse,
-    });
+    } as unknown as Response);
 
     // When no context that enables optimization is provided, fetch should be called
     const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {});
@@ -289,13 +289,13 @@ describe('buildFlexUrlWithTypeDetection', () => {
 
   it('should throw error for null elementId in buildFlexUrlWithTypeDetection', async () => {
     await expect(
-      buildFlexUrlWithTypeDetection(null as any, 'test-token')
+      buildFlexUrlWithTypeDetection(null as unknown as string, 'test-token')
     ).rejects.toThrow('Invalid elementId');
   });
 
   it('should throw error for undefined elementId in buildFlexUrlWithTypeDetection', async () => {
     await expect(
-      buildFlexUrlWithTypeDetection(undefined as any, 'test-token')
+      buildFlexUrlWithTypeDetection(undefined as unknown as string, 'test-token')
     ).rejects.toThrow('Invalid elementId');
   });
 
@@ -316,7 +316,7 @@ describe('buildFlexUrlWithTypeDetection', () => {
   });
 
   it('should use fallback when authToken is empty and no context', async () => {
-    (global.fetch as any).mockRejectedValueOnce(new Error('Unauthorized'));
+    vi.mocked(global.fetch).mockRejectedValueOnce(new Error('Unauthorized'));
 
     const url = await buildFlexUrlWithTypeDetection('test-element-id', '');
 

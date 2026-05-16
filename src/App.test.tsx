@@ -81,7 +81,7 @@ vi.mock("@/hooks/useShortcutInitialization", () => ({
 }));
 
 vi.mock("@/components/AppInit", () => ({
-  AppInit: () => null,
+  AppInit: (): null => null,
 }));
 
 vi.mock("@/providers/SubscriptionProvider", () => ({
@@ -93,7 +93,7 @@ vi.mock("@/hooks/useActivityPushFallback", () => ({
 }));
 
 vi.mock("@/components/achievements/AchievementBanner", () => ({
-  AchievementBanner: () => null,
+  AchievementBanner: (): null => null,
 }));
 
 vi.mock("@/pages/Auth", () => ({

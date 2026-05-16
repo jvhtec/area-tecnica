@@ -253,7 +253,7 @@ const FestivalGearManagement = () => {
         return;
       }
       
-      const setupMap = stageSetupData.reduce((acc, item) => {
+      const setupMap = stageSetupData.reduce<Record<number, boolean>>((acc, item: { stage_number: number }) => {
         acc[item.stage_number] = true;
         return acc;
       }, {});

@@ -624,7 +624,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
               if (taskIds && taskIds.length > 0) {
                 const { error } = await fromDynamicTable(step.table)
                   .delete()
-                  .in(step.condition, taskIds.map(t => t.id));
+                  .in(step.condition, taskIds.map((t: { id: string }) => t.id));
 
                 if (error) {
                   console.error(`Error deleting from ${step.table}:`, error);

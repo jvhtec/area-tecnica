@@ -339,7 +339,7 @@ export const attachShiftAssignmentsAndProfiles = (
           ? {
               id: profile.id,
               first_name: toStringValue(profile.first_name),
-              nickname: null,
+              nickname: null as string | null,
               last_name: toStringValue(profile.last_name),
               email: toStringValue(profile.email),
               department: toStringValue(profile.department),

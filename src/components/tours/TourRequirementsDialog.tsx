@@ -8,10 +8,12 @@ import { Separator } from '@/components/ui/separator'
 import { roleOptionsForDiscipline } from '@/types/roles'
 import { supabase } from '@/lib/supabase'
 import { useToast } from '@/hooks/use-toast'
+import type { Json } from '@/integrations/supabase/types'
 
 type Dept = 'sound' | 'lights' | 'video'
 
 interface RequirementRow { role_code: string; quantity: number }
+interface RequirementRpcRow extends RequirementRow { department: Dept; notes: string | null }
 
 interface TourRequirementsDialogProps {
   open: boolean
@@ -79,31 +81,24 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
         return
       }
 
-      // 2) For each job, replace required roles for selected departments
+      // 2) For each job, replace required roles for selected departments atomically
       for (const jobId of jobIds) {
-        // Delete existing for selected departments
-        for (const dept of selectedDepts) {
-          const { error: delErr } = await supabase
-            .from('job_required_roles')
-            .delete()
-            .eq('job_id', jobId)
-            .eq('department', dept)
-          if (delErr) throw delErr
-        }
-        // Insert new rows
-        const rows = selectedDepts.flatMap((dept) =>
-          byDept[dept].filter((r) => (r.quantity ?? 0) > 0).map((r) => ({
-            job_id: jobId,
+        const rows: RequirementRpcRow[] = selectedDepts.flatMap((dept) =>
+          byDept[dept].filter((r) => (r.quantity ?? 0) > 0).map((r): RequirementRpcRow => ({
             department: dept,
             role_code: r.role_code,
             quantity: Math.max(0, Math.floor(r.quantity || 0)),
             notes: null,
           }))
         )
-        if (rows.length) {
-          const { error: insErr } = await supabase.from('job_required_roles').insert(rows)
-          if (insErr) throw insErr
-        }
+
+        const { error: replaceErr } = await supabase.rpc('replace_job_required_roles', {
+          p_job_id: jobId,
+          p_departments: selectedDepts,
+          p_rows: rows as unknown as Json,
+        })
+
+        if (replaceErr) throw replaceErr
       }
 
       toast({ title: 'Applied', description: `Requirements applied to ${jobIds.length} job(s)` })
@@ -176,4 +171,3 @@ export const TourRequirementsDialog: React.FC<TourRequirementsDialogProps> = ({ 
     </Dialog>
   )
 }
-

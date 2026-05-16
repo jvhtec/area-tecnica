@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { JobCardActions } from '../JobCardActions';
 import { buildTechnicalPowerSummaryPackFilename } from '@/utils/pdf/technicalPowerSummaryPack';
 import type { FlatElementNode } from '@/utils/flex-folders';
+import type { CombinedTechnicalPowerSummaryData } from '@/utils/technicalPowerTypes';
 import * as resolveFlexUrl from '@/utils/flex-folders/resolveFlexUrl';
 import * as useFlexUuidModule from '@/hooks/useFlexUuid';
 import * as flexMainFolderId from '@/utils/flexMainFolderId';
@@ -81,7 +82,7 @@ const createSupabaseBuilder = (response: { data: any; error: any }) => {
   return builder;
 };
 
-const createTechnicalPowerSummary = (missingDepartments: string[] = []) => ({
+const createTechnicalPowerSummary = (missingDepartments: string[] = []): CombinedTechnicalPowerSummaryData => ({
   departments: {
     sound: {
       department: 'sound',
@@ -170,7 +171,7 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
 });
 
 vi.mock('@/components/incident-reports/TechnicianIncidentReportDialog', () => ({
-  TechnicianIncidentReportDialog: () => null,
+  TechnicianIncidentReportDialog: (): null => null,
 }));
 
 vi.mock('@/components/flex/FlexElementSelectorDialog', () => ({
@@ -216,7 +217,7 @@ vi.mock('@/utils/pdf/logoUtils', () => ({
 }));
 
 describe('JobCardActions', () => {
-  const defaultProps = {
+  const defaultProps: any = {
     job: {
       id: 'test-job-id',
       job_type: 'single',

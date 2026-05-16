@@ -9,6 +9,25 @@ type StaffingByDate = {
   offer_job_id?: string | null,
 }
 
+type StaffingPhase = 'availability' | 'offer'
+type RawStaffingStatus = 'confirmed' | 'declined' | 'expired' | 'pending' | null
+type StaffingRequestRow = {
+  job_id: string
+  phase: StaffingPhase
+  status: RawStaffingStatus
+  updated_at: string | null
+  single_day: boolean | null
+  target_date: string | null
+}
+
+type NormalizedStatusRow = {
+  job_id: string
+  availability_status: StaffingByDate['availability_status']
+  availability_updated_at: string | null
+  offer_status: StaffingByDate['offer_status']
+  offer_updated_at: string | null
+}
+
 export function useStaffingStatusByDate(profileId: string, date: Date) {
   return useQuery({
     queryKey: ['staffing-by-date', profileId, format(date, 'yyyy-MM-dd')],
@@ -54,7 +73,7 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
       const batchResults = await Promise.all(batchPromises);
 
       // Collect all results and check for errors
-      const rawStatuses: any[] = [];
+      const rawStatuses: StaffingRequestRow[] = [];
       let statusesError = null;
       for (const result of batchResults) {
         if (result.error) {
@@ -62,7 +81,7 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
           break;
         }
         if (result.data) {
-          rawStatuses.push(...result.data);
+          rawStatuses.push(...(result.data as StaffingRequestRow[]));
         }
       }
 
@@ -79,12 +98,12 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
       const statuses = rawStatuses
         // Respect single-day scoping: only include requests whose target_date matches this day when flagged
         .filter(r => {
-          if ((r as any).single_day) {
-            return (r as any).target_date === dStr
+          if (r.single_day) {
+            return r.target_date === dStr
           }
           return true
         })
-        .map(r => ({
+        .map<NormalizedStatusRow>(r => ({
         job_id: r.job_id,
         availability_status: r.phase === 'availability' ? (r.status === 'pending' ? 'requested' : r.status) : null,
         availability_updated_at: r.phase === 'availability' ? r.updated_at : null,
@@ -97,8 +116,8 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
         const withAvail = statuses.filter(s => s.availability_status)
         if (withAvail.length > 0) {
           const latest = withAvail.reduce((acc, s) => {
-            const t = s.availability_updated_at ? new Date(s.availability_updated_at as any).getTime() : 0
-            const accT = acc.availability_updated_at ? new Date(acc.availability_updated_at as any).getTime() : 0
+            const t = s.availability_updated_at ? new Date(s.availability_updated_at).getTime() : 0
+            const accT = acc.availability_updated_at ? new Date(acc.availability_updated_at).getTime() : 0
             return t > accT ? s : acc
           }, withAvail[0])
           return { 
@@ -113,8 +132,8 @@ export function useStaffingStatusByDate(profileId: string, date: Date) {
         const withOffer = statuses.filter(s => s.offer_status)
         if (withOffer.length > 0) {
           const latest = withOffer.reduce((acc, s) => {
-            const t = s.offer_updated_at ? new Date(s.offer_updated_at as any).getTime() : 0
-            const accT = acc.offer_updated_at ? new Date(acc.offer_updated_at as any).getTime() : 0
+            const t = s.offer_updated_at ? new Date(s.offer_updated_at).getTime() : 0
+            const accT = acc.offer_updated_at ? new Date(acc.offer_updated_at).getTime() : 0
             return t > accT ? s : acc
           }, withOffer[0])
           return { 

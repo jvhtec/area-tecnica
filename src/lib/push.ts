@@ -117,7 +117,7 @@ export const getExistingPushSubscription = async (): Promise<PushSubscription | 
 
   const registration =
     (await navigator.serviceWorker.getRegistration('/')) ||
-    (await navigator.serviceWorker.ready.catch(() => undefined))
+    (await navigator.serviceWorker.ready.catch((): undefined => undefined))
 
   if (!registration) {
     return null

@@ -47,10 +47,18 @@ import { roleOptionsForDiscipline, labelForCode } from '@/utils/roles';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 import { isDepartmentManagementRole, isManagementRole } from '@/utils/permissions';
+
+const MADRID_TIME_ZONE = 'Europe/Madrid';
+const formatMadridDateKey = (date: Date) => formatInTimeZone(date, MADRID_TIME_ZONE, "yyyy-MM-dd");
+const parseMadridDateKey = (dateKey: string) => fromZonedTime(`${dateKey}T00:00:00`, MADRID_TIME_ZONE);
+const addDaysToDateKey = (dateKey: string, days: number) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+};
 
 interface JobAssignmentDialogProps {
   isOpen: boolean;
@@ -60,6 +68,15 @@ interface JobAssignmentDialogProps {
   department?: string;
   disableCategorySync?: boolean;
 }
+
+type JobDateTypeRow = {
+  date?: string | null;
+  type?: string | null;
+};
+
+type JobWithDateTypes = Job & {
+  job_date_types?: JobDateTypeRow[];
+};
 
 interface Assignment {
   technician_id: string;
@@ -126,7 +143,14 @@ const formatAvailableTechnicianName = (technician: { first_name: string; last_na
 const formatJobDateLabel = (date: string | null | undefined) => {
   if (!date) return '';
   try {
-    return new Intl.DateTimeFormat('es-ES', { dateStyle: 'full' }).format(new Date(date));
+    const dateKey = date.includes('T')
+      ? formatInTimeZone(new Date(date), MADRID_TIME_ZONE, "yyyy-MM-dd")
+      : date;
+    const madridDate = fromZonedTime(`${dateKey}T00:00:00`, MADRID_TIME_ZONE);
+    return new Intl.DateTimeFormat('es-ES', {
+      dateStyle: 'full',
+      timeZone: MADRID_TIME_ZONE,
+    }).format(madridDate);
   } catch (error) {
     console.warn('Failed to format job date', error);
     return date;
@@ -199,7 +223,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     jobId: jobId,
     jobStartTime: jobData?.start_time || "",
     jobEndTime: jobData?.end_time || "",
-    assignmentDate: singleDay ? (selectedJobDate ? format(selectedJobDate, "yyyy-MM-dd") : null) : null,
+    assignmentDate: singleDay ? (selectedJobDate ? formatMadridDateKey(selectedJobDate) : null) : null,
     enabled: isOpen && !!jobData && !!jobId
   });
 
@@ -216,18 +240,15 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const jobDates = useMemo(() => {
     if (!jobData) return [] as Date[];
 
-    const typedDates = Array.isArray((jobData as any).job_date_types)
-      ? (jobData as any).job_date_types
-        .filter((dt: any) => dt?.date)
-        .filter((dt: any) => {
+    const dateTypeRows = (jobData as unknown as JobWithDateTypes).job_date_types;
+    const typedDates: Date[] = Array.isArray(dateTypeRows)
+      ? dateTypeRows
+        .filter((dt): dt is JobDateTypeRow & { date: string } => Boolean(dt?.date))
+        .filter((dt) => {
           const type = (dt?.type || '').toLowerCase();
           return type !== 'off' && type !== 'travel';
         })
-        .map((dt: any) => {
-          const d = new Date(`${dt.date}T00:00:00`);
-          d.setHours(0, 0, 0, 0);
-          return d;
-        })
+        .map((dt) => parseMadridDateKey(dt.date))
       : [];
 
     if (typedDates.length > 0) {
@@ -235,27 +256,25 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
     }
 
     if (jobData.start_time) {
-      const start = new Date(jobData.start_time);
-      start.setHours(0, 0, 0, 0);
+      const startKey = formatMadridDateKey(new Date(jobData.start_time));
       if (jobData.end_time) {
-        const end = new Date(jobData.end_time);
-        end.setHours(0, 0, 0, 0);
+        const endKey = formatMadridDateKey(new Date(jobData.end_time));
         const result: Date[] = [];
-        const cursor = new Date(start);
-        while (cursor <= end) {
-          result.push(new Date(cursor));
-          cursor.setDate(cursor.getDate() + 1);
+        let cursorKey = startKey;
+        while (cursorKey <= endKey) {
+          result.push(parseMadridDateKey(cursorKey));
+          cursorKey = addDaysToDateKey(cursorKey, 1);
         }
         return result;
       }
-      return [start];
+      return [parseMadridDateKey(startKey)];
     }
 
     return [] as Date[];
   }, [jobData]);
 
   const allowedJobDateSet = useMemo(() => {
-    return new Set(jobDates.map(date => format(date, "yyyy-MM-dd")));
+    return new Set(jobDates.map(formatMadridDateKey));
   }, [jobDates]);
 
   useEffect(() => {
@@ -266,7 +285,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       return;
     }
 
-    const currentKey = selectedJobDate ? format(selectedJobDate, "yyyy-MM-dd") : null;
+    const currentKey = selectedJobDate ? formatMadridDateKey(selectedJobDate) : null;
     if (!currentKey || !allowedJobDateSet.has(currentKey)) {
       setSelectedJobDate(jobDates[0]);
     }
@@ -323,7 +342,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       return;
     }
 
-    const singleDayDateKey = selectedJobDate ? format(selectedJobDate, "yyyy-MM-dd") : null;
+    const singleDayDateKey = selectedJobDate ? formatMadridDateKey(selectedJobDate) : null;
     if (singleDay && !singleDayDateKey) {
       toast({
         title: "Selecciona una fecha",

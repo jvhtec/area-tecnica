@@ -10,7 +10,7 @@ describe('getErrorMessage', () => {
     const error = {
       message: 'duplicate key value violates unique constraint',
       details: 'Key (task_type, assigned_to, job_id, tour_id) already exists.',
-      hint: null,
+      hint: null as string | null,
       code: '23505',
     };
 
@@ -36,4 +36,3 @@ describe('getErrorMessage', () => {
     expect(message).not.toBe('[object Object]');
   });
 });
-

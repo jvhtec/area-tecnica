@@ -626,7 +626,7 @@ export const Profile = () => {
                     <div className="flex flex-wrap gap-2">
                       <Button
                         onClick={() => {
-                          void enable().catch(() => undefined);
+                          void enable().catch((): undefined => undefined);
                         }}
                         disabled={!showEnableButton || isEnabling}
                       >
@@ -635,7 +635,7 @@ export const Profile = () => {
                       <Button
                         variant="outline"
                         onClick={() => {
-                          void disable().catch(() => undefined);
+                          void disable().catch((): undefined => undefined);
                         }}
                         disabled={!hasSubscription || isDisabling || isInitializing}
                       >

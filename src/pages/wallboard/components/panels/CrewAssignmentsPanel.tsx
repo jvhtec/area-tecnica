@@ -38,15 +38,15 @@ export const CrewAssignmentsPanel: React.FC<{
             <div
               key={job.id}
               className={`rounded-lg p-4 border ${theme === 'light' ? 'border-zinc-200' : 'border-zinc-800'}`}
-              style={{ backgroundColor: getJobCardBackground((job as any).color, theme) }}
+              style={{ backgroundColor: getJobCardBackground(job.color, theme) }}
             >
               <div className="mb-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-38 font-medium">{job.title}</div>
                   {getDateTypeIcon(
                     getDateTypeForJobOnDay(
-                      { id: job.id, job_type: (job as any).jobType, start_time: (job as any).start_time || '', end_time: (job as any).end_time || '' },
-                      new Date((job as any).start_time || '')
+                      { id: job.id, job_type: job.jobType ?? job.job_type, start_time: job.start_time || '', end_time: job.end_time || '' },
+                      new Date(job.start_time || '')
                     )
                   ) && (
                     <div
@@ -56,30 +56,30 @@ export const CrewAssignmentsPanel: React.FC<{
                     >
                       {getDateTypeIcon(
                         getDateTypeForJobOnDay(
-                          { id: job.id, job_type: (job as any).jobType, start_time: (job as any).start_time || '', end_time: (job as any).end_time || '' },
-                          new Date((job as any).start_time || '')
+                          { id: job.id, job_type: job.jobType ?? job.job_type, start_time: job.start_time || '', end_time: job.end_time || '' },
+                          new Date(job.start_time || '')
                         )
                       )}
                     </div>
                   )}
                 </div>
                 <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                  {formatJobTypeLabel((job as any).jobType || (job as any).job_type) && (
+                  {formatJobTypeLabel(job.jobType || job.job_type) && (
                     <span
                       className={`px-2 py-0.5 rounded-full border ${
                         theme === 'light' ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-blue-900/40 text-blue-200 border-blue-700/60'
                       }`}
                     >
-                      {formatJobTypeLabel((job as any).jobType || (job as any).job_type)}
+                      {formatJobTypeLabel(job.jobType || job.job_type)}
                     </span>
                   )}
-                  {formatJobDateTypeLabel((job as any).start_time, (job as any).end_time) && (
+                  {formatJobDateTypeLabel(job.start_time, job.end_time) && (
                     <span
                       className={`px-2 py-0.5 rounded-full border ${
                         theme === 'light' ? 'bg-zinc-50 text-zinc-700 border-zinc-300' : 'bg-zinc-900/40 text-zinc-200 border-zinc-700/60'
                       }`}
                     >
-                      {formatJobDateTypeLabel((job as any).start_time, (job as any).end_time)}
+                      {formatJobDateTypeLabel(job.start_time, job.end_time)}
                     </span>
                   )}
                 </div>
@@ -99,7 +99,7 @@ export const CrewAssignmentsPanel: React.FC<{
                         <div className={`text-xl truncate ${theme === 'light' ? 'text-zinc-500' : 'text-zinc-400'}`}>{c.role}</div>
                       </div>
                     </div>
-                    {String(((job as any).jobType || (job as any).job_type || '')).toLowerCase() !== 'tourdate' && (
+                    {String((job.jobType || job.job_type || '')).toLowerCase() !== 'tourdate' && (
                       <div
                         className={`px-2 py-1 rounded text-xl ${
                           c.timesheetStatus === 'approved'
@@ -130,4 +130,3 @@ export const CrewAssignmentsPanel: React.FC<{
     </AutoScrollWrapper>
   );
 };
-

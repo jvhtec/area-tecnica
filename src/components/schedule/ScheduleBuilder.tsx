@@ -152,7 +152,7 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
 
   const exportPdf = async () => {
     const { jsPDF } = await import('jspdf');
-    const autoTable = (await import('jspdf-autotable')).default as any;
+    const { autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF();
     doc.setFontSize(14);
     doc.text(title, 20, 20);

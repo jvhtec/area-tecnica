@@ -17,6 +17,7 @@ import { fetchJobLogo } from "@/utils/pdf/logoUtils";
 import { compareArtistRequirements, ArtistGearComparison } from "@/utils/gearComparisonService";
 import { GearMismatchIndicator } from "./GearMismatchIndicator";
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
+import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMappers";
 import { buildReadableFilename } from "@/utils/fileName";
 import { MobileArtistList } from "./mobile/MobileArtistList";
 import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
@@ -205,7 +206,7 @@ export const ArtistTable = ({
           return;
         }
 
-        setFestivalGearSetup(mainSetup as unknown as FestivalGearSetup);
+        setFestivalGearSetup(mapFestivalGearSetup(mainSetup));
 
         // Fetch stage-specific setups if main setup exists
         if (mainSetup) {
@@ -217,11 +218,7 @@ export const ArtistTable = ({
           if (stageError) {
             console.error('Error fetching stage gear setups:', stageError);
           } else {
-            const stageSetupsMap: Record<number, StageGearSetup> = {};
-            stageSetups?.forEach(setup => {
-              stageSetupsMap[setup.stage_number] = setup as unknown as StageGearSetup;
-            });
-            setStageGearSetups(stageSetupsMap);
+            setStageGearSetups(mapStageGearSetups(stageSetups));
           }
         }
       } catch (error) {

@@ -74,59 +74,59 @@ vi.mock("@/components/technician/AboutModal", () => ({
 }));
 
 vi.mock("@/components/technician/TourDetailView", () => ({
-  TourDetailView: () => null,
+  TourDetailView: (): null => null,
 }));
 
 vi.mock("@/components/technician/MessagesModal", () => ({
-  MessagesModal: () => null,
+  MessagesModal: (): null => null,
 }));
 
 vi.mock("@/components/technician/SoundVisionModal", () => ({
-  SoundVisionModal: () => null,
+  SoundVisionModal: (): null => null,
 }));
 
 vi.mock("@/components/technician/ObliqueStrategyModal", () => ({
-  ObliqueStrategyModal: () => null,
+  ObliqueStrategyModal: (): null => null,
 }));
 
 vi.mock("@/components/technician/TimesheetView", () => ({
-  TimesheetView: () => null,
+  TimesheetView: (): null => null,
 }));
 
 vi.mock("@/components/technician/DetailsModal", () => ({
-  DetailsModal: () => null,
+  DetailsModal: (): null => null,
 }));
 
 vi.mock("@/components/technician/TechnicianArtistReadOnlyModal", () => ({
-  TechnicianArtistReadOnlyModal: () => null,
+  TechnicianArtistReadOnlyModal: (): null => null,
 }));
 
 vi.mock("@/components/technician/TechnicianRfTableModal", () => ({
-  TechnicianRfTableModal: () => null,
+  TechnicianRfTableModal: (): null => null,
 }));
 
 vi.mock("@/components/incident-reports/TechnicianIncidentReportDialog", () => ({
-  TechnicianIncidentReportDialog: () => null,
+  TechnicianIncidentReportDialog: (): null => null,
 }));
 
 vi.mock("@/components/jobs/JobDetailsDialog", () => ({
-  JobDetailsDialog: () => null,
+  JobDetailsDialog: (): null => null,
 }));
 
 vi.mock("@/components/dashboard/TechnicianTourRates", () => ({
-  TechnicianTourRates: () => null,
+  TechnicianTourRates: (): null => null,
 }));
 
 vi.mock("@/components/messages/SendMessage", () => ({
-  SendMessage: () => null,
+  SendMessage: (): null => null,
 }));
 
 vi.mock("@/components/messages/MessagesList", () => ({
-  MessagesList: () => null,
+  MessagesList: (): null => null,
 }));
 
 vi.mock("@/components/messages/DirectMessagesList", () => ({
-  DirectMessagesList: () => null,
+  DirectMessagesList: (): null => null,
 }));
 
 import TechnicianSuperApp from "../TechnicianSuperApp";

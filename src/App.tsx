@@ -98,19 +98,19 @@ const PageLoader = () => (
 );
 
 // Initialize service worker update detection
-function ServiceWorkerUpdateInit() {
+function ServiceWorkerUpdateInit(): null {
   useServiceWorkerUpdate();
   return null;
 }
 
 // Initialize push subscription recovery detection
-function PushSubscriptionRecoveryInit() {
+function PushSubscriptionRecoveryInit(): null {
   usePushSubscriptionRecovery();
   return null;
 }
 
 // Initialize global keyboard shortcuts and Stream Deck integration
-function ShortcutSystemInit() {
+function ShortcutSystemInit(): null {
   useShortcutInitialization();
   return null;
 }

@@ -30,33 +30,44 @@ interface AvailabilitySchedule {
 
 type AvailabilityStatus = 'vacation' | 'travel' | 'sick' | 'day_off' | 'unavailable' | 'warehouse';
 
+interface AvailabilityStore {
+  data: Record<string, AvailabilityStatus>;
+  listeners: Set<() => void>;
+  subscribe(listener: () => void): () => void;
+  getSnapshot(): Record<string, AvailabilityStatus>;
+  setData(newData: Record<string, AvailabilityStatus>): void;
+  updateKey(key: string, status: AvailabilityStatus | null): void;
+}
+
 // Global store for availability data - prevents parent rerenders
-const availabilityStore = {
+const availabilityStore: AvailabilityStore = {
   data: {} as Record<string, AvailabilityStatus>,
   listeners: new Set<() => void>(),
 
-  subscribe(listener: () => void) {
+  subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
-    return () => this.listeners.delete(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
   },
 
-  getSnapshot() {
+  getSnapshot(): Record<string, AvailabilityStatus> {
     return this.data;
   },
 
-  setData(newData: Record<string, AvailabilityStatus>) {
+  setData(newData: Record<string, AvailabilityStatus>): void {
     this.data = newData;
-    this.listeners.forEach(listener => listener());
+    this.listeners.forEach((listener: () => void) => listener());
   },
 
-  updateKey(key: string, status: AvailabilityStatus | null) {
+  updateKey(key: string, status: AvailabilityStatus | null): void {
     if (status === null) {
       const { [key]: _, ...rest } = this.data;
       this.data = rest;
     } else {
       this.data = { ...this.data, [key]: status };
     }
-    this.listeners.forEach(listener => listener());
+    this.listeners.forEach((listener: () => void) => listener());
   }
 };
 

@@ -175,7 +175,7 @@ const Sound = () => {
     return jobs.filter(job => {
       if (job.job_type === 'tour') return false;
 
-      const isInDepartment = job.job_departments?.some(dept =>
+      const isInDepartment = job.job_departments?.some((dept: { department: string }) =>
         dept.department === currentDepartment
       );
       if (job.tour_date_id) {

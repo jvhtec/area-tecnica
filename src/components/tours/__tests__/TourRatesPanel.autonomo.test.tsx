@@ -39,7 +39,7 @@ vi.mock('@tanstack/react-query', async () => {
       mutateAsync: vi.fn(),
       isPending: false,
       isError: false,
-      error: null,
+      error: null as Error | null,
     }),
   };
 });

@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render as rtlRender, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { ComponentProps } from 'react';
 import { OptimizedMatrixCell } from '../OptimizedMatrixCell';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { createMockQueryBuilder } from '@/test/mockSupabase';
@@ -58,7 +59,24 @@ vi.mock('@/features/staffing/hooks/useStaffing', () => ({
   }),
 }));
 
-const mockTechnician = {
+type MatrixCellProps = ComponentProps<typeof OptimizedMatrixCell>;
+type MatrixTechnician = MatrixCellProps['technician'];
+type MatrixStaffingStatus = NonNullable<MatrixCellProps['staffingStatusByDateProvided']>;
+type MatrixAssignment = {
+  job_id: string;
+  status: string;
+  sound_role: string | null;
+  lights_role: string | null;
+  video_role: string | null;
+  single_day: boolean;
+  assignment_date: string | null;
+  job: {
+    title: string;
+    color: string | null;
+  };
+};
+
+const mockTechnician: MatrixTechnician = {
   id: 'tech-1',
   first_name: 'John',
   nickname: null,
@@ -68,7 +86,7 @@ const mockTechnician = {
 
 const mockDate = new Date('2024-05-15T00:00:00Z');
 
-const mockAssignment = {
+const mockAssignment: MatrixAssignment = {
   job_id: 'job-1',
   status: 'confirmed',
   sound_role: 'foh',
@@ -270,7 +288,7 @@ describe('OptimizedMatrixCell', () => {
   });
 
   it('displays staffing availability status badge', () => {
-    const staffingStatus = {
+    const staffingStatus: MatrixStaffingStatus = {
       availability_status: 'confirmed',
       offer_status: null,
     };
@@ -292,7 +310,7 @@ describe('OptimizedMatrixCell', () => {
   });
 
   it('displays staffing offer status badge', () => {
-    const staffingStatus = {
+    const staffingStatus: MatrixStaffingStatus = {
       availability_status: null,
       offer_status: 'sent',
     };
@@ -331,7 +349,7 @@ describe('OptimizedMatrixCell', () => {
   });
 
   it('shows offer buttons when availability is confirmed', () => {
-    const staffingStatus = {
+    const staffingStatus: MatrixStaffingStatus = {
       availability_status: 'confirmed',
       offer_status: null,
     };
@@ -651,7 +669,7 @@ describe('OptimizedMatrixCell', () => {
 
   it('renders staffing tooltip metadata and degrades gracefully when sender is missing', async () => {
     const user = userEvent.setup();
-    const staffingStatus = {
+    const staffingStatus: MatrixStaffingStatus = {
       availability_status: ' Requested ',
       availability_requested_by: null,
       availability_created_at: '2026-04-08T09:15:00.000Z',

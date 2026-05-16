@@ -26,10 +26,12 @@ import { invalidateRatesContext } from '@/services/ratesService';
 import { syncFlexWorkOrdersForJob, FlexWorkOrderSyncResult } from '@/services/flexWorkOrders';
 import { toast } from 'sonner';
 import { generateRateQuotePDF, generateTourRatesSummaryPDF } from '@/utils/rates-pdf-export';
+import type { TechnicianProfile } from '@/utils/rates-pdf-export';
 import { sendTourJobEmails } from '@/lib/tour-payout-email';
 import { buildTourRatesExportPayload } from '@/services/tourRatesExport';
 import { isManagementRole } from '@/utils/permissions';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
+import type { Database } from '@/integrations/supabase/types';
 
 type TourRatesManagerDialogProps = {
   open: boolean;
@@ -37,9 +39,24 @@ type TourRatesManagerDialogProps = {
   tourId: string;
 };
 
+type TourRatesJob = Pick<
+  Database['public']['Tables']['jobs']['Row'],
+  'id' | 'title' | 'start_time' | 'end_time' | 'timezone' | 'job_type' | 'tour_id'
+>;
+
+type RateProfile = TechnicianProfile & {
+  email?: string | null;
+  assignable_as_tech?: boolean | null;
+};
+
+type TimesheetCategory = 'tecnico' | 'especialista' | 'responsable';
+
+const isTimesheetCategory = (value: string): value is TimesheetCategory =>
+  value === 'tecnico' || value === 'especialista' || value === 'responsable';
+
 export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRatesManagerDialogProps) {
   // Fetch tour jobs (include tour dates + single/festival; exclude dryhire)
-  const { data: tourJobs = [] } = useQuery({
+  const { data: tourJobs = [] } = useQuery<TourRatesJob[]>({
     queryKey: ['tour-jobs-for-rates', tourId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -49,7 +66,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
         .neq('job_type', 'dryhire')
         .order('start_time', { ascending: true });
       if (error) throw error;
-      return data || [];
+      return (data || []) as TourRatesJob[];
     },
     enabled: open && !!tourId,
   });
@@ -63,11 +80,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
   }, [open, tourJobs, selectedJobId]);
 
   // Manager view: compute quotes for selected job (tourdate -> RPC; single/festival -> payout totals)
-  const selectedJob = useMemo(() => tourJobs.find((j: any) => j.id === selectedJobId), [tourJobs, selectedJobId]);
+  const selectedJob = useMemo(() => tourJobs.find((j) => j.id === selectedJobId), [tourJobs, selectedJobId]);
   const isSelectedJobLocked = isJobPastClosureWindow(selectedJob?.end_time, selectedJob?.timezone ?? 'Europe/Madrid');
   const { data: quotes = [], isLoading: quotesLoading } = useManagerJobQuotes(selectedJobId, selectedJob?.job_type, tourId);
 
-  const jobIds = useMemo(() => tourJobs.map((job: any) => job.id).filter(Boolean), [tourJobs]);
+  const jobIds = useMemo(() => tourJobs.map((job) => job.id).filter(Boolean), [tourJobs]);
   const { data: jobApprovalMap } = useJobRatesApprovalMap(jobIds);
   const { data: jobApprovalRow } = useJobRatesApproval(selectedJobId);
   const selectedJobApproved = selectedJobId
@@ -75,7 +92,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
     : false;
 
   // Fetch profiles for names
-  const { data: profiles = [] } = useQuery({
+  const { data: profiles = [] } = useQuery<RateProfile[]>({
     queryKey: ['profiles-for-rates-manager', quotes.map(q => q.technician_id)],
     queryFn: async () => {
       if (!quotes.length) return [];
@@ -85,18 +102,18 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
         .select('id, first_name, last_name, email, default_timesheet_category, role, assignable_as_tech')
         .in('id', techIds);
       if (error) throw error;
-      return data || [];
+      return (data || []) as RateProfile[];
     },
     enabled: open && !!quotes.length,
   });
 
   const getTechName = (id: string) => {
-    const p = profiles.find((x: any) => x.id === id);
+    const p = profiles.find((x) => x.id === id);
     return p ? `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim() || 'Unknown' : 'Unknown';
   };
 
   const isAssignableManagement = (id: string) => {
-    const p = profiles.find((x: any) => x.id === id);
+    const p = profiles.find((x) => x.id === id);
     return p && isManagementRole(p.role) && Boolean(p.assignable_as_tech);
   };
 
@@ -208,7 +225,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
             rates_approved: true,
             rates_approved_at: new Date().toISOString(),
             rates_approved_by: approver,
-          } as any)
+          })
           .eq('id', jobId);
         if (error) throw error;
         let syncResult: FlexWorkOrderSyncResult | null = null;
@@ -227,7 +244,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
             rates_approved: false,
             rates_approved_at: null,
             rates_approved_by: null,
-          } as any)
+          })
           .eq('id', jobId);
         if (error) throw error;
         return { jobId, approve, syncResult: null, syncError: null };
@@ -290,8 +307,8 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                       .order('start_time', { ascending: true });
                     if (jobsError) throw jobsError;
 
-                    const eligible = (allJobs || []).filter((j: any) => (j.job_type ?? '').toLowerCase() !== 'dryhire');
-                    const jobsForExport = eligible.map((job: any) => ({
+                    const eligible = (allJobs || []).filter((j) => (j.job_type ?? '').toLowerCase() !== 'dryhire');
+                    const jobsForExport = eligible.map((job) => ({
                       id: job.id,
                       title: job.title,
                       start_time: job.start_time,
@@ -333,7 +350,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   onClick={async () => {
                     const { error } = await supabase
                       .from('tours')
-                      .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null } as any)
+                      .update({ rates_approved: false, rates_approved_at: null, rates_approved_by: null })
                       .eq('id', tourId);
                     if (!error) {
                       refetchApproval();
@@ -341,7 +358,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                   }}
                   className="flex items-center gap-1"
                 >
-                  <ShieldX className="h-4 w-4" /> Revocar base
+                      <ShieldX className="h-4 w-4" /> Revocar base
                 </Button>
               ) : (
                 <Button
@@ -352,7 +369,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                     const approver = user?.user?.id || null;
                     const { error } = await supabase
                       .from('tours')
-                      .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: approver } as any)
+                      .update({ rates_approved: true, rates_approved_at: new Date().toISOString(), rates_approved_by: approver })
                       .eq('id', tourId);
                     if (!error) {
                       refetchApproval();
@@ -390,7 +407,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                 <Select value={selectedJobId} onValueChange={(v) => setSelectedJobId(v)}>
                   <SelectTrigger className="min-w-[260px]"><SelectValue placeholder="Elegir fecha" /></SelectTrigger>
                   <SelectContent>
-                    {tourJobs.map((j: any) => (
+                    {tourJobs.map((j) => (
                       <SelectItem
                         key={j.id}
                         value={j.id}
@@ -414,7 +431,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                     size="sm"
                     disabled={!selectedJobId || quotes.length === 0}
                     onClick={async () => {
-                      const job = tourJobs.find((j: any) => j.id === selectedJobId);
+                      const job = tourJobs.find((j) => j.id === selectedJobId);
                       if (!job) return;
                       
                       const { data: lpoRows } = await supabase
@@ -426,7 +443,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                         (lpoRows || []).map(r => [r.technician_id, r.lpo_number])
                       );
 
-                      await generateRateQuotePDF(quotes, job, profiles as any, lpoMap);
+                      await generateRateQuotePDF(quotes, job, profiles, lpoMap);
                       toast.success('PDF generado');
                     }}
                   >
@@ -445,7 +462,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                           jobId: selectedJobId,
                           supabase,
                           quotes,
-                          profiles: profiles as any,
+                          profiles,
                         });
                         if (result.error) {
                           console.error('[TourRatesManagerDialog] Error sending tour-date emails', result.error);
@@ -531,7 +548,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                             variant="outline"
                             disabled={
                               !selectedJobId || !selectedJobApproved || !!sendingByTech[q.technician_id] ||
-                              !(profiles.find((p: any) => p.id === q.technician_id)?.email)
+                              !(profiles.find((p) => p.id === q.technician_id)?.email)
                             }
                             onClick={async () => {
                               if (!selectedJobId) return;
@@ -541,16 +558,16 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                                   jobId: selectedJobId,
                                   supabase,
                                   quotes: quotes.filter(qq => qq.technician_id === q.technician_id),
-                                  profiles: profiles as any,
+                                  profiles,
                                   technicianIds: [q.technician_id],
                                 });
                                 if (result.error) {
                                   toast.error('No se pudo enviar el correo a este técnico');
                                 } else {
-                                  const r = Array.isArray(result.response?.results)
+                                  const r: { technician_id?: string; sent: boolean } | undefined = Array.isArray(result.response?.results)
                                     ? (result.response.results as Array<{ technician_id: string; sent: boolean }>).
                                         find((x) => x.technician_id === q.technician_id)
-                                    : { sent: result.success } as any;
+                                    : { sent: result.success };
                                   if (r?.sent) {
                                     toast.success('Correo enviado a este técnico');
                                   } else {
@@ -563,7 +580,7 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                                 setSendingByTech((s) => ({ ...s, [q.technician_id]: false }));
                               }
                             }}
-                            title={selectedJobApproved ? (profiles.find((p: any) => p.id === q.technician_id)?.email ? 'Enviar a este técnico' : 'Sin correo configurado') : 'Liberar pago final para habilitar envío'}
+                            title={selectedJobApproved ? (profiles.find((p) => p.id === q.technician_id)?.email ? 'Enviar a este técnico' : 'Sin correo configurado') : 'Liberar pago final para habilitar envío'}
                           >
                             {sendingByTech[q.technician_id] ? 'Enviando…' : 'Enviar'}
                           </Button>
@@ -589,7 +606,11 @@ export function TourRatesManagerDialog({ open, onOpenChange, tourId }: TourRates
                           {errorCode === 'category_missing' && (
                             <div className="flex items-center gap-2">
                               <Label className="text-xs">Establecer categoría:</Label>
-                              <Select onValueChange={(val: any) => fixCategoryMutation.mutate({ technicianId: q.technician_id, category: val })}>
+                              <Select onValueChange={(val) => {
+                                if (isTimesheetCategory(val)) {
+                                  fixCategoryMutation.mutate({ technicianId: q.technician_id, category: val });
+                                }
+                              }}>
                                 <SelectTrigger className="w-48"><SelectValue placeholder="Elegir" /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="tecnico">Técnico</SelectItem>

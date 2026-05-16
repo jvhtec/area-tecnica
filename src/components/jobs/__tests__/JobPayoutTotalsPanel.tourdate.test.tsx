@@ -24,7 +24,7 @@ import { JobPayoutTotalsPanel } from "../JobPayoutTotalsPanel";
 const normalizeCurrencyText = (value: string) => value.replace(/\s+/g, "");
 
 describe("JobPayoutTotalsPanel tourdate payouts", () => {
-  const buildPayoutData = () => ({
+  const buildPayoutData = (): any => ({
     jobMeta: {
       id: "job-tour-1",
       title: "Tour Date",
@@ -91,13 +91,13 @@ describe("JobPayoutTotalsPanel tourdate payouts", () => {
     getTechName: () => "Ana Lopez",
     lpoMap: new Map(),
     flexElementMap: new Map(),
-    buildFinDocUrl: () => null,
+    buildFinDocUrl: (): null => null,
     techDaysMap: new Map(),
     techTotalDaysMap: new Map(),
     technicianTimesheetDatesMap: new Map<string, string[]>(),
     payoutOverrides: [],
     overrideActorMap: new Map(),
-    getTechOverride: () => undefined,
+    getTechOverride: (): undefined => undefined,
     calculatedGrandTotal: 175,
     isManager: true,
     isAdmin: false,

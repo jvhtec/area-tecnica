@@ -10,8 +10,12 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { format } from 'date-fns'
 import { useToast } from '@/hooks/use-toast'
+import type { Database, Json } from '@/integrations/supabase/types'
 
 type Department = 'sound' | 'lights' | 'video'
+type JobRow = Database['public']['Tables']['jobs']['Row']
+type TransportRequestRow = Database['public']['Tables']['transport_requests']['Row']
+type TransportRequestItemRow = Database['public']['Tables']['transport_request_items']['Row']
 
 interface TourLogisticsDialogProps {
   open: boolean
@@ -20,6 +24,34 @@ interface TourLogisticsDialogProps {
 }
 
 type VehicleItem = { transport_type: string; leftover_space_meters?: number | '' }
+type TransportRequestRpcItem = { transport_type: string; leftover_space_meters: number | null }
+type TourLogisticsJob = Pick<JobRow, 'id' | 'title' | 'start_time' | 'job_type' | 'status'>
+type TransportRequestWithItems = Pick<
+  TransportRequestRow,
+  'id' | 'job_id' | 'department' | 'note' | 'status' | 'created_by'
+> & {
+  items?: Array<Pick<TransportRequestItemRow, 'transport_type' | 'leftover_space_meters'>> | null
+}
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error)
+
+const parseLeftoverSpaceInput = (value: string): VehicleItem['leftover_space_meters'] | null => {
+  if (value === '') return ''
+
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return null
+
+  return Math.max(0, parsed)
+}
+
+const toTransportRequestRpcItems = (items: VehicleItem[]): TransportRequestRpcItem[] =>
+  items
+    .filter((item) => Boolean(item.transport_type))
+    .map((item) => ({
+      transport_type: item.transport_type,
+      leftover_space_meters: item.leftover_space_meters === '' ? null : item.leftover_space_meters ?? null,
+    }))
 
 export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogisticsDialogProps) {
   const { toast } = useToast()
@@ -40,11 +72,11 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
         .eq('job_type', 'tourdate')
         .order('start_time', { ascending: true })
       if (error) throw error
-      return data || []
+      return (data || []) as TourLogisticsJob[]
     },
   })
 
-  const jobIds = useMemo(() => tourJobs.map((j: any) => j.id), [tourJobs])
+  const jobIds = useMemo(() => tourJobs.map((j) => j.id), [tourJobs])
 
   // Load existing requests for current department
   const { data: existingReqs = [], refetch: refetchRequests } = useQuery({
@@ -53,11 +85,11 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
     queryFn: async () => {
       const { data, error } = await supabase
         .from('transport_requests')
-        .select('id, job_id, department, note, items:transport_request_items(transport_type, leftover_space_meters)')
+        .select('id, job_id, department, note, status, created_by, items:transport_request_items(transport_type, leftover_space_meters)')
         .in('job_id', jobIds)
         .eq('department', department)
       if (error) throw error
-      return data || []
+      return (data || []) as TransportRequestWithItems[]
     },
   })
 
@@ -66,18 +98,20 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
     if (!open) return
     // Pick the first request as the default template if available
     if (existingReqs.length > 0) {
-      const first = existingReqs[0] as any
-      const items = Array.isArray(first.items) && first.items.length > 0
-        ? first.items.map((it: any) => ({ transport_type: it.transport_type, leftover_space_meters: it.leftover_space_meters ?? '' }))
+      const first = existingReqs[0]
+      const items: VehicleItem[] = Array.isArray(first.items) && first.items.length > 0
+        ? first.items.map((it): VehicleItem => ({ transport_type: it.transport_type, leftover_space_meters: it.leftover_space_meters ?? '' }))
         : [{ transport_type: 'trailer', leftover_space_meters: '' }]
       setDefaultItems(items)
-      setNote((first.note as string) || '')
+      setNote(first.note || '')
 
       const nextOverrides: Record<string, VehicleItem[]> = {}
-      existingReqs.forEach((r: any) => {
-        const its = Array.isArray(r.items) ? r.items.map((it: any) => ({ transport_type: it.transport_type, leftover_space_meters: it.leftover_space_meters ?? '' })) : []
+      existingReqs.forEach((r) => {
+        const its: VehicleItem[] = Array.isArray(r.items)
+          ? r.items.map((it): VehicleItem => ({ transport_type: it.transport_type, leftover_space_meters: it.leftover_space_meters ?? '' }))
+          : []
         // Consider an override if items differ from default or note differs
-        const differ = JSON.stringify(its) !== JSON.stringify(items) || (r.note || '') !== ((first.note as string) || '')
+        const differ = JSON.stringify(its) !== JSON.stringify(items) || (r.note || '') !== (first.note || '')
         if (differ) nextOverrides[r.job_id] = its.length ? its : [{ transport_type: 'trailer', leftover_space_meters: '' }]
       })
       setOverrides(nextOverrides)
@@ -107,61 +141,30 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
       const userId = userData.user?.id
       if (!userId) throw new Error('Not authenticated')
 
-      for (const job of tourJobs as any[]) {
-        const jobId = job.id as string
+      for (const job of tourJobs) {
+        const jobId = job.id
         const items = overrides[jobId] || defaultItems
 
         // Find existing request for job+department
-        const existing = (existingReqs as any[]).find(r => r.job_id === jobId)
-        let requestId: string | null = existing?.id || null
+        const existing = existingReqs.find(r => r.job_id === jobId)
+        const { error } = await supabase.rpc('replace_transport_request_with_items', {
+          p_request_id: existing?.id || null,
+          p_job_id: jobId,
+          p_department: department,
+          p_note: note || null,
+          p_status: existing?.status || 'requested',
+          p_created_by: existing?.created_by || userId,
+          p_items: toTransportRequestRpcItems(items) as unknown as Json,
+        })
 
-        const payload = {
-          job_id: jobId,
-          department,
-          note: note || null,
-          status: existing?.status || 'requested',
-          created_by: existing?.created_by || userId,
-        } as any
-
-        if (requestId) {
-          const { error: uErr } = await supabase.from('transport_requests').update(payload).eq('id', requestId)
-          if (uErr) throw uErr
-          // replace items
-          await supabase.from('transport_request_items').delete().eq('request_id', requestId)
-          const toInsert = items.filter(it => !!it.transport_type).map(it => ({
-            request_id: requestId!,
-            transport_type: it.transport_type,
-            leftover_space_meters: it.leftover_space_meters === '' ? null : it.leftover_space_meters,
-          }))
-          if (toInsert.length) {
-            const { error: iErr } = await supabase.from('transport_request_items').insert(toInsert)
-            if (iErr) throw iErr
-          }
-        } else {
-          const { data: ins, error: iErr } = await supabase
-            .from('transport_requests')
-            .insert(payload)
-            .select('id')
-            .single()
-          if (iErr) throw iErr
-          requestId = (ins as any).id
-          const toInsert = items.filter(it => !!it.transport_type).map(it => ({
-            request_id: requestId!,
-            transport_type: it.transport_type,
-            leftover_space_meters: it.leftover_space_meters === '' ? null : it.leftover_space_meters,
-          }))
-          if (toInsert.length) {
-            const { error: iiErr } = await supabase.from('transport_request_items').insert(toInsert)
-            if (iiErr) throw iiErr
-          }
-        }
+        if (error) throw error
       }
 
       toast({ title: 'Logística actualizada para las fechas de gira' })
       await refetchRequests()
       onOpenChange(false)
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message || 'Error al guardar la logística', variant: 'destructive' })
+    } catch (e: unknown) {
+      toast({ title: 'Error', description: getErrorMessage(e) || 'Error al guardar la logística', variant: 'destructive' })
     }
   }
 
@@ -224,9 +227,10 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                   value={it.leftover_space_meters === '' ? '' : it.leftover_space_meters}
                   onChange={(e) => {
                     const val = e.target.value
-                    const num = val === '' ? '' : Math.max(0, Number(val))
+                    const num = parseLeftoverSpaceInput(val)
+                    if (num === null) return
                     const next = defaultItems.slice()
-                    next[idx] = { ...next[idx], leftover_space_meters: num as any }
+                    next[idx] = { ...next[idx], leftover_space_meters: num }
                     setDefaultItems(next)
                   }}
                 />
@@ -253,7 +257,7 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
         <div className="mt-6">
           <Label>Anulaciones por fecha (opcional)</Label>
           <div className="mt-2 space-y-3 max-h-[40vh] overflow-y-auto pr-2">
-            {tourJobs.map((job: any) => {
+            {tourJobs.map((job) => {
               const items = overrides[job.id]
               return (
                 <div key={job.id} className="p-3 border rounded-md">
@@ -301,9 +305,10 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
                             value={it.leftover_space_meters === '' ? '' : it.leftover_space_meters}
                             onChange={(e) => {
                               const val = e.target.value
-                              const num = val === '' ? '' : Math.max(0, Number(val))
+                              const num = parseLeftoverSpaceInput(val)
+                              if (num === null) return
                               const next = (overrides[job.id] || []).slice()
-                              next[idx] = { ...next[idx], leftover_space_meters: num as any }
+                              next[idx] = { ...next[idx], leftover_space_meters: num }
                               setOverrideFor(job.id, next)
                             }}
                           />
@@ -334,4 +339,3 @@ export function TourLogisticsDialog({ open, onOpenChange, tourId }: TourLogistic
     </Dialog>
   )
 }
-

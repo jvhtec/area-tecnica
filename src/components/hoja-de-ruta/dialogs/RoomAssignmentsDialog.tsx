@@ -16,12 +16,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RoomAssignment } from "@/types/hoja-de-ruta";
+import { EventData, RoomAssignment } from "@/types/hoja-de-ruta";
 import { Trash2 } from "lucide-react";
 
 interface RoomAssignmentsDialogProps {
   roomAssignments: RoomAssignment[];
-  eventData: any;
+  eventData: EventData;
   updateRoomAssignment: (index: number, field: keyof RoomAssignment, value: string) => void;
   addRoomAssignment: () => void;
   removeRoomAssignment: (index: number) => void;
@@ -103,7 +103,7 @@ export const RoomAssignmentsDialog = ({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="unassigned">Sin asignar</SelectItem>
-                    {eventData.staff.map((member) => (
+                    {(eventData.staff || []).map((member) => (
                       <SelectItem key={member.name} value={member.name}>
                         {`${member.name} ${member.surname1 || ""}`}
                       </SelectItem>
@@ -130,7 +130,7 @@ export const RoomAssignmentsDialog = ({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned">Sin asignar</SelectItem>
-                      {eventData.staff.map((member) => (
+                      {(eventData.staff || []).map((member) => (
                         <SelectItem key={member.name} value={member.name}>
                           {`${member.name} ${member.surname1 || ""}`}
                         </SelectItem>

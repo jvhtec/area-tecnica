@@ -29,6 +29,69 @@ type TourDatePowerOverrideRow =
   Database['public']['Tables']['tour_date_power_overrides']['Row'];
 type TourDateWeightOverrideRow =
   Database['public']['Tables']['tour_date_weight_overrides']['Row'];
+type TourPowerDefaultRow =
+  Database['public']['Tables']['tour_power_defaults']['Row'];
+
+interface TourDateWithLocation {
+  id: string;
+  date: string;
+  locations?: { name: string | null } | Array<{ name: string | null }> | null;
+}
+
+interface PdfTableRow {
+  quantity?: string;
+  lineName?: string;
+  componentName?: string;
+  weight?: string;
+  watts?: string;
+  totalWeight?: number;
+  totalWatts?: number;
+  x?: number;
+  reactionKg?: number;
+  hoistName?: string;
+}
+
+interface PdfTable {
+  name: string;
+  rows: PdfTableRow[];
+  totalWeight?: number;
+  dualMotors?: boolean;
+  totalWatts?: number;
+  totalVa?: number;
+  currentPerPhase?: number;
+  phaseMode?: 'single' | 'three';
+  toolType?: 'pesos' | 'consumos' | 'rigging';
+  pduType?: string;
+  customPduType?: string;
+  position?: string;
+  customPosition?: string;
+  includesHoist?: boolean;
+  riggingPoint?: string;
+  id?: number;
+}
+
+type JsonRecord = Record<string, unknown>;
+
+const isRecord = (value: unknown): value is JsonRecord =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const getRowsFromJson = (value: unknown): PdfTableRow[] => {
+  if (!isRecord(value) || !Array.isArray(value.rows)) return [];
+  return value.rows.filter(isRecord).map((row) => row as PdfTableRow);
+};
+
+const getSafetyMarginFromJson = (value: unknown): number => {
+  if (!isRecord(value)) return 0;
+  const safetyMargin = value.safetyMargin;
+  return typeof safetyMargin === 'number' && Number.isFinite(safetyMargin) ? safetyMargin : 0;
+};
+
+const getTourDateLocationName = (tourDate: TourDateWithLocation): string => {
+  const location = Array.isArray(tourDate.locations)
+    ? tourDate.locations[0]
+    : tourDate.locations;
+  return location?.name || UNKNOWN_LOCATION_LABEL;
+};
 
 const isTechnicalPowerDepartment = (
   department: string
@@ -76,6 +139,7 @@ const getTourDatePdfFilename = (
 // Legacy types for backward compatibility
 interface TourPowerDefault {
   id: string;
+  tour_id?: string;
   table_name?: string;
   item_name?: string;
   total_watts: number;
@@ -86,6 +150,7 @@ interface TourPowerDefault {
   custom_position?: string | null;
   includes_hoist?: boolean;
   department?: string;
+  created_at?: string | null;
 }
 
 interface TourWeightDefault {
@@ -106,7 +171,7 @@ export const TourDefaultsManager = ({
 }: TourDefaultsManagerProps) => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('sound');
-  const [tourDates, setTourDates] = useState<any[]>([]);
+  const [tourDates, setTourDates] = useState<TourDateWithLocation[]>([]);
 
   // Use the new tour default sets hook
   const {
@@ -154,7 +219,7 @@ export const TourDefaultsManager = ({
         return;
       }
 
-      setTourDates(data || []);
+      setTourDates((data || []) as TourDateWithLocation[]);
     };
 
     fetchTourDates();
@@ -172,6 +237,23 @@ export const TourDefaultsManager = ({
   const isLegacyWeightDefault = (item: CombinedDefaultType): item is TourWeightDefault => {
     return 'weight_kg' in item && !('set_id' in item);
   };
+
+  const toTourPowerDefaultRows = (items: TourPowerDefault[]): TourPowerDefaultRow[] =>
+    items.map((item): TourPowerDefaultRow => ({
+      id: item.id,
+      tour_id: item.tour_id ?? tour?.id ?? '',
+      table_name: item.table_name || item.item_name || 'Unnamed',
+      total_watts: item.total_watts || 0,
+      current_per_phase: item.current_per_phase || 0,
+      pdu_type: item.pdu_type || '',
+      custom_pdu_type: item.custom_pdu_type ?? null,
+      custom_position: item.custom_position ?? null,
+      position: item.position ?? null,
+      includes_hoist: item.includes_hoist ?? false,
+      department: item.department ?? null,
+      created_at: item.created_at ?? null,
+      updated_at: null,
+    }));
 
   // Get defaults by department - prioritize new system, fallback to legacy
   const getDepartmentDefaults = (department: string, type: 'power' | 'weight'): CombinedDefaultType[] => {
@@ -311,7 +393,7 @@ export const TourDefaultsManager = ({
         const { tables, safetyMargin } = buildNormalizedTourPowerTables({
           department: department as 'sound' | 'lights' | 'video',
           defaultTables: relevantDefaults.filter(isNewFormatTable),
-          legacyDefaults: relevantDefaults.filter(isLegacyPowerDefault) as any,
+          legacyDefaults: toTourPowerDefaultRows(relevantDefaults.filter(isLegacyPowerDefault)),
         });
 
         const powerSummary = {
@@ -363,13 +445,13 @@ export const TourDefaultsManager = ({
       });
 
       // Convert defaults to the format expected by exportToPDF
-      const tables = sortedDefaults.map(defaultItem => {
+      const tables: PdfTable[] = sortedDefaults.map((defaultItem): PdfTable => {
         // Check if this is new format with table_data
         if (isNewFormatTable(defaultItem) && defaultItem.table_data?.rows) {
-          const watts = undefined;
+          const watts: number | undefined = undefined;
           return {
             name: getTableName(defaultItem),
-            rows: defaultItem.table_data.rows || [],
+            rows: getRowsFromJson(defaultItem.table_data),
             totalWeight: defaultItem.total_value,
             totalWatts: undefined,
             totalVa: watts ? computeTotalVa(watts, defaultItem.metadata, department) : undefined,
@@ -386,7 +468,7 @@ export const TourDefaultsManager = ({
           };
         } else {
           // Legacy format - create a summary row
-          const watts = undefined;
+          const watts: number | undefined = undefined;
           return {
             name: getTableName(defaultItem),
             rows: [{
@@ -412,7 +494,7 @@ export const TourDefaultsManager = ({
         }
       });
 
-      const powerSummary = undefined;
+      const powerSummary: undefined = undefined;
 
       // Get safety margin from the first default's metadata, fallback to 0
       const safetyMargin = (() => {
@@ -504,7 +586,7 @@ export const TourDefaultsManager = ({
   };
 
   const exportTourDatePDF = async (
-    tourDate: any,
+    tourDate: TourDateWithLocation,
     department: string,
     type: 'power' | 'weight',
     logoUrl?: string
@@ -535,7 +617,7 @@ export const TourDefaultsManager = ({
         department: department as 'sound' | 'lights' | 'video',
         overrides: (overrides || []) as TourDatePowerOverrideRow[],
         defaultTables: defaultsData.filter(isNewFormatTable),
-        legacyDefaults: defaultsData.filter(isLegacyPowerDefault) as any,
+        legacyDefaults: toTourPowerDefaultRows(defaultsData.filter(isLegacyPowerDefault)),
       });
 
       if (tables.length === 0) return false;
@@ -548,7 +630,7 @@ export const TourDefaultsManager = ({
           1000,
       };
 
-      const locationName = (tourDate.locations as any)?.name || UNKNOWN_LOCATION_LABEL;
+      const locationName = getTourDateLocationName(tourDate);
       const dateStr = tourDate.date;
 
       const pdfBlob = await exportToPDF(
@@ -581,16 +663,16 @@ export const TourDefaultsManager = ({
       return true;
     }
 
-    let combinedTables;
+    let combinedTables: PdfTable[];
     let safetyMargin = 0;
     const typedWeightOverrides = (overrides || []) as TourDateWeightOverrideRow[];
 
     // If overrides exist, use overrides, otherwise use defaults
     if (typedWeightOverrides.length > 0) {
-      combinedTables = typedWeightOverrides.map((override) => {
+      combinedTables = typedWeightOverrides.map((override): PdfTable => {
         return {
-          name: (override as any).table_name || override.item_name || 'Anulación',
-          rows: (override.override_data as any)?.rows || [],
+          name: override.item_name || 'Anulación',
+          rows: getRowsFromJson(override.override_data),
           totalWeight: (override.weight_kg || 0) * (override.quantity || 1),
           totalWatts: undefined,
           totalVa: undefined,
@@ -602,7 +684,7 @@ export const TourDefaultsManager = ({
           id: Date.now() + Math.random()
         };
       });
-      safetyMargin = (typedWeightOverrides[0]?.override_data as any)?.safetyMargin || 0;
+      safetyMargin = getSafetyMarginFromJson(typedWeightOverrides[0]?.override_data);
     } else {
       // Sort defaults by order_index if available, then by created_at
       const sortedDefaults = [...defaultsData].sort((a, b) => {
@@ -615,13 +697,13 @@ export const TourDefaultsManager = ({
         return 0;
       });
       
-      combinedTables = sortedDefaults.map(defaultItem => {
+      combinedTables = sortedDefaults.map((defaultItem): PdfTable => {
         // Check if this is new format with table_data
         if (isNewFormatTable(defaultItem) && defaultItem.table_data?.rows) {
-          const watts = undefined;
+          const watts: number | undefined = undefined;
           return {
             name: getTableName(defaultItem),
-            rows: defaultItem.table_data.rows || [],
+            rows: getRowsFromJson(defaultItem.table_data),
             totalWeight: defaultItem.total_value,
             totalWatts: watts,
             totalVa: watts ? computeTotalVa(watts, defaultItem.metadata, department) : undefined,
@@ -638,7 +720,7 @@ export const TourDefaultsManager = ({
           };
         } else {
           // Legacy format
-          const watts = undefined;
+          const watts: number | undefined = undefined;
           return {
             name: getTableName(defaultItem),
             rows: [{
@@ -667,9 +749,9 @@ export const TourDefaultsManager = ({
 
     if (combinedTables.length === 0) return false;
 
-    const powerSummary = undefined;
+    const powerSummary: undefined = undefined;
 
-    const locationName = (tourDate.locations as any)?.name || UNKNOWN_LOCATION_LABEL;
+    const locationName = getTourDateLocationName(tourDate);
     const dateStr = tourDate.date; // Pass ISO string directly for proper parsing
 
     const pdfBlob = await exportToPDF(
@@ -987,7 +1069,7 @@ export const TourDefaultsManager = ({
                       {new Date(tourDate.date).toLocaleDateString('en-GB')}
                     </h4>
                     <p className="text-sm text-muted-foreground">
-                      {(tourDate.locations as any)?.name || UNKNOWN_LOCATION_LABEL}
+                      {getTourDateLocationName(tourDate)}
                     </p>
                   </div>
                 </div>
