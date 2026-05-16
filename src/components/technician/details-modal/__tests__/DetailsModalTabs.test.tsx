@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { screen } from "@testing-library/react";
 
-import { DocumentsTab, InfoTab, RestaurantsTab } from "@/components/technician/details-modal/DetailsModalTabs";
+import { DocumentsTab, InfoTab, RestaurantsTab, WeatherTab } from "@/components/technician/details-modal/DetailsModalTabs";
 import type { DetailsModalViewModel } from "@/components/technician/details-modal/useDetailsModalData";
 import { renderWithProviders } from "@/test/renderWithProviders";
 
@@ -29,6 +29,8 @@ const createVm = (overrides: Partial<DetailsModalViewModel> = {}) => ({
   canUploadTourDocuments: false,
   dateTypeMap: new Map(),
   documentLoading: new Set<string>(),
+  eventDatesString: "2026-05-16",
+  fetchWeather: vi.fn(),
   festivalStageNameMap: new Map(),
   getRoomOccupantsLabel: vi.fn(() => "Alex Manager · Bea Tech"),
   handleDownload: vi.fn(),
@@ -47,6 +49,7 @@ const createVm = (overrides: Partial<DetailsModalViewModel> = {}) => ({
   isDark: true,
   isRidersLoading: false,
   isUploadingTourDocument: false,
+  isWeatherLoading: false,
   job: {
     id: "job-1",
     title: "Technician Job",
@@ -75,6 +78,15 @@ const createVm = (overrides: Partial<DetailsModalViewModel> = {}) => ({
   tourDocumentsLoading: false,
   tourId: undefined,
   user: { id: "tech-1" },
+  weatherData: undefined,
+  weatherError: null,
+  weatherVenue: {
+    address: "Gran Via 1",
+    coordinates: {
+      lat: 40.4168,
+      lng: -3.7038,
+    },
+  },
   ...overrides,
 }) as unknown as DetailsModalViewModel;
 
@@ -230,6 +242,7 @@ describe("DetailsModal tabs", () => {
           rating: 4.5,
           priceLevel: 1,
           distance: 150,
+          phone: "+34911111111",
           website: "https://safe.example",
           googlePlaceId: "place-safe",
         },
@@ -250,7 +263,41 @@ describe("DetailsModal tabs", () => {
 
     expect(screen.getByText("Safe Restaurant")).toBeInTheDocument();
     expect(screen.getByText("Unsafe Restaurant")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Llamar a Safe Restaurant" })).toHaveAttribute("href", "tel:+34911111111");
+    expect(screen.getByRole("link", { name: "Abrir sitio web de Safe Restaurant" })).toHaveAttribute("href", "https://safe.example/");
     expect(container.querySelector('a[href="https://safe.example/"]')).toBeInTheDocument();
     expect(container.querySelector('a[href^="javascript:"]')).not.toBeInTheDocument();
+  });
+
+  it("shows weather refresh controls when the venue only has coordinates", () => {
+    const fetchWeather = vi.fn();
+    const vm = createVm({
+      eventDatesString: "2026-05-16",
+      fetchWeather,
+      jobDetailsLoading: false,
+      weatherData: [
+        {
+          date: "2026-05-16",
+          condition: "Clouds",
+          icon: "cloud",
+          maxTemp: 22,
+          minTemp: 15,
+          precipitationProbability: 10,
+          weatherCode: 3,
+        },
+      ],
+      weatherVenue: {
+        address: undefined,
+        coordinates: {
+          lat: 40.4168,
+          lng: -3.7038,
+        },
+      },
+    });
+
+    renderWithProviders(<WeatherTab vm={vm} />);
+
+    expect(screen.getByRole("button", { name: "Actualizar" })).toBeInTheDocument();
+    expect(screen.queryByText("El pronóstico del tiempo requiere ubicación del lugar")).not.toBeInTheDocument();
   });
 });

@@ -838,12 +838,12 @@ export const RestaurantsTab = ({ vm }: TabProps) => {
 
                   <div className="flex gap-1 shrink-0">
                     {restaurant.phone && (
-                      <a href={`tel:${restaurant.phone}`} className={`p-2 rounded-lg border ${theme.divider} hover:bg-white/5`}>
+                      <a href={`tel:${restaurant.phone}`} aria-label={`Llamar a ${restaurant.name}`} className={`p-2 rounded-lg border ${theme.divider} hover:bg-white/5`}>
                         <Phone size={14} className={theme.textMuted} />
                       </a>
                     )}
                     {websiteUrl && (
-                      <a href={websiteUrl} target="_blank" rel="noopener noreferrer" className={`p-2 rounded-lg border ${theme.divider} hover:bg-white/5`}>
+                      <a href={websiteUrl} target="_blank" rel="noopener noreferrer" aria-label={`Abrir sitio web de ${restaurant.name}`} className={`p-2 rounded-lg border ${theme.divider} hover:bg-white/5`}>
                         <Globe size={14} className={theme.textMuted} />
                       </a>
                     )}
@@ -889,6 +889,7 @@ export const WeatherTab = ({ vm }: TabProps) => {
     weatherError,
     weatherVenue,
   } = vm;
+  const hasWeatherLocation = Boolean(weatherVenue.address || weatherVenue.coordinates);
 
   return (
     <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
@@ -897,7 +898,7 @@ export const WeatherTab = ({ vm }: TabProps) => {
           <CloudRain size={18} className={theme.textMuted} />
           <h3 className={`text-lg font-bold ${theme.textMain}`}>Pronóstico del Tiempo</h3>
         </div>
-        {!jobDetailsLoading && weatherVenue.address && eventDatesString && (
+        {!jobDetailsLoading && hasWeatherLocation && eventDatesString && (
           <Button variant="outline" size="sm" onClick={fetchWeather} disabled={isWeatherLoading}>
             {isWeatherLoading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw size={14} className="mr-1" />}
             {isWeatherLoading ? "Cargando..." : "Actualizar"}
@@ -909,7 +910,7 @@ export const WeatherTab = ({ vm }: TabProps) => {
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
         </div>
-      ) : !weatherVenue.address && !weatherVenue.coordinates ? (
+      ) : !hasWeatherLocation ? (
         <div className={`flex items-center gap-2 text-sm ${theme.textMuted} py-4`}>
           <AlertTriangle size={16} />
           El pronóstico del tiempo requiere ubicación del lugar
