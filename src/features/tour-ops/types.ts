@@ -111,6 +111,7 @@ export interface TourOpsAccommodation {
   id: string;
   tourDateId: string | null;
   hojaDeRutaId?: string | null;
+  locationId?: string | null;
   hotelName: string;
   hotelAddress: string | null;
   latitude?: number | null;

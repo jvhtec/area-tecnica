@@ -285,6 +285,7 @@ const normalizeAccommodation = (row: AnyRecord): TourOpsAccommodation => ({
   id: textOrNull(row.id) ?? crypto.randomUUID(),
   tourDateId: textOrNull(row.tour_date_id),
   hojaDeRutaId: textOrNull(row.hoja_de_ruta_id),
+  locationId: textOrNull(row.location_id),
   hotelName: textOrNull(row.hotel_name) ?? "Hotel",
   hotelAddress: textOrNull(row.hotel_address ?? row.address),
   latitude: toNumber(row.latitude),
@@ -1122,6 +1123,125 @@ export async function deleteTravelSegment(id: string) {
   if (error) throw error;
 }
 
+const opsAccommodationPayloadFromHotel = (input: Partial<TourOpsAccommodation> & { tourId: string }) => ({
+  tour_id: input.tourId,
+  tour_date_id: input.tourDateId || null,
+  hotel_name: input.hotelName || "Hotel",
+  hotel_address: input.hotelAddress || null,
+  location_id: input.locationId || null,
+  latitude: input.latitude ?? null,
+  longitude: input.longitude ?? null,
+  check_in_date: input.checkInDate || null,
+  check_out_date: input.checkOutDate || input.checkInDate || null,
+  confirmation_number: input.confirmationNumber || null,
+  room_allocation: input.roomAllocation || [],
+  rooms_booked: input.roomsBooked ?? 0,
+  notes: input.notes || null,
+  status: "planned",
+});
+
+const hojaAccommodationPayloadFromHotel = (input: Partial<TourOpsAccommodation>) => ({
+  hotel_name: input.hotelName || "Hotel",
+  address: input.hotelAddress || null,
+  check_in: input.checkInDate || null,
+  check_out: input.checkOutDate || input.checkInDate || null,
+  latitude: input.latitude ?? null,
+  longitude: input.longitude ?? null,
+});
+
+const findSimilarOpsAccommodation = async (input: Partial<TourOpsAccommodation> & { tourId: string }) => {
+  if (!input.tourDateId || !input.hotelName) return null;
+  const { data, error } = await client
+    .from("tour_accommodations")
+    .select("id")
+    .eq("tour_id", input.tourId)
+    .eq("tour_date_id", input.tourDateId)
+    .ilike("hotel_name", input.hotelName)
+    .limit(1);
+  if (error) throw error;
+  return asArray<AnyRecord>(data)[0] ?? null;
+};
+
+const upsertOpsAccommodationFromHoja = async (input: Partial<TourOpsAccommodation> & { tourId: string }) => {
+  const payload = opsAccommodationPayloadFromHotel(input);
+  if (!payload.check_in_date || !payload.check_out_date) return false;
+
+  const existing = await findSimilarOpsAccommodation(input);
+  if (existing?.id) {
+    const { error } = await client.from("tour_accommodations").update(payload).eq("id", existing.id);
+    if (error) throw error;
+    return true;
+  }
+
+  const { error } = await client.from("tour_accommodations").insert(payload);
+  if (error) throw error;
+  return true;
+};
+
+const syncAccommodationToHoja = async (input: Partial<TourOpsAccommodation>) => {
+  const hoja = await getHojaForTourDate(input.tourDateId);
+  if (!hoja?.id) return false;
+
+  const payload = {
+    hoja_de_ruta_id: hoja.id,
+    ...hojaAccommodationPayloadFromHotel(input),
+  };
+
+  const { data: existing, error: existingError } = await client
+    .from("hoja_de_ruta_accommodations")
+    .select("id, hotel_name")
+    .eq("hoja_de_ruta_id", hoja.id)
+    .ilike("hotel_name", payload.hotel_name)
+    .limit(1);
+  if (existingError) throw existingError;
+
+  const existingRow = asArray<AnyRecord>(existing)[0];
+  if (existingRow?.id) {
+    const { error } = await client.from("hoja_de_ruta_accommodations").update(payload).eq("id", existingRow.id);
+    if (error) throw error;
+    return true;
+  }
+
+  const { error } = await client.from("hoja_de_ruta_accommodations").insert(payload);
+  if (error) throw error;
+  return true;
+};
+
+export async function saveAccommodation(input: Partial<TourOpsAccommodation> & { tourId: string }) {
+  if (input.source === "hoja" && input.id) {
+    const { error } = await client
+      .from("hoja_de_ruta_accommodations")
+      .update(hojaAccommodationPayloadFromHotel(input))
+      .eq("id", input.id);
+    if (error) throw error;
+    await upsertOpsAccommodationFromHoja(input);
+    return input.id;
+  }
+
+  const payload = opsAccommodationPayloadFromHotel(input);
+  if (!payload.check_in_date || !payload.check_out_date) {
+    throw new Error("Check-in y check-out son obligatorios");
+  }
+
+  if (input.id) {
+    const { error } = await client.from("tour_accommodations").update(payload).eq("id", input.id);
+    if (error) throw error;
+    await syncAccommodationToHoja(input);
+    return input.id;
+  }
+
+  const { data, error } = await client.from("tour_accommodations").insert(payload).select("id").single();
+  if (error) throw error;
+  await syncAccommodationToHoja({ ...input, id: data.id as string, source: "normalized" });
+  return data.id as string;
+}
+
+export async function deleteAccommodation(input: { id: string; source?: TourOpsAccommodation["source"] }) {
+  const table = input.source === "hoja" ? "hoja_de_ruta_accommodations" : "tour_accommodations";
+  const { error } = await client.from(table).delete().eq("id", input.id);
+  if (error) throw error;
+}
+
 export async function migrateLegacyTravelPlan(model: TourOpsModel) {
   const legacySegments = model.travelSegments.filter((segment) => segment.source === "legacy");
   if (legacySegments.length === 0) return 0;
@@ -1310,7 +1430,7 @@ export async function syncHojaRutaOpsData(model: TourOpsModel) {
 export async function fetchTourGuestLinks(tourId: string): Promise<TourGuestLink[]> {
   const { data, error } = await client
     .from("tour_guest_links")
-    .select("id, tour_id, label, allowed_sections, expires_at, revoked_at, created_at")
+    .select("id, tour_id, token, label, allowed_sections, expires_at, revoked_at, created_at")
     .eq("tour_id", tourId)
     .order("created_at", { ascending: false });
   if (error) throw error;
