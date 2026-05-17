@@ -1219,6 +1219,7 @@ export async function fetchTourOpsShare(token: string): Promise<TourOpsModel> {
             id: data.share.id,
             label: data.share.label,
             expiresAt: data.share.expires_at ?? null,
+            accessLevel: data.share.access_level === "edit" ? "edit" : "view",
           }
         : null,
     },
@@ -1252,6 +1253,17 @@ export async function saveTimelineEvent(input: Partial<TourOpsTimelineEvent> & {
   const { data, error } = await client.from("tour_timeline_events").insert(payload).select("id").single();
   if (error) throw error;
   return data.id as string;
+}
+
+export async function saveProgramSchedule(input: { hojaDeRutaId: string; program: TourOpsProgramDay[] }) {
+  const { error } = await client
+    .from("hoja_de_ruta")
+    .update({
+      program_schedule_json: input.program,
+      last_modified: new Date().toISOString(),
+    })
+    .eq("id", input.hojaDeRutaId);
+  if (error) throw error;
 }
 
 export async function deleteTimelineEvent(id: string) {
@@ -1817,7 +1829,7 @@ export async function syncHojaRutaOpsData(model: TourOpsModel) {
 export async function fetchTourGuestLinks(tourId: string): Promise<TourGuestLink[]> {
   const { data, error } = await client
     .from("tour_guest_links")
-    .select("id, tour_id, token, label, allowed_sections, expires_at, revoked_at, created_at")
+    .select("id, tour_id, token, label, allowed_sections, access_level, expires_at, revoked_at, created_at")
     .eq("tour_id", tourId)
     .order("created_at", { ascending: false });
   if (error) throw error;
@@ -1828,6 +1840,7 @@ export async function createTourGuestLink(input: {
   tourId: string;
   label: string;
   allowedSections: TourOpsAllowedSections;
+  accessLevel?: "view" | "edit";
   expiresAt?: string | null;
 }): Promise<TourGuestLink> {
   const { data, error } = await client.rpc("create_tour_guest_link", {
@@ -1835,6 +1848,7 @@ export async function createTourGuestLink(input: {
     p_label: input.label,
     p_allowed_sections: input.allowedSections,
     p_expires_at: input.expiresAt || null,
+    p_access_level: input.accessLevel || "view",
   });
   if (error) throw error;
   return data?.[0] as TourGuestLink;
@@ -1842,6 +1856,14 @@ export async function createTourGuestLink(input: {
 
 export async function revokeTourGuestLink(linkId: string) {
   const { error } = await client.rpc("revoke_tour_guest_link", { p_link_id: linkId });
+  if (error) throw error;
+}
+
+export async function setTourGuestLinkAccess(input: { linkId: string; accessLevel: "disabled" | "view" | "edit" }) {
+  const { error } = await client.rpc("set_tour_guest_link_access", {
+    p_link_id: input.linkId,
+    p_access_level: input.accessLevel,
+  });
   if (error) throw error;
 }
 

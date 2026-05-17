@@ -11,7 +11,9 @@ import {
   revokeTourGuestLink,
   deleteAccommodation,
   saveAccommodation,
+  saveProgramSchedule,
   saveTimelineEvent,
+  setTourGuestLinkAccess,
   saveTravelSegment,
   syncHojaRutaOpsData,
   updateTourDocumentGuestVisibility,
@@ -53,6 +55,11 @@ export function useTourOpsMutations(tourId: string) {
   const saveEvent = useMutation({
     mutationFn: (input: Partial<TourOpsTimelineEvent> & { tourId: string; date: string; title: string }) =>
       saveTimelineEvent(input),
+    onSuccess: invalidate,
+  });
+
+  const saveProgram = useMutation({
+    mutationFn: saveProgramSchedule,
     onSuccess: invalidate,
   });
 
@@ -102,6 +109,7 @@ export function useTourOpsMutations(tourId: string) {
 
   return {
     saveEvent,
+    saveProgram,
     removeEvent,
     saveTravel,
     removeTravel,
@@ -126,7 +134,7 @@ export function useTourGuestLinkMutations(tourId: string) {
   const invalidate = () => queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-guest-links", tourId) });
 
   const createLink = useMutation({
-    mutationFn: (input: { label: string; allowedSections: TourOpsAllowedSections; expiresAt?: string | null }) =>
+    mutationFn: (input: { label: string; allowedSections: TourOpsAllowedSections; accessLevel?: "view" | "edit"; expiresAt?: string | null }) =>
       createTourGuestLink({ tourId, ...input }),
     onSuccess: invalidate,
   });
@@ -136,5 +144,10 @@ export function useTourGuestLinkMutations(tourId: string) {
     onSuccess: invalidate,
   });
 
-  return { createLink, revokeLink };
+  const setLinkAccess = useMutation({
+    mutationFn: (input: { linkId: string; accessLevel: "disabled" | "view" | "edit" }) => setTourGuestLinkAccess(input),
+    onSuccess: invalidate,
+  });
+
+  return { createLink, revokeLink, setLinkAccess };
 }

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -71,6 +72,8 @@ type ModernHojaDeRutaProps = {
 
 export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
   const { toast } = useToast();
+  const [searchParams] = useSearchParams();
+  const routedJobId = jobId ?? searchParams.get("jobId") ?? searchParams.get("openHojaDeRuta") ?? undefined;
   const [activeTab, setActiveTab] = useState("event");
   const [completionProgress, setCompletionProgress] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -156,12 +159,12 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     importTransports
   } = useHojaDeRutaForm(venueImagesForSave);
 
-  // If a jobId is provided from parent, lock selection to that job
+  // If a jobId is provided from parent or route query, lock selection to that job
   useEffect(() => {
-    if (jobId && selectedJobId !== jobId) {
-      setSelectedJobId(jobId);
+    if (routedJobId && selectedJobId !== routedJobId) {
+      setSelectedJobId(routedJobId);
     }
-  }, [jobId, selectedJobId, setSelectedJobId]);
+  }, [routedJobId, selectedJobId, setSelectedJobId]);
 
   // Calculate completion progress including weather and restaurants
   useEffect(() => {

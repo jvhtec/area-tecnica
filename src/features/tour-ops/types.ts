@@ -192,6 +192,7 @@ export interface TourOpsModel {
     id: string;
     label: string;
     expiresAt: string | null;
+    accessLevel?: "view" | "edit";
   } | null;
   tour: {
     id: string;
@@ -229,6 +230,7 @@ export interface TourGuestLink {
   tour_id: string;
   label: string;
   allowed_sections: TourOpsAllowedSections;
+  access_level?: "view" | "edit";
   expires_at: string | null;
   revoked_at: string | null;
   created_at: string;

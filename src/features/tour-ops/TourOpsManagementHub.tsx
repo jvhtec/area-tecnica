@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Copy,
   Download,
+  Eye,
   ExternalLink,
   FileText,
   Hotel,
@@ -24,6 +25,7 @@ import {
   Share2,
   Trash2,
   Users,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -41,15 +43,18 @@ import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
 import { TourContactsManager } from "@/components/tours/scheduling/TourContactsManager";
 import { TourMapViewMapbox } from "@/components/tours/scheduling/TourMapViewMapbox";
 import { TourSettingsPanel } from "@/components/tours/scheduling/TourSettingsPanel";
+import { MultiDayScheduleBuilder } from "@/components/schedule/MultiDayScheduleBuilder";
 import { cn } from "@/lib/utils";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { MADRID_TIMEZONE, utcToLocalInput } from "@/utils/timezoneUtils";
+import type { ProgramDay as HojaProgramDay } from "@/types/hoja-de-ruta";
 import type {
   TourGuestLink,
   TourOpsAllowedSections,
   TourOpsAccommodation,
   TourOpsDate,
   TourOpsModel,
+  TourOpsProgramDay,
   TourOpsRoomAssignment,
   TourOpsTimelineEvent,
   TourOpsTravelSegment,
@@ -193,11 +198,11 @@ const ActiveDateSelector = ({
 }: {
   dates: TourOpsDate[];
   selectedDate: TourOpsDate | null;
-  onSelect: (id: string) => void;
+  onSelect: (id: string | null) => void;
 }) => {
   const selectedIndex = selectedDate ? dates.findIndex((date) => date.id === selectedDate.id) : -1;
   const previousDate = selectedIndex > 0 ? dates[selectedIndex - 1] : null;
-  const nextDate = selectedIndex >= 0 && selectedIndex < dates.length - 1 ? dates[selectedIndex + 1] : null;
+  const nextDate = selectedIndex === -1 ? dates[0] ?? null : selectedIndex < dates.length - 1 ? dates[selectedIndex + 1] : null;
 
   return (
     <div className="rounded-lg border bg-background p-3">
@@ -207,7 +212,7 @@ const ActiveDateSelector = ({
           <div className="mt-1 flex min-w-0 items-center gap-2">
             <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="truncate font-medium">
-              {selectedDate ? formatDate(selectedDate.date) : "Selecciona una fecha"}
+              {selectedDate ? formatDate(selectedDate.date) : "Vista general del tour"}
             </div>
             {selectedDate?.health.length ? (
               <Badge variant="destructive" className="shrink-0 text-[10px]">{selectedDate.health.length} avisos</Badge>
@@ -215,15 +220,17 @@ const ActiveDateSelector = ({
               <Badge variant="outline" className="shrink-0 text-[10px]">Completo</Badge>
             ) : null}
           </div>
-          {selectedDate && (
-            <div className="mt-1 flex items-start gap-1 text-sm text-muted-foreground">
-              <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-              <span className="line-clamp-2">{selectedDate.venueName || selectedDate.location?.name || "Venue pendiente"}</span>
-            </div>
-          )}
+          <div className="mt-1 flex items-start gap-1 text-sm text-muted-foreground">
+            <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span className="line-clamp-2">
+              {selectedDate
+                ? selectedDate.venueName || selectedDate.location?.name || "Venue pendiente"
+                : `${dates.length} fechas en la gira`}
+            </span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-[40px_1fr_40px] gap-2 md:min-w-[420px]">
+        <div className="grid grid-cols-[40px_1fr_40px_auto] gap-2 md:min-w-[520px]">
           <Button
             type="button"
             variant="outline"
@@ -234,11 +241,12 @@ const ActiveDateSelector = ({
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Select value={selectedDate?.id ?? ""} onValueChange={onSelect}>
+          <Select value={selectedDate?.id ?? "__tour_overview__"} onValueChange={(value) => onSelect(value === "__tour_overview__" ? null : value)}>
             <SelectTrigger className="min-w-0">
-              <SelectValue placeholder="Selecciona fecha" />
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="__tour_overview__">Vista general del tour</SelectItem>
               {dates.map((date, index) => (
                 <SelectItem key={date.id} value={date.id}>
                   Dia {index + 1} · {formatDate(date.date)} · {date.venueName || date.location?.name || "Pendiente"}
@@ -255,6 +263,9 @@ const ActiveDateSelector = ({
             aria-label="Fecha siguiente"
           >
             <ChevronRight className="h-4 w-4" />
+          </Button>
+          <Button type="button" variant="outline" size="icon" onClick={() => onSelect(null)} aria-label="Ver tour completo">
+            <X className="h-4 w-4" />
           </Button>
         </div>
       </div>
@@ -408,13 +419,13 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
             <div className="flex items-center justify-between gap-3">
               <div>
                 <CardTitle className="text-base">Programa</CardTitle>
-                <p className="text-xs text-muted-foreground">Lectura desde Hoja de Ruta. Edita el programa completo en la Hoja.</p>
+                <p className="text-xs text-muted-foreground">Resumen desde Hoja de Ruta. Edita en la pestaña Programa.</p>
               </div>
               <Button
                 size="sm"
                 variant="outline"
                 disabled={!date.jobId}
-                onClick={() => date.jobId && window.open(`/project-management?openHojaDeRuta=${date.jobId}`, "_blank", "noopener,noreferrer")}
+                onClick={() => date.jobId && window.open(`/hoja-de-ruta?jobId=${date.jobId}`, "_blank", "noopener,noreferrer")}
               >
                 <ExternalLink className="h-4 w-4 mr-1" />
                 Abrir Hoja
@@ -504,6 +515,40 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
                 </div>
               )) : <div className="text-sm text-muted-foreground">Sin alojamiento definido.</div>}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Contactos</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {model.tour.contacts.length ? model.tour.contacts.slice(0, 8).map((contact, index) => (
+              <div key={contact.id ?? index} className="rounded-md border p-3 text-sm">
+                <div className="font-medium">{contact.name}</div>
+                <div className="text-xs text-muted-foreground">{[contact.role, contact.company].filter(Boolean).join(" · ")}</div>
+                <div className="mt-1 text-xs">{[contact.phone, contact.email].filter(Boolean).join(" · ")}</div>
+              </div>
+            )) : (
+              <div className="text-sm text-muted-foreground">Sin contactos de tour definidos.</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-base">Documentos</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            {model.documents.length ? model.documents.slice(0, 6).map((document) => (
+              <div key={document.id} className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+                <div className="min-w-0">
+                  <div className="truncate font-medium">{document.fileName}</div>
+                  <div className="text-xs text-muted-foreground">{document.visibleToTech ? "Visible técnicos" : "Interno"}</div>
+                </div>
+                <Badge variant={document.visibleToGuest ? "secondary" : "outline"}>
+                  {document.visibleToGuest ? "Externo" : "No externo"}
+                </Badge>
+              </div>
+            )) : (
+              <div className="text-sm text-muted-foreground">Sin documentos para esta gira.</div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -992,12 +1037,134 @@ const HotelDialog = ({
   );
 };
 
+const toHojaProgramDays = (program: TourOpsProgramDay[] | null | undefined, selectedDate: TourOpsDate | null): HojaProgramDay[] => {
+  if (program?.length) {
+    return program.map((day, index) => ({
+      label: day.label || `Dia ${index + 1}`,
+      date: day.date || undefined,
+      rows: day.rows.map((row) => ({
+        time: row.time || "",
+        item: row.item || "",
+        dept: row.dept || "",
+        notes: row.notes || "",
+      })),
+    }));
+  }
+
+  return [{
+    label: selectedDate ? formatDate(selectedDate.date) : "Dia 1",
+    date: selectedDate?.date.slice(0, 10),
+    rows: [],
+  }];
+};
+
+const cleanProgramDays = (program: HojaProgramDay[]): TourOpsProgramDay[] =>
+  program
+    .map((day, index) => ({
+      label: day.label?.trim() || `Dia ${index + 1}`,
+      date: day.date || null,
+      rows: (day.rows || [])
+        .map((row) => ({
+          time: row.time?.trim() || null,
+          item: row.item?.trim() || null,
+          dept: row.dept?.trim() || null,
+          notes: row.notes?.trim() || null,
+        }))
+        .filter((row) => row.time || row.item || row.dept || row.notes),
+    }))
+    .filter((day) => day.label || day.rows.length > 0);
+
+const ProgramPanel = ({
+  selectedDate,
+  onSave,
+  clipboard,
+  onCopy,
+  onPaste,
+}: {
+  selectedDate: TourOpsDate | null;
+  onSave: (program: TourOpsProgramDay[]) => Promise<void>;
+  clipboard: HojaProgramDay[] | null;
+  onCopy: (program: HojaProgramDay[]) => void;
+  onPaste: () => HojaProgramDay[] | null;
+}) => {
+  const [program, setProgram] = useState<HojaProgramDay[]>(() => toHojaProgramDays(selectedDate?.program, selectedDate));
+
+  useEffect(() => {
+    setProgram(toHojaProgramDays(selectedDate?.program, selectedDate));
+  }, [selectedDate]);
+
+  if (!selectedDate) {
+    return (
+      <Card>
+        <CardContent className="p-10 text-center text-sm text-muted-foreground">
+          Selecciona una fecha para ver y editar el programa.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const save = async () => {
+    if (!selectedDate.hojaDeRutaId) {
+      toast.error("Esta fecha no tiene Hoja de Ruta vinculada");
+      return;
+    }
+    await onSave(cleanProgramDays(program));
+    toast.success("Programa guardado en la Hoja de Ruta");
+  };
+
+  const paste = () => {
+    const copied = onPaste();
+    if (!copied) {
+      toast.error("No hay programa copiado");
+      return;
+    }
+    setProgram(copied.map((day) => ({ ...day, rows: day.rows.map((row) => ({ ...row })) })));
+    toast.success("Programa pegado. Revisa y guarda los cambios.");
+  };
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <CardTitle>Programa</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Edita el programa de {formatDate(selectedDate.date)} y guarda directamente en su Hoja de Ruta.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => onCopy(program)}>
+              <Copy className="h-4 w-4 mr-2" />
+              Copiar
+            </Button>
+            <Button variant="outline" disabled={!clipboard} onClick={paste}>
+              Pegar
+            </Button>
+            <Button onClick={save} disabled={!selectedDate.hojaDeRutaId}>
+              <Save className="h-4 w-4 mr-2" />
+              Guardar programa
+            </Button>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <MultiDayScheduleBuilder
+        value={program}
+        onChange={setProgram}
+        dayTitle="Programa"
+        subtitle={selectedDate.venueName || selectedDate.location?.name || undefined}
+      />
+    </div>
+  );
+};
+
 const SharePanel = ({ model }: { model: TourOpsModel }) => {
   const { data: links = [], isLoading } = useTourGuestLinks(model.tour.id);
-  const { createLink, revokeLink } = useTourGuestLinkMutations(model.tour.id);
+  const { createLink, revokeLink, setLinkAccess } = useTourGuestLinkMutations(model.tour.id);
   const [label, setLabel] = useState("External tour manager");
   const [expiresAt, setExpiresAt] = useState("");
   const [sections, setSections] = useState<TourOpsAllowedSections>(DEFAULT_TOUR_OPS_SECTIONS);
+  const [accessLevel, setAccessLevel] = useState<"view" | "edit">("view");
   const [lastToken, setLastToken] = useState<string | null>(null);
 
   const create = async () => {
@@ -1005,6 +1172,7 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
       const link = await createLink.mutateAsync({
         label,
         allowedSections: sections,
+        accessLevel,
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
       });
       if (link?.token) {
@@ -1022,6 +1190,9 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
       toast.error(message);
     }
   };
+
+  const linkAccessValue = (link: TourGuestLink): "disabled" | "view" | "edit" =>
+    link.revoked_at ? "disabled" : link.access_level === "edit" ? "edit" : "view";
 
   const copyLink = async (url: string) => {
     await navigator.clipboard?.writeText(url);
@@ -1049,6 +1220,16 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
           <div className="space-y-2">
             <Label>Caduca</Label>
             <Input type="datetime-local" value={expiresAt} onChange={(event) => setExpiresAt(event.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Permiso</Label>
+            <Select value={accessLevel} onValueChange={(value) => setAccessLevel(value as "view" | "edit")}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="view">View only</SelectItem>
+                <SelectItem value="edit">Can edit</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label>Secciones visibles</Label>
@@ -1087,6 +1268,11 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
                       {link.expires_at ? `Caduca ${format(new Date(link.expires_at), "d MMM yyyy HH:mm", { locale: es })}` : "Sin caducidad"}
                     </div>
                     {link.revoked_at && <Badge variant="destructive" className="mt-1">Revocado</Badge>}
+                    {!link.revoked_at && (
+                      <Badge variant={link.access_level === "edit" ? "default" : "outline"} className="mt-1">
+                        {link.access_level === "edit" ? "Can edit" : "View only"}
+                      </Badge>
+                    )}
                     {!link.token && !link.revoked_at && (
                       <div className="mt-1 text-xs text-amber-600">
                         Link antiguo sin token recuperable. Revocalo y crea uno nuevo para copiarlo.
@@ -1094,6 +1280,24 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
                     )}
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      <Select
+                        value={linkAccessValue(link)}
+                        onValueChange={(value) =>
+                          setLinkAccess.mutate({
+                            linkId: link.id,
+                            accessLevel: value as "disabled" | "view" | "edit",
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-8 w-[150px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="disabled">Disabled</SelectItem>
+                          <SelectItem value="view">View only</SelectItem>
+                          <SelectItem value="edit">Can edit</SelectItem>
+                        </SelectContent>
+                      </Select>
                       {guestLinkUrl(link) && !link.revoked_at && (
                         <>
                           <Button size="sm" variant="outline" onClick={() => window.open(guestLinkUrl(link) ?? "", "_blank")}>
@@ -1139,10 +1343,16 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
 
 const TourMapPanel = ({
   model,
+  selectedDate,
+  onDateSelect,
   onSettingsSave,
+  showSettings = true,
 }: {
   model: TourOpsModel;
+  selectedDate: TourOpsDate | null;
+  onDateSelect: (dateId: string) => void;
   onSettingsSave: () => void;
+  showSettings?: boolean;
 }) => {
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [mapboxError, setMapboxError] = useState<string | null>(null);
@@ -1180,82 +1390,94 @@ const TourMapPanel = ({
       id: model.tour.id,
       name: model.tour.name,
       tour_settings: model.tour.settings,
-      travel_plan: model.travelSegments.map((segment) => ({
-        id: segment.id,
-        fromDateId: segment.fromTourDateId,
-        toDateId: segment.toTourDateId,
-        fromTourDateId: segment.fromTourDateId,
-        toTourDateId: segment.toTourDateId,
-        fromType: segment.fromTourDateId ? "venue" : "home",
-        toType: segment.toTourDateId ? "venue" : "home",
-        transportType: segment.transportationType,
-        transportation_type: segment.transportationType,
-        departureTime: segment.departureTime,
-        arrivalTime: segment.arrivalTime,
-        fromLocation: segment.fromLocationId ? null : undefined,
-        toLocation: segment.toLocationId ? null : undefined,
-      })),
+      travel_plan: model.travelSegments
+        .filter((segment) =>
+          selectedDate
+            ? segment.fromTourDateId === selectedDate.id || segment.toTourDateId === selectedDate.id
+            : true
+        )
+        .map((segment) => ({
+          id: segment.id,
+          fromDateId: segment.fromTourDateId,
+          toDateId: segment.toTourDateId,
+          fromTourDateId: segment.fromTourDateId,
+          toTourDateId: segment.toTourDateId,
+          fromType: segment.fromTourDateId ? "venue" : "home",
+          toType: segment.toTourDateId ? "venue" : "home",
+          transportType: segment.transportationType,
+          transportation_type: segment.transportationType,
+          departureTime: segment.departureTime,
+          arrivalTime: segment.arrivalTime,
+          fromLocation: segment.fromLocationId ? null : undefined,
+          toLocation: segment.toLocationId ? null : undefined,
+        })),
     }),
-    [model],
+    [model, selectedDate],
   );
 
   const mapDates = useMemo(
     () =>
-      model.dates.map((date) => {
-        const location = date.location
-          ? {
-              id: date.location.id,
-              name: date.venueName || date.location.name,
-              venue_name: date.venueName || date.location.name,
-              formatted_address: date.venueAddress || date.location.formattedAddress,
-              address: date.venueAddress || date.location.formattedAddress,
-              latitude: date.location.latitude,
-              longitude: date.location.longitude,
-            }
-          : null;
+      model.dates
+        .filter((date) => (selectedDate ? date.id === selectedDate.id : true))
+        .map((date) => {
+          const location = date.location
+            ? {
+                id: date.location.id,
+                name: date.venueName || date.location.name,
+                venue_name: date.venueName || date.location.name,
+                formatted_address: date.venueAddress || date.location.formattedAddress,
+                address: date.venueAddress || date.location.formattedAddress,
+                latitude: date.location.latitude,
+                longitude: date.location.longitude,
+              }
+            : null;
 
-        return {
-          ...date,
-          location,
-          locations: location,
-          call_time: date.program[0]?.rows[0]?.time ?? null,
-        };
-      }),
-    [model],
+          return {
+            ...date,
+            location,
+            locations: location,
+            call_time: date.program[0]?.rows[0]?.time ?? null,
+          };
+        }),
+    [model, selectedDate],
   );
 
   const mapAccommodations = useMemo(
     () =>
-      model.accommodations.map((hotel) => ({
-        id: hotel.id,
-        hotel_name: hotel.hotelName,
-        hotel_address: hotel.hotelAddress,
-        check_in_date: hotel.checkInDate,
-        check_out_date: hotel.checkOutDate,
-        rooms_booked: hotel.roomsBooked,
-        latitude: hotel.latitude,
-        longitude: hotel.longitude,
-      })),
-    [model],
+      model.accommodations
+        .filter((hotel) => (selectedDate ? hotel.tourDateId === selectedDate.id : true))
+        .map((hotel) => ({
+          id: hotel.id,
+          hotel_name: hotel.hotelName,
+          hotel_address: hotel.hotelAddress,
+          check_in_date: hotel.checkInDate,
+          check_out_date: hotel.checkOutDate,
+          rooms_booked: hotel.roomsBooked,
+          latitude: hotel.latitude,
+          longitude: hotel.longitude,
+        })),
+    [model, selectedDate],
   );
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
-      <div className="space-y-3">
-        {!homeBaseConfigured && (
-          <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
-            <CardContent className="p-3 text-sm text-amber-900 dark:text-amber-200">
-              Configura la base de operaciones para mostrar rutas desde/hacia casa y calcular distancias.
-            </CardContent>
-          </Card>
-        )}
-        <TourSettingsPanel
-          tourId={model.tour.id}
-          tourData={{ tour_settings: model.tour.settings }}
-          canEdit
-          onSave={onSettingsSave}
-        />
-      </div>
+    <div className={cn("grid gap-4", showSettings ? "xl:grid-cols-[380px_1fr]" : "grid-cols-1")}>
+      {showSettings && (
+        <div className="space-y-3">
+          {!homeBaseConfigured && (
+            <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+              <CardContent className="p-3 text-sm text-amber-900 dark:text-amber-200">
+                Configura la base de operaciones para mostrar rutas desde/hacia casa y calcular distancias.
+              </CardContent>
+            </Card>
+          )}
+          <TourSettingsPanel
+            tourId={model.tour.id}
+            tourData={{ tour_settings: model.tour.settings }}
+            canEdit
+            onSave={onSettingsSave}
+          />
+        </div>
+      )}
       <div className="min-w-0">
         {mapboxLoading ? (
           <Card>
@@ -1273,6 +1495,8 @@ const TourMapPanel = ({
             tourDates={mapDates}
             accommodations={mapAccommodations}
             mapboxToken={mapboxToken}
+            selectedTourDateId={selectedDate?.id ?? null}
+            onTourDateSelect={onDateSelect}
           />
         ) : null}
       </div>
@@ -1292,12 +1516,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   const [editingHotel, setEditingHotel] = useState<TourOpsAccommodation | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("timeline");
-
-  useEffect(() => {
-    if (!selectedDateId && model?.dates[0]?.id) {
-      setSelectedDateId(model.dates[0].id);
-    }
-  }, [model, selectedDateId]);
+  const [programClipboard, setProgramClipboard] = useState<HojaProgramDay[] | null>(null);
 
   const selectedDate = useMemo(
     () => model?.dates.find((date) => date.id === selectedDateId) ?? null,
@@ -1325,6 +1544,14 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   const selectedRoomingHotels = useMemo(
     () => selectedAccommodations.filter((hotel) => hotel.roomAllocation.length > 0),
     [selectedAccommodations],
+  );
+
+  const selectedTimelineEvents = useMemo(
+    () =>
+      selectedDate
+        ? model?.timelineEvents.filter((event) => event.date?.slice(0, 10) === selectedDate.date.slice(0, 10)) ?? []
+        : model?.timelineEvents ?? [],
+    [model?.timelineEvents, selectedDate],
   );
 
   const contactsTourData = useMemo(
@@ -1360,6 +1587,14 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
     toast.success("Evento guardado");
   };
 
+  const saveProgram = async (program: TourOpsProgramDay[]) => {
+    if (!selectedDate?.hojaDeRutaId) {
+      toast.error("Selecciona una fecha con Hoja de Ruta");
+      return;
+    }
+    await mutations.saveProgram.mutateAsync({ hojaDeRutaId: selectedDate.hojaDeRutaId, program });
+  };
+
   const saveTravel = async (input: Partial<TourOpsTravelSegment> & { tourId: string }) => {
     await mutations.saveTravel.mutateAsync(input);
     toast.success("Viaje guardado");
@@ -1384,12 +1619,59 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
     );
   };
 
+  const copyProgram = (program: HojaProgramDay[]) => {
+    setProgramClipboard(program.map((day) => ({
+      ...day,
+      rows: day.rows.map((row) => ({ ...row })),
+    })));
+    toast.success("Programa copiado");
+  };
+
+  const pasteProgram = () => {
+    if (!programClipboard) return null;
+    return programClipboard.map((day) => ({
+      ...day,
+      rows: day.rows.map((row) => ({ ...row })),
+    }));
+  };
+
+  const getDocumentUrl = async (document: { filePath: string }) => {
+    const { data, error } = await dataLayerClient.storage
+      .from("tour-documents")
+      .createSignedUrl(document.filePath, 60 * 60);
+    if (error || !data?.signedUrl) throw error || new Error("No se pudo generar la URL del documento");
+    return data.signedUrl;
+  };
+
+  const openDocument = async (document: { filePath: string; fileName: string }) => {
+    try {
+      const url = await getDocumentUrl(document);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch {
+      toast.error("No se pudo abrir el documento");
+    }
+  };
+
+  const downloadDocument = async (document: { filePath: string; fileName: string }) => {
+    try {
+      const url = await getDocumentUrl(document);
+      const link = globalThis.document.createElement("a");
+      link.href = url;
+      link.download = document.fileName;
+      globalThis.document.body.appendChild(link);
+      link.click();
+      globalThis.document.body.removeChild(link);
+    } catch {
+      toast.error("No se pudo descargar el documento");
+    }
+  };
+
   const openSelectedHoja = () => {
     if (!selectedDate?.jobId) {
-      toast.error("Esta fecha no tiene job vinculado");
+      toast.error("Selecciona una fecha con Hoja de Ruta vinculada");
       return;
     }
-    window.open(`/project-management?openHojaDeRuta=${selectedDate.jobId}`, "_blank", "noopener,noreferrer");
+    window.open(`/hoja-de-ruta?jobId=${selectedDate.jobId}`, "_blank", "noopener,noreferrer");
   };
 
   const statCards = [
@@ -1437,6 +1719,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
         <TabsList className="flex h-auto flex-wrap justify-start">
           <TabsTrigger value="timeline">Cronograma</TabsTrigger>
           <TabsTrigger value="map"><MapIcon className="h-4 w-4 mr-1" />Mapa</TabsTrigger>
+          <TabsTrigger value="program">Programa</TabsTrigger>
           <TabsTrigger value="travel">Viajes</TabsTrigger>
           <TabsTrigger value="hotels"><Hotel className="h-4 w-4 mr-1" />Hoteles</TabsTrigger>
           <TabsTrigger value="rooming"><Bed className="h-4 w-4 mr-1" />Rooming</TabsTrigger>
@@ -1479,12 +1762,22 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
             </Card>
 
             <div className="space-y-4">
-              <DateDetail model={model} date={selectedDate} />
+              {selectedDate ? (
+                <DateDetail model={model} date={selectedDate} />
+              ) : (
+                <TourMapPanel
+                  model={model}
+                  selectedDate={null}
+                  onDateSelect={setSelectedDateId}
+                  onSettingsSave={() => void refetch()}
+                  showSettings={false}
+                />
+              )}
 
               <Card>
                 <CardHeader><CardTitle className="text-base">Eventos adicionales</CardTitle></CardHeader>
                 <CardContent className="space-y-2">
-                  {model.timelineEvents.length ? model.timelineEvents.map((event) => (
+                  {selectedTimelineEvents.length ? selectedTimelineEvents.map((event) => (
                     <div key={event.id} className="flex flex-col gap-2 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
                       <div>
                         <div className="font-medium">{event.title}</div>
@@ -1507,7 +1800,22 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
         </TabsContent>
 
         <TabsContent value="map" className="m-0">
-          <TourMapPanel model={model} onSettingsSave={() => void refetch()} />
+          <TourMapPanel
+            model={model}
+            selectedDate={selectedDate}
+            onDateSelect={setSelectedDateId}
+            onSettingsSave={() => void refetch()}
+          />
+        </TabsContent>
+
+        <TabsContent value="program" className="m-0">
+          <ProgramPanel
+            selectedDate={selectedDate}
+            onSave={saveProgram}
+            clipboard={programClipboard}
+            onCopy={copyProgram}
+            onPaste={pasteProgram}
+          />
         </TabsContent>
 
         <TabsContent value="travel" className="m-0">
@@ -1721,12 +2029,22 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                     <div className="font-medium">{document.fileName}</div>
                     <div className="text-xs text-muted-foreground">{document.visibleToTech ? "Visible técnicos" : "Interno"} · {document.visibleToGuest ? "Visible externo" : "No externo"}</div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Externo</span>
-                    <Switch
-                      checked={document.visibleToGuest}
-                      onCheckedChange={(visibleToGuest) => mutations.setGuestDocumentVisibility.mutate({ documentId: document.id, visibleToGuest })}
-                    />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => openDocument(document)}>
+                      <Eye className="h-4 w-4 mr-1" />
+                      Ver
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => downloadDocument(document)}>
+                      <Download className="h-4 w-4 mr-1" />
+                      Descargar
+                    </Button>
+                    <label className="flex items-center gap-2 rounded-md border px-2 py-1">
+                      <span className="text-xs text-muted-foreground">Externo</span>
+                      <Switch
+                        checked={document.visibleToGuest}
+                        onCheckedChange={(visibleToGuest) => mutations.setGuestDocumentVisibility.mutate({ documentId: document.id, visibleToGuest })}
+                      />
+                    </label>
                   </div>
                 </div>
               )) : <div className="text-sm text-muted-foreground">Sin documentos.</div>}
@@ -1740,9 +2058,15 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
 
         <TabsContent value="health" className="m-0">
           <Card>
-            <CardHeader><CardTitle>Avisos de planificacion</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle>
+                Avisos {selectedDate ? `- ${formatDate(selectedDate.date)}` : ""}
+              </CardTitle>
+            </CardHeader>
             <CardContent className="space-y-2">
-              {model.health.length ? model.health.map((issue) => (
+              {!selectedDate ? (
+                <div className="text-sm text-muted-foreground">Selecciona una fecha para ver sus avisos.</div>
+              ) : selectedDate.health.length ? selectedDate.health.map((issue) => (
                 <div key={issue.id} className="flex gap-3 rounded-lg border p-3">
                   <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5" />
                   <div>
@@ -1753,7 +2077,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
               )) : (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
-                  Sin avisos principales.
+                  Sin avisos para la fecha seleccionada.
                 </div>
               )}
             </CardContent>

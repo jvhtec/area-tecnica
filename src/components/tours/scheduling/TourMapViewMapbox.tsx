@@ -10,6 +10,8 @@ interface TourMapViewMapboxProps {
   tourDates: any[];
   accommodations?: any[];
   mapboxToken: string; // Required prop - must be pre-fetched by parent
+  selectedTourDateId?: string | null;
+  onTourDateSelect?: (tourDateId: string) => void;
 }
 
 export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
@@ -17,6 +19,8 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
   tourDates,
   accommodations = [],
   mapboxToken,
+  selectedTourDateId,
+  onTourDateSelect,
 }) => {
   const { toast } = useToast();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -122,7 +126,7 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
     if (!mapLoaded || !map.current) return;
 
     renderMapContent();
-  }, [mapLoaded, tourData, tourDates, accommodations]);
+  }, [mapLoaded, tourData, tourDates, accommodations, selectedTourDateId, onTourDateSelect]);
 
   const escapeHtml = (text: string | null | undefined): string => {
     if (!text) return '';
@@ -189,12 +193,13 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
       // Create custom venue marker
       const venueEl = document.createElement('div');
       venueEl.className = 'custom-marker-venue';
+      const isSelected = selectedTourDateId === date.id;
       venueEl.innerHTML = `<div style="
-        width: 32px;
-        height: 32px;
+        width: ${isSelected ? 38 : 32}px;
+        height: ${isSelected ? 38 : 32}px;
         border-radius: 50%;
-        background-color: #ef4444;
-        border: 3px solid white;
+        background-color: ${isSelected ? '#111827' : '#ef4444'};
+        border: ${isSelected ? 4 : 3}px solid white;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -204,6 +209,9 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         cursor: pointer;
       ">${index + 1}</div>`;
+      venueEl.addEventListener('click', () => {
+        if (date.id) onTourDateSelect?.(date.id);
+      });
 
       const dateStr = new Date(date.date).toLocaleDateString("es-ES", {
         weekday: "long",
@@ -456,7 +464,7 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
               </Badge>
               <Badge variant="outline" className="bg-red-50 dark:bg-red-950">
                 <MapPin className="h-3 w-3 mr-1" />
-                Venues
+                {selectedTourDateId ? 'Fecha activa' : 'Venues'}
               </Badge>
               {hasRoute && (
                 <Badge variant="outline" className="bg-violet-50 dark:bg-violet-950">
