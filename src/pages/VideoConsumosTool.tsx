@@ -15,7 +15,17 @@ import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { Badge } from '@/components/ui/badge';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
-import type { Json } from '@/integrations/supabase/types';
+import {
+  createCalculatedPowerTable,
+  getPowerPduOptions,
+} from '@/features/technical-tools/power/powerCalculations';
+import { PowerTableControls } from '@/features/technical-tools/power/PowerTableControls';
+import {
+  buildLegacyPowerOverridePayload,
+  buildPowerRequirementInsert,
+  buildTourPowerDefaultTable,
+  uploadPowerReportAndCompleteTask,
+} from '@/features/technical-tools/power/powerPersistence';
 import {
   CUSTOM_POWER_POSITION_VALUE,
   getPowerPositionCustomValue,
@@ -31,9 +41,6 @@ const videoComponentDatabase = [
   { id: 4, name: 'LED Screen', watts: 700 }
 ];
 
-const SQRT3 = Math.sqrt(3);
-const PDU_TYPES_THREE = ['CEE16A 3P+N+G', 'CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE125A 3P+N+G', 'Powerlock 400A 3P+N+G'];
-const PDU_TYPES_SINGLE = ['Schuko 16A', 'CEE32A 1P+N+G', 'CEE63A 1P+N+G'];
 const TABLE_SETTINGS_SAVE_DEBOUNCE_MS = 300;
 
 interface TableRow {
@@ -169,32 +176,11 @@ const VideoConsumosTool: React.FC = () => {
       // Get or create the video set ID
       const setId = await getOrCreateVideoSetId();
 
-      // Now create the table with the detailed data
-      await createTourDefaultTable({
-        set_id: setId,
-        table_name: table.name,
-        table_data: {
-          rows: table.rows,
-          safetyMargin,
-          pf,
-          phaseMode,
-          voltage
-        } as unknown as Json,
-        table_type: 'power',
-        total_value: table.totalWatts || 0,
-        metadata: {
-          current_per_phase: table.currentPerPhase,
-          pdu_type: table.customPduType || table.pduType,
-          custom_pdu_type: table.customPduType,
-          includes_hoist: table.includesHoist || false,
-          position: table.position,
-          custom_position: table.customPosition,
-          safetyMargin,
-          pf,
-          phaseMode,
-          voltage
-        }
-      });
+      await createTourDefaultTable(buildTourPowerDefaultTable({
+        setId,
+        settings: getPowerSettings(),
+        table,
+      }));
 
       toast({
         title: "Success",
@@ -255,46 +241,16 @@ const VideoConsumosTool: React.FC = () => {
     setSelectedJob(job);
   };
 
-  const calculateLineCurrent = (totalWatts: number) => {
-    const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
-    const currentLine = phaseMode === 'single'
-      ? adjustedWatts / (voltage * pf)
-      : adjustedWatts / (SQRT3 * voltage * pf);
-    return { adjustedWatts, currentLine };
-  };
-
-  const PDU_TYPES = phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE;
-  const planningLimit = (amps: number) => amps * 0.8;
-  const recommendPDU = (currentLine: number) => {
-    if (phaseMode === 'single') {
-      if (currentLine <= planningLimit(16)) return PDU_TYPES_SINGLE[0];
-      if (currentLine <= planningLimit(32)) return PDU_TYPES_SINGLE[1];
-      return PDU_TYPES_SINGLE[2];
-    }
-    if (currentLine <= planningLimit(16)) return PDU_TYPES_THREE[0];
-    if (currentLine <= planningLimit(32)) return PDU_TYPES_THREE[1];
-    if (currentLine <= planningLimit(63)) return PDU_TYPES_THREE[2];
-    if (currentLine <= planningLimit(125)) return PDU_TYPES_THREE[3];
-    return PDU_TYPES_THREE[4];
-  };
+  const getPowerSettings = () => ({ safetyMargin, powerFactor: pf, phaseMode, voltage });
+  const PDU_TYPES = getPowerPduOptions('video', phaseMode);
 
   const savePowerRequirementTable = async (table: Table) => {
     if (isOverrideMode && overrideData) {
       // Save as override for tour date
-      const overrideSuccess = await saveOverride('power', {
-        table_name: table.name,
-        total_watts: table.totalWatts || 0,
-        current_per_phase: table.currentPerPhase || 0,
-        pdu_type: table.customPduType || table.pduType || '',
-        custom_pdu_type: table.customPduType,
-        position: table.position || null,
-        custom_position: table.customPosition || null,
-        includes_hoist: table.includesHoist || false,
-        override_data: {
-          rows: table.rows,
-          safetyMargin: safetyMargin
-        }
-      });
+      const overrideSuccess = await saveOverride('power', buildLegacyPowerOverridePayload({
+        settings: getPowerSettings(),
+        table,
+      }));
 
       if (overrideSuccess) {
         toast({
@@ -307,19 +263,12 @@ const VideoConsumosTool: React.FC = () => {
 
     try {
       const { error } = await dataLayerClient.from('power_requirement_tables')
-        .insert({
-          job_id: selectedJobId,
+        .insert(buildPowerRequirementInsert({
           department: 'video',
-          table_name: table.name,
-          total_watts: table.totalWatts || 0,
-          current_per_phase: table.currentPerPhase || 0,
-          pdu_type: table.customPduType || table.pduType || '',
-          custom_pdu_type: table.customPduType,
-          position: table.position || null,
-          custom_position: table.customPosition || null,
-          table_data: { rows: table.rows } as unknown as Json,
-          includes_hoist: table.includesHoist || false
-        });
+          jobId: selectedJobId,
+          settings: getPowerSettings(),
+          table,
+        }));
 
       if (error) throw error;
 
@@ -347,38 +296,17 @@ const VideoConsumosTool: React.FC = () => {
       return;
     }
 
-    const calculatedRows = currentTable.rows.map((row) => {
-      const component = videoComponentDatabase.find((c) => c.id.toString() === row.componentId);
-      const totalWatts =
-        parseFloat(row.quantity || '0') && parseFloat(row.watts || '0')
-          ? parseFloat(row.quantity) * parseFloat(row.watts)
-          : 0;
-      return {
-        ...row,
-        componentName: component?.name || '',
-        totalWatts,
-      };
-    });
-
-    const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const { adjustedWatts, currentLine } = calculateLineCurrent(totalWatts);
-    const pduSuggestion = recommendPDU(currentLine);
-    const totalVa = pf > 0 ? adjustedWatts / pf : adjustedWatts; // apparent power (VA) with safety margin
-
-    const newTable = {
-      name: tableName,
-      rows: calculatedRows,
-      totalWatts,
-      adjustedWatts,
-      totalVa,
-      currentPerPhase: currentLine,
-      pduType: pduSuggestion,
-      customPduType: undefined as string | undefined,
-      position: currentTable.position,
-      customPosition: currentTable.customPosition,
-      includesHoist: false,
+    const newTable = createCalculatedPowerTable<TableRow, typeof videoComponentDatabase[number]>({
+      components: videoComponentDatabase,
+      currentTable,
       id: Date.now(),
-    };
+      name: tableName,
+      pduOptions: PDU_TYPES,
+      settings: getPowerSettings(),
+      tablePatch: {
+        customPduType: undefined,
+      },
+    }) as Table;
 
     setTables((prev) => [...prev, newTable]);
     
@@ -502,24 +430,15 @@ const VideoConsumosTool: React.FC = () => {
       // This automation is department-specific: only video department tasks are affected
       let completedTasksCount = 0;
       if (!isTourDefaults && selectedJobId) {
-        try {
-          const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
-          await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/consumos');
-          
-          // Auto-complete Consumos tasks for video department only
-          const { autoCompleteConsumosTasks } = await import('@/utils/taskAutoCompletion');
-          const result = await autoCompleteConsumosTasks(selectedJobId, 'video');
-          completedTasksCount = result.completedCount;
-          
-          if (result.completedCount > 0) {
-            console.log(`Auto-completed ${result.completedCount} video Consumos task(s)`);
-          }
-        } catch (err) {
-          // If auto-completion fails, log but don't fail the upload
-          if (err instanceof Error && err.message.includes('uploadJobPdfWithCleanup')) {
-            throw err; // Re-throw upload errors
-          }
-          console.warn('Task auto-completion failed:', err);
+        completedTasksCount = await uploadPowerReportAndCompleteTask({
+          department: 'video',
+          fileName,
+          jobId: selectedJobId,
+          pdfBlob,
+        });
+
+        if (completedTasksCount > 0) {
+          console.log(`Auto-completed ${completedTasksCount} video Consumos task(s)`);
         }
         
         toast({
@@ -580,7 +499,7 @@ const VideoConsumosTool: React.FC = () => {
       
       setDefaultTables(powerDefaults);
     }
-  }, [isOverrideMode, overrideData]);
+  }, [isOverrideMode, overrideData, safetyMargin, pf]);
 
   // Load tour name for display
   useEffect(() => {
@@ -943,90 +862,11 @@ const VideoConsumosTool: React.FC = () => {
                   </Button>
                 )}
               </div>
-              <div className="p-4 bg-muted/50 space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id={`hoist-${table.id}`}
-                      checked={table.includesHoist}
-                      onCheckedChange={(checked) => {
-                        updateTableSettings(table.id as number | string, { includesHoist: !!checked });
-                      }}
-                    />
-                    <Label htmlFor={`hoist-${table.id}`}>Requires additional hoist power (CEE32A 3P+N+G)</Label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label>PDU Type Override:</Label>
-                    <Select
-                      value={table.customPduType ? ((phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE).includes(table.customPduType) ? table.customPduType : 'custom') : 'default'}
-                      onValueChange={(value) => {
-                        if (value === 'default') {
-                          updateTableSettings(table.id as number | string, { customPduType: undefined });
-                          return;
-                        }
-                        if (value === 'custom') {
-                          updateTableSettings(table.id as number | string, { customPduType: '' });
-                          return;
-                        }
-                        updateTableSettings(table.id as number | string, { customPduType: value });
-                      }}
-                    >
-                      <SelectTrigger className="w-[220px]"><SelectValue placeholder="Use recommended PDU type" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="default">Use recommended ({table.pduType})</SelectItem>
-                        {(phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE).map((type) => (
-                          <SelectItem key={type} value={type}>{type}</SelectItem>
-                        ))}
-                        <SelectItem value="custom">Custom PDU Type</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {table.customPduType !== undefined && !((phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE).includes(table.customPduType || '')) && (
-                      <Input
-                        placeholder="Enter custom PDU type"
-                        value={table.customPduType || ''}
-                        onChange={(e) => updateTableSettings(table.id as number | string, { customPduType: e.target.value })}
-                        className="w-[220px]"
-                      />
-                    )}
-                    <div className="flex items-center gap-2">
-                      <Label>Position:</Label>
-                      <Select
-                        value={getPowerPositionSelectValue(table.position, table.customPosition)}
-                        onValueChange={(value) => {
-                          if (value === NO_POWER_POSITION_VALUE) {
-                            updateTableSettings(table.id as number | string, { position: undefined, customPosition: undefined });
-                            return;
-                          }
-                          if (value === CUSTOM_POWER_POSITION_VALUE) {
-                            updateTableSettings(table.id as number | string, { position: undefined, customPosition: '' });
-                            return;
-                          }
-                          updateTableSettings(table.id as number | string, { position: value, customPosition: undefined });
-                        }}
-                      >
-                        <SelectTrigger className="w-[180px]"><SelectValue placeholder="No position" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={NO_POWER_POSITION_VALUE}>No position</SelectItem>
-                          {POWER_POSITION_PRESETS.map((position) => (
-                            <SelectItem key={position} value={position}>{position}</SelectItem>
-                          ))}
-                          <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Custom</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {getPowerPositionSelectValue(table.position, table.customPosition) === CUSTOM_POWER_POSITION_VALUE && (
-                      <Input
-                        placeholder="Enter custom position"
-                        value={getPowerPositionCustomValue(table.position, table.customPosition)}
-                        onChange={(e) =>
-                          updateTableSettings(table.id as number | string, { position: undefined, customPosition: e.target.value })
-                        }
-                        className="w-[220px]"
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
+              <PowerTableControls
+                table={table}
+                pduTypes={PDU_TYPES}
+                onUpdateSettings={(patch) => updateTableSettings(table.id as number | string, patch)}
+              />
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>

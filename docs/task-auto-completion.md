@@ -37,10 +37,9 @@ Show success toast with completion count
    - Push notifications for completed tasks
 
 3. **Calculator Integrations**
-   - `PesosTool.tsx` - Completes all "Pesos" tasks across departments
-   - `ConsumosTool.tsx` - Completes "Consumos" tasks for sound department only
-   - `LightsConsumosTool.tsx` - Completes "Consumos" tasks for lights department only
-   - `VideoConsumosTool.tsx` - Completes "Consumos" tasks for video department only
+   - `src/features/technical-tools/weights/weightPersistence.ts` uploads Pesos reports and completes all "Pesos" tasks across departments
+   - `src/features/technical-tools/power/powerPersistence.ts` uploads Consumos reports and completes "Consumos" tasks for the selected department
+   - `PesosTool.tsx`, `ConsumosTool.tsx`, `LightsConsumosTool.tsx`, and `VideoConsumosTool.tsx` delegate upload/task-completion behavior to those shared wrappers
 
 ## Task Matching Logic
 
@@ -133,6 +132,15 @@ Helper for Pesos tool - completes all Pesos tasks.
 ### `autoCompleteConsumosTasks(jobId, department)`
 
 Helper for Consumos tools - completes tasks for specific department.
+
+### Technical tool upload wrappers
+
+The calculator pages should call the shared wrappers instead of importing upload or auto-completion utilities directly:
+
+- `uploadWeightReportAndCompleteTasks({ jobId, pdfBlob, fileName })`
+- `uploadPowerReportAndCompleteTask({ department, jobId, pdfBlob, fileName })`
+
+Both wrappers propagate PDF upload failures and treat task auto-completion failures as non-fatal warnings after the document has already uploaded.
 
 ## Testing Checklist
 

@@ -1,17 +1,9 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { Table } from "../types";
+import { PowerTableControls } from "@/features/technical-tools/power/PowerTableControls";
 import {
-  CUSTOM_POWER_POSITION_VALUE,
-  getPowerPositionCustomValue,
-  getPowerPositionSelectValue,
   getResolvedPowerPosition,
-  NO_POWER_POSITION_VALUE,
-  POWER_POSITION_PRESETS,
 } from "@/utils/powerPositions";
 
 export const PowerTableCard: React.FC<{
@@ -33,99 +25,12 @@ export const PowerTableCard: React.FC<{
         </Button>
       </div>
 
-      <div className="p-4 bg-muted/50 space-y-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={`hoist-${tableId}`}
-              checked={table.includesHoist}
-              onCheckedChange={(checked) => onUpdateSettings({ includesHoist: !!checked })}
-            />
-            <Label htmlFor={`hoist-${tableId}`} className="text-sm">
-              Requires additional hoist power (CEE32A 3P+N+G)
-            </Label>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-            <Label className="text-sm whitespace-nowrap">PDU Type Override:</Label>
-            <Select
-              value={
-                table.customPduType
-                  ? pduTypes.includes(table.customPduType)
-                    ? table.customPduType
-                    : "custom"
-                  : "default"
-              }
-              onValueChange={(value) => {
-                if (value === "default") {
-                  onUpdateSettings({ customPduType: undefined });
-                } else if (value === "custom") {
-                  onUpdateSettings({ customPduType: "" });
-                } else {
-                  onUpdateSettings({ customPduType: value });
-                }
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-[220px]">
-                <SelectValue placeholder="Use recommended PDU type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="default">Use recommended ({table.pduType})</SelectItem>
-                {pduTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type}
-                  </SelectItem>
-                ))}
-                <SelectItem value="custom">Custom PDU Type</SelectItem>
-              </SelectContent>
-            </Select>
-            {table.customPduType !== undefined && !pduTypes.includes(table.customPduType || "") && (
-              <Input
-                placeholder="Enter custom PDU type"
-                value={table.customPduType || ""}
-                onChange={(e) => onUpdateSettings({ customPduType: e.target.value })}
-                className="w-full sm:w-[220px]"
-              />
-            )}
-          </div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-            <Label className="text-sm whitespace-nowrap">Position:</Label>
-            <Select
-              value={getPowerPositionSelectValue(table.position, table.customPosition)}
-              onValueChange={(value) => {
-                if (value === NO_POWER_POSITION_VALUE) {
-                  onUpdateSettings({ position: undefined, customPosition: undefined });
-                } else if (value === CUSTOM_POWER_POSITION_VALUE) {
-                  onUpdateSettings({ position: undefined, customPosition: "" });
-                } else {
-                  onUpdateSettings({ position: value, customPosition: undefined });
-                }
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="No position" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NO_POWER_POSITION_VALUE}>No position</SelectItem>
-                {POWER_POSITION_PRESETS.map((position) => (
-                  <SelectItem key={position} value={position}>
-                    {position}
-                  </SelectItem>
-                ))}
-                <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Custom</SelectItem>
-              </SelectContent>
-            </Select>
-            {getPowerPositionSelectValue(table.position, table.customPosition) === CUSTOM_POWER_POSITION_VALUE && (
-              <Input
-                placeholder="Enter custom position"
-                value={getPowerPositionCustomValue(table.position, table.customPosition)}
-                onChange={(e) => onUpdateSettings({ position: undefined, customPosition: e.target.value })}
-                className="w-full sm:w-[180px]"
-              />
-            )}
-          </div>
-        </div>
-      </div>
+      <PowerTableControls
+        table={table}
+        tableId={tableId}
+        pduTypes={pduTypes}
+        onUpdateSettings={onUpdateSettings}
+      />
 
       <div className="overflow-x-auto">
         <table className="w-full">

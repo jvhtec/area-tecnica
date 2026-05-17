@@ -20,7 +20,25 @@ import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeade
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type { Json } from '@/integrations/supabase/types';
+import {
+  calculateElectricalTotals,
+  calculateMixedLoadApparentPower,
+  calculatePowerRows,
+  getPowerPduOptions,
+  recommendPowerPdu,
+} from '@/features/technical-tools/power/powerCalculations';
+import {
+  PowerTableControls,
+  SPANISH_POWER_TABLE_CONTROL_LABELS,
+} from '@/features/technical-tools/power/PowerTableControls';
+import {
+  buildLegacyPowerOverridePayload,
+  buildPowerRequirementInsert,
+  buildPowerTableData,
+  buildPowerTableMetadata,
+  buildTourPowerDefaultTable,
+  uploadPowerReportAndCompleteTask,
+} from '@/features/technical-tools/power/powerPersistence';
 import {
   CUSTOM_POWER_POSITION_VALUE,
   getPowerPositionCustomValue,
@@ -124,17 +142,6 @@ const lightComponentDatabase: LightComponent[] = [
 
 ];
 
-const SQRT3 = Math.sqrt(3);
-
-const PDU_TYPES_THREE = [
-  'CEE32A 3P+N+G',
-  'CEE63A 3P+N+G',
-  'CEE125A 3P+N+G',
-  'Powerlock 400A 3P+N+G',
-];
-
-const PDU_TYPES_SINGLE = ['Schuko 16A', 'CEE32A 1P+N+G', 'CEE63A 1P+N+G'];
-
 interface TableRow {
   quantity: string;
   componentId: string;
@@ -224,7 +231,14 @@ const LightsConsumosTool: React.FC = () => {
   // resolvedSetIdRef persists the created id across the React Query re-fetch window.
   const pendingSetIdRef = React.useRef<Promise<string> | null>(null);
   const resolvedSetIdRef = React.useRef<string | null>(null);
-  const pduOptions = phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE;
+  const pduOptions = getPowerPduOptions('lights', phaseMode);
+  const getPowerSettings = (
+    overrides: Partial<{ phaseMode: 'single' | 'three'; safetyMargin: number; voltage: number }> = {}
+  ) => ({
+    safetyMargin: overrides.safetyMargin ?? safetyMargin,
+    phaseMode: overrides.phaseMode ?? phaseMode,
+    voltage: overrides.voltage ?? voltage,
+  });
 
   // Load tour name via React Query for caching and error handling
   const { data: tourName = '' } = useQuery({
@@ -270,24 +284,13 @@ const LightsConsumosTool: React.FC = () => {
     const v  = table.snapshotVoltage ?? voltage;
     try {
       const setId = await getOrCreateLightsSetId();
-      const newDefaultTable = await createTourDefaultTable({
-        set_id: setId,
-        table_name: table.name,
-        table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v } as unknown as Json,
-        table_type: 'power',
-        total_value: table.totalWatts || 0,
-        metadata: {
-          current_per_phase: table.currentPerPhase,
-          pdu_type: table.customPduType || table.pduType,
-          custom_pdu_type: table.customPduType,
-          position: table.position,
-          custom_position: table.customPosition,
-          includes_hoist: table.includesHoist || false,
-          safetyMargin: sm,
-          phaseMode: pm,
-          voltage: v
-        }
-      });
+      const newDefaultTable = await createTourDefaultTable(
+        buildTourPowerDefaultTable({
+          setId,
+          settings: getPowerSettings({ phaseMode: pm, safetyMargin: sm, voltage: v }),
+          table,
+        })
+      );
       // Replace local numeric id with server UUID so delete/edit handlers
       // treat this entry as persisted (typeof id !== 'number')
       setTables(prev => prev.map(t => t.id === table.id
@@ -324,25 +327,14 @@ const LightsConsumosTool: React.FC = () => {
       const pm = table.snapshotPhaseMode ?? phaseMode;
       const v  = table.snapshotVoltage ?? voltage;
       try {
-        const newDefaultTable = await createTourDefaultTable({
-          set_id: setId,
-          table_name: table.name,
-          table_data: { rows: table.rows, safetyMargin: sm, phaseMode: pm, voltage: v } as unknown as Json,
-          table_type: 'power',
-          total_value: table.totalWatts || 0,
-          metadata: {
-            current_per_phase: table.currentPerPhase,
-            pdu_type: table.customPduType || table.pduType,
-            custom_pdu_type: table.customPduType,
-            position: table.position,
-            custom_position: table.customPosition,
-            includes_hoist: table.includesHoist || false,
-            safetyMargin: sm,
-            phaseMode: pm,
-            voltage: v,
-            order_index: i
-          }
-        });
+        const newDefaultTable = await createTourDefaultTable(
+          buildTourPowerDefaultTable({
+            orderIndex: i,
+            setId,
+            settings: getPowerSettings({ phaseMode: pm, safetyMargin: sm, voltage: v }),
+            table,
+          })
+        );
         // Replace local numeric id with server UUID (see saveTourDefault for rationale)
         setTables(prev => prev.map(t => t.id === table.id
           ? { ...t, id: newDefaultTable.id, isDefault: true, defaultTableId: newDefaultTable.id }
@@ -395,7 +387,7 @@ const LightsConsumosTool: React.FC = () => {
 
       setDefaultTables(powerDefaults);
     }
-  }, [isOverrideMode, overrideData]);
+  }, [isOverrideMode, overrideData, safetyMargin]);
 
   // Preselect job from query param and fetch details if not in the list
   useEffect(() => {
@@ -538,45 +530,23 @@ const LightsConsumosTool: React.FC = () => {
   };
 
   const calculateLineCurrent = (totalWatts: number, totalVa: number) => {
-    const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
-    const adjustedVa = totalVa * (1 + safetyMargin / 100);
-    const currentLine =
-      phaseMode === 'single'
-        ? adjustedVa / voltage
-        : adjustedVa / (SQRT3 * voltage);
+    const { adjustedWatts, adjustedVa, currentLine } = calculateElectricalTotals({
+      rawApparentPowerVa: totalVa,
+      settings: getPowerSettings(),
+      totalWatts,
+    });
     return { adjustedWatts, currentLine, adjustedVa };
   };
 
-  const planningLimit = (amps: number) => amps * 0.8;
-
-  const recommendPDU = (currentLine: number) => {
-    if (phaseMode === 'single') {
-      if (currentLine <= planningLimit(16)) return PDU_TYPES_SINGLE[0];
-      if (currentLine <= planningLimit(32)) return PDU_TYPES_SINGLE[1];
-      return PDU_TYPES_SINGLE[2];
-    }
-    if (currentLine <= planningLimit(32)) return PDU_TYPES_THREE[0];
-    if (currentLine <= planningLimit(63)) return PDU_TYPES_THREE[1];
-    if (currentLine <= planningLimit(125)) return PDU_TYPES_THREE[2];
-    return PDU_TYPES_THREE[3];
-  };
+  const recommendPDU = (currentLine: number) => recommendPowerPdu(currentLine, pduOptions);
 
   const savePowerRequirementTable = async (table: Table) => {
     if (isOverrideMode && overrideData) {
       // Save as override for tour date
-      const overrideSuccess = await saveOverride('power', {
-        table_name: table.name,
-        total_watts: table.totalWatts || 0,
-        current_per_phase: table.currentPerPhase || 0,
-        pdu_type: table.customPduType || table.pduType || '',
-        custom_pdu_type: table.customPduType,
-        position: table.position || null,
-        custom_position: table.customPosition || null,
-        includes_hoist: table.includesHoist || false,
-        override_data: {
-          rows: table.rows
-        }
-      });
+      const overrideSuccess = await saveOverride('power', buildLegacyPowerOverridePayload({
+        settings: getPowerSettings(),
+        table,
+      }));
 
       if (overrideSuccess) {
         toast({
@@ -592,19 +562,16 @@ const LightsConsumosTool: React.FC = () => {
 
     try {
       const { error } = await dataLayerClient.from('power_requirement_tables')
-        .insert({
-          job_id: selectedJobId,
+        .insert(buildPowerRequirementInsert({
           department: 'lights',
-          table_name: table.name,
-          total_watts: table.totalWatts || 0,
-          current_per_phase: table.currentPerPhase || 0,
-          pdu_type: table.customPduType || table.pduType || '',
-          includes_hoist: table.includesHoist || false,
-          custom_pdu_type: table.customPduType,
-          position: table.position || null,
-          custom_position: table.customPosition || null,
-          table_data: { rows: table.rows } as unknown as Json,
-        });
+          jobId: selectedJobId,
+          settings: getPowerSettings({
+            phaseMode: table.snapshotPhaseMode,
+            safetyMargin: table.snapshotSafetyMargin,
+            voltage: table.snapshotVoltage,
+          }),
+          table,
+        }));
 
       if (error) throw error;
 
@@ -632,32 +599,22 @@ const LightsConsumosTool: React.FC = () => {
       return;
     }
 
-    const calculatedRows = currentTable.rows.map((row) => {
+    const preparedRows = currentTable.rows.map((row) => {
       const component = lightComponentDatabase.find((c) => c.id.toString() === row.componentId);
       const fixtureType = row.fixtureType || component?.fixtureType || DEFAULT_FIXTURE_TYPE;
       const pfValue = parseRowPf(row, component);
-      const totalWatts =
-        parseFloat(row.quantity) && parseFloat(row.watts)
-          ? parseFloat(row.quantity) * parseFloat(row.watts)
-          : 0;
       return {
         ...row,
-        componentName: component?.name || '',
         fixtureType,
         pf: pfValue.toFixed(2),
-        totalWatts,
       };
     });
+    const calculatedRows = calculatePowerRows(preparedRows, lightComponentDatabase);
 
     const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    // Vector sum of apparent power: S = √(P² + Q²)
-    // More accurate than scalar sum Σ(P_i/PF_i) for mixed load types
-    const totalVar = calculatedRows.reduce((sum, row) => {
-      const pfValue = Number(row.pf) || getRecommendedPf(row.fixtureType);
-      if (!pfValue || pfValue >= 1) return sum; // purely resistive loads have no reactive component
-      return sum + (row.totalWatts || 0) * Math.tan(Math.acos(pfValue));
-    }, 0);
-    const totalVa = Math.sqrt(totalWatts * totalWatts + totalVar * totalVar);
+    const totalVa = calculateMixedLoadApparentPower(calculatedRows, (row) =>
+      Number(row.pf) || getRecommendedPf(row.fixtureType)
+    );
     const { currentLine, adjustedWatts, adjustedVa } = calculateLineCurrent(totalWatts, totalVa);
     const pduSuggestion = recommendPDU(currentLine);
     const pduOverride =
@@ -736,22 +693,13 @@ const LightsConsumosTool: React.FC = () => {
             const sm = updatedTable.snapshotSafetyMargin ?? safetyMargin;
             const pm = updatedTable.snapshotPhaseMode ?? phaseMode;
             const v = updatedTable.snapshotVoltage ?? voltage;
+            const settings = getPowerSettings({ phaseMode: pm, safetyMargin: sm, voltage: v });
             updateTourDefaultTable({
               tableId: updatedTable.defaultTableId,
               updates: {
-                table_data: { rows: updatedTable.rows, safetyMargin: sm, phaseMode: pm, voltage: v } as unknown as Json,
+                table_data: buildPowerTableData(updatedTable, settings),
                 total_value: updatedTable.totalWatts || 0,
-                metadata: {
-                  current_per_phase: updatedTable.currentPerPhase,
-                  pdu_type: updatedTable.customPduType || updatedTable.pduType,
-                  custom_pdu_type: updatedTable.customPduType,
-                  position: updatedTable.position,
-                  custom_position: updatedTable.customPosition,
-                  includes_hoist: updatedTable.includesHoist || false,
-                  safetyMargin: sm,
-                  phaseMode: pm,
-                  voltage: v,
-                },
+                metadata: buildPowerTableMetadata(updatedTable, settings),
               },
             });
           } else if (!isTourDefaults && selectedJobId) {
@@ -819,29 +767,15 @@ const LightsConsumosTool: React.FC = () => {
       // This automation is department-specific: only lights department tasks are affected
       let completedTasksCount = 0;
       if (!isOverrideMode && selectedJobId) {
-        try {
-          const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
-          await uploadJobPdfWithCleanup(
-            selectedJobId,
-            pdfBlob,
-            fileName,
-            'calculators/lights-consumos'
-          );
+        completedTasksCount = await uploadPowerReportAndCompleteTask({
+          department: 'lights',
+          fileName,
+          jobId: selectedJobId,
+          pdfBlob,
+        });
 
-          // Auto-complete Consumos tasks for lights department only
-          const { autoCompleteConsumosTasks } = await import('@/utils/taskAutoCompletion');
-          const result = await autoCompleteConsumosTasks(selectedJobId, 'lights');
-          completedTasksCount = result.completedCount;
-
-          if (result.completedCount > 0) {
-            console.log(`Auto-completed ${result.completedCount} lights Consumos task(s)`);
-          }
-        } catch (err) {
-          // If auto-completion fails, log but don't fail the upload
-          if (err instanceof Error && err.message.includes('uploadJobPdfWithCleanup')) {
-            throw err; // Re-throw upload errors
-          }
-          console.warn('Task auto-completion failed:', err);
+        if (completedTasksCount > 0) {
+          console.log(`Auto-completed ${completedTasksCount} lights Consumos task(s)`);
         }
       }
 
@@ -1306,103 +1240,13 @@ const LightsConsumosTool: React.FC = () => {
               </div>
 
               {table.id !== undefined && (
-                <div className="p-4 bg-muted/50 space-y-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id={`hoist-${table.id}`}
-                        checked={table.includesHoist}
-                        onCheckedChange={(checked) =>
-                          updateTableSettings(table.id as number | string, { includesHoist: !!checked })
-                        }
-                      />
-                      <Label htmlFor={`hoist-${table.id}`}>Incluir Potencia para Motor (CEE32A 3P+N+G)</Label>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <Label>Anulación de Tipo de PDU:</Label>
-                      <Select
-                        value={
-                          table.customPduType
-                            ? pduOptions.includes(table.customPduType)
-                              ? table.customPduType
-                              : 'Custom'
-                            : 'default'
-                        }
-                        onValueChange={(value) => {
-                          if (value === 'default') {
-                            updateTableSettings(table.id as number | string, { customPduType: undefined });
-                          } else if (value === 'Custom') {
-                            updateTableSettings(table.id as number | string, { customPduType: '' });
-                          } else {
-                            updateTableSettings(table.id as number | string, { customPduType: value });
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-[200px]">
-                          <SelectValue placeholder="Usar PDU sugerido" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Usar PDU sugerido</SelectItem>
-                          {pduOptions.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value="Custom">Tipo de PDU personalizado</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {table.customPduType !== undefined && !pduOptions.includes(table.customPduType || '') && (
-                      <Input
-                        placeholder="Ingrese un tipo de PDU personalizado"
-                        value={table.customPduType || ''}
-                        onChange={(e) =>
-                          updateTableSettings(table.id as number | string, { customPduType: e.target.value })
-                        }
-                        className="w-[220px]"
-                      />
-                    )}
-                    <div className="flex items-center gap-2">
-                      <Label>Posición:</Label>
-                      <Select
-                        value={getPowerPositionSelectValue(table.position, table.customPosition)}
-                        onValueChange={(value) => {
-                          if (value === NO_POWER_POSITION_VALUE) {
-                            updateTableSettings(table.id as number | string, { position: undefined, customPosition: undefined });
-                          } else if (value === CUSTOM_POWER_POSITION_VALUE) {
-                            updateTableSettings(table.id as number | string, { position: undefined, customPosition: '' });
-                          } else {
-                            updateTableSettings(table.id as number | string, { position: value, customPosition: undefined });
-                          }
-                        }}
-                      >
-                        <SelectTrigger className="w-[180px]">
-                          <SelectValue placeholder="Sin posición" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={NO_POWER_POSITION_VALUE}>Sin posición</SelectItem>
-                          {POWER_POSITION_PRESETS.map((position) => (
-                            <SelectItem key={position} value={position}>
-                              {position}
-                            </SelectItem>
-                          ))}
-                          <SelectItem value={CUSTOM_POWER_POSITION_VALUE}>Personalizada</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {getPowerPositionSelectValue(table.position, table.customPosition) === CUSTOM_POWER_POSITION_VALUE && (
-                      <Input
-                        placeholder="Ingrese una posición personalizada"
-                        value={getPowerPositionCustomValue(table.position, table.customPosition)}
-                        onChange={(e) =>
-                          updateTableSettings(table.id as number | string, { position: undefined, customPosition: e.target.value })
-                        }
-                        className="w-[220px]"
-                      />
-                    )}
-                  </div>
-                </div>
+                <PowerTableControls
+                  table={table}
+                  customPduSelectValue="Custom"
+                  labels={SPANISH_POWER_TABLE_CONTROL_LABELS}
+                  pduTypes={pduOptions}
+                  onUpdateSettings={(patch) => updateTableSettings(table.id as number | string, patch)}
+                />
               )}
 
               <table className="w-full">

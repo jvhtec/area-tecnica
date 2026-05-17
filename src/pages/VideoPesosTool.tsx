@@ -15,6 +15,11 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { useTourOverrideMode } from '@/hooks/useTourOverrideMode';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { Badge } from '@/components/ui/badge';
+import {
+  calculateWeightRows,
+  formatRiggingPoint,
+  sumWeightRows,
+} from '@/features/technical-tools/weights/weightCalculations';
 
 const videoComponentDatabase = [
   { id: 1, name: 'Pantalla Central', weight: 32 },
@@ -102,14 +107,13 @@ const VideoPesosTool: React.FC = () => {
   const getSuffix = () => {
     if (useDualMotors) {
       videoTableCounter++;
-      const num1 = videoTableCounter.toString().padStart(2, '0');
+      const suffixOne = formatRiggingPoint('VX', videoTableCounter);
       videoTableCounter++;
-      const num2 = videoTableCounter.toString().padStart(2, '0');
-      return `VX${num1}, VX${num2}`;
+      const suffixTwo = formatRiggingPoint('VX', videoTableCounter);
+      return `${suffixOne}, ${suffixTwo}`;
     } else {
       videoTableCounter++;
-      const num = videoTableCounter.toString().padStart(2, '0');
-      return `VX${num}`;
+      return formatRiggingPoint('VX', videoTableCounter);
     }
   };
 
@@ -202,20 +206,8 @@ const VideoPesosTool: React.FC = () => {
       return;
     }
 
-    const calculatedRows = currentTable.rows.map((row) => {
-      const component = videoComponentDatabase.find((c) => c.id.toString() === row.componentId);
-      const totalWeight =
-        parseFloat(row.quantity) && parseFloat(row.weight)
-          ? parseFloat(row.quantity) * parseFloat(row.weight)
-          : 0;
-      return {
-        ...row,
-        componentName: component?.name || '',
-        totalWeight,
-      };
-    });
-
-    const totalWeight = calculatedRows.reduce((sum, row) => sum + (row.totalWeight || 0), 0);
+    const calculatedRows = calculateWeightRows(currentTable.rows, videoComponentDatabase);
+    const totalWeight = sumWeightRows(calculatedRows);
 
     // For grouping, assign a new clusterId for this generation
     const newClusterId = Date.now().toString();

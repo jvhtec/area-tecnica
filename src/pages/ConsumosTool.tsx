@@ -16,9 +16,20 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TourOverrideModeHeader } from '@/components/tours/TourOverrideModeHeader';
 import { useTourDefaultSets } from '@/hooks/useTourDefaultSets';
-import type { Json } from '@/integrations/supabase/types';
 import type { Table, TableRow } from './consumos-tool/types';
 import { PowerTableCard } from './consumos-tool/components/PowerTableCard';
+import {
+  createCalculatedPowerTable,
+  getPowerPduOptions,
+} from '@/features/technical-tools/power/powerCalculations';
+import {
+  buildPowerOverridePayload,
+  buildPowerRequirementInsert,
+  buildPowerTableData,
+  buildPowerTableMetadata,
+  buildTourPowerDefaultTable,
+  uploadPowerReportAndCompleteTask,
+} from '@/features/technical-tools/power/powerPersistence';
 import {
   CUSTOM_POWER_POSITION_VALUE,
   getPowerPositionCustomValue,
@@ -181,54 +192,18 @@ const ConsumosTool: React.FC = () => {
     setSelectedJob(job);
   };
 
-  // ---- Correct power math + PDU suggestions ----
-  const SQRT3 = Math.sqrt(3);
-
-  // Returns adjusted watts and line current (A).
-  // For 3φ it's per-phase line current; for 1φ it's the single line current.
-  const calculateLineCurrent = (totalWatts: number) => {
-    const adjustedWatts = totalWatts * (1 + safetyMargin / 100);
-    const currentLine =
-      phaseMode === 'single'
-        ? adjustedWatts / (voltage * pf)                 // I = P / (V * PF)
-        : adjustedWatts / (SQRT3 * voltage * pf);        // I = P / (√3 * V_LL * PF)
-    return { adjustedWatts, currentLine };
-  };
-
-  const PDU_TYPES_THREE = ['CEE16A 3P+N+G', 'CEE32A 3P+N+G', 'CEE63A 3P+N+G', 'CEE125A 3P+N+G'];
-  const PDU_TYPES_SINGLE = ['Schuko 16A', 'CEE32A 1P+N+G', 'CEE63A 1P+N+G'];
-  const PDU_TYPES = phaseMode === 'single' ? PDU_TYPES_SINGLE : PDU_TYPES_THREE;
-
-  const planningLimit = (amps: number) => amps * 0.8;
-
-  const recommendPDU = (currentLine: number) => {
-    if (phaseMode === 'single') {
-      if (currentLine <= planningLimit(16)) return PDU_TYPES_SINGLE[0];
-      if (currentLine <= planningLimit(32)) return PDU_TYPES_SINGLE[1];
-      return PDU_TYPES_SINGLE[2];
-    }
-    if (currentLine <= planningLimit(16)) return PDU_TYPES_THREE[0];
-    if (currentLine <= planningLimit(32)) return PDU_TYPES_THREE[1];
-    if (currentLine <= planningLimit(63)) return PDU_TYPES_THREE[2];
-    return PDU_TYPES_THREE[3];
-  };
+  const getPowerSettings = () => ({ safetyMargin, powerFactor: pf, phaseMode, voltage });
+  const PDU_TYPES = getPowerPduOptions('sound', phaseMode);
 
   const savePowerRequirementTable = async (table: Table) => {
     try {
       const { error } = await dataLayerClient.from('power_requirement_tables')
-        .insert({
-          job_id: selectedJobId,
+        .insert(buildPowerRequirementInsert({
           department: 'sound',
-          table_name: table.name,
-          total_watts: table.totalWatts || 0,
-          current_per_phase: table.currentPerPhase || 0,
-          pdu_type: table.customPduType || table.pduType || '',
-          custom_pdu_type: table.customPduType,
-          position: table.position || null,
-          custom_position: table.customPosition || null,
-          table_data: { rows: table.rows } as unknown as Json,
-          includes_hoist: table.includesHoist || false
-        });
+          jobId: selectedJobId,
+          settings: getPowerSettings(),
+          table,
+        }));
 
       if (error) throw error;
 
@@ -245,25 +220,13 @@ const ConsumosTool: React.FC = () => {
     if (!tourId) return;
     try {
       const setId = await getOrCreateSoundSetId();
-      const newDefaultTable = await _createTourDefaultTableInternal({
-        set_id: setId,
-        table_name: table.name,
-        table_data: { rows: table.rows, safetyMargin, pf, phaseMode, voltage } as unknown as Json,
-        table_type: 'power',
-        total_value: table.totalWatts || 0,
-        metadata: {
-          current_per_phase: table.currentPerPhase,
-          pdu_type: table.customPduType || table.pduType,
-          custom_pdu_type: table.customPduType,
-          position: table.position,
-          custom_position: table.customPosition,
-          includes_hoist: table.includesHoist || false,
-          safetyMargin,
-          pf,
-          phaseMode,
-          voltage
-        }
-      });
+      const newDefaultTable = await _createTourDefaultTableInternal(
+        buildTourPowerDefaultTable({
+          setId,
+          settings: getPowerSettings(),
+          table,
+        })
+      );
 
       const tableIndex = tables.findIndex(t => t.id === table.id);
       if (tableIndex !== -1) {
@@ -280,19 +243,12 @@ const ConsumosTool: React.FC = () => {
   const saveTourOverride = async (table: Table) => {
     if (!tourDateId) return;
     try {
-      await createPowerOverride({
-        tour_date_id: tourDateId,
-        table_name: table.name,
-        total_watts: table.totalWatts || 0,
-        current_per_phase: table.currentPerPhase || 0,
-        pdu_type: table.customPduType || table.pduType || '',
-        custom_pdu_type: table.customPduType,
-        position: table.position || null,
-        custom_position: table.customPosition || null,
-        includes_hoist: table.includesHoist || false,
+      await createPowerOverride(buildPowerOverridePayload({
         department: 'sound',
-        override_data: { rows: table.rows, safetyMargin, pf, phaseMode, voltage }
-      });
+        settings: getPowerSettings(),
+        table,
+        tourDateId,
+      }));
       toast({ title: "Success", description: "Tour override saved successfully" });
     } catch (error: any) {
       console.error('Error saving tour override:', error);
@@ -336,36 +292,18 @@ const ConsumosTool: React.FC = () => {
       return;
     }
 
-    const calculatedRows = currentTable.rows.map((row) => {
-      const component = soundComponentDatabase.find((c) => c.id.toString() === row.componentId);
-      const totalWatts =
-        parseFloat(row.quantity || '0') && parseFloat(row.watts || '0')
-          ? parseFloat(row.quantity) * parseFloat(row.watts)
-          : 0;
-      return { ...row, componentName: component?.name || '', totalWatts };
-    });
-
-    const totalWatts = calculatedRows.reduce((sum, row) => sum + (row.totalWatts || 0), 0);
-    const { currentLine, adjustedWatts } = calculateLineCurrent(totalWatts);
-    const pduSuggestion = recommendPDU(currentLine);
-    const totalVa = pf > 0 ? adjustedWatts / pf : adjustedWatts; // apparent power (VA) with safety margin
-
-    const newTable: Table = {
-      name: tableName,
-      rows: calculatedRows,
-      totalWatts,
-      adjustedWatts,
-      totalVa,
-      currentPerPhase: currentLine, // keep field name for compatibility
-      pduType: pduSuggestion,
-      customPduType: '',
-      position: currentTable.position,
-      customPosition: currentTable.customPosition,
-      includesHoist: false,
+    const newTable = createCalculatedPowerTable<TableRow, typeof soundComponentDatabase[number]>({
+      components: soundComponentDatabase,
+      currentTable,
       id: Date.now(),
-      isDefault: false,
-      defaultTableId: undefined
-    };
+      name: tableName,
+      pduOptions: PDU_TYPES,
+      settings: getPowerSettings(),
+      tablePatch: {
+        isDefault: false,
+        defaultTableId: undefined,
+      },
+    }) as Table;
 
     setTables((prev) => [...prev, newTable]);
 
@@ -407,26 +345,14 @@ const ConsumosTool: React.FC = () => {
       for (let i = 0; i < unsavedTables.length; i++) {
         const table = unsavedTables[i];
         if (i > 0) await new Promise(r => setTimeout(r, 100));
-        const newDefaultTable = await createTourDefaultTable({
-          set_id: setId,
-          table_name: table.name,
-          table_data: { rows: table.rows, safetyMargin, pf, phaseMode, voltage } as unknown as Json,
-          table_type: 'power',
-          total_value: table.totalWatts || 0,
-          metadata: {
-            current_per_phase: table.currentPerPhase,
-            pdu_type: table.customPduType || table.pduType,
-            custom_pdu_type: table.customPduType,
-            position: table.position,
-            custom_position: table.customPosition,
-            includes_hoist: table.includesHoist || false,
-            safetyMargin,
-            pf,
-            phaseMode,
-            voltage,
-            order_index: i
-          }
-        });
+        const newDefaultTable = await createTourDefaultTable(
+          buildTourPowerDefaultTable({
+            orderIndex: i,
+            setId,
+            settings: getPowerSettings(),
+            table,
+          })
+        );
         setTables(prev => prev.map(t => t.id === table.id ? { ...t, isDefault: true, defaultTableId: newDefaultTable.id } : t));
       }
       toast({ title: "Success", description: `${unsavedTables.length} default table(s) saved successfully` });
@@ -445,20 +371,9 @@ const ConsumosTool: React.FC = () => {
             updateTourDefaultTable({
               tableId: table.defaultTableId,
               updates: {
-                table_data: { rows: updatedTable.rows, safetyMargin, pf, phaseMode, voltage } as unknown as Json,
+                table_data: buildPowerTableData(updatedTable, getPowerSettings()),
                 total_value: updatedTable.totalWatts || 0,
-                metadata: {
-                  current_per_phase: updatedTable.currentPerPhase,
-                  pdu_type: updatedTable.customPduType || updatedTable.pduType,
-                  custom_pdu_type: updatedTable.customPduType,
-                  position: updatedTable.position,
-                  custom_position: updatedTable.customPosition,
-                  includes_hoist: updatedTable.includesHoist || false,
-                  safetyMargin,
-                  pf,
-                  phaseMode,
-                  voltage
-                }
+                metadata: buildPowerTableMetadata(updatedTable, getPowerSettings()),
               }
             });
           } else if (isJobOverrideMode && table.isOverride && table.overrideId && updatePowerOverride) {
@@ -472,7 +387,7 @@ const ConsumosTool: React.FC = () => {
                 position: updatedTable.position || null,
                 custom_position: updatedTable.customPosition || null,
                 includes_hoist: updatedTable.includesHoist || false,
-                override_data: { rows: updatedTable.rows, safetyMargin, pf, phaseMode, voltage }
+                override_data: buildPowerTableData(updatedTable, getPowerSettings()),
               }
             });
           } else if (selectedJobId) {
@@ -544,25 +459,15 @@ const ConsumosTool: React.FC = () => {
       // This automation is department-specific: only sound department tasks are affected
       let completedTasksCount = 0;
       if (selectedJobId) {
-        try {
-          const { uploadJobPdfWithCleanup } = await import('@/utils/jobDocumentsUpload');
-          await uploadJobPdfWithCleanup(selectedJobId, pdfBlob, fileName, 'calculators/consumos');
+        completedTasksCount = await uploadPowerReportAndCompleteTask({
+          department: 'sound',
+          fileName,
+          jobId: selectedJobId,
+          pdfBlob,
+        });
 
-          // Auto-complete Consumos tasks for sound department only
-          // Note: Lights and video Consumos tools should implement their own auto-completion
-          const { autoCompleteConsumosTasks } = await import('@/utils/taskAutoCompletion');
-          const result = await autoCompleteConsumosTasks(selectedJobId, 'sound');
-          completedTasksCount = result.completedCount;
-
-          if (result.completedCount > 0) {
-            console.log(`Auto-completed ${result.completedCount} sound Consumos task(s)`);
-          }
-        } catch (err) {
-          // If auto-completion fails, log but don't fail the upload
-          if (err instanceof Error && err.message.includes('uploadJobPdfWithCleanup')) {
-            throw err; // Re-throw upload errors
-          }
-          console.warn('Task auto-completion failed:', err);
+        if (completedTasksCount > 0) {
+          console.log(`Auto-completed ${completedTasksCount} sound Consumos task(s)`);
         }
       }
 
@@ -607,8 +512,6 @@ const ConsumosTool: React.FC = () => {
       // Read saved electrical metadata from table.metadata or table.table_data
       const savedPf = table.metadata?.pf ?? table.table_data?.pf ?? pf;
       const savedSafetyMargin = table.metadata?.safetyMargin ?? table.table_data?.safetyMargin ?? safetyMargin;
-      const savedPhaseMode = table.metadata?.phaseMode ?? table.table_data?.phaseMode ?? phaseMode;
-      const savedVoltage = table.metadata?.voltage ?? table.table_data?.voltage ?? voltage;
 
       // Compute electrical values using saved metadata
       const adjW = (table.total_value || 0) * (1 + savedSafetyMargin / 100);
@@ -636,8 +539,6 @@ const ConsumosTool: React.FC = () => {
     // Read saved electrical metadata from def.metadata or def (legacy structure)
     const savedPf = def.metadata?.pf ?? def.pf ?? pf;
     const savedSafetyMargin = def.metadata?.safetyMargin ?? def.safetyMargin ?? safetyMargin;
-    const savedPhaseMode = def.metadata?.phaseMode ?? def.phaseMode ?? phaseMode;
-    const savedVoltage = def.metadata?.voltage ?? def.voltage ?? voltage;
 
     // Compute electrical values using saved metadata
     const adjW = (def.total_watts || 0) * (1 + savedSafetyMargin / 100);
@@ -666,8 +567,6 @@ const ConsumosTool: React.FC = () => {
     // Read saved electrical metadata from override.override_data
     const savedPf = override.override_data?.pf ?? pf;
     const savedSafetyMargin = override.override_data?.safetyMargin ?? safetyMargin;
-    const savedPhaseMode = override.override_data?.phaseMode ?? phaseMode;
-    const savedVoltage = override.override_data?.voltage ?? voltage;
 
     // Compute electrical values using saved metadata
     const adjW = (override.total_watts || 0) * (1 + savedSafetyMargin / 100);
