@@ -21,7 +21,10 @@ The festival system includes:
 ## Core UI and orchestration entry points
 
 - Route pages: `src/pages/FestivalManagement.tsx`, `src/pages/FestivalArtistManagement.tsx`, `src/pages/FestivalGearManagement.tsx`, `src/pages/Festivals.tsx`.
-- Festival VM/orchestration: `src/pages/festival-management/useFestivalManagementVm.ts`.
+- Festival VM composition and feature logic: `src/features/festival-management/`.
+  - `useFestivalManagementVm.ts` composes route state into the view model.
+  - `hooks/` contains query-backed state and command-focused hooks.
+  - `queries.ts`, `commands.ts`, and `selectors.ts` isolate Supabase reads, side-effecting commands, and derived data.
 - Domain UI modules: `src/components/festival/` (`form`, `gear-setup`, `mobile`, `pdf`, `scheduling`).
 
 ## Core database entities

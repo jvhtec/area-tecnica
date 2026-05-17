@@ -5,7 +5,9 @@ This document explains how Festival management connects to Flex for folders, ele
 ## 1) Integration surfaces in festival UX
 
 - Festival orchestration uses Flex folder context through:
-  - `src/pages/festival-management/useFestivalManagementVm.ts`
+  - `src/features/festival-management/useFestivalManagementVm.ts`
+  - `src/features/festival-management/hooks/useFestivalFlexControls.ts`
+  - `src/features/festival-management/commands.ts`
 - Flex push operation for gear:
   - `src/components/festival/PushToFlexPullsheetDialog.tsx`
 - Flex folder helpers and navigation:

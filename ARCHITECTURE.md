@@ -167,7 +167,7 @@ area-tecnica/
 │   │
 │   ├── features/                     # Feature modules (co-located logic)
 │   │   ├── activity/                 # Activity feed & notifications
-│   │   ├── festival-management/      # Festival management view model
+│   │   ├── festival-management/      # Festival VM composition, query hooks, commands, and selectors
 │   │   ├── lights/                   # Lighting department logic
 │   │   ├── rates/                    # Rate management
 │   │   ├── staffing/                 # Crew staffing logic

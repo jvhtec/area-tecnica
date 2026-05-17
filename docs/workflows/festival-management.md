@@ -22,7 +22,9 @@ Festival execution is attached to a parent job (`jobs.id`) and orchestrated prim
 | Artist-focused view | `src/pages/FestivalArtistManagement.tsx` |
 | Gear-focused view | `src/pages/FestivalGearManagement.tsx` |
 | Listing/launcher | `src/pages/Festivals.tsx` |
-| VM/orchestration | `src/pages/festival-management/useFestivalManagementVm.ts` |
+| VM composition | `src/features/festival-management/useFestivalManagementVm.ts` |
+| VM query/command hooks | `src/features/festival-management/hooks/` |
+| Query services, command services, selectors | `src/features/festival-management/queries.ts`, `commands.ts`, `selectors.ts` |
 
 ## Architecture docs by section
 
