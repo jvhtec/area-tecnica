@@ -21,9 +21,14 @@ export async function handleChangelogEvents(context: BroadcastEventContext): Pro
   context.state.url = context.body.url || '/?showAbout=1';
   context.audience.clearAllRecipients();
 
-  const { data: allUsers } = await context.client
+  const { data: allUsers, error } = await context.client
     .from('profiles')
     .select('id');
+  if (error) {
+    console.error('push changelog recipient lookup error', error);
+    throw error;
+  }
+
   if (allUsers && allUsers.length > 0) {
     context.audience.addNaturalRecipients(allUsers.map((user: { id?: string | null }) => user.id));
   }

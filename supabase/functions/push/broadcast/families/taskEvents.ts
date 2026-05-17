@@ -10,6 +10,12 @@ export async function handleTaskEvents(context: BroadcastEventContext): Promise<
     return false;
   }
 
+  const recipientId = context.body.recipient_id?.trim();
+  if (!recipientId) {
+    context.audience.clearAllRecipients();
+    return true;
+  }
+
   setBroadcastMessage(context.state, message.title, message.text);
   context.state.changeSummary = message.changeSummary;
 
@@ -17,6 +23,6 @@ export async function handleTaskEvents(context: BroadcastEventContext): Promise<
     context.audience.clearAllRecipients();
   }
 
-  context.audience.addRecipients([context.body.recipient_id]);
+  context.audience.addRecipients([recipientId]);
   return true;
 }

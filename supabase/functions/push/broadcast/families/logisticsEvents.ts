@@ -14,13 +14,14 @@ export async function handleLogisticsEvents(context: BroadcastEventContext): Pro
     setBroadcastMessage(state, message.title, message.text);
 
     const logisticsUrl = jobId ? `/jobs/${jobId}` : '/logistics';
-    state.url = body.url || logisticsUrl;
+    const targetUrl = body.url || logisticsUrl;
+    state.url = targetUrl;
     audience.clearAllRecipients();
     audience.addNaturalRecipients(await getLogisticsManagementRecipients(context.client));
     state.metaExtras.view = 'logistics';
     state.metaExtras.department = body.department;
     state.metaExtras.description = body.description;
-    state.metaExtras.targetUrl = logisticsUrl;
+    state.metaExtras.targetUrl = targetUrl;
     return true;
   }
 

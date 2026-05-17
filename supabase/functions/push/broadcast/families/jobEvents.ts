@@ -33,7 +33,7 @@ export async function handleJobEvents(context: BroadcastEventContext): Promise<B
 
   if (type === EVENT_TYPES.JOB_REQUIREMENTS_UPDATED) {
     const providedSummary = normalizeDepartmentRolesPayload(body.department_roles);
-    let summary = await getJobRequiredRolesSummary(context.client, jobId);
+    let summary = jobId ? await getJobRequiredRolesSummary(context.client, jobId) : providedSummary;
     if (!summary.length) {
       summary = providedSummary;
     }

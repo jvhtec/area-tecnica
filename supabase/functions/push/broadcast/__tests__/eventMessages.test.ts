@@ -19,7 +19,10 @@ import {
   buildFestivalPublicRiderMessage,
 } from "../messages/festivalMessages.ts";
 import { buildTaskMessage } from "../messages/taskMessages.ts";
-import { buildTourDateTypeChangedMessage } from "../messages/tourMessages.ts";
+import {
+  buildTourdateUpdatedText,
+  buildTourDateTypeChangedMessage,
+} from "../messages/tourMessages.ts";
 import type { BroadcastBody } from "../../types.ts";
 
 describe("push broadcast event message builders", () => {
@@ -30,6 +33,8 @@ describe("push broadcast event message builders", () => {
     });
 
     expect(text).toBe('Laura actualizó "Gala Norte". Cambios: Inicio, Ubicación.');
+    expect(buildJobUpdatedText("Laura", "Gala Norte", {}))
+      .toBe('Laura actualizó "Gala Norte".');
   });
 
   it("builds job date and job type change messages by event family", () => {
@@ -126,6 +131,7 @@ describe("push broadcast event message builders", () => {
     expect(task?.title).toBe("Tarea actualizada");
     expect(task?.text).toContain('Eva actualizó la tarea "revisar PA" en "Sala Principal".');
     expect(task?.changeSummary).toContain("Fecha límite:");
+    expect(buildTourdateUpdatedText("Eva", {})).toBe("Eva actualizó una fecha de tour.");
 
     expect(buildTourDateTypeChangedMessage("tourdate.type.changed.travel", "Eva", {
       action: "broadcast",

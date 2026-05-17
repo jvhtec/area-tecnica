@@ -17,6 +17,7 @@ export type DeliveryResult = {
   ok: boolean;
   status?: number;
   skipped?: boolean;
+  error?: string;
 };
 
 export async function loadNativeTokens(
@@ -70,22 +71,40 @@ export async function sendPayloadToTargets(
 
   await Promise.all([
     ...subscriptions.map(async (sub) => {
-      const result = await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, payload);
-      results.push({
-        endpoint: sub.endpoint,
-        ok: result.ok,
-        status: 'status' in result ? result.status : undefined,
-        skipped: 'skipped' in result ? result.skipped : undefined,
-      });
+      try {
+        const result = await sendPushNotification(client, { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth }, payload);
+        results.push({
+          endpoint: sub.endpoint,
+          ok: result.ok,
+          status: 'status' in result ? result.status : undefined,
+          skipped: 'skipped' in result ? result.skipped : undefined,
+        });
+      } catch (error) {
+        console.error('push broadcast web delivery error', { endpoint: sub.endpoint, error });
+        results.push({
+          endpoint: sub.endpoint,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }),
     ...nativeTokens.map(async (tokenRow) => {
-      const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
-      results.push({
-        endpoint: `apns:${tokenRow.device_token}`,
-        ok: result.ok,
-        status: 'status' in result ? result.status : undefined,
-        skipped: 'skipped' in result ? result.skipped : undefined,
-      });
+      try {
+        const result = await sendNativePushNotification(client, tokenRow.device_token, payload);
+        results.push({
+          endpoint: `apns:${tokenRow.device_token}`,
+          ok: result.ok,
+          status: 'status' in result ? result.status : undefined,
+          skipped: 'skipped' in result ? result.skipped : undefined,
+        });
+      } catch (error) {
+        console.error('push broadcast native delivery error', { token: tokenRow.device_token, error });
+        results.push({
+          endpoint: `apns:${tokenRow.device_token}`,
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }),
   ]);
 

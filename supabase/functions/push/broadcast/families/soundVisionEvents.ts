@@ -18,6 +18,7 @@ export async function handleSoundVisionEvents(context: BroadcastEventContext): P
   );
   state.url = body.url || '/soundvision-files';
 
+  audience.clearAllRecipients();
   const soundManagement = Array.from(audience.management).filter((id) => audience.soundDept.has(id));
   audience.addNaturalRecipients(soundManagement);
   return true;

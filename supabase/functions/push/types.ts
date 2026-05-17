@@ -62,7 +62,7 @@ export type BroadcastBody = {
   department?: string;
   description?: string;
   departments?: string[];
-  department_roles?: DepartmentRoleSummary[] | unknown;
+  department_roles?: unknown;
   auto_created_unload?: boolean;
   paired_event_type?: string;
   paired_event_date?: string;

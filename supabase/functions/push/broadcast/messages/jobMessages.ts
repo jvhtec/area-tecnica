@@ -31,7 +31,9 @@ export function buildJobUpdatedText(
   if (changes && typeof changes === 'object') {
     const keys = Object.keys(changes as Record<string, unknown>);
     const labels = keys.slice(0, 4).map(fmtFieldEs);
-    return `${actor} actualizó "${jobLabel(jobTitle)}". Cambios: ${labels.join(', ')}.`;
+    if (labels.length > 0) {
+      return `${actor} actualizó "${jobLabel(jobTitle)}". Cambios: ${labels.join(', ')}.`;
+    }
   }
 
   return `${actor} actualizó "${jobLabel(jobTitle)}".`;

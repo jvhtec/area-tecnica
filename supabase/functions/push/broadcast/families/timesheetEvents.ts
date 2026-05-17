@@ -30,23 +30,25 @@ export async function handleTimesheetEvents(context: BroadcastEventContext): Pro
   }
 
   if (type === EVENT_TYPES.TIMESHEET_APPROVED) {
-    const techId = body.recipient_id || body.technician_id;
+    const techId = body.technician_id || body.recipient_id || userId;
+    const broadcastRecipientId = body.recipient_id || techId;
     const techName = recipName || (await getProfileDisplayName(context.client, techId)) || 'Tu';
-    const text = techId === userId
+    const text = broadcastRecipientId === techId
       ? `Tu parte para "${jobTitle || 'Trabajo'}" ha sido aprobado.`
       : `El parte de ${techName} para "${jobTitle || 'Trabajo'}" ha sido aprobado.`;
 
     setBroadcastMessage(state, 'Parte aprobado', text);
     clearAllRecipients();
-    addRecipients([techId]);
+    addRecipients([broadcastRecipientId]);
     return true;
   }
 
   if (type === EVENT_TYPES.TIMESHEET_REJECTED) {
-    const techId = body.recipient_id || body.technician_id;
+    const techId = body.technician_id || body.recipient_id || userId;
+    const broadcastRecipientId = body.recipient_id || techId;
     const techName = recipName || (await getProfileDisplayName(context.client, techId)) || 'Tu';
     const reason = body.rejection_reason;
-    const text = techId === userId
+    const text = broadcastRecipientId === techId
       ? reason
         ? `Tu parte para "${jobTitle || 'Trabajo'}" ha sido rechazado. Motivo: ${reason}`
         : `Tu parte para "${jobTitle || 'Trabajo'}" ha sido rechazado.`
@@ -56,7 +58,7 @@ export async function handleTimesheetEvents(context: BroadcastEventContext): Pro
 
     setBroadcastMessage(state, 'Parte rechazado', text);
     clearAllRecipients();
-    addRecipients([techId]);
+    addRecipients([broadcastRecipientId]);
     return true;
   }
 

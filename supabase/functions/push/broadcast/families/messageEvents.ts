@@ -6,8 +6,14 @@ export async function handleMessageEvents(context: BroadcastEventContext): Promi
     return false;
   }
 
+  const recipientId = context.body.recipient_id?.trim();
+  if (!recipientId) {
+    context.audience.clearAllRecipients();
+    return true;
+  }
+
   setBroadcastMessage(context.state, 'Nuevo mensaje', `${context.actor}: ${context.body.message_preview || ''}`);
   context.audience.clearAllRecipients();
-  context.audience.addRecipients([context.body.recipient_id]);
+  context.audience.addRecipients([recipientId]);
   return true;
 }
