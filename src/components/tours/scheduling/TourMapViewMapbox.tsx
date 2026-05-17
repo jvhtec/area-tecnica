@@ -124,6 +124,16 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
     renderMapContent();
   }, [mapLoaded, tourData, tourDates, accommodations]);
 
+  const escapeHtml = (text: string | null | undefined): string => {
+    if (!text) return '';
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
+
   const renderMapContent = () => {
     if (!map.current) return;
     const mapboxgl = mapboxglRef.current;
@@ -155,8 +165,8 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
       }).setHTML(`
         <div style="padding: 8px; min-width: 200px; background: hsl(var(--popover)); color: hsl(var(--popover-foreground));">
           <h3 style="font-weight: bold; margin-bottom: 4px;">🏠 Base de Operaciones</h3>
-          <p style="margin: 4px 0; font-size: 14px;">${homeBase.name}</p>
-          <p style="margin: 4px 0; font-size: 12px; opacity: 0.8;">${homeBase.address || ''}</p>
+          <p style="margin: 4px 0; font-size: 14px;">${escapeHtml(homeBase.name)}</p>
+          <p style="margin: 4px 0; font-size: 12px; opacity: 0.8;">${escapeHtml(homeBase.address)}</p>
         </div>
       `);
 
@@ -202,7 +212,7 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         day: "numeric",
       });
 
-      const venueName = location.venue_name || location.name || "Venue";
+      const venueName = location.venue_name || location.name || "Lugar";
       const venueAddress = location.formatted_address || location.address || [location.city, location.state].filter(Boolean).join(", ");
       const venuePopup = new mapboxgl.Popup({
         offset: 25,
@@ -210,10 +220,10 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
       }).setHTML(`
         <div style="padding: 8px; max-width: 250px; background: hsl(var(--popover)); color: hsl(var(--popover-foreground));">
           <h3 style="font-weight: bold; margin-bottom: 4px;">📍 Fecha ${index + 1}</h3>
-          <p style="margin: 4px 0; font-weight: 600; font-size: 14px;">${venueName}</p>
+          <p style="margin: 4px 0; font-weight: 600; font-size: 14px;">${escapeHtml(venueName)}</p>
           <p style="margin: 4px 0; font-size: 12px;">${dateStr}</p>
-          <p style="margin: 4px 0; font-size: 12px; opacity: 0.8;">${venueAddress}</p>
-          ${date.call_time ? `<p style="margin: 4px 0; font-size: 12px;"><strong>Call:</strong> ${date.call_time}</p>` : ""}
+          <p style="margin: 4px 0; font-size: 12px; opacity: 0.8;">${escapeHtml(venueAddress)}</p>
+          ${date.call_time ? `<p style="margin: 4px 0; font-size: 12px;"><strong>Call:</strong> ${escapeHtml(date.call_time)}</p>` : ""}
         </div>
       `);
 
@@ -298,11 +308,11 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         const fromLocation =
           segment.fromType === 'home'
             ? homeBase
-            : segment.fromLocation || getLocationFromDateId(segment.fromDateId || segment.fromTourDateId);
+            : segment.fromLocation || (getLocationFromDateId(segment.fromDateId) || getLocationFromDateId(segment.fromTourDateId));
         const toLocation =
           segment.toType === 'home'
             ? homeBase
-            : segment.toLocation || getLocationFromDateId(segment.toDateId || segment.toTourDateId);
+            : segment.toLocation || (getLocationFromDateId(segment.toDateId) || getLocationFromDateId(segment.toTourDateId));
 
         const fromCoords =
           fromLocation?.longitude != null && fromLocation?.latitude != null

@@ -39,7 +39,7 @@ const formatDateTime = (value: string | null | undefined) => {
 };
 
 const roomOccupants = (room: TourOpsDate["accommodations"][number]["roomAllocation"][number]) =>
-  [room.staffMember1Name, room.staffMember2Name, room.staffMember1Id, room.staffMember2Id]
+  [room.staffMember1Name || room.staffMember1Id, room.staffMember2Name || room.staffMember2Id]
     .filter(Boolean)
     .join(" / ");
 
@@ -323,28 +323,6 @@ export async function generateTourOpsPdf(
   if (options.action === "print" && typeof document !== "undefined") {
     const blob = pdf.output("blob");
     const url = URL.createObjectURL(blob);
-    if (printWindow && !printWindow.closed) {
-      printWindow.document.open();
-      printWindow.document.write(`
-        <!doctype html>
-        <html>
-          <head>
-            <title>${filename}</title>
-            <style>
-              html, body, iframe { margin: 0; width: 100%; height: 100%; border: 0; }
-              .fallback { position: fixed; top: 10px; right: 10px; z-index: 2; font-family: sans-serif; }
-            </style>
-          </head>
-          <body>
-            <button class="fallback" onclick="frames[0].focus(); frames[0].print()">Imprimir</button>
-            <iframe src="${url}" onload="this.contentWindow.focus(); this.contentWindow.print()"></iframe>
-          </body>
-        </html>
-      `);
-      printWindow.document.close();
-      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-      return;
-    }
 
     const iframe = document.createElement("iframe");
     iframe.style.position = "fixed";
