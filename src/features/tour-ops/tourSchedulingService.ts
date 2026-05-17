@@ -531,7 +531,6 @@ export async function fetchTourOpsModel(
                 id,
                 first_name,
                 last_name,
-                full_name,
                 phone,
                 email,
                 department
@@ -580,7 +579,6 @@ export async function fetchTourOpsModel(
           id,
           first_name,
           last_name,
-          full_name,
           phone,
           email,
           department
