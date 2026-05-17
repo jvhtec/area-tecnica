@@ -12,8 +12,13 @@ import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { FlexSyncLogDialog } from "@/components/jobs/FlexSyncLogDialog";
 import { JobPresetManagerDialog } from "@/components/jobs/JobPresetManagerDialog";
+import {
+  buildFestivalWhatsappStageOptions,
+  requiresFestivalWhatsappStage,
+} from "@/features/festival-management/selectors";
+import type { FestivalManagementVm } from "@/features/festival-management/types";
 
-export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
+export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) => {
   const {
     job,
     jobId,
@@ -108,14 +113,8 @@ export const FestivalManagementDialogs = ({ vm }: { vm: any }) => {
     isDeleting,
     handleDeleteJob,
   } = vm;
-  const festivalWhatsappStageOptions =
-    festivalStageOptions.length > 0
-      ? festivalStageOptions
-      : Array.from({ length: maxStages }, (_, idx) => ({
-          number: idx + 1,
-          name: `Stage ${idx + 1}`,
-        }));
-  const requiresStageScopedWhatsapp = maxStages > 1 && waDepartment !== "lights";
+  const festivalWhatsappStageOptions = buildFestivalWhatsappStageOptions(festivalStageOptions, maxStages);
+  const requiresStageScopedWhatsapp = requiresFestivalWhatsappStage(maxStages, waDepartment);
 
   return (
     <>

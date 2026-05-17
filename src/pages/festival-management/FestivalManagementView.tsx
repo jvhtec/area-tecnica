@@ -33,12 +33,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { FestivalManagementVm } from "@/features/festival-management/types";
 import type { Department } from "@/types/department";
 import { canSubmitTechnicianIncidentReports, isDepartmentManagementRole, isManagementRole } from "@/utils/permissions";
 
 import { FestivalManagementDialogs } from "./FestivalManagementDialogs";
 
-export const FestivalManagementView = ({ vm }: { vm: any }) => {
+export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => {
   const {
     job,
     jobId,
@@ -694,7 +695,7 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                 )}
 
                 {/* Incident Report */}
-                {canSubmitTechnicianIncidentReports(userRole) && (
+                {canSubmitTechnicianIncidentReports(userRole) && job && (
                   <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-red-500/5">
                     <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
                       <AlertCircle className="h-4 w-4 flex-shrink-0 text-red-500" />
@@ -748,14 +749,7 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                     </h4>
                     {jobDocuments.length > 0 ? (
                       <div className="space-y-2">
-                        {jobDocuments.map((doc: {
-                          id: string;
-                          file_name: string;
-                          uploaded_at: string;
-                          template_type?: string | null;
-                          read_only?: boolean | null;
-                          file_path?: string | null;
-                        }) => {
+                        {jobDocuments.map((doc) => {
                           const isTemplate = doc.template_type === "soundvision";
                           const isReadOnly = Boolean(doc.read_only);
                           return (
@@ -819,27 +813,11 @@ export const FestivalManagementView = ({ vm }: { vm: any }) => {
                     </h4>
                     {groupedRiderFiles.length > 0 ? (
                       <div className="space-y-4">
-                        {groupedRiderFiles.map((artist: {
-                          artistId: string;
-                          artistName: string;
-                          files: Array<{
-                            id: string;
-                            file_name: string;
-                            uploaded_at?: string | null;
-                            created_at?: string | null;
-                            file_path?: string | null;
-                          }>;
-                        }) => (
+                        {groupedRiderFiles.map((artist) => (
                           <div key={artist.artistId} className="space-y-2">
                             <div className="text-xs md:text-sm font-medium text-foreground">{artist.artistName}</div>
                             <div className="space-y-2">
-                              {artist.files.map((file: {
-                                id: string;
-                                file_name: string;
-                                uploaded_at?: string | null;
-                                created_at?: string | null;
-                                file_path?: string | null;
-                              }) => (
+                              {artist.files.map((file) => (
                                 <div
                                   key={file.id}
                                   className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-md border bg-accent/20 p-3"
