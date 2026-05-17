@@ -90,7 +90,7 @@ area-tecnica/
 │   │   ├── 00000000000000_production_schema.sql  # Initial schema (10,500 lines)
 │   │   └── 20260305120000_*.sql      # Latest migration
 │   └── functions/                    # 61 Edge Functions (Deno/TypeScript)
-│       ├── push/                     # Push notification service
+│       ├── push/                     # Push notification service and broadcast event families
 │       ├── send-*-email/             # Email services (11 functions)
 │       ├── create-flex-folders/      # Flex ERP integration
 │       ├── create-whatsapp-group/    # WhatsApp automation
@@ -394,7 +394,7 @@ area-tecnica/
 | **Staffing** | 3 | `staffing-orchestrator`, `staffing-sweeper`, `staffing-click` |
 | **Maps/Location** | 3 | `get-mapbox-token`, `get-google-maps-key`, `static-map` |
 | **WhatsApp** | 2 | `create-whatsapp-group`, `send-job-whatsapp-message` |
-| **Push Notifications** | 1 | `push` (handles subscribe, unsubscribe, broadcast, test, check_scheduled) |
+| **Push Notifications** | 1 | `push` (handles subscribe, unsubscribe, broadcast, test, check_scheduled; broadcast event-family modules live under `push/broadcast/`) |
 | **Wallboard** | 3 | `wallboard-auth`, `wallboard-feed`, `wallboard-debug` |
 | **Other** | 22+ | `system-health`, `submit-bug-report`, `submit-feature-request`, `tech-calendar-ics`, `evaluate-achievements`, `image-proxy`, `recalc-timesheet-amount`, etc. |
 
@@ -619,6 +619,7 @@ area-tecnica/
 | **Auth** | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` |
 | **Service Worker** | `public/sw.js` (version injected at build time) |
 | **Native** | Capacitor Push Notifications plugin for iOS/Android |
+| **Broadcast Router** | `supabase/functions/push/broadcast.ts` remains the single router entry; event copy/recipient rules are grouped under `supabase/functions/push/broadcast/families/` with pure message builders under `broadcast/messages/` |
 
 ---
 

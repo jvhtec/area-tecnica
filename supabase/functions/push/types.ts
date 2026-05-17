@@ -59,7 +59,10 @@ export type BroadcastBody = {
   transport_type?: string;
   loading_bay?: string | null;
   title?: string | null;
+  department?: string;
+  description?: string;
   departments?: string[];
+  department_roles?: DepartmentRoleSummary[] | unknown;
   auto_created_unload?: boolean;
   paired_event_type?: string;
   paired_event_date?: string;
@@ -71,15 +74,20 @@ export type BroadcastBody = {
   actor_name?: string;
   actor_id?: string;
   recipient_name?: string;
+  technician_id?: string;
+  rejection_reason?: string;
   artist_id?: string;
   artist_name?: string;
   artist_date?: string;
   channel?: 'email' | 'whatsapp';
   status?: string; // confirmed | cancelled | declined
   assignment_status?: string; // confirmed | invited (for direct assignments)
+  target_date?: string;
+  single_day?: boolean;
   changes?: Record<string, { from?: unknown; to?: unknown } | unknown> | Record<string, unknown>;
   message_preview?: string;
   message_id?: string;
+  task_id?: string;
   // Tour/Tourdate optional hints
   tour_id?: string;
   tour_date_id?: string;
@@ -89,6 +97,9 @@ export type BroadcastBody = {
   location_name?: string;
   old_type?: string;
   new_type?: string;
+  // Changelog optional hints
+  version?: string;
+  content?: string;
 };
 
 export type CheckScheduledBody = {
