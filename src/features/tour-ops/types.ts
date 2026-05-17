@@ -102,20 +102,26 @@ export interface TourOpsTravelSegment {
   crewManifest: unknown[];
   luggageTruck: boolean;
   status: string | null;
-  source: "normalized" | "legacy";
+  source: "normalized" | "legacy" | "hoja";
+  hojaDeRutaId?: string | null;
+  sourceTable?: "tour_travel_segments" | "hoja_de_ruta_travel_arrangements" | "hoja_de_ruta_transport" | "travel_plan";
 }
 
 export interface TourOpsAccommodation {
   id: string;
   tourDateId: string | null;
+  hojaDeRutaId?: string | null;
   hotelName: string;
   hotelAddress: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
   checkInDate: string | null;
   checkOutDate: string | null;
   confirmationNumber: string | null;
   roomAllocation: unknown[];
   roomsBooked: number | null;
   notes: string | null;
+  source: "normalized" | "hoja";
 }
 
 export interface TourOpsDocument {
@@ -146,6 +152,7 @@ export interface TourOpsDate {
   rehearsalDays: number | null;
   isTourPackOnly: boolean;
   location: TourOpsLocation | null;
+  hojaDeRutaId: string | null;
   jobId: string | null;
   jobTitle: string | null;
   jobStatus: string | null;

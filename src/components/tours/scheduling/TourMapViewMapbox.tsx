@@ -202,15 +202,17 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         day: "numeric",
       });
 
+      const venueName = location.venue_name || location.name || "Venue";
+      const venueAddress = location.formatted_address || location.address || [location.city, location.state].filter(Boolean).join(", ");
       const venuePopup = new mapboxgl.Popup({
         offset: 25,
         closeButton: true,
       }).setHTML(`
         <div style="padding: 8px; max-width: 250px; background: hsl(var(--popover)); color: hsl(var(--popover-foreground));">
           <h3 style="font-weight: bold; margin-bottom: 4px;">📍 Fecha ${index + 1}</h3>
-          <p style="margin: 4px 0; font-weight: 600; font-size: 14px;">${location.venue_name || "Venue"}</p>
+          <p style="margin: 4px 0; font-weight: 600; font-size: 14px;">${venueName}</p>
           <p style="margin: 4px 0; font-size: 12px;">${dateStr}</p>
-          <p style="margin: 4px 0; font-size: 12px; opacity: 0.8;">${location.city || ""}, ${location.state || ""}</p>
+          <p style="margin: 4px 0; font-size: 12px; opacity: 0.8;">${venueAddress}</p>
           ${date.call_time ? `<p style="margin: 4px 0; font-size: 12px;"><strong>Call:</strong> ${date.call_time}</p>` : ""}
         </div>
       `);
@@ -296,11 +298,11 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         const fromLocation =
           segment.fromType === 'home'
             ? homeBase
-            : segment.fromLocation || getLocationFromDateId(segment.fromDateId);
+            : segment.fromLocation || getLocationFromDateId(segment.fromDateId || segment.fromTourDateId);
         const toLocation =
           segment.toType === 'home'
             ? homeBase
-            : segment.toLocation || getLocationFromDateId(segment.toDateId);
+            : segment.toLocation || getLocationFromDateId(segment.toDateId || segment.toTourDateId);
 
         const fromCoords =
           fromLocation?.longitude != null && fromLocation?.latitude != null

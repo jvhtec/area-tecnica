@@ -71,8 +71,30 @@ const rawPayload = {
       id: "hdr-1",
       tour_date_id: "date-1",
       job_id: "job-1",
+      venue_name: "Barcelona Arena",
       program_schedule_json: [{ label: "Dia 1", rows: [{ time: "10:00", item: "Load in", dept: "sound" }] }],
       weather_data: [{ condition: "sun" }],
+    },
+  ],
+  hoja_travel_arrangements: [
+    {
+      id: "hdr-travel-1",
+      hoja_de_ruta_id: "hdr-1",
+      transportation_type: "van",
+      pickup_address: "BCN Airport",
+      departure_time: "08:00",
+      arrival_time: "09:00",
+      driver_name: "Driver One",
+    },
+  ],
+  hoja_accommodations: [
+    {
+      id: "hdr-hotel-1",
+      hoja_de_ruta_id: "hdr-1",
+      hotel_name: "Hoja Hotel",
+      address: "Carrer de la Ruta",
+      check_in: "2026-06-01",
+      check_out: "2026-06-02",
     },
   ],
   timeline_events: [
@@ -89,6 +111,7 @@ const rawPayload = {
     { id: "doc-3", tour_id: "tour-1", file_name: "Guest.pdf", file_path: "c", visible_to_tech: true, visible_to_guest: true },
   ],
   tour_assignments: [
+    { id: "tour-assign-0", technician_id: "tech-1", department: "sound", role: "Systems", profiles: { first_name: "Ada", last_name: "Lovelace" } },
     { id: "tour-assign-1", technician_id: "tech-2", department: "lights", role: "LX", profiles: { first_name: "Grace", last_name: "Hopper" } },
   ],
 };
@@ -103,13 +126,21 @@ describe("tour ops normalization", () => {
     expect(model.dates[0].jobId).toBe("job-1");
     expect(model.dates[0].program[0].rows[0].item).toBe("Load in");
     expect(model.dates[0].crew.map((member) => member.name)).toContain("Ada Lovelace");
-    expect(model.dates[0].accommodations[0].hotelName).toBe("Hotel One");
-    expect(model.travelSegments[0]).toMatchObject({
-      source: "legacy",
-      fromTourDateId: "date-1",
-      toTourDateId: "date-2",
-      transportationType: "bus",
-    });
+    expect(model.dates[0].crew.filter((member) => member.name === "Ada Lovelace")).toHaveLength(1);
+    expect(model.dates[0].accommodations.map((hotel) => hotel.hotelName)).toEqual(expect.arrayContaining(["Hotel One", "Hoja Hotel"]));
+    expect(model.travelSegments).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        source: "legacy",
+        fromTourDateId: "date-1",
+        toTourDateId: "date-2",
+        transportationType: "bus",
+      }),
+      expect.objectContaining({
+        source: "hoja",
+        toTourDateId: "date-1",
+        transportationType: "van",
+      }),
+    ]));
     expect(model.health.some((issue) => issue.id === "date-2:job")).toBe(true);
   });
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import {
@@ -8,6 +9,7 @@ import {
   Download,
   FileText,
   Loader2,
+  Map as MapIcon,
   MapPin,
   Plus,
   Route,
@@ -28,7 +30,10 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
+import { TourMapViewMapbox } from "@/components/tours/scheduling/TourMapViewMapbox";
+import { TourSettingsPanel } from "@/components/tours/scheduling/TourSettingsPanel";
 import { cn } from "@/lib/utils";
+import { dataLayerClient } from "@/services/dataLayerClient";
 import { MADRID_TIMEZONE, utcToLocalInput } from "@/utils/timezoneUtils";
 import type {
   TourGuestLink,
@@ -82,6 +87,9 @@ const finiteNumberOrNull = (value: string) => {
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
 };
+
+const sourceLabel = (source?: string) =>
+  source === "hoja" ? "hoja de ruta" : source === "legacy" ? "legacy" : "ops";
 
 const DateList = ({
   dates,
@@ -216,11 +224,35 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
         </Card>
 
         <Card>
+          <CardHeader><CardTitle className="text-base">Viajes y transporte</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            {[...date.travelIn, ...date.travelOut].length ? [...date.travelIn, ...date.travelOut].map((segment) => (
+              <div key={`${segment.source}-${segment.id}`} className="rounded-md border p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-medium">{segment.fromLabel} {"->"} {segment.toLabel}</div>
+                    <div className="text-muted-foreground">
+                      {[segment.transportationType, formatTime(segment.departureTime), formatTime(segment.arrivalTime), segment.carrierName]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                  </div>
+                  <Badge variant="outline">{sourceLabel(segment.source)}</Badge>
+                </div>
+                {segment.routeNotes && <div className="mt-2 text-muted-foreground">{segment.routeNotes}</div>}
+              </div>
+            )) : (
+              <div className="text-sm text-muted-foreground">Sin viajes definidos.</div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader><CardTitle className="text-base">Equipo y alojamiento</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               {date.crew.length ? date.crew.slice(0, 8).map((member) => (
-                <div key={`${member.id}-${member.role}`} className="flex justify-between gap-3 rounded-md bg-muted/50 p-2 text-sm">
+                <div key={member.id} className="flex justify-between gap-3 rounded-md bg-muted/50 p-2 text-sm">
                   <span>{member.name}</span>
                   <span className="text-muted-foreground">{member.role || member.department}</span>
                 </div>
@@ -228,8 +260,11 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
             </div>
             <div className="border-t pt-3 space-y-2">
               {date.accommodations.length ? date.accommodations.map((hotel) => (
-                <div key={hotel.id} className="text-sm">
-                  <div className="font-medium">{hotel.hotelName}</div>
+                <div key={`${hotel.source}-${hotel.id}`} className="text-sm">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{hotel.hotelName}</span>
+                    <Badge variant="outline">{sourceLabel(hotel.source)}</Badge>
+                  </div>
                   <div className="text-muted-foreground">{hotel.checkInDate} {"->"} {hotel.checkOutDate}</div>
                 </div>
               )) : <div className="text-sm text-muted-foreground">Sin alojamiento definido.</div>}
@@ -414,21 +449,31 @@ const TravelDialog = ({
   }, [editingSegment, open]);
 
   const handleSubmit = async () => {
+    const fromDate = model.dates.find((date) => date.id === form.fromTourDateId);
+    const toDate = model.dates.find((date) => date.id === form.toTourDateId);
     await onSave({
       id: editingSegment?.id,
       source: editingSegment?.source,
+      sourceTable: editingSegment?.sourceTable,
+      hojaDeRutaId: editingSegment?.hojaDeRutaId,
       tourId: model.tour.id,
       fromTourDateId: form.fromTourDateId || null,
       toTourDateId: form.toTourDateId || null,
-      fromLocationId: model.dates.find((date) => date.id === form.fromTourDateId)?.location?.id ?? null,
-      toLocationId: model.dates.find((date) => date.id === form.toTourDateId)?.location?.id ?? null,
+      fromLocationId: fromDate?.location?.id ?? null,
+      toLocationId: toDate?.location?.id ?? null,
+      fromLabel: editingSegment?.fromLabel ?? fromDate?.venueName ?? fromDate?.location?.name ?? "Base",
+      toLabel: editingSegment?.toLabel ?? toDate?.venueName ?? toDate?.location?.name ?? "Base",
       transportationType: form.transportationType,
       departureTime: form.departureTime || null,
       arrivalTime: form.arrivalTime || null,
       carrierName: form.carrierName || null,
+      vehicleDetails: editingSegment?.vehicleDetails ?? null,
       distanceKm: finiteNumberOrNull(form.distanceKm),
       estimatedDurationMinutes: finiteNumberOrNull(form.estimatedDurationMinutes),
       routeNotes: form.routeNotes || null,
+      stops: editingSegment?.stops ?? [],
+      crewManifest: editingSegment?.crewManifest ?? [],
+      luggageTruck: editingSegment?.luggageTruck ?? false,
       status: form.status,
     });
     onOpenChange(false);
@@ -439,7 +484,9 @@ const TravelDialog = ({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{editingSegment ? "Editar viaje" : "Nuevo viaje"}</DialogTitle>
-          <DialogDescription>Los viajes se guardan en tour_travel_segments.</DialogDescription>
+          <DialogDescription>
+            Los viajes nuevos se guardan en operaciones y se sincronizan con hoja de ruta cuando exista una hoja vinculada.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2">
@@ -603,8 +650,141 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
   );
 };
 
+const TourMapPanel = ({
+  model,
+  onSettingsSave,
+}: {
+  model: TourOpsModel;
+  onSettingsSave: () => void;
+}) => {
+  const [mapboxToken, setMapboxToken] = useState<string | null>(null);
+  const [mapboxError, setMapboxError] = useState<string | null>(null);
+  const [mapboxLoading, setMapboxLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadToken = async () => {
+      setMapboxLoading(true);
+      setMapboxError(null);
+      try {
+        const { data, error } = await dataLayerClient.functions.invoke("get-mapbox-token");
+        if (error) throw new Error(error.message);
+        if (!data?.token) throw new Error("No se encontro el token de Mapbox.");
+        if (!cancelled) setMapboxToken(data.token);
+      } catch (err) {
+        if (!cancelled) {
+          setMapboxError(err instanceof Error ? err.message : "No se pudo cargar Mapbox.");
+        }
+      } finally {
+        if (!cancelled) setMapboxLoading(false);
+      }
+    };
+
+    loadToken();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const mapTourData = useMemo(
+    () => ({
+      id: model.tour.id,
+      name: model.tour.name,
+      tour_settings: model.tour.settings,
+      travel_plan: model.travelSegments.map((segment) => ({
+        id: segment.id,
+        fromDateId: segment.fromTourDateId,
+        toDateId: segment.toTourDateId,
+        fromTourDateId: segment.fromTourDateId,
+        toTourDateId: segment.toTourDateId,
+        fromType: segment.fromTourDateId ? "venue" : "home",
+        toType: segment.toTourDateId ? "venue" : "home",
+        transportType: segment.transportationType,
+        transportation_type: segment.transportationType,
+        departureTime: segment.departureTime,
+        arrivalTime: segment.arrivalTime,
+        fromLocation: segment.fromLocationId ? null : undefined,
+        toLocation: segment.toLocationId ? null : undefined,
+      })),
+    }),
+    [model],
+  );
+
+  const mapDates = useMemo(
+    () =>
+      model.dates.map((date) => {
+        const location = date.location
+          ? {
+              id: date.location.id,
+              name: date.venueName || date.location.name,
+              venue_name: date.venueName || date.location.name,
+              formatted_address: date.venueAddress || date.location.formattedAddress,
+              address: date.venueAddress || date.location.formattedAddress,
+              latitude: date.location.latitude,
+              longitude: date.location.longitude,
+            }
+          : null;
+
+        return {
+          ...date,
+          location,
+          locations: location,
+          call_time: date.program[0]?.rows[0]?.time ?? null,
+        };
+      }),
+    [model],
+  );
+
+  const mapAccommodations = useMemo(
+    () =>
+      model.accommodations.map((hotel) => ({
+        id: hotel.id,
+        hotel_name: hotel.hotelName,
+        hotel_address: hotel.hotelAddress,
+        check_in_date: hotel.checkInDate,
+        check_out_date: hotel.checkOutDate,
+        rooms_booked: hotel.roomsBooked,
+        latitude: hotel.latitude,
+        longitude: hotel.longitude,
+      })),
+    [model],
+  );
+
+  return (
+    <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
+      <TourSettingsPanel
+        tourId={model.tour.id}
+        tourData={{ tour_settings: model.tour.settings }}
+        canEdit
+        onSave={onSettingsSave}
+      />
+      <div className="min-w-0">
+        {mapboxLoading ? (
+          <Card>
+            <CardContent className="flex h-[360px] items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </CardContent>
+          </Card>
+        ) : mapboxError ? (
+          <Card>
+            <CardContent className="p-6 text-sm text-destructive">{mapboxError}</CardContent>
+          </Card>
+        ) : mapboxToken ? (
+          <TourMapViewMapbox
+            tourData={mapTourData}
+            tourDates={mapDates}
+            accommodations={mapAccommodations}
+            mapboxToken={mapboxToken}
+          />
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
 export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubProps) {
-  const { data: model, isLoading, error } = useTourOps(tourId, "management");
+  const { data: model, isLoading, error, refetch } = useTourOps(tourId, "management");
   const mutations = useTourOpsMutations(tourId);
   const [selectedDateId, setSelectedDateId] = useState<string | null>(null);
   const [eventDialogOpen, setEventDialogOpen] = useState(false);
@@ -640,6 +820,20 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   const saveTravel = async (input: Partial<TourOpsTravelSegment> & { tourId: string }) => {
     await mutations.saveTravel.mutateAsync(input);
     toast.success("Viaje guardado");
+  };
+
+  const syncHojaOps = async () => {
+    const result = await mutations.syncHojaOps.mutateAsync(model);
+    const total =
+      result.insertedTravelSegments +
+      result.insertedHojaTravelRows +
+      result.insertedAccommodations +
+      result.insertedHojaAccommodations;
+    toast.success(
+      total
+        ? `Sincronizacion completada: ${total} cambios.`
+        : "Hoja de ruta y operaciones ya estaban sincronizadas.",
+    );
   };
 
   const statCards = [
@@ -686,6 +880,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
       <Tabs defaultValue="timeline" className="space-y-4">
         <TabsList className="flex h-auto flex-wrap justify-start">
           <TabsTrigger value="timeline">Cronograma</TabsTrigger>
+          <TabsTrigger value="map"><MapIcon className="h-4 w-4 mr-1" />Mapa</TabsTrigger>
           <TabsTrigger value="travel">Viajes</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
           <TabsTrigger value="share">Externo</TabsTrigger>
@@ -736,6 +931,10 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
           </div>
         </TabsContent>
 
+        <TabsContent value="map" className="m-0">
+          <TourMapPanel model={model} onSettingsSave={() => void refetch()} />
+        </TabsContent>
+
         <TabsContent value="travel" className="m-0">
           <Card>
             <CardHeader className="flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -744,8 +943,15 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                 {model.tour.hasLegacyTravelPlan && (
                   <p className="text-sm text-amber-600">Este tour tiene travel_plan legacy pendiente de normalizar.</p>
                 )}
+                <p className="text-sm text-muted-foreground">
+                  Incluye viajes de operaciones y de hoja de ruta. La sincronizacion mantiene ambos lados alineados.
+                </p>
               </div>
               <div className="flex gap-2">
+                <Button variant="outline" onClick={syncHojaOps} disabled={mutations.syncHojaOps.isPending}>
+                  {mutations.syncHojaOps.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Route className="h-4 w-4 mr-2" />}
+                  Sincronizar hoja
+                </Button>
                 {model.tour.hasLegacyTravelPlan && (
                   <Button variant="outline" onClick={() => mutations.migrateTravel.mutate(model)}>
                     Migrar legacy
@@ -769,11 +975,11 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                           .join(" · ")}
                       </div>
                       {segment.routeNotes && <div className="mt-2 text-sm">{segment.routeNotes}</div>}
-                      {segment.source === "legacy" && <Badge variant="outline" className="mt-2">legacy</Badge>}
+                      <Badge variant="outline" className="mt-2">{sourceLabel(segment.source)}</Badge>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => { setEditingSegment(segment); setTravelDialogOpen(true); }}>Editar</Button>
-                      {segment.source !== "legacy" && (
+                      {segment.source === "normalized" && (
                         <Button size="sm" variant="ghost" className="text-destructive" onClick={() => mutations.removeTravel.mutate(segment.id)}>
                           <Trash2 className="h-4 w-4" />
                         </Button>

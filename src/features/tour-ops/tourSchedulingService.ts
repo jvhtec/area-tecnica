@@ -146,9 +146,10 @@ const roleFromAssignment = (assignment: AnyRecord): string | null =>
 
 const normalizeTourAssignment = (assignment: AnyRecord): TourOpsCrewMember => {
   const profile = firstRelation(assignment.profiles ?? assignment.technician);
+  const fallbackName = textOrNull(assignment.external_technician_name);
   return {
-    id: textOrNull(assignment.technician_id) ?? textOrNull(assignment.id) ?? crypto.randomUUID(),
-    name: profileName(profile, textOrNull(assignment.external_technician_name)),
+    id: textOrNull(assignment.technician_id) ?? `external:${fallbackName ?? textOrNull(assignment.id) ?? crypto.randomUUID()}`,
+    name: profileName(profile, fallbackName),
     department: textOrNull(assignment.department),
     role: roleFromAssignment(assignment),
     phone: textOrNull(profile?.phone),
@@ -159,9 +160,10 @@ const normalizeTourAssignment = (assignment: AnyRecord): TourOpsCrewMember => {
 
 const normalizeJobAssignment = (assignment: AnyRecord): TourOpsCrewMember => {
   const profile = firstRelation(assignment.profiles ?? assignment.technician);
+  const fallbackName = textOrNull(assignment.external_technician_name);
   return {
-    id: textOrNull(assignment.technician_id) ?? textOrNull(assignment.id) ?? crypto.randomUUID(),
-    name: profileName(profile, textOrNull(assignment.external_technician_name)),
+    id: textOrNull(assignment.technician_id) ?? `external:${fallbackName ?? textOrNull(assignment.id) ?? crypto.randomUUID()}`,
+    name: profileName(profile, fallbackName),
     department: textOrNull(profile?.department),
     role: roleFromAssignment(assignment),
     phone: textOrNull(profile?.phone),
@@ -173,14 +175,34 @@ const normalizeJobAssignment = (assignment: AnyRecord): TourOpsCrewMember => {
 const dedupeCrew = (crew: TourOpsCrewMember[], projection: TourOpsProjection): TourOpsCrewMember[] => {
   const byKey = new Map<string, TourOpsCrewMember>();
   crew.forEach((member) => {
-    const key = `${member.id}:${member.role ?? ""}:${member.department ?? ""}`;
-    if (!byKey.has(key)) {
+    const key = member.id.startsWith("external:")
+      ? `external:${member.name.trim().toLowerCase()}`
+      : member.id;
+    const existing = byKey.get(key);
+    if (!existing) {
       byKey.set(key, {
         ...member,
         phone: projection === "guest" ? null : member.phone,
         email: projection === "guest" ? null : member.email,
       });
+      return;
     }
+
+    const mergeUnique = (left: string | null, right: string | null) => {
+      const values = [left, right]
+        .map(textOrNull)
+        .filter((value, index, list): value is string => Boolean(value) && list.indexOf(value) === index);
+      return values.length ? values.join(" / ") : null;
+    };
+
+    byKey.set(key, {
+      ...existing,
+      department: mergeUnique(existing.department, member.department),
+      role: mergeUnique(existing.role, member.role),
+      phone: existing.phone ?? (projection === "guest" ? null : member.phone),
+      email: existing.email ?? (projection === "guest" ? null : member.email),
+      source: existing.source === "job" || member.source === "job" ? "job" : "tour",
+    });
   });
   return Array.from(byKey.values()).sort((a, b) => a.name.localeCompare(b.name));
 };
@@ -221,12 +243,13 @@ export const normalizeTravelSegment = (
   row: AnyRecord,
   dateById: Map<string, AnyRecord>,
   locationById: Map<string, TourOpsLocation>,
-  source: "normalized" | "legacy" = "normalized",
+  source: "normalized" | "legacy" | "hoja" = "normalized",
 ): TourOpsTravelSegment => {
   const fromTourDateId = textOrNull(row.from_tour_date_id ?? row.fromDateId);
   const toTourDateId = textOrNull(row.to_tour_date_id ?? row.toDateId);
   const fromLocationId = textOrNull(row.from_location_id ?? row.fromLocation?.id);
   const toLocationId = textOrNull(row.to_location_id ?? row.toLocation?.id);
+  const vehicleDetails = isRecord(row.vehicle_details) ? row.vehicle_details : null;
 
   return {
     id: textOrNull(row.id) ?? crypto.randomUUID(),
@@ -235,13 +258,16 @@ export const normalizeTravelSegment = (
     toTourDateId,
     fromLocationId,
     toLocationId,
-    fromLabel: formatTravelLabel(fromTourDateId, fromLocationId, dateById, locationById, row.fromType === "home" ? "Base" : "Origen"),
-    toLabel: formatTravelLabel(toTourDateId, toLocationId, dateById, locationById, row.toType === "home" ? "Base" : "Destino"),
+    fromLabel:
+      textOrNull(row.from_label) ??
+      textOrNull(vehicleDetails?.pickupAddress) ??
+      formatTravelLabel(fromTourDateId, fromLocationId, dateById, locationById, row.fromType === "home" ? "Base" : "Origen"),
+    toLabel: textOrNull(row.to_label) ?? formatTravelLabel(toTourDateId, toLocationId, dateById, locationById, row.toType === "home" ? "Base" : "Destino"),
     transportationType: textOrNull(row.transportation_type ?? row.transportType) ?? "bus",
     departureTime: textOrNull(row.departure_time ?? row.departureTime),
     arrivalTime: textOrNull(row.arrival_time ?? row.arrivalTime),
     carrierName: textOrNull(row.carrier_name ?? row.carrierName),
-    vehicleDetails: isRecord(row.vehicle_details) ? row.vehicle_details : null,
+    vehicleDetails,
     distanceKm: toNumber(row.distance_km ?? row.distance),
     estimatedDurationMinutes: toNumber(row.estimated_duration_minutes ?? row.duration),
     routeNotes: textOrNull(row.route_notes ?? row.notes),
@@ -250,21 +276,128 @@ export const normalizeTravelSegment = (
     luggageTruck: Boolean(row.luggage_truck),
     status: textOrNull(row.status),
     source,
+    hojaDeRutaId: textOrNull(row.hoja_de_ruta_id) ?? textOrNull(vehicleDetails?.hojaDeRutaId),
+    sourceTable: textOrNull(row.source_table) as TourOpsTravelSegment["sourceTable"] | undefined,
   };
 };
 
 const normalizeAccommodation = (row: AnyRecord): TourOpsAccommodation => ({
   id: textOrNull(row.id) ?? crypto.randomUUID(),
   tourDateId: textOrNull(row.tour_date_id),
+  hojaDeRutaId: textOrNull(row.hoja_de_ruta_id),
   hotelName: textOrNull(row.hotel_name) ?? "Hotel",
-  hotelAddress: textOrNull(row.hotel_address),
+  hotelAddress: textOrNull(row.hotel_address ?? row.address),
+  latitude: toNumber(row.latitude),
+  longitude: toNumber(row.longitude),
   checkInDate: textOrNull(row.check_in_date),
   checkOutDate: textOrNull(row.check_out_date),
   confirmationNumber: textOrNull(row.confirmation_number),
-  roomAllocation: asArray(row.room_allocation),
-  roomsBooked: toNumber(row.rooms_booked),
+  roomAllocation: asArray(row.room_allocation ?? row.hoja_de_ruta_room_assignments),
+  roomsBooked: toNumber(row.rooms_booked) ?? (asArray(row.hoja_de_ruta_room_assignments).length || null),
   notes: textOrNull(row.notes),
+  source: row.source === "hoja" ? "hoja" : "normalized",
 });
+
+const normalizeHojaAccommodation = (row: AnyRecord, hojaById: Map<string, AnyRecord>): TourOpsAccommodation => {
+  const hoja = hojaById.get(textOrNull(row.hoja_de_ruta_id) ?? "");
+  return normalizeAccommodation({
+    ...row,
+    source: "hoja",
+    tour_date_id: hoja?.tour_date_id,
+    hotel_address: row.address,
+    check_in_date: row.check_in,
+    check_out_date: row.check_out,
+    room_allocation: row.hoja_de_ruta_room_assignments,
+  });
+};
+
+const normalizeHojaTravelArrangement = (
+  row: AnyRecord,
+  hojaById: Map<string, AnyRecord>,
+  dateById: Map<string, AnyRecord>,
+  locationById: Map<string, TourOpsLocation>,
+): TourOpsTravelSegment => {
+  const hoja = hojaById.get(textOrNull(row.hoja_de_ruta_id) ?? "");
+  const tourDateId = textOrNull(hoja?.tour_date_id);
+  const venueName = textOrNull(hoja?.venue_name) ?? formatTravelLabel(tourDateId, null, dateById, locationById, "Venue");
+  const pickupAddress = textOrNull(row.pickup_address);
+  const details = [textOrNull(row.flight_train_number), textOrNull(row.driver_name), textOrNull(row.driver_phone), textOrNull(row.plate_number)]
+    .filter(Boolean)
+    .join(" · ");
+
+  return normalizeTravelSegment(
+    {
+      ...row,
+      source_table: "hoja_de_ruta_travel_arrangements",
+      tour_id: textOrNull(hoja?.tour_id),
+      to_tour_date_id: tourDateId,
+      from_label: pickupAddress,
+      to_label: venueName,
+      transportation_type: row.transportation_type,
+      carrier_name: textOrNull(row.flight_train_number) ?? textOrNull(row.driver_name),
+      departure_time: textOrNull(row.departure_time) ?? textOrNull(row.pickup_time),
+      arrival_time: row.arrival_time,
+      route_notes: [textOrNull(row.notes), details].filter(Boolean).join(" · "),
+      vehicle_details: {
+        pickupAddress,
+        pickupTime: textOrNull(row.pickup_time),
+        flightTrainNumber: textOrNull(row.flight_train_number),
+        driverName: textOrNull(row.driver_name),
+        driverPhone: textOrNull(row.driver_phone),
+        plateNumber: textOrNull(row.plate_number),
+      },
+    },
+    dateById,
+    locationById,
+    "hoja",
+  );
+};
+
+const normalizeHojaTransport = (
+  row: AnyRecord,
+  hojaById: Map<string, AnyRecord>,
+  dateById: Map<string, AnyRecord>,
+  locationById: Map<string, TourOpsLocation>,
+): TourOpsTravelSegment => {
+  const hoja = hojaById.get(textOrNull(row.hoja_de_ruta_id) ?? "");
+  const tourDateId = textOrNull(hoja?.tour_date_id);
+  const venueName = textOrNull(hoja?.venue_name) ?? formatTravelLabel(tourDateId, null, dateById, locationById, "Venue");
+  const categories = asArray<string>(row.logistics_categories).join(", ");
+  const notes = [
+    textOrNull(row.company),
+    textOrNull(row.driver_name),
+    textOrNull(row.driver_phone),
+    textOrNull(row.license_plate),
+    categories || null,
+  ].filter(Boolean).join(" · ");
+
+  return normalizeTravelSegment(
+    {
+      ...row,
+      source_table: "hoja_de_ruta_transport",
+      tour_id: textOrNull(hoja?.tour_id),
+      to_tour_date_id: tourDateId,
+      from_label: textOrNull(row.company) ?? "Logística",
+      to_label: venueName,
+      transportation_type: textOrNull(row.transport_type) ?? "truck",
+      departure_time: row.date_time,
+      arrival_time: row.return_date_time,
+      carrier_name: textOrNull(row.company),
+      route_notes: notes,
+      vehicle_details: {
+        driverName: textOrNull(row.driver_name),
+        driverPhone: textOrNull(row.driver_phone),
+        plateNumber: textOrNull(row.license_plate),
+        hasReturn: Boolean(row.has_return),
+        logisticsCategories: asArray(row.logistics_categories),
+      },
+      luggage_truck: true,
+    },
+    dateById,
+    locationById,
+    "hoja",
+  );
+};
 
 const normalizeDocument = (row: AnyRecord): TourOpsDocument => ({
   id: textOrNull(row.id) ?? crypto.randomUUID(),
@@ -317,12 +450,75 @@ const buildDateHealth = (date: TourOpsDate): TourOpsHealthIssue[] => {
       tourDateId: date.id,
     });
   }
+  if (date.travelIn.length + date.travelOut.length === 0) {
+    issues.push({
+      id: `${date.id}:travel`,
+      severity: "info",
+      label: "Viajes sin datos",
+      detail: `${prefix} no tiene traslados o transporte sincronizado.`,
+      tourDateId: date.id,
+    });
+  }
+  if (date.accommodations.length === 0) {
+    issues.push({
+      id: `${date.id}:hotel`,
+      severity: "info",
+      label: "Alojamiento sin datos",
+      detail: `${prefix} no tiene alojamiento sincronizado.`,
+      tourDateId: date.id,
+    });
+  }
 
   return issues;
 };
 
 const shouldIncludeSection = (allowed: TourOpsAllowedSections, section: keyof TourOpsAllowedSections) =>
   allowed[section] !== false;
+
+const normalizeComparison = (value: string | null | undefined) => (value ?? "").trim().toLowerCase();
+
+const mergeTravelSegments = (segments: TourOpsTravelSegment[]) => {
+  const byKey = new Map<string, TourOpsTravelSegment>();
+  const sourceRank: Record<TourOpsTravelSegment["source"], number> = { normalized: 3, hoja: 2, legacy: 1 };
+
+  segments.forEach((segment) => {
+    const key = [
+      segment.fromTourDateId,
+      segment.toTourDateId,
+      normalizeComparison(segment.fromLabel),
+      normalizeComparison(segment.toLabel),
+      normalizeComparison(segment.transportationType),
+      normalizeComparison(segment.departureTime),
+      normalizeComparison(segment.arrivalTime),
+    ].join("|");
+    const existing = byKey.get(key);
+    if (!existing || sourceRank[segment.source] > sourceRank[existing.source]) {
+      byKey.set(key, segment);
+    }
+  });
+
+  return Array.from(byKey.values());
+};
+
+const mergeAccommodations = (accommodations: TourOpsAccommodation[]) => {
+  const byKey = new Map<string, TourOpsAccommodation>();
+  const sourceRank: Record<TourOpsAccommodation["source"], number> = { normalized: 2, hoja: 1 };
+
+  accommodations.forEach((accommodation) => {
+    const key = [
+      accommodation.tourDateId,
+      normalizeComparison(accommodation.hotelName),
+      normalizeComparison(accommodation.checkInDate),
+      normalizeComparison(accommodation.checkOutDate),
+    ].join("|");
+    const existing = byKey.get(key);
+    if (!existing || sourceRank[accommodation.source] > sourceRank[existing.source]) {
+      byKey.set(key, accommodation);
+    }
+  });
+
+  return Array.from(byKey.values());
+};
 
 export function normalizeTourOpsModel(
   raw: AnyRecord,
@@ -354,9 +550,13 @@ export function normalizeTourOpsModel(
 
   const hojas = asArray<AnyRecord>(raw.hoja_de_ruta ?? raw.hojaDeRutaRecords);
   const hojaByDate = new Map<string, AnyRecord>();
+  const hojaById = new Map<string, AnyRecord>();
   hojas.forEach((hoja) => {
+    const enrichedHoja = { ...hoja, tour_id: textOrNull(hoja.tour_id) ?? textOrNull(tour.id) };
     const tourDateId = textOrNull(hoja.tour_date_id);
-    if (tourDateId) hojaByDate.set(tourDateId, hoja);
+    if (tourDateId) hojaByDate.set(tourDateId, enrichedHoja);
+    const hojaId = textOrNull(hoja.id);
+    if (hojaId) hojaById.set(hojaId, enrichedHoja);
   });
 
   const tourCrew = asArray<AnyRecord>(raw.tour_assignments).map(normalizeTourAssignment);
@@ -368,15 +568,21 @@ export function normalizeTourOpsModel(
   });
 
   const normalizedTravel = asArray<AnyRecord>(raw.travel_segments).map((row) =>
-    normalizeTravelSegment(row, dateById, locationById, "normalized"),
+    normalizeTravelSegment({ ...row, source_table: "tour_travel_segments" }, dateById, locationById, "normalized"),
   );
 
   const legacyTravel = normalizedTravel.length === 0
-    ? asArray<AnyRecord>(tour.travel_plan).map((row) => normalizeTravelSegment({ ...row, tour_id: tour.id }, dateById, locationById, "legacy"))
+    ? asArray<AnyRecord>(tour.travel_plan).map((row) => normalizeTravelSegment({ ...row, tour_id: tour.id, source_table: "travel_plan" }, dateById, locationById, "legacy"))
     : [];
 
-  const travelSegments = [...normalizedTravel, ...legacyTravel];
-  const accommodations = asArray<AnyRecord>(raw.accommodations).map(normalizeAccommodation);
+  const hojaTravel = asArray<AnyRecord>(raw.hoja_travel_arrangements)
+    .map((row) => normalizeHojaTravelArrangement(row, hojaById, dateById, locationById));
+  const hojaTransport = asArray<AnyRecord>(raw.hoja_transport)
+    .map((row) => normalizeHojaTransport(row, hojaById, dateById, locationById));
+  const travelSegments = mergeTravelSegments([...normalizedTravel, ...hojaTravel, ...hojaTransport, ...legacyTravel]);
+  const normalizedAccommodations = asArray<AnyRecord>(raw.accommodations).map((row) => normalizeAccommodation({ ...row, source: "normalized" }));
+  const hojaAccommodations = asArray<AnyRecord>(raw.hoja_accommodations).map((row) => normalizeHojaAccommodation(row, hojaById));
+  const accommodations = mergeAccommodations([...normalizedAccommodations, ...hojaAccommodations]);
 
   const allDocuments = asArray<AnyRecord>(raw.documents).map(normalizeDocument);
   const documents = allDocuments.filter((document) => {
@@ -417,6 +623,7 @@ export function normalizeTourOpsModel(
         rehearsalDays: toNumber(date.rehearsal_days),
         isTourPackOnly: Boolean(date.is_tour_pack_only),
         location: date.location,
+        hojaDeRutaId: textOrNull(hoja?.id),
         jobId: textOrNull(job?.id),
         jobTitle: textOrNull(job?.title),
         jobStatus: textOrNull(job?.status),
@@ -591,6 +798,53 @@ export async function fetchTourOpsModel(
   const firstError = results.find((result) => result.error)?.error;
   if (firstError) throw firstError;
 
+  const hojaIds = asArray<AnyRecord>(hojaResult.data).map((hoja) => hoja.id).filter(Boolean);
+  const [
+    hojaTravelArrangementsResult,
+    hojaTransportResult,
+    hojaAccommodationsResult,
+  ] = await Promise.all([
+    hojaIds.length
+      ? client
+          .from("hoja_de_ruta_travel_arrangements")
+          .select("id, hoja_de_ruta_id, transportation_type, pickup_address, pickup_time, departure_time, arrival_time, flight_train_number, driver_name, driver_phone, plate_number, notes")
+          .in("hoja_de_ruta_id", hojaIds)
+      : Promise.resolve({ data: [], error: null }),
+    hojaIds.length
+      ? client
+          .from("hoja_de_ruta_transport")
+          .select("id, hoja_de_ruta_id, transport_type, driver_name, driver_phone, license_plate, company, date_time, has_return, return_date_time, logistics_categories, is_hoja_relevant")
+          .in("hoja_de_ruta_id", hojaIds)
+          .or("is_hoja_relevant.eq.true,is_hoja_relevant.is.null")
+      : Promise.resolve({ data: [], error: null }),
+    hojaIds.length
+      ? client
+          .from("hoja_de_ruta_accommodations")
+          .select(`
+            id,
+            hoja_de_ruta_id,
+            hotel_name,
+            address,
+            check_in,
+            check_out,
+            latitude,
+            longitude,
+            hoja_de_ruta_room_assignments (
+              id,
+              room_type,
+              room_number,
+              staff_member1_id,
+              staff_member2_id
+            )
+          `)
+          .in("hoja_de_ruta_id", hojaIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  const childResults = [hojaTravelArrangementsResult, hojaTransportResult, hojaAccommodationsResult];
+  const firstChildError = childResults.find((result) => result.error)?.error;
+  if (firstChildError) throw firstChildError;
+
   return normalizeTourOpsModel(
     {
       tour,
@@ -600,6 +854,9 @@ export async function fetchTourOpsModel(
       timeline_events: eventsResult.data ?? [],
       travel_segments: travelResult.data ?? [],
       accommodations: accommodationsResult.data ?? [],
+      hoja_travel_arrangements: hojaTravelArrangementsResult.data ?? [],
+      hoja_transport: hojaTransportResult.data ?? [],
+      hoja_accommodations: hojaAccommodationsResult.data ?? [],
       documents: documentsResult.data ?? [],
       tour_assignments: assignmentsResult.data ?? [],
     },
@@ -682,35 +939,181 @@ const normalizeDbTimestamp = (date: string | null | undefined, timeOrTimestamp: 
   return `${date}T${timeOrTimestamp.length === 5 ? `${timeOrTimestamp}:00` : timeOrTimestamp}`;
 };
 
-export async function saveTravelSegment(input: Partial<TourOpsTravelSegment> & { tourId: string }) {
+const normalizeHojaTransportationType = (value: string | null | undefined) => {
+  const raw = normalizeComparison(value);
+  if (raw === "plane") return "plane";
+  if (raw === "train") return "train";
+  if (raw === "rv") return "RV";
+  if (raw === "sleeper_bus" || raw === "bus" || raw === "autobus") return "sleeper_bus";
+  return "van";
+};
+
+const getHojaForTourDate = async (tourDateId: string | null | undefined) => {
+  if (!tourDateId) return null;
+  const { data, error } = await client
+    .from("hoja_de_ruta")
+    .select("id, tour_date_id")
+    .eq("tour_date_id", tourDateId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as AnyRecord | null;
+};
+
+const hojaTravelPayloadFromSegment = (input: Partial<TourOpsTravelSegment>) => ({
+  transportation_type: normalizeHojaTransportationType(input.transportationType),
+  pickup_address: input.fromLabel && input.fromLabel !== "Origen" ? input.fromLabel : null,
+  pickup_time: input.departureTime || null,
+  departure_time: input.departureTime || null,
+  arrival_time: input.arrivalTime || null,
+  flight_train_number: input.carrierName || null,
+  driver_name: textOrNull((input.vehicleDetails as AnyRecord | null)?.driverName),
+  driver_phone: textOrNull((input.vehicleDetails as AnyRecord | null)?.driverPhone),
+  plate_number: textOrNull((input.vehicleDetails as AnyRecord | null)?.plateNumber),
+  notes: input.routeNotes || null,
+});
+
+const opsTravelPayloadFromSegment = (input: Partial<TourOpsTravelSegment> & { tourId: string }) => ({
+  tour_id: input.tourId,
+  from_tour_date_id: input.fromTourDateId || null,
+  to_tour_date_id: input.toTourDateId || null,
+  from_location_id: input.fromLocationId || null,
+  to_location_id: input.toLocationId || null,
+  transportation_type: input.transportationType || "bus",
+  departure_time: input.departureTime || null,
+  arrival_time: input.arrivalTime || null,
+  carrier_name: input.carrierName || null,
+  vehicle_details: input.source === "hoja"
+    ? {
+        ...(isRecord(input.vehicleDetails) ? input.vehicleDetails : {}),
+        hojaSourceId: input.id,
+        hojaSourceTable: input.sourceTable,
+        hojaDeRutaId: input.hojaDeRutaId,
+      }
+    : input.vehicleDetails || {},
+  distance_km: input.distanceKm ?? null,
+  estimated_duration_minutes: input.estimatedDurationMinutes ?? null,
+  route_notes: input.routeNotes || null,
+  stops: input.stops || [],
+  crew_manifest: input.crewManifest || [],
+  luggage_truck: Boolean(input.luggageTruck),
+  status: input.status || "planned",
+});
+
+const upsertOpsTravelFromHoja = async (input: Partial<TourOpsTravelSegment> & { tourId: string }) => {
+  if (!input.id) return false;
+  const payload = opsTravelPayloadFromSegment(input);
+  const { data: existing, error: existingError } = await client
+    .from("tour_travel_segments")
+    .select("id")
+    .eq("tour_id", input.tourId)
+    .contains("vehicle_details", { hojaSourceId: input.id })
+    .maybeSingle();
+  if (existingError) throw existingError;
+
+  if (existing?.id) {
+    const { error } = await client.from("tour_travel_segments").update(payload).eq("id", existing.id);
+    if (error) throw error;
+    return true;
+  }
+
+  const { error } = await client.from("tour_travel_segments").insert(payload);
+  if (error) throw error;
+  return true;
+};
+
+const hojaTravelRowMatchesPayload = (row: AnyRecord, payload: AnyRecord) =>
+  normalizeComparison(row.transportation_type) === normalizeComparison(payload.transportation_type) &&
+  normalizeComparison(row.pickup_address) === normalizeComparison(payload.pickup_address) &&
+  normalizeComparison(row.departure_time) === normalizeComparison(payload.departure_time) &&
+  normalizeComparison(row.arrival_time) === normalizeComparison(payload.arrival_time) &&
+  normalizeComparison(row.flight_train_number) === normalizeComparison(payload.flight_train_number) &&
+  normalizeComparison(row.notes) === normalizeComparison(payload.notes);
+
+const syncSegmentToHoja = async (input: Partial<TourOpsTravelSegment>) => {
+  const targetDateId = input.toTourDateId || input.fromTourDateId;
+  const hoja = await getHojaForTourDate(targetDateId);
+  if (!hoja?.id) return false;
+
   const payload = {
-    tour_id: input.tourId,
-    from_tour_date_id: input.fromTourDateId || null,
-    to_tour_date_id: input.toTourDateId || null,
-    from_location_id: input.fromLocationId || null,
-    to_location_id: input.toLocationId || null,
-    transportation_type: input.transportationType || "bus",
-    departure_time: input.departureTime || null,
-    arrival_time: input.arrivalTime || null,
-    carrier_name: input.carrierName || null,
-    vehicle_details: input.vehicleDetails || {},
-    distance_km: input.distanceKm ?? null,
-    estimated_duration_minutes: input.estimatedDurationMinutes ?? null,
-    route_notes: input.routeNotes || null,
-    stops: input.stops || [],
-    crew_manifest: input.crewManifest || [],
-    luggage_truck: Boolean(input.luggageTruck),
-    status: input.status || "planned",
+    hoja_de_ruta_id: hoja.id,
+    ...hojaTravelPayloadFromSegment(input),
   };
+
+  const linkedHojaSourceId = textOrNull((input.vehicleDetails as AnyRecord | null)?.hojaSourceId);
+  if (linkedHojaSourceId) {
+    const { data: existingLinked, error: existingLinkedError } = await client
+      .from("hoja_de_ruta_travel_arrangements")
+      .select("id, transportation_type, pickup_address, departure_time, arrival_time, flight_train_number, notes")
+      .eq("id", linkedHojaSourceId)
+      .maybeSingle();
+    if (existingLinkedError) throw existingLinkedError;
+    if (existingLinked && hojaTravelRowMatchesPayload(existingLinked, payload)) return false;
+
+    const { error } = await client
+      .from("hoja_de_ruta_travel_arrangements")
+      .update(payload)
+      .eq("id", linkedHojaSourceId);
+    if (error) throw error;
+    return true;
+  }
+
+  const { data: existing, error: existingError } = await client
+    .from("hoja_de_ruta_travel_arrangements")
+    .select("id, transportation_type, pickup_address, departure_time, arrival_time, flight_train_number, notes")
+    .eq("hoja_de_ruta_id", hoja.id);
+  if (existingError) throw existingError;
+
+  const alreadyExists = asArray<AnyRecord>(existing).some((row) => hojaTravelRowMatchesPayload(row, payload));
+  if (alreadyExists) return false;
+
+  const { error } = await client.from("hoja_de_ruta_travel_arrangements").insert(payload);
+  if (error) throw error;
+  return true;
+};
+
+export async function saveTravelSegment(input: Partial<TourOpsTravelSegment> & { tourId: string }) {
+  if (input.source === "hoja" && input.id) {
+    const payload = hojaTravelPayloadFromSegment(input);
+    const table = input.sourceTable === "hoja_de_ruta_transport"
+      ? "hoja_de_ruta_transport"
+      : "hoja_de_ruta_travel_arrangements";
+
+    if (table === "hoja_de_ruta_transport") {
+      const { error } = await client
+        .from("hoja_de_ruta_transport")
+        .update({
+          transport_type: input.transportationType || "furgoneta",
+          date_time: input.departureTime || null,
+          return_date_time: input.arrivalTime || null,
+          company: input.carrierName || null,
+          driver_name: textOrNull((input.vehicleDetails as AnyRecord | null)?.driverName),
+          driver_phone: textOrNull((input.vehicleDetails as AnyRecord | null)?.driverPhone),
+          license_plate: textOrNull((input.vehicleDetails as AnyRecord | null)?.plateNumber),
+        })
+        .eq("id", input.id);
+      if (error) throw error;
+      await upsertOpsTravelFromHoja(input);
+      return input.id;
+    }
+
+    const { error } = await client.from("hoja_de_ruta_travel_arrangements").update(payload).eq("id", input.id);
+    if (error) throw error;
+    await upsertOpsTravelFromHoja(input);
+    return input.id;
+  }
+
+  const payload = opsTravelPayloadFromSegment(input);
 
   if (input.id && input.source !== "legacy") {
     const { error } = await client.from("tour_travel_segments").update(payload).eq("id", input.id);
     if (error) throw error;
+    await syncSegmentToHoja(input);
     return input.id;
   }
 
   const { data, error } = await client.from("tour_travel_segments").insert(payload).select("id").single();
   if (error) throw error;
+  await syncSegmentToHoja({ ...input, id: data.id as string, source: "normalized" });
   return data.id as string;
 }
 
@@ -755,6 +1158,153 @@ export async function migrateLegacyTravelPlan(model: TourOpsModel) {
   if (error) throw error;
 
   return rows.length;
+}
+
+const similarTravelExists = (segment: TourOpsTravelSegment, candidates: TourOpsTravelSegment[], source: TourOpsTravelSegment["source"]) =>
+  candidates.some((candidate) =>
+    candidate.source === source &&
+    candidate.fromTourDateId === segment.fromTourDateId &&
+    candidate.toTourDateId === segment.toTourDateId &&
+    normalizeComparison(candidate.transportationType) === normalizeComparison(segment.transportationType) &&
+    normalizeComparison(candidate.departureTime) === normalizeComparison(segment.departureTime) &&
+    normalizeComparison(candidate.arrivalTime) === normalizeComparison(segment.arrivalTime)
+  );
+
+const similarAccommodationExists = (
+  accommodation: TourOpsAccommodation,
+  candidates: TourOpsAccommodation[],
+  source: TourOpsAccommodation["source"],
+) =>
+  candidates.some((candidate) =>
+    candidate.source === source &&
+    candidate.tourDateId === accommodation.tourDateId &&
+    normalizeComparison(candidate.hotelName) === normalizeComparison(accommodation.hotelName) &&
+    normalizeComparison(candidate.checkInDate) === normalizeComparison(accommodation.checkInDate) &&
+    normalizeComparison(candidate.checkOutDate) === normalizeComparison(accommodation.checkOutDate)
+  );
+
+export async function syncHojaRutaOpsData(model: TourOpsModel) {
+  const dateById = new Map(model.dates.map((date) => [date.id, date]));
+  let insertedTravelSegments = 0;
+  let insertedHojaTravelRows = 0;
+  let insertedAccommodations = 0;
+  let insertedHojaAccommodations = 0;
+
+  const hojaTravelToNormalize = model.travelSegments.filter((segment) =>
+    segment.source === "hoja" && !similarTravelExists(segment, model.travelSegments, "normalized")
+  );
+  if (hojaTravelToNormalize.length > 0) {
+    const rows = hojaTravelToNormalize.map((segment) => {
+      const fromDate = segment.fromTourDateId ? dateById.get(segment.fromTourDateId) : null;
+      const toDate = segment.toTourDateId ? dateById.get(segment.toTourDateId) : null;
+      const departureAnchorDate = fromDate?.date ?? toDate?.date ?? model.tour.startDate;
+      const arrivalAnchorDate = toDate?.date ?? fromDate?.date ?? model.tour.startDate;
+
+      return {
+        tour_id: model.tour.id,
+        from_tour_date_id: segment.fromTourDateId,
+        to_tour_date_id: segment.toTourDateId,
+        from_location_id: segment.fromLocationId,
+        to_location_id: segment.toLocationId,
+        transportation_type: segment.transportationType,
+        departure_time: normalizeDbTimestamp(departureAnchorDate, segment.departureTime),
+        arrival_time: normalizeDbTimestamp(arrivalAnchorDate, segment.arrivalTime),
+        carrier_name: segment.carrierName,
+        vehicle_details: {
+          ...(isRecord(segment.vehicleDetails) ? segment.vehicleDetails : {}),
+          hojaSourceId: segment.id,
+          hojaSourceTable: segment.sourceTable,
+          hojaDeRutaId: segment.hojaDeRutaId,
+        },
+        distance_km: segment.distanceKm,
+        estimated_duration_minutes: segment.estimatedDurationMinutes,
+        route_notes: segment.routeNotes,
+        stops: segment.stops,
+        crew_manifest: segment.crewManifest,
+        luggage_truck: segment.luggageTruck,
+        status: segment.status ?? "planned",
+      };
+    });
+    const { error } = await client.from("tour_travel_segments").insert(rows);
+    if (error) throw error;
+    insertedTravelSegments = rows.length;
+  }
+
+  const normalizedTravelToHoja = model.travelSegments.filter((segment) =>
+    segment.source === "normalized" && !similarTravelExists(segment, model.travelSegments, "hoja")
+  );
+  for (const segment of normalizedTravelToHoja) {
+    if (await syncSegmentToHoja(segment)) {
+      insertedHojaTravelRows += 1;
+    }
+  }
+
+  const hojaHotelsToNormalize = model.accommodations.filter((hotel) =>
+    hotel.source === "hoja" && !similarAccommodationExists(hotel, model.accommodations, "normalized")
+  );
+  if (hojaHotelsToNormalize.length > 0) {
+    const rows = hojaHotelsToNormalize.map((hotel) => {
+      const date = hotel.tourDateId ? dateById.get(hotel.tourDateId) : null;
+      const checkIn = hotel.checkInDate ?? date?.date ?? model.tour.startDate;
+      const checkOut = hotel.checkOutDate ?? checkIn;
+      return {
+        tour_id: model.tour.id,
+        tour_date_id: hotel.tourDateId,
+        hotel_name: hotel.hotelName,
+        hotel_address: hotel.hotelAddress,
+        latitude: hotel.latitude,
+        longitude: hotel.longitude,
+        check_in_date: checkIn,
+        check_out_date: checkOut,
+        room_allocation: hotel.roomAllocation,
+        rooms_booked: hotel.roomsBooked ?? hotel.roomAllocation.length,
+        notes: hotel.notes,
+        status: "planned",
+      };
+    }).filter((row) => row.check_in_date && row.check_out_date);
+    if (rows.length > 0) {
+      const { error } = await client.from("tour_accommodations").insert(rows);
+      if (error) throw error;
+      insertedAccommodations = rows.length;
+    }
+  }
+
+  const normalizedHotelsToHoja = model.accommodations.filter((hotel) =>
+    hotel.source === "normalized" && hotel.tourDateId && !similarAccommodationExists(hotel, model.accommodations, "hoja")
+  );
+  for (const hotel of normalizedHotelsToHoja) {
+    const hoja = await getHojaForTourDate(hotel.tourDateId);
+    if (!hoja?.id) continue;
+    const { data: existing, error: existingError } = await client
+      .from("hoja_de_ruta_accommodations")
+      .select("id, hotel_name, check_in, check_out")
+      .eq("hoja_de_ruta_id", hoja.id);
+    if (existingError) throw existingError;
+    const exists = asArray<AnyRecord>(existing).some((row) =>
+      normalizeComparison(row.hotel_name) === normalizeComparison(hotel.hotelName) &&
+      normalizeComparison(row.check_in) === normalizeComparison(hotel.checkInDate) &&
+      normalizeComparison(row.check_out) === normalizeComparison(hotel.checkOutDate)
+    );
+    if (exists) continue;
+    const { error } = await client.from("hoja_de_ruta_accommodations").insert({
+      hoja_de_ruta_id: hoja.id,
+      hotel_name: hotel.hotelName,
+      address: hotel.hotelAddress,
+      check_in: hotel.checkInDate,
+      check_out: hotel.checkOutDate,
+      latitude: hotel.latitude,
+      longitude: hotel.longitude,
+    });
+    if (error) throw error;
+    insertedHojaAccommodations += 1;
+  }
+
+  return {
+    insertedTravelSegments,
+    insertedHojaTravelRows,
+    insertedAccommodations,
+    insertedHojaAccommodations,
+  };
 }
 
 export async function fetchTourGuestLinks(tourId: string): Promise<TourGuestLink[]> {

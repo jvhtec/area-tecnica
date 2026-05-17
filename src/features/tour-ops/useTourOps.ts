@@ -11,6 +11,7 @@ import {
   revokeTourGuestLink,
   saveTimelineEvent,
   saveTravelSegment,
+  syncHojaRutaOpsData,
   updateTourDocumentGuestVisibility,
 } from "@/features/tour-ops/tourSchedulingService";
 import type {
@@ -72,6 +73,11 @@ export function useTourOpsMutations(tourId: string) {
     onSuccess: invalidate,
   });
 
+  const syncHojaOps = useMutation({
+    mutationFn: (model: TourOpsModel) => syncHojaRutaOpsData(model),
+    onSuccess: invalidate,
+  });
+
   const setGuestDocumentVisibility = useMutation({
     mutationFn: ({ documentId, visibleToGuest }: { documentId: string; visibleToGuest: boolean }) =>
       updateTourDocumentGuestVisibility(documentId, visibleToGuest),
@@ -87,6 +93,7 @@ export function useTourOpsMutations(tourId: string) {
     saveTravel,
     removeTravel,
     migrateTravel,
+    syncHojaOps,
     setGuestDocumentVisibility,
   };
 }

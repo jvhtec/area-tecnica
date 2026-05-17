@@ -110,7 +110,11 @@ export const TourSettingsPanel: React.FC<TourSettingsPanelProps> = ({
 
     setIsSaving(true);
     try {
+      const existingSettings = tourData?.tour_settings && typeof tourData.tour_settings === "object"
+        ? tourData.tour_settings
+        : {};
       const tourSettings = {
+        ...existingSettings,
         homeBase: {
           name: settings.name,
           address: settings.address,
