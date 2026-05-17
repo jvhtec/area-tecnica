@@ -7,6 +7,8 @@ import {
   Bed,
   Calendar,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Copy,
   Download,
   ExternalLink,
@@ -145,6 +147,82 @@ const DateList = ({
     ))}
   </div>
 );
+
+const ActiveDateSelector = ({
+  dates,
+  selectedDate,
+  onSelect,
+}: {
+  dates: TourOpsDate[];
+  selectedDate: TourOpsDate | null;
+  onSelect: (id: string) => void;
+}) => {
+  const selectedIndex = selectedDate ? dates.findIndex((date) => date.id === selectedDate.id) : -1;
+  const previousDate = selectedIndex > 0 ? dates[selectedIndex - 1] : null;
+  const nextDate = selectedIndex >= 0 && selectedIndex < dates.length - 1 ? dates[selectedIndex + 1] : null;
+
+  return (
+    <div className="rounded-lg border bg-background p-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase text-muted-foreground">Fecha activa</div>
+          <div className="mt-1 flex min-w-0 items-center gap-2">
+            <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="truncate font-medium">
+              {selectedDate ? formatDate(selectedDate.date) : "Selecciona una fecha"}
+            </div>
+            {selectedDate?.health.length ? (
+              <Badge variant="destructive" className="shrink-0 text-[10px]">{selectedDate.health.length} avisos</Badge>
+            ) : selectedDate ? (
+              <Badge variant="outline" className="shrink-0 text-[10px]">Completo</Badge>
+            ) : null}
+          </div>
+          {selectedDate && (
+            <div className="mt-1 flex items-start gap-1 text-sm text-muted-foreground">
+              <MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+              <span className="line-clamp-2">{selectedDate.venueName || selectedDate.location?.name || "Venue pendiente"}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-[40px_1fr_40px] gap-2 md:min-w-[420px]">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={!previousDate}
+            onClick={() => previousDate && onSelect(previousDate.id)}
+            aria-label="Fecha anterior"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Select value={selectedDate?.id ?? ""} onValueChange={onSelect}>
+            <SelectTrigger className="min-w-0">
+              <SelectValue placeholder="Selecciona fecha" />
+            </SelectTrigger>
+            <SelectContent>
+              {dates.map((date, index) => (
+                <SelectItem key={date.id} value={date.id}>
+                  Dia {index + 1} · {formatDate(date.date)} · {date.venueName || date.location?.name || "Pendiente"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={!nextDate}
+            onClick={() => nextDate && onSelect(nextDate.id)}
+            aria-label="Fecha siguiente"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | null }) => {
   if (!date) {
@@ -1084,6 +1162,29 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
     [model, selectedDateId],
   );
 
+  const selectedTravelSegments = useMemo(
+    () =>
+      selectedDate
+        ? model?.travelSegments.filter((segment) =>
+            segment.fromTourDateId === selectedDate.id || segment.toTourDateId === selectedDate.id
+          ) ?? []
+        : model?.travelSegments ?? [],
+    [model?.travelSegments, selectedDate],
+  );
+
+  const selectedAccommodations = useMemo(
+    () =>
+      selectedDate
+        ? model?.accommodations.filter((hotel) => hotel.tourDateId === selectedDate.id) ?? []
+        : model?.accommodations ?? [],
+    [model?.accommodations, selectedDate],
+  );
+
+  const selectedRoomingHotels = useMemo(
+    () => selectedAccommodations.filter((hotel) => hotel.roomAllocation.length > 0),
+    [selectedAccommodations],
+  );
+
   const contactsTourData = useMemo(
     () => ({
       tour_contacts: (model?.tour.contacts ?? []).map((contact) => ({
@@ -1190,6 +1291,8 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
           <TabsTrigger value="health">Avisos</TabsTrigger>
         </TabsList>
 
+        <ActiveDateSelector dates={model.dates} selectedDate={selectedDate} onSelect={setSelectedDateId} />
+
         <TabsContent value="timeline" className="m-0">
           <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
             <Card>
@@ -1267,7 +1370,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              {model.travelSegments.length ? model.travelSegments.map((segment) => (
+              {selectedTravelSegments.length ? selectedTravelSegments.map((segment) => (
                 <div key={segment.id} className="rounded-lg border p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -1290,7 +1393,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                     </div>
                   </div>
                 </div>
-              )) : <div className="text-sm text-muted-foreground">Sin viajes definidos.</div>}
+              )) : <div className="text-sm text-muted-foreground">Sin viajes definidos para la fecha seleccionada.</div>}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1310,7 +1413,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
               </Button>
             </CardHeader>
             <CardContent className="space-y-3">
-              {model.accommodations.length ? model.accommodations.map((hotel) => {
+              {selectedAccommodations.length ? selectedAccommodations.map((hotel) => {
                 const tourDate = model.dates.find((date) => date.id === hotel.tourDateId);
                 return (
                   <div key={`${hotel.source}-${hotel.id}`} className="rounded-lg border p-4">
@@ -1351,7 +1454,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                     </div>
                   </div>
                 );
-              }) : <div className="text-sm text-muted-foreground">Sin alojamientos definidos.</div>}
+              }) : <div className="text-sm text-muted-foreground">Sin alojamientos definidos para la fecha seleccionada.</div>}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1365,9 +1468,8 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
               </p>
             </CardHeader>
             <CardContent className="space-y-3">
-              {model.accommodations.some((hotel) => hotel.roomAllocation.length > 0) ? (
-                model.accommodations
-                  .filter((hotel) => hotel.roomAllocation.length > 0)
+              {selectedRoomingHotels.length ? (
+                selectedRoomingHotels
                   .map((hotel) => {
                     const tourDate = model.dates.find((date) => date.id === hotel.tourDateId);
                     return (
@@ -1398,7 +1500,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                     );
                   })
               ) : (
-                <div className="text-sm text-muted-foreground">Sin rooming definido.</div>
+                <div className="text-sm text-muted-foreground">Sin rooming definido para la fecha seleccionada.</div>
               )}
             </CardContent>
           </Card>
