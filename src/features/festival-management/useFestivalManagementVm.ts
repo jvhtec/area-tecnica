@@ -7,16 +7,15 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { Department } from "@/types/department";
 import { isManagementRole } from "@/utils/permissions";
-
-import { useFestivalAdminActions } from "./hooks/useFestivalAdminActions";
-import { useFestivalDocuments } from "./hooks/useFestivalDocuments";
-import { useFestivalFlexControls } from "./hooks/useFestivalFlexControls";
-import { useFestivalJobData } from "./hooks/useFestivalJobData";
-import { useFestivalMapPreview } from "./hooks/useFestivalMapPreview";
-import { useFestivalPrintActions } from "./hooks/useFestivalPrintActions";
-import { useFestivalWhatsappActions } from "./hooks/useFestivalWhatsappActions";
-import { FESTIVAL_DEPARTMENT_OPTIONS, humanizeFestivalDepartment } from "./selectors";
-import type { FestivalManagementVm } from "./types";
+import { useFestivalAdminActions } from "@/features/festival-management/hooks/useFestivalAdminActions";
+import { useFestivalDocuments } from "@/features/festival-management/hooks/useFestivalDocuments";
+import { useFestivalFlexControls } from "@/features/festival-management/hooks/useFestivalFlexControls";
+import { useFestivalJobData } from "@/features/festival-management/hooks/useFestivalJobData";
+import { useFestivalMapPreview } from "@/features/festival-management/hooks/useFestivalMapPreview";
+import { useFestivalPrintActions } from "@/features/festival-management/hooks/useFestivalPrintActions";
+import { useFestivalWhatsappActions } from "@/features/festival-management/hooks/useFestivalWhatsappActions";
+import { FESTIVAL_DEPARTMENT_OPTIONS, humanizeFestivalDepartment } from "@/features/festival-management/selectors";
+import type { FestivalManagementVm } from "@/features/festival-management/types";
 
 export type FestivalManagementVmResult =
   | { status: "missing_job_id" }
@@ -88,8 +87,6 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
   const isViewOnly = userRole === "technician";
 
   useEffect(() => {
-    jobData.fetchJobDetails();
-
     if (!jobId) {
       return;
     }
@@ -115,10 +112,6 @@ export const useFestivalManagementVm = (): FestivalManagementVmResult => {
       channel.unsubscribe();
     };
   }, [documents.fetchDocuments, jobData.fetchJobDetails, jobId]);
-
-  useEffect(() => {
-    documents.fetchDocuments();
-  }, [documents.fetchDocuments]);
 
   const handleAssignmentChange = useCallback(() => {
     jobData.fetchJobDetails({ silent: true });

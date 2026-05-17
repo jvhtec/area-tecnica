@@ -1,6 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
-
-import { buildFallbackStageOptions, buildFestivalStageOptions, buildJobDates } from "./selectors";
+import {
+  buildFallbackStageOptions,
+  buildFestivalStageOptions,
+  buildJobDates,
+} from "@/features/festival-management/selectors";
 import type {
   ArtistRiderFile,
   FestivalDocumentsData,
@@ -8,7 +11,7 @@ import type {
   FestivalJobDetailsData,
   FestivalVenueData,
   JobDocumentEntry,
-} from "./types";
+} from "@/features/festival-management/types";
 
 type LocationRow = {
   formatted_address?: string | null;
@@ -108,11 +111,15 @@ export const fetchFestivalJobDetails = async (jobId: string): Promise<FestivalJo
   }
 
   console.log("Job data retrieved:", jobData);
-  const job = jobData as FestivalJob;
+  const job = {
+    ...jobData,
+    location_id: jobData.location_id ?? undefined,
+    tour_date_id: jobData.tour_date_id ?? undefined,
+  } as FestivalJob;
 
   const { count: artistCountValue, error: artistError } = await supabase
     .from("festival_artists")
-    .select("*", { count: "exact" })
+    .select("id", { count: "exact", head: true })
     .eq("job_id", jobId);
 
   if (artistError) {

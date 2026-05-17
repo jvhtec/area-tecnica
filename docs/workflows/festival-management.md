@@ -26,6 +26,13 @@ Festival execution is attached to a parent job (`jobs.id`) and orchestrated prim
 | VM query/command hooks | `src/features/festival-management/hooks/` |
 | Query services, command services, selectors | `src/features/festival-management/queries.ts`, `commands.ts`, `selectors.ts` |
 
+## Data loading and date conventions
+
+- Job details and document/rider lists are loaded through TanStack Query-backed festival hooks, with realtime events and manual refreshes refetching the same query-backed state.
+- Festival day derivation, date labels, and Flex folder document numbers use the `Europe/Madrid` timezone so local event dates do not drift around UTC boundaries.
+- Job document uploads write the storage object first and then insert metadata; if the metadata insert fails, the uploaded object is removed before the original error is surfaced.
+- Flex folder creation treats the push broadcast as non-critical: failures are logged, while successful folder creation still refreshes Flex, job, and document state.
+
 ## Architecture docs by section
 
 For full section-specific architecture, use:

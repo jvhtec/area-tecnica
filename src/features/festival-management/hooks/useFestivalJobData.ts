@@ -1,74 +1,67 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useQuery } from "@tanstack/react-query";
 
-import { fetchFestivalJobDetails } from "../queries";
-import type { FestivalJob, FestivalStageOption, FestivalVenueData } from "../types";
+import { fetchFestivalJobDetails } from "@/features/festival-management/queries";
+import { queryKeys } from "@/lib/react-query";
 
 type ToastFn = (props: { description?: string; title: string; variant?: "destructive" }) => void;
 
 export const useFestivalJobData = ({ jobId, toast }: { jobId?: string; toast: ToastFn }) => {
-  const [job, setJob] = useState<FestivalJob | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [artistCount, setArtistCount] = useState(0);
-  const [jobDates, setJobDates] = useState<Date[]>([]);
-  const [venueData, setVenueData] = useState<FestivalVenueData>({});
-  const [maxStages, setMaxStages] = useState(1);
-  const [festivalStageOptions, setFestivalStageOptions] = useState<FestivalStageOption[]>([]);
+  const silentErrorRef = useRef(false);
+  const jobDetailsQueryKey = useMemo(() => queryKeys.scope("festival-job-details", jobId ?? "none"), [jobId]);
+
+  const { data, error, errorUpdatedAt, isLoading, refetch } = useQuery({
+    queryKey: jobDetailsQueryKey,
+    enabled: Boolean(jobId),
+    staleTime: 0,
+    queryFn: () => {
+      if (!jobId) {
+        throw new Error("Missing festival job id");
+      }
+
+      return fetchFestivalJobDetails(jobId);
+    },
+  });
+
+  useEffect(() => {
+    if (!error) {
+      return;
+    }
+
+    console.error("Error fetching festival details:", error);
+    if (!silentErrorRef.current) {
+      toast({
+        title: "Error",
+        description: "Could not load festival details",
+        variant: "destructive",
+      });
+    }
+    silentErrorRef.current = false;
+  }, [error, errorUpdatedAt, toast]);
 
   const fetchJobDetails = useCallback(
     async (options?: { silent?: boolean }) => {
-      const silent = options?.silent ?? false;
-
       if (!jobId) {
-        setJob(null);
-        setArtistCount(0);
-        setJobDates([]);
-        setVenueData({});
-        setFestivalStageOptions([]);
-        setMaxStages(1);
-        if (!silent) {
-          setIsLoading(false);
-        }
         return;
       }
 
-      if (!silent) {
-        setIsLoading(true);
-      }
-
-      try {
-        const data = await fetchFestivalJobDetails(jobId);
-        setJob(data.job);
-        setArtistCount(data.artistCount);
-        setJobDates(data.jobDates);
-        setVenueData(data.venueData);
-        setMaxStages(data.maxStages);
-        setFestivalStageOptions(data.festivalStageOptions);
-      } catch (error) {
-        console.error("Error fetching festival details:", error);
-        if (!silent) {
-          toast({
-            title: "Error",
-            description: "Could not load festival details",
-            variant: "destructive",
-          });
-        }
-      } finally {
-        if (!silent) {
-          setIsLoading(false);
-        }
+      silentErrorRef.current = options?.silent ?? false;
+      const result = await refetch();
+      if (!result.error) {
+        silentErrorRef.current = false;
       }
     },
-    [jobId, toast],
+    [jobId, refetch],
   );
 
   return {
-    artistCount,
-    festivalStageOptions,
+    artistCount: data?.artistCount ?? 0,
+    festivalStageOptions: data?.festivalStageOptions ?? [],
     fetchJobDetails,
-    isLoading,
-    job,
-    jobDates,
-    maxStages,
-    venueData,
+    isLoading: jobId ? isLoading : false,
+    job: data?.job ?? null,
+    jobDates: data?.jobDates ?? [],
+    maxStages: data?.maxStages ?? 1,
+    venueData: data?.venueData ?? {},
   };
 };

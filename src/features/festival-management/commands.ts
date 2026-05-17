@@ -1,12 +1,6 @@
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
-import { supabase } from "@/integrations/supabase/client";
-import type { CreateFoldersOptions } from "@/utils/flex-folders";
-import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
-import { resolveJobDocLocation } from "@/utils/jobDocuments";
-import { generateIndividualStagePDFs } from "@/utils/pdf/individualStagePdfGenerator";
-import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
-
 import type {
+  ArtistRiderFile,
   FestivalArchiveMode,
   FestivalArchiveResult,
   FestivalBackfillResult,
@@ -15,8 +9,13 @@ import type {
   FestivalVenueData,
   FestivalWhatsappDepartment,
   JobDocumentEntry,
-  ArtistRiderFile,
-} from "./types";
+} from "@/features/festival-management/types";
+import { supabase } from "@/integrations/supabase/client";
+import type { CreateFoldersOptions } from "@/utils/flex-folders";
+import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
+import { resolveJobDocLocation } from "@/utils/jobDocuments";
+import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
+import { generateIndividualStagePDFs } from "@/utils/pdf/individualStagePdfGenerator";
 
 export const getJobDocumentSignedUrl = async (docEntry: JobDocumentEntry) => {
   const { bucket, path } = resolveJobDocLocation(docEntry.file_path);
@@ -71,7 +70,13 @@ export const uploadJobDocument = async ({ file, jobId }: { file: File; jobId: st
     file_path: filePath,
   });
 
-  if (dbError) throw dbError;
+  if (dbError) {
+    const { error: cleanupError } = await supabase.storage.from("job_documents").remove([filePath]);
+    if (cleanupError) {
+      console.error("Failed to remove uploaded job document after database insert error:", cleanupError);
+    }
+    throw dbError;
+  }
 };
 
 export const loadStaticMapPreviewUrl = async (venueData: FestivalVenueData) => {
@@ -124,9 +129,21 @@ export const createFestivalFlexFolders = async ({
 }) => createAllFoldersForJob(job, startDate, endDate, documentNumber, options);
 
 export const broadcastFlexFoldersCreated = async (jobId: string) => {
-  await supabase.functions.invoke("push", {
-    body: { action: "broadcast", type: "flex.folders.created", job_id: jobId },
-  });
+  try {
+    const { error } = await supabase.functions.invoke("push", {
+      body: { action: "broadcast", type: "flex.folders.created", job_id: jobId },
+    });
+
+    if (error) {
+      console.error("Error sending Flex folders push notification:", error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error("Error sending Flex folders push notification:", error);
+    return false;
+  }
 };
 
 export const openFestivalFlexElement = async ({

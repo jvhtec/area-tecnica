@@ -1,6 +1,5 @@
-import { format, isValid } from "date-fns";
-
-import type { Department } from "@/types/department";
+import { eachDayOfInterval, isValid } from "date-fns";
+import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 
 import type {
   ArtistRiderFile,
@@ -9,7 +8,8 @@ import type {
   FestivalStageOption,
   FestivalWhatsappDepartment,
   GroupedRiderFiles,
-} from "./types";
+} from "@/features/festival-management/types";
+import type { Department } from "@/types/department";
 
 type StageRow = {
   name?: string | null;
@@ -19,6 +19,8 @@ type StageRow = {
 type JobDateTypeRow = {
   date?: string | null;
 };
+
+const FESTIVAL_TIMEZONE = "Europe/Madrid";
 
 export const FESTIVAL_DEPARTMENT_OPTIONS: Department[] = [
   "sound",
@@ -68,20 +70,29 @@ export const buildFestivalStageOptions = (
   };
 };
 
+const parseFestivalDateType = (value: string) => {
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? fromZonedTime(`${value}T00:00:00`, FESTIVAL_TIMEZONE)
+    : new Date(value);
+
+  return isValid(parsed) ? parsed : null;
+};
+
 export const buildJobDates = (job: Pick<FestivalJob, "start_time" | "end_time">, dateTypes: JobDateTypeRow[] = []) => {
   const startDate = new Date(job.start_time);
   const endDate = new Date(job.end_time);
 
   if (isValid(startDate) && isValid(endDate)) {
-    const dates: Date[] = [];
-    const currentDate = new Date(startDate);
+    const zonedStart = toZonedTime(startDate, FESTIVAL_TIMEZONE);
+    const zonedEnd = toZonedTime(endDate, FESTIVAL_TIMEZONE);
 
-    while (currentDate <= endDate) {
-      dates.push(new Date(currentDate));
-      currentDate.setDate(currentDate.getDate() + 1);
+    if (zonedEnd < zonedStart) {
+      return [fromZonedTime(zonedStart, FESTIVAL_TIMEZONE)];
     }
 
-    return dates;
+    return eachDayOfInterval({ start: zonedStart, end: zonedEnd }).map((date) =>
+      fromZonedTime(date, FESTIVAL_TIMEZONE),
+    );
   }
 
   const fallbackDates = Array.from(
@@ -91,8 +102,8 @@ export const buildJobDates = (job: Pick<FestivalJob, "start_time" | "end_time">,
         .filter((value): value is string => Boolean(value)),
     ),
   )
-    .map((date) => new Date(date))
-    .filter((date) => isValid(date));
+    .map(parseFestivalDateType)
+    .filter((date): date is Date => Boolean(date));
 
   return fallbackDates.length > 0 ? fallbackDates : [new Date()];
 };
@@ -117,7 +128,7 @@ export const groupFestivalRiderFiles = (artistRiderFiles: ArtistRiderFile[]): Gr
 export const formatFestivalDateLabel = (value?: string | null) => {
   if (!value) return "Unknown date";
   const parsed = new Date(value);
-  return isValid(parsed) ? format(parsed, "MMM d, yyyy") : "Unknown date";
+  return isValid(parsed) ? formatInTimeZone(parsed, FESTIVAL_TIMEZONE, "MMM d, yyyy") : "Unknown date";
 };
 
 export const getFestivalFlexStatus = ({

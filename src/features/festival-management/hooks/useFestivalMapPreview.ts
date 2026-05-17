@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
-import { loadStaticMapPreviewUrl } from "../commands";
-import type { FestivalVenueData } from "../types";
+import { loadStaticMapPreviewUrl } from "@/features/festival-management/commands";
+import type { FestivalVenueData } from "@/features/festival-management/types";
 
 export const useFestivalMapPreview = (venueData: FestivalVenueData) => {
   const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);

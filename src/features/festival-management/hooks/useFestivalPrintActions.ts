@@ -1,8 +1,7 @@
 import { useCallback, useState } from "react";
 
 import type { PrintOptions } from "@/components/festival/pdf/PrintOptionsDialog";
-
-import { downloadBlobInBrowser, generateFestivalDocumentation } from "../commands";
+import { downloadBlobInBrowser, generateFestivalDocumentation } from "@/features/festival-management/commands";
 
 type ToastFn = (props: { description?: string; title: string; variant?: "destructive" }) => void;
 

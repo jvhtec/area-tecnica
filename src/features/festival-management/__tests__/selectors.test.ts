@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { formatInTimeZone } from "date-fns-tz";
 
 import {
   buildFestivalStageOptions,
@@ -9,8 +10,10 @@ import {
   groupFestivalRiderFiles,
   normalizeFestivalWhatsappStage,
   requiresFestivalWhatsappStage,
-} from "../selectors";
-import type { ArtistRiderFile } from "../types";
+} from "@/features/festival-management/selectors";
+import type { ArtistRiderFile } from "@/features/festival-management/types";
+
+const formatMadridDate = (date: Date) => formatInTimeZone(date, "Europe/Madrid", "yyyy-MM-dd");
 
 describe("festival management selectors", () => {
   it("merges configured stage names with fallback stage count", () => {
@@ -33,16 +36,16 @@ describe("festival management selectors", () => {
   it("builds inclusive job dates and falls back to date-type rows when needed", () => {
     expect(
       buildJobDates({
-        start_time: "2026-06-01T10:00:00.000Z",
-        end_time: "2026-06-03T22:00:00.000Z",
-      }).map((date) => date.toISOString().slice(0, 10)),
+        start_time: "2026-06-01T08:00:00.000Z",
+        end_time: "2026-06-03T20:00:00.000Z",
+      }).map(formatMadridDate),
     ).toEqual(["2026-06-01", "2026-06-02", "2026-06-03"]);
 
     expect(
       buildJobDates(
         { start_time: "invalid", end_time: "invalid" },
         [{ date: "2026-07-01" }, { date: "2026-07-01" }, { date: "2026-07-02" }],
-      ).map((date) => date.toISOString().slice(0, 10)),
+      ).map(formatMadridDate),
     ).toEqual(["2026-07-01", "2026-07-02"]);
   });
 
@@ -90,5 +93,6 @@ describe("festival management selectors", () => {
       "destructive",
     );
     expect(formatFestivalDateLabel("not-a-date")).toBe("Unknown date");
+    expect(formatFestivalDateLabel("2026-06-01T22:30:00.000Z")).toBe("Jun 2, 2026");
   });
 });

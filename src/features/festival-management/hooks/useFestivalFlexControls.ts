@@ -1,18 +1,23 @@
 import { useCallback, useMemo, useState } from "react";
 import { isValid } from "date-fns";
-
-import type { CreateFoldersOptions } from "@/utils/flex-folders";
+import { formatInTimeZone } from "date-fns-tz";
 
 import {
   broadcastFlexFoldersCreated,
   createFestivalFlexFolders,
   ensureNoExistingFlexFolders,
   openFestivalFlexElement,
-} from "../commands";
-import { getFestivalFlexStatus } from "../selectors";
-import type { FestivalJob } from "../types";
+} from "@/features/festival-management/commands";
+import { getFestivalFlexStatus } from "@/features/festival-management/selectors";
+import type { FestivalJob } from "@/features/festival-management/types";
+import type { CreateFoldersOptions } from "@/utils/flex-folders";
 
 type ToastFn = (props: { description?: string; title: string; variant?: "destructive" }) => void;
+
+const FESTIVAL_TIMEZONE = "Europe/Madrid";
+const FLEX_DATE_TIME_FORMAT = "yyyy-MM-dd'T'HH:mm:ss'.000Z'";
+
+const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
 
 export const useFestivalFlexControls = ({
   fetchDocuments,
@@ -87,11 +92,11 @@ export const useFestivalFlexControls = ({
             });
             return;
           }
-        } catch (error: any) {
+        } catch (error) {
           console.error("Error checking existing folders:", error);
           toast({
             title: "Error al verificar carpetas",
-            description: error.message || "Por favor, inténtalo de nuevo en un momento.",
+            description: getErrorMessage(error, "Por favor, inténtalo de nuevo en un momento."),
             variant: "destructive",
           });
           return;
@@ -122,9 +127,9 @@ export const useFestivalFlexControls = ({
       try {
         setIsCreatingFlexFolders(true);
 
-        const documentNumber = startDate.toISOString().slice(2, 10).replace(/-/g, "");
-        const formattedStartDate = startDate.toISOString().split(".")[0] + ".000Z";
-        const formattedEndDate = endDate.toISOString().split(".")[0] + ".000Z";
+        const documentNumber = formatInTimeZone(startDate, FESTIVAL_TIMEZONE, "yyMMdd");
+        const formattedStartDate = formatInTimeZone(startDate, FESTIVAL_TIMEZONE, FLEX_DATE_TIME_FORMAT);
+        const formattedEndDate = formatInTimeZone(endDate, FESTIVAL_TIMEZONE, FLEX_DATE_TIME_FORMAT);
 
         toast({
           title: flexPickerMode === "create" ? "Creando carpetas Flex…" : "Añadiendo carpetas Flex…",
@@ -142,9 +147,10 @@ export const useFestivalFlexControls = ({
           startDate: formattedStartDate,
         });
 
-        void broadcastFlexFoldersCreated(jobId).catch((pushError) => {
-          console.error("Error sending push notification:", pushError);
-        });
+        const didBroadcast = await broadcastFlexFoldersCreated(jobId);
+        if (!didBroadcast) {
+          console.warn("Flex folders were created but the realtime broadcast did not complete.");
+        }
 
         toast({
           title: flexPickerMode === "create" ? "Carpetas Flex listas" : "Carpetas Flex actualizadas",
@@ -155,11 +161,11 @@ export const useFestivalFlexControls = ({
         });
 
         await Promise.all([refetchFlexUuid(), fetchJobDetails({ silent: true }), fetchDocuments()]);
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error adding Flex folders:", error);
         toast({
           title: "Error al actualizar carpetas Flex",
-          description: error.message || "Por favor, inténtalo de nuevo en un momento.",
+          description: getErrorMessage(error, "Por favor, inténtalo de nuevo en un momento."),
           variant: "destructive",
         });
       } finally {

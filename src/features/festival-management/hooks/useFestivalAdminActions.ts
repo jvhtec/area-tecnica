@@ -6,8 +6,13 @@ import {
   backfillFlexDocTecnica,
   createLocalFolders,
   deleteFestivalJob,
-} from "../commands";
-import type { FestivalArchiveMode, FestivalArchiveResult, FestivalBackfillResult, FestivalJob } from "../types";
+} from "@/features/festival-management/commands";
+import type {
+  FestivalArchiveMode,
+  FestivalArchiveResult,
+  FestivalBackfillResult,
+  FestivalJob,
+} from "@/features/festival-management/types";
 
 type ToastFn = (props: { description?: string; title: string; variant?: "destructive" }) => void;
 

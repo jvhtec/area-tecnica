@@ -1,27 +1,20 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { NavigateFunction } from "react-router-dom";
 
+import type { useFestivalAdminActions } from "@/features/festival-management/hooks/useFestivalAdminActions";
+import type { useFestivalDocuments } from "@/features/festival-management/hooks/useFestivalDocuments";
+import type { useFestivalFlexControls } from "@/features/festival-management/hooks/useFestivalFlexControls";
+import type { useFestivalMapPreview } from "@/features/festival-management/hooks/useFestivalMapPreview";
+import type { useFestivalPrintActions } from "@/features/festival-management/hooks/useFestivalPrintActions";
+import type { useFestivalWhatsappActions } from "@/features/festival-management/hooks/useFestivalWhatsappActions";
 import type { Department } from "@/types/department";
-import type { JobType } from "@/types/job";
+import type { Job, JobType } from "@/types/job";
 
-import type { useFestivalAdminActions } from "./hooks/useFestivalAdminActions";
-import type { useFestivalDocuments } from "./hooks/useFestivalDocuments";
-import type { useFestivalFlexControls } from "./hooks/useFestivalFlexControls";
-import type { useFestivalMapPreview } from "./hooks/useFestivalMapPreview";
-import type { useFestivalPrintActions } from "./hooks/useFestivalPrintActions";
-import type { useFestivalWhatsappActions } from "./hooks/useFestivalWhatsappActions";
-
-export interface FestivalJob {
-  id: string;
-  title: string;
-  description?: string;
-  start_time: string;
-  end_time: string;
-  created_at: string;
-  location_id?: string | null;
+export interface FestivalJob extends Omit<Job, "location_id" | "tour_date_id"> {
+  location_id?: string;
   job_type: JobType;
   tour_id?: string | null;
-  tour_date_id?: string | null;
+  tour_date_id?: string;
   [key: string]: unknown;
 }
 

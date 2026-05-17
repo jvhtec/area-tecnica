@@ -1,16 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { queryKeys } from "@/lib/react-query";
-import { supabase } from "@/integrations/supabase/client";
-
 import {
   clearWhatsappGroupRequest,
   createWhatsappGroup,
   sendWarehouseMessage,
-} from "../commands";
-import { normalizeFestivalWhatsappStage } from "../selectors";
-import type { FestivalWhatsappDepartment } from "../types";
+} from "@/features/festival-management/commands";
+import { normalizeFestivalWhatsappStage } from "@/features/festival-management/selectors";
+import type { FestivalWhatsappDepartment } from "@/features/festival-management/types";
+import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/react-query";
 
 type ToastFn = (props: { description?: string; title: string; variant?: "default" | "destructive" }) => void;
 

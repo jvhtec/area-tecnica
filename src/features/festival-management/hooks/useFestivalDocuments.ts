@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, type ChangeEvent } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   downloadBlobInBrowser,
@@ -7,43 +8,89 @@ import {
   getJobDocumentSignedUrl,
   getRiderSignedUrl,
   uploadJobDocument,
-} from "../commands";
-import { fetchFestivalDocuments } from "../queries";
-import { formatFestivalDateLabel, groupFestivalRiderFiles } from "../selectors";
-import type { ArtistRiderFile, JobDocumentEntry } from "../types";
+} from "@/features/festival-management/commands";
+import { fetchFestivalDocuments } from "@/features/festival-management/queries";
+import { formatFestivalDateLabel, groupFestivalRiderFiles } from "@/features/festival-management/selectors";
+import type { ArtistRiderFile, JobDocumentEntry } from "@/features/festival-management/types";
+import { queryKeys } from "@/lib/react-query";
 
 type ToastFn = (props: { description?: string; title: string; variant?: "destructive" }) => void;
 
-export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: ToastFn }) => {
-  const [jobDocuments, setJobDocuments] = useState<JobDocumentEntry[]>([]);
-  const [artistRiderFiles, setArtistRiderFiles] = useState<ArtistRiderFile[]>([]);
-  const [isLoadingDocuments, setIsLoadingDocuments] = useState(false);
-  const [isUploadingDocument, setIsUploadingDocument] = useState(false);
+const EMPTY_ARTIST_RIDER_FILES: ArtistRiderFile[] = [];
+const EMPTY_JOB_DOCUMENTS: JobDocumentEntry[] = [];
 
-  const fetchDocuments = useCallback(async () => {
-    if (!jobId) {
-      setJobDocuments([]);
-      setArtistRiderFiles([]);
-      setIsLoadingDocuments(false);
+const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
+
+export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: ToastFn }) => {
+  const queryClient = useQueryClient();
+  const documentsQueryKey = useMemo(() => queryKeys.scope("festival-documents", jobId ?? "none"), [jobId]);
+  const {
+    data: documents,
+    error: documentsError,
+    isFetching: isLoadingDocuments,
+    refetch: refetchDocuments,
+  } = useQuery({
+    queryKey: documentsQueryKey,
+    enabled: Boolean(jobId),
+    staleTime: 0,
+    queryFn: () => {
+      if (!jobId) {
+        return Promise.resolve({ artistRiderFiles: [], jobDocuments: [] });
+      }
+
+      return fetchFestivalDocuments(jobId);
+    },
+  });
+
+  useEffect(() => {
+    if (!documentsError) {
       return;
     }
 
-    setIsLoadingDocuments(true);
-    try {
-      const documents = await fetchFestivalDocuments(jobId);
-      setJobDocuments(documents.jobDocuments);
-      setArtistRiderFiles(documents.artistRiderFiles);
-    } catch (error: any) {
-      console.error("Error fetching documents:", error);
+    console.error("Error fetching documents:", documentsError);
+    toast({
+      title: "Error al cargar documentos",
+      description: getErrorMessage(documentsError, "No se pudieron cargar los documentos para este trabajo."),
+      variant: "destructive",
+    });
+  }, [documentsError, toast]);
+
+  const fetchDocuments = useCallback(async () => {
+    if (!jobId) {
+      return;
+    }
+
+    await queryClient.invalidateQueries({ queryKey: documentsQueryKey });
+    await refetchDocuments();
+  }, [documentsQueryKey, jobId, queryClient, refetchDocuments]);
+
+  const { isPending: isUploadingDocument, mutateAsync: uploadDocument } = useMutation({
+    mutationFn: (file: File) => {
+      if (!jobId) {
+        throw new Error("No se encontró el trabajo.");
+      }
+
+      return uploadJobDocument({ file, jobId });
+    },
+    onSuccess: async () => {
       toast({
-        title: "Error al cargar documentos",
-        description: error.message || "No se pudieron cargar los documentos para este trabajo.",
+        title: "Éxito",
+        description: "Documento subido exitosamente",
+      });
+      await queryClient.invalidateQueries({ queryKey: documentsQueryKey });
+    },
+    onError: (error) => {
+      console.error("Error uploading document:", error);
+      toast({
+        title: "Error al subir",
+        description: getErrorMessage(error, "Error al subir documento"),
         variant: "destructive",
       });
-    } finally {
-      setIsLoadingDocuments(false);
-    }
-  }, [jobId, toast]);
+    },
+  });
+
+  const jobDocuments = documents?.jobDocuments ?? EMPTY_JOB_DOCUMENTS;
+  const artistRiderFiles = documents?.artistRiderFiles ?? EMPTY_ARTIST_RIDER_FILES;
 
   const handleJobDocumentView = useCallback(
     async (docEntry: JobDocumentEntry) => {
@@ -52,11 +99,11 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
         if (signedUrl) {
           window.open(signedUrl, "_blank", "noopener");
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error viewing document:", error);
         toast({
           title: "No se puede abrir el documento",
-          description: error.message || "Por favor, inténtalo de nuevo en unos momentos.",
+          description: getErrorMessage(error, "Por favor, inténtalo de nuevo en unos momentos."),
           variant: "destructive",
         });
       }
@@ -69,11 +116,11 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
       try {
         const blob = await downloadJobDocumentBlob(docEntry);
         downloadBlobInBrowser(blob, docEntry.file_name);
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error downloading document:", error);
         toast({
           title: "Descarga fallida",
-          description: error.message || "No se pudo descargar ese archivo.",
+          description: getErrorMessage(error, "No se pudo descargar ese archivo."),
           variant: "destructive",
         });
       }
@@ -88,11 +135,11 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
         if (signedUrl) {
           window.open(signedUrl, "_blank", "noopener");
         }
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error viewing rider:", error);
         toast({
           title: "No se puede abrir el rider",
-          description: error.message || "Por favor, inténtalo de nuevo más tarde.",
+          description: getErrorMessage(error, "Por favor, inténtalo de nuevo más tarde."),
           variant: "destructive",
         });
       }
@@ -105,11 +152,11 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
       try {
         const blob = await downloadRiderBlob(file);
         downloadBlobInBrowser(blob, file.file_name);
-      } catch (error: any) {
+      } catch (error) {
         console.error("Error downloading rider:", error);
         toast({
           title: "Descarga fallida",
-          description: error.message || "No se pudo descargar ese archivo de rider.",
+          description: getErrorMessage(error, "No se pudo descargar ese archivo de rider."),
           variant: "destructive",
         });
       }
@@ -120,29 +167,18 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
   const handleDocumentUpload = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (!file || !jobId) return;
+      if (!file || !jobId) {
+        event.target.value = "";
+        return;
+      }
 
-      setIsUploadingDocument(true);
       try {
-        await uploadJobDocument({ file, jobId });
-        toast({
-          title: "Éxito",
-          description: "Documento subido exitosamente",
-        });
-        fetchDocuments();
-      } catch (error: any) {
-        console.error("Error uploading document:", error);
-        toast({
-          title: "Error al subir",
-          description: error.message || "Error al subir documento",
-          variant: "destructive",
-        });
+        await uploadDocument(file);
       } finally {
-        setIsUploadingDocument(false);
         event.target.value = "";
       }
     },
-    [fetchDocuments, jobId, toast],
+    [jobId, uploadDocument],
   );
 
   const groupedRiderFiles = useMemo(() => groupFestivalRiderFiles(artistRiderFiles), [artistRiderFiles]);
