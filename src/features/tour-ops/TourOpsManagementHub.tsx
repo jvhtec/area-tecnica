@@ -4,18 +4,24 @@ import { es } from "date-fns/locale";
 import { formatInTimeZone } from "date-fns-tz";
 import {
   AlertTriangle,
+  Bed,
   Calendar,
   CheckCircle2,
+  Copy,
   Download,
+  ExternalLink,
   FileText,
+  Hotel,
   Loader2,
   Map as MapIcon,
   MapPin,
   Plus,
   Route,
   Save,
+  Send,
   Share2,
   Trash2,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +36,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
+import { TourContactsManager } from "@/components/tours/scheduling/TourContactsManager";
 import { TourMapViewMapbox } from "@/components/tours/scheduling/TourMapViewMapbox";
 import { TourSettingsPanel } from "@/components/tours/scheduling/TourSettingsPanel";
 import { cn } from "@/lib/utils";
@@ -38,8 +45,10 @@ import { MADRID_TIMEZONE, utcToLocalInput } from "@/utils/timezoneUtils";
 import type {
   TourGuestLink,
   TourOpsAllowedSections,
+  TourOpsAccommodation,
   TourOpsDate,
   TourOpsModel,
+  TourOpsRoomAssignment,
   TourOpsTimelineEvent,
   TourOpsTravelSegment,
 } from "@/features/tour-ops/types";
@@ -90,6 +99,14 @@ const finiteNumberOrNull = (value: string) => {
 
 const sourceLabel = (source?: string) =>
   source === "hoja" ? "hoja de ruta" : source === "legacy" ? "legacy" : "ops";
+
+const guestLinkUrl = (link: Pick<TourGuestLink, "token">) =>
+  link.token && typeof window !== "undefined" ? `${window.location.origin}/tour-share/${link.token}` : null;
+
+const roomOccupants = (room: TourOpsRoomAssignment) =>
+  [room.staffMember1Name, room.staffMember2Name, room.staffMember1Id, room.staffMember2Id]
+    .filter(Boolean)
+    .join(" / ");
 
 const DateList = ({
   dates,
@@ -154,7 +171,7 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
             </div>
             <Button variant="outline" onClick={() => generateTourOpsPdf(model, "management", { dateId: date.id })}>
               <Download className="h-4 w-4 mr-2" />
-              Hoja diaria
+              PDF hoja diaria
             </Button>
           </div>
         </CardHeader>
@@ -266,6 +283,15 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
                     <Badge variant="outline">{sourceLabel(hotel.source)}</Badge>
                   </div>
                   <div className="text-muted-foreground">{hotel.checkInDate} {"->"} {hotel.checkOutDate}</div>
+                  {hotel.roomAllocation.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {hotel.roomAllocation.map((room, index) => (
+                        <div key={room.id ?? index} className="rounded bg-muted/50 px-2 py-1 text-xs">
+                          {[room.roomType || "habitacion", room.roomNumber, roomOccupants(room)].filter(Boolean).join(" · ")}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )) : <div className="text-sm text-muted-foreground">Sin alojamiento definido.</div>}
             </div>
@@ -556,6 +582,207 @@ const TravelDialog = ({
   );
 };
 
+const HotelDialog = ({
+  model,
+  open,
+  onOpenChange,
+  editingHotel,
+  selectedDate,
+  onSave,
+}: {
+  model: TourOpsModel;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  editingHotel: TourOpsAccommodation | null;
+  selectedDate: TourOpsDate | null;
+  onSave: (input: Partial<TourOpsAccommodation> & { tourId: string }) => Promise<void>;
+}) => {
+  const [form, setForm] = useState({
+    tourDateId: "",
+    hotelName: "",
+    hotelAddress: "",
+    checkInDate: "",
+    checkOutDate: "",
+    confirmationNumber: "",
+    roomsBooked: "",
+    notes: "",
+  });
+  const [rooms, setRooms] = useState<TourOpsRoomAssignment[]>([]);
+
+  useEffect(() => {
+    setForm({
+      tourDateId: editingHotel?.tourDateId ?? selectedDate?.id ?? model.dates[0]?.id ?? "",
+      hotelName: editingHotel?.hotelName ?? "",
+      hotelAddress: editingHotel?.hotelAddress ?? "",
+      checkInDate: editingHotel?.checkInDate ?? selectedDate?.date?.slice(0, 10) ?? "",
+      checkOutDate: editingHotel?.checkOutDate ?? selectedDate?.date?.slice(0, 10) ?? "",
+      confirmationNumber: editingHotel?.confirmationNumber ?? "",
+      roomsBooked: editingHotel?.roomsBooked != null ? String(editingHotel.roomsBooked) : "",
+      notes: editingHotel?.notes ?? "",
+    });
+    setRooms(editingHotel?.roomAllocation ?? []);
+  }, [editingHotel, model.dates, open, selectedDate]);
+
+  const updateRoom = (index: number, patch: Partial<TourOpsRoomAssignment>) => {
+    setRooms((current) => current.map((room, roomIndex) => (roomIndex === index ? { ...room, ...patch } : room)));
+  };
+
+  const addRoom = () => {
+    setRooms((current) => [
+      ...current,
+      {
+        roomType: "single",
+        roomNumber: "",
+        staffMember1Id: "",
+        staffMember2Id: "",
+        staffMember1Name: "",
+        staffMember2Name: "",
+      },
+    ]);
+  };
+
+  const removeRoom = (index: number) => {
+    setRooms((current) => current.filter((_, roomIndex) => roomIndex !== index));
+  };
+
+  const handleSubmit = async () => {
+    if (!form.hotelName.trim() || !form.checkInDate || !form.checkOutDate) {
+      toast.error("Hotel, check-in y check-out son obligatorios");
+      return;
+    }
+
+    await onSave({
+      id: editingHotel?.id,
+      source: editingHotel?.source,
+      tourId: model.tour.id,
+      tourDateId: form.tourDateId || null,
+      hojaDeRutaId: editingHotel?.hojaDeRutaId,
+      locationId: editingHotel?.locationId ?? null,
+      hotelName: form.hotelName.trim(),
+      hotelAddress: form.hotelAddress || null,
+      latitude: editingHotel?.latitude ?? null,
+      longitude: editingHotel?.longitude ?? null,
+      checkInDate: form.checkInDate,
+      checkOutDate: form.checkOutDate,
+      confirmationNumber: form.confirmationNumber || null,
+      roomAllocation: rooms,
+      roomsBooked: finiteNumberOrNull(form.roomsBooked) ?? rooms.length,
+      notes: form.notes || null,
+    });
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{editingHotel ? "Editar hotel" : "Nuevo hotel"}</DialogTitle>
+          <DialogDescription>
+            Los hoteles se guardan en operaciones y se sincronizan con hoja de ruta cuando la fecha tenga hoja vinculada.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Fecha</Label>
+            <Select value={form.tourDateId || "none"} onValueChange={(tourDateId) => setForm({ ...form, tourDateId: tourDateId === "none" ? "" : tourDateId })}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Tour general</SelectItem>
+                {model.dates.map((date) => <SelectItem key={date.id} value={date.id}>{formatDate(date.date)} - {date.venueName || "Pendiente"}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <Label>Hotel</Label>
+              <Input value={form.hotelName} onChange={(event) => setForm({ ...form, hotelName: event.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Confirmacion</Label>
+              <Input value={form.confirmationNumber} onChange={(event) => setForm({ ...form, confirmationNumber: event.target.value })} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Direccion</Label>
+            <Input value={form.hotelAddress} onChange={(event) => setForm({ ...form, hotelAddress: event.target.value })} />
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="space-y-2">
+              <Label>Check-in</Label>
+              <Input type="date" value={form.checkInDate} onChange={(event) => setForm({ ...form, checkInDate: event.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Check-out</Label>
+              <Input type="date" value={form.checkOutDate} onChange={(event) => setForm({ ...form, checkOutDate: event.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Habitaciones</Label>
+              <Input inputMode="numeric" value={form.roomsBooked} onChange={(event) => setForm({ ...form, roomsBooked: event.target.value })} />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label>Notas</Label>
+            <Textarea value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+          </div>
+          <div className="space-y-3 rounded-lg border p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <Label>Rooming</Label>
+                <p className="text-xs text-muted-foreground">Habitaciones y ocupantes sincronizados con hoja de ruta.</p>
+              </div>
+              <Button type="button" size="sm" variant="outline" onClick={addRoom}>
+                <Plus className="h-4 w-4 mr-1" />
+                Habitacion
+              </Button>
+            </div>
+            {rooms.length ? (
+              <div className="space-y-3">
+                {rooms.map((room, index) => (
+                  <div key={room.id ?? index} className="grid gap-3 rounded-md bg-muted/40 p-3 md:grid-cols-[120px_120px_1fr_1fr_auto]">
+                    <Select value={room.roomType || "single"} onValueChange={(roomType) => updateRoom(index, { roomType })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="single">Individual</SelectItem>
+                        <SelectItem value="double">Doble</SelectItem>
+                        <SelectItem value="twin">Twin</SelectItem>
+                        <SelectItem value="triple">Triple</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      value={room.roomNumber ?? ""}
+                      onChange={(event) => updateRoom(index, { roomNumber: event.target.value })}
+                      placeholder="Hab."
+                    />
+                    <Input
+                      value={room.staffMember1Name || room.staffMember1Id || ""}
+                      onChange={(event) => updateRoom(index, { staffMember1Name: event.target.value, staffMember1Id: event.target.value, rawStaffMember1Id: null })}
+                      placeholder="Ocupante 1"
+                    />
+                    <Input
+                      value={room.staffMember2Name || room.staffMember2Id || ""}
+                      onChange={(event) => updateRoom(index, { staffMember2Name: event.target.value, staffMember2Id: event.target.value, rawStaffMember2Id: null })}
+                      placeholder="Ocupante 2"
+                    />
+                    <Button type="button" size="icon" variant="ghost" className="text-destructive" onClick={() => removeRoom(index)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-muted-foreground">Sin habitaciones definidas.</div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+            <Button onClick={handleSubmit}><Save className="h-4 w-4 mr-2" />Guardar</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const SharePanel = ({ model }: { model: TourOpsModel }) => {
   const { data: links = [], isLoading } = useTourGuestLinks(model.tour.id);
   const { createLink, revokeLink } = useTourGuestLinkMutations(model.tour.id);
@@ -585,6 +812,20 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
         : "No se pudo crear el link externo";
       toast.error(message);
     }
+  };
+
+  const copyLink = async (url: string) => {
+    await navigator.clipboard?.writeText(url);
+    toast.success("Link copiado");
+  };
+
+  const shareLink = async (link: TourGuestLink, url: string) => {
+    const title = `${model.tour.name} - ${link.label}`;
+    if (navigator.share) {
+      await navigator.share({ title, url }).catch(() => undefined);
+      return;
+    }
+    window.open(`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`, "_blank");
   };
 
   return (
@@ -629,24 +870,52 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
           ) : links.length ? (
             <div className="space-y-2">
               {links.map((link: TourGuestLink) => (
-                <div key={link.id} className="flex flex-col gap-2 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
-                  <div>
+                <div key={link.id} className="flex flex-col gap-3 rounded-lg border p-3">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div>
                     <div className="font-medium">{link.label}</div>
                     <div className="text-xs text-muted-foreground">
                       {link.expires_at ? `Caduca ${format(new Date(link.expires_at), "d MMM yyyy HH:mm", { locale: es })}` : "Sin caducidad"}
                     </div>
                     {link.revoked_at && <Badge variant="destructive" className="mt-1">Revocado</Badge>}
+                    {!link.token && !link.revoked_at && (
+                      <div className="mt-1 text-xs text-amber-600">
+                        Link antiguo sin token recuperable. Revocalo y crea uno nuevo para copiarlo.
+                      </div>
+                    )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {guestLinkUrl(link) && !link.revoked_at && (
+                        <>
+                          <Button size="sm" variant="outline" onClick={() => window.open(guestLinkUrl(link) ?? "", "_blank")}>
+                            <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                            Ver
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => copyLink(guestLinkUrl(link) ?? "")}>
+                            <Copy className="h-3.5 w-3.5 mr-1" />
+                            Copiar
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => shareLink(link, guestLinkUrl(link) ?? "")}>
+                            <Send className="h-3.5 w-3.5 mr-1" />
+                            Enviar
+                          </Button>
+                        </>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={Boolean(link.revoked_at)}
+                        onClick={() => revokeLink.mutate(link)}
+                      >
+                        Revocar
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={Boolean(link.revoked_at)}
-                      onClick={() => revokeLink.mutate(link)}
-                    >
-                      Revocar
-                    </Button>
-                  </div>
+                  {guestLinkUrl(link) && !link.revoked_at && (
+                    <div className="rounded-md bg-muted/50 px-2 py-1 font-mono text-xs break-all">
+                      {guestLinkUrl(link)}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -800,6 +1069,8 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   const [editingEvent, setEditingEvent] = useState<TourOpsTimelineEvent | null>(null);
   const [travelDialogOpen, setTravelDialogOpen] = useState(false);
   const [editingSegment, setEditingSegment] = useState<TourOpsTravelSegment | null>(null);
+  const [hotelDialogOpen, setHotelDialogOpen] = useState(false);
+  const [editingHotel, setEditingHotel] = useState<TourOpsAccommodation | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
 
   useEffect(() => {
@@ -811,6 +1082,21 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   const selectedDate = useMemo(
     () => model?.dates.find((date) => date.id === selectedDateId) ?? null,
     [model, selectedDateId],
+  );
+
+  const contactsTourData = useMemo(
+    () => ({
+      tour_contacts: (model?.tour.contacts ?? []).map((contact) => ({
+        id: contact.id,
+        name: contact.name,
+        role: contact.role ?? "",
+        phone: contact.phone ?? "",
+        email: contact.email ?? "",
+        isPrimary: Boolean(contact.isPrimary),
+        notes: contact.notes ?? "",
+      })),
+    }),
+    [model?.tour.contacts],
   );
 
   if (isLoading) {
@@ -829,6 +1115,11 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   const saveTravel = async (input: Partial<TourOpsTravelSegment> & { tourId: string }) => {
     await mutations.saveTravel.mutateAsync(input);
     toast.success("Viaje guardado");
+  };
+
+  const saveHotel = async (input: Partial<TourOpsAccommodation> & { tourId: string }) => {
+    await mutations.saveHotel.mutateAsync(input);
+    toast.success("Hotel guardado");
   };
 
   const syncHojaOps = async () => {
@@ -891,6 +1182,9 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
           <TabsTrigger value="timeline">Cronograma</TabsTrigger>
           <TabsTrigger value="map"><MapIcon className="h-4 w-4 mr-1" />Mapa</TabsTrigger>
           <TabsTrigger value="travel">Viajes</TabsTrigger>
+          <TabsTrigger value="hotels"><Hotel className="h-4 w-4 mr-1" />Hoteles</TabsTrigger>
+          <TabsTrigger value="rooming"><Bed className="h-4 w-4 mr-1" />Rooming</TabsTrigger>
+          <TabsTrigger value="contacts"><Users className="h-4 w-4 mr-1" />Contactos</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
           <TabsTrigger value="share">Externo</TabsTrigger>
           <TabsTrigger value="health">Avisos</TabsTrigger>
@@ -1001,6 +1295,124 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
           </Card>
         </TabsContent>
 
+        <TabsContent value="hotels" className="m-0">
+          <Card>
+            <CardHeader className="flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <CardTitle>Hoteles y alojamientos</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Incluye alojamientos de operaciones y hoja de ruta. Los cambios se sincronizan en ambos sentidos.
+                </p>
+              </div>
+              <Button onClick={() => { setEditingHotel(null); setHotelDialogOpen(true); }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Hotel
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {model.accommodations.length ? model.accommodations.map((hotel) => {
+                const tourDate = model.dates.find((date) => date.id === hotel.tourDateId);
+                return (
+                  <div key={`${hotel.source}-${hotel.id}`} className="rounded-lg border p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="font-medium">{hotel.hotelName}</div>
+                          <Badge variant="outline">{sourceLabel(hotel.source)}</Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {[tourDate ? formatDate(tourDate.date) : null, hotel.checkInDate, hotel.checkOutDate].filter(Boolean).join(" · ")}
+                        </div>
+                        {hotel.hotelAddress && <div className="mt-1 text-sm">{hotel.hotelAddress}</div>}
+                        {hotel.confirmationNumber && <div className="mt-1 text-xs text-muted-foreground">Confirmacion: {hotel.confirmationNumber}</div>}
+                        {hotel.roomsBooked != null && <div className="mt-1 text-xs text-muted-foreground">Habitaciones: {hotel.roomsBooked}</div>}
+                        {hotel.notes && <div className="mt-2 text-sm">{hotel.notes}</div>}
+                        {hotel.roomAllocation.length > 0 && (
+                          <div className="mt-3 grid gap-2 md:grid-cols-2">
+                            {hotel.roomAllocation.map((room, index) => (
+                              <div key={room.id ?? index} className="rounded-md bg-muted/50 px-3 py-2 text-xs">
+                                <div className="font-medium">
+                                  {[room.roomType || "Habitacion", room.roomNumber].filter(Boolean).join(" ")}
+                                </div>
+                                <div className="text-muted-foreground">{roomOccupants(room) || "Sin ocupantes"}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => { setEditingHotel(hotel); setHotelDialogOpen(true); }}>Editar</Button>
+                        {!hotel.id.startsWith("hotel-info:") && (
+                          <Button size="sm" variant="ghost" className="text-destructive" onClick={() => mutations.removeHotel.mutate({ id: hotel.id, source: hotel.source })}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }) : <div className="text-sm text-muted-foreground">Sin alojamientos definidos.</div>}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="rooming" className="m-0">
+          <Card>
+            <CardHeader>
+              <CardTitle>Rooming</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Habitaciones por fecha y hotel desde operaciones y hoja de ruta.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {model.accommodations.some((hotel) => hotel.roomAllocation.length > 0) ? (
+                model.accommodations
+                  .filter((hotel) => hotel.roomAllocation.length > 0)
+                  .map((hotel) => {
+                    const tourDate = model.dates.find((date) => date.id === hotel.tourDateId);
+                    return (
+                      <div key={`rooming-${hotel.source}-${hotel.id}`} className="rounded-lg border p-4">
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="font-medium">{hotel.hotelName}</div>
+                              <Badge variant="outline">{sourceLabel(hotel.source)}</Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground">
+                              {[tourDate ? formatDate(tourDate.date) : null, hotel.checkInDate, hotel.checkOutDate].filter(Boolean).join(" · ")}
+                            </div>
+                          </div>
+                          <Button size="sm" variant="outline" onClick={() => { setEditingHotel(hotel); setHotelDialogOpen(true); }}>Editar rooming</Button>
+                        </div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                          {hotel.roomAllocation.map((room, index) => (
+                            <div key={room.id ?? index} className="rounded-md bg-muted/50 p-3 text-sm">
+                              <div className="font-medium">
+                                {[room.roomType || "Habitacion", room.roomNumber].filter(Boolean).join(" ")}
+                              </div>
+                              <div className="text-muted-foreground">{roomOccupants(room) || "Sin ocupantes"}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })
+              ) : (
+                <div className="text-sm text-muted-foreground">Sin rooming definido.</div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="contacts" className="m-0">
+          <TourContactsManager
+            tourId={model.tour.id}
+            tourData={contactsTourData}
+            canEdit
+            onSave={() => void refetch()}
+          />
+        </TabsContent>
+
         <TabsContent value="documents" className="m-0">
           <Card>
             <CardHeader className="flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -1071,6 +1483,14 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
         onOpenChange={setTravelDialogOpen}
         editingSegment={editingSegment}
         onSave={saveTravel}
+      />
+      <HotelDialog
+        model={model}
+        open={hotelDialogOpen}
+        onOpenChange={setHotelDialogOpen}
+        editingHotel={editingHotel}
+        selectedDate={selectedDate}
+        onSave={saveHotel}
       />
       <TourDocumentsDialog open={docsOpen} onOpenChange={setDocsOpen} tourId={tourId} tourName={tourName} />
     </div>

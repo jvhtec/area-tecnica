@@ -107,6 +107,18 @@ export interface TourOpsTravelSegment {
   sourceTable?: "tour_travel_segments" | "hoja_de_ruta_travel_arrangements" | "hoja_de_ruta_transport" | "travel_plan";
 }
 
+export interface TourOpsRoomAssignment {
+  id?: string | null;
+  roomType: string | null;
+  roomNumber: string | null;
+  staffMember1Id?: string | null;
+  staffMember2Id?: string | null;
+  staffMember1Name?: string | null;
+  staffMember2Name?: string | null;
+  rawStaffMember1Id?: string | null;
+  rawStaffMember2Id?: string | null;
+}
+
 export interface TourOpsAccommodation {
   id: string;
   tourDateId: string | null;
@@ -119,7 +131,7 @@ export interface TourOpsAccommodation {
   checkInDate: string | null;
   checkOutDate: string | null;
   confirmationNumber: string | null;
-  roomAllocation: unknown[];
+  roomAllocation: TourOpsRoomAssignment[];
   roomsBooked: number | null;
   notes: string | null;
   source: "normalized" | "hoja";

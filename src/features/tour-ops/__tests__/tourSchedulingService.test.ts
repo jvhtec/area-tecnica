@@ -69,11 +69,12 @@ const rawPayload = {
   hoja_de_ruta: [
     {
       id: "hdr-1",
-      tour_date_id: "date-1",
+      tour_date_id: null,
       job_id: "job-1",
       venue_name: "Barcelona Arena",
       program_schedule_json: [{ label: "Dia 1", rows: [{ time: "10:00", item: "Load in", dept: "sound" }] }],
       weather_data: [{ condition: "sun" }],
+      hotel_info: { hotel_name: "Legacy Hoja Hotel", address: "Legacy address", check_in: "2026-06-01", check_out: "2026-06-02" },
     },
   ],
   hoja_travel_arrangements: [
@@ -127,7 +128,7 @@ describe("tour ops normalization", () => {
     expect(model.dates[0].program[0].rows[0].item).toBe("Load in");
     expect(model.dates[0].crew.map((member) => member.name)).toContain("Ada Lovelace");
     expect(model.dates[0].crew.filter((member) => member.name === "Ada Lovelace")).toHaveLength(1);
-    expect(model.dates[0].accommodations.map((hotel) => hotel.hotelName)).toEqual(expect.arrayContaining(["Hotel One", "Hoja Hotel"]));
+    expect(model.dates[0].accommodations.map((hotel) => hotel.hotelName)).toEqual(expect.arrayContaining(["Hotel One", "Hoja Hotel", "Legacy Hoja Hotel"]));
     expect(model.travelSegments).toEqual(expect.arrayContaining([
       expect.objectContaining({
         source: "legacy",

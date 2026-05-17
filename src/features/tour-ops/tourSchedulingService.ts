@@ -14,6 +14,7 @@ import type {
   TourOpsModel,
   TourOpsProgramDay,
   TourOpsProjection,
+  TourOpsRoomAssignment,
   TourOpsTimelineEvent,
   TourOpsTravelSegment,
 } from "@/features/tour-ops/types";
@@ -77,6 +78,9 @@ const toNumber = (value: unknown): number | null => {
 
 const textOrNull = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value : null;
+
+const displayName = (...parts: unknown[]) =>
+  parts.map(textOrNull).filter(Boolean).join(" ").trim() || null;
 
 const objectOrEmpty = (value: unknown): Record<string, unknown> => (isRecord(value) ? value : {});
 
@@ -281,26 +285,117 @@ export const normalizeTravelSegment = (
   };
 };
 
-const normalizeAccommodation = (row: AnyRecord): TourOpsAccommodation => ({
-  id: textOrNull(row.id) ?? crypto.randomUUID(),
-  tourDateId: textOrNull(row.tour_date_id),
-  hojaDeRutaId: textOrNull(row.hoja_de_ruta_id),
-  locationId: textOrNull(row.location_id),
-  hotelName: textOrNull(row.hotel_name) ?? "Hotel",
-  hotelAddress: textOrNull(row.hotel_address ?? row.address),
-  latitude: toNumber(row.latitude),
-  longitude: toNumber(row.longitude),
-  checkInDate: textOrNull(row.check_in_date),
-  checkOutDate: textOrNull(row.check_out_date),
-  confirmationNumber: textOrNull(row.confirmation_number),
-  roomAllocation: asArray(row.room_allocation ?? row.hoja_de_ruta_room_assignments),
-  roomsBooked: toNumber(row.rooms_booked) ?? (asArray(row.hoja_de_ruta_room_assignments).length || null),
-  notes: textOrNull(row.notes),
-  source: row.source === "hoja" ? "hoja" : "normalized",
-});
+type HojaStaffReference = {
+  id: string | null;
+  technicianId: string | null;
+  index: string;
+  name: string | null;
+};
 
-const normalizeHojaAccommodation = (row: AnyRecord, hojaById: Map<string, AnyRecord>): TourOpsAccommodation => {
+const buildHojaStaffLookup = (rows: AnyRecord[]) => {
+  const grouped = new Map<string, HojaStaffReference[]>();
+  rows.forEach((row) => {
+    const hojaId = textOrNull(row.hoja_de_ruta_id);
+    if (!hojaId) return;
+    const members = grouped.get(hojaId) ?? [];
+    members.push({
+      id: textOrNull(row.id),
+      technicianId: textOrNull(row.technician_id),
+      index: String(members.length),
+      name: displayName(row.name, row.surname1, row.surname2) ?? textOrNull(row.position),
+    });
+    grouped.set(hojaId, members);
+  });
+
+  const lookup = new Map<string, Map<string, HojaStaffReference>>();
+  grouped.forEach((members, hojaId) => {
+    const byKey = new Map<string, HojaStaffReference>();
+    members.forEach((member) => {
+      [member.index, member.id, member.technicianId].filter(Boolean).forEach((key) => {
+        byKey.set(key as string, member);
+      });
+    });
+    lookup.set(hojaId, byKey);
+  });
+  return lookup;
+};
+
+const normalizeRoomAssignment = (
+  row: AnyRecord,
+  staffLookup?: Map<string, HojaStaffReference>,
+): TourOpsRoomAssignment => {
+  const rawStaffMember1Id = textOrNull(row.staff_member1_id ?? row.staffMember1Id ?? row.rawStaffMember1Id);
+  const rawStaffMember2Id = textOrNull(row.staff_member2_id ?? row.staffMember2Id ?? row.rawStaffMember2Id);
+  const staff1 = rawStaffMember1Id ? staffLookup?.get(rawStaffMember1Id) : null;
+  const staff2 = rawStaffMember2Id ? staffLookup?.get(rawStaffMember2Id) : null;
+
+  return {
+    id: textOrNull(row.id),
+    roomType: textOrNull(row.room_type ?? row.roomType),
+    roomNumber: textOrNull(row.room_number ?? row.roomNumber),
+    staffMember1Id: staff1?.technicianId ?? staff1?.id ?? rawStaffMember1Id,
+    staffMember2Id: staff2?.technicianId ?? staff2?.id ?? rawStaffMember2Id,
+    staffMember1Name: staff1?.name ?? textOrNull(row.staff_member1_name ?? row.staffMember1Name ?? row.occupant1Name),
+    staffMember2Name: staff2?.name ?? textOrNull(row.staff_member2_name ?? row.staffMember2Name ?? row.occupant2Name),
+    rawStaffMember1Id,
+    rawStaffMember2Id,
+  };
+};
+
+const normalizeRoomAssignments = (value: unknown, staffLookup?: Map<string, HojaStaffReference>) =>
+  asArray<AnyRecord>(value).map((row) => normalizeRoomAssignment(row, staffLookup));
+
+const serializeRoomAllocation = (rooms: TourOpsRoomAssignment[] | undefined | null) =>
+  asArray<TourOpsRoomAssignment>(rooms)
+    .filter((room) =>
+      room.roomType ||
+      room.roomNumber ||
+      room.staffMember1Id ||
+      room.staffMember2Id ||
+      room.staffMember1Name ||
+      room.staffMember2Name
+    )
+    .map((room) => ({
+      id: room.id ?? undefined,
+      room_type: room.roomType || "single",
+      room_number: room.roomNumber || "",
+      staff_member1_id: room.staffMember1Id || room.rawStaffMember1Id || null,
+      staff_member2_id: room.staffMember2Id || room.rawStaffMember2Id || null,
+      staff_member1_name: room.staffMember1Name || null,
+      staff_member2_name: room.staffMember2Name || null,
+    }));
+
+const normalizeAccommodation = (
+  row: AnyRecord,
+  staffLookup?: Map<string, HojaStaffReference>,
+): TourOpsAccommodation => {
+  const roomAllocation = normalizeRoomAssignments(row.room_allocation ?? row.hoja_de_ruta_room_assignments, staffLookup);
+  return {
+    id: textOrNull(row.id) ?? crypto.randomUUID(),
+    tourDateId: textOrNull(row.tour_date_id),
+    hojaDeRutaId: textOrNull(row.hoja_de_ruta_id),
+    locationId: textOrNull(row.location_id),
+    hotelName: textOrNull(row.hotel_name) ?? "Hotel",
+    hotelAddress: textOrNull(row.hotel_address ?? row.address),
+    latitude: toNumber(row.latitude),
+    longitude: toNumber(row.longitude),
+    checkInDate: textOrNull(row.check_in_date),
+    checkOutDate: textOrNull(row.check_out_date),
+    confirmationNumber: textOrNull(row.confirmation_number),
+    roomAllocation,
+    roomsBooked: toNumber(row.rooms_booked) ?? (roomAllocation.length || null),
+    notes: textOrNull(row.notes),
+    source: row.source === "hoja" ? "hoja" : "normalized",
+  };
+};
+
+const normalizeHojaAccommodation = (
+  row: AnyRecord,
+  hojaById: Map<string, AnyRecord>,
+  hojaStaffLookupById: Map<string, Map<string, HojaStaffReference>>,
+): TourOpsAccommodation => {
   const hoja = hojaById.get(textOrNull(row.hoja_de_ruta_id) ?? "");
+  const hojaId = textOrNull(row.hoja_de_ruta_id) ?? "";
   return normalizeAccommodation({
     ...row,
     source: "hoja",
@@ -309,7 +404,61 @@ const normalizeHojaAccommodation = (row: AnyRecord, hojaById: Map<string, AnyRec
     check_in_date: row.check_in,
     check_out_date: row.check_out,
     room_allocation: row.hoja_de_ruta_room_assignments,
+  }, hojaStaffLookupById.get(hojaId));
+};
+
+const normalizeHojaHotelInfo = (hoja: AnyRecord): TourOpsAccommodation[] => {
+  const hojaId = textOrNull(hoja.id);
+  const hotelInfo = hoja.hotel_info;
+  if (!hojaId || hotelInfo == null) return [];
+
+  const fromObject = (value: AnyRecord, index: number) => normalizeAccommodation({
+    id: `hotel-info:${hojaId}:${index}`,
+    source: "hoja",
+    hoja_de_ruta_id: hojaId,
+    tour_date_id: textOrNull(hoja.tour_date_id),
+    hotel_name:
+      value.hotel_name ??
+      value.hotelName ??
+      value.name ??
+      value.hotel ??
+      "Alojamiento hoja de ruta",
+    hotel_address: value.hotel_address ?? value.address,
+    check_in_date: value.check_in_date ?? value.check_in ?? value.checkIn,
+    check_out_date: value.check_out_date ?? value.check_out ?? value.checkOut,
+    confirmation_number: value.confirmation_number ?? value.confirmation,
+    room_allocation: value.room_allocation ?? value.rooms,
+    rooms_booked: value.rooms_booked ?? asArray(value.rooms).length,
+    notes: value.notes,
+    latitude: value.latitude ?? value.coordinates?.lat,
+    longitude: value.longitude ?? value.coordinates?.lng,
   });
+
+  if (Array.isArray(hotelInfo)) {
+    return hotelInfo.filter(isRecord).map(fromObject);
+  }
+
+  if (isRecord(hotelInfo)) {
+    const nested = hotelInfo.accommodations ?? hotelInfo.hotels ?? hotelInfo.rooms;
+    if (Array.isArray(nested)) {
+      return nested.filter(isRecord).map(fromObject);
+    }
+    return [fromObject(hotelInfo, 0)];
+  }
+
+  const notes = textOrNull(hotelInfo);
+  return notes
+    ? [normalizeAccommodation({
+        id: `hotel-info:${hojaId}:0`,
+        source: "hoja",
+        hoja_de_ruta_id: hojaId,
+        tour_date_id: textOrNull(hoja.tour_date_id),
+        hotel_name: "Alojamiento hoja de ruta",
+        check_in_date: textOrNull(hoja.event_dates) ?? textOrNull(hoja.date),
+        check_out_date: textOrNull(hoja.event_dates) ?? textOrNull(hoja.date),
+        notes,
+      })]
+    : [];
 };
 
 const normalizeHojaTravelArrangement = (
@@ -544,7 +693,10 @@ export function normalizeTourOpsModel(
 
   const jobs = asArray<AnyRecord>(raw.jobs);
   const jobByTourDate = new Map<string, AnyRecord>();
+  const jobById = new Map<string, AnyRecord>();
   jobs.forEach((job) => {
+    const jobId = textOrNull(job.id);
+    if (jobId) jobById.set(jobId, job);
     const tourDateId = textOrNull(job.tour_date_id);
     if (tourDateId) jobByTourDate.set(tourDateId, job);
   });
@@ -553,8 +705,13 @@ export function normalizeTourOpsModel(
   const hojaByDate = new Map<string, AnyRecord>();
   const hojaById = new Map<string, AnyRecord>();
   hojas.forEach((hoja) => {
-    const enrichedHoja = { ...hoja, tour_id: textOrNull(hoja.tour_id) ?? textOrNull(tour.id) };
-    const tourDateId = textOrNull(hoja.tour_date_id);
+    const linkedJob = jobById.get(textOrNull(hoja.job_id) ?? "");
+    const tourDateId = textOrNull(hoja.tour_date_id) ?? textOrNull(linkedJob?.tour_date_id);
+    const enrichedHoja = {
+      ...hoja,
+      tour_date_id: tourDateId,
+      tour_id: textOrNull(hoja.tour_id) ?? textOrNull(tour.id),
+    };
     if (tourDateId) hojaByDate.set(tourDateId, enrichedHoja);
     const hojaId = textOrNull(hoja.id);
     if (hojaId) hojaById.set(hojaId, enrichedHoja);
@@ -581,9 +738,13 @@ export function normalizeTourOpsModel(
   const hojaTransport = asArray<AnyRecord>(raw.hoja_transport)
     .map((row) => normalizeHojaTransport(row, hojaById, dateById, locationById));
   const travelSegments = mergeTravelSegments([...normalizedTravel, ...hojaTravel, ...hojaTransport, ...legacyTravel]);
+  const hojaStaffLookupById = buildHojaStaffLookup(asArray<AnyRecord>(raw.hoja_staff));
   const normalizedAccommodations = asArray<AnyRecord>(raw.accommodations).map((row) => normalizeAccommodation({ ...row, source: "normalized" }));
-  const hojaAccommodations = asArray<AnyRecord>(raw.hoja_accommodations).map((row) => normalizeHojaAccommodation(row, hojaById));
-  const accommodations = mergeAccommodations([...normalizedAccommodations, ...hojaAccommodations]);
+  const hojaAccommodations = asArray<AnyRecord>(raw.hoja_accommodations).map((row) =>
+    normalizeHojaAccommodation(row, hojaById, hojaStaffLookupById)
+  );
+  const hojaInfoAccommodations = Array.from(hojaById.values()).flatMap(normalizeHojaHotelInfo);
+  const accommodations = mergeAccommodations([...normalizedAccommodations, ...hojaAccommodations, ...hojaInfoAccommodations]);
 
   const allDocuments = asArray<AnyRecord>(raw.documents).map(normalizeDocument);
   const documents = allDocuments.filter((document) => {
@@ -750,7 +911,7 @@ export async function fetchTourOpsModel(
     dateIds.length
       ? client
           .from("hoja_de_ruta")
-          .select("id, job_id, tour_date_id, program_schedule_json, logistics_info, venue_name, venue_address, weather_data, local_contacts, restaurants_info")
+          .select("id, job_id, tour_date_id, program_schedule_json, logistics_info, venue_name, venue_address, weather_data, hotel_info, local_contacts, restaurants_info")
           .in("tour_date_id", dateIds)
       : Promise.resolve({ data: [], error: null }),
     client
@@ -799,11 +960,27 @@ export async function fetchTourOpsModel(
   const firstError = results.find((result) => result.error)?.error;
   if (firstError) throw firstError;
 
-  const hojaIds = asArray<AnyRecord>(hojaResult.data).map((hoja) => hoja.id).filter(Boolean);
+  const jobIds = asArray<AnyRecord>(jobsResult.data).map((job) => job.id).filter(Boolean);
+  const hojaByJobResult = jobIds.length
+    ? await client
+        .from("hoja_de_ruta")
+        .select("id, job_id, tour_date_id, program_schedule_json, logistics_info, venue_name, venue_address, weather_data, hotel_info, local_contacts, restaurants_info")
+        .in("job_id", jobIds)
+    : { data: [], error: null };
+  if (hojaByJobResult.error) throw hojaByJobResult.error;
+
+  const hojaRecordsById = new Map<string, AnyRecord>();
+  [...asArray<AnyRecord>(hojaResult.data), ...asArray<AnyRecord>(hojaByJobResult.data)].forEach((hoja) => {
+    const id = textOrNull(hoja.id);
+    if (id) hojaRecordsById.set(id, hoja);
+  });
+  const hojaRecords = Array.from(hojaRecordsById.values());
+  const hojaIds = hojaRecords.map((hoja) => hoja.id).filter(Boolean);
   const [
     hojaTravelArrangementsResult,
     hojaTransportResult,
     hojaAccommodationsResult,
+    hojaStaffResult,
   ] = await Promise.all([
     hojaIds.length
       ? client
@@ -840,9 +1017,15 @@ export async function fetchTourOpsModel(
           `)
           .in("hoja_de_ruta_id", hojaIds)
       : Promise.resolve({ data: [], error: null }),
+    hojaIds.length
+      ? client
+          .from("hoja_de_ruta_staff")
+          .select("id, hoja_de_ruta_id, name, surname1, surname2, position")
+          .in("hoja_de_ruta_id", hojaIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
-  const childResults = [hojaTravelArrangementsResult, hojaTransportResult, hojaAccommodationsResult];
+  const childResults = [hojaTravelArrangementsResult, hojaTransportResult, hojaAccommodationsResult, hojaStaffResult];
   const firstChildError = childResults.find((result) => result.error)?.error;
   if (firstChildError) throw firstChildError;
 
@@ -851,13 +1034,14 @@ export async function fetchTourOpsModel(
       tour,
       tour_dates: tourDates,
       jobs: jobsResult.data ?? [],
-      hoja_de_ruta: hojaResult.data ?? [],
+      hoja_de_ruta: hojaRecords,
       timeline_events: eventsResult.data ?? [],
       travel_segments: travelResult.data ?? [],
       accommodations: accommodationsResult.data ?? [],
       hoja_travel_arrangements: hojaTravelArrangementsResult.data ?? [],
       hoja_transport: hojaTransportResult.data ?? [],
       hoja_accommodations: hojaAccommodationsResult.data ?? [],
+      hoja_staff: hojaStaffResult.data ?? [],
       documents: documentsResult.data ?? [],
       tour_assignments: assignmentsResult.data ?? [],
     },
@@ -1134,8 +1318,8 @@ const opsAccommodationPayloadFromHotel = (input: Partial<TourOpsAccommodation> &
   check_in_date: input.checkInDate || null,
   check_out_date: input.checkOutDate || input.checkInDate || null,
   confirmation_number: input.confirmationNumber || null,
-  room_allocation: input.roomAllocation || [],
-  rooms_booked: input.roomsBooked ?? 0,
+  room_allocation: serializeRoomAllocation(input.roomAllocation),
+  rooms_booked: input.roomsBooked ?? serializeRoomAllocation(input.roomAllocation).length,
   notes: input.notes || null,
   status: "planned",
 });
@@ -1148,6 +1332,62 @@ const hojaAccommodationPayloadFromHotel = (input: Partial<TourOpsAccommodation>)
   latitude: input.latitude ?? null,
   longitude: input.longitude ?? null,
 });
+
+const hojaStaffStorageLookup = async (hojaId: string) => {
+  const { data, error } = await client
+    .from("hoja_de_ruta_staff")
+    .select("id, name, surname1, surname2, position")
+    .eq("hoja_de_ruta_id", hojaId);
+  if (error) throw error;
+
+  const byValue = new Map<string, string>();
+  asArray<AnyRecord>(data).forEach((member, index) => {
+    const indexValue = String(index);
+    [textOrNull(member.id), textOrNull(member.technician_id)]
+      .filter(Boolean)
+      .forEach((key) => byValue.set(key as string, indexValue));
+    const name = displayName(member.name, member.surname1, member.surname2);
+    if (name) byValue.set(name, indexValue);
+  });
+  return byValue;
+};
+
+const replaceHojaRoomAssignments = async (
+  accommodationId: string,
+  hojaId: string | null | undefined,
+  rooms: TourOpsRoomAssignment[] | undefined | null,
+) => {
+  const serializedRooms = serializeRoomAllocation(rooms);
+  const { error: deleteError } = await client
+    .from("hoja_de_ruta_room_assignments")
+    .delete()
+    .eq("accommodation_id", accommodationId);
+  if (deleteError) throw deleteError;
+  if (serializedRooms.length === 0) return;
+
+  const staffValueLookup = hojaId ? await hojaStaffStorageLookup(hojaId) : new Map<string, string>();
+  const staffValue = (value: unknown, rawValue: unknown) => {
+    const normalizedValue = textOrNull(value);
+    const raw = textOrNull(rawValue);
+    if (normalizedValue && staffValueLookup.has(normalizedValue)) return staffValueLookup.get(normalizedValue);
+    if (raw && staffValueLookup.has(raw)) return staffValueLookup.get(raw);
+    return normalizedValue ?? raw;
+  };
+
+  const rows = asArray<TourOpsRoomAssignment>(rooms)
+    .filter((room) => room.roomType || room.roomNumber || room.staffMember1Id || room.staffMember2Id)
+    .map((room) => ({
+      accommodation_id: accommodationId,
+      room_type: room.roomType || "single",
+      room_number: room.roomNumber || "",
+      staff_member1_id: staffValue(room.staffMember1Id, room.rawStaffMember1Id) ?? null,
+      staff_member2_id: staffValue(room.staffMember2Id, room.rawStaffMember2Id) ?? null,
+    }));
+  if (rows.length === 0) return;
+
+  const { error } = await client.from("hoja_de_ruta_room_assignments").insert(rows);
+  if (error) throw error;
+};
 
 const findSimilarOpsAccommodation = async (input: Partial<TourOpsAccommodation> & { tourId: string }) => {
   if (!input.tourDateId || !input.hotelName) return null;
@@ -1199,21 +1439,26 @@ const syncAccommodationToHoja = async (input: Partial<TourOpsAccommodation>) => 
   if (existingRow?.id) {
     const { error } = await client.from("hoja_de_ruta_accommodations").update(payload).eq("id", existingRow.id);
     if (error) throw error;
+    await replaceHojaRoomAssignments(existingRow.id, hoja.id, input.roomAllocation);
     return true;
   }
 
-  const { error } = await client.from("hoja_de_ruta_accommodations").insert(payload);
+  const { data, error } = await client.from("hoja_de_ruta_accommodations").insert(payload).select("id").single();
   if (error) throw error;
+  await replaceHojaRoomAssignments(data.id as string, hoja.id, input.roomAllocation);
   return true;
 };
 
 export async function saveAccommodation(input: Partial<TourOpsAccommodation> & { tourId: string }) {
-  if (input.source === "hoja" && input.id) {
+  const isLegacyHotelInfo = Boolean(input.id?.startsWith("hotel-info:"));
+
+  if (input.source === "hoja" && input.id && !isLegacyHotelInfo) {
     const { error } = await client
       .from("hoja_de_ruta_accommodations")
       .update(hojaAccommodationPayloadFromHotel(input))
       .eq("id", input.id);
     if (error) throw error;
+    await replaceHojaRoomAssignments(input.id, input.hojaDeRutaId, input.roomAllocation);
     await upsertOpsAccommodationFromHoja(input);
     return input.id;
   }
@@ -1223,7 +1468,7 @@ export async function saveAccommodation(input: Partial<TourOpsAccommodation> & {
     throw new Error("Check-in y check-out son obligatorios");
   }
 
-  if (input.id) {
+  if (input.id && !isLegacyHotelInfo) {
     const { error } = await client.from("tour_accommodations").update(payload).eq("id", input.id);
     if (error) throw error;
     await syncAccommodationToHoja(input);
@@ -1376,7 +1621,7 @@ export async function syncHojaRutaOpsData(model: TourOpsModel) {
         longitude: hotel.longitude,
         check_in_date: checkIn,
         check_out_date: checkOut,
-        room_allocation: hotel.roomAllocation,
+        room_allocation: serializeRoomAllocation(hotel.roomAllocation),
         rooms_booked: hotel.roomsBooked ?? hotel.roomAllocation.length,
         notes: hotel.notes,
         status: "planned",

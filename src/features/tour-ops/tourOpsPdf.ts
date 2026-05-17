@@ -38,6 +38,11 @@ const formatDateTime = (value: string | null | undefined) => {
   return value;
 };
 
+const roomOccupants = (room: TourOpsDate["accommodations"][number]["roomAllocation"][number]) =>
+  [room.staffMember1Name, room.staffMember2Name, room.staffMember1Id, room.staffMember2Id]
+    .filter(Boolean)
+    .join(" / ");
+
 const header = (pdf: jsPDF, title: string, subtitle: string) => {
   const width = pdf.internal.pageSize.width;
   pdf.setFillColor(...RED);
@@ -108,9 +113,12 @@ const addDatePage = (
   tourDate: TourOpsDate,
   pageRef: { value: number },
   projection: TourOpsProjection,
+  startOnNewPage = true,
 ) => {
-  pdf.addPage();
-  pageRef.value += 1;
+  if (startOnNewPage) {
+    pdf.addPage();
+    pageRef.value += 1;
+  }
   header(pdf, model.tour.name, `${formatDate(tourDate.date)} - ${tourDate.venueName || "Fecha de gira"}`);
   let y = 40;
 
@@ -200,6 +208,28 @@ const addDatePage = (
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [70, 82, 96], textColor: [255, 255, 255] },
     });
+    y = lastY(pdf, y) + 10;
+
+    const roomRows = tourDate.accommodations.flatMap((hotel) =>
+      hotel.roomAllocation.map((room) => [
+        hotel.hotelName,
+        room.roomType || "",
+        room.roomNumber || "",
+        roomOccupants(room) || "",
+      ]),
+    );
+    if (roomRows.length > 0) {
+      y = ensurePage(pdf, y, pageRef, model.tour.name, "Continuacion");
+      y = sectionTitle(pdf, "Rooming", y);
+      runAutoTable(pdf, autoTable, pageRef, model.tour.name, "Continuacion", {
+        startY: y,
+        head: [["Hotel", "Tipo", "Hab.", "Ocupantes"]],
+        body: roomRows,
+        theme: "grid",
+        styles: { fontSize: 8, cellPadding: 2 },
+        headStyles: { fillColor: [70, 82, 96], textColor: [255, 255, 255] },
+      });
+    }
   }
 
   footer(pdf, pageRef.value);
@@ -208,12 +238,27 @@ const addDatePage = (
 export async function generateTourOpsPdf(
   model: TourOpsModel,
   projection: TourOpsProjection,
-  options: { dateId?: string; filenameSuffix?: string } = {},
+  options: { dateId?: string; filenameSuffix?: string; action?: "download" | "print" } = {},
 ) {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const pdf = new jsPDF();
   const pageRef = { value: 1 };
   const dates = options.dateId ? model.dates.filter((date) => date.id === options.dateId) : model.dates;
+  const isDaySheet = Boolean(options.dateId);
+
+  if (isDaySheet) {
+    dates.forEach((date, index) => addDatePage(pdf, autoTable, model, date, pageRef, projection, index > 0));
+    const date = dates[0];
+    const filename = buildReadableFilename([
+      model.tour.name,
+      "day-sheet",
+      date ? formatDate(date.date) : null,
+      date?.venueName,
+      options.filenameSuffix,
+    ]);
+    pdf.save(filename);
+    return;
+  }
 
   pdf.setFillColor(...RED);
   pdf.rect(0, 0, pdf.internal.pageSize.width, pdf.internal.pageSize.height, "F");
@@ -274,5 +319,52 @@ export async function generateTourOpsPdf(
     options.dateId ? "day-sheet" : projection === "guest" ? "external-itinerary" : "tour-ops-book",
     options.filenameSuffix,
   ]);
+
+  if (options.action === "print" && typeof document !== "undefined") {
+    const blob = pdf.output("blob");
+    const url = URL.createObjectURL(blob);
+    if (printWindow && !printWindow.closed) {
+      printWindow.document.open();
+      printWindow.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <title>${filename}</title>
+            <style>
+              html, body, iframe { margin: 0; width: 100%; height: 100%; border: 0; }
+              .fallback { position: fixed; top: 10px; right: 10px; z-index: 2; font-family: sans-serif; }
+            </style>
+          </head>
+          <body>
+            <button class="fallback" onclick="frames[0].focus(); frames[0].print()">Imprimir</button>
+            <iframe src="${url}" onload="this.contentWindow.focus(); this.contentWindow.print()"></iframe>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      return;
+    }
+
+    const iframe = document.createElement("iframe");
+    iframe.style.position = "fixed";
+    iframe.style.left = "-100vw";
+    iframe.style.top = "0";
+    iframe.style.width = "100vw";
+    iframe.style.height = "100vh";
+    iframe.style.border = "0";
+    iframe.src = url;
+    iframe.onload = () => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      window.setTimeout(() => {
+        iframe.remove();
+        URL.revokeObjectURL(url);
+      }, 60_000);
+    };
+    document.body.appendChild(iframe);
+    return;
+  }
+
   pdf.save(filename);
 }
