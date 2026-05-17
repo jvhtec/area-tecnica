@@ -1,122 +1,20 @@
-
-import React, { memo, useCallback, useState } from 'react';
+import React, { memo, useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Label } from '@/components/ui/label';
-import { Calendar, Clock, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, MessageCircle, Loader2 } from 'lucide-react';
+import { Calendar, Check, X, UserX, Mail, CheckCircle, Ban, Refrigerator, MessageCircle } from 'lucide-react';
 import { format, isToday, isWeekend } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { formatInTimeZone } from 'date-fns-tz';
 import { cn } from '@/lib/utils';
 import { useCancelStaffingRequest, useSendStaffingEmail } from '@/features/staffing/hooks/useStaffing';
-import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
 import { pickTextColor, rgbaFromHex } from '@/utils/color';
-import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
-
-interface TimesheetDateRow {
-  date: string;
-}
-
-interface MultiDateRemovalState {
-  isOpen: boolean;
-  isLoading: boolean;
-  otherDates: string[];  // Other timesheet dates for this job/tech (excluding current)
-  otherDatesCount: number;
-  currentDate: string | null;  // The date of the cell being removed
-  removeOption: 'single' | 'all';
-}
-
-interface OptimizedMatrixCellProps {
-  technician: {
-    id: string;
-    first_name: string;
-    nickname?: string | null;
-    last_name: string;
-    department: string;
-  };
-  date: Date;
-  assignment?: any;
-  availability?: any;
-  width: number;
-  height: number;
-  isSelected: boolean;
-  onSelect: (selected: boolean) => void;
-  onClick: (action: 'select-job' | 'select-job-for-staffing' | 'assign' | 'unavailable' | 'confirm' | 'decline' | 'offer-details' | 'offer-details-wa' | 'offer-details-email' | 'availability-wa' | 'availability-email' | 'toggle-unavailable', selectedJobId?: string) => void;
-  onPrefetch?: () => void;
-  onOptimisticUpdate?: (status: string) => void;
-  onRender?: () => void;
-  jobId?: string;
-  allowDirectAssign?: boolean;
-  allowMarkUnavailable?: boolean;
-  declinedJobIdsSet?: Set<string>;
-  staffingStatusProvided?: { availability_status: any; offer_status: any } | null;
-  staffingStatusByDateProvided?: {
-    availability_status: any;
-    offer_status: any;
-    availability_job_id?: string | null;
-    offer_job_id?: string | null;
-    availability_requested_by?: string | null;
-    availability_created_at?: string | null;
-    offer_requested_by?: string | null;
-    offer_created_at?: string | null;
-    pending_availability_job_ids?: string[];
-    pending_offer_job_ids?: string[];
-  } | null;
-  profileNamesMap?: Map<string, string>;
-  isFridge?: boolean;
-  mobile?: boolean;
-  hideStaffingEmailButtons?: boolean;
-  hideStaffingWhatsappButtons?: boolean;
-}
-
-const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
-
-const normalizeStatus = (status?: string | null) => status?.trim().toLowerCase() ?? null;
-
-const formatDateTimeEs = (iso?: string | null) => {
-  if (!iso) return null;
-  const parsed = new Date(iso);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return formatInTimeZone(parsed, 'Europe/Madrid', 'd MMM yyyy, HH:mm', { locale: es });
-};
-
-const assignmentStatusLabel = (status?: string | null) => {
-  const normalizedStatus = normalizeStatus(status);
-  if (normalizedStatus === 'confirmed') return 'Confirmado';
-  if (normalizedStatus === 'declined') return 'Rechazado';
-  if (normalizedStatus === 'invited') return 'Invitado';
-  return 'Pendiente';
-};
-
-const availabilityStatusLabel = (status?: string | null) => {
-  const normalizedStatus = normalizeStatus(status);
-  if (normalizedStatus === 'requested' || normalizedStatus === 'pending') return 'Solicitada';
-  if (normalizedStatus === 'confirmed') return 'Confirmada';
-  if (normalizedStatus === 'declined') return 'Rechazada';
-  return null;
-};
-
-const offerStatusLabel = (status?: string | null) => {
-  const normalizedStatus = normalizeStatus(status);
-  if (normalizedStatus === 'sent' || normalizedStatus === 'pending') return 'Enviada';
-  if (normalizedStatus === 'confirmed') return 'Confirmada';
-  if (normalizedStatus === 'declined') return 'Rechazada';
-  return null;
-};
-
-type AssignmentLifecycleResult = {
-  error?: string;
-};
-
-const readAssignmentLifecycleResult = (value: unknown): AssignmentLifecycleResult => (
-  value && typeof value === 'object' ? value as AssignmentLifecycleResult : {}
-);
+import { OptimizedMatrixCellDialogs } from '@/components/matrix/optimized-matrix-cell/OptimizedMatrixCellDialogs';
+import { OptimizedMatrixCellTooltip } from '@/components/matrix/optimized-matrix-cell/OptimizedMatrixCellTooltip';
+import { assignmentStatusLabel, EMPTY_PROFILE_NAMES_MAP, normalizeStatus } from '@/components/matrix/optimized-matrix-cell/helpers';
+import type { OptimizedMatrixCellProps } from '@/components/matrix/optimized-matrix-cell/types';
+import { useMatrixCellAssignmentRemoval } from '@/components/matrix/optimized-matrix-cell/useMatrixCellAssignmentRemoval';
 
 export const OptimizedMatrixCell = memo(({
   technician,
@@ -168,142 +66,14 @@ export const OptimizedMatrixCell = memo(({
   const [availabilityRetrying, setAvailabilityRetrying] = React.useState(false);
   const [pendingRetry, setPendingRetry] = React.useState<null | { jobId: string }>(null);
   const [pendingCancel, setPendingCancel] = React.useState<null | { phase: 'availability' | 'offer', jobId: string | null, allJobIds?: string[] }>(null);
-  const [multiDateRemoval, setMultiDateRemoval] = React.useState<MultiDateRemovalState>({
-    isOpen: false,
-    isLoading: false,
-    otherDates: [],
-    otherDatesCount: 0,
-    currentDate: null,
-    removeOption: 'single'
-  });
-  const [isRemovingAssignment, setIsRemovingAssignment] = React.useState(false);
   const [retryChannel, setRetryChannel] = React.useState<'email' | 'whatsapp'>('email');
-
-  // Check if tech has timesheets on other dates for this same job
-  const checkMultiDateAssignment = useCallback(async () => {
-    if (!assignment?.job_id) return;
-
-    const currentDateStr = format(date, 'yyyy-MM-dd');
-    setMultiDateRemoval(prev => ({ ...prev, isOpen: true, isLoading: true, currentDate: currentDateStr }));
-
-    try {
-      // Get all timesheets for this job/technician combination
-      const { data: timesheets, error: timesheetError } = await dataLayerClient.from('timesheets')
-        .select('date')
-        .eq('job_id', assignment.job_id)
-        .eq('technician_id', technician.id)
-        .eq('is_active', true)
-        .neq('date', currentDateStr);
-
-      if (timesheetError) throw timesheetError;
-
-      const otherDates = ((timesheets || []) as TimesheetDateRow[]).map((t) => t.date);
-
-      setMultiDateRemoval({
-        isOpen: true,
-        isLoading: false,
-        otherDates,
-        otherDatesCount: otherDates.length,
-        currentDate: currentDateStr,
-        removeOption: 'single'
-      });
-    } catch (error) {
-      console.error('Error checking multi-date assignment:', error);
-      // On error, show simple removal dialog
-      setMultiDateRemoval({
-        isOpen: true,
-        isLoading: false,
-        otherDates: [],
-        otherDatesCount: 0,
-        currentDate: currentDateStr,
-        removeOption: 'single'
-      });
-    }
-  }, [assignment?.job_id, technician.id, date]);
-
-  // Remove assignment based on user selection
-  const handleRemoveAssignment = useCallback(async (removeAll: boolean) => {
-    if (!assignment?.job_id) return;
-
-    setIsRemovingAssignment(true);
-
-    try {
-      if (removeAll || multiDateRemoval.otherDatesCount === 0) {
-        // Remove entire assignment + all timesheets
-        const { data, error } = await dataLayerClient.rpc('manage_assignment_lifecycle', {
-          p_job_id: assignment.job_id,
-          p_technician_id: technician.id,
-          p_action: 'cancel',
-          p_delete_mode: 'hard'
-        });
-
-        if (error) throw error;
-        const result = readAssignmentLifecycleResult(data);
-        if (result.error) throw new Error(result.error);
-
-        // Remove Flex crew assignment if applicable
-        const flexDepartments = determineFlexDepartmentsForAssignment(assignment, technician.department);
-        if (flexDepartments.length > 0) {
-          await Promise.allSettled(flexDepartments.map(async (department) => {
-            try {
-              await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
-                body: {
-                  job_id: assignment.job_id,
-                  technician_id: technician.id,
-                  department,
-                  action: 'remove'
-                }
-              });
-            } catch (flexError) {
-              console.error('Failed to remove Flex crew assignment:', flexError);
-            }
-          }));
-        }
-
-        // Send push notification
-        try {
-          void dataLayerClient.functions.invoke('push', {
-            body: {
-              action: 'broadcast',
-              type: 'assignment.removed',
-              job_id: assignment.job_id,
-              recipient_id: technician.id,
-              technician_id: technician.id
-            }
-          });
-        } catch (pushErr) {
-          console.warn('Failed to send assignment removal notification:', pushErr);
-        }
-
-        const message = multiDateRemoval.otherDatesCount > 0
-          ? `${multiDateRemoval.otherDatesCount + 1} días eliminados de la asignación`
-          : 'Asignación eliminada';
-        toast.success(message);
-      } else {
-        // Remove only the current date's timesheet, keep assignment active
-        const { error } = await dataLayerClient.from('timesheets')
-          .delete()
-          .eq('job_id', assignment.job_id)
-          .eq('technician_id', technician.id)
-          .eq('date', multiDateRemoval.currentDate);
-
-        if (error) throw error;
-
-        toast.success('Día eliminado de la asignación');
-      }
-
-      setMultiDateRemoval(prev => ({ ...prev, isOpen: false }));
-      window.dispatchEvent(new CustomEvent('assignment-updated'));
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error(String(error) || 'No se pudo eliminar la asignación');
-      }
-    } finally {
-      setIsRemovingAssignment(false);
-    }
-  }, [assignment, technician.id, technician.department, multiDateRemoval.otherDatesCount, multiDateRemoval.currentDate]);
+  const {
+    multiDateRemoval,
+    setMultiDateRemoval,
+    isRemovingAssignment,
+    checkMultiDateAssignment,
+    handleRemoveAssignment,
+  } = useMatrixCellAssignmentRemoval({ assignment, technician, date });
 
   // Use job-specific status for assigned cells, date-based status for empty cells
   const staffingStatus = isConfirmedAssignment ? null : (hasAssignment ? staffingStatusByJob : staffingStatusByDate);
@@ -764,288 +534,42 @@ export const OptimizedMatrixCell = memo(({
             <div className="absolute bottom-0 left-0 w-full h-1 bg-orange-400 dark:bg-orange-600" />
           )}
 
-          {pendingRetry && (
-            <Dialog open={true} onOpenChange={(v) => !v && setPendingRetry(null)}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Reenviar solicitud de disponibilidad</DialogTitle>
-                  <DialogDescription>Elige el canal y reenvía la solicitud de disponibilidad.</DialogDescription>
-                </DialogHeader>
-                <div className="py-2">
-                  <div className="space-y-3">
-                    <label className="font-medium text-sm text-foreground">Canal</label>
-                    <div className="flex items-center gap-4">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="availability-retry-channel"
-                          checked={retryChannel === 'email'}
-                          onChange={() => setRetryChannel('email')}
-                        />
-                        <span>Email</span>
-                      </label>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="availability-retry-channel"
-                          checked={retryChannel === 'whatsapp'}
-                          onChange={() => setRetryChannel('whatsapp')}
-                        />
-                        <span>WhatsApp</span>
-                      </label>
-                    </div>
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setPendingRetry(null)}>Cancelar</Button>
-                  <Button onClick={() => {
-                    if (!pendingRetry) return;
-                    setAvailabilityRetrying(true);
-                    sendStaffingEmail(
-                      ({ job_id: pendingRetry.jobId, profile_id: technician.id, phase: 'availability', channel: retryChannel, target_date: format(date, 'yyyy-MM-dd'), single_day: true } as any),
-                      {
-                        onSuccess: () => {
-                          setAvailabilityRetrying(false);
-                          setPendingRetry(null);
-                          toast.success('Solicitud de disponibilidad reenviada');
-                        },
-                        onError: (error) => {
-                          setAvailabilityRetrying(false);
-                          setPendingRetry(null);
-                          toast.error(`No se pudo reenviar la solicitud de disponibilidad: ${error.message}`);
-                        }
-                      }
-                    );
-                  }} disabled={availabilityRetrying}>
-                    {availabilityRetrying ? 'Reenviando…' : 'Reenviar'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
-
-          {pendingCancel && (
-            <Dialog open={true} onOpenChange={(v) => !v && setPendingCancel(null)}>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{pendingCancel.phase === 'availability' ? '¿Cancelar solicitud de disponibilidad?' : '¿Cancelar oferta?'}</DialogTitle>
-                  <DialogDescription>
-                    Esto marcará la fase de {pendingCancel.phase === 'availability' ? 'disponibilidad' : 'oferta'} como cancelada para {displayName}.
-                    {pendingCancel.allJobIds && pendingCancel.allJobIds.length > 1 && (
-                      <span className="block mt-1 text-xs text-muted-foreground">
-                        Se cancelarán {pendingCancel.allJobIds.length} solicitudes pendientes en esta fecha.
-                      </span>
-                    )}
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setPendingCancel(null)}>Mantener</Button>
-                  <Button onClick={async () => {
-                    // Cancel ALL pending job IDs for this date to fully clear the cell
-                    const jobIdsToCancel = pendingCancel.allJobIds?.length
-                      ? pendingCancel.allJobIds
-                      : (pendingCancel.jobId ? [pendingCancel.jobId] : []);
-
-                    if (!jobIdsToCancel.length) {
-                      setPendingCancel(null);
-                      return;
-                    }
-
-                    try {
-                      // Cancel all job IDs in parallel
-                      await Promise.all(
-                        jobIdsToCancel.map(jid =>
-                          new Promise<void>((resolve, reject) => {
-                            cancelStaffing(
-                              { job_id: jid, profile_id: technician.id, phase: pendingCancel.phase },
-                              {
-                                onSuccess: () => resolve(),
-                                onError: (e: any) => reject(e)
-                              }
-                            );
-                          })
-                        )
-                      );
-                      setPendingCancel(null);
-                      toast.success(`${pendingCancel.phase === 'availability' ? 'Disponibilidad' : 'Oferta'} cancelada`);
-                    } catch (e: any) {
-                      toast.error(e?.message || 'No se pudo cancelar');
-                    }
-                  }} disabled={isCancelling}>
-                    {isCancelling ? 'Cancelando…' : 'Cancelar'}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
-
-          {multiDateRemoval.isOpen && (
-            <Dialog open={true} onOpenChange={(v) => !v && setMultiDateRemoval(prev => ({ ...prev, isOpen: false }))}>
-              <DialogContent
-                onClick={(event) => event.stopPropagation()}
-                onPointerDown={(event) => event.stopPropagation()}
-              >
-                <DialogHeader>
-                  <DialogTitle>¿Eliminar asignación?</DialogTitle>
-                  <DialogDescription>
-                    {multiDateRemoval.isLoading ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Comprobando otras fechas asignadas...
-                      </span>
-                    ) : multiDateRemoval.otherDatesCount > 0 ? (
-                      <>
-                        {displayName} está asignado a este trabajo durante <strong>{multiDateRemoval.otherDatesCount + 1} días</strong>.
-                        ¿Qué deseas eliminar?
-                      </>
-                    ) : (
-                      <>Se eliminará la asignación de {displayName} de este trabajo.</>
-                    )}
-                  </DialogDescription>
-                </DialogHeader>
-
-                {!multiDateRemoval.isLoading && multiDateRemoval.otherDatesCount > 0 && (
-                  <div className="py-4">
-                    <RadioGroup
-                      value={multiDateRemoval.removeOption}
-                      onValueChange={(value: 'single' | 'all') =>
-                        setMultiDateRemoval(prev => ({ ...prev, removeOption: value }))
-                      }
-                      className="space-y-3"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <RadioGroupItem value="single" id="remove-single" />
-                        <Label htmlFor="remove-single" className="cursor-pointer">
-                          Solo este día ({multiDateRemoval.currentDate})
-                        </Label>
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <RadioGroupItem value="all" id="remove-all" />
-                        <Label htmlFor="remove-all" className="cursor-pointer">
-                          Todos los días ({multiDateRemoval.otherDatesCount + 1} días - elimina la asignación completa)
-                        </Label>
-                      </div>
-                    </RadioGroup>
-                  </div>
-                )}
-
-                <DialogFooter>
-                  <Button
-                    variant="outline"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setMultiDateRemoval(prev => ({ ...prev, isOpen: false }));
-                    }}
-                    disabled={isRemovingAssignment}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void handleRemoveAssignment(multiDateRemoval.removeOption === 'all');
-                    }}
-                    disabled={multiDateRemoval.isLoading || isRemovingAssignment}
-                  >
-                    {isRemovingAssignment ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Eliminando...
-                      </span>
-                    ) : multiDateRemoval.removeOption === 'all' && multiDateRemoval.otherDatesCount > 0 ? (
-                      `Eliminar ${multiDateRemoval.otherDatesCount + 1} días`
-                    ) : (
-                      'Eliminar'
-                    )}
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
+          <OptimizedMatrixCellDialogs
+            date={date}
+            technicianId={technician.id}
+            displayName={displayName}
+            pendingRetry={pendingRetry}
+            setPendingRetry={setPendingRetry}
+            retryChannel={retryChannel}
+            setRetryChannel={setRetryChannel}
+            availabilityRetrying={availabilityRetrying}
+            setAvailabilityRetrying={setAvailabilityRetrying}
+            sendStaffingEmail={sendStaffingEmail}
+            pendingCancel={pendingCancel}
+            setPendingCancel={setPendingCancel}
+            cancelStaffing={cancelStaffing}
+            isCancelling={isCancelling}
+            multiDateRemoval={multiDateRemoval}
+            setMultiDateRemoval={setMultiDateRemoval}
+            handleRemoveAssignment={handleRemoveAssignment}
+            isRemovingAssignment={isRemovingAssignment}
+          />
         </div>
       </TooltipTrigger>
       <TooltipContent
         side="top"
         className="max-w-xs p-2"
       >
-        <div className="space-y-1 text-sm">
-          <div className="font-semibold">
-            {displayName}
-          </div>
-          <div className="text-muted-foreground">
-            {technician.department}
-          </div>
-          {hasAssignment && (
-            <div className="text-xs">
-              <div>{assignment.job?.title}</div>
-              <div className="text-muted-foreground">
-                {labelForCode(assignment.sound_role || assignment.lights_role || assignment.video_role)}
-              </div>
-              {assignment.single_day && assignment.assignment_date && (
-                <div className="text-muted-foreground">
-                  Día único: {format(new Date(`${assignment.assignment_date}T00:00:00`), 'MMM d')}
-                </div>
-              )}
-              <div className={`capitalize ${assignment.status === 'confirmed' ? 'text-green-600' : assignment.status === 'declined' ? 'text-red-600' : 'text-yellow-600'}`}>
-                Estado: {assignmentStatusLabel(assignment.status)}
-              </div>
-              {assignment.assigned_by && profileNamesMap.has(assignment.assigned_by) && (
-                <div className="text-muted-foreground">
-                  Asignado por: {profileNamesMap.get(assignment.assigned_by)}
-                </div>
-              )}
-              {assignment.assigned_at && formatDateTimeEs(assignment.assigned_at) && (
-                <div className="text-muted-foreground">
-                  Fecha: {formatDateTimeEs(assignment.assigned_at)}
-                </div>
-              )}
-            </div>
-          )}
-          {!hasAssignment && !isUnavailable && staffingStatusByDate && (
-            <div className="text-xs space-y-2 pt-1">
-              {availabilityStatusLabel(staffingStatusByDate.availability_status) && (
-                <div>
-                  <div className="text-yellow-700">
-                    Disponibilidad: {availabilityStatusLabel(staffingStatusByDate.availability_status)}
-                  </div>
-                  {staffingStatusByDate.availability_requested_by && profileNamesMap.has(staffingStatusByDate.availability_requested_by) && (
-                    <div className="text-muted-foreground">
-                      Enviado por: {profileNamesMap.get(staffingStatusByDate.availability_requested_by)}
-                    </div>
-                  )}
-                  {staffingStatusByDate.availability_created_at && formatDateTimeEs(staffingStatusByDate.availability_created_at) && (
-                    <div className="text-muted-foreground">
-                      Fecha: {formatDateTimeEs(staffingStatusByDate.availability_created_at)}
-                    </div>
-                  )}
-                </div>
-              )}
-              {offerStatusLabel(staffingStatusByDate.offer_status) && (
-                <div>
-                  <div className="text-blue-700">
-                    Oferta: {offerStatusLabel(staffingStatusByDate.offer_status)}
-                  </div>
-                  {staffingStatusByDate.offer_requested_by && profileNamesMap.has(staffingStatusByDate.offer_requested_by) && (
-                    <div className="text-muted-foreground">
-                      Enviado por: {profileNamesMap.get(staffingStatusByDate.offer_requested_by)}
-                    </div>
-                  )}
-                  {staffingStatusByDate.offer_created_at && formatDateTimeEs(staffingStatusByDate.offer_created_at) && (
-                    <div className="text-muted-foreground">
-                      Fecha: {formatDateTimeEs(staffingStatusByDate.offer_created_at)}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          {isUnavailable && !hasAssignment && (
-            <div className="text-xs text-muted-foreground">
-              No disponible{availability.notes ? `: ${availability.notes}` : ''}
-            </div>
-          )}
-        </div>
+        <OptimizedMatrixCellTooltip
+          displayName={displayName}
+          technician={technician}
+          hasAssignment={hasAssignment}
+          assignment={assignment}
+          isUnavailable={isUnavailable}
+          availability={availability}
+          staffingStatusByDate={staffingStatusByDate}
+          profileNamesMap={profileNamesMap}
+        />
       </TooltipContent>
     </Tooltip>
   );

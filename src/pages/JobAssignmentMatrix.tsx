@@ -1,28 +1,14 @@
 import React, { useState, useMemo } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, Filter, Users, RefreshCw, Refrigerator } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
 import { OptimizedAssignmentMatrix } from '@/components/matrix/OptimizedAssignmentMatrix';
-import { StaffingOrchestratorPanel } from '@/components/matrix/StaffingOrchestratorPanel';
-
-import { DateRangeExpander } from '@/components/matrix/DateRangeExpander';
 import { useVirtualizedDateRange } from '@/hooks/useVirtualizedDateRange';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
-import { SkillsFilter } from '@/components/matrix/SkillsFilter';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { hasTechnicianSelfServiceAccess, isManagementRole } from '@/utils/permissions';
+import { MatrixPageControls } from '@/pages/job-assignment-matrix/MatrixPageControls';
+import { StaffingReminderDialogs } from '@/pages/job-assignment-matrix/StaffingReminderDialogs';
+import { useDebouncedMatrixSearch, useIsMatrixMobile } from '@/pages/job-assignment-matrix/useMatrixViewport';
+import { useStaffingButtonPreferences } from '@/pages/job-assignment-matrix/useStaffingButtonPreferences';
 import {
   AVAILABLE_DEPARTMENTS,
   DEPARTMENT_LABELS,
@@ -39,35 +25,11 @@ import {
   type OutstandingRoleInfo,
   type StaffingAssignmentRow,
   type StaffingSummaryRow,
-} from './job-assignment-matrix/utils';
+} from '@/pages/job-assignment-matrix/utils';
 
 
 import { queryKeys } from "@/lib/react-query";
-const HIDE_STAFFING_EMAIL_BUTTONS_STORAGE_KEY = 'job-assignment-matrix:hide-staffing-email-buttons';
-const HIDE_STAFFING_WHATSAPP_BUTTONS_STORAGE_KEY = 'job-assignment-matrix:hide-staffing-whatsapp-buttons';
 
-const getUserScopedStorageKey = (baseKey: string, userId?: string | null) =>
-  userId ? `${baseKey}:${userId}` : baseKey;
-
-const readStoredBoolean = (key: string) => {
-  if (typeof window === 'undefined') return false;
-  try {
-    return window.localStorage.getItem(key) === 'true';
-  } catch {
-    return false;
-  }
-};
-
-/**
- * Render the interactive job assignment matrix UI for viewing and managing technician assignments.
- *
- * The component provides department selection, virtualized date range navigation, technician and job
- * filtering (search, skills, specialties, and fridge visibility), direct-assignment and mark-unavailable
- * toggles (when permitted), background prefetching of adjacent matrix windows, staffing reminders with
- * an auto-staffing panel, and responsive layouts for desktop and mobile.
- *
- * @returns The rendered React element for the job assignment matrix and its associated controls and dialogs.
- */
 export default function JobAssignmentMatrix() {
   const qc = useQueryClient();
   const prefetchStatusRef = React.useRef<Map<string, 'pending' | 'done'>>(new Map<string, 'pending' | 'done'>());
@@ -75,20 +37,19 @@ export default function JobAssignmentMatrix() {
   const [defaultDepartment, setDefaultDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const [selectedDepartment, setSelectedDepartment] = useState<Department>(FALLBACK_DEPARTMENT);
   const hasManualDepartmentSelection = React.useRef(false);
-  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const isMobile = useIsMatrixMobile();
   const [filtersOpen, setFiltersOpen] = useState<boolean>(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  // Debounce search to reduce filtering churn
-  React.useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchTerm.trim().toLowerCase()), 150);
-    return () => clearTimeout(t);
-  }, [searchTerm]);
+  const debouncedSearch = useDebouncedMatrixSearch(searchTerm);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [allowDirectAssign, setAllowDirectAssign] = useState(false);
   const [allowMarkUnavailable, setAllowMarkUnavailable] = useState(false);
-  const [hideStaffingEmailButtons, setHideStaffingEmailButtons] = useState(false);
-  const [hideStaffingWhatsappButtons, setHideStaffingWhatsappButtons] = useState(false);
+  const {
+    hideStaffingEmailButtons,
+    setHideStaffingEmailButtons,
+    hideStaffingWhatsappButtons,
+    setHideStaffingWhatsappButtons,
+  } = useStaffingButtonPreferences(user?.id);
   const canMarkUnavailable = isManagementRole(userRole);
   const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
   const [hideFridge, setHideFridge] = useState<boolean>(true);
@@ -99,11 +60,6 @@ export default function JobAssignmentMatrix() {
     jobTitle: string;
   }>(null);
   const [lastAcknowledgedHash, setLastAcknowledgedHash] = useState<string | null>(null);
-  const skipNextStaffingPreferencePersistRef = React.useRef(true);
-  const staffingPreferenceStorageKeys = React.useMemo(() => ({
-    email: getUserScopedStorageKey(HIDE_STAFFING_EMAIL_BUTTONS_STORAGE_KEY, user?.id),
-    whatsapp: getUserScopedStorageKey(HIDE_STAFFING_WHATSAPP_BUTTONS_STORAGE_KEY, user?.id),
-  }), [user?.id]);
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -116,32 +72,6 @@ export default function JobAssignmentMatrix() {
       console.warn('Failed to read outstanding hash from storage', error);
     }
   }, []);
-
-  React.useEffect(() => {
-    skipNextStaffingPreferencePersistRef.current = true;
-    setHideStaffingEmailButtons(readStoredBoolean(staffingPreferenceStorageKeys.email));
-    setHideStaffingWhatsappButtons(readStoredBoolean(staffingPreferenceStorageKeys.whatsapp));
-  }, [staffingPreferenceStorageKeys.email, staffingPreferenceStorageKeys.whatsapp]);
-
-  React.useEffect(() => {
-    if (skipNextStaffingPreferencePersistRef.current) {
-      skipNextStaffingPreferencePersistRef.current = false;
-      return;
-    }
-
-    if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(staffingPreferenceStorageKeys.email, String(hideStaffingEmailButtons));
-      window.localStorage.setItem(staffingPreferenceStorageKeys.whatsapp, String(hideStaffingWhatsappButtons));
-    } catch (error) {
-      console.warn('Failed to persist staffing button visibility preferences', error);
-    }
-  }, [
-    hideStaffingEmailButtons,
-    hideStaffingWhatsappButtons,
-    staffingPreferenceStorageKeys.email,
-    staffingPreferenceStorageKeys.whatsapp,
-  ]);
 
   const specialtyOptions = React.useMemo(() => {
     if (selectedDepartment === 'lights') {
@@ -640,14 +570,6 @@ export default function JobAssignmentMatrix() {
     setTimeout(() => setIsRefreshing(false), 1000);
   };
 
-  // Responsive breakpoint detection
-  React.useEffect(() => {
-    const update = () => setIsMobile(window.innerWidth <= 768);
-    update();
-    window.addEventListener('resize', update);
-    return () => window.removeEventListener('resize', update);
-  }, []);
-
   // Active filters count for mobile badge
   const activeFilterCount = React.useMemo(() => {
     let c = 0;
@@ -680,317 +602,49 @@ export default function JobAssignmentMatrix() {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      {/* Header */}
-      <div className="flex-shrink-0 border-b bg-card p-2 md:p-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-4">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 md:h-6 md:w-6" />
-            <h1 className="text-lg md:text-2xl font-bold">Matriz de asignación de trabajos</h1>
-          </div>
-          <div className="flex items-center gap-2 self-stretch sm:self-auto">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setShowStaffingReminder(true);
-                handleReminderOpenChange(true);
-              }}
-              className="shrink-0 flex items-center gap-2"
-              aria-label={`Ver recordatorio de staffing. ${outstandingJobsDescription}.`}
-            >
-              Ver recordatorio de staffing
-              {outstandingJobsCount !== null && (
-                <Badge variant="outline" className="text-xs" aria-hidden="true">
-                  {outstandingJobsCount}
-                </Badge>
-              )}
-              <span className="sr-only">{outstandingJobsDescription}</span>
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="shrink-0"
-            >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">Refrescar</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* Date Range Controls - hidden on mobile (use in-header arrows instead) */}
-        <div className="hidden md:block">
-          <DateRangeExpander
-            canExpandBefore={canExpandBefore}
-            canExpandAfter={canExpandAfter}
-            onExpandBefore={expandBefore}
-            onExpandAfter={expandAfter}
-            onReset={resetRange}
-            onJumpToMonth={jumpToMonth}
-            rangeInfo={rangeInfo}
-          />
-        </div>
-
-        {/* Filters */}
-        <div className="hidden md:flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            <span className="text-sm font-medium">Filtros:</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-            <Tabs
-              value={selectedDepartment}
-              onValueChange={(value) => handleDepartmentChange(value as Department)}
-              className="w-full sm:w-auto"
-            >
-              <TabsList className="flex w-full sm:w-auto overflow-x-auto rounded-md bg-muted p-1 gap-1">
-                {AVAILABLE_DEPARTMENTS.map((dept) => (
-                  <TabsTrigger
-                    key={dept}
-                    value={dept}
-                    className="flex-1 whitespace-nowrap capitalize sm:flex-none"
-                  >
-                    {DEPARTMENT_LABELS[dept] || formatLabel(dept)}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-
-            <Input
-              placeholder="Buscar técnicos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-48 min-w-0 flex-1 sm:flex-none"
-            />
-
-            <SkillsFilter selected={selectedSkills} onChange={setSelectedSkills} department={selectedDepartment} />
-            {/* Quick specialties */}
-            {specialtyOptions.length > 0 && (
-              <div className="flex items-center gap-1">
-                {specialtyOptions.map((opt) => (
-                  <Badge
-                    key={opt}
-                    variant={selectedSkills.includes(opt) ? 'default' : 'outline'}
-                    className="cursor-pointer capitalize"
-                    onClick={() => toggleSpecialty(opt)}
-                  >
-                    {opt}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 sm:ml-auto">
-            <div className="flex items-center gap-2 pr-2 border-r">
-              <Refrigerator className="h-4 w-4" />
-              <span className="text-sm font-medium">{hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}</span>
-              <Switch
-                checked={hideFridge}
-                onCheckedChange={(v) => setHideFridge(Boolean(v))}
-                aria-label={hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}
-              />
-              <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{fridgeCount}</Badge>
-            </div>
-            <div className="flex items-center gap-2 pr-2 border-r">
-              <span className="text-sm font-medium">Asignación directa</span>
-              <Switch
-                checked={allowDirectAssign}
-                onCheckedChange={(v) => { setAllowDirectAssign(Boolean(v)); if (v) setAllowMarkUnavailable(false); }}
-                aria-label="Alternar asignación directa"
-              />
-            </div>
-            {canMarkUnavailable && (
-              <div className="flex items-center gap-2 pr-2 border-r">
-                <span className="text-sm font-medium">No disponible</span>
-                <Switch
-                  checked={allowMarkUnavailable}
-                  onCheckedChange={(v) => { setAllowMarkUnavailable(Boolean(v)); if (v) setAllowDirectAssign(false); }}
-                  aria-label="Alternar marcar no disponible"
-                />
-              </div>
-            )}
-            <div className="flex items-center gap-2 pr-2 border-r">
-              <span className="text-sm font-medium">Email</span>
-              <Switch
-                checked={!hideStaffingEmailButtons}
-                onCheckedChange={(v) => setHideStaffingEmailButtons(!v)}
-                aria-label="Mostrar botones de email"
-              />
-            </div>
-            <div className="flex items-center gap-2 pr-2 border-r">
-              <span className="text-sm font-medium">WhatsApp</span>
-              <Switch
-                checked={!hideStaffingWhatsappButtons}
-                onCheckedChange={(v) => setHideStaffingWhatsappButtons(!v)}
-                aria-label="Mostrar botones de WhatsApp"
-              />
-            </div>
-            <Users className="h-4 w-4" />
-            <Badge variant="secondary" className="text-xs">
-              {filteredTechnicians.length} técnicos
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {yearJobs.length} trabajos
-            </Badge>
-            {isBackgroundFetchingMatrix && (
-              <Badge variant="outline" className="text-xs flex items-center gap-1">
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                Actualizando...
-              </Badge>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile quick controls + filter toggle */}
-      <div className="md:hidden mt-2">
-        <div className="flex items-center justify-between gap-2">
-          <button
-            className="text-sm font-medium px-3 py-2 border rounded-md bg-background"
-            onClick={() => setFiltersOpen(v => !v)}
-            aria-expanded={filtersOpen}
-            aria-controls="mobile-filters"
-          >
-            Filtros {activeFilterCount > 0 && <span className="ml-2 inline-flex items-center justify-center text-[10px] h-5 min-w-[20px] px-1.5 rounded-full bg-primary/10 text-primary border border-primary/20">{activeFilterCount}</span>}
-          </button>
-          {/* Quick direct assign toggle */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs">Directa</span>
-            <Switch
-              checked={allowDirectAssign}
-              onCheckedChange={(v) => { setAllowDirectAssign(Boolean(v)); if (v) setAllowMarkUnavailable(false); }}
-              aria-label="Alternar asignación directa"
-            />
-          </div>
-          {canMarkUnavailable && (
-            <div className="flex items-center gap-2">
-              <span className="text-xs">No disp.</span>
-              <Switch
-                checked={allowMarkUnavailable}
-                onCheckedChange={(v) => { setAllowMarkUnavailable(Boolean(v)); if (v) setAllowDirectAssign(false); }}
-                aria-label="Alternar marcar no disponible"
-              />
-            </div>
-          )}
-          <div className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            <Badge variant="secondary" className="text-xs">
-              {filteredTechnicians.length} técnicos
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {yearJobs.length} trabajos
-            </Badge>
-            {isBackgroundFetchingMatrix && (
-              <Badge variant="outline" className="text-[10px] flex items-center gap-1">
-                <RefreshCw className="h-3 w-3 animate-spin" />
-                Actualizando...
-              </Badge>
-            )}
-          </div>
-        </div>
-        {filtersOpen && (
-          <div id="mobile-filters" className="mt-2 max-h-[300px] overflow-y-auto p-2 border rounded-md bg-muted/30 space-y-2">
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4" />
-              <span className="text-sm font-medium">Filtros</span>
-              {activeFilterCount > 0 && (
-                <button
-                  className="ml-auto text-xs underline"
-                  onClick={() => {
-                    resetDepartmentToDefault();
-                    setSearchTerm('');
-                    setSelectedSkills([]);
-                    setHideFridge(false);
-                    setAllowDirectAssign(false);
-                    setHideStaffingEmailButtons(false);
-                    setHideStaffingWhatsappButtons(false);
-                  }}
-                >
-                  Limpiar
-                </button>
-              )}
-            </div>
-            <Tabs
-              value={selectedDepartment}
-              onValueChange={(value) => handleDepartmentChange(value as Department)}
-              className="w-full"
-            >
-              <TabsList className="flex w-full overflow-x-auto rounded-md bg-muted p-1 gap-1">
-                {AVAILABLE_DEPARTMENTS.map((dept) => (
-                  <TabsTrigger
-                    key={dept}
-                    value={dept}
-                    className="flex-1 whitespace-nowrap capitalize"
-                  >
-                    {DEPARTMENT_LABELS[dept] || formatLabel(dept)}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-            <Input
-              placeholder="Buscar técnicos..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <SkillsFilter selected={selectedSkills} onChange={setSelectedSkills} department={selectedDepartment} />
-            {specialtyOptions.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {specialtyOptions.map((opt) => (
-                  <Badge
-                    key={opt}
-                    variant={selectedSkills.includes(opt) ? 'default' : 'outline'}
-                    className="cursor-pointer capitalize"
-                    onClick={() => toggleSpecialty(opt)}
-                  >
-                    {opt}
-                  </Badge>
-                ))}
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Refrigerator className="h-4 w-4" />
-                <span className="text-sm font-medium">{hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={hideFridge} onCheckedChange={(v) => setHideFridge(Boolean(v))} aria-label={hideFridge ? 'Abrir la nevera' : 'Cerrar la nevera'} />
-                <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{fridgeCount}</Badge>
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Asignación directa</span>
-              <Switch checked={allowDirectAssign} onCheckedChange={(v) => { setAllowDirectAssign(Boolean(v)); if (v) setAllowMarkUnavailable(false); }} aria-label="Alternar asignación directa" />
-            </div>
-            {canMarkUnavailable && (
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Marcar no disponible</span>
-                <Switch checked={allowMarkUnavailable} onCheckedChange={(v) => { setAllowMarkUnavailable(Boolean(v)); if (v) setAllowDirectAssign(false); }} aria-label="Alternar marcar no disponible" />
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Mostrar email</span>
-              <Switch
-                checked={!hideStaffingEmailButtons}
-                onCheckedChange={(v) => setHideStaffingEmailButtons(!v)}
-                aria-label="Mostrar botones de email"
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Mostrar WhatsApp</span>
-              <Switch
-                checked={!hideStaffingWhatsappButtons}
-                onCheckedChange={(v) => setHideStaffingWhatsappButtons(!v)}
-                aria-label="Mostrar botones de WhatsApp"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
+      <MatrixPageControls
+        selectedDepartment={selectedDepartment}
+        defaultDepartment={defaultDepartment}
+        handleDepartmentChange={handleDepartmentChange}
+        resetDepartmentToDefault={resetDepartmentToDefault}
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        selectedSkills={selectedSkills}
+        setSelectedSkills={setSelectedSkills}
+        specialtyOptions={specialtyOptions}
+        toggleSpecialty={toggleSpecialty}
+        hideFridge={hideFridge}
+        setHideFridge={setHideFridge}
+        fridgeCount={fridgeCount}
+        allowDirectAssign={allowDirectAssign}
+        setAllowDirectAssign={setAllowDirectAssign}
+        allowMarkUnavailable={allowMarkUnavailable}
+        setAllowMarkUnavailable={setAllowMarkUnavailable}
+        canMarkUnavailable={canMarkUnavailable}
+        hideStaffingEmailButtons={hideStaffingEmailButtons}
+        setHideStaffingEmailButtons={setHideStaffingEmailButtons}
+        hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
+        setHideStaffingWhatsappButtons={setHideStaffingWhatsappButtons}
+        filtersOpen={filtersOpen}
+        setFiltersOpen={setFiltersOpen}
+        activeFilterCount={activeFilterCount}
+        isRefreshing={isRefreshing}
+        handleRefresh={handleRefresh}
+        isBackgroundFetchingMatrix={isBackgroundFetchingMatrix}
+        filteredTechnicianCount={filteredTechnicians.length}
+        jobsCount={yearJobs.length}
+        canExpandBefore={canExpandBefore}
+        canExpandAfter={canExpandAfter}
+        expandBefore={expandBefore}
+        expandAfter={expandAfter}
+        resetRange={resetRange}
+        jumpToMonth={jumpToMonth}
+        rangeInfo={rangeInfo}
+        setShowStaffingReminder={setShowStaffingReminder}
+        handleReminderOpenChange={handleReminderOpenChange}
+        outstandingJobsCount={outstandingJobsCount}
+        outstandingJobsDescription={outstandingJobsDescription}
+      />
 
       {/* Matrix Content */}
       <div className="flex-1 overflow-hidden">
@@ -1029,90 +683,15 @@ export default function JobAssignmentMatrix() {
         )}
       </div>
 
-      <Dialog open={showStaffingReminder} onOpenChange={handleReminderOpenChange}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>
-              Hay {outstandingJobs.length} trabajos con personal por completar
-            </DialogTitle>
-            <DialogDescription>
-              Revisa los roles pendientes para completar la dotación de cada equipo.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {outstandingJobs.map((job) => (
-              <div key={job.jobId} className="rounded-md border p-3">
-                <div className="text-sm font-semibold">{job.jobTitle}</div>
-                <div className="mt-2 space-y-2">
-                  {job.departments.map((dept) => (
-                    <div key={`${job.jobId}-${dept.department}`}>
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-sm font-medium">{dept.displayName}</div>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setStaffingOrchestratorTarget({
-                              jobId: job.jobId,
-                              department: dept.department,
-                              jobTitle: job.jobTitle,
-                            });
-                            setShowStaffingReminder(false);
-                          }}
-                        >
-                          Auto staffing
-                        </Button>
-                      </div>
-                      <ul className="ml-4 mt-1 list-disc space-y-1 text-sm text-muted-foreground">
-                        {dept.roles.map((role) => (
-                          <li key={`${job.jobId}-${dept.department}-${role.roleCode}`}>
-                            {role.outstanding} × {formatLabel(role.roleCode)}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button onClick={handleDismissReminder} variant="default">
-              Entendido
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(staffingOrchestratorTarget)}
-        onOpenChange={(open) => {
-          if (!open) setStaffingOrchestratorTarget(null);
-        }}
-      >
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              Auto staffing{staffingOrchestratorTarget?.jobTitle ? ` — ${staffingOrchestratorTarget.jobTitle}` : ''}
-            </DialogTitle>
-            <DialogDescription>
-              {staffingOrchestratorTarget?.department
-                ? `Departamento: ${DEPARTMENT_LABELS[staffingOrchestratorTarget.department] || formatLabel(staffingOrchestratorTarget.department)}`
-                : null}
-            </DialogDescription>
-          </DialogHeader>
-
-          {staffingOrchestratorTarget && (
-            <StaffingOrchestratorPanel
-              jobId={staffingOrchestratorTarget.jobId}
-              department={staffingOrchestratorTarget.department}
-              jobTitle={staffingOrchestratorTarget.jobTitle}
-              onClose={() => setStaffingOrchestratorTarget(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <StaffingReminderDialogs
+        showStaffingReminder={showStaffingReminder}
+        handleReminderOpenChange={handleReminderOpenChange}
+        outstandingJobs={outstandingJobs}
+        handleDismissReminder={handleDismissReminder}
+        staffingOrchestratorTarget={staffingOrchestratorTarget}
+        setStaffingOrchestratorTarget={setStaffingOrchestratorTarget}
+        setShowStaffingReminder={setShowStaffingReminder}
+      />
     </div >
   );
 }
