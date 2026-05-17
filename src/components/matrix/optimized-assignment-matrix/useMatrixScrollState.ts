@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { isSameDay } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 
 import { useDragScroll } from "@/hooks/useDragScroll";
 import { throttle } from "@/utils/throttle";
+
+const MADRID_TIMEZONE = "Europe/Madrid";
+const MAX_AUTO_SCROLL_RETRIES = 5;
 
 type UseMatrixScrollStateArgs = {
   dates: Date[];
@@ -41,7 +44,6 @@ export const useMatrixScrollState = ({
   const autoScrolledRef = useRef(false);
   const prevDatesRef = useRef<Date[] | null>(null);
 
-  const [scrollAttempts, setScrollAttempts] = useState(0);
   const [visibleRows, setVisibleRows] = useState({ start: 0, end: Math.min(techniciansLength - 1, 20) });
   const [visibleCols, setVisibleCols] = useState({ start: 0, end: Math.min(dates.length - 1, 14) });
   const [canNavLeft, setCanNavLeft] = useState(false);
@@ -206,8 +208,10 @@ export const useMatrixScrollState = ({
       return false;
     }
 
-    const today = new Date();
-    const todayIndex = dates.findIndex((date) => isSameDay(date, today));
+    const todayKey = formatInTimeZone(new Date(), MADRID_TIMEZONE, "yyyy-MM-dd");
+    const todayIndex = dates.findIndex(
+      (date) => formatInTimeZone(date, MADRID_TIMEZONE, "yyyy-MM-dd") === todayKey,
+    );
 
     if (todayIndex === -1) {
       return false;
@@ -233,20 +237,29 @@ export const useMatrixScrollState = ({
     if (autoScrolledRef.current) return;
     if (isInitialLoading || dates.length === 0) return;
 
+    let retries = 0;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
     const attemptScroll = () => {
       const success = scrollToToday();
-      if (!success && scrollAttempts < 5) {
-        setScrollAttempts((prev) => prev + 1);
-        setTimeout(attemptScroll, 100 * (scrollAttempts + 1));
-      } else if (success) {
-        setScrollAttempts(0);
+      if (success) {
         autoScrolledRef.current = true;
+        return;
+      }
+
+      retries += 1;
+      if (retries < MAX_AUTO_SCROLL_RETRIES) {
+        timeoutId = setTimeout(attemptScroll, 100 * retries);
       }
     };
 
-    const timeoutId = setTimeout(attemptScroll, 50);
-    return () => clearTimeout(timeoutId);
-  }, [dates.length, isInitialLoading, scrollAttempts, scrollToToday]);
+    timeoutId = setTimeout(attemptScroll, 50);
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [dates.length, isInitialLoading, scrollToToday]);
 
   useEffect(() => {
     updateVisibleWindow();

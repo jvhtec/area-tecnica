@@ -1,4 +1,5 @@
-import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { formatInTimeZone } from 'date-fns-tz';
 
 import { labelForCode } from '@/utils/roles';
 import type { MatrixStaffingStatus } from '@/components/matrix/optimized-matrix-cell/types';
@@ -47,7 +48,7 @@ export const OptimizedMatrixCellTooltip = ({
         </div>
         {assignment.single_day && assignment.assignment_date && (
           <div className="text-muted-foreground">
-            Día único: {format(new Date(`${assignment.assignment_date}T00:00:00`), 'MMM d')}
+            Día único: {formatInTimeZone(new Date(`${assignment.assignment_date}T00:00:00`), 'Europe/Madrid', 'MMM d', { locale: es })}
           </div>
         )}
         <div className={`capitalize ${assignment.status === 'confirmed' ? 'text-green-600' : assignment.status === 'declined' ? 'text-red-600' : 'text-yellow-600'}`}>

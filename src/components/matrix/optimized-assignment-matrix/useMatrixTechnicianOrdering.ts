@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { formatInTimeZone } from "date-fns-tz";
 
 import { queryKeys } from "@/lib/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -30,11 +31,12 @@ type TimesheetCountMaps = {
   departments: Map<string, string>;
 };
 
+const MADRID_TIMEZONE = "Europe/Madrid";
 const EMPTY_COUNT_MAPS = { counts: new Map<string, number>(), departments: new Map<string, string>() };
 
 const fetchTimesheetCountMaps = async (year: number): Promise<TimesheetCountMaps> => {
-  const yearStart = new Date(year, 0, 1).toISOString().split("T")[0];
-  const yearEnd = new Date(year, 11, 31).toISOString().split("T")[0];
+  const yearStart = formatInTimeZone(new Date(Date.UTC(year, 0, 1)), MADRID_TIMEZONE, "yyyy-MM-dd");
+  const yearEnd = formatInTimeZone(new Date(Date.UTC(year, 11, 31)), MADRID_TIMEZONE, "yyyy-MM-dd");
 
   const { data: countRows, error: timesheetError } = await dataLayerClient.rpc("get_active_timesheet_counts_by_technician", {
     p_start_date: yearStart,
@@ -177,9 +179,9 @@ export const useMatrixTechnicianOrdering = ({
     gcTime: 300_000,
   });
 
-  const currentYear = new Date().getFullYear();
+  const currentYear = Number(formatInTimeZone(new Date(), MADRID_TIMEZONE, "yyyy"));
   const { data: techConfirmedCounts } = useQuery({
-    queryKey: queryKeys.scope("tech-confirmed-counts-all-with-dept"),
+    queryKey: queryKeys.scope("tech-confirmed-counts-all-with-dept", currentYear),
     queryFn: () => fetchTimesheetCountMaps(currentYear),
     enabled: true,
     staleTime: 60_000,
@@ -187,7 +189,7 @@ export const useMatrixTechnicianOrdering = ({
   });
 
   const { data: techLastYearCounts } = useQuery({
-    queryKey: queryKeys.scope("tech-last-year-counts-all-with-dept"),
+    queryKey: queryKeys.scope("tech-last-year-counts-all-with-dept", currentYear - 1),
     queryFn: () => fetchTimesheetCountMaps(currentYear - 1),
     enabled: true,
     staleTime: 60_000,

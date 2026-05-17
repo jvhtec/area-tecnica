@@ -92,9 +92,9 @@ export const useMatrixCellAssignmentRemoval = ({
 
         const flexDepartments = determineFlexDepartmentsForAssignment(assignment, technician.department);
         if (flexDepartments.length > 0) {
-          await Promise.allSettled(flexDepartments.map(async (department) => {
-            try {
-              await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
+          const flexRemovalResults = await Promise.allSettled(
+            flexDepartments.map(async (department) => {
+              const { error: flexInvokeError } = await dataLayerClient.functions.invoke('manage-flex-crew-assignments', {
                 body: {
                   job_id: assignment.job_id,
                   technician_id: technician.id,
@@ -102,14 +102,19 @@ export const useMatrixCellAssignmentRemoval = ({
                   action: 'remove',
                 },
               });
-            } catch (flexError) {
-              console.error('Failed to remove Flex crew assignment:', flexError);
+              if (flexInvokeError) throw flexInvokeError;
+            }),
+          );
+
+          flexRemovalResults.forEach((result) => {
+            if (result.status === 'rejected') {
+              console.error('Failed to remove Flex crew assignment:', result.reason);
             }
-          }));
+          });
         }
 
         try {
-          void dataLayerClient.functions.invoke('push', {
+          const { error: pushError } = await dataLayerClient.functions.invoke('push', {
             body: {
               action: 'broadcast',
               type: 'assignment.removed',
@@ -118,6 +123,7 @@ export const useMatrixCellAssignmentRemoval = ({
               technician_id: technician.id,
             },
           });
+          if (pushError) throw pushError;
         } catch (pushErr) {
           console.warn('Failed to send assignment removal notification:', pushErr);
         }

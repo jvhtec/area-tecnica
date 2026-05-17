@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { Calendar as CalendarIcon } from "lucide-react";
 
 import { AssignmentStatusDialog } from "@/components/matrix/AssignmentStatusDialog";
@@ -10,7 +11,9 @@ import { StaffingJobSelectionDialog } from "@/components/matrix/StaffingJobSelec
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CreateUserDialog } from "@/components/users/CreateUserDialog";
 import { queryKeys } from "@/lib/react-query";
 import type { OptimizedAssignmentMatrixViewProps } from "@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView";
@@ -149,91 +152,99 @@ export const MatrixDialogs = ({
         defaultDateIso={format(cellAction.date, "yyyy-MM-dd")}
         onSubmit={({ role, message, singleDay, dates }) => {
           if (!cellAction.selectedJobId) return;
-          (async () => {
-            const jobId = cellAction.selectedJobId!;
-            const profileId = currentTechnician.id;
-            const via = offerChannel;
-            if (singleDay) {
-              const selectedDates =
-                Array.isArray(dates) && dates.length ? dates : [format(cellAction.date, "yyyy-MM-dd")];
-              for (const d of selectedDates) {
-                const conflictResult = await checkTimeConflictEnhanced(profileId, jobId, {
-                  targetDateIso: d,
-                  singleDayOnly: true,
-                  includePending: true,
-                });
-                if (conflictResult.hasHardConflict) {
-                  const conflict = conflictResult.hardConflicts[0];
-                  toast({
-                    title: "Conflicto de horarios",
-                    description: `(${d}) Ya tiene confirmado: ${conflict.title}`,
-                    variant: "destructive",
+          void (async () => {
+            try {
+              const jobId = cellAction.selectedJobId!;
+              const profileId = currentTechnician.id;
+              const via = offerChannel;
+              if (singleDay) {
+                const selectedDates =
+                  Array.isArray(dates) && dates.length ? dates : [format(cellAction.date, "yyyy-MM-dd")];
+                for (const d of selectedDates) {
+                  const conflictResult = await checkTimeConflictEnhanced(profileId, jobId, {
+                    targetDateIso: d,
+                    singleDayOnly: true,
+                    includePending: true,
                   });
-                  return;
+                  if (conflictResult.hasHardConflict) {
+                    const conflict = conflictResult.hardConflicts[0];
+                    toast({
+                      title: "Conflicto de horarios",
+                      description: `(${d}) Ya tiene confirmado: ${conflict.title}`,
+                      variant: "destructive",
+                    });
+                    return;
+                  }
                 }
+                const payload: any = {
+                  job_id: jobId,
+                  profile_id: profileId,
+                  phase: "offer",
+                  role,
+                  message,
+                  channel: via,
+                  single_day: true,
+                  dates: selectedDates,
+                };
+                if (selectedDates.length === 1) {
+                  payload.target_date = selectedDates[0];
+                }
+                sendStaffingEmail(payload, {
+                  onSuccess: (data: any) => {
+                    const ch = data?.channel || via;
+                    toast({
+                      title: "Oferta enviada",
+                      description: `Oferta de ${role} enviada por ${ch} (${selectedDates.length} día${selectedDates.length > 1 ? "s" : ""}).`,
+                    });
+                    closeDialogs();
+                  },
+                  onError: (error: any) => {
+                    toast({
+                      title: "No se pudo enviar la oferta",
+                      description: error.message,
+                      variant: "destructive",
+                    });
+                  },
+                });
+                return;
               }
-              const payload: any = {
-                job_id: jobId,
-                profile_id: profileId,
-                phase: "offer",
-                role,
-                message,
-                channel: via,
-                single_day: true,
-                dates: selectedDates,
-              };
-              if (selectedDates.length === 1) {
-                payload.target_date = selectedDates[0];
-              }
-              sendStaffingEmail(payload, {
-                onSuccess: (data: any) => {
-                  const ch = data?.channel || via;
-                  toast({
-                    title: "Oferta enviada",
-                    description: `Oferta de ${role} enviada por ${ch} (${selectedDates.length} día${selectedDates.length > 1 ? "s" : ""}).`,
-                  });
-                  closeDialogs();
-                },
-                onError: (error: any) => {
-                  toast({
-                    title: "No se pudo enviar la oferta",
-                    description: error.message,
-                    variant: "destructive",
-                  });
-                },
-              });
-              return;
-            }
 
-            const conflictResult = await checkTimeConflictEnhanced(profileId, jobId, {
-              includePending: true,
-            });
-            if (conflictResult.hasHardConflict) {
-              const conflict = conflictResult.hardConflicts[0];
+              const conflictResult = await checkTimeConflictEnhanced(profileId, jobId, {
+                includePending: true,
+              });
+              if (conflictResult.hasHardConflict) {
+                const conflict = conflictResult.hardConflicts[0];
+                toast({
+                  title: "Conflicto de horarios",
+                  description: `Ya tiene confirmado: ${conflict.title}`,
+                  variant: "destructive",
+                });
+                return;
+              }
+              sendStaffingEmail(
+                ({ job_id: jobId, profile_id: profileId, phase: "offer", role, message, channel: via, single_day: false } as any),
+                {
+                  onSuccess: (data: any) => {
+                    const ch = data?.channel || via;
+                    toast({ title: "Oferta enviada", description: `Oferta de ${role} enviada por ${ch}.` });
+                    closeDialogs();
+                  },
+                  onError: (error: any) => {
+                    toast({
+                      title: "No se pudo enviar la oferta",
+                      description: error.message,
+                      variant: "destructive",
+                    });
+                  },
+                }
+              );
+            } catch (error) {
               toast({
-                title: "Conflicto de horarios",
-                description: `Ya tiene confirmado: ${conflict.title}`,
+                title: "No se pudo enviar la oferta",
+                description: error instanceof Error ? error.message : "Error inesperado al procesar la oferta",
                 variant: "destructive",
               });
-              return;
             }
-            sendStaffingEmail(
-              ({ job_id: jobId, profile_id: profileId, phase: "offer", role, message, channel: via, single_day: false } as any),
-              {
-                onSuccess: (data: any) => {
-                  const ch = data?.channel || via;
-                  toast({ title: "Oferta enviada", description: `Oferta de ${role} enviada por ${ch}.` });
-                  closeDialogs();
-                },
-                onError: (error: any) => {
-                  toast({
-                    title: "No se pudo enviar la oferta",
-                    description: error.message,
-                    variant: "destructive",
-                  });
-                },
-              }
-            );
           })();
         }}
       />
@@ -251,47 +262,41 @@ export const MatrixDialogs = ({
           </DialogHeader>
           <div className="py-2">
             <div className="space-y-3">
-              <label className="font-medium text-sm text-foreground">Cobertura</label>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="availability-coverage"
-                    checked={availabilityCoverage === "full"}
-                    onChange={() => setAvailabilityCoverage("full")}
-                  />
-                  <span>Todo el trabajo</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="availability-coverage"
-                    checked={availabilityCoverage === "single"}
-                    onChange={() => setAvailabilityCoverage("single")}
-                  />
-                  <span>Un día</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="availability-coverage"
-                    checked={availabilityCoverage === "multi"}
-                    onChange={() => setAvailabilityCoverage("multi")}
-                  />
-                  <span>Varios días</span>
-                </label>
-              </div>
+              <Label className="font-medium text-sm text-foreground">Cobertura</Label>
+              <RadioGroup
+                value={availabilityCoverage}
+                onValueChange={(value) => setAvailabilityCoverage(value as "full" | "single" | "multi")}
+                className="flex items-center gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="availability-coverage-full" value="full" />
+                  <Label htmlFor="availability-coverage-full" className="cursor-pointer">
+                    Todo el trabajo
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="availability-coverage-single" value="single" />
+                  <Label htmlFor="availability-coverage-single" className="cursor-pointer">
+                    Un día
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="availability-coverage-multi" value="multi" />
+                  <Label htmlFor="availability-coverage-multi" className="cursor-pointer">
+                    Varios días
+                  </Label>
+                </div>
+              </RadioGroup>
               {(() => {
                 const job = jobs.find((j) => j.id === availabilityDialog.jobId);
-                const start = job?.start_time ? new Date(job.start_time) : undefined;
-                const end = job?.end_time ? new Date(job.end_time) : start;
-                if (start) start.setHours(0, 0, 0, 0);
-                if (end) end.setHours(0, 0, 0, 0);
+                const toMadridDay = (value: Date | string) =>
+                  formatInTimeZone(value, "Europe/Madrid", "yyyy-MM-dd");
+                const startDay = job?.start_time ? toMadridDay(job.start_time) : undefined;
+                const endDay = job?.end_time ? toMadridDay(job.end_time) : startDay;
                 const isAllowed = (d: Date) => {
-                  if (!start || !end) return true;
-                  const t = new Date(d);
-                  t.setHours(0, 0, 0, 0);
-                  return t >= start && t <= end;
+                  if (!startDay || !endDay) return true;
+                  const day = toMadridDay(d);
+                  return day >= startDay && day <= endDay;
                 };
                 return (
                   <>

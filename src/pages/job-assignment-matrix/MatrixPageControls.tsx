@@ -322,6 +322,7 @@ export const MatrixPageControls = ({
                   setSelectedSkills([]);
                   setHideFridge(false);
                   setAllowDirectAssign(false);
+                  setAllowMarkUnavailable(false);
                   setHideStaffingEmailButtons(false);
                   setHideStaffingWhatsappButtons(false);
                 }}

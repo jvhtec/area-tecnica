@@ -63,27 +63,25 @@ export const OptimizedMatrixCellDialogs = ({
           </DialogHeader>
           <div className="py-2">
             <div className="space-y-3">
-              <label className="font-medium text-sm text-foreground">Canal</label>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="availability-retry-channel"
-                    checked={retryChannel === 'email'}
-                    onChange={() => setRetryChannel('email')}
-                  />
-                  <span>Email</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="availability-retry-channel"
-                    checked={retryChannel === 'whatsapp'}
-                    onChange={() => setRetryChannel('whatsapp')}
-                  />
-                  <span>WhatsApp</span>
-                </label>
-              </div>
+              <Label className="font-medium text-sm text-foreground">Canal</Label>
+              <RadioGroup
+                value={retryChannel}
+                onValueChange={(value) => setRetryChannel(value as 'email' | 'whatsapp')}
+                className="flex items-center gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="availability-retry-channel-email" value="email" />
+                  <Label htmlFor="availability-retry-channel-email" className="cursor-pointer">
+                    Email
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem id="availability-retry-channel-whatsapp" value="whatsapp" />
+                  <Label htmlFor="availability-retry-channel-whatsapp" className="cursor-pointer">
+                    WhatsApp
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
           </div>
           <DialogFooter>

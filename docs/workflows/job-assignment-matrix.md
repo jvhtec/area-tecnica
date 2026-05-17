@@ -18,7 +18,7 @@ The Job Assignment Matrix is the primary interface for crew scheduling. It displ
 | **Assignment dialog** | `src/components/matrix/AssignJobDialog.tsx` |
 | **Cell components** | `src/components/matrix/MatrixCell.tsx`, `OptimizedMatrixCell.tsx`, `optimized-matrix-cell/` |
 | **Data hook** | `src/hooks/useOptimizedMatrixData.ts` (21.3KB) |
-| **Virtualization** | `src/hooks/useVirtualizedMatrix.ts` |
+| **Virtualization** | `src/components/matrix/optimized-assignment-matrix/useMatrixScrollState.ts` |
 | **Memoization** | `src/hooks/useMemoizedMatrix.ts` |
 | **Available techs** | `src/hooks/useAvailableTechnicians.ts` |
 | **Conflict utils** | `src/utils/technicianAvailability.ts` (12.5KB) |
@@ -55,15 +55,15 @@ The Job Assignment Matrix is the primary interface for crew scheduling. It displ
 - Builds assignment date maps from timesheet data
 
 ### Virtualization (`useMatrixScrollState`)
-- Tracks synchronized header, technician-column, and grid scroll positions
-- Calculates the visible row/column window with desktop/mobile overscan
-- Preserves scroll position when date ranges expand before or after the current window
-- Keeps mobile date navigation and edge-triggered range expansion outside the render component
-- Only renders visible cells (critical for 100+ technicians x 30+ days)
+- `useMatrixScrollState` tracks synchronized header, technician-column, and grid scroll positions
+- `useMatrixScrollState` calculates the visible row/column window with desktop/mobile overscan
+- `useMatrixScrollState` preserves scroll position when date ranges expand before or after the current window
+- `useMatrixScrollState` keeps mobile date navigation and edge-triggered range expansion outside the render component
+- `useMatrixScrollState` limits rendering to visible cells (critical for 100+ technicians x 30+ days)
 
 ### Technician Ordering (`useMatrixTechnicianOrdering`)
 - Owns job-focused sort state and batched staffing status lookup for the selected sort job
-- Loads residencia data only when location sorting is active
+- Loads residence data only when location sorting is active
 - Loads current-year and last-year timesheet counts for per-department medal ranking
 - Keeps sorting/ranking logic out of the virtualized layout component
 
