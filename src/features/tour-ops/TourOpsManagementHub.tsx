@@ -565,16 +565,25 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
   const [lastToken, setLastToken] = useState<string | null>(null);
 
   const create = async () => {
-    const link = await createLink.mutateAsync({
-      label,
-      allowedSections: sections,
-      expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
-    });
-    if (link?.token) {
-      const url = `${window.location.origin}/tour-share/${link.token}`;
-      setLastToken(url);
-      await navigator.clipboard?.writeText(url).catch(() => undefined);
-      toast.success("Link creado y copiado");
+    try {
+      const link = await createLink.mutateAsync({
+        label,
+        allowedSections: sections,
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+      });
+      if (link?.token) {
+        const url = `${window.location.origin}/tour-share/${link.token}`;
+        setLastToken(url);
+        await navigator.clipboard?.writeText(url).catch(() => undefined);
+        toast.success("Link creado y copiado");
+        return;
+      }
+      toast.error("No se recibio el token del link externo");
+    } catch (err) {
+      const message = err && typeof err === "object" && "message" in err
+        ? String((err as { message?: unknown }).message)
+        : "No se pudo crear el link externo";
+      toast.error(message);
     }
   };
 
