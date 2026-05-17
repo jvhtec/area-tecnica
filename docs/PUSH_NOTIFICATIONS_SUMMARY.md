@@ -93,11 +93,11 @@ You can configure:
 - `/supabase/migrations/20251030110000_add_tour_date_type_change_events.sql`
 
 ### Backend (Push Function)
-- `/supabase/functions/push/index.ts`
-  - Added `job.assignment.direct` handler (line ~879-906)
-  - Added `tourdate.type.changed.*` handlers (line ~1098-1161)
-  - Added `job.type.changed.*` handlers (line ~1162-1207)
-  - Updated `BroadcastBody` type with new fields
+- `/supabase/functions/push/index.ts` dispatches the `broadcast` action to the broadcast router.
+- `/supabase/functions/push/broadcast.ts` stays the single broadcast entrypoint: it resolves shared job/tour/actor context, applies route overrides, loads web/native delivery targets, and sends the final payload.
+- `/supabase/functions/push/broadcast/families/` groups event-specific recipient rules and delivery branches by family: jobs, timesheets, documents, festival public submissions, incidents, staffing, assignments, tasks, logistics, Flex, messages, tours, SoundVision, changelog, and fallback.
+- `/supabase/functions/push/broadcast/messages/` contains pure Spanish message builders covered by section-level tests.
+- `/supabase/functions/push/types.ts` defines the typed broadcast payload hints used by the router and event families.
 
 ### Frontend
 - `/src/components/matrix/AssignJobDialog.tsx` - Uses `job.assignment.direct`
@@ -193,7 +193,7 @@ All events support the following recipient configurations:
 
 - All notifications are **non-blocking** - if they fail, the operation still succeeds
 - Notifications are sent to all logged-in devices
-- Spanish translations are built into the push function
+- Spanish translations are built into push broadcast message builders
 - Events respect configured push notification routes
 - All changes are logged in the activity log regardless of push notifications
 
