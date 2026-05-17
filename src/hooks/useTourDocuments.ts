@@ -22,6 +22,7 @@ export interface TourDocument {
   uploaded_by?: string;
   uploaded_at: string;
   visible_to_tech?: boolean;
+  visible_to_guest?: boolean;
 }
 
 export const useTourDocuments = (tourId: string) => {
@@ -133,6 +134,29 @@ export const useTourDocuments = (tourId: string) => {
     },
   });
 
+  const updateGuestVisibility = useMutation({
+    mutationFn: async ({ documentId, visibleToGuest }: { documentId: string; visibleToGuest: boolean }) => {
+      if (!canManageVisibility) {
+        throw new Error('Not allowed');
+      }
+
+      const { error } = await supabase
+        .from('tour_documents')
+        .update({ visible_to_guest: visibleToGuest } as any)
+        .eq('id', documentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
+      toast.success('Guest visibility updated');
+    },
+    onError: (error: any) => {
+      console.error('Update guest visibility error:', error);
+      toast.error('Failed to update guest visibility');
+    },
+  });
+
   const deleteDocument = useMutation({
     mutationFn: async (document: TourDocument) => {
       if (!user?.id) {
@@ -224,6 +248,7 @@ export const useTourDocuments = (tourId: string) => {
     error,
     uploadDocument,
     updateVisibility,
+    updateGuestVisibility,
     deleteDocument,
     getDocumentUrl,
     canDelete,

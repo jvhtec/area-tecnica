@@ -61,6 +61,17 @@ export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
     { table: 'tours', priority: 'high' }, 
     { table: 'tour_dates', priority: 'medium' }
   ],
+  '/tour-management': [
+    { table: 'tours', priority: 'high' },
+    { table: 'tour_dates', priority: 'high' },
+    { table: 'tour_timeline_events', priority: 'high' },
+    { table: 'tour_travel_segments', priority: 'high' },
+    { table: 'tour_accommodations', priority: 'medium' },
+    { table: 'tour_documents', priority: 'medium' },
+    { table: 'tour_guest_links', priority: 'low' },
+    { table: 'hoja_de_ruta', priority: 'medium' },
+    { table: 'job_assignments', priority: 'medium' }
+  ],
   '/project-management': [
     { table: 'jobs', priority: 'high' },
     { table: 'job_assignments', priority: 'medium' },
@@ -159,6 +170,11 @@ const ROUTE_QUERY_KEY_OVERRIDES: Record<string, string | string[]> = {
   job_documents: ['optimized-jobs'],
   flex_folders: ['optimized-jobs'],
   locations: ['optimized-jobs'],
+  tour_timeline_events: ['tour-ops'],
+  tour_travel_segments: ['tour-ops'],
+  tour_accommodations: ['tour-ops'],
+  tour_documents: ['tour-ops', 'tour-documents'],
+  tour_guest_links: ['tour-guest-links'],
   job_date_types: ['date-types'],
   messages: ['messages'],
   direct_messages: ['direct_messages'],

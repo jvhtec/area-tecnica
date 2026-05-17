@@ -8,6 +8,8 @@ import { ArrowLeft, Calendar as CalendarIcon, FileText, Download, AlertTriangle,
 import { Button } from '@/components/ui/button';
 import { Theme } from './types';
 import { fetchTourLogo } from '@/utils/pdf/logoUtils';
+import { TourOpsMobileItinerary } from '@/features/tour-ops/TourOpsMobileItinerary';
+import { useTourOps } from '@/features/tour-ops/useTourOps';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -97,6 +99,8 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
         enabled: !!tourId,
     });
 
+    const { data: tourOpsModel, isLoading: tourOpsLoading } = useTourOps(tourId, "technician");
+
     if (tourLoading) {
         return (
             <div className={`fixed inset-0 z-[60] ${theme.bg} flex items-center justify-center`}>
@@ -136,13 +140,6 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
         const end = tourData.end_date ? format(new Date(tourData.end_date), "d 'de' MMM, yyyy", { locale: es }) : '';
         if (start && end) return `${start} - ${end}`;
         return start || end;
-    };
-
-    const getDateStatus = (dateEntry: TourDate): 'done' | 'next' | 'upcoming' => {
-        const dateObj = new Date(dateEntry.date);
-        if (dateObj < now) return 'done';
-        if (nextShow && dateEntry.id === nextShow.id) return 'next';
-        return 'upcoming';
     };
 
     const handleDownloadDoc = async (doc: TourDocument) => {
@@ -278,58 +275,21 @@ export const TourDetailView = ({ tourId, theme, isDark, onClose, onOpenJob }: To
                     </div>
                 )}
 
-                {/* Itinerary */}
                 <div>
-                    <h3 className={`font-bold ${theme.textMain} mb-3`}>Itinerario</h3>
-                    <div className="space-y-2">
-                        {tourDates.length === 0 ? (
-                            <div className={`p-8 rounded-xl border ${theme.card} text-center`}>
-                                <CalendarIcon size={32} className={`mx-auto mb-2 ${theme.textMuted}`} />
-                                <p className={`text-sm ${theme.textMuted}`}>No hay fechas programadas</p>
-                            </div>
-                        ) : (
-                            [...tourDates]
-                                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                                .map((dateEntry) => {
-                                    const status = getDateStatus(dateEntry);
-                                    const statusStyles: Record<string, string> = {
-                                        done: 'bg-emerald-500/10 text-emerald-500',
-                                        next: 'bg-blue-500/10 text-blue-500',
-                                        upcoming: isDark ? 'bg-gray-500/10 text-gray-400' : 'bg-slate-100 text-slate-500',
-                                    };
-                                    const statusLabels: Record<string, string> = { done: 'Hecho', next: 'Próximo', upcoming: 'Pendiente' };
-
-                                    return (
-                                        <div
-                                            key={dateEntry.id}
-                                            className={`flex items-center justify-between p-3 rounded-xl border ${theme.card}`}
-                                        >
-                                            <div className="flex items-center gap-4">
-                                                <div className="text-center w-10">
-                                                    <div className={`text-[10px] font-bold uppercase ${theme.textMuted}`}>
-                                                        {format(new Date(dateEntry.date), 'MMM', { locale: es })}
-                                                    </div>
-                                                    <div className={`text-lg font-bold ${theme.textMain}`}>
-                                                        {format(new Date(dateEntry.date), 'd')}
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div className={`font-bold text-sm ${theme.textMain}`}>{dateEntry.location?.name || 'Recinto'}</div>
-                                                    <div className={`text-xs ${theme.textMuted}`}>
-                                                        {dateEntry.location?.formatted_address || dateEntry.tour_date_type || 'Concierto'}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${statusStyles[status]}`}>
-                                                    {statusLabels[status]}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                        )}
-                    </div>
+                    <h3 className={`font-bold ${theme.textMain} mb-3`}>Itinerario operativo</h3>
+                    {tourOpsLoading ? (
+                        <div className={`p-8 rounded-xl border ${theme.card} text-center`}>
+                            <Loader2 size={28} className="mx-auto mb-2 animate-spin text-blue-500" />
+                            <p className={`text-sm ${theme.textMuted}`}>Cargando itinerario...</p>
+                        </div>
+                    ) : tourOpsModel ? (
+                        <TourOpsMobileItinerary model={tourOpsModel} projection="technician" />
+                    ) : (
+                        <div className={`p-8 rounded-xl border ${theme.card} text-center`}>
+                            <CalendarIcon size={32} className={`mx-auto mb-2 ${theme.textMuted}`} />
+                            <p className={`text-sm ${theme.textMuted}`}>No hay fechas programadas</p>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
