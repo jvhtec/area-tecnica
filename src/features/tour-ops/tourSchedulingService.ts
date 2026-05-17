@@ -280,6 +280,7 @@ export const normalizeTravelSegment = (
     luggageTruck: Boolean(row.luggage_truck),
     status: textOrNull(row.status),
     source,
+    syncStatus: source === "legacy" ? "legacy" : source === "hoja" ? "imported" : "needs_sync",
     hojaDeRutaId: textOrNull(row.hoja_de_ruta_id) ?? textOrNull(vehicleDetails?.hojaDeRutaId),
     sourceTable: textOrNull(row.source_table) as TourOpsTravelSegment["sourceTable"] | undefined,
   };
@@ -386,6 +387,7 @@ const normalizeAccommodation = (
     roomsBooked: toNumber(row.rooms_booked) ?? (roomAllocation.length || null),
     notes: textOrNull(row.notes),
     source: row.source === "hoja" ? "hoja" : "normalized",
+    syncStatus: row.source === "hoja" ? "imported" : "needs_sync",
   };
 };
 
@@ -573,6 +575,15 @@ const buildDateHealth = (date: TourOpsDate): TourOpsHealthIssue[] => {
       tourDateId: date.id,
     });
   }
+  if (date.location?.name && (date.location.latitude == null || date.location.longitude == null)) {
+    issues.push({
+      id: `${date.id}:venue-coordinates`,
+      severity: "warning",
+      label: "Venue sin coordenadas",
+      detail: `${prefix} no tiene coordenadas para mapa, rutas y calculos de distancia.`,
+      tourDateId: date.id,
+    });
+  }
   if (!date.jobId) {
     issues.push({
       id: `${date.id}:job`,
@@ -582,12 +593,39 @@ const buildDateHealth = (date: TourOpsDate): TourOpsHealthIssue[] => {
       tourDateId: date.id,
     });
   }
+  if (!date.hojaDeRutaId) {
+    issues.push({
+      id: `${date.id}:hoja`,
+      severity: "info",
+      label: "Sin Hoja de Ruta vinculada",
+      detail: `${prefix} guardara datos de operaciones, pero no podra sincronizar day sheet hasta que exista Hoja de Ruta.`,
+      tourDateId: date.id,
+    });
+  }
   if (date.program.length === 0) {
     issues.push({
       id: `${date.id}:program`,
       severity: "warning",
       label: "Programa pendiente",
       detail: `${prefix} no tiene programa del dia.`,
+      tourDateId: date.id,
+    });
+  }
+  if ([...date.travelIn, ...date.travelOut].some((segment) => segment.syncStatus === "needs_sync")) {
+    issues.push({
+      id: `${date.id}:travel-sync`,
+      severity: "warning",
+      label: "Viajes pendientes de sincronizar",
+      detail: `${prefix} tiene viajes de operaciones que todavia no coinciden con Hoja de Ruta.`,
+      tourDateId: date.id,
+    });
+  }
+  if (date.accommodations.some((hotel) => hotel.syncStatus === "needs_sync")) {
+    issues.push({
+      id: `${date.id}:hotel-sync`,
+      severity: "warning",
+      label: "Hoteles pendientes de sincronizar",
+      detail: `${prefix} tiene alojamientos de operaciones que todavia no coinciden con Hoja de Ruta.`,
       tourDateId: date.id,
     });
   }
@@ -670,6 +708,79 @@ const mergeAccommodations = (accommodations: TourOpsAccommodation[]) => {
   return Array.from(byKey.values());
 };
 
+const hasHomeBase = (settings: Record<string, unknown>) => {
+  const homeBase = isRecord(settings.homeBase) ? settings.homeBase : null;
+  return Boolean(homeBase && toNumber(homeBase.latitude) != null && toNumber(homeBase.longitude) != null);
+};
+
+const travelSyncKey = (segment: TourOpsTravelSegment) => [
+  segment.fromTourDateId,
+  segment.toTourDateId,
+  normalizeComparison(segment.transportationType),
+  normalizeComparison(segment.departureTime),
+  normalizeComparison(segment.arrivalTime),
+].join("|");
+
+const accommodationSyncKey = (accommodation: TourOpsAccommodation) => [
+  accommodation.tourDateId,
+  normalizeComparison(accommodation.hotelName),
+  normalizeComparison(accommodation.checkInDate),
+  normalizeComparison(accommodation.checkOutDate),
+].join("|");
+
+const annotateTravelSyncStatus = (
+  segments: TourOpsTravelSegment[],
+  allCandidates: TourOpsTravelSegment[],
+  hojaByDate: Map<string, AnyRecord>,
+) => {
+  const hojaKeys = new Set(
+    allCandidates
+      .filter((segment) => segment.source === "hoja")
+      .map(travelSyncKey),
+  );
+
+  return segments.map((segment) => {
+    if (segment.source === "legacy") return { ...segment, syncStatus: "legacy" as const };
+    if (segment.source === "hoja") return { ...segment, syncStatus: "imported" as const };
+
+    const linkedDateIds = [segment.fromTourDateId, segment.toTourDateId].filter(Boolean) as string[];
+    const hasHojaTarget = linkedDateIds.some((id) => hojaByDate.has(id));
+    return {
+      ...segment,
+      syncStatus: hojaKeys.has(travelSyncKey(segment))
+        ? "synced"
+        : hasHojaTarget
+          ? "needs_sync"
+          : "no_hoja",
+    };
+  });
+};
+
+const annotateAccommodationSyncStatus = (
+  accommodations: TourOpsAccommodation[],
+  allCandidates: TourOpsAccommodation[],
+  hojaByDate: Map<string, AnyRecord>,
+) => {
+  const hojaKeys = new Set(
+    allCandidates
+      .filter((hotel) => hotel.source === "hoja")
+      .map(accommodationSyncKey),
+  );
+
+  return accommodations.map((hotel) => {
+    if (hotel.source === "hoja") return { ...hotel, syncStatus: "imported" as const };
+    const hasHojaTarget = Boolean(hotel.tourDateId && hojaByDate.has(hotel.tourDateId));
+    return {
+      ...hotel,
+      syncStatus: hojaKeys.has(accommodationSyncKey(hotel))
+        ? "synced"
+        : hasHojaTarget
+          ? "needs_sync"
+          : "no_hoja",
+    };
+  });
+};
+
 export function normalizeTourOpsModel(
   raw: AnyRecord,
   projection: TourOpsProjection,
@@ -737,14 +848,24 @@ export function normalizeTourOpsModel(
     .map((row) => normalizeHojaTravelArrangement(row, hojaById, dateById, locationById));
   const hojaTransport = asArray<AnyRecord>(raw.hoja_transport)
     .map((row) => normalizeHojaTransport(row, hojaById, dateById, locationById));
-  const travelSegments = mergeTravelSegments([...normalizedTravel, ...hojaTravel, ...hojaTransport, ...legacyTravel]);
+  const allTravelCandidates = [...normalizedTravel, ...hojaTravel, ...hojaTransport, ...legacyTravel];
+  const travelSegments = annotateTravelSyncStatus(
+    mergeTravelSegments(allTravelCandidates),
+    allTravelCandidates,
+    hojaByDate,
+  );
   const hojaStaffLookupById = buildHojaStaffLookup(asArray<AnyRecord>(raw.hoja_staff));
   const normalizedAccommodations = asArray<AnyRecord>(raw.accommodations).map((row) => normalizeAccommodation({ ...row, source: "normalized" }));
   const hojaAccommodations = asArray<AnyRecord>(raw.hoja_accommodations).map((row) =>
     normalizeHojaAccommodation(row, hojaById, hojaStaffLookupById)
   );
   const hojaInfoAccommodations = Array.from(hojaById.values()).flatMap(normalizeHojaHotelInfo);
-  const accommodations = mergeAccommodations([...normalizedAccommodations, ...hojaAccommodations, ...hojaInfoAccommodations]);
+  const allAccommodationCandidates = [...normalizedAccommodations, ...hojaAccommodations, ...hojaInfoAccommodations];
+  const accommodations = annotateAccommodationSyncStatus(
+    mergeAccommodations(allAccommodationCandidates),
+    allAccommodationCandidates,
+    hojaByDate,
+  );
 
   const allDocuments = asArray<AnyRecord>(raw.documents).map(normalizeDocument);
   const documents = allDocuments.filter((document) => {
@@ -807,7 +928,28 @@ export function normalizeTourOpsModel(
     })
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-  const health = projection === "management" ? dates.flatMap((date) => date.health) : [];
+  const tourSettings = objectOrEmpty(tour.tour_settings);
+  const globalHealth: TourOpsHealthIssue[] = projection === "management"
+    ? [
+        ...(!hasHomeBase(tourSettings)
+          ? [{
+              id: `${tour.id}:home-base`,
+              severity: "warning" as const,
+              label: "Base de operaciones pendiente",
+              detail: "Configura la base del tour para mapa, rutas, calculos de distancia y viajes generados.",
+            }]
+          : []),
+        ...(allDocuments.length === 0
+          ? [{
+              id: `${tour.id}:documents`,
+              severity: "info" as const,
+              label: "Sin documentos de gira",
+              detail: "No hay documentos cargados para tecnicos o enlaces externos.",
+            }]
+          : []),
+      ]
+    : [];
+  const health = projection === "management" ? [...globalHealth, ...dates.flatMap((date) => date.health)] : [];
   const tourTimezone = textOrNull(tour.default_timezone) ?? MADRID_TIMEZONE;
   const todayKey = formatInTimeZone(new Date(), tourTimezone, "yyyy-MM-dd");
   const completedDates = dates.filter((date) => date.date.slice(0, 10) < todayKey).length;
@@ -828,7 +970,7 @@ export function normalizeTourOpsModel(
       endDate: textOrNull(tour.end_date),
       defaultTimezone: textOrNull(tour.default_timezone),
       contacts: shouldIncludeSection(allowedSections, "contacts") ? normalizeContacts(tour.tour_contacts, projection) : [],
-      settings: objectOrEmpty(tour.tour_settings),
+      settings: tourSettings,
       schedulingPreferences: objectOrEmpty(tour.scheduling_preferences),
       hasLegacyTravelPlan: normalizedTravel.length === 0 && asArray(tour.travel_plan).length > 0,
     },
@@ -1263,6 +1405,8 @@ export async function saveTravelSegment(input: Partial<TourOpsTravelSegment> & {
       ? "hoja_de_ruta_transport"
       : "hoja_de_ruta_travel_arrangements";
 
+    await upsertOpsTravelFromHoja(input);
+
     if (table === "hoja_de_ruta_transport") {
       const { error } = await client
         .from("hoja_de_ruta_transport")
@@ -1277,13 +1421,11 @@ export async function saveTravelSegment(input: Partial<TourOpsTravelSegment> & {
         })
         .eq("id", input.id);
       if (error) throw error;
-      await upsertOpsTravelFromHoja(input);
       return input.id;
     }
 
     const { error } = await client.from("hoja_de_ruta_travel_arrangements").update(payload).eq("id", input.id);
     if (error) throw error;
-    await upsertOpsTravelFromHoja(input);
     return input.id;
   }
 
@@ -1453,13 +1595,13 @@ export async function saveAccommodation(input: Partial<TourOpsAccommodation> & {
   const isLegacyHotelInfo = Boolean(input.id?.startsWith("hotel-info:"));
 
   if (input.source === "hoja" && input.id && !isLegacyHotelInfo) {
+    await upsertOpsAccommodationFromHoja(input);
     const { error } = await client
       .from("hoja_de_ruta_accommodations")
       .update(hojaAccommodationPayloadFromHotel(input))
       .eq("id", input.id);
     if (error) throw error;
     await replaceHojaRoomAssignments(input.id, input.hojaDeRutaId, input.roomAllocation);
-    await upsertOpsAccommodationFromHoja(input);
     return input.id;
   }
 

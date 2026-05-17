@@ -1,4 +1,5 @@
 export type TourOpsProjection = "management" | "technician" | "guest";
+export type TourOpsSyncStatus = "synced" | "needs_sync" | "no_hoja" | "imported" | "legacy";
 
 export type TourOpsSection =
   | "overview"
@@ -103,6 +104,7 @@ export interface TourOpsTravelSegment {
   luggageTruck: boolean;
   status: string | null;
   source: "normalized" | "legacy" | "hoja";
+  syncStatus: TourOpsSyncStatus;
   hojaDeRutaId?: string | null;
   sourceTable?: "tour_travel_segments" | "hoja_de_ruta_travel_arrangements" | "hoja_de_ruta_transport" | "travel_plan";
 }
@@ -135,6 +137,7 @@ export interface TourOpsAccommodation {
   roomsBooked: number | null;
   notes: string | null;
   source: "normalized" | "hoja";
+  syncStatus: TourOpsSyncStatus;
 }
 
 export interface TourOpsDocument {

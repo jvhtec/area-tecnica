@@ -132,17 +132,60 @@ describe("tour ops normalization", () => {
     expect(model.travelSegments).toEqual(expect.arrayContaining([
       expect.objectContaining({
         source: "legacy",
+        syncStatus: "legacy",
         fromTourDateId: "date-1",
         toTourDateId: "date-2",
         transportationType: "bus",
       }),
       expect.objectContaining({
         source: "hoja",
+        syncStatus: "imported",
         toTourDateId: "date-1",
         transportationType: "van",
       }),
     ]));
     expect(model.health.some((issue) => issue.id === "date-2:job")).toBe(true);
+    expect(model.health.some((issue) => issue.id === "tour-1:home-base")).toBe(true);
+  });
+
+  it("keeps normalized ops rows as the visible source when matching hoja fallback exists", () => {
+    const model = normalizeTourOpsModel(
+      {
+        ...rawPayload,
+        tour: { ...rawTour, travel_plan: [] },
+        travel_segments: [
+          {
+            id: "ops-travel-1",
+            tour_id: "tour-1",
+            to_tour_date_id: "date-1",
+            from_label: "BCN Airport",
+            to_label: "Barcelona Arena",
+            transportation_type: "van",
+            departure_time: "08:00",
+            arrival_time: "09:00",
+          },
+        ],
+        accommodations: [
+          {
+            id: "ops-hotel-1",
+            tour_id: "tour-1",
+            tour_date_id: "date-1",
+            hotel_name: "Hoja Hotel",
+            hotel_address: "Carrer de la Ruta",
+            check_in_date: "2026-06-01",
+            check_out_date: "2026-06-02",
+          },
+        ],
+      },
+      "management",
+    );
+
+    expect(model.travelSegments.filter((segment) => segment.transportationType === "van")).toEqual([
+      expect.objectContaining({ id: "ops-travel-1", source: "normalized", syncStatus: "synced" }),
+    ]);
+    expect(model.accommodations.filter((hotel) => hotel.hotelName === "Hoja Hotel")).toEqual([
+      expect.objectContaining({ id: "ops-hotel-1", source: "normalized", syncStatus: "synced" }),
+    ]);
   });
 
   it("filters private data for technician and guest projections", () => {

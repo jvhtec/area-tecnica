@@ -74,7 +74,20 @@ const getNextDate = (dates: TourOpsDate[]) => {
   return dates.find((date) => madridDateKey(date.date) >= todayKey) ?? dates[0] ?? null;
 };
 
-const DateDetail = ({ date, projection }: { date: TourOpsDate; projection: TourOpsProjection }) => (
+const roomOccupants = (room: TourOpsDate["accommodations"][number]["roomAllocation"][number]) =>
+  [room.staffMember1Name || room.staffMember1Id, room.staffMember2Name || room.staffMember2Id]
+    .filter(Boolean)
+    .join(" / ");
+
+const DateDetail = ({
+  date,
+  projection,
+  model,
+}: {
+  date: TourOpsDate;
+  projection: TourOpsProjection;
+  model: TourOpsModel;
+}) => (
   <div className="space-y-3">
     <Card>
       <CardContent className="p-4 space-y-3">
@@ -233,6 +246,15 @@ const DateDetail = ({ date, projection }: { date: TourOpsDate; projection: TourO
                   <div className="text-xs mt-1">
                     {[hotel.checkInDate, hotel.checkOutDate].filter(Boolean).join(" -> ")}
                   </div>
+                  {hotel.roomAllocation.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {hotel.roomAllocation.map((room, index) => (
+                        <div key={room.id ?? index} className="rounded bg-muted/50 px-2 py-1 text-xs">
+                          {[room.roomType || "Habitacion", room.roomNumber, roomOccupants(room)].filter(Boolean).join(" · ")}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))
             ) : (
@@ -251,6 +273,35 @@ const DateDetail = ({ date, projection }: { date: TourOpsDate; projection: TourO
         </CardContent>
       </Card>
     ) : null}
+
+    {model.tour.contacts.length > 0 && (
+      <Collapsible defaultOpen={projection === "guest"}>
+        <Card>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer py-3">
+              <CardTitle className="text-base flex items-center justify-between">
+                <span className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Contactos
+                </span>
+                <ChevronDown className="h-4 w-4" />
+              </CardTitle>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="pt-0 space-y-2">
+              {model.tour.contacts.map((contact, index) => (
+                <div key={contact.id ?? index} className="rounded-lg border p-3 text-sm">
+                  <div className="font-medium">{contact.name}</div>
+                  <div className="text-xs text-muted-foreground">{[contact.role, contact.company].filter(Boolean).join(" · ")}</div>
+                  <div className="mt-1 text-xs">{[contact.phone, contact.email].filter(Boolean).join(" · ")}</div>
+                </div>
+              ))}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+    )}
   </div>
 );
 
@@ -324,7 +375,7 @@ export function TourOpsMobileItinerary({ model, projection, shareToken, classNam
       </div>
 
       {selectedDate ? (
-        <DateDetail date={selectedDate} projection={projection} />
+        <DateDetail date={selectedDate} projection={projection} model={model} />
       ) : (
         <Card>
           <CardContent className="p-6 text-center text-sm text-muted-foreground">

@@ -100,13 +100,51 @@ const finiteNumberOrNull = (value: string) => {
 };
 
 const sourceLabel = (source?: string) =>
-  source === "hoja" ? "hoja de ruta" : source === "legacy" ? "legacy" : "ops";
+  source === "hoja" ? "Hoja import" : source === "legacy" ? "Legacy" : "Ops";
+
+const syncStatusLabel = (status?: string) => {
+  switch (status) {
+    case "synced":
+      return "Synced";
+    case "needs_sync":
+      return "Needs sync";
+    case "no_hoja":
+      return "No Hoja for date";
+    case "imported":
+      return "Hoja import";
+    case "legacy":
+      return "Legacy";
+    default:
+      return "Needs sync";
+  }
+};
+
+const syncStatusVariant = (status?: string): "default" | "secondary" | "destructive" | "outline" => {
+  switch (status) {
+    case "synced":
+      return "default";
+    case "needs_sync":
+      return "destructive";
+    case "imported":
+      return "secondary";
+    default:
+      return "outline";
+  }
+};
+
+const hasTourHomeBase = (settings: Record<string, unknown>) => {
+  const homeBase = settings.homeBase as { latitude?: unknown; longitude?: unknown } | undefined;
+  return homeBase?.latitude != null &&
+    homeBase?.longitude != null &&
+    Number.isFinite(Number(homeBase.latitude)) &&
+    Number.isFinite(Number(homeBase.longitude));
+};
 
 const guestLinkUrl = (link: Pick<TourGuestLink, "token">) =>
   link.token && typeof window !== "undefined" ? `${window.location.origin}/tour-share/${link.token}` : null;
 
 const roomOccupants = (room: TourOpsRoomAssignment) =>
-  [room.staffMember1Name, room.staffMember2Name, room.staffMember1Id, room.staffMember2Id]
+  [room.staffMember1Name || room.staffMember1Id, room.staffMember2Name || room.staffMember2Id]
     .filter(Boolean)
     .join(" / ");
 
@@ -224,6 +262,79 @@ const ActiveDateSelector = ({
   );
 };
 
+const DateContextHeader = ({
+  model,
+  selectedDate,
+  onOpenHoja,
+  onAddTravel,
+  onAddHotel,
+  onOpenDocs,
+}: {
+  model: TourOpsModel;
+  selectedDate: TourOpsDate | null;
+  onOpenHoja: () => void;
+  onAddTravel: () => void;
+  onAddHotel: () => void;
+  onOpenDocs: () => void;
+}) => {
+  if (!selectedDate) return null;
+
+  const travelCount = selectedDate.travelIn.length + selectedDate.travelOut.length;
+  const hotelCount = selectedDate.accommodations.length;
+  const roomCount = selectedDate.accommodations.reduce((total, hotel) => total + hotel.roomAllocation.length, 0);
+
+  return (
+    <Card>
+      <CardContent className="flex flex-col gap-3 p-3 md:flex-row md:items-center md:justify-between">
+        <div className="min-w-0 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={selectedDate.jobId ? "default" : "outline"}>
+              {selectedDate.jobId ? "Job linked" : "No job"}
+            </Badge>
+            <Badge variant={selectedDate.hojaDeRutaId ? "default" : "outline"}>
+              {selectedDate.hojaDeRutaId ? "Hoja linked" : "No Hoja for date"}
+            </Badge>
+            <Badge variant={travelCount ? "secondary" : "outline"}>{travelCount} viajes</Badge>
+            <Badge variant={hotelCount ? "secondary" : "outline"}>{hotelCount} hoteles</Badge>
+            <Badge variant={roomCount ? "secondary" : "outline"}>{roomCount} habitaciones</Badge>
+            {selectedDate.health.length ? (
+              <Badge variant="destructive">{selectedDate.health.length} avisos</Badge>
+            ) : (
+              <Badge variant="outline">Completo</Badge>
+            )}
+          </div>
+          <div className="text-sm text-muted-foreground">
+            {selectedDate.venueName || selectedDate.location?.name || "Venue pendiente"}
+            {selectedDate.jobTitle ? ` · ${selectedDate.jobTitle}` : ""}
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" onClick={() => generateTourOpsPdf(model, "management", { dateId: selectedDate.id })}>
+            <Download className="h-4 w-4 mr-1" />
+            Day sheet
+          </Button>
+          <Button variant="outline" size="sm" onClick={onOpenHoja} disabled={!selectedDate.jobId}>
+            <ExternalLink className="h-4 w-4 mr-1" />
+            Abrir Hoja
+          </Button>
+          <Button variant="outline" size="sm" onClick={onAddTravel}>
+            <Route className="h-4 w-4 mr-1" />
+            Viaje
+          </Button>
+          <Button variant="outline" size="sm" onClick={onAddHotel}>
+            <Hotel className="h-4 w-4 mr-1" />
+            Hotel
+          </Button>
+          <Button variant="outline" size="sm" onClick={onOpenDocs}>
+            <FileText className="h-4 w-4 mr-1" />
+            Docs
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | null }) => {
   if (!date) {
     return (
@@ -293,7 +404,23 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle className="text-base">Programa</CardTitle></CardHeader>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">Programa</CardTitle>
+                <p className="text-xs text-muted-foreground">Lectura desde Hoja de Ruta. Edita el programa completo en la Hoja.</p>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!date.jobId}
+                onClick={() => date.jobId && window.open(`/project-management?openHojaDeRuta=${date.jobId}`, "_blank", "noopener,noreferrer")}
+              >
+                <ExternalLink className="h-4 w-4 mr-1" />
+                Abrir Hoja
+              </Button>
+            </div>
+          </CardHeader>
           <CardContent>
             {date.program.length ? (
               <div className="space-y-3">
@@ -332,7 +459,10 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
                         .join(" · ")}
                     </div>
                   </div>
-                  <Badge variant="outline">{sourceLabel(segment.source)}</Badge>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{sourceLabel(segment.source)}</Badge>
+                    <Badge variant={syncStatusVariant(segment.syncStatus)}>{syncStatusLabel(segment.syncStatus)}</Badge>
+                  </div>
                 </div>
                 {segment.routeNotes && <div className="mt-2 text-muted-foreground">{segment.routeNotes}</div>}
               </div>
@@ -359,6 +489,7 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{hotel.hotelName}</span>
                     <Badge variant="outline">{sourceLabel(hotel.source)}</Badge>
+                    <Badge variant={syncStatusVariant(hotel.syncStatus)}>{syncStatusLabel(hotel.syncStatus)}</Badge>
                   </div>
                   <div className="text-muted-foreground">{hotel.checkInDate} {"->"} {hotel.checkOutDate}</div>
                   {hotel.roomAllocation.length > 0 && (
@@ -1016,6 +1147,7 @@ const TourMapPanel = ({
   const [mapboxToken, setMapboxToken] = useState<string | null>(null);
   const [mapboxError, setMapboxError] = useState<string | null>(null);
   const [mapboxLoading, setMapboxLoading] = useState(false);
+  const homeBaseConfigured = hasTourHomeBase(model.tour.settings);
 
   useEffect(() => {
     let cancelled = false;
@@ -1109,12 +1241,21 @@ const TourMapPanel = ({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[380px_1fr]">
-      <TourSettingsPanel
-        tourId={model.tour.id}
-        tourData={{ tour_settings: model.tour.settings }}
-        canEdit
-        onSave={onSettingsSave}
-      />
+      <div className="space-y-3">
+        {!homeBaseConfigured && (
+          <Card className="border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+            <CardContent className="p-3 text-sm text-amber-900 dark:text-amber-200">
+              Configura la base de operaciones para mostrar rutas desde/hacia casa y calcular distancias.
+            </CardContent>
+          </Card>
+        )}
+        <TourSettingsPanel
+          tourId={model.tour.id}
+          tourData={{ tour_settings: model.tour.settings }}
+          canEdit
+          onSave={onSettingsSave}
+        />
+      </div>
       <div className="min-w-0">
         {mapboxLoading ? (
           <Card>
@@ -1150,6 +1291,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   const [hotelDialogOpen, setHotelDialogOpen] = useState(false);
   const [editingHotel, setEditingHotel] = useState<TourOpsAccommodation | null>(null);
   const [docsOpen, setDocsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("timeline");
 
   useEffect(() => {
     if (!selectedDateId && model?.dates[0]?.id) {
@@ -1200,6 +1342,11 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
     [model?.tour.contacts],
   );
 
+  const homeBaseConfigured = useMemo(
+    () => Boolean(model && hasTourHomeBase(model.tour.settings)),
+    [model],
+  );
+
   if (isLoading) {
     return <div className="flex h-72 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
@@ -1235,6 +1382,14 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
         ? `Sincronizacion completada: ${total} cambios.`
         : "Hoja de ruta y operaciones ya estaban sincronizadas.",
     );
+  };
+
+  const openSelectedHoja = () => {
+    if (!selectedDate?.jobId) {
+      toast.error("Esta fecha no tiene job vinculado");
+      return;
+    }
+    window.open(`/project-management?openHojaDeRuta=${selectedDate.jobId}`, "_blank", "noopener,noreferrer");
   };
 
   const statCards = [
@@ -1278,7 +1433,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
         ))}
       </div>
 
-      <Tabs defaultValue="timeline" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="flex h-auto flex-wrap justify-start">
           <TabsTrigger value="timeline">Cronograma</TabsTrigger>
           <TabsTrigger value="map"><MapIcon className="h-4 w-4 mr-1" />Mapa</TabsTrigger>
@@ -1292,6 +1447,20 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
         </TabsList>
 
         <ActiveDateSelector dates={model.dates} selectedDate={selectedDate} onSelect={setSelectedDateId} />
+        <DateContextHeader
+          model={model}
+          selectedDate={selectedDate}
+          onOpenHoja={openSelectedHoja}
+          onAddTravel={() => {
+            setEditingSegment(null);
+            setTravelDialogOpen(true);
+          }}
+          onAddHotel={() => {
+            setEditingHotel(null);
+            setHotelDialogOpen(true);
+          }}
+          onOpenDocs={() => setDocsOpen(true)}
+        />
 
         <TabsContent value="timeline" className="m-0">
           <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
@@ -1370,6 +1539,14 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
+              {!homeBaseConfigured && (
+                <div className="flex flex-col gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/30 dark:text-amber-200 md:flex-row md:items-center md:justify-between">
+                  <span>Base de operaciones pendiente. Configurala para rutas de salida/regreso y calculo de distancias.</span>
+                  <Button size="sm" variant="outline" onClick={() => setActiveTab("map")}>
+                    Configurar base
+                  </Button>
+                </div>
+              )}
               {selectedTravelSegments.length ? selectedTravelSegments.map((segment) => (
                 <div key={segment.id} className="rounded-lg border p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -1381,7 +1558,10 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                           .join(" · ")}
                       </div>
                       {segment.routeNotes && <div className="mt-2 text-sm">{segment.routeNotes}</div>}
-                      <Badge variant="outline" className="mt-2">{sourceLabel(segment.source)}</Badge>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Badge variant="outline">{sourceLabel(segment.source)}</Badge>
+                        <Badge variant={syncStatusVariant(segment.syncStatus)}>{syncStatusLabel(segment.syncStatus)}</Badge>
+                      </div>
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => { setEditingSegment(segment); setTravelDialogOpen(true); }}>Editar</Button>
@@ -1422,6 +1602,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                         <div className="flex items-center gap-2">
                           <div className="font-medium">{hotel.hotelName}</div>
                           <Badge variant="outline">{sourceLabel(hotel.source)}</Badge>
+                          <Badge variant={syncStatusVariant(hotel.syncStatus)}>{syncStatusLabel(hotel.syncStatus)}</Badge>
                         </div>
                         <div className="text-sm text-muted-foreground">
                           {[tourDate ? formatDate(tourDate.date) : null, hotel.checkInDate, hotel.checkOutDate].filter(Boolean).join(" · ")}
@@ -1479,6 +1660,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                             <div className="flex flex-wrap items-center gap-2">
                               <div className="font-medium">{hotel.hotelName}</div>
                               <Badge variant="outline">{sourceLabel(hotel.source)}</Badge>
+                              <Badge variant={syncStatusVariant(hotel.syncStatus)}>{syncStatusLabel(hotel.syncStatus)}</Badge>
                             </div>
                             <div className="text-sm text-muted-foreground">
                               {[tourDate ? formatDate(tourDate.date) : null, hotel.checkInDate, hotel.checkOutDate].filter(Boolean).join(" · ")}
@@ -1520,6 +1702,14 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
             <CardHeader className="flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <CardTitle>Documentos y exportacion</CardTitle>
               <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  disabled={!selectedDate}
+                  onClick={() => selectedDate && generateTourOpsPdf(model, "management", { dateId: selectedDate.id })}
+                >
+                  Day sheet
+                </Button>
+                <Button variant="outline" onClick={() => setDocsOpen(true)}>Subir docs</Button>
                 <Button variant="outline" onClick={() => generateTourOpsPdf(model, "technician")}>PDF equipo</Button>
                 <Button variant="outline" onClick={() => generateTourOpsPdf(model, "guest")}>PDF externo</Button>
               </div>
