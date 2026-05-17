@@ -1,6 +1,5 @@
-
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { format, isSameDay } from 'date-fns';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useOptimizedMatrixData } from '@/hooks/useOptimizedMatrixData';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
@@ -12,44 +11,24 @@ import { checkTimeConflictEnhanced } from '@/utils/technicianAvailability';
 import { useStaffingMatrixStatuses } from '@/features/staffing/hooks/useStaffingMatrixStatuses';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { throttle } from '@/utils/throttle';
 import { useSelectedCellStore } from '@/stores/useSelectedCellStore';
-import { useDragScroll } from '@/hooks/useDragScroll';
 import { formatUserName } from '@/utils/userName';
 import { isManagementRole } from '@/utils/permissions';
 
-import { OptimizedAssignmentMatrixView } from './optimized-assignment-matrix/OptimizedAssignmentMatrixView';
-import type { CellAction, OptimizedAssignmentMatrixExtendedProps, TechSortMethod } from './optimized-assignment-matrix/types';
-import type { MatrixTimesheetAssignment } from '@/hooks/useOptimizedMatrixData';
+import { OptimizedAssignmentMatrixView } from '@/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView';
+import { useMatrixScrollState } from '@/components/matrix/optimized-assignment-matrix/useMatrixScrollState';
+import { useMatrixTechnicianOrdering } from '@/components/matrix/optimized-assignment-matrix/useMatrixTechnicianOrdering';
+import type { CellAction, OptimizedAssignmentMatrixExtendedProps } from '@/components/matrix/optimized-assignment-matrix/types';
 
 
 import { queryKeys } from "@/lib/react-query";
-// Drag scroll hook is used on mainScrollRef below for desktop users
-
 const EMPTY_PROFILE_NAMES_MAP = new Map<string, string>();
-
-type SortJobStatusRow = {
-  profile_id: string;
-  availability_status: string | null;
-  offer_status: string | null;
-};
-
-type TechResidenciaRow = {
-  id: string;
-  residencia: string | null;
-};
 
 type ProfileNameRow = {
   id: string;
   first_name: string | null;
   nickname: string | null;
   last_name: string | null;
-};
-
-type TimesheetCountRow = {
-  technician_id: string;
-  timesheet_count: number | null;
-  department: string | null;
 };
 
 type StaffingEmailPayload = {
@@ -88,44 +67,15 @@ export const OptimizedAssignmentMatrix = ({
 
   // Global selected cell store for Stream Deck integration
   const {
-    selectedCell,
     selectCell,
     clearSelection: clearGlobalSelection,
     isCellSelected: isGlobalCellSelected
   } = useSelectedCellStore();
 
-  const matrixContainerRef = useRef<HTMLDivElement>(null);
-  const technicianScrollRef = useRef<HTMLDivElement>(null);
-  const dateHeadersRef = useRef<HTMLDivElement>(null);
-  const mainScrollRef = useRef<HTMLDivElement>(null);
-
-  // Enable drag scrolling (desktop only)
-  useDragScroll(mainScrollRef, {
-    enabled: !mobile,
-    onScroll: (left, top) => {
-      // Sync headers and technician column
-      syncScrollPositions(left, top, 'main');
-      // Update virtualization window
-      scheduleVisibleWindowUpdate();
-      // Update refs
-      lastKnownScrollRef.current.left = left;
-      lastKnownScrollRef.current.top = top;
-    }
-  });
-
-  const [scrollAttempts, setScrollAttempts] = useState(0);
-  const syncInProgressRef = useRef(false);
-  const lastKnownScrollRef = useRef({ left: 0, top: 0 });
-  const previousMainScrollLeftRef = useRef<number | null>(null);
-  const lastEdgeTriggerRef = useRef({ t: 0 });
   const [createUserOpen, setCreateUserOpen] = useState(false);
   const { userRole } = useOptimizedAuth();
   const isManagementUser = isManagementRole(userRole);
   const qc = useQueryClient();
-  // Sorting focus by job
-  const [sortJobId, setSortJobId] = useState<string | null>(null);
-  // Technician column sorting
-  const [techSortMethod, setTechSortMethod] = useState<TechSortMethod>('default');
 
   // Performance monitoring
   const { startRenderTimer, endRenderTimer, incrementCellRender } = usePerformanceMonitor('AssignmentMatrix');
@@ -154,139 +104,17 @@ export const OptimizedAssignmentMatrix = ({
     isFetching
   } = useOptimizedMatrixData({ technicians, dates, jobs });
 
-  // Technician IDs for queries
-  const allTechIds = useMemo(() => technicians.map(t => t.id), [technicians]);
-
-  // When sorting by a job, fetch statuses for that job across all technicians (batched)
-  const { data: sortJobStatuses } = useQuery({
-    queryKey: queryKeys.scope('matrix-sort-job-statuses', sortJobId, allTechIds.join(',')),
-    queryFn: async () => {
-      if (!sortJobId || !allTechIds.length) return new Map<string, { availability_status: string | null; offer_status: string | null }>();
-      // Batch the call to RPC to avoid payload limits
-      const chunk = <T,>(arr: T[], size: number) => {
-        const out: T[][] = [];
-        for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-        return out;
-      };
-      const batches = chunk(allTechIds, 30);
-      const map = new Map<string, { availability_status: string | null; offer_status: string | null }>();
-      for (const b of batches) {
-        const { data, error } = await dataLayerClient.rpc('get_assignment_matrix_staffing_filtered', {
-            p_job_ids: [sortJobId],
-            p_profile_ids: b,
-          });
-        if (error) {
-          console.warn('Sort job statuses RPC error', error);
-          continue;
-        }
-        ((data || []) as SortJobStatusRow[]).forEach((r) => {
-          const av = r.availability_status === 'pending' ? 'requested' : (r.availability_status === 'expired' ? null : r.availability_status);
-          const of = r.offer_status === 'pending' ? 'sent' : (r.offer_status === 'expired' ? null : r.offer_status);
-          map.set(r.profile_id, { availability_status: av, offer_status: of });
-        });
-      }
-      return map;
-    },
-    enabled: !!sortJobId,
-    staleTime: 2_000,
-    gcTime: 60_000,
-  });
-
-  // Fetch residencia for all technicians for location-based sorting
-  const { data: techResidencias } = useQuery({
-    queryKey: queryKeys.scope('tech-residencias', allTechIds.join(',')),
-    queryFn: async () => {
-      if (!allTechIds.length) return new Map<string, string | null>();
-      const { data, error } = await dataLayerClient.from('profiles')
-        .select('id, residencia')
-        .in('id', allTechIds);
-      if (error) {
-        console.warn('Failed to fetch residencias', error);
-        return new Map<string, string | null>();
-      }
-      const map = new Map<string, string | null>();
-      ((data || []) as TechResidenciaRow[]).forEach((r) => {
-        map.set(r.id, r.residencia);
-      });
-      return map;
-    },
-    enabled: allTechIds.length > 0 && techSortMethod === 'location',
-    staleTime: 60_000, // 1 minute
-    gcTime: 300_000, // 5 minutes
-  });
-
-  // Fetch current year timesheet counts for ALL technicians with their departments
-  // This ensures medals are calculated per department fairly
-  // Counts this year's active timesheets including scheduled gigs (draft status)
-  const { data: techConfirmedCounts } = useQuery({
-    queryKey: queryKeys.scope('tech-confirmed-counts-all-with-dept'),
-    queryFn: async () => {
-      // Get start of current year
-      const now = new Date();
-      const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0];
-      const yearEnd = new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0];
-
-      const { data: countRows, error: timesheetError } = await dataLayerClient.rpc('get_active_timesheet_counts_by_technician', {
-          p_start_date: yearStart,
-          p_end_date: yearEnd,
-        });
-
-      if (timesheetError) {
-        console.warn('Failed to fetch timesheet counts', timesheetError);
-        return { counts: new Map<string, number>(), departments: new Map<string, string>() };
-      }
-
-      const countMap = new Map<string, number>();
-      const departmentMap = new Map<string, string>();
-      ((countRows || []) as TimesheetCountRow[]).forEach((row) => {
-        countMap.set(row.technician_id, Number(row.timesheet_count || 0));
-        if (row.department) {
-          departmentMap.set(row.technician_id, row.department);
-        }
-      });
-
-      return { counts: countMap, departments: departmentMap };
-    },
-    enabled: true,
-    staleTime: 60_000, // 1 minute
-    gcTime: 300_000, // 5 minutes
-  });
-
-  // Fetch last year's timesheet counts for ALL technicians with their departments
-  // This ensures last year's medals are calculated per department fairly
-  const { data: techLastYearCounts } = useQuery({
-    queryKey: queryKeys.scope('tech-last-year-counts-all-with-dept'),
-    queryFn: async () => {
-      // Get last year's date range
-      const now = new Date();
-      const lastYear = now.getFullYear() - 1;
-      const yearStart = new Date(lastYear, 0, 1).toISOString().split('T')[0];
-      const yearEnd = new Date(lastYear, 11, 31).toISOString().split('T')[0];
-
-      const { data: countRows, error: timesheetError } = await dataLayerClient.rpc('get_active_timesheet_counts_by_technician', {
-          p_start_date: yearStart,
-          p_end_date: yearEnd,
-        });
-
-      if (timesheetError) {
-        console.warn('Failed to fetch last year timesheet counts', timesheetError);
-        return { counts: new Map<string, number>(), departments: new Map<string, string>() };
-      }
-
-      const countMap = new Map<string, number>();
-      const departmentMap = new Map<string, string>();
-      ((countRows || []) as TimesheetCountRow[]).forEach((row) => {
-        countMap.set(row.technician_id, Number(row.timesheet_count || 0));
-        if (row.department) {
-          departmentMap.set(row.technician_id, row.department);
-        }
-      });
-
-      return { counts: countMap, departments: departmentMap };
-    },
-    enabled: true,
-    staleTime: 60_000, // 1 minute
-    gcTime: 300_000, // 5 minutes
+  const {
+    orderedTechnicians,
+    setSortJobId,
+    techMedalRankings,
+    techLastYearMedalRankings,
+    cycleTechSort,
+    getSortLabel,
+  } = useMatrixTechnicianOrdering({
+    technicians,
+    allAssignments,
+    mobile,
   });
 
   // Listen for assignment updates and refresh data
@@ -318,63 +146,30 @@ export const OptimizedAssignmentMatrix = ({
   const matrixWidth = dates.length * CELL_WIDTH;
   const matrixHeight = technicians.length * CELL_HEIGHT;
 
-  // Visible window state for virtualization
-  const [visibleRows, setVisibleRows] = useState({ start: 0, end: Math.min(technicians.length - 1, 20) });
-  const [visibleCols, setVisibleCols] = useState({ start: 0, end: Math.min(dates.length - 1, 14) });
-  // Higher overscan to keep cells rendered during fast vertical/horizontal scrolls
-  const OVERSCAN_ROWS = mobile ? 6 : 10;
-  const OVERSCAN_COLS = mobile ? 4 : 6;
-
-  // Mobile date navigation state
-  const [canNavLeft, setCanNavLeft] = useState(false);
-  const [canNavRight, setCanNavRight] = useState(true);
-  const [navStep, setNavStep] = useState(3);
-
-  const updateNavAvailability = useCallback(() => {
-    if (!mobile) return;
-    const el = dateHeadersRef.current;
-    if (!el) return;
-    const sl = el.scrollLeft;
-    const max = el.scrollWidth - el.clientWidth - 1;
-    setCanNavLeft(sl > 2);
-    setCanNavRight(sl < max);
-  }, [mobile]);
-
-  const updateVisibleWindow = useCallback(() => {
-    const el = mainScrollRef.current;
-    if (!el) return;
-    const scrollTop = el.scrollTop;
-    const scrollLeft = el.scrollLeft;
-    const clientH = el.clientHeight;
-    const clientW = el.clientWidth;
-
-    const rowStart = Math.max(0, Math.floor(scrollTop / CELL_HEIGHT) - OVERSCAN_ROWS);
-    const rowEnd = Math.min(technicians.length - 1, Math.floor((scrollTop + clientH) / CELL_HEIGHT) + OVERSCAN_ROWS);
-    const colStart = Math.max(0, Math.floor(scrollLeft / CELL_WIDTH) - OVERSCAN_COLS);
-    const colEnd = Math.min(dates.length - 1, Math.floor((scrollLeft + clientW) / CELL_WIDTH) + OVERSCAN_COLS);
-
-    setVisibleRows(prev => (prev.start !== rowStart || prev.end !== rowEnd ? { start: rowStart, end: rowEnd } : prev));
-    setVisibleCols(prev => (prev.start !== colStart || prev.end !== colEnd ? { start: colStart, end: colEnd } : prev));
-  }, [technicians.length, dates.length]);
-
-  // Avoid the first-scroll "snap": run a direct window update on the very first scroll event
-  const hasHandledFirstScrollRef = useRef(false);
-
-  // Throttle visible window updates with rAF
-  const updateScheduledRef = useRef(false);
-  const scheduleVisibleWindowUpdate = useCallback(() => {
-    if (!hasHandledFirstScrollRef.current) {
-      hasHandledFirstScrollRef.current = true;
-      updateVisibleWindow();
-      return;
-    }
-    if (updateScheduledRef.current) return;
-    updateScheduledRef.current = true;
-    requestAnimationFrame(() => {
-      updateScheduledRef.current = false;
-      updateVisibleWindow();
-    });
-  }, [updateVisibleWindow]);
+  const {
+    dateHeadersRef,
+    technicianScrollRef,
+    mainScrollRef,
+    visibleCols,
+    visibleRows,
+    canNavLeft,
+    canNavRight,
+    handleMobileNav,
+    handleDateHeadersScroll,
+    handleTechnicianScroll,
+    handleMainScroll,
+  } = useMatrixScrollState({
+    dates,
+    techniciansLength: technicians.length,
+    cellWidth: CELL_WIDTH,
+    cellHeight: CELL_HEIGHT,
+    matrixWidth,
+    mobile,
+    isInitialLoading,
+    canExpandBefore,
+    canExpandAfter,
+    onNearEdgeScroll,
+  });
 
   // Build declined job sets per technician for targeted staffing blocking
   const declinedJobsByTech = React.useMemo(() => {
@@ -387,117 +182,6 @@ export const OptimizedAssignmentMatrix = ({
     });
     return map;
   }, [allAssignments]);
-
-  // Optimized scroll synchronization
-  const syncScrollPositions = useCallback((scrollLeft: number, scrollTop: number, source: string) => {
-    if (syncInProgressRef.current) return;
-
-    syncInProgressRef.current = true;
-
-    requestAnimationFrame(() => {
-      try {
-        if (source !== 'dateHeaders' && dateHeadersRef.current) {
-          dateHeadersRef.current.scrollLeft = scrollLeft;
-        }
-        if (source !== 'main' && mainScrollRef.current) {
-          mainScrollRef.current.scrollLeft = scrollLeft;
-        }
-        if (source !== 'technician' && technicianScrollRef.current) {
-          technicianScrollRef.current.scrollTop = scrollTop;
-        }
-        if (source !== 'main' && mainScrollRef.current) {
-          mainScrollRef.current.scrollTop = scrollTop;
-        }
-      } finally {
-        syncInProgressRef.current = false;
-      }
-    });
-  }, []);
-
-  const handleMainScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (syncInProgressRef.current) return;
-    const scrollLeft = e.currentTarget.scrollLeft;
-    const scrollTop = e.currentTarget.scrollTop;
-
-    const previousScrollLeft = previousMainScrollLeftRef.current;
-    const horizontalDelta = previousScrollLeft === null ? 0 : scrollLeft - previousScrollLeft;
-    const movedHorizontally = previousScrollLeft !== null && horizontalDelta !== 0;
-
-    // Ignore pure vertical scrolls while keeping scroll positions in sync
-    if (previousScrollLeft !== null && !movedHorizontally) {
-      syncScrollPositions(scrollLeft, scrollTop, 'main');
-      scheduleVisibleWindowUpdate();
-      return;
-    }
-
-    previousMainScrollLeftRef.current = scrollLeft;
-
-    const movingTowardLeftEdge = movedHorizontally && horizontalDelta < 0;
-    const movingTowardRightEdge = movedHorizontally && horizontalDelta > 0;
-
-    // Check if we're near the edges and can expand
-    const scrollElement = e.currentTarget;
-    const scrollWidth = scrollElement.scrollWidth;
-    const clientWidth = scrollElement.clientWidth;
-    const maxScrollLeft = scrollWidth - clientWidth;
-
-    const nearLeftEdge = scrollLeft < 200; // Within 200px of left edge
-    const nearRightEdge = scrollLeft > maxScrollLeft - 200; // Within 200px of right edge
-
-    // Trigger expansion if we're near an edge and can expand
-    // Edge expansion throttled to avoid repeated triggers
-    const now = performance.now();
-    const lastEdgeRef = lastEdgeTriggerRef.current;
-    if (movedHorizontally && now - lastEdgeRef.t > 300) {
-      if (movingTowardLeftEdge && nearLeftEdge && canExpandBefore && onNearEdgeScroll) {
-        onNearEdgeScroll('before');
-        lastEdgeRef.t = now;
-      } else if (movingTowardRightEdge && nearRightEdge && canExpandAfter && onNearEdgeScroll) {
-        onNearEdgeScroll('after');
-        lastEdgeRef.t = now;
-      }
-    }
-
-    syncScrollPositions(scrollLeft, scrollTop, 'main');
-    lastKnownScrollRef.current.left = scrollLeft;
-    lastKnownScrollRef.current.top = scrollTop;
-    // Update visible window for virtualization
-    scheduleVisibleWindowUpdate();
-  }, [syncScrollPositions, canExpandBefore, canExpandAfter, onNearEdgeScroll, scheduleVisibleWindowUpdate]);
-
-  const handleDateHeadersScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (syncInProgressRef.current) return;
-    const scrollLeft = e.currentTarget.scrollLeft;
-    syncScrollPositions(scrollLeft, mainScrollRef.current?.scrollTop || 0, 'dateHeaders');
-    lastKnownScrollRef.current.left = scrollLeft;
-    updateNavAvailability();
-  }, [syncScrollPositions, updateNavAvailability]);
-
-  const handleTechnicianScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-    if (syncInProgressRef.current) return;
-    const scrollTop = e.currentTarget.scrollTop;
-    syncScrollPositions(mainScrollRef.current?.scrollLeft || 0, scrollTop, 'technician');
-    lastKnownScrollRef.current.top = scrollTop;
-    // Ensure virtualization window follows when scrolling the technician column
-    scheduleVisibleWindowUpdate();
-  }, [syncScrollPositions, scheduleVisibleWindowUpdate]);
-
-  // Keep main scroll handler unthrottled for tighter sync between grid and header/technician column
-  const handleMainScroll = handleMainScrollCore;
-
-  const handleDateHeadersScroll = useMemo(
-    () => throttle(handleDateHeadersScrollCore, 12),
-    [handleDateHeadersScrollCore]
-  );
-
-  // Keep technician column scroll unthrottled to stay locked with main grid vertically
-  const handleTechnicianScroll = handleTechnicianScrollCore;
-
-  useEffect(() => {
-    return () => {
-      handleDateHeadersScroll.cancel();
-    };
-  }, [handleDateHeadersScroll, handleMainScroll, handleTechnicianScroll]);
 
   const [availabilityPreferredChannel, setAvailabilityPreferredChannel] = useState<null | 'email' | 'whatsapp'>(null);
   const [offerChannel, setOfferChannel] = useState<'email' | 'whatsapp'>('email');
@@ -749,374 +433,7 @@ export const OptimizedAssignmentMatrix = ({
     updateAssignmentOptimistically(technicianId, jobId, status);
   }, [updateAssignmentOptimistically]);
 
-  // Improved auto-scroll to today with retry mechanism (run once)
-  const autoScrolledRef = useRef(false);
-  const scrollToToday = useCallback(() => {
-    if (!mainScrollRef.current || dates.length === 0) {
-      return false;
-    }
-
-    const today = new Date();
-    const todayIndex = dates.findIndex(date => isSameDay(date, today));
-
-    if (todayIndex === -1) {
-      return false;
-    }
-
-    const container = mainScrollRef.current;
-    const containerWidth = container.clientWidth;
-
-    if (containerWidth === 0) {
-      return false;
-    }
-
-    let scrollPosition = (todayIndex * CELL_WIDTH) - (containerWidth / 2) + (CELL_WIDTH / 2);
-    const maxScroll = matrixWidth - containerWidth;
-    scrollPosition = Math.max(0, Math.min(scrollPosition, maxScroll));
-
-
-    container.scrollLeft = scrollPosition;
-
-    // Verify the scroll actually happened
-    requestAnimationFrame(() => { /* verify next frame (no-op) */ });
-
-    return true;
-  }, [dates, CELL_WIDTH, matrixWidth]);
-
-  // Auto-scroll to today with retry mechanism (only first render)
-  useEffect(() => {
-    if (autoScrolledRef.current) return;
-    if (isInitialLoading || dates.length === 0) return;
-
-    const attemptScroll = () => {
-      const success = scrollToToday();
-      if (!success && scrollAttempts < 5) {
-        setScrollAttempts(prev => prev + 1);
-        setTimeout(attemptScroll, 100 * (scrollAttempts + 1)); // Increasing delay
-      } else if (success) {
-        setScrollAttempts(0);
-        autoScrolledRef.current = true;
-      } else {
-        // give up
-      }
-    };
-
-    const timeoutId = setTimeout(attemptScroll, 50);
-    return () => clearTimeout(timeoutId);
-  }, [scrollToToday, isInitialLoading, dates.length, scrollAttempts]);
-
-  // Initialize visible window after mount and when sizes change
-  useEffect(() => {
-    updateVisibleWindow();
-    hasHandledFirstScrollRef.current = false;
-  }, [technicians.length, dates.length, scheduleVisibleWindowUpdate]);
-
-  // Keep scroll position stable when dates expand before/after
-  const prevDatesRef = useRef<Date[] | null>(null);
-  useEffect(() => {
-    const prev = prevDatesRef.current;
-    const main = mainScrollRef.current;
-    const headers = dateHeadersRef.current;
-    const technicianScroller = technicianScrollRef.current;
-    if (!main || dates.length === 0) {
-      prevDatesRef.current = dates.slice();
-      return;
-    }
-
-    const lastLeft = lastKnownScrollRef.current.left ?? main.scrollLeft;
-    const lastTop = lastKnownScrollRef.current.top ?? main.scrollTop;
-
-    let targetLeft = lastLeft;
-
-    if (prev && prev.length > 0) {
-      const prevFirstIso = prev[0].toISOString();
-      const nextIndex = dates.findIndex(date => date.toISOString() === prevFirstIso);
-
-      if (nextIndex > 0) {
-        targetLeft = lastLeft + nextIndex * CELL_WIDTH;
-      } else if (nextIndex === -1) {
-        // Range replaced entirely; keep current anchor instead of jumping to start
-        targetLeft = lastLeft;
-      }
-    }
-
-    const applyScroll = (element: HTMLDivElement | null, value: number) => {
-      if (!element) return;
-      if (Math.abs(element.scrollLeft - value) > 1) {
-        element.scrollLeft = value;
-      }
-    };
-
-    applyScroll(main, targetLeft);
-    applyScroll(headers, targetLeft);
-    if (technicianScroller && Math.abs(technicianScroller.scrollTop - lastTop) > 1) {
-      technicianScroller.scrollTop = lastTop;
-    }
-    if (Math.abs(main.scrollTop - lastTop) > 1) {
-      main.scrollTop = lastTop;
-    }
-
-    lastKnownScrollRef.current.left = targetLeft;
-    lastKnownScrollRef.current.top = lastTop;
-
-    previousMainScrollLeftRef.current = targetLeft;
-
-    prevDatesRef.current = dates.slice();
-  }, [dates, CELL_WIDTH]);
-
-  // Determine step (3-4) based on header width
-  useEffect(() => {
-    if (!mobile) return;
-    const updateStep = () => {
-      const w = dateHeadersRef.current?.clientWidth || 0;
-      const cols = Math.max(3, Math.min(4, Math.floor(w / CELL_WIDTH)) || 3);
-      setNavStep(cols);
-    };
-    updateStep();
-    window.addEventListener('resize', updateStep);
-    return () => window.removeEventListener('resize', updateStep);
-  }, [mobile, CELL_WIDTH]);
-
-  useEffect(() => {
-    if (!mobile) return;
-    updateNavAvailability();
-  }, [mobile, visibleCols, dates.length, updateNavAvailability]);
-
-  const handleMobileNav = useCallback((dir: 'left' | 'right') => {
-    const el = dateHeadersRef.current;
-    const main = mainScrollRef.current;
-    if (!el || !main) return;
-    const delta = navStep * CELL_WIDTH * (dir === 'left' ? -1 : 1);
-    const target = Math.max(0, Math.min(el.scrollLeft + delta, el.scrollWidth - el.clientWidth));
-    el.scrollTo({ left: target, behavior: 'smooth' });
-    main.scrollTo({ left: target, top: main.scrollTop, behavior: 'smooth' as ScrollBehavior });
-  }, [navStep, CELL_WIDTH]);
-
   // Batched staffing statuses for visible window
-  const orderedTechnicians = useMemo(() => {
-    const techs = [...technicians];
-
-    // Job sorting takes precedence over column sorting
-    if (sortJobId) {
-      const baseOrder = new Map<string, number>();
-      technicians.forEach((t, i) => baseOrder.set(t.id, i));
-      // Build engagement scores for current sort job
-      const scoreMap = new Map<string, number>();
-      // Prefer using allAssignments (confirmed assignment) for the job
-      allAssignments?.forEach((a) => {
-        if (a.job_id !== sortJobId) return;
-        const cur = scoreMap.get(a.technician_id) || 0;
-        const status = (a.status || '').toLowerCase();
-        const add = status === 'confirmed' ? 3 : (status === 'invited' ? 1 : 0);
-        scoreMap.set(a.technician_id, Math.max(cur, add));
-      });
-      // Use fetched statuses for all technicians to boost scores consistently
-      if (sortJobStatuses && sortJobStatuses.size) {
-        technicians.forEach(t => {
-          const s = sortJobStatuses.get(t.id);
-          if (!s) return;
-          const cur = scoreMap.get(t.id) || 0;
-          let add = 0;
-          if (s.offer_status === 'confirmed') add = Math.max(add, 2);
-          else if (s.offer_status === 'sent') add = Math.max(add, 1.5);
-          if (s.availability_status === 'confirmed') add = Math.max(add, 1.2);
-          else if (s.availability_status === 'requested') add = Math.max(add, 1);
-          if (add > 0) scoreMap.set(t.id, Math.max(cur, add));
-        });
-      }
-      // Sort by score desc, then original order
-      techs.sort((a, b) => {
-        const sa = scoreMap.get(a.id) || 0;
-        const sb = scoreMap.get(b.id) || 0;
-        if (sb !== sa) return sb - sa;
-        return (baseOrder.get(a.id)! - baseOrder.get(b.id)!);
-      });
-      return techs;
-    }
-
-    // Apply technician column sorting
-    switch (techSortMethod) {
-      case 'location':
-        techs.sort((a, b) => {
-          const resA = techResidencias?.get(a.id) || '';
-          const resB = techResidencias?.get(b.id) || '';
-
-          // Sort by residencia, with empty values at the end
-          if (resA && !resB) return -1;
-          if (!resA && resB) return 1;
-          if (!resA && !resB) return a.first_name.localeCompare(b.first_name);
-
-          // Parse city and country (format: "City, Country" or just "City")
-          const parseLocation = (loc: string) => {
-            const parts = loc.split(',').map(p => p.trim());
-            if (parts.length > 1) {
-              return { city: parts[0], country: parts[1] };
-            }
-            return { city: parts[0], country: 'España' }; // Default to Spain
-          };
-
-          const locA = parseLocation(resA);
-          const locB = parseLocation(resB);
-
-          // First sort by country (Spain first, then alphabetically)
-          const isSpainA = locA.country === 'España' || locA.country === 'Spain';
-          const isSpainB = locB.country === 'España' || locB.country === 'Spain';
-
-          if (isSpainA && !isSpainB) return -1;
-          if (!isSpainA && isSpainB) return 1;
-          if (!isSpainA && !isSpainB) {
-            const countryCompare = locA.country.localeCompare(locB.country, 'es');
-            if (countryCompare !== 0) return countryCompare;
-          }
-
-          // Then sort by city within same country
-          const cityCompare = locA.city.localeCompare(locB.city, 'es');
-          if (cityCompare !== 0) return cityCompare;
-
-          // Finally sort by first name
-          return a.first_name.localeCompare(b.first_name);
-        });
-        break;
-      case 'name-asc':
-        techs.sort((a, b) => a.first_name.localeCompare(b.first_name));
-        break;
-      case 'name-desc':
-        techs.sort((a, b) => b.first_name.localeCompare(a.first_name));
-        break;
-      case 'surname-asc':
-        techs.sort((a, b) => a.last_name.localeCompare(b.last_name));
-        break;
-      case 'surname-desc':
-        techs.sort((a, b) => b.last_name.localeCompare(a.last_name));
-        break;
-      case 'default':
-      default:
-        // House techs first, then sort by confirmed job count (descending)
-        techs.sort((a, b) => {
-          const aIsHouse = a.role === 'house_tech';
-          const bIsHouse = b.role === 'house_tech';
-          if (aIsHouse && !bIsHouse) return -1;
-          if (!aIsHouse && bIsHouse) return 1;
-
-          // Within regular techs, sort by confirmed job count (descending)
-          if (!aIsHouse && !bIsHouse && techConfirmedCounts?.counts) {
-            const aCount = techConfirmedCounts.counts.get(a.id) || 0;
-            const bCount = techConfirmedCounts.counts.get(b.id) || 0;
-            if (bCount !== aCount) return bCount - aCount;
-          }
-
-          // Maintain original order as tiebreaker
-          return 0;
-        });
-        break;
-    }
-
-    return techs;
-  }, [technicians, sortJobId, techSortMethod, techResidencias, allAssignments, sortJobStatuses, techConfirmedCounts]);
-
-  // Calculate medal rankings (top 3 technicians per department by current year activity)
-  const techMedalRankings = useMemo(() => {
-    const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
-
-    if (!techConfirmedCounts?.counts || !techConfirmedCounts?.departments || techSortMethod !== 'default' || sortJobId) {
-      return rankings;
-    }
-
-    // Group technicians by department
-    const techsByDepartment = new Map<string, Array<{ id: string; count: number }>>();
-
-    Array.from(techConfirmedCounts.counts.entries()).forEach(([id, count]) => {
-      const department = techConfirmedCounts.departments.get(id);
-      if (!department) return; // Skip technicians without department
-
-      if (!techsByDepartment.has(department)) {
-        techsByDepartment.set(department, []);
-      }
-      techsByDepartment.get(department)!.push({ id, count });
-    });
-
-    // Award medals per department (top 3 in each department) with Olympic-style tie handling
-    techsByDepartment.forEach((techs, department) => {
-      // Sort by count descending
-      techs.sort((a, b) => b.count - a.count);
-
-      // Olympic-style medal assignment: ties get same medal, next rank is skipped
-      let medalIndex = 0; // Track which medal position we're at
-      let i = 0;
-
-      while (i < techs.length && medalIndex < 3) {
-        const currentCount = techs[i].count;
-        if (currentCount === 0) break; // No medals for zero activity
-
-        const medal = medalIndex === 0 ? 'gold' : medalIndex === 1 ? 'silver' : 'bronze';
-
-        // Find all technicians tied at this count
-        let tiedCount = 0;
-        while (i + tiedCount < techs.length && techs[i + tiedCount].count === currentCount) {
-          rankings.set(techs[i + tiedCount].id, medal);
-          tiedCount++;
-        }
-
-        // Skip medal positions equal to number of people who got this medal
-        medalIndex += tiedCount;
-        i += tiedCount;
-      }
-    });
-
-    return rankings;
-  }, [techConfirmedCounts, techSortMethod, sortJobId]);
-
-  // Calculate last year's medal rankings per department (for nostalgia and snarky comments)
-  const techLastYearMedalRankings = useMemo(() => {
-    const rankings = new Map<string, 'gold' | 'silver' | 'bronze'>();
-
-    // Hide last year medals when sorting (consistent with current year behavior)
-    if (!techLastYearCounts?.counts || !techLastYearCounts?.departments || techSortMethod !== 'default' || sortJobId) {
-      return rankings;
-    }
-
-    // Group technicians by department
-    const techsByDepartment = new Map<string, Array<{ id: string; count: number }>>();
-
-    Array.from(techLastYearCounts.counts.entries()).forEach(([id, count]) => {
-      const department = techLastYearCounts.departments.get(id);
-      if (!department) return; // Skip technicians without department
-
-      if (!techsByDepartment.has(department)) {
-        techsByDepartment.set(department, []);
-      }
-      techsByDepartment.get(department)!.push({ id, count });
-    });
-
-    // Award last year's medals per department with Olympic-style tie handling
-    techsByDepartment.forEach((techs, department) => {
-      // Sort by count descending
-      techs.sort((a, b) => b.count - a.count);
-
-      // Olympic-style medal assignment: ties get same medal, next rank is skipped
-      let medalIndex = 0;
-      let i = 0;
-
-      while (i < techs.length && medalIndex < 3) {
-        const currentCount = techs[i].count;
-        if (currentCount === 0) break;
-
-        const medal = medalIndex === 0 ? 'gold' : medalIndex === 1 ? 'silver' : 'bronze';
-
-        let tiedCount = 0;
-        while (i + tiedCount < techs.length && techs[i + tiedCount].count === currentCount) {
-          rankings.set(techs[i + tiedCount].id, medal);
-          tiedCount++;
-        }
-
-        medalIndex += tiedCount;
-        i += tiedCount;
-      }
-    });
-
-    return rankings;
-  }, [techLastYearCounts, techSortMethod, sortJobId]);
-
   const visibleTechIds = useMemo(() => {
     const start = Math.max(0, visibleRows.start - 10);
     const end = Math.min(orderedTechnicians.length - 1, visibleRows.end + 10);
@@ -1240,31 +557,6 @@ export const OptimizedAssignmentMatrix = ({
       } catch { /* ignore */ }
     }
   }, [availabilityDialog?.open, selectedCells]);
-
-  // Cycle through technician sorting methods
-  const cycleTechSort = useCallback(() => {
-    const methods: TechSortMethod[] = ['default', 'location', 'name-asc', 'name-desc', 'surname-asc', 'surname-desc'];
-    const currentIndex = methods.indexOf(techSortMethod);
-    const nextIndex = (currentIndex + 1) % methods.length;
-    setTechSortMethod(methods[nextIndex]);
-    // Clear job sorting when changing tech sorting
-    if (sortJobId) {
-      setSortJobId(null);
-    }
-  }, [techSortMethod, sortJobId]);
-
-  // Get label for current sorting method
-  const getSortLabel = useCallback(() => {
-    switch (techSortMethod) {
-      case 'location': return mobile ? '📍 Ubic.' : '📍 Ubicación';
-      case 'name-asc': return mobile ? 'A→Z' : 'A→Z Nombre';
-      case 'name-desc': return mobile ? 'Z→A' : 'Z→A Nombre';
-      case 'surname-asc': return mobile ? 'A→Z Ape.' : 'A→Z Apellido';
-      case 'surname-desc': return mobile ? 'Z→A Ape.' : 'Z→A Apellido';
-      case 'default': return '';
-      default: return '';
-    }
-  }, [techSortMethod, mobile]);
 
   if (isInitialLoading) {
     return (

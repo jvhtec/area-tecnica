@@ -11,11 +11,14 @@ The Job Assignment Matrix is the primary interface for crew scheduling. It displ
 | Category | Path |
 |----------|------|
 | **Page** | `src/pages/JobAssignmentMatrix.tsx` |
+| **Page controls/dialogs** | `src/pages/job-assignment-matrix/MatrixPageControls.tsx`, `StaffingReminderDialogs.tsx`, `useStaffingButtonPreferences.ts`, `useMatrixViewport.ts` |
 | **Core component** | `src/components/matrix/OptimizedAssignmentMatrix.tsx` |
+| **Matrix controller hooks** | `src/components/matrix/optimized-assignment-matrix/useMatrixScrollState.ts`, `useMatrixTechnicianOrdering.ts` |
+| **Matrix view/dialogs** | `src/components/matrix/optimized-assignment-matrix/OptimizedAssignmentMatrixView.tsx`, `MatrixDialogs.tsx` |
 | **Assignment dialog** | `src/components/matrix/AssignJobDialog.tsx` |
-| **Cell components** | `src/components/matrix/MatrixCell.tsx`, `OptimizedMatrixCell.tsx` |
+| **Cell components** | `src/components/matrix/MatrixCell.tsx`, `OptimizedMatrixCell.tsx`, `optimized-matrix-cell/` |
 | **Data hook** | `src/hooks/useOptimizedMatrixData.ts` (21.3KB) |
-| **Virtualization** | `src/hooks/useVirtualizedMatrix.ts` |
+| **Virtualization** | `src/components/matrix/optimized-assignment-matrix/useMatrixScrollState.ts` |
 | **Memoization** | `src/hooks/useMemoizedMatrix.ts` |
 | **Available techs** | `src/hooks/useAvailableTechnicians.ts` |
 | **Conflict utils** | `src/utils/technicianAvailability.ts` (12.5KB) |
@@ -51,10 +54,18 @@ The Job Assignment Matrix is the primary interface for crew scheduling. It displ
 - Uses `get_job_staffing_summary` RPC for cost/count rollups
 - Builds assignment date maps from timesheet data
 
-### Virtualization (`useVirtualizedMatrix`)
-- Tracks scroll position (scrollLeft, scrollTop)
-- Calculates visible range with 5-row/column overscan
-- Only renders visible cells (critical for 100+ technicians x 30+ days)
+### Virtualization (`useMatrixScrollState`)
+- `useMatrixScrollState` tracks synchronized header, technician-column, and grid scroll positions
+- `useMatrixScrollState` calculates the visible row/column window with desktop/mobile overscan
+- `useMatrixScrollState` preserves scroll position when date ranges expand before or after the current window
+- `useMatrixScrollState` keeps mobile date navigation and edge-triggered range expansion outside the render component
+- `useMatrixScrollState` limits rendering to visible cells (critical for 100+ technicians x 30+ days)
+
+### Technician Ordering (`useMatrixTechnicianOrdering`)
+- Owns job-focused sort state and batched staffing status lookup for the selected sort job
+- Loads residence data only when location sorting is active
+- Loads current-year and last-year timesheet counts for per-department medal ranking
+- Keeps sorting/ranking logic out of the virtualized layout component
 
 ### Memoization (`useMemoizedMatrix`)
 - Pre-computes lookup maps: `technician_id:YYYY-MM-DD` → assignment
@@ -110,3 +121,10 @@ Located in `src/utils/technicianAvailability.ts`:
 - **Timesheet System**: Assignments auto-create timesheets
 - **Tour System**: Tour assignments visible in matrix as multi-day ranges
 - **Stream Deck**: Selected cell state exposed via `useSelectedCellStore`
+
+## Refactor Boundary Notes
+
+- `JobAssignmentMatrix.tsx` is now the route composition shell; control rendering, mobile filter UI, reminder dialogs, viewport detection, and staffing button preference persistence live in `src/pages/job-assignment-matrix/`.
+- `OptimizedAssignmentMatrix.tsx` composes data, ordering, scroll state, and cell actions. Virtualized layout rendering remains in `OptimizedAssignmentMatrixView.tsx`.
+- `OptimizedMatrixCell.tsx` owns the visible cell content, while assignment removal side effects, retry/cancel dialogs, and tooltip formatting live under `src/components/matrix/optimized-matrix-cell/`.
+- Focused regression coverage for this boundary is in `src/pages/__tests__/JobAssignmentMatrix.test.tsx`, `src/components/matrix/__tests__/OptimizedAssignmentMatrix.test.tsx`, `src/components/matrix/__tests__/OptimizedMatrixCell.test.tsx`, `src/components/matrix/optimized-assignment-matrix/__tests__/OptimizedAssignmentMatrixView.test.tsx`, and the matrix Playwright smoke tests.

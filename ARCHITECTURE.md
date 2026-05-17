@@ -140,7 +140,8 @@ area-tecnica/
 │   │   ├── logistics/                # Logistics & warehouse
 │   │   ├── maps/                     # Map components (Mapbox)
 │   │   ├── matrix/                   # Crew assignment matrix
-│   │   │   └── optimized-assignment-matrix/
+│   │   │   ├── optimized-assignment-matrix/
+│   │   │   └── optimized-matrix-cell/
 │   │   ├── messages/                 # Internal messaging
 │   │   ├── profile/                  # User profile
 │   │   ├── schedule/                 # Scheduling views
@@ -207,7 +208,8 @@ area-tecnica/
 │   │   ├── Jobs.tsx                  # Job management
 │   │   ├── Tours.tsx                 # Tours & festivals
 │   │   ├── Timesheets.tsx            # Timesheet management
-│   │   ├── JobAssignmentMatrix.tsx   # Crew assignment matrix
+│   │   ├── JobAssignmentMatrix.tsx   # Crew assignment matrix route shell
+│   │   ├── job-assignment-matrix/    # Matrix page controls, reminders, and viewport helpers
 │   │   ├── EquipmentManagement.tsx   # Equipment catalog
 │   │   ├── festival-management/      # Festival management route shell
 │   │   ├── consumos-tool/            # Power consumption calculator
