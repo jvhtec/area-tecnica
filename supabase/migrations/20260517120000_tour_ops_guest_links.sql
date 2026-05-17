@@ -7,19 +7,8 @@ alter table public.tour_documents
   add column if not exists visible_to_guest boolean not null default false;
 
 drop policy if exists "p_storage_tour_documents_select_visible_to_guest" on storage.objects;
-create policy "p_storage_tour_documents_select_visible_to_guest"
-on storage.objects
-for select
-to anon
-using (
-  bucket_id = 'tour-documents'
-  and exists (
-    select 1
-    from public.tour_documents td
-    where td.file_path = storage.objects.name
-      and coalesce(td.visible_to_guest, false) = true
-  )
-);
+-- Guest document object access is issued by the tour-guest-document-url Edge Function
+-- after validating the guest token, expiry, revocation, section visibility, and document visibility.
 
 create table if not exists public.tour_guest_links (
   id uuid primary key default gen_random_uuid(),

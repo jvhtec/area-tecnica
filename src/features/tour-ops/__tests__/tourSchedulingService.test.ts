@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeTourOpsModel } from "../tourSchedulingService";
+import { normalizeTourOpsModel } from "@/features/tour-ops/tourSchedulingService";
 
 const rawTour = {
   id: "tour-1",

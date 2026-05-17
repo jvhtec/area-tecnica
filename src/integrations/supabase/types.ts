@@ -7904,6 +7904,7 @@ export type Database = {
           tour_id: string
           uploaded_at: string
           uploaded_by: string | null
+          visible_to_guest: boolean
           visible_to_tech: boolean
         }
         Insert: {
@@ -7915,6 +7916,7 @@ export type Database = {
           tour_id: string
           uploaded_at?: string
           uploaded_by?: string | null
+          visible_to_guest?: boolean
           visible_to_tech?: boolean
         }
         Update: {
@@ -7926,6 +7928,7 @@ export type Database = {
           tour_id?: string
           uploaded_at?: string
           uploaded_by?: string | null
+          visible_to_guest?: boolean
           visible_to_tech?: boolean
         }
         Relationships: [

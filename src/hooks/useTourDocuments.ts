@@ -142,7 +142,7 @@ export const useTourDocuments = (tourId: string) => {
 
       const { error } = await supabase
         .from('tour_documents')
-        .update({ visible_to_guest: visibleToGuest } as any)
+        .update({ visible_to_guest: visibleToGuest })
         .eq('id', documentId);
 
       if (error) throw error;

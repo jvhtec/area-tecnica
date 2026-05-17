@@ -32,10 +32,10 @@ export const TourSchedulingDialog: React.FC<TourSchedulingDialogProps> = ({
           <div>
             <DialogTitle className="flex items-center gap-2 text-xl md:text-2xl">
               <Clock className="h-5 w-5" />
-              Programacion y Timeline del Tour
+              Programación y cronograma de la gira
             </DialogTitle>
             <DialogDescription>
-              Tour Ops Hub para itinerarios, viajes, documentos y acceso externo.
+              Centro de operaciones de la gira para itinerarios, viajes, documentos y acceso externo.
             </DialogDescription>
           </div>
           <Badge variant="outline">{tourDates.length} fechas</Badge>

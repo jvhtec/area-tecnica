@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { format } from "date-fns";
 import { es } from "date-fns/locale";
+import { formatInTimeZone } from "date-fns-tz";
 import {
   AlertTriangle,
   Calendar,
@@ -29,6 +29,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { TourDocumentsDialog } from "@/components/tours/TourDocumentsDialog";
 import { cn } from "@/lib/utils";
+import { MADRID_TIMEZONE, utcToLocalInput } from "@/utils/timezoneUtils";
 import type {
   TourGuestLink,
   TourOpsAllowedSections,
@@ -36,15 +37,15 @@ import type {
   TourOpsModel,
   TourOpsTimelineEvent,
   TourOpsTravelSegment,
-} from "./types";
-import { DEFAULT_TOUR_OPS_SECTIONS } from "./types";
+} from "@/features/tour-ops/types";
+import { DEFAULT_TOUR_OPS_SECTIONS } from "@/features/tour-ops/types";
 import {
   useTourGuestLinkMutations,
   useTourGuestLinks,
   useTourOps,
   useTourOpsMutations,
-} from "./useTourOps";
-import { generateTourOpsPdf } from "./tourOpsPdf";
+} from "@/features/tour-ops/useTourOps";
+import { generateTourOpsPdf } from "@/features/tour-ops/tourOpsPdf";
 
 interface TourOpsManagementHubProps {
   tourId: string;
@@ -54,12 +55,13 @@ interface TourOpsManagementHubProps {
 const eventTypeOptions = ["show", "rehearsal", "travel", "load_in", "show_call", "meeting", "day_off", "hotel", "note", "other"];
 const transportOptions = ["bus", "van", "plane", "train", "ferry", "truck", "personal"];
 
-const formatDate = (value: string) => format(new Date(value), "EEE d MMM yyyy", { locale: es });
+const dateOnlyAsMadridNoon = (value: string) => (value.includes("T") ? value : `${value}T12:00:00`);
+const formatDate = (value: string) =>
+  formatInTimeZone(dateOnlyAsMadridNoon(value), MADRID_TIMEZONE, "EEE d MMM yyyy", { locale: es });
 const formatTime = (value?: string | null) => {
   if (!value) return "";
   if (value.includes("T")) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : format(date, "d MMM HH:mm", { locale: es });
+    return formatInTimeZone(value, MADRID_TIMEZONE, "d MMM HH:mm", { locale: es });
   }
   return value.slice(0, 5);
 };
@@ -67,10 +69,18 @@ const formatTime = (value?: string | null) => {
 const dateTimeInputValue = (value?: string | null) => {
   if (!value) return "";
   if (!value.includes("T")) return value;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
+  try {
+    return utcToLocalInput(value, MADRID_TIMEZONE);
+  } catch {
+    return "";
+  }
+};
+
+const finiteNumberOrNull = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
 };
 
 const DateList = ({
@@ -98,7 +108,7 @@ const DateList = ({
           {date.health.length ? (
             <Badge variant="destructive" className="text-[10px]">{date.health.length} avisos</Badge>
           ) : (
-            <Badge variant="outline" className="text-[10px]">OK</Badge>
+            <Badge variant="outline" className="text-[10px]">Completo</Badge>
           )}
         </div>
         <div className="mt-1 font-medium">{formatDate(date.date)}</div>
@@ -136,7 +146,7 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
             </div>
             <Button variant="outline" onClick={() => generateTourOpsPdf(model, "management", { dateId: date.id })}>
               <Download className="h-4 w-4 mr-2" />
-              Day sheet
+              Hoja diaria
             </Button>
           </div>
         </CardHeader>
@@ -147,7 +157,7 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
             <div className="text-sm text-muted-foreground">{date.venueAddress || date.location?.formattedAddress || ""}</div>
           </div>
           <div className="rounded-lg border p-3">
-            <div className="text-xs uppercase text-muted-foreground">Crew</div>
+            <div className="text-xs uppercase text-muted-foreground">Equipo</div>
             <div className="mt-1 font-medium">{date.crew.length} personas</div>
             <div className="text-sm text-muted-foreground">{date.jobTitle || date.jobId || "Sin job vinculado"}</div>
           </div>
@@ -206,7 +216,7 @@ const DateDetail = ({ model, date }: { model: TourOpsModel; date: TourOpsDate | 
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-base">Crew y alojamiento</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">Equipo y alojamiento</CardTitle></CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               {date.crew.length ? date.crew.slice(0, 8).map((member) => (
@@ -416,8 +426,8 @@ const TravelDialog = ({
       departureTime: form.departureTime || null,
       arrivalTime: form.arrivalTime || null,
       carrierName: form.carrierName || null,
-      distanceKm: form.distanceKm ? Number(form.distanceKm) : null,
-      estimatedDurationMinutes: form.estimatedDurationMinutes ? Number(form.estimatedDurationMinutes) : null,
+      distanceKm: finiteNumberOrNull(form.distanceKm),
+      estimatedDurationMinutes: finiteNumberOrNull(form.estimatedDurationMinutes),
       routeNotes: form.routeNotes || null,
       status: form.status,
     });
@@ -439,7 +449,7 @@ const TravelDialog = ({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Base / externo</SelectItem>
-                  {model.dates.map((date) => <SelectItem key={date.id} value={date.id}>{formatDate(date.date)} - {date.venueName || "TBC"}</SelectItem>)}
+                  {model.dates.map((date) => <SelectItem key={date.id} value={date.id}>{formatDate(date.date)} - {date.venueName || "Pendiente"}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -449,7 +459,7 @@ const TravelDialog = ({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Base / externo</SelectItem>
-                  {model.dates.map((date) => <SelectItem key={date.id} value={date.id}>{formatDate(date.date)} - {date.venueName || "TBC"}</SelectItem>)}
+                  {model.dates.map((date) => <SelectItem key={date.id} value={date.id}>{formatDate(date.date)} - {date.venueName || "Pendiente"}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -619,7 +629,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
   }
 
   if (error || !model) {
-    return <div className="p-6 text-destructive">No se pudo cargar Tour Ops.</div>;
+    return <div className="p-6 text-destructive">No se pudieron cargar las operaciones de gira.</div>;
   }
 
   const saveEvent = async (input: Partial<TourOpsTimelineEvent> & { tourId: string; date: string; title: string }) => {
@@ -645,7 +655,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-semibold">{tourName}</h2>
-          <p className="text-sm text-muted-foreground">Tour Ops Hub: programacion, viajes, documentos y acceso externo.</p>
+          <p className="text-sm text-muted-foreground">Centro de operaciones: programación, viajes, documentos y acceso externo.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => generateTourOpsPdf(model, "management")}>
@@ -675,10 +685,10 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
 
       <Tabs defaultValue="timeline" className="space-y-4">
         <TabsList className="flex h-auto flex-wrap justify-start">
-          <TabsTrigger value="timeline">Timeline</TabsTrigger>
+          <TabsTrigger value="timeline">Cronograma</TabsTrigger>
           <TabsTrigger value="travel">Viajes</TabsTrigger>
           <TabsTrigger value="documents">Documentos</TabsTrigger>
-          <TabsTrigger value="share">Guest</TabsTrigger>
+          <TabsTrigger value="share">Externo</TabsTrigger>
           <TabsTrigger value="health">Avisos</TabsTrigger>
         </TabsList>
 
@@ -781,7 +791,7 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
             <CardHeader className="flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <CardTitle>Documentos y exportacion</CardTitle>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => generateTourOpsPdf(model, "technician")}>PDF tech</Button>
+                <Button variant="outline" onClick={() => generateTourOpsPdf(model, "technician")}>PDF equipo</Button>
                 <Button variant="outline" onClick={() => generateTourOpsPdf(model, "guest")}>PDF externo</Button>
               </div>
             </CardHeader>
@@ -790,10 +800,10 @@ export function TourOpsManagementHub({ tourId, tourName }: TourOpsManagementHubP
                 <div key={document.id} className="flex flex-col gap-3 rounded-lg border p-3 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="font-medium">{document.fileName}</div>
-                    <div className="text-xs text-muted-foreground">{document.visibleToTech ? "Visible tech" : "Interno"} · {document.visibleToGuest ? "Visible guest" : "No guest"}</div>
+                    <div className="text-xs text-muted-foreground">{document.visibleToTech ? "Visible técnicos" : "Interno"} · {document.visibleToGuest ? "Visible externo" : "No externo"}</div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Guest</span>
+                    <span className="text-xs text-muted-foreground">Externo</span>
                     <Switch
                       checked={document.visibleToGuest}
                       onCheckedChange={(visibleToGuest) => mutations.setGuestDocumentVisibility.mutate({ documentId: document.id, visibleToGuest })}

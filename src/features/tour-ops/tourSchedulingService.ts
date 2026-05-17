@@ -1,4 +1,6 @@
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { MADRID_TIMEZONE } from "@/utils/timezoneUtils";
+import { formatInTimeZone } from "date-fns-tz";
 import type {
   TourGuestLink,
   TourOpsAccommodation,
@@ -14,8 +16,8 @@ import type {
   TourOpsProjection,
   TourOpsTimelineEvent,
   TourOpsTravelSegment,
-} from "./types";
-import { DEFAULT_TOUR_OPS_SECTIONS } from "./types";
+} from "@/features/tour-ops/types";
+import { DEFAULT_TOUR_OPS_SECTIONS } from "@/features/tour-ops/types";
 
 type AnyRecord = Record<string, any>;
 
@@ -310,8 +312,8 @@ const buildDateHealth = (date: TourOpsDate): TourOpsHealthIssue[] => {
     issues.push({
       id: `${date.id}:crew`,
       severity: "warning",
-      label: "Crew pendiente",
-      detail: `${prefix} no tiene crew confirmado en la vista de ops.`,
+      label: "Equipo pendiente",
+      detail: `${prefix} no tiene equipo confirmado en la vista de operaciones.`,
       tourDateId: date.id,
     });
   }
@@ -437,8 +439,11 @@ export function normalizeTourOpsModel(
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   const health = projection === "management" ? dates.flatMap((date) => date.health) : [];
-  const now = new Date();
-  const completedDates = dates.filter((date) => new Date(date.date).getTime() < now.getTime()).length;
+  const tourTimezone = textOrNull(tour.default_timezone) ?? MADRID_TIMEZONE;
+  const todayKey = formatInTimeZone(new Date(), tourTimezone, "yyyy-MM-dd");
+  const completedDates = dates.filter((date) => date.date.slice(0, 10) < todayKey).length;
+  const visibleTravelSegments = shouldIncludeSection(allowedSections, "travel") ? travelSegments : [];
+  const visibleAccommodations = shouldIncludeSection(allowedSections, "accommodations") ? accommodations : [];
 
   return {
     projection,
@@ -460,8 +465,8 @@ export function normalizeTourOpsModel(
     },
     dates,
     timelineEvents,
-    travelSegments: shouldIncludeSection(allowedSections, "travel") ? travelSegments : [],
-    accommodations: shouldIncludeSection(allowedSections, "accommodations") ? accommodations : [],
+    travelSegments: visibleTravelSegments,
+    accommodations: visibleAccommodations,
     documents,
     crew: projection === "guest" ? [] : dedupeCrew(tourCrew, projection),
     health,
@@ -470,7 +475,7 @@ export function normalizeTourOpsModel(
       completedDates,
       upcomingDates: Math.max(0, dates.length - completedDates),
       venueCount: new Set(dates.map((date) => date.location?.id || date.location?.name).filter(Boolean)).size,
-      travelSegments: travelSegments.length,
+      travelSegments: visibleTravelSegments.length,
       healthWarnings: health.length,
     },
   };

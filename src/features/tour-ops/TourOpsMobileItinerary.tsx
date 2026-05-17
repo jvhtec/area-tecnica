@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { format } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
 import { es } from "date-fns/locale";
+import { formatInTimeZone } from "date-fns-tz";
 import {
   Bed,
   Calendar,
@@ -20,29 +20,44 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { cn } from "@/lib/utils";
+import { formatInJobTimezone, MADRID_TIMEZONE } from "@/utils/timezoneUtils";
 import { toast } from "sonner";
-import type { TourOpsDate, TourOpsDocument, TourOpsModel, TourOpsProjection } from "./types";
-import { generateTourOpsPdf } from "./tourOpsPdf";
+import type { TourOpsDate, TourOpsDocument, TourOpsModel, TourOpsProjection } from "@/features/tour-ops/types";
+import { generateTourOpsPdf } from "@/features/tour-ops/tourOpsPdf";
 
 interface TourOpsMobileItineraryProps {
   model: TourOpsModel;
   projection: TourOpsProjection;
+  shareToken?: string;
   className?: string;
 }
 
-const formatDate = (value: string) => format(new Date(value), "EEE d MMM", { locale: es });
+const dateOnlyAsMadridNoon = (value: string) => (value.includes("T") ? value : `${value}T12:00:00`);
+const madridDateKey = (value: string) =>
+  value.includes("T") ? formatInJobTimezone(value, "yyyy-MM-dd", MADRID_TIMEZONE) : value.slice(0, 10);
+
+const formatDate = (value: string) =>
+  formatInTimeZone(dateOnlyAsMadridNoon(value), MADRID_TIMEZONE, "EEE d MMM", { locale: es });
 
 const formatTime = (value?: string | null) => {
   if (!value) return "";
   if (value.includes("T")) {
-    const date = new Date(value);
-    return Number.isNaN(date.getTime()) ? value : format(date, "HH:mm");
+    return formatInTimeZone(value, MADRID_TIMEZONE, "HH:mm", { locale: es });
   }
   return value.slice(0, 5);
 };
 
-const openTourDocument = async (document: TourOpsDocument) => {
+const openTourDocument = async (document: TourOpsDocument, shareToken?: string) => {
   try {
+    if (shareToken) {
+      const { data, error } = await dataLayerClient.functions.invoke("tour-guest-document-url", {
+        body: { token: shareToken, documentId: document.id },
+      });
+      if (error || !data?.signedUrl) throw error || new Error("No signed URL");
+      window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      return;
+    }
+
     const { data, error } = await dataLayerClient.storage
       .from("tour-documents")
       .createSignedUrl(document.filePath, 300);
@@ -55,8 +70,8 @@ const openTourDocument = async (document: TourOpsDocument) => {
 };
 
 const getNextDate = (dates: TourOpsDate[]) => {
-  const now = Date.now();
-  return dates.find((date) => new Date(date.date).getTime() >= now) ?? dates[0] ?? null;
+  const todayKey = formatInJobTimezone(new Date(), "yyyy-MM-dd", MADRID_TIMEZONE);
+  return dates.find((date) => madridDateKey(date.date) >= todayKey) ?? dates[0] ?? null;
 };
 
 const DateDetail = ({ date, projection }: { date: TourOpsDate; projection: TourOpsProjection }) => (
@@ -68,7 +83,7 @@ const DateDetail = ({ date, projection }: { date: TourOpsDate; projection: TourO
           <div className="min-w-0">
             <div className="font-medium">{date.venueName || date.location?.name || "Venue por confirmar"}</div>
             <div className="text-sm text-muted-foreground break-words">
-              {date.venueAddress || date.location?.formattedAddress || "Direccion pendiente"}
+              {date.venueAddress || date.location?.formattedAddress || "Dirección pendiente"}
             </div>
           </div>
         </div>
@@ -76,8 +91,8 @@ const DateDetail = ({ date, projection }: { date: TourOpsDate; projection: TourO
         {date.type && (
           <div className="flex items-center gap-2">
             <Badge variant="outline">{date.type}</Badge>
-            {date.rehearsalDays ? <Badge variant="secondary">{date.rehearsalDays} dias</Badge> : null}
-            {date.isTourPackOnly ? <Badge variant="secondary">Pack only</Badge> : null}
+            {date.rehearsalDays ? <Badge variant="secondary">{date.rehearsalDays} días</Badge> : null}
+            {date.isTourPackOnly ? <Badge variant="secondary">Solo pack</Badge> : null}
           </div>
         )}
       </CardContent>
@@ -171,7 +186,7 @@ const DateDetail = ({ date, projection }: { date: TourOpsDate; projection: TourO
               <CardTitle className="text-base flex items-center justify-between">
                 <span className="flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Crew
+                  Equipo
                 </span>
                 <ChevronDown className="h-4 w-4" />
               </CardTitle>
@@ -183,11 +198,11 @@ const DateDetail = ({ date, projection }: { date: TourOpsDate; projection: TourO
                 date.crew.map((member) => (
                   <div key={`${member.id}-${member.role}`} className="flex justify-between gap-3 rounded-lg bg-muted/50 p-2 text-sm">
                     <span>{member.name}</span>
-                    <span className="text-muted-foreground">{member.role || member.department || "Crew"}</span>
+                    <span className="text-muted-foreground">{member.role || member.department || "Equipo"}</span>
                   </div>
                 ))
               ) : (
-                <div className="text-sm text-muted-foreground">Sin crew confirmado.</div>
+                <div className="text-sm text-muted-foreground">Sin equipo confirmado.</div>
               )}
             </CardContent>
           </CollapsibleContent>
@@ -232,33 +247,39 @@ const DateDetail = ({ date, projection }: { date: TourOpsDate; projection: TourO
       <Card>
         <CardContent className="p-4 text-sm flex items-center gap-2">
           <CloudSun className="h-4 w-4 text-muted-foreground" />
-          Prevision disponible en hoja de ruta.
+          Previsión disponible en hoja de ruta.
         </CardContent>
       </Card>
     ) : null}
   </div>
 );
 
-export function TourOpsMobileItinerary({ model, projection, className }: TourOpsMobileItineraryProps) {
+export function TourOpsMobileItinerary({ model, projection, shareToken, className }: TourOpsMobileItineraryProps) {
   const nextDate = getNextDate(model.dates);
   const [filter, setFilter] = useState("next");
   const [selectedDateId, setSelectedDateId] = useState(nextDate?.id ?? model.dates[0]?.id ?? null);
 
-  const visibleDates = filter === "all"
-    ? model.dates
-    : filter === "today"
-      ? model.dates.filter((date) => new Date(date.date).toDateString() === new Date().toDateString())
-      : nextDate
-        ? [nextDate]
-        : [];
-  const selectedDate = model.dates.find((date) => date.id === selectedDateId) ?? visibleDates[0] ?? model.dates[0];
+  const visibleDates = useMemo(() => {
+    const todayKey = formatInJobTimezone(new Date(), "yyyy-MM-dd", MADRID_TIMEZONE);
+    if (filter === "all") return model.dates;
+    if (filter === "today") return model.dates.filter((date) => madridDateKey(date.date) === todayKey);
+    return nextDate ? [nextDate] : [];
+  }, [filter, model.dates, nextDate]);
+
+  useEffect(() => {
+    if (!visibleDates.some((date) => date.id === selectedDateId)) {
+      setSelectedDateId(visibleDates[0]?.id ?? null);
+    }
+  }, [selectedDateId, visibleDates]);
+
+  const selectedDate = visibleDates.find((date) => date.id === selectedDateId) ?? visibleDates[0] ?? null;
 
   return (
     <div className={cn("space-y-4", className)}>
       {nextDate && (
         <Card className="border-primary/40 bg-primary/5">
           <CardContent className="p-4">
-            <div className="text-xs font-semibold uppercase text-muted-foreground">Proxima llamada</div>
+            <div className="text-xs font-semibold uppercase text-muted-foreground">Próxima llamada</div>
             <div className="mt-1 flex items-end justify-between gap-3">
               <div>
                 <div className="text-lg font-semibold">{nextDate.venueName || nextDate.location?.name || "Venue por confirmar"}</div>
@@ -276,7 +297,7 @@ export function TourOpsMobileItinerary({ model, projection, className }: TourOps
         <Tabs value={filter} onValueChange={setFilter}>
           <TabsList>
             <TabsTrigger value="today">Hoy</TabsTrigger>
-            <TabsTrigger value="next">Proxima</TabsTrigger>
+            <TabsTrigger value="next">Próxima</TabsTrigger>
             <TabsTrigger value="all">Todas</TabsTrigger>
           </TabsList>
         </Tabs>
@@ -297,12 +318,20 @@ export function TourOpsMobileItinerary({ model, projection, className }: TourOps
             )}
           >
             <div className="text-xs text-muted-foreground">{formatDate(date.date)}</div>
-            <div className="truncate text-sm font-medium">{date.venueName || date.location?.name || "TBC"}</div>
+            <div className="truncate text-sm font-medium">{date.venueName || date.location?.name || "Pendiente"}</div>
           </button>
         ))}
       </div>
 
-      {selectedDate ? <DateDetail date={selectedDate} projection={projection} /> : null}
+      {selectedDate ? (
+        <DateDetail date={selectedDate} projection={projection} />
+      ) : (
+        <Card>
+          <CardContent className="p-6 text-center text-sm text-muted-foreground">
+            No hay fechas para este filtro.
+          </CardContent>
+        </Card>
+      )}
 
       {model.documents.length > 0 && (
         <Card>
@@ -318,7 +347,7 @@ export function TourOpsMobileItinerary({ model, projection, className }: TourOps
                 key={document.id}
                 variant="outline"
                 className="w-full justify-start"
-                onClick={() => openTourDocument(document)}
+                onClick={() => openTourDocument(document, shareToken)}
               >
                 <FileText className="h-4 w-4 mr-2" />
                 <span className="truncate">{document.fileName}</span>

@@ -12,7 +12,7 @@ import {
   saveTimelineEvent,
   saveTravelSegment,
   updateTourDocumentGuestVisibility,
-} from "./tourSchedulingService";
+} from "@/features/tour-ops/tourSchedulingService";
 import type {
   TourGuestLink,
   TourOpsAllowedSections,
@@ -20,7 +20,7 @@ import type {
   TourOpsProjection,
   TourOpsTimelineEvent,
   TourOpsTravelSegment,
-} from "./types";
+} from "@/features/tour-ops/types";
 
 export const tourOpsQueryKey = (tourId: string, projection: TourOpsProjection) =>
   queryKeys.scope("tour-ops", tourId, projection);
