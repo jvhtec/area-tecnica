@@ -9,6 +9,8 @@ import {
   fetchTourOpsShare,
   migrateLegacyTravelPlan,
   revokeTourGuestLink,
+  deleteAccommodation,
+  saveAccommodation,
   saveTimelineEvent,
   saveTravelSegment,
   syncHojaRutaOpsData,
@@ -17,6 +19,7 @@ import {
 import type {
   TourGuestLink,
   TourOpsAllowedSections,
+  TourOpsAccommodation,
   TourOpsModel,
   TourOpsProjection,
   TourOpsTimelineEvent,
@@ -68,6 +71,16 @@ export function useTourOpsMutations(tourId: string) {
     onSuccess: invalidate,
   });
 
+  const saveHotel = useMutation({
+    mutationFn: (input: Partial<TourOpsAccommodation> & { tourId: string }) => saveAccommodation(input),
+    onSuccess: invalidate,
+  });
+
+  const removeHotel = useMutation({
+    mutationFn: (input: { id: string; source?: TourOpsAccommodation["source"] }) => deleteAccommodation(input),
+    onSuccess: invalidate,
+  });
+
   const migrateTravel = useMutation({
     mutationFn: (model: TourOpsModel) => migrateLegacyTravelPlan(model),
     onSuccess: invalidate,
@@ -92,6 +105,8 @@ export function useTourOpsMutations(tourId: string) {
     removeEvent,
     saveTravel,
     removeTravel,
+    saveHotel,
+    removeHotel,
     migrateTravel,
     syncHojaOps,
     setGuestDocumentVisibility,
