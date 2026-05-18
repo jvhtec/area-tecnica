@@ -5,11 +5,14 @@ import { Users } from "lucide-react";
 import { Department } from "@/types/department";
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
-import { format } from "date-fns";
+import { differenceInCalendarDays, parseISO } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { es } from "date-fns/locale";
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from "@/lib/utils";
 import { getScheduledWorkDateKeys, resolveAssignmentWorkDateKeys } from "@/utils/assignmentWorkDates";
+
+const MADRID_TIME_ZONE = "Europe/Madrid";
 
 interface JobCardAssignmentsProps {
   assignments: any[];
@@ -119,6 +122,15 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
     }
   }
 
+  const formatDateKey = (dateKey: string, pattern: string) => (
+    formatInTimeZone(
+      fromZonedTime(`${dateKey}T00:00:00`, MADRID_TIME_ZONE),
+      MADRID_TIME_ZONE,
+      pattern,
+      { locale: es },
+    )
+  );
+
   const assignedTechnicians = Array.from(grouped.values());
 
   if (assignedTechnicians.length === 0) {
@@ -133,7 +145,7 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
           // Format single/multi-day suffix compactly
           const dateList = Array.from(tech.dates).sort();
           let dateSuffix: string | null = null;
-          const formatCompactDate = (dateKey: string) => format(new Date(`${dateKey}T00:00:00`), 'd MMM', { locale: es });
+          const formatCompactDate = (dateKey: string) => formatDateKey(dateKey, 'd MMM');
           if (dateList.length === 1) {
             try { dateSuffix = ` • ${formatCompactDate(dateList[0])}`; } catch { dateSuffix = ` • ${dateList[0]}`; }
           } else if (dateList.length > 1 && dateList.length <= 3) {
@@ -144,17 +156,22 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
             }
           } else if (dateList.length > 1) {
             // Detect contiguous range; otherwise show count
-            const ds = dateList.map(d => new Date(`${d}T00:00:00`)).sort((a, b) => a.getTime() - b.getTime());
+            const ds = dateList.map((d) => parseISO(d)).sort((a, b) => a.getTime() - b.getTime());
             let contiguous = true;
             for (let i = 1; i < ds.length; i++) {
-              const diff = (ds[i].getTime() - ds[i - 1].getTime()) / (24 * 3600 * 1000);
-              if (diff !== 1) { contiguous = false; break; }
+              if (differenceInCalendarDays(ds[i], ds[i - 1]) !== 1) {
+                contiguous = false;
+                break;
+              }
             }
             if (contiguous) {
-              const first = ds[0];
-              const last = ds[ds.length - 1];
-              const sameMonth = first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear();
-              dateSuffix = ` • ${format(first, 'd MMM', { locale: es })}${sameMonth ? '–' + format(last, 'd', { locale: es }) : '–' + format(last, 'd MMM', { locale: es })}`;
+              const firstKey = dateList[0];
+              const lastKey = dateList[dateList.length - 1];
+              const sameMonth = (
+                formatDateKey(firstKey, 'M') === formatDateKey(lastKey, 'M') &&
+                formatDateKey(firstKey, 'yyyy') === formatDateKey(lastKey, 'yyyy')
+              );
+              dateSuffix = ` • ${formatCompactDate(firstKey)}${sameMonth ? '–' + formatDateKey(lastKey, 'd') : '–' + formatCompactDate(lastKey)}`;
             } else {
               try {
                 dateSuffix = ` • ${formatCompactDate(dateList[0])} +${dateList.length - 1} días`;
@@ -168,7 +185,7 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
             if (dateList.length === 0) return null;
             try {
               const pretty = dateList
-                .map(d => format(new Date(`${d}T00:00:00`), 'PPP', { locale: es }))
+                .map(d => formatDateKey(d, 'PPP'))
                 .join('\n');
               return pretty;
             } catch {

@@ -147,11 +147,14 @@ export const useOptimizedJobCard = (
         console.warn('Error fetching job date types for job card:', dateTypesError);
       }
 
-      const scheduledWorkDates = getScheduledWorkDateKeys({
+      const computedScheduledWorkDates = getScheduledWorkDateKeys({
         job_date_types: jobDateTypes || job?.job_date_types || [],
         start_time: job?.start_time,
         end_time: job?.end_time,
-      }) || jobScheduledWorkDates;
+      });
+      const scheduledWorkDates = computedScheduledWorkDates.length > 0
+        ? computedScheduledWorkDates
+        : jobScheduledWorkDates;
 
       const mergedAssignments: any[] = (baseAssignments || []).map((a: any) => ({
         ...a,

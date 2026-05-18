@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { format } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { es } from "date-fns/locale";
 import { Users } from "lucide-react";
 
@@ -9,6 +9,8 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { labelForCode } from "@/utils/roles";
 import { getScheduledWorkDateKeys, resolveAssignmentWorkDateKeys } from "@/utils/assignmentWorkDates";
+
+const MADRID_TIME_ZONE = "Europe/Madrid";
 
 interface JobDetailsPersonnelTabProps {
   jobDetails: any;
@@ -71,7 +73,12 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
   ), [filteredAssignments, scheduledWorkDateKeys, technicianDatesMap]);
 
   const formatDateKey = (dateKey: string, pattern: string) => (
-    format(new Date(`${dateKey}T00:00:00`), pattern, { locale: es })
+    formatInTimeZone(
+      fromZonedTime(`${dateKey}T00:00:00`, MADRID_TIME_ZONE),
+      MADRID_TIME_ZONE,
+      pattern,
+      { locale: es },
+    )
   );
 
   return (

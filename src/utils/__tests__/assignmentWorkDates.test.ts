@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { getScheduledWorkDateKeys, resolveAssignmentWorkDateKeys } from '../assignmentWorkDates';
+import { getScheduledWorkDateKeys, normalizeDateKey, resolveAssignmentWorkDateKeys } from '@/utils/assignmentWorkDates';
 
 describe('assignment work date resolution', () => {
+  it('normalizes timestamp values using the Madrid calendar day', () => {
+    expect(normalizeDateKey('2026-06-01T22:30:00Z')).toBe('2026-06-02');
+    expect(normalizeDateKey('2026-06-01')).toBe('2026-06-01');
+  });
+
   it('uses working job date types as the scheduled job span', () => {
     expect(getScheduledWorkDateKeys({
       start_time: '2026-06-01T06:00:00',
