@@ -79,7 +79,8 @@ export const useOptimizedJobCard = (
     job_date_types: job?.job_date_types,
     start_time: job?.start_time,
     end_time: job?.end_time,
-  }), [job?.job_date_types, job?.start_time, job?.end_time]);
+    tour_date: job?.tour_date,
+  }), [job?.job_date_types, job?.start_time, job?.end_time, job?.tour_date]);
 
   // Helper to fetch and update assignments for this job
   // job_assignments are the base; timesheets add per-day date info (with RLS-safe fallback)
@@ -151,6 +152,7 @@ export const useOptimizedJobCard = (
         job_date_types: jobDateTypes || job?.job_date_types || [],
         start_time: job?.start_time,
         end_time: job?.end_time,
+        tour_date: job?.tour_date,
       });
       const scheduledWorkDates = computedScheduledWorkDates.length > 0
         ? computedScheduledWorkDates
@@ -187,7 +189,7 @@ export const useOptimizedJobCard = (
     } catch (err) {
       console.warn('Error refreshing assignments', err);
     }
-  }, [job?.id, job?.job_assignments, job?.job_date_types, job?.start_time, job?.end_time, jobScheduledWorkDates]);
+  }, [job?.id, job?.job_assignments, job?.job_date_types, job?.start_time, job?.end_time, job?.tour_date, jobScheduledWorkDates]);
 
   // Keep local state in sync with incoming job prop updates for instant UI
   useEffect(() => {

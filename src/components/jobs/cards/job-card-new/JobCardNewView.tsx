@@ -459,6 +459,7 @@ export function JobCardNewView({
                     jobDateTypes={job.job_date_types || []}
                     jobStartTime={job.start_time || null}
                     jobEndTime={job.end_time || null}
+                    jobTourDate={job.tour_date || null}
                   />
                 )}
 

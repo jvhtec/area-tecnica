@@ -10,17 +10,22 @@ import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { es } from "date-fns/locale";
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from "@/lib/utils";
-import { getScheduledWorkDateKeys, resolveAssignmentWorkDateKeys } from "@/utils/assignmentWorkDates";
+import {
+  getScheduledWorkDateKeys,
+  resolveAssignmentWorkDateKeys,
+  type JobScheduleLike,
+} from "@/utils/assignmentWorkDates";
 
 const MADRID_TIME_ZONE = "Europe/Madrid";
 
 interface JobCardAssignmentsProps {
   assignments: any[];
   department: Department;
-  jobTimesheets?: { technician_id: string; status: string }[];
+  jobTimesheets?: { technician_id: string; status: string; date?: string | null }[];
   jobDateTypes?: Array<{ date?: string | null; type?: string | null }> | null;
   jobStartTime?: string | null;
   jobEndTime?: string | null;
+  jobTourDate?: JobScheduleLike["tour_date"];
 }
 
 export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
@@ -30,12 +35,26 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
   jobDateTypes,
   jobStartTime,
   jobEndTime,
+  jobTourDate,
 }) => {
   const scheduledWorkDateKeys = React.useMemo(() => getScheduledWorkDateKeys({
     job_date_types: jobDateTypes,
     start_time: jobStartTime,
     end_time: jobEndTime,
-  }), [jobDateTypes, jobStartTime, jobEndTime]);
+    tour_date: jobTourDate,
+  }), [jobDateTypes, jobStartTime, jobEndTime, jobTourDate]);
+
+  const timesheetDateKeysByTech = React.useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const timesheet of jobTimesheets) {
+      if (!timesheet.technician_id || !timesheet.date) continue;
+      if (!map.has(timesheet.technician_id)) {
+        map.set(timesheet.technician_id, new Set());
+      }
+      map.get(timesheet.technician_id)?.add(timesheet.date);
+    }
+    return map;
+  }, [jobTimesheets]);
 
   // Determine overall timesheet state for a technician
   const getTechTimesheetState = (techId: string): 'none' | 'draft' | 'partial' | 'submitted' | 'approved' | 'rejected' => {
@@ -102,7 +121,12 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
     const key = assignment.technician_id ? `tech:${assignment.technician_id}` : `ext:${name}`;
     const roleLabel = roleCode ? labelForCode(roleCode) : null;
     const isFromTour = assignment.assignment_source === 'tour';
-    const datesToAdd = resolveAssignmentWorkDateKeys(assignment, { scheduledDateKeys: scheduledWorkDateKeys });
+    const datesToAdd = resolveAssignmentWorkDateKeys(assignment, {
+      timesheetDateKeys: assignment.technician_id
+        ? timesheetDateKeysByTech.get(assignment.technician_id)
+        : null,
+      scheduledDateKeys: scheduledWorkDateKeys,
+    });
 
     if (!grouped.has(key)) {
       grouped.set(key, {
