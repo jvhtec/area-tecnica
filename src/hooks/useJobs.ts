@@ -13,6 +13,7 @@ export const useJobs = () => {
     { table: 'jobs', queryKey: queryKeys.scope('jobs'), priority: 'high' },
     { table: 'job_assignments', queryKey: queryKeys.scope('jobs'), priority: 'medium' },
     { table: 'job_departments', queryKey: queryKeys.scope('jobs'), priority: 'medium' },
+    { table: 'job_date_types', queryKey: queryKeys.scope('jobs'), priority: 'medium' },
     // Documents and tour dates change less frequently; keep lower priority
     { table: 'job_documents', queryKey: queryKeys.scope('jobs'), priority: 'low' },
     { table: 'tour_dates', queryKey: queryKeys.scope('jobs'), priority: 'low' },
@@ -50,6 +51,10 @@ export const useJobs = () => {
                   nickname,
                   department
                 )
+              ),
+              job_date_types(
+                date,
+                type
               ),
               job_documents(
                 id,

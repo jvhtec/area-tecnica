@@ -3,10 +3,10 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { format } from 'date-fns';
 import { createQueryKey } from '@/lib/optimized-react-query';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
+import { getScheduledWorkDateKeys } from '@/utils/assignmentWorkDates';
 import {
   canCreateFolders,
   canEditJobs as canEditJobsForRole,
@@ -75,6 +75,11 @@ export const useOptimizedJobCard = (
   }, [job.job_documents]);
 
   const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
+  const jobScheduledWorkDates = useMemo(() => getScheduledWorkDateKeys({
+    job_date_types: job?.job_date_types,
+    start_time: job?.start_time,
+    end_time: job?.end_time,
+  }), [job?.job_date_types, job?.start_time, job?.end_time]);
 
   // Helper to fetch and update assignments for this job
   // job_assignments are the base; timesheets add per-day date info (with RLS-safe fallback)
@@ -133,10 +138,29 @@ export const useOptimizedJobCard = (
         normalizedTimesheetsByTech.set(techId, uniqueSorted);
       });
 
+      const { data: jobDateTypes, error: dateTypesError } = await supabase
+        .from('job_date_types')
+        .select('date, type')
+        .eq('job_id', job.id);
+
+      if (dateTypesError) {
+        console.warn('Error fetching job date types for job card:', dateTypesError);
+      }
+
+      const computedScheduledWorkDates = getScheduledWorkDateKeys({
+        job_date_types: jobDateTypes || job?.job_date_types || [],
+        start_time: job?.start_time,
+        end_time: job?.end_time,
+      });
+      const scheduledWorkDates = computedScheduledWorkDates.length > 0
+        ? computedScheduledWorkDates
+        : jobScheduledWorkDates;
+
       const mergedAssignments: any[] = (baseAssignments || []).map((a: any) => ({
         ...a,
         profiles: normalizeProfile(a.profiles),
         _timesheet_dates: normalizedTimesheetsByTech.get(a.technician_id) || [],
+        _scheduled_work_dates: scheduledWorkDates,
       }));
 
       // If timesheets exist for technicians not in job_assignments (edge cases), include them so badges still appear
@@ -155,6 +179,7 @@ export const useOptimizedJobCard = (
           assignment_date: null,
           assigned_at: null,
           _timesheet_dates: dates,
+          _scheduled_work_dates: scheduledWorkDates,
         });
       });
 
@@ -162,12 +187,18 @@ export const useOptimizedJobCard = (
     } catch (err) {
       console.warn('Error refreshing assignments', err);
     }
-  }, [job?.id, job?.job_assignments]);
+  }, [job?.id, job?.job_assignments, job?.job_date_types, job?.start_time, job?.end_time, jobScheduledWorkDates]);
 
   // Keep local state in sync with incoming job prop updates for instant UI
   useEffect(() => {
-    setAssignments(job.job_assignments || []);
-  }, [job.job_assignments]);
+    const nextAssignments = Array.isArray(job.job_assignments)
+      ? job.job_assignments.map((assignment: any) => ({
+        ...assignment,
+        _scheduled_work_dates: jobScheduledWorkDates,
+      }))
+      : [];
+    setAssignments(nextAssignments);
+  }, [job.job_assignments, jobScheduledWorkDates]);
 
   // One-time load refresh for contexts that must show current assignment badges immediately
   useEffect(() => {

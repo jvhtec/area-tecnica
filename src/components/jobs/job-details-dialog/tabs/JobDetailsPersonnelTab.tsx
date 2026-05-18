@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { format } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { es } from "date-fns/locale";
 import { Users } from "lucide-react";
 
@@ -8,6 +8,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { labelForCode } from "@/utils/roles";
+import { getScheduledWorkDateKeys, resolveAssignmentWorkDateKeys } from "@/utils/assignmentWorkDates";
+
+const MADRID_TIME_ZONE = "Europe/Madrid";
 
 interface JobDetailsPersonnelTabProps {
   jobDetails: any;
@@ -45,6 +48,7 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
     const map = new Map<string, Set<string>>();
     if (jobDetails?.timesheets) {
       jobDetails.timesheets.forEach((t: any) => {
+        if (t?.is_active === false) return;
         if (t.technician_id && t.date) {
           if (!map.has(t.technician_id)) {
             map.set(t.technician_id, new Set());
@@ -55,6 +59,27 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
     }
     return map;
   }, [jobDetails?.timesheets]);
+
+  const scheduledWorkDateKeys = useMemo(() => getScheduledWorkDateKeys(jobDetails), [jobDetails]);
+
+  const assignmentsWithDates = useMemo<Array<{ assignment: any; workDateKeys: string[] }>>(() => (
+    filteredAssignments.map((assignment: any) => ({
+      assignment,
+      workDateKeys: resolveAssignmentWorkDateKeys(assignment, {
+        timesheetDateKeys: technicianDatesMap.get(assignment.technician_id),
+        scheduledDateKeys: scheduledWorkDateKeys,
+      }),
+    }))
+  ), [filteredAssignments, scheduledWorkDateKeys, technicianDatesMap]);
+
+  const formatDateKey = (dateKey: string, pattern: string) => (
+    formatInTimeZone(
+      fromZonedTime(`${dateKey}T00:00:00`, MADRID_TIME_ZONE),
+      MADRID_TIME_ZONE,
+      pattern,
+      { locale: es },
+    )
+  );
 
   return (
     <TabsContent value="personnel" className="space-y-4 min-w-0 overflow-x-hidden">
@@ -68,9 +93,9 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
           <div className="flex items-center justify-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
-        ) : filteredAssignments.length > 0 ? (
+        ) : assignmentsWithDates.length > 0 ? (
           <div className="space-y-3">
-            {filteredAssignments.map((assignment: any) => (
+            {assignmentsWithDates.map(({ assignment, workDateKeys }) => (
               <div
                 key={assignment.technician_id}
                 className="flex flex-col md:flex-row md:items-start md:justify-between gap-2 p-3 bg-muted rounded min-w-0"
@@ -96,22 +121,14 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
                         : assignment.external_technician_name || "Desconocido"}
                     </p>
                     <p className="text-sm text-muted-foreground">{assignment.profiles?.department || "Externo"}</p>
-                    {assignment.single_day && (
-                      <p className="text-xs text-muted-foreground break-words">
-                        {(() => {
-                          const dates = technicianDatesMap.get(assignment.technician_id);
-                          if (dates && dates.size > 0) {
-                            const sortedDates = Array.from(dates).sort();
-                            if (sortedDates.length === 1) {
-                              return `Solo día: ${format(new Date(sortedDates[0]), "PPP", { locale: es })}`;
-                            }
-                            return `Días: ${sortedDates.map((d) => format(new Date(d), "dd/MM")).join(", ")}`;
-                          }
-                          return assignment.assignment_date
-                            ? `Solo día: ${format(new Date(assignment.assignment_date), "PPP", { locale: es })}`
-                            : "Sin fecha definida";
-                        })()}
-                      </p>
+                    {workDateKeys.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {workDateKeys.map((dateKey) => (
+                          <Badge key={dateKey} variant="secondary" className="text-[11px] font-normal">
+                            {formatDateKey(dateKey, "d MMM")}
+                          </Badge>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -131,15 +148,9 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
                       Vídeo: {labelForCode(assignment.video_role)}
                     </Badge>
                   )}
-                  {assignment.single_day && (
+                  {workDateKeys.length > 0 && (
                     <Badge variant="secondary" className="text-xs">
-                      {(() => {
-                        const dates = technicianDatesMap.get(assignment.technician_id);
-                        if (dates && dates.size > 0) {
-                          return dates.size === 1 ? "Día único" : "Varios días";
-                        }
-                        return "Día único";
-                      })()}
+                      {workDateKeys.length === 1 ? "1 día" : `${workDateKeys.length} días`}
                     </Badge>
                   )}
                 </div>
@@ -156,4 +167,3 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
     </TabsContent>
   );
 };
-

@@ -452,7 +452,14 @@ export function JobCardNewView({
             {job.job_type !== "dryhire" && (
               <>
                 {assignments.length > 0 && (
-                  <JobCardAssignments assignments={assignments} department={department} jobTimesheets={jobTimesheets || []} />
+                  <JobCardAssignments
+                    assignments={assignments}
+                    department={department}
+                    jobTimesheets={jobTimesheets || []}
+                    jobDateTypes={job.job_date_types || []}
+                    jobStartTime={job.start_time || null}
+                    jobEndTime={job.end_time || null}
+                  />
                 )}
 
                 {documents.length > 0 && (

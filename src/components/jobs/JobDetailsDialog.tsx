@@ -61,10 +61,11 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
           job_assignments(
             job_id, technician_id, assigned_by, assigned_at,
             sound_role, lights_role, video_role, status,
-            single_day, assignment_date,
+            single_day, assignment_date, assignment_source,
             profiles!job_assignments_technician_id_fkey(id, first_name, last_name, department, role, profile_picture_url)
           ),
-          timesheets(technician_id, date),
+          timesheets(technician_id, date, is_active, is_schedule_only),
+          job_date_types(date, type),
           job_documents(id, file_name, file_path, uploaded_at, file_size, visible_to_tech, read_only, template_type),
           logistics_events(id, event_type, transport_type, event_date, event_time, license_plate)
         `
