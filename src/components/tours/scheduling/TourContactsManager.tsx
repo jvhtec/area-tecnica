@@ -42,6 +42,85 @@ interface TourContact {
   notes: string;
 }
 
+const contactKey = (contact: Pick<TourContact, "name" | "role" | "phone">) =>
+  [contact.name, contact.role, contact.phone]
+    .map((value) => (value || "").trim().toLowerCase())
+    .join("|");
+
+const syncTourContactsToHojas = async (tourId: string, contacts: TourContact[]) => {
+  const tourContacts = contacts.filter((contact) => contact.name?.trim()).map((contact) => ({
+    name: contact.name.trim(),
+    role: contact.role || null,
+    phone: contact.phone || null,
+  }));
+  if (tourContacts.length === 0) return 0;
+
+  const { data: tourDates, error: datesError } = await dataLayerClient
+    .from("tour_dates")
+    .select("id")
+    .eq("tour_id", tourId);
+  if (datesError) throw datesError;
+
+  const dateIds = (tourDates || []).map((date: any) => date.id).filter(Boolean);
+
+  const [hojasByTourResult, hojasByDateResult] = await Promise.all([
+    dataLayerClient.from("hoja_de_ruta").select("id").eq("tour_id", tourId),
+    dateIds.length
+      ? dataLayerClient.from("hoja_de_ruta").select("id").in("tour_date_id", dateIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (hojasByTourResult.error) throw hojasByTourResult.error;
+  if (hojasByDateResult.error) throw hojasByDateResult.error;
+
+  const hojaIds = Array.from(new Set([
+    ...(hojasByTourResult.data || []).map((hoja: any) => hoja.id),
+    ...(hojasByDateResult.data || []).map((hoja: any) => hoja.id),
+  ].filter(Boolean)));
+
+  if (hojaIds.length === 0) return 0;
+
+  const { data: existingContacts, error: contactsError } = await dataLayerClient
+    .from("hoja_de_ruta_contacts")
+    .select("hoja_de_ruta_id, name, role, phone")
+    .in("hoja_de_ruta_id", hojaIds);
+  if (contactsError) throw contactsError;
+
+  const existingByHoja = new Map<string, Set<string>>();
+  (existingContacts || []).forEach((contact: any) => {
+    const hojaId = contact.hoja_de_ruta_id;
+    if (!hojaId) return;
+    if (!existingByHoja.has(hojaId)) existingByHoja.set(hojaId, new Set());
+    existingByHoja.get(hojaId)?.add(contactKey({
+      name: contact.name || "",
+      role: contact.role || "",
+      phone: contact.phone || "",
+    }));
+  });
+
+  const rows = hojaIds.flatMap((hojaId) => {
+    const existing = existingByHoja.get(hojaId) ?? new Set<string>();
+    return tourContacts
+      .filter((contact) => !existing.has(contactKey({
+        name: contact.name,
+        role: contact.role || "",
+        phone: contact.phone || "",
+      })))
+      .map((contact) => ({
+        hoja_de_ruta_id: hojaId,
+        name: contact.name,
+        role: contact.role,
+        phone: contact.phone,
+      }));
+  });
+
+  if (rows.length === 0) return 0;
+
+  const { error: insertError } = await dataLayerClient.from("hoja_de_ruta_contacts").insert(rows);
+  if (insertError) throw insertError;
+  return rows.length;
+};
+
 export const TourContactsManager: React.FC<TourContactsManagerProps> = ({
   tourId,
   tourData,
@@ -192,9 +271,13 @@ export const TourContactsManager: React.FC<TourContactsManagerProps> = ({
 
       if (error) throw error;
 
+      const syncedRows = await syncTourContactsToHojas(tourId, contacts);
+
       toast({
         title: "Guardado",
-        description: "Los contactos se han guardado correctamente",
+        description: syncedRows
+          ? `Contactos guardados y sincronizados en ${syncedRows} hoja(s).`
+          : "Contactos guardados. Las hojas ya estaban sincronizadas.",
       });
 
       onSave();

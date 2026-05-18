@@ -60,3 +60,6 @@ verify_jwt = false
 
 [functions.submit-public-artist-form]
 verify_jwt = false
+
+[functions.tour-guest-document-url]
+verify_jwt = false

@@ -75,6 +75,7 @@ const UserManual = lazy(() => import('@/components/UserManual').then(m => ({ def
 const IncidentReports = lazy(() => import('@/pages/IncidentReports'));
 const Wallboard = lazy(() => import('@/pages/Wallboard'));
 const WallboardPublic = lazy(() => import('@/pages/WallboardPublic'));
+const TourShare = lazy(() => import('@/pages/TourShare'));
 const Announcements = lazy(() => import('@/pages/Announcements'));
 const WallboardPresets = lazy(() => import('@/pages/WallboardPresets'));
 const RatesCenterPage = lazy(() => import('@/pages/RatesCenterPage'));
@@ -240,6 +241,7 @@ export default function App() {
 
                           {/* Wallboard: public tokenized access (no auth required) */}
                           <Route path="/wallboard/public/:token/:presetSlug?" element={<WallboardPublic />} />
+                          <Route path="/tour-share/:token" element={<TourShare />} />
 
                           {/* Public Routes */}
                           <Route path="/privacy" element={<Privacy />} />

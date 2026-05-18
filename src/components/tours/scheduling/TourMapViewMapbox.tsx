@@ -10,6 +10,8 @@ interface TourMapViewMapboxProps {
   tourDates: any[];
   accommodations?: any[];
   mapboxToken: string; // Required prop - must be pre-fetched by parent
+  selectedTourDateId?: string | null;
+  onTourDateSelect?: (tourDateId: string) => void;
 }
 
 export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
@@ -17,6 +19,8 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
   tourDates,
   accommodations = [],
   mapboxToken,
+  selectedTourDateId,
+  onTourDateSelect,
 }) => {
   const { toast } = useToast();
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -122,7 +126,17 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
     if (!mapLoaded || !map.current) return;
 
     renderMapContent();
-  }, [mapLoaded, tourData, tourDates, accommodations]);
+  }, [mapLoaded, tourData, tourDates, accommodations, selectedTourDateId, onTourDateSelect]);
+
+  const escapeHtml = (text: string | null | undefined): string => {
+    if (!text) return '';
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  };
 
   const renderMapContent = () => {
     if (!map.current) return;
@@ -155,8 +169,8 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
       }).setHTML(`
         <div style="padding: 8px; min-width: 200px; background: hsl(var(--popover)); color: hsl(var(--popover-foreground));">
           <h3 style="font-weight: bold; margin-bottom: 4px;">🏠 Base de Operaciones</h3>
-          <p style="margin: 4px 0; font-size: 14px;">${homeBase.name}</p>
-          <p style="margin: 4px 0; font-size: 12px; opacity: 0.8;">${homeBase.address || ''}</p>
+          <p style="margin: 4px 0; font-size: 14px;">${escapeHtml(homeBase.name)}</p>
+          <p style="margin: 4px 0; font-size: 12px; opacity: 0.8;">${escapeHtml(homeBase.address)}</p>
         </div>
       `);
 
@@ -179,12 +193,13 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
       // Create custom venue marker
       const venueEl = document.createElement('div');
       venueEl.className = 'custom-marker-venue';
+      const isSelected = selectedTourDateId === date.id;
       venueEl.innerHTML = `<div style="
-        width: 32px;
-        height: 32px;
+        width: ${isSelected ? 38 : 32}px;
+        height: ${isSelected ? 38 : 32}px;
         border-radius: 50%;
-        background-color: #ef4444;
-        border: 3px solid white;
+        background-color: ${isSelected ? '#111827' : '#ef4444'};
+        border: ${isSelected ? 4 : 3}px solid white;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -194,6 +209,9 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         box-shadow: 0 2px 8px rgba(0,0,0,0.4);
         cursor: pointer;
       ">${index + 1}</div>`;
+      venueEl.addEventListener('click', () => {
+        if (date.id) onTourDateSelect?.(date.id);
+      });
 
       const dateStr = new Date(date.date).toLocaleDateString("es-ES", {
         weekday: "long",
@@ -202,16 +220,18 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         day: "numeric",
       });
 
+      const venueName = location.venue_name || location.name || "Lugar";
+      const venueAddress = location.formatted_address || location.address || [location.city, location.state].filter(Boolean).join(", ");
       const venuePopup = new mapboxgl.Popup({
         offset: 25,
         closeButton: true,
       }).setHTML(`
         <div style="padding: 8px; max-width: 250px; background: hsl(var(--popover)); color: hsl(var(--popover-foreground));">
           <h3 style="font-weight: bold; margin-bottom: 4px;">📍 Fecha ${index + 1}</h3>
-          <p style="margin: 4px 0; font-weight: 600; font-size: 14px;">${location.venue_name || "Venue"}</p>
+          <p style="margin: 4px 0; font-weight: 600; font-size: 14px;">${escapeHtml(venueName)}</p>
           <p style="margin: 4px 0; font-size: 12px;">${dateStr}</p>
-          <p style="margin: 4px 0; font-size: 12px; opacity: 0.8;">${location.city || ""}, ${location.state || ""}</p>
-          ${date.call_time ? `<p style="margin: 4px 0; font-size: 12px;"><strong>Call:</strong> ${date.call_time}</p>` : ""}
+          <p style="margin: 4px 0; font-size: 12px; opacity: 0.8;">${escapeHtml(venueAddress)}</p>
+          ${date.call_time ? `<p style="margin: 4px 0; font-size: 12px;"><strong>Call:</strong> ${escapeHtml(date.call_time)}</p>` : ""}
         </div>
       `);
 
@@ -296,11 +316,11 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
         const fromLocation =
           segment.fromType === 'home'
             ? homeBase
-            : segment.fromLocation || getLocationFromDateId(segment.fromDateId);
+            : segment.fromLocation || (getLocationFromDateId(segment.fromDateId) || getLocationFromDateId(segment.fromTourDateId));
         const toLocation =
           segment.toType === 'home'
             ? homeBase
-            : segment.toLocation || getLocationFromDateId(segment.toDateId);
+            : segment.toLocation || (getLocationFromDateId(segment.toDateId) || getLocationFromDateId(segment.toTourDateId));
 
         const fromCoords =
           fromLocation?.longitude != null && fromLocation?.latitude != null
@@ -444,7 +464,7 @@ export const TourMapViewMapbox: React.FC<TourMapViewMapboxProps> = ({
               </Badge>
               <Badge variant="outline" className="bg-red-50 dark:bg-red-950">
                 <MapPin className="h-3 w-3 mr-1" />
-                Venues
+                {selectedTourDateId ? 'Fecha activa' : 'Venues'}
               </Badge>
               {hasRoute && (
                 <Badge variant="outline" className="bg-violet-50 dark:bg-violet-950">

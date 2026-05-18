@@ -14,7 +14,15 @@ interface TourDocumentsListProps {
 }
 
 export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
-  const { documents, deleteDocument, getDocumentUrl, canDelete, canManageVisibility, updateVisibility } = useTourDocuments(tourId);
+  const {
+    documents,
+    deleteDocument,
+    getDocumentUrl,
+    canDelete,
+    canManageVisibility,
+    updateVisibility,
+    updateGuestVisibility,
+  } = useTourDocuments(tourId);
 
   const handleView = async (doc: any) => {
     try {
@@ -114,6 +122,9 @@ export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
                         Interno
                       </Badge>
                     )}
+                    {document.visible_to_guest ? (
+                      <Badge variant="secondary">Visible externo</Badge>
+                    ) : null}
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
@@ -129,15 +140,27 @@ export const TourDocumentsList = ({ tourId }: TourDocumentsListProps) => {
 
               <div className="flex gap-2 items-center">
                 {canManageVisibility ? (
-                  <div className="flex items-center gap-2 mr-2">
-                    <span className="text-xs text-muted-foreground">Visible a técnicos</span>
-                    <Switch
-                      checked={Boolean(document.visible_to_tech)}
-                      onCheckedChange={(checked) => {
-                        void updateVisibility.mutateAsync({ documentId: document.id, visibleToTech: checked });
-                      }}
-                      disabled={updateVisibility.isPending}
-                    />
+                  <div className="flex flex-col gap-2 mr-2">
+                    <label className="flex items-center justify-end gap-2">
+                      <span className="text-xs text-muted-foreground">Técnicos</span>
+                      <Switch
+                        checked={Boolean(document.visible_to_tech)}
+                        onCheckedChange={(checked) => {
+                          void updateVisibility.mutateAsync({ documentId: document.id, visibleToTech: checked });
+                        }}
+                        disabled={updateVisibility.isPending}
+                      />
+                    </label>
+                    <label className="flex items-center justify-end gap-2">
+                      <span className="text-xs text-muted-foreground">Externo</span>
+                      <Switch
+                        checked={Boolean(document.visible_to_guest)}
+                        onCheckedChange={(checked) => {
+                          void updateGuestVisibility.mutateAsync({ documentId: document.id, visibleToGuest: checked });
+                        }}
+                        disabled={updateGuestVisibility.isPending}
+                      />
+                    </label>
                   </div>
                 ) : null}
 

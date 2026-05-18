@@ -24,6 +24,33 @@ export const useHojaDeRutaInitialization = (
       phone: jobData.client_phone || ""
     }] : [{ name: "", role: "", phone: "" }];
 
+  const normalizeTourContacts = (value: unknown) => {
+    if (!Array.isArray(value)) return [];
+    return value
+      .filter((contact): contact is Record<string, unknown> => Boolean(contact && typeof contact === "object" && !Array.isArray(contact)))
+      .map((contact) => ({
+        name: typeof contact.name === "string" ? contact.name : "",
+        role: typeof contact.role === "string" ? contact.role : "",
+        phone: typeof contact.phone === "string" ? contact.phone : "",
+      }))
+      .filter((contact) => contact.name.trim());
+  };
+
+  const mergeContacts = (...groups: Array<Array<{ name?: string; role?: string; phone?: string }> | undefined>) => {
+    const merged: Array<{ name: string; role: string; phone: string }> = [];
+    const seen = new Set<string>();
+    groups.flatMap((group) => group || []).forEach((contact) => {
+      const name = contact.name || "";
+      const role = contact.role || "";
+      const phone = contact.phone || "";
+      const key = [name, role, phone].map((value) => value.trim().toLowerCase()).join("|");
+      if (!name.trim() || seen.has(key)) return;
+      seen.add(key);
+      merged.push({ name, role, phone });
+    });
+    return merged.length ? merged : [{ name: "", role: "", phone: "" }];
+  };
+
   // Fetch power requirements for a job
   const fetchPowerRequirements = useCallback(async (jobId: string): Promise<string> => {
     if (!jobId) return "";
@@ -121,8 +148,20 @@ export const useHojaDeRutaInitialization = (
         role: "house_tech",
       })) || [];
 
+      let tourContacts: Array<{ name: string; role: string; phone: string }> = [];
+      if ((jobData as any).tour_id) {
+        const { data: tourData, error: tourError } = await supabase
+          .from('tours')
+          .select('tour_contacts')
+          .eq('id', (jobData as any).tour_id)
+          .maybeSingle();
+        if (!tourError) {
+          tourContacts = normalizeTourContacts((tourData as any)?.tour_contacts);
+        }
+      }
+
       console.log("✅ INITIALIZATION: Loaded current assignments:", staffFromAssignments);
-      return { jobData, staffFromAssignments };
+      return { jobData, staffFromAssignments, tourContacts };
     } catch (error) {
       console.error("❌ INITIALIZATION: Error loading job assignments:", error);
       return null;
@@ -143,7 +182,7 @@ export const useHojaDeRutaInitialization = (
 
       if (!assignmentData) return;
 
-      const { jobData, staffFromAssignments } = assignmentData;
+      const { jobData, staffFromAssignments, tourContacts } = assignmentData;
 
       // Prepare basic event data
       const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
@@ -168,7 +207,10 @@ export const useHojaDeRutaInitialization = (
             ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
             : undefined,
         },
-        contacts: buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
+        contacts: mergeContacts(
+          buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
+          tourContacts,
+        ),
         logistics: {
           transport: [],
           loadingDetails: "",
@@ -237,7 +279,7 @@ export const useHojaDeRutaInitialization = (
         return;
       }
 
-      const { jobData, staffFromAssignments } = assignmentData;
+      const { jobData, staffFromAssignments, tourContacts } = assignmentData;
       
       // Prepare basic event data from job
       const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
@@ -343,9 +385,12 @@ export const useHojaDeRutaInitialization = (
                 : undefined
             )
           },
-          contacts: savedEventData?.contacts?.length > 0 
-            ? savedEventData.contacts
-            : buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
+          contacts: savedEventData?.contacts?.length > 0
+            ? mergeContacts(savedEventData.contacts, tourContacts)
+            : mergeContacts(
+                buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
+                tourContacts,
+              ),
           logistics: savedEventData?.logistics || {
             transport: [],
             loadingDetails: "",
@@ -402,7 +447,10 @@ export const useHojaDeRutaInitialization = (
               ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
               : undefined,
           },
-          contacts: buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
+          contacts: mergeContacts(
+            buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
+            tourContacts,
+          ),
           logistics: {
             transport: [],
             loadingDetails: "",
