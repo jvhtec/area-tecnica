@@ -42,6 +42,43 @@ interface TourContact {
   notes: string;
 }
 
+type DataLayerRowsResult<T> = {
+  data: T[] | null;
+  error: { message?: string } | null;
+};
+
+type DataLayerWriteResult = {
+  error: { message?: string } | null;
+};
+
+type SelectRowsQuery<T> = {
+  select(columns: string): {
+    eq(column: string, value: string): Promise<DataLayerRowsResult<T>>;
+    in(column: string, values: string[]): Promise<DataLayerRowsResult<T>>;
+  };
+};
+
+type InsertRowsQuery = {
+  insert(rows: unknown[]): Promise<DataLayerWriteResult>;
+};
+
+type UpdateRowsQuery = {
+  update(values: unknown): {
+    eq(column: string, value: string): Promise<DataLayerWriteResult>;
+  };
+};
+
+type IdRow = { id: string | null };
+type HojaContactRow = {
+  hoja_de_ruta_id: string | null;
+  name: string | null;
+  role: string | null;
+  phone: string | null;
+};
+
+const dataLayerTable = <TQuery,>(table: string): TQuery =>
+  dataLayerClient.from(table as never) as unknown as TQuery;
+
 const contactKey = (contact: Pick<TourContact, "name" | "role" | "phone">) =>
   [contact.name, contact.role, contact.phone]
     .map((value) => (value || "").trim().toLowerCase())
@@ -55,18 +92,19 @@ const syncTourContactsToHojas = async (tourId: string, contacts: TourContact[]) 
   }));
   if (tourContacts.length === 0) return 0;
 
-  const { data: tourDates, error: datesError } = await dataLayerClient
-    .from("tour_dates")
+  const { data: tourDates, error: datesError } = await dataLayerTable<SelectRowsQuery<IdRow>>("tour_dates")
     .select("id")
     .eq("tour_id", tourId);
   if (datesError) throw datesError;
 
-  const dateIds = (tourDates || []).map((date: any) => date.id).filter(Boolean);
+  const dateIds = (tourDates || [])
+    .map((date) => date.id)
+    .filter((id): id is string => Boolean(id));
 
   const [hojasByTourResult, hojasByDateResult] = await Promise.all([
-    dataLayerClient.from("hoja_de_ruta").select("id").eq("tour_id", tourId),
+    dataLayerTable<SelectRowsQuery<IdRow>>("hoja_de_ruta").select("id").eq("tour_id", tourId),
     dateIds.length
-      ? dataLayerClient.from("hoja_de_ruta").select("id").in("tour_date_id", dateIds)
+      ? dataLayerTable<SelectRowsQuery<IdRow>>("hoja_de_ruta").select("id").in("tour_date_id", dateIds)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -74,20 +112,19 @@ const syncTourContactsToHojas = async (tourId: string, contacts: TourContact[]) 
   if (hojasByDateResult.error) throw hojasByDateResult.error;
 
   const hojaIds = Array.from(new Set([
-    ...(hojasByTourResult.data || []).map((hoja: any) => hoja.id),
-    ...(hojasByDateResult.data || []).map((hoja: any) => hoja.id),
-  ].filter(Boolean)));
+    ...(hojasByTourResult.data || []).map((hoja) => hoja.id),
+    ...(hojasByDateResult.data || []).map((hoja) => hoja.id),
+  ].filter((id): id is string => Boolean(id))));
 
   if (hojaIds.length === 0) return 0;
 
-  const { data: existingContacts, error: contactsError } = await dataLayerClient
-    .from("hoja_de_ruta_contacts")
+  const { data: existingContacts, error: contactsError } = await dataLayerTable<SelectRowsQuery<HojaContactRow>>("hoja_de_ruta_contacts")
     .select("hoja_de_ruta_id, name, role, phone")
     .in("hoja_de_ruta_id", hojaIds);
   if (contactsError) throw contactsError;
 
   const existingByHoja = new Map<string, Set<string>>();
-  (existingContacts || []).forEach((contact: any) => {
+  (existingContacts || []).forEach((contact) => {
     const hojaId = contact.hoja_de_ruta_id;
     if (!hojaId) return;
     if (!existingByHoja.has(hojaId)) existingByHoja.set(hojaId, new Set());
@@ -116,7 +153,7 @@ const syncTourContactsToHojas = async (tourId: string, contacts: TourContact[]) 
 
   if (rows.length === 0) return 0;
 
-  const { error: insertError } = await dataLayerClient.from("hoja_de_ruta_contacts").insert(rows);
+  const { error: insertError } = await dataLayerTable<InsertRowsQuery>("hoja_de_ruta_contacts").insert(rows);
   if (insertError) throw insertError;
   return rows.length;
 };
@@ -265,8 +302,8 @@ export const TourContactsManager: React.FC<TourContactsManagerProps> = ({
 
     setIsSaving(true);
     try {
-      const { error } = await dataLayerClient.from("tours")
-        .update({ tour_contacts: contacts } as any)
+      const { error } = await dataLayerTable<UpdateRowsQuery>("tours")
+        .update({ tour_contacts: contacts })
         .eq("id", tourId);
 
       if (error) throw error;

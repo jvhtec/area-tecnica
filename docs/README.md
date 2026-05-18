@@ -84,6 +84,9 @@ Detailed deep-dive docs for the full festival subsystem:
   - P3-03 Flex folder creation refactor is complete as of 2026-05-16: `src/utils/flex-folders/folders.ts` is a compatibility entrypoint, while creation orchestration, dryhire handling, tourdate handling, standard job handling, commercial extras, helpers, and shared creation types live under `src/utils/flex-folders/folder-creation/`.
   - P3-04 Consumos/Pesos refactor is complete as of 2026-05-16: shared power and weight calculations, persistence payload builders, PDF upload/task-completion wrappers, and reusable power table controls live under `src/features/technical-tools/`, while department pages keep their department-specific labels, catalogs, and export categories.
   - P3-05 festival management VM refactor is complete as of 2026-05-17: the VM composition hook is under 500 LOC, with query hooks, command wrappers, and derived selectors split under `src/features/festival-management/`.
+  - P3-06 assignment matrix refactor is complete as of 2026-05-17: page controls, virtualization state, technician ordering, dialogs, and cell rendering are split across focused matrix modules.
+  - P3-07 push broadcast refactor is complete as of 2026-05-17: the Edge Function entrypoint delegates to event-family handlers, shared delivery/recipient helpers, and pure message builders under `supabase/functions/push/broadcast/`.
+  - P3-08 PDF exporter refactor is complete as of 2026-05-18: shared jsPDF setup, logo data URL loading, corporate header/footer drawing, AutoTable final-Y access, safe image insertion, and blob output live in `src/utils/pdf/exportHelpers.ts`.
   - P6-03 source placeholder cleanup is complete as of 2026-05-15; deferred source work should reference a durable roadmap or issue ID rather than bare TODO/FIXME/HACK comments.
 - `migrations/` (migration notes)
 
