@@ -1,7 +1,8 @@
 import type jsPDF from 'jspdf';
-import { format } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { es } from 'date-fns/locale';
 import { loadPdfLibs, type AutoTableFn } from '@/utils/pdf/lazyPdf';
+import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 
 export type { AutoTableFn };
 export type PdfRgb = [number, number, number];
@@ -203,7 +204,12 @@ export const drawGeneratedPdfFooter = (
   pdf.setFontSize(8);
   pdf.setTextColor(100, 100, 100);
   pdf.text(
-    `Generado el ${format(generatedAt, "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}`,
+    `Generado el ${formatInTimeZone(
+      generatedAt,
+      MADRID_TIMEZONE,
+      "d 'de' MMMM 'de' yyyy 'a las' HH:mm",
+      { locale: es },
+    )}`,
     10,
     pageHeight - 10,
   );

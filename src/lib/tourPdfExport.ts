@@ -1,6 +1,8 @@
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 import { buildReadableFilename } from '@/utils/fileName';
+import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 import {
   createPdfExportDocument,
   drawCorporatePdfHeader,
@@ -29,13 +31,13 @@ interface TourScheduleExport {
 
 const sortedTourDates = (tour: TourScheduleExport): TourScheduleDate[] =>
   [...(tour.tour_dates ?? [])].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+    (a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime(),
   );
 
 const tableRowsForTour = (tour: TourScheduleExport) =>
   sortedTourDates(tour).map((date) => [
-    format(new Date(date.date), 'dd/MM/yyyy'),
-    format(new Date(date.date), 'EEEE'),
+    format(parseISO(date.date), 'dd/MM/yyyy'),
+    format(parseISO(date.date), 'EEEE'),
     date.location?.name || 'TBC',
     date.is_tour_pack_only ? 'Tour Pack Only' : 'Full Setup',
   ]);
@@ -96,7 +98,11 @@ const drawTourScheduleFooter = async (pdf: AutoTablePdfDocument) => {
 
   pdf.setFontSize(10);
   pdf.setTextColor(...SECTOR_PRO_RED);
-  pdf.text(`Generated on ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 10, finalY + 20);
+  pdf.text(
+    `Generated on ${formatInTimeZone(new Date(), MADRID_TIMEZONE, 'dd/MM/yyyy HH:mm')}`,
+    10,
+    finalY + 20,
+  );
 
   const logo = await loadCompanyLogoDataUrl();
   if (!logo) {

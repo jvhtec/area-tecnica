@@ -1178,8 +1178,10 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
       if (link?.token) {
         const url = `${window.location.origin}/tour-share/${link.token}`;
         setLastToken(url);
-        await navigator.clipboard?.writeText(url).catch((): void => undefined);
-        toast.success("Link creado y copiado");
+        const copied = navigator.clipboard
+          ? await navigator.clipboard.writeText(url).then(() => true).catch(() => false)
+          : false;
+        toast.success(copied ? "Link creado y copiado" : "Link creado");
         return;
       }
       toast.error("No se recibio el token del link externo");

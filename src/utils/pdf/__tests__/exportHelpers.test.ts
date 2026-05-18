@@ -100,7 +100,7 @@ describe('PDF export helpers', () => {
     const pdf = makePdf();
 
     drawGeneratedPdfFooter(pdf as unknown as jsPDF, {
-      generatedAt: new Date(2026, 0, 2, 3, 4),
+      generatedAt: new Date(Date.UTC(2026, 0, 2, 2, 4)),
       logo: 'data:image/png;base64,logo',
       pageNumber: 7,
     });
