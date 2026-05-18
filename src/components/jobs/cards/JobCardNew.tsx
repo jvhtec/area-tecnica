@@ -535,25 +535,25 @@ function JobCardNewFull({
     [assignments]
   );
 
-  // Fetch timesheet statuses per technician for this job (for badge color coding)
+  // Fetch active timesheet rows per technician for badge color coding and exact date display.
   const { data: jobTimesheets } = useQuery({
     queryKey: queryKeys.scope("job-timesheets-status", job.id),
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('timesheets')
-        .select('technician_id, status')
+        .select('technician_id, status, date')
         .eq('job_id', job.id)
         .eq('is_active', true);
       if (error) throw error;
-      return data as { technician_id: string; status: string }[];
+      return data as { technician_id: string; status: string; date: string | null }[];
     },
-    enabled: hasAssignedTechnicians && job.job_type !== 'dryhire' && job.job_type !== 'tourdate',
+    enabled: hasAssignedTechnicians && job.job_type !== 'dryhire',
     staleTime: 60_000
   });
 
   // Realtime invalidation when timesheets change
   useEffect(() => {
     if (!hasAssignedTechnicians) return;
-    if (job.job_type === 'dryhire' || job.job_type === 'tourdate') return;
+    if (job.job_type === 'dryhire') return;
 
     const channel = dataLayerClient.channel(`job-timesheets-${job.id}`)
       .on('postgres_changes',

@@ -10,13 +10,23 @@ export interface JobDateTypeLike {
   type?: string | null;
 }
 
+export interface TourDateLike {
+  date?: DateValue;
+  start_date?: DateValue;
+  end_date?: DateValue;
+  tour_date_type?: string | null;
+  type?: string | null;
+}
+
 export interface JobScheduleLike {
   job_date_types?: JobDateTypeLike[] | null;
   start_time?: DateValue;
   end_time?: DateValue;
+  tour_date?: TourDateLike | TourDateLike[] | null;
 }
 
 export interface AssignmentDateLike {
+  assignment_source?: string | null;
   single_day?: boolean | null;
   assignment_date?: DateValue;
   _timesheet_dates?: DateValue[] | null;
@@ -89,19 +99,55 @@ function buildDateRange(startKey: string, endKey: string): string[] {
   return dates;
 }
 
+function normalizeTourDateRows(tourDate: JobScheduleLike["tour_date"]): TourDateLike[] {
+  if (!tourDate) return [];
+  return (Array.isArray(tourDate) ? tourDate : [tourDate]).filter(Boolean);
+}
+
+function getTourDateWorkDateKeys(tourDate: JobScheduleLike["tour_date"]): string[] {
+  const dates: string[] = [];
+
+  for (const row of normalizeTourDateRows(tourDate)) {
+    const dateType = row.tour_date_type ?? row.type;
+    if (isNonWorkingDateType(dateType)) continue;
+
+    const startKey = normalizeDateKey(row.start_date ?? row.date);
+    if (!startKey) continue;
+
+    const endKey = normalizeDateKey(row.end_date) ?? normalizeDateKey(row.date) ?? startKey;
+    dates.push(...buildDateRange(startKey, endKey));
+  }
+
+  return uniqueSortedDateKeys(dates);
+}
+
 /** Returns the working dates for a job, excluding travel/off date types when present. */
 export function getScheduledWorkDateKeys(job: JobScheduleLike | null | undefined): string[] {
   if (!job) return [];
 
   const dateTypeRows = Array.isArray(job.job_date_types) ? job.job_date_types : [];
   const typedRowsWithDates = dateTypeRows.filter((row) => Boolean(normalizeDateKey(row?.date)));
+  const tourDateWorkDates = getTourDateWorkDateKeys(job.tour_date);
 
   if (typedRowsWithDates.length > 0) {
-    return uniqueSortedDateKeys(
+    const nonWorkingTypedDates = new Set(
+      uniqueSortedDateKeys(
+        typedRowsWithDates
+          .filter((row) => isNonWorkingDateType(row?.type))
+          .map((row) => row.date),
+      ),
+    );
+    const typedWorkDates = uniqueSortedDateKeys(
       typedRowsWithDates
         .filter((row) => !isNonWorkingDateType(row?.type))
         .map((row) => row.date),
     );
+    const fallbackTourDates = tourDateWorkDates.filter((dateKey) => !nonWorkingTypedDates.has(dateKey));
+    return uniqueSortedDateKeys([...typedWorkDates, ...fallbackTourDates]);
+  }
+
+  if (tourDateWorkDates.length > 0) {
+    return tourDateWorkDates;
   }
 
   const startKey = normalizeDateKey(job.start_time);
@@ -127,9 +173,13 @@ export function resolveAssignmentWorkDateKeys(
   const scheduledDates = uniqueSortedDateKeys([...assignmentScheduledDates, ...optionScheduledDates]);
 
   const assignmentDate = normalizeDateKey(assignment.assignment_date);
+  const isTourAssignment = assignment.assignment_source === "tour";
 
-  if (assignment.single_day) {
-    if (timesheetDates.length > 0) return timesheetDates;
+  if (timesheetDates.length > 0) {
+    return timesheetDates;
+  }
+
+  if (assignment.single_day && !isTourAssignment) {
     return assignmentDate ? [assignmentDate] : [];
   }
 

@@ -70,6 +70,7 @@ export const useJobs = () => {
                 date,
                 start_date,
                 end_date,
+                tour_date_type,
                 is_tour_pack_only,
                 tour: tours(
                   id,

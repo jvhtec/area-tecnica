@@ -31,6 +31,7 @@ export const useOptimizedJobs = (
     { table: 'job_documents', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
     { table: 'flex_folders', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
     { table: 'locations', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
+    { table: 'tour_dates', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
     { table: 'tours', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
   ]);
 
@@ -91,6 +92,12 @@ export const useOptimizedJobs = (
         job_date_types(
           date,
           type
+        ),
+        tour_date:tour_dates(
+          date,
+          start_date,
+          end_date,
+          tour_date_type
         ),
         flex_folders(
           id,
