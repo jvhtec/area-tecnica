@@ -24,14 +24,14 @@ interface AboutModalProps {
 
 // An array of image URLs to choose from
 const images = [
-  { src: '/lovable-uploads/7bd0c1d7-3226-470d-bea4-5cd7222e3248.png', width: 972, height: 835 },
-  { src: '/lovable-uploads/77dcfa7b-e05a-48e3-b662-03242aa8e853.png', width: 512, height: 512 },
-  { src: '/lovable-uploads/642b8d57-4a23-490e-b7c6-fe8de9eafc63.png', width: 512, height: 512 },
-  { src: '/lovable-uploads/5624e847-e131-4bdf-b4a9-2058fe294ead.png', width: 512, height: 512 },
-  { src: '/lovable-uploads/44b5a76b-8a09-4270-b439-9e7976926b18.png', width: 512, height: 512 },
-  { src: '/lovable-uploads/3c5cf97c-840a-48fd-b781-098c27729d90.png', width: 512, height: 512 },
-  { src: '/lovable-uploads/39daae92-fbe9-4d38-ae04-8e929d2b1e6f.png', width: 512, height: 512 },
-  { src: '/lovable-uploads/14f2fcca-4286-46dc-8d87-4aad90d42e27.png', width: 512, height: 512 },
+  { src: '/lovable-uploads/7bd0c1d7-3226-470d-bea4-5cd7222e3248.webp', width: 972, height: 835 },
+  { src: '/lovable-uploads/77dcfa7b-e05a-48e3-b662-03242aa8e853.webp', width: 512, height: 512 },
+  { src: '/lovable-uploads/642b8d57-4a23-490e-b7c6-fe8de9eafc63.webp', width: 512, height: 512 },
+  { src: '/lovable-uploads/5624e847-e131-4bdf-b4a9-2058fe294ead.webp', width: 512, height: 512 },
+  { src: '/lovable-uploads/44b5a76b-8a09-4270-b439-9e7976926b18.webp', width: 512, height: 512 },
+  { src: '/lovable-uploads/3c5cf97c-840a-48fd-b781-098c27729d90.webp', width: 512, height: 512 },
+  { src: '/lovable-uploads/39daae92-fbe9-4d38-ae04-8e929d2b1e6f.webp', width: 512, height: 512 },
+  { src: '/lovable-uploads/14f2fcca-4286-46dc-8d87-4aad90d42e27.webp', width: 512, height: 512 },
 ] as const;
 
 const filterRecentEntries = (entries: ChangelogEntry[]) => {

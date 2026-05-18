@@ -1,0 +1,1008 @@
+{
+  "generatedAt": "2026-05-18T18:46:33.309Z",
+  "gitCommit": "9373dd93793ce7476d2434f036d0fe06ca7c3592",
+  "previewUrl": "http://127.0.0.1:4174",
+  "profilerUrl": "http://127.0.0.1:4175",
+  "bundle": {
+    "totalFiles": 475,
+    "totalsByKind": {
+      "image": {
+        "files": 82,
+        "sizeBytes": 8873444,
+        "gzipBytes": 7333241
+      },
+      "other": {
+        "files": 11,
+        "sizeBytes": 114590,
+        "gzipBytes": 28581
+      },
+      "js": {
+        "files": 376,
+        "sizeBytes": 9150161,
+        "gzipBytes": 2775923
+      },
+      "css": {
+        "files": 3,
+        "sizeBytes": 239687,
+        "gzipBytes": 36992
+      },
+      "font": {
+        "files": 3,
+        "sizeBytes": 4641516,
+        "gzipBytes": 2730099
+      }
+    },
+    "entryScripts": [
+      "/assets/index-BgSU4hlO.js"
+    ],
+    "entryStyles": [
+      "/assets/index-BM8z9z1k.css"
+    ],
+    "largestAssets": [
+      {
+        "path": "dist/fonts/NotoSans-Italic-VariableFont_wdth,wght.ttf",
+        "file": "NotoSans-Italic-VariableFont_wdth,wght.ttf",
+        "kind": "font",
+        "sizeBytes": 2300468,
+        "gzipBytes": 1398443
+      },
+      {
+        "path": "dist/fonts/NotoSans-VariableFont_wdth,wght.ttf",
+        "file": "NotoSans-VariableFont_wdth,wght.ttf",
+        "kind": "font",
+        "sizeBytes": 2044548,
+        "gzipBytes": 1209033
+      },
+      {
+        "path": "dist/assets/maps-lib-Ce1ARJmz.js",
+        "file": "maps-lib-Ce1ARJmz.js",
+        "kind": "js",
+        "sizeBytes": 1676434,
+        "gzipBytes": 463246
+      },
+      {
+        "path": "dist/assets/pdf-libs-CmwCtmNR.js",
+        "file": "pdf-libs-CmwCtmNR.js",
+        "kind": "js",
+        "sizeBytes": 948116,
+        "gzipBytes": 346502
+      },
+      {
+        "path": "dist/assets/spreadsheet-libs-C15GPh2f.js",
+        "file": "spreadsheet-libs-C15GPh2f.js",
+        "kind": "js",
+        "sizeBytes": 939186,
+        "gzipBytes": 270968
+      },
+      {
+        "path": "dist/stamps/sector-pro-stamp.png",
+        "file": "sector-pro-stamp.png",
+        "kind": "image",
+        "sizeBytes": 725939,
+        "gzipBytes": 723450
+      },
+      {
+        "path": "dist/lovable-uploads/IMG_7835.jpeg",
+        "file": "IMG_7835.jpeg",
+        "kind": "image",
+        "sizeBytes": 716389,
+        "gzipBytes": 688748
+      },
+      {
+        "path": "dist/assets/index-BgSU4hlO.js",
+        "file": "index-BgSU4hlO.js",
+        "kind": "js",
+        "sizeBytes": 634625,
+        "gzipBytes": 190160
+      },
+      {
+        "path": "dist/lovable-uploads/IMG_7834.jpeg",
+        "file": "IMG_7834.jpeg",
+        "kind": "image",
+        "sizeBytes": 530046,
+        "gzipBytes": 501015
+      },
+      {
+        "path": "dist/lovable-uploads/IMG_7836.jpeg",
+        "file": "IMG_7836.jpeg",
+        "kind": "image",
+        "sizeBytes": 436854,
+        "gzipBytes": 397538
+      },
+      {
+        "path": "dist/lovable-uploads/assignmentMatrix.jpg",
+        "file": "assignmentMatrix.jpg",
+        "kind": "image",
+        "sizeBytes": 416551,
+        "gzipBytes": 242222
+      },
+      {
+        "path": "dist/8067C0A4-0C71-4CDF-952B-0E699DA25A74.png",
+        "file": "8067C0A4-0C71-4CDF-952B-0E699DA25A74.png",
+        "kind": "image",
+        "sizeBytes": 315123,
+        "gzipBytes": 304769
+      },
+      {
+        "path": "dist/og-image.png",
+        "file": "og-image.png",
+        "kind": "image",
+        "sizeBytes": 315123,
+        "gzipBytes": 304769
+      },
+      {
+        "path": "dist/lovable-uploads/festivalManagement3.jpg",
+        "file": "festivalManagement3.jpg",
+        "kind": "image",
+        "sizeBytes": 298974,
+        "gzipBytes": 226971
+      },
+      {
+        "path": "dist/fonts/NotoEmoji-Regular.ttf",
+        "file": "NotoEmoji-Regular.ttf",
+        "kind": "font",
+        "sizeBytes": 296500,
+        "gzipBytes": 122623
+      },
+      {
+        "path": "dist/lovable-uploads/dashboardHero.jpg",
+        "file": "dashboardHero.jpg",
+        "kind": "image",
+        "sizeBytes": 266995,
+        "gzipBytes": 178885
+      },
+      {
+        "path": "dist/lovable-uploads/tourManagement1.jpg",
+        "file": "tourManagement1.jpg",
+        "kind": "image",
+        "sizeBytes": 261073,
+        "gzipBytes": 195292
+      },
+      {
+        "path": "dist/assets/ModernHojaDeRuta-C3ZgJxU4.js",
+        "file": "ModernHojaDeRuta-C3ZgJxU4.js",
+        "kind": "js",
+        "sizeBytes": 256047,
+        "gzipBytes": 74285
+      },
+      {
+        "path": "dist/lovable-uploads/festivalManagement1.jpg",
+        "file": "festivalManagement1.jpg",
+        "kind": "image",
+        "sizeBytes": 255057,
+        "gzipBytes": 185502
+      },
+      {
+        "path": "dist/lovable-uploads/personalCalendar.jpg",
+        "file": "personalCalendar.jpg",
+        "kind": "image",
+        "sizeBytes": 229804,
+        "gzipBytes": 154491
+      },
+      {
+        "path": "dist/assets/editor-lib-fUHf8ZJG.js",
+        "file": "editor-lib-fUHf8ZJG.js",
+        "kind": "js",
+        "sizeBytes": 216921,
+        "gzipBytes": 55657
+      },
+      {
+        "path": "dist/lovable-uploads/festivalManagement4.jpg",
+        "file": "festivalManagement4.jpg",
+        "kind": "image",
+        "sizeBytes": 212926,
+        "gzipBytes": 109717
+      },
+      {
+        "path": "dist/assets/html2canvas.esm-vQ3n7XO2.js",
+        "file": "html2canvas.esm-vQ3n7XO2.js",
+        "kind": "js",
+        "sizeBytes": 201876,
+        "gzipBytes": 47905
+      },
+      {
+        "path": "dist/lovable-uploads/tourManagement2.jpg",
+        "file": "tourManagement2.jpg",
+        "kind": "image",
+        "sizeBytes": 201374,
+        "gzipBytes": 137707
+      },
+      {
+        "path": "dist/assets/JobAssignmentMatrix-7ndaD6o9.js",
+        "file": "JobAssignmentMatrix-7ndaD6o9.js",
+        "kind": "js",
+        "sizeBytes": 182124,
+        "gzipBytes": 49615
+      },
+      {
+        "path": "dist/assets/UserManual-LVO07lKh.js",
+        "file": "UserManual-LVO07lKh.js",
+        "kind": "js",
+        "sizeBytes": 181821,
+        "gzipBytes": 56377
+      },
+      {
+        "path": "dist/lovable-uploads/calendar.jpg",
+        "file": "calendar.jpg",
+        "kind": "image",
+        "sizeBytes": 179058,
+        "gzipBytes": 128951
+      },
+      {
+        "path": "dist/assets/index-BM8z9z1k.css",
+        "file": "index-BM8z9z1k.css",
+        "kind": "css",
+        "sizeBytes": 177159,
+        "gzipBytes": 27734
+      },
+      {
+        "path": "dist/assets/TechnicianRfTableModal-BW2I_Zcj.js",
+        "file": "TechnicianRfTableModal-BW2I_Zcj.js",
+        "kind": "js",
+        "sizeBytes": 174265,
+        "gzipBytes": 44945
+      },
+      {
+        "path": "dist/lovable-uploads/IMG_8504.png",
+        "file": "IMG_8504.png",
+        "kind": "image",
+        "sizeBytes": 160513,
+        "gzipBytes": 157802
+      }
+    ],
+    "largeJsAssets": [
+      {
+        "path": "dist/assets/maps-lib-Ce1ARJmz.js",
+        "file": "maps-lib-Ce1ARJmz.js",
+        "kind": "js",
+        "sizeBytes": 1676434,
+        "gzipBytes": 463246
+      },
+      {
+        "path": "dist/assets/pdf-libs-CmwCtmNR.js",
+        "file": "pdf-libs-CmwCtmNR.js",
+        "kind": "js",
+        "sizeBytes": 948116,
+        "gzipBytes": 346502
+      },
+      {
+        "path": "dist/assets/spreadsheet-libs-C15GPh2f.js",
+        "file": "spreadsheet-libs-C15GPh2f.js",
+        "kind": "js",
+        "sizeBytes": 939186,
+        "gzipBytes": 270968
+      },
+      {
+        "path": "dist/assets/index-BgSU4hlO.js",
+        "file": "index-BgSU4hlO.js",
+        "kind": "js",
+        "sizeBytes": 634625,
+        "gzipBytes": 190160
+      }
+    ]
+  },
+  "routes": [
+    {
+      "id": "dashboard-mobile",
+      "path": "/dashboard",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "visibleReadyMs": 181,
+      "reachedNetworkIdle": false,
+      "networkIdleWaitMs": 5004,
+      "totalMeasuredMs": 5185,
+      "navigation": {
+        "domContentLoadedMs": 51.5,
+        "loadEventEndMs": 51.700000047683716,
+        "responseEndMs": 6.599999904632568
+      },
+      "paints": {
+        "first-paint": 32,
+        "first-contentful-paint": 80
+      },
+      "resourceCounts": {
+        "total": 131,
+        "js": 103,
+        "css": 1,
+        "images": 1
+      },
+      "encodedBodyBytes": {
+        "js": 314735,
+        "css": 27734,
+        "images": 11417
+      },
+      "profiler": {
+        "samples": 0,
+        "totalActualDurationMs": 0,
+        "maxActualDurationMs": 0,
+        "p95ActualDurationMs": 0
+      },
+      "pageErrors": [],
+      "screenshot": "docs/performance/phase-4-baseline/screenshots/dashboard-mobile.png"
+    },
+    {
+      "id": "auth",
+      "path": "/auth",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "visibleReadyMs": 69,
+      "reachedNetworkIdle": true,
+      "networkIdleWaitMs": 487,
+      "totalMeasuredMs": 556,
+      "navigation": {
+        "domContentLoadedMs": 23.09999990463257,
+        "loadEventEndMs": 23.299999952316284,
+        "responseEndMs": 1.5999999046325684
+      },
+      "paints": {
+        "first-paint": 20,
+        "first-contentful-paint": 44
+      },
+      "resourceCounts": {
+        "total": 25,
+        "js": 22,
+        "css": 1,
+        "images": 2
+      },
+      "encodedBodyBytes": {
+        "js": 220077,
+        "css": 27734,
+        "images": 22834
+      },
+      "profiler": {
+        "samples": 0,
+        "totalActualDurationMs": 0,
+        "maxActualDurationMs": 0,
+        "p95ActualDurationMs": 0
+      },
+      "pageErrors": [],
+      "screenshot": null
+    },
+    {
+      "id": "assignment-matrix-mobile",
+      "path": "/job-assignment-matrix",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "visibleReadyMs": 222,
+      "reachedNetworkIdle": false,
+      "networkIdleWaitMs": 5001,
+      "totalMeasuredMs": 5223,
+      "navigation": {
+        "domContentLoadedMs": 25.100000143051147,
+        "loadEventEndMs": 25.300000190734863,
+        "responseEndMs": 1.4000000953674316
+      },
+      "paints": {
+        "first-paint": 20,
+        "first-contentful-paint": 44
+      },
+      "resourceCounts": {
+        "total": 250,
+        "js": 124,
+        "css": 1,
+        "images": 1
+      },
+      "encodedBodyBytes": {
+        "js": 390255,
+        "css": 27734,
+        "images": 11417
+      },
+      "profiler": {
+        "samples": 0,
+        "totalActualDurationMs": 0,
+        "maxActualDurationMs": 0,
+        "p95ActualDurationMs": 0
+      },
+      "pageErrors": [],
+      "screenshot": "docs/performance/phase-4-baseline/screenshots/assignment-matrix-mobile.png"
+    },
+    {
+      "id": "dashboard",
+      "path": "/dashboard",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "visibleReadyMs": 229,
+      "reachedNetworkIdle": false,
+      "networkIdleWaitMs": 5001,
+      "totalMeasuredMs": 5230,
+      "navigation": {
+        "domContentLoadedMs": 22.799999952316284,
+        "loadEventEndMs": 22.90000009536743,
+        "responseEndMs": 1.7000000476837158
+      },
+      "paints": {
+        "first-paint": 36,
+        "first-contentful-paint": 40
+      },
+      "resourceCounts": {
+        "total": 250,
+        "js": 226,
+        "css": 1,
+        "images": 4
+      },
+      "encodedBodyBytes": {
+        "js": 1008182,
+        "css": 27734,
+        "images": 45668
+      },
+      "profiler": {
+        "samples": 0,
+        "totalActualDurationMs": 0,
+        "maxActualDurationMs": 0,
+        "p95ActualDurationMs": 0
+      },
+      "pageErrors": [],
+      "screenshot": null
+    },
+    {
+      "id": "project-management",
+      "path": "/project-management",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "visibleReadyMs": 224,
+      "reachedNetworkIdle": false,
+      "networkIdleWaitMs": 5001,
+      "totalMeasuredMs": 5225,
+      "navigation": {
+        "domContentLoadedMs": 24.90000009536743,
+        "loadEventEndMs": 25,
+        "responseEndMs": 1.4000000953674316
+      },
+      "paints": {
+        "first-paint": 16,
+        "first-contentful-paint": 44
+      },
+      "resourceCounts": {
+        "total": 250,
+        "js": 208,
+        "css": 1,
+        "images": 3
+      },
+      "encodedBodyBytes": {
+        "js": 968315,
+        "css": 27734,
+        "images": 110923
+      },
+      "profiler": {
+        "samples": 0,
+        "totalActualDurationMs": 0,
+        "maxActualDurationMs": 0,
+        "p95ActualDurationMs": 0
+      },
+      "pageErrors": [],
+      "screenshot": null
+    },
+    {
+      "id": "assignment-matrix",
+      "path": "/job-assignment-matrix",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "visibleReadyMs": 226,
+      "reachedNetworkIdle": false,
+      "networkIdleWaitMs": 5000,
+      "totalMeasuredMs": 5226,
+      "navigation": {
+        "domContentLoadedMs": 23.300000190734863,
+        "loadEventEndMs": 23.40000009536743,
+        "responseEndMs": 1.4000000953674316
+      },
+      "paints": {
+        "first-paint": 40,
+        "first-contentful-paint": 40
+      },
+      "resourceCounts": {
+        "total": 250,
+        "js": 124,
+        "css": 1,
+        "images": 2
+      },
+      "encodedBodyBytes": {
+        "js": 390255,
+        "css": 27734,
+        "images": 22834
+      },
+      "profiler": {
+        "samples": 0,
+        "totalActualDurationMs": 0,
+        "maxActualDurationMs": 0,
+        "p95ActualDurationMs": 0
+      },
+      "pageErrors": [],
+      "screenshot": null
+    },
+    {
+      "id": "technician-app-mobile",
+      "path": "/tech-app",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "visibleReadyMs": 252,
+      "reachedNetworkIdle": true,
+      "networkIdleWaitMs": 402,
+      "totalMeasuredMs": 654,
+      "navigation": {
+        "domContentLoadedMs": 24.600000143051147,
+        "loadEventEndMs": 24.700000047683716,
+        "responseEndMs": 1.7000000476837158
+      },
+      "paints": {
+        "first-paint": 28,
+        "first-contentful-paint": 44
+      },
+      "resourceCounts": {
+        "total": 169,
+        "js": 161,
+        "css": 1,
+        "images": 1
+      },
+      "encodedBodyBytes": {
+        "js": 816741,
+        "css": 27734,
+        "images": 11417
+      },
+      "profiler": {
+        "samples": 0,
+        "totalActualDurationMs": 0,
+        "maxActualDurationMs": 0,
+        "p95ActualDurationMs": 0
+      },
+      "pageErrors": [],
+      "screenshot": "docs/performance/phase-4-baseline/screenshots/technician-app-mobile.png"
+    },
+    {
+      "id": "public-artist-form-mobile",
+      "path": "/festival/artist-form/blank?jobId=festival-job-1&date=2026-07-10&lang=en",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "visibleReadyMs": 120,
+      "reachedNetworkIdle": true,
+      "networkIdleWaitMs": 489,
+      "totalMeasuredMs": 609,
+      "navigation": {
+        "domContentLoadedMs": 24.5,
+        "loadEventEndMs": 24.59999990463257,
+        "responseEndMs": 1.4000000953674316
+      },
+      "paints": {
+        "first-paint": 20,
+        "first-contentful-paint": 44
+      },
+      "resourceCounts": {
+        "total": 45,
+        "js": 39,
+        "css": 1,
+        "images": 1
+      },
+      "encodedBodyBytes": {
+        "js": 250879,
+        "css": 27734,
+        "images": 11417
+      },
+      "profiler": {
+        "samples": 0,
+        "totalActualDurationMs": 0,
+        "maxActualDurationMs": 0,
+        "p95ActualDurationMs": 0
+      },
+      "pageErrors": [],
+      "screenshot": "docs/performance/phase-4-baseline/screenshots/public-artist-form-mobile.png"
+    },
+    {
+      "id": "wallboard-public-mobile",
+      "path": "/wallboard/public/perf-token/default",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "visibleReadyMs": 8899,
+      "reachedNetworkIdle": true,
+      "networkIdleWaitMs": 0,
+      "totalMeasuredMs": 8899,
+      "navigation": {
+        "domContentLoadedMs": 23.299999952316284,
+        "loadEventEndMs": 23.40000009536743,
+        "responseEndMs": 1.6000001430511475
+      },
+      "paints": {
+        "first-paint": 36,
+        "first-contentful-paint": 40
+      },
+      "resourceCounts": {
+        "total": 41,
+        "js": 19,
+        "css": 1,
+        "images": 4
+      },
+      "encodedBodyBytes": {
+        "js": 219509,
+        "css": 27734,
+        "images": 34260
+      },
+      "profiler": {
+        "samples": 0,
+        "totalActualDurationMs": 0,
+        "maxActualDurationMs": 0,
+        "p95ActualDurationMs": 0
+      },
+      "pageErrors": [],
+      "screenshot": "docs/performance/phase-4-baseline/screenshots/wallboard-public-mobile.png"
+    }
+  ],
+  "reactProfilerRoutes": [
+    {
+      "id": "dashboard-mobile",
+      "path": "/dashboard",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "visibleReadyMs": 1305,
+      "reachedNetworkIdle": false,
+      "networkIdleWaitMs": 5003,
+      "totalMeasuredMs": 6308,
+      "navigation": {
+        "domContentLoadedMs": 1086.5,
+        "loadEventEndMs": 1087.2000000476837,
+        "responseEndMs": 625.1000001430511
+      },
+      "paints": {
+        "first-paint": 1088,
+        "first-contentful-paint": 1108
+      },
+      "resourceCounts": {
+        "total": 211,
+        "js": 0,
+        "css": 0,
+        "images": 1
+      },
+      "encodedBodyBytes": {
+        "js": 0,
+        "css": 0,
+        "images": 11417
+      },
+      "profiler": {
+        "samples": 39,
+        "totalActualDurationMs": 36.1,
+        "maxActualDurationMs": 8.4,
+        "p95ActualDurationMs": 6.1
+      },
+      "pageErrors": [],
+      "screenshot": "docs/performance/phase-4-baseline/screenshots/dashboard-mobile.png"
+    },
+    {
+      "id": "auth",
+      "path": "/auth",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "visibleReadyMs": 151,
+      "reachedNetworkIdle": true,
+      "networkIdleWaitMs": 493,
+      "totalMeasuredMs": 644,
+      "navigation": {
+        "domContentLoadedMs": 84.10000014305115,
+        "loadEventEndMs": 85,
+        "responseEndMs": 2.700000047683716
+      },
+      "paints": {
+        "first-paint": 88,
+        "first-contentful-paint": 104
+      },
+      "resourceCounts": {
+        "total": 117,
+        "js": 0,
+        "css": 0,
+        "images": 2
+      },
+      "encodedBodyBytes": {
+        "js": 0,
+        "css": 0,
+        "images": 22834
+      },
+      "profiler": {
+        "samples": 8,
+        "totalActualDurationMs": 11.3,
+        "maxActualDurationMs": 8.4,
+        "p95ActualDurationMs": 8.4
+      },
+      "pageErrors": [],
+      "screenshot": null
+    },
+    {
+      "id": "assignment-matrix-mobile",
+      "path": "/job-assignment-matrix",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "visibleReadyMs": 314,
+      "reachedNetworkIdle": false,
+      "networkIdleWaitMs": 5000,
+      "totalMeasuredMs": 5314,
+      "navigation": {
+        "domContentLoadedMs": 72.09999990463257,
+        "loadEventEndMs": 72.89999985694885,
+        "responseEndMs": 2.299999952316284
+      },
+      "paints": {
+        "first-paint": 96,
+        "first-contentful-paint": 96
+      },
+      "resourceCounts": {
+        "total": 250,
+        "js": 0,
+        "css": 0,
+        "images": 1
+      },
+      "encodedBodyBytes": {
+        "js": 0,
+        "css": 0,
+        "images": 11417
+      },
+      "profiler": {
+        "samples": 184,
+        "totalActualDurationMs": 212.3,
+        "maxActualDurationMs": 11,
+        "p95ActualDurationMs": 5.3
+      },
+      "pageErrors": [],
+      "screenshot": "docs/performance/phase-4-baseline/screenshots/assignment-matrix-mobile.png"
+    },
+    {
+      "id": "dashboard",
+      "path": "/dashboard",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "visibleReadyMs": 900,
+      "reachedNetworkIdle": false,
+      "networkIdleWaitMs": 5002,
+      "totalMeasuredMs": 5902,
+      "navigation": {
+        "domContentLoadedMs": 72.20000004768372,
+        "loadEventEndMs": 73,
+        "responseEndMs": 2.200000047683716
+      },
+      "paints": {
+        "first-paint": 76,
+        "first-contentful-paint": 92
+      },
+      "resourceCounts": {
+        "total": 250,
+        "js": 0,
+        "css": 0,
+        "images": 3
+      },
+      "encodedBodyBytes": {
+        "js": 0,
+        "css": 0,
+        "images": 34251
+      },
+      "profiler": {
+        "samples": 45,
+        "totalActualDurationMs": 47.4,
+        "maxActualDurationMs": 8.5,
+        "p95ActualDurationMs": 6.5
+      },
+      "pageErrors": [],
+      "screenshot": null
+    },
+    {
+      "id": "project-management",
+      "path": "/project-management",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "visibleReadyMs": 421,
+      "reachedNetworkIdle": false,
+      "networkIdleWaitMs": 5001,
+      "totalMeasuredMs": 5422,
+      "navigation": {
+        "domContentLoadedMs": 79.40000009536743,
+        "loadEventEndMs": 80.30000019073486,
+        "responseEndMs": 3.4000000953674316
+      },
+      "paints": {
+        "first-paint": 84,
+        "first-contentful-paint": 100
+      },
+      "resourceCounts": {
+        "total": 250,
+        "js": 0,
+        "css": 0,
+        "images": 1
+      },
+      "encodedBodyBytes": {
+        "js": 0,
+        "css": 0,
+        "images": 11417
+      },
+      "profiler": {
+        "samples": 65,
+        "totalActualDurationMs": 72.3,
+        "maxActualDurationMs": 11.6,
+        "p95ActualDurationMs": 6.7
+      },
+      "pageErrors": [],
+      "screenshot": null
+    },
+    {
+      "id": "assignment-matrix",
+      "path": "/job-assignment-matrix",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "visibleReadyMs": 314,
+      "reachedNetworkIdle": false,
+      "networkIdleWaitMs": 5002,
+      "totalMeasuredMs": 5316,
+      "navigation": {
+        "domContentLoadedMs": 80.59999990463257,
+        "loadEventEndMs": 81.70000004768372,
+        "responseEndMs": 3
+      },
+      "paints": {
+        "first-paint": 84,
+        "first-contentful-paint": 104
+      },
+      "resourceCounts": {
+        "total": 250,
+        "js": 0,
+        "css": 0,
+        "images": 2
+      },
+      "encodedBodyBytes": {
+        "js": 0,
+        "css": 0,
+        "images": 22834
+      },
+      "profiler": {
+        "samples": 183,
+        "totalActualDurationMs": 253.3,
+        "maxActualDurationMs": 12.5,
+        "p95ActualDurationMs": 5.9
+      },
+      "pageErrors": [],
+      "screenshot": null
+    },
+    {
+      "id": "technician-app-mobile",
+      "path": "/tech-app",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "visibleReadyMs": 308,
+      "reachedNetworkIdle": true,
+      "networkIdleWaitMs": 512,
+      "totalMeasuredMs": 820,
+      "navigation": {
+        "domContentLoadedMs": 90.70000004768372,
+        "loadEventEndMs": 91.5,
+        "responseEndMs": 3.5
+      },
+      "paints": {
+        "first-paint": 92,
+        "first-contentful-paint": 116
+      },
+      "resourceCounts": {
+        "total": 250,
+        "js": 0,
+        "css": 0,
+        "images": 1
+      },
+      "encodedBodyBytes": {
+        "js": 0,
+        "css": 0,
+        "images": 11417
+      },
+      "profiler": {
+        "samples": 18,
+        "totalActualDurationMs": 19.9,
+        "maxActualDurationMs": 8.5,
+        "p95ActualDurationMs": 8.5
+      },
+      "pageErrors": [],
+      "screenshot": "docs/performance/phase-4-baseline/screenshots/technician-app-mobile.png"
+    },
+    {
+      "id": "public-artist-form-mobile",
+      "path": "/festival/artist-form/blank?jobId=festival-job-1&date=2026-07-10&lang=en",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "visibleReadyMs": 195,
+      "reachedNetworkIdle": true,
+      "networkIdleWaitMs": 506,
+      "totalMeasuredMs": 701,
+      "navigation": {
+        "domContentLoadedMs": 71,
+        "loadEventEndMs": 71.70000004768372,
+        "responseEndMs": 2.799999952316284
+      },
+      "paints": {
+        "first-paint": 72,
+        "first-contentful-paint": 92
+      },
+      "resourceCounts": {
+        "total": 146,
+        "js": 0,
+        "css": 0,
+        "images": 1
+      },
+      "encodedBodyBytes": {
+        "js": 0,
+        "css": 0,
+        "images": 11417
+      },
+      "profiler": {
+        "samples": 20,
+        "totalActualDurationMs": 46.8,
+        "maxActualDurationMs": 13.1,
+        "p95ActualDurationMs": 7.9
+      },
+      "pageErrors": [],
+      "screenshot": "docs/performance/phase-4-baseline/screenshots/public-artist-form-mobile.png"
+    },
+    {
+      "id": "wallboard-public-mobile",
+      "path": "/wallboard/public/perf-token/default",
+      "viewport": {
+        "width": 390,
+        "height": 664
+      },
+      "visibleReadyMs": 8983,
+      "reachedNetworkIdle": true,
+      "networkIdleWaitMs": 0,
+      "totalMeasuredMs": 8983,
+      "navigation": {
+        "domContentLoadedMs": 71.79999995231628,
+        "loadEventEndMs": 72.39999985694885,
+        "responseEndMs": 2.5
+      },
+      "paints": {
+        "first-paint": 92,
+        "first-contentful-paint": 92
+      },
+      "resourceCounts": {
+        "total": 145,
+        "js": 0,
+        "css": 0,
+        "images": 4
+      },
+      "encodedBodyBytes": {
+        "js": 0,
+        "css": 0,
+        "images": 34260
+      },
+      "profiler": {
+        "samples": 20,
+        "totalActualDurationMs": 15.1,
+        "maxActualDurationMs": 8.5,
+        "p95ActualDurationMs": 1.4
+      },
+      "pageErrors": [],
+      "screenshot": "docs/performance/phase-4-baseline/screenshots/wallboard-public-mobile.png"
+    }
+  ]
+}

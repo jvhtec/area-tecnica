@@ -244,6 +244,16 @@ export function useEnhancedRouteSubscriptions() {
     };
   }, []);
 
+  useEffect(() => {
+    return () => {
+      const routeKey = currentRouteKey.current;
+      if (routeKey) {
+        manager.cleanupRouteDependentSubscriptions(routeKey);
+        currentRouteKey.current = null;
+      }
+    };
+  }, [manager]);
+
   // Find the most specific route match
   const findRoutePath = useCallback((pathname: string) => {
     // First check if we have an exact match
