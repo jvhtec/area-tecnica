@@ -27,6 +27,7 @@ export const useOptimizedJobs = (
     { table: 'jobs', queryKey: queryKeys.scope('optimized-jobs'), priority: 'high' },
     { table: 'job_assignments', queryKey: queryKeys.scope('optimized-jobs'), priority: 'high' },
     { table: 'job_departments', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' },
+    { table: 'job_date_types', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' },
     { table: 'job_documents', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
     { table: 'flex_folders', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
     { table: 'locations', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
@@ -63,6 +64,7 @@ export const useOptimizedJobs = (
           sound_role,
           lights_role,
           video_role,
+          assignment_source,
           single_day,
           assignment_date,
           status,
@@ -85,6 +87,10 @@ export const useOptimizedJobs = (
           uploaded_at,
           read_only,
           template_type
+        ),
+        job_date_types(
+          date,
+          type
         ),
         flex_folders(
           id,

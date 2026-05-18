@@ -6,16 +6,34 @@ import { Department } from "@/types/department";
 import { labelForCode } from '@/utils/roles';
 import { formatUserName } from '@/utils/userName';
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { cn } from "@/lib/utils";
+import { getScheduledWorkDateKeys, resolveAssignmentWorkDateKeys } from "@/utils/assignmentWorkDates";
 
 interface JobCardAssignmentsProps {
   assignments: any[];
   department: Department;
   jobTimesheets?: { technician_id: string; status: string }[];
+  jobDateTypes?: Array<{ date?: string | null; type?: string | null }> | null;
+  jobStartTime?: string | null;
+  jobEndTime?: string | null;
 }
 
-export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignments, department, jobTimesheets = [] }) => {
+export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({
+  assignments,
+  department,
+  jobTimesheets = [],
+  jobDateTypes,
+  jobStartTime,
+  jobEndTime,
+}) => {
+  const scheduledWorkDateKeys = React.useMemo(() => getScheduledWorkDateKeys({
+    job_date_types: jobDateTypes,
+    start_time: jobStartTime,
+    end_time: jobEndTime,
+  }), [jobDateTypes, jobStartTime, jobEndTime]);
+
   // Determine overall timesheet state for a technician
   const getTechTimesheetState = (techId: string): 'none' | 'draft' | 'partial' | 'submitted' | 'approved' | 'rejected' => {
     const list = jobTimesheets.filter(t => t.technician_id === techId);
@@ -81,16 +99,7 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
     const key = assignment.technician_id ? `tech:${assignment.technician_id}` : `ext:${name}`;
     const roleLabel = roleCode ? labelForCode(roleCode) : null;
     const isFromTour = assignment.assignment_source === 'tour';
-    // Use timesheet dates if available (from useOptimizedJobCard), otherwise fall back to assignment date
-    const timesheetDates = assignment._timesheet_dates;
-    const assignmentDate = assignment.single_day && assignment.assignment_date ? assignment.assignment_date : null;
-
-    const datesToAdd = new Set<string>();
-    if (Array.isArray(timesheetDates) && timesheetDates.length > 0) {
-      timesheetDates.forEach(d => datesToAdd.add(d));
-    } else if (assignmentDate) {
-      datesToAdd.add(assignmentDate);
-    }
+    const datesToAdd = resolveAssignmentWorkDateKeys(assignment, { scheduledDateKeys: scheduledWorkDateKeys });
 
     if (!grouped.has(key)) {
       grouped.set(key, {
@@ -99,14 +108,14 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
         role: roleLabel,
         isFromTour,
         isExternal,
-        dates: datesToAdd
+        dates: new Set(datesToAdd)
       });
     } else {
       const g = grouped.get(key)!;
       // Preserve first non-null role label; otherwise keep existing
       if (!g.role && roleLabel) g.role = roleLabel;
       if (isFromTour) g.isFromTour = true;
-      datesToAdd.forEach(d => g.dates.add(d));
+      datesToAdd.forEach((d) => g.dates.add(d));
     }
   }
 
@@ -122,10 +131,17 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
       <div className="flex flex-wrap gap-1">
         {assignedTechnicians.map((tech, index) => {
           // Format single/multi-day suffix compactly
-          const dateList = Array.from(tech.dates);
+          const dateList = Array.from(tech.dates).sort();
           let dateSuffix: string | null = null;
+          const formatCompactDate = (dateKey: string) => format(new Date(`${dateKey}T00:00:00`), 'd MMM', { locale: es });
           if (dateList.length === 1) {
-            try { dateSuffix = ` • ${format(new Date(`${dateList[0]}T00:00:00`), 'MMM d')}`; } catch { dateSuffix = ` • ${dateList[0]}`; }
+            try { dateSuffix = ` • ${formatCompactDate(dateList[0])}`; } catch { dateSuffix = ` • ${dateList[0]}`; }
+          } else if (dateList.length > 1 && dateList.length <= 3) {
+            try {
+              dateSuffix = ` • ${dateList.map(formatCompactDate).join(', ')}`;
+            } catch {
+              dateSuffix = ` • ${dateList.join(', ')}`;
+            }
           } else if (dateList.length > 1) {
             // Detect contiguous range; otherwise show count
             const ds = dateList.map(d => new Date(`${d}T00:00:00`)).sort((a, b) => a.getTime() - b.getTime());
@@ -138,9 +154,13 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
               const first = ds[0];
               const last = ds[ds.length - 1];
               const sameMonth = first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear();
-              dateSuffix = ` • ${format(first, 'MMM d')}${sameMonth ? '–' + format(last, 'd') : '–' + format(last, 'MMM d')}`;
+              dateSuffix = ` • ${format(first, 'd MMM', { locale: es })}${sameMonth ? '–' + format(last, 'd', { locale: es }) : '–' + format(last, 'd MMM', { locale: es })}`;
             } else {
-              dateSuffix = ` • ${dateList.length}d`;
+              try {
+                dateSuffix = ` • ${formatCompactDate(dateList[0])} +${dateList.length - 1} días`;
+              } catch {
+                dateSuffix = ` • ${dateList.length} días`;
+              }
             }
           }
           // Build tooltip content with the exact dates list
@@ -148,7 +168,7 @@ export const JobCardAssignments: React.FC<JobCardAssignmentsProps> = ({ assignme
             if (dateList.length === 0) return null;
             try {
               const pretty = dateList
-                .map(d => format(new Date(`${d}T00:00:00`), 'PPP'))
+                .map(d => format(new Date(`${d}T00:00:00`), 'PPP', { locale: es }))
                 .join('\n');
               return pretty;
             } catch {
