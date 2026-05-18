@@ -10,24 +10,34 @@
  * Add this component once to your App.tsx
  */
 
-import { CreateJobDialog } from './CreateJobDialog';
+import { lazy, Suspense } from 'react';
 import { useCreateJobDialogStore } from '@/stores/useCreateJobDialogStore';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
+
+const CreateJobDialog = lazy(() =>
+  import('./CreateJobDialog').then((module) => ({ default: module.CreateJobDialog })),
+);
 
 export function GlobalCreateJobDialog() {
   const { isOpen, closeDialog, initialDepartment, initialDate, initialJobType } = useCreateJobDialogStore();
   const { userDepartment } = useOptimizedAuth();
 
+  if (!isOpen) {
+    return null;
+  }
+
   // Use current user's department as default if not specified
   const currentDepartment = initialDepartment || userDepartment || 'sound';
 
   return (
-    <CreateJobDialog
-      open={isOpen}
-      onOpenChange={closeDialog}
-      currentDepartment={currentDepartment}
-      initialDate={initialDate}
-      initialJobType={initialJobType}
-    />
+    <Suspense fallback={null}>
+      <CreateJobDialog
+        open={isOpen}
+        onOpenChange={closeDialog}
+        currentDepartment={currentDepartment}
+        initialDate={initialDate}
+        initialJobType={initialJobType}
+      />
+    </Suspense>
   );
 }

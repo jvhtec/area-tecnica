@@ -1,3 +1,4 @@
+import { Profiler, type ProfilerOnRenderCallback } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
@@ -9,8 +10,40 @@ import { CHUNK_ERROR_RELOAD_KEY, MAX_CHUNK_ERROR_RELOADS } from '@/utils/chunkEr
 declare global {
   interface Window {
     __chunkErrorReloadAttempted?: boolean;
+    __sectorProReactProfiler?: {
+      samples: Array<{
+        id: string;
+        phase: 'mount' | 'update' | 'nested-update';
+        actualDuration: number;
+        baseDuration: number;
+        startTime: number;
+        commitTime: number;
+      }>;
+    };
   }
 }
+
+const onReactProfilerRender: ProfilerOnRenderCallback = (
+  id,
+  phase,
+  actualDuration,
+  baseDuration,
+  startTime,
+  commitTime,
+) => {
+  const profiler = window.__sectorProReactProfiler ?? { samples: [] };
+
+  profiler.samples.push({
+    id,
+    phase,
+    actualDuration,
+    baseDuration,
+    startTime,
+    commitTime,
+  });
+
+  window.__sectorProReactProfiler = profiler;
+};
 
 const handleChunkLoadError = async () => {
   // Ask the service worker to wipe all caches before we reload so the browser
@@ -109,7 +142,15 @@ if (!rootElement) {
   throw new Error('Root element not found')
 }
 
-createRoot(rootElement).render(<App />)
+const app = import.meta.env.VITE_REACT_PROFILER_BASELINE === 'true'
+  ? (
+      <Profiler id="SectorProApp" onRender={onReactProfilerRender}>
+        <App />
+      </Profiler>
+    )
+  : <App />
+
+createRoot(rootElement).render(app)
 
 const shouldRegisterServiceWorker = (() => {
   if (!('serviceWorker' in navigator)) {

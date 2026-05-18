@@ -87,6 +87,7 @@ Detailed deep-dive docs for the full festival subsystem:
   - P3-06 assignment matrix refactor is complete as of 2026-05-17: page controls, virtualization state, technician ordering, dialogs, and cell rendering are split across focused matrix modules.
   - P3-07 push broadcast refactor is complete as of 2026-05-17: the Edge Function entrypoint delegates to event-family handlers, shared delivery/recipient helpers, and pure message builders under `supabase/functions/push/broadcast/`.
   - P3-08 PDF exporter refactor is complete as of 2026-05-18: shared jsPDF setup, logo data URL loading, corporate header/footer drawing, AutoTable final-Y access, safe image insertion, and blob output live in `src/utils/pdf/exportHelpers.ts`.
+  - Phase 4 is complete as of 2026-05-18: `npm run perf:baseline` writes bundle, route timing, React Profiler, Lighthouse, and mobile screenshot artifacts to `docs/performance/phase-4-baseline/`; the global create-job dialog is interaction-lazy; About/changelog artwork now uses WebP payloads; route-owned subscriptions clean up on authenticated shell unmount; and dashboard, matrix, technician app, public artist form, and wallboard mobile screenshots are committed.
   - P6-03 source placeholder cleanup is complete as of 2026-05-15; deferred source work should reference a durable roadmap or issue ID rather than bare TODO/FIXME/HACK comments.
 - `migrations/` (migration notes)
 
