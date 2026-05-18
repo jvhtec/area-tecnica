@@ -1851,7 +1851,11 @@ export async function createTourGuestLink(input: {
     p_access_level: input.accessLevel || "view",
   });
   if (error) throw error;
-  return data?.[0] as TourGuestLink;
+  const link = data?.[0] as TourGuestLink | undefined;
+  if (!link) {
+    throw new Error("No se pudo crear el enlace externo");
+  }
+  return link;
 }
 
 export async function revokeTourGuestLink(linkId: string) {
