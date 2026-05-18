@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normalizeTourOpsModel } from "@/features/tour-ops/tourSchedulingService";
 
-const rawTour = {
+const rawTour: Record<string, unknown> = {
   id: "tour-1",
   name: "Arena Tour",
   description: "Spring run",
@@ -28,7 +28,7 @@ const rawTour = {
   ],
 };
 
-const rawPayload = {
+const rawPayload: Record<string, unknown> = {
   tour: rawTour,
   tour_dates: [
     {

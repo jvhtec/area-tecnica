@@ -4,18 +4,17 @@ import { es } from 'date-fns/locale';
 import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { getWeatherForJob } from '@/utils/weather/weatherApi';
-import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import {
+  createPdfExportDocument,
+  drawCorporatePdfHeader,
+  drawGeneratedPdfFooter,
+  getLastAutoTableY,
+  loadCompanyLogoDataUrl,
+  SECTOR_PRO_RED,
+} from '@/utils/pdf/exportHelpers';
 import { buildReadableFilename } from '@/utils/fileName';
 
-const CORPORATE_RED: [number, number, number] = [125, 1, 1];
-const HEADER_HEIGHT = 30;
-const FOOTER_HEIGHT = 30;
-
-interface AutoTableDocument extends jsPDF {
-  lastAutoTable?: {
-    finalY?: number;
-  };
-}
+const CORPORATE_RED = SECTOR_PRO_RED;
 
 interface TourLocation {
   name?: string | null;
@@ -62,9 +61,6 @@ interface CrewAssignment {
   profiles?: CrewProfile | CrewProfile[] | null;
 }
 
-const getLastAutoTableY = (pdf: jsPDF, fallback: number): number =>
-  (pdf as AutoTableDocument).lastAutoTable?.finalY ?? fallback;
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -88,36 +84,6 @@ const asProgramDays = (value: unknown): ProgramDay[] => {
 const asCrewAssignments = (value: unknown): CrewAssignment[] => (Array.isArray(value) ? (value as CrewAssignment[]) : []);
 
 /**
- * Load company logo as base64
- */
-const loadCompanyLogo = async (): Promise<string | null> => {
-  const paths = [
-    '/sector pro logo.png',
-    './sector pro logo.png',
-    'sector pro logo.png',
-  ];
-
-  for (const path of paths) {
-    try {
-      const response = await fetch(path);
-      if (!response.ok) continue;
-
-      const blob = await response.blob();
-      return await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to convert image'));
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      continue;
-    }
-  }
-
-  return null;
-};
-
-/**
  * Add PDF header with logo and title
  */
 const addPDFHeader = (
@@ -126,67 +92,21 @@ const addPDFHeader = (
   subtitle: string,
   tourLogoUrl?: string
 ) => {
-  const pageWidth = pdf.internal.pageSize.width;
-
-  // Red header background
-  pdf.setFillColor(...CORPORATE_RED);
-  pdf.rect(0, 0, pageWidth, HEADER_HEIGHT, 'F');
-
-  // Add tour logo if available
-  if (tourLogoUrl) {
-    try {
-      pdf.addImage(tourLogoUrl, 'PNG', 5, 5, 25, 20);
-    } catch (error) {
-      console.warn('Error adding tour logo:', error);
-    }
-  }
-
-  // Header text
-  pdf.setTextColor(255, 255, 255);
-  pdf.setFontSize(18);
-  pdf.text(title, pageWidth / 2, 15, { align: 'center' });
-  pdf.setFontSize(12);
-  pdf.text(subtitle, pageWidth / 2, 25, { align: 'center' });
+  drawCorporatePdfHeader(pdf, {
+    title,
+    subtitle,
+    logo: tourLogoUrl,
+  });
 };
 
 /**
  * Add PDF footer with company logo and timestamp
  */
 const addPDFFooter = async (pdf: jsPDF, pageNum?: number) => {
-  const pageWidth = pdf.internal.pageSize.width;
-  const pageHeight = pdf.internal.pageSize.height;
-
-  // Add company logo
-  const companyLogo = await loadCompanyLogo();
-  if (companyLogo) {
-    try {
-      const logoWidth = 40;
-      const logoHeight = 15;
-      const x = (pageWidth - logoWidth) / 2;
-      const y = pageHeight - 25;
-      pdf.addImage(companyLogo, 'PNG', x, y, logoWidth, logoHeight);
-    } catch (error) {
-      console.warn('Error adding company logo:', error);
-    }
-  }
-
-  // Add timestamp
-  pdf.setFontSize(8);
-  pdf.setTextColor(100, 100, 100);
-  pdf.text(
-    `Generado el ${format(new Date(), "d 'de' MMMM 'de' yyyy 'a las' HH:mm", { locale: es })}`,
-    10,
-    pageHeight - 10
-  );
-
-  // Add page number if provided
-  if (pageNum !== undefined) {
-    pdf.text(
-      `Página ${pageNum}`,
-      pageWidth - 30,
-      pageHeight - 10
-    );
-  }
+  drawGeneratedPdfFooter(pdf, {
+    pageNumber: pageNum,
+    logo: await loadCompanyLogoDataUrl(),
+  });
 };
 
 /**
@@ -196,8 +116,7 @@ export const generateTourDaySheet = async (
   tourData: TourData,
   tourDate: TourDateData
 ) => {
-  const { jsPDF, autoTable } = await loadPdfLibs();
-  const pdf = new jsPDF();
+  const { pdf, autoTable } = await createPdfExportDocument();
   const pageWidth = pdf.internal.pageSize.width;
   let currentY = 40;
 
@@ -464,8 +383,7 @@ export const generateTourBook = async (
   tourData: TourData,
   tourDates: TourDateData[]
 ) => {
-  const { jsPDF, autoTable } = await loadPdfLibs();
-  const pdf = new jsPDF();
+  const { pdf, autoTable } = await createPdfExportDocument();
   const pageWidth = pdf.internal.pageSize.width;
   let pageNum = 1;
 

@@ -234,7 +234,7 @@ area-tecnica/
 │       │   └── folder-creation/      # Folder creation orchestration and operation modules
 │       ├── hoja-de-ruta/             # Tour book utilities & PDF export
 │       ├── incident-report/          # Incident report utilities
-│       ├── pdf/                      # PDF generation engine (jsPDF + pdf-lib)
+│       ├── pdf/                      # PDF generation engine and shared export helpers
 │       ├── stage-plot/               # Stage plot rendering
 │       ├── weather/                  # Weather API (Open-Meteo)
 │       ├── roleBasedRouting.ts       # Role-based navigation
@@ -380,6 +380,12 @@ area-tecnica/
 | `maps-lib` | mapbox-gl | Large map SDK, lazy-loaded |
 | `spreadsheet-libs` | ExcelJS | Only needed for Excel export |
 | `editor-lib` | Quill | Rich text editor, lazy-loaded |
+
+PDF exporters should load jsPDF/AutoTable through `src/utils/pdf/lazyPdf.ts`
+and share setup, company-logo data URL loading, corporate header/footer drawing,
+AutoTable `finalY` access, safe image insertion, and blob output through
+`src/utils/pdf/exportHelpers.ts`. Hoja de Ruta keeps its dedicated PDF engine
+under `src/utils/hoja-de-ruta/pdf/` for route-sheet-specific composition.
 
 ### 3.2 Backend — Supabase Edge Functions (Deno)
 

@@ -1178,8 +1178,10 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
       if (link?.token) {
         const url = `${window.location.origin}/tour-share/${link.token}`;
         setLastToken(url);
-        await navigator.clipboard?.writeText(url).catch(() => undefined);
-        toast.success("Link creado y copiado");
+        const copied = navigator.clipboard
+          ? await navigator.clipboard.writeText(url).then(() => true).catch(() => false)
+          : false;
+        toast.success(copied ? "Link creado y copiado" : "Link creado");
         return;
       }
       toast.error("No se recibio el token del link externo");
@@ -1202,7 +1204,7 @@ const SharePanel = ({ model }: { model: TourOpsModel }) => {
   const shareLink = async (link: TourGuestLink, url: string) => {
     const title = `${model.tour.name} - ${link.label}`;
     if (navigator.share) {
-      await navigator.share({ title, url }).catch(() => undefined);
+      await navigator.share({ title, url }).catch((): void => undefined);
       return;
     }
     window.open(`mailto:?subject=${encodeURIComponent(title)}&body=${encodeURIComponent(url)}`, "_blank");
@@ -1408,8 +1410,8 @@ const TourMapPanel = ({
           transportation_type: segment.transportationType,
           departureTime: segment.departureTime,
           arrivalTime: segment.arrivalTime,
-          fromLocation: segment.fromLocationId ? null : undefined,
-          toLocation: segment.toLocationId ? null : undefined,
+          fromLocation: segment.fromLocationId ? (null as null) : undefined,
+          toLocation: segment.toLocationId ? (null as null) : undefined,
         })),
     }),
     [model, selectedDate],

@@ -159,14 +159,14 @@ const runAutoTable = (
     ...options,
     margin: { top: 34, left: 12, right: 12, ...(options.margin ?? {}) },
     didDrawPage: (data: any) => {
-      const currentPage = (pdf.internal as any).getCurrentPageInfo?.().pageNumber ?? pdf.internal.getNumberOfPages();
-      pageRef.value = Math.max(pageRef.value, pdf.internal.getNumberOfPages());
+      const currentPage = (pdf.internal as any).getCurrentPageInfo?.().pageNumber ?? pdf.getNumberOfPages();
+      pageRef.value = Math.max(pageRef.value, pdf.getNumberOfPages());
       header(pdf, title, subtitle, branding);
       footer(pdf, currentPage, branding);
       userDidDrawPage?.(data);
     },
   });
-  pageRef.value = Math.max(pageRef.value, pdf.internal.getNumberOfPages());
+  pageRef.value = Math.max(pageRef.value, pdf.getNumberOfPages());
 };
 
 const addDatePage = (

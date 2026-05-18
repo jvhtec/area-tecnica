@@ -15,6 +15,7 @@ import type {
   TourOpsProgramDay,
   TourOpsProjection,
   TourOpsRoomAssignment,
+  TourOpsSyncStatus,
   TourOpsTimelineEvent,
   TourOpsTravelSegment,
 } from "@/features/tour-ops/types";
@@ -732,7 +733,7 @@ const annotateTravelSyncStatus = (
   segments: TourOpsTravelSegment[],
   allCandidates: TourOpsTravelSegment[],
   hojaByDate: Map<string, AnyRecord>,
-) => {
+): TourOpsTravelSegment[] => {
   const hojaKeys = new Set(
     allCandidates
       .filter((segment) => segment.source === "hoja")
@@ -745,13 +746,15 @@ const annotateTravelSyncStatus = (
 
     const linkedDateIds = [segment.fromTourDateId, segment.toTourDateId].filter(Boolean) as string[];
     const hasHojaTarget = linkedDateIds.some((id) => hojaByDate.has(id));
+    const syncStatus: TourOpsSyncStatus = hojaKeys.has(travelSyncKey(segment))
+      ? "synced"
+      : hasHojaTarget
+        ? "needs_sync"
+        : "no_hoja";
+
     return {
       ...segment,
-      syncStatus: hojaKeys.has(travelSyncKey(segment))
-        ? "synced"
-        : hasHojaTarget
-          ? "needs_sync"
-          : "no_hoja",
+      syncStatus,
     };
   });
 };
@@ -760,7 +763,7 @@ const annotateAccommodationSyncStatus = (
   accommodations: TourOpsAccommodation[],
   allCandidates: TourOpsAccommodation[],
   hojaByDate: Map<string, AnyRecord>,
-) => {
+): TourOpsAccommodation[] => {
   const hojaKeys = new Set(
     allCandidates
       .filter((hotel) => hotel.source === "hoja")
@@ -770,13 +773,15 @@ const annotateAccommodationSyncStatus = (
   return accommodations.map((hotel) => {
     if (hotel.source === "hoja") return { ...hotel, syncStatus: "imported" as const };
     const hasHojaTarget = Boolean(hotel.tourDateId && hojaByDate.has(hotel.tourDateId));
+    const syncStatus: TourOpsSyncStatus = hojaKeys.has(accommodationSyncKey(hotel))
+      ? "synced"
+      : hasHojaTarget
+        ? "needs_sync"
+        : "no_hoja";
+
     return {
       ...hotel,
-      syncStatus: hojaKeys.has(accommodationSyncKey(hotel))
-        ? "synced"
-        : hasHojaTarget
-          ? "needs_sync"
-          : "no_hoja",
+      syncStatus,
     };
   });
 };
@@ -792,7 +797,7 @@ export function normalizeTourOpsModel(
 ): TourOpsModel {
   const allowedSections = normalizeSections(options.allowedSections);
   const tour = raw.tour ?? raw;
-  const rawDates = asArray<AnyRecord>(raw.tour_dates ?? tour.tour_dates).map((date) => ({
+  const rawDates: (AnyRecord & { location: TourOpsLocation | null })[] = asArray<AnyRecord>(raw.tour_dates ?? tour.tour_dates).map((date) => ({
     ...date,
     location: normalizeTourOpsLocation(date.location ?? date.locations),
   }));
