@@ -325,6 +325,7 @@ const routes = [
   },
 ];
 
+/** Runs a repository command with the mock Supabase baseline environment. */
 function run(command, args, options = {}) {
   execFileSync(command, args, {
     cwd: repoRoot,
@@ -341,6 +342,7 @@ function run(command, args, options = {}) {
   });
 }
 
+/** Starts a production preview server for route and Lighthouse measurements. */
 function startPreview() {
   const child = spawn(
     "npx",
@@ -364,6 +366,7 @@ function startPreview() {
   return child;
 }
 
+/** Starts a Vite dev server with React Profiler instrumentation enabled. */
 function startProfilerServer() {
   const child = spawn(
     "npx",
@@ -388,6 +391,7 @@ function startProfilerServer() {
   return child;
 }
 
+/** Waits until a local server responds before browser measurements begin. */
 async function waitForServer(url) {
   const deadline = Date.now() + 60_000;
 
@@ -405,6 +409,7 @@ async function waitForServer(url) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
+/** Returns all files under a directory for bundle inventory collection. */
 function walkFiles(dir) {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const path = join(dir, entry.name);
@@ -412,6 +417,7 @@ function walkFiles(dir) {
   });
 }
 
+/** Classifies a built asset into the reporting buckets used by the baseline. */
 function assetKind(file) {
   const ext = extname(file).toLowerCase();
   if (ext === ".js") return "js";
@@ -421,6 +427,7 @@ function assetKind(file) {
   return "other";
 }
 
+/** Computes raw and gzip bundle metrics from the current production build. */
 function collectBundleMetrics() {
   const files = walkFiles(distDir).map((file) => {
     const content = readFileSync(file);
@@ -458,6 +465,7 @@ function collectBundleMetrics() {
   };
 }
 
+/** Builds a Supabase-compatible mocked user payload for authenticated routes. */
 function buildUser(auth) {
   return {
     id: auth.userId,
@@ -479,6 +487,7 @@ function buildUser(auth) {
   };
 }
 
+/** Builds a Supabase-compatible mocked session payload for auth refresh flows. */
 function buildSession(auth) {
   const expiresIn = 60 * 60;
   return {
@@ -491,6 +500,7 @@ function buildSession(auth) {
   };
 }
 
+/** Seeds browser storage and platform stubs before a route measurement starts. */
 async function seedAppState(context, authOverrides = {}) {
   await context.addInitScript((auth) => {
     window.localStorage.clear();
@@ -582,6 +592,7 @@ async function seedAppState(context, authOverrides = {}) {
   }, { ...authDefaults, ...authOverrides });
 }
 
+/** Reads a Playwright request body as JSON when possible and raw text otherwise. */
 async function readRequestBody(request) {
   const payload = request.postData();
   if (!payload) return null;
@@ -593,20 +604,24 @@ async function readRequestBody(request) {
   }
 }
 
+/** Detects PostgREST single-object response requests from Accept headers. */
 function wantsObjectResponse(request) {
   return (request.headers().accept ?? "").includes("application/vnd.pgrst.object+json");
 }
 
+/** Shapes mocked PostgREST responses to match list or object response modes. */
 function normalizePostgrestPayload(data, request) {
   if (!wantsObjectResponse(request)) return data;
   return Array.isArray(data) ? data[0] ?? null : data;
 }
 
+/** Resolves static or function-based mock responders for Supabase routes. */
 async function resolveResponder(responder, fallbackValue, context) {
   if (typeof responder === "function") return await responder(context);
   return responder ?? fallbackValue;
 }
 
+/** Installs deterministic Supabase REST, auth, function, and storage mocks. */
 async function installSupabaseMocks(context, options) {
   const auth = { ...authDefaults, ...options.auth };
   const tables = options.tables ?? {};
@@ -688,6 +703,7 @@ async function installSupabaseMocks(context, options) {
   });
 }
 
+/** Calculates a percentile from numeric samples for profiler summaries. */
 function percentile(values, percent) {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -695,6 +711,7 @@ function percentile(values, percent) {
   return sorted[index];
 }
 
+/** Summarizes React Profiler samples into stable metrics for the baseline. */
 function summarizeProfiler(samples) {
   const durations = samples.map((sample) => sample.actualDuration);
   return {
@@ -705,6 +722,7 @@ function summarizeProfiler(samples) {
   };
 }
 
+/** Measures one configured route and optionally captures its mobile screenshot. */
 async function measureRoute(browser, routeConfig, baseUrl = previewUrl) {
   const context = await browser.newContext({
     viewport: routeConfig.viewport,
@@ -796,12 +814,14 @@ async function measureRoute(browser, routeConfig, baseUrl = previewUrl) {
   };
 }
 
+/** Formats byte counts for the generated Markdown report. */
 function formatBytes(bytes) {
   if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
   if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} kB`;
   return `${bytes} B`;
 }
 
+/** Extracts headline Lighthouse scores from committed JSON artifacts. */
 function collectLighthouseSummaries() {
   return [
     ["Auth desktop", "lighthouse-auth-desktop.json"],
@@ -828,6 +848,7 @@ function collectLighthouseSummaries() {
   });
 }
 
+/** Writes the human-readable Phase 4 baseline report. */
 function writeMarkdown(results) {
   const screenshotRoutes = results.routes.filter((route) => route.screenshot);
   const lighthouseRows = collectLighthouseSummaries();
@@ -931,6 +952,7 @@ function writeMarkdown(results) {
   writeFileSync(join(outputDir, "README.md"), `${lines.join("\n")}\n`);
 }
 
+/** Coordinates build, preview, route measurements, and artifact writing. */
 async function main() {
   mkdirSync(outputDir, { recursive: true });
   mkdirSync(screenshotDir, { recursive: true });

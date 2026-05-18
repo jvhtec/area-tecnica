@@ -65,7 +65,7 @@ vi.mock("sonner", () => ({
   },
 }));
 
-import { useEnhancedRouteSubscriptions } from "../useEnhancedRouteSubscriptions";
+import { useEnhancedRouteSubscriptions } from "@/hooks/useEnhancedRouteSubscriptions";
 
 function Harness(): React.JSX.Element {
   useEnhancedRouteSubscriptions();
