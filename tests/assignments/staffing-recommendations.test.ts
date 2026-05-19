@@ -12,29 +12,48 @@ const smarterMigration = readFileSync(
   "utf-8",
 );
 
+const jobScopedAvailabilityMigration = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260519165000_job_scoped_staffing_availability.sql"),
+  "utf-8",
+);
+
+const declinedPenaltyMigration = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260519170000_declined_staffing_request_ranking_penalty.sql"),
+  "utf-8",
+);
+
 const sendStaffingEmailFunction = readFileSync(
   join(process.cwd(), "supabase/functions/send-staffing-email/index.ts"),
   "utf-8",
 );
 
+const staffingOrchestratorFunction = readFileSync(
+  join(process.cwd(), "supabase/functions/staffing-orchestrator/index.ts"),
+  "utf-8",
+);
+
 describe("staffing recommendation consultation guards", () => {
-  it("stores a structured role_code on staffing requests", () => {
+  it("stores a structured role_code for role-specific staffing requests", () => {
     expect(migration).toContain("ADD COLUMN IF NOT EXISTS role_code text");
     expect(migration).toContain("NULLIF(BTRIM(se.meta->>'role'), '') AS role_code");
+    expect(jobScopedAvailabilityMigration).toContain("WHERE phase = 'availability'");
+    expect(jobScopedAvailabilityMigration).toContain("SET role_code = NULL");
+    expect(sendStaffingEmailFunction).toContain("roleCode && phase === 'offer'");
   });
 
-  it("excludes active same-role requests but does not treat expired as active", () => {
-    expect(migration).toMatch(/NULLIF\(BTRIM\(sr\.role_code\), ''\) = v_normalized_role_code/);
-    expect(migration).toMatch(/sr\.phase IN \('availability', 'offer'\)/);
-    expect(migration).toMatch(/sr\.status IN \('pending', 'confirmed', 'declined'\)/);
-    expect(migration).not.toMatch(/sr\.status IN \('pending', 'confirmed', 'declined', 'expired'\)/);
+  it("excludes active job-level availability without treating expired as active", () => {
+    expect(jobScopedAvailabilityMigration).toContain("Availability is job-scoped");
+    expect(jobScopedAvailabilityMigration).toMatch(/sr\.phase = 'availability'/);
+    expect(jobScopedAvailabilityMigration).toMatch(/sr\.status IN \('pending', 'confirmed'\)/);
+    expect(jobScopedAvailabilityMigration).toMatch(/sr\.phase = 'offer'/);
+    expect(jobScopedAvailabilityMigration).not.toMatch(/sr\.status IN \('pending', 'confirmed', 'declined', 'expired'\)/);
   });
 
-  it("keeps role-less requests eligible unless a declined request overlaps the job dates", () => {
-    expect(migration).toMatch(/NULLIF\(BTRIM\(sr\.role_code\), ''\) IS NULL/);
-    expect(migration).toMatch(/sr\.status = 'declined'/);
-    expect(migration).toMatch(/sr\.single_day = false/);
-    expect(migration).toMatch(/sr\.target_date BETWEEN v_job_start::date AND v_job_end::date/);
+  it("blocks declined job-level availability when it overlaps the job dates", () => {
+    expect(jobScopedAvailabilityMigration).toMatch(/sr\.phase = 'availability'/);
+    expect(jobScopedAvailabilityMigration).toMatch(/sr\.status = 'declined'/);
+    expect(jobScopedAvailabilityMigration).toMatch(/sr\.single_day = false/);
+    expect(jobScopedAvailabilityMigration).toMatch(/sr\.target_date BETWEEN v_job_start::date AND v_job_end::date/);
   });
 });
 
@@ -48,6 +67,16 @@ describe("smarter staffing recommendation migration", () => {
     expect(smarterMigration).toContain("Role experience: ");
   });
 
+  it("penalizes prior declined requests for the same role prefix", () => {
+    expect(declinedPenaltyMigration).toContain("role_declines AS");
+    expect(declinedPenaltyMigration).toMatch(/sr\.status = 'declined'/);
+    expect(declinedPenaltyMigration).toMatch(/se\.meta->>'phase' = sr\.phase/);
+    expect(declinedPenaltyMigration).toMatch(/public\.staffing_role_prefix\(/);
+    expect(declinedPenaltyMigration).toContain("role_decline_penalty");
+    expect(declinedPenaltyMigration).toContain("GREATEST(0, GREATEST(wr.manual_skill_score, wr.role_experience_score) - wr.role_decline_penalty)");
+    expect(declinedPenaltyMigration).toContain("Declined role requests:");
+  });
+
   it("filters hard collisions and unavailability before candidates are returned", () => {
     expect(smarterMigration).toMatch(/FROM technician_availability ta/);
     expect(smarterMigration).toMatch(/JOIN target_dates td ON td\.target_date = ta\.date/);
@@ -57,11 +86,12 @@ describe("smarter staffing recommendation migration", () => {
     expect(smarterMigration).toMatch(/WHERE ja\.job_id = p_job_id\s+AND ja\.technician_id = p\.id/);
   });
 
-  it("dedupes active same-role requests without treating expired requests as active", () => {
-    expect(smarterMigration).toMatch(/NULLIF\(BTRIM\(sr\.role_code\), ''\) = v_normalized_role_code/);
-    expect(smarterMigration).toMatch(/sr\.phase IN \('availability', 'offer'\)/);
-    expect(smarterMigration).toMatch(/sr\.status IN \('pending', 'confirmed', 'declined'\)/);
-    expect(smarterMigration).not.toMatch(/sr\.status IN \('pending', 'confirmed', 'declined', 'expired'\)/);
+  it("dedupes job-level availability separately from role-specific offers", () => {
+    expect(jobScopedAvailabilityMigration).toMatch(/sr\.phase = 'availability'/);
+    expect(jobScopedAvailabilityMigration).toMatch(/sr\.status IN \('pending', 'confirmed'\)/);
+    expect(jobScopedAvailabilityMigration).toMatch(/NULLIF\(BTRIM\(sr\.role_code\), ''\) = v_normalized_role_code/);
+    expect(jobScopedAvailabilityMigration).toMatch(/sr\.phase = 'offer'/);
+    expect(jobScopedAvailabilityMigration).not.toMatch(/sr\.status IN \('pending', 'confirmed', 'declined', 'expired'\)/);
   });
 
   it("uses role-prefix mappings for manual skills", () => {
@@ -83,7 +113,26 @@ describe("smarter staffing recommendation migration", () => {
     expect(sendStaffingEmailFunction).toContain("RECOMMENDATION GUARD");
     expect(sendStaffingEmailFunction).toContain("overlapping_assignments");
     expect(sendStaffingEmailFunction).toContain("same_role_requests");
+    expect(sendStaffingEmailFunction).toContain("job_availability_requests");
     expect(sendStaffingEmailFunction).toContain("roleless_declines");
     expect(sendStaffingEmailFunction).toContain("status: 409");
+  });
+
+  it("lets service-role automation send WhatsApp as the campaign creator", () => {
+    expect(sendStaffingEmailFunction).toContain("isServiceRoleRequest");
+    expect(sendStaffingEmailFunction).toContain("body?.actor_id");
+    expect(staffingOrchestratorFunction).toContain("actor_id: campaign.created_by");
+  });
+
+  it("prioritizes confirmed assisted availability before auto mode contacts new candidates", () => {
+    expect(staffingOrchestratorFunction).toContain("assisted_handoff_priority");
+    expect(staffingOrchestratorFunction).toContain("confirmedAvailabilityRowsForJob");
+    expect(staffingOrchestratorFunction).toContain("confirmedAvailabilityByRequestedRole");
+    expect(staffingOrchestratorFunction).toContain(".order('created_at', { ascending: false })");
+    expect(staffingOrchestratorFunction).toContain("const confirmedAvailabilityRows = matchingRequestedRole");
+    expect(staffingOrchestratorFunction).toContain("offerRequestProfilesForJob");
+    expect(staffingOrchestratorFunction).toContain("phase: 'offer'");
+    expect(staffingOrchestratorFunction).toContain("require_no_conflicts: true");
+    expect(staffingOrchestratorFunction).toContain("auto_actions");
   });
 });

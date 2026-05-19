@@ -1,12 +1,14 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { StaffingCampaignPanel } from './StaffingCampaignPanel'
 import { StaffingCandidateList } from './StaffingCandidateList'
 import { StaffingOfferList } from './StaffingOfferList'
 import { StaffingAutoModePanel } from './StaffingAutoModePanel'
+import { parseSummaryRow } from '@/pages/job-assignment-matrix/utils'
 import {
   useStaffingCampaignRealtime,
   useStaffingCampaignRolesRealtime,
@@ -34,6 +36,18 @@ interface Campaign {
   updated_at: string
   last_run_at?: string
   next_run_at?: string
+}
+
+interface CampaignRole {
+  id: string
+  campaign_id: string
+  role_code: string
+  assigned_count: number
+  pending_availability: number
+  confirmed_availability: number
+  pending_offers: number
+  accepted_offers: number
+  stage: string
 }
 
 export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps> = ({
@@ -73,10 +87,32 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
         .select('*')
         .eq('campaign_id', campaign.id)
         .order('role_code')
-      return data || []
+      return (data || []) as CampaignRole[]
     },
     enabled: !!campaign?.id
   })
+
+  const { data: requiredRoleSummary } = useQuery({
+    queryKey: queryKeys.scope('staffing_required_roles', jobId, department),
+    queryFn: async () => {
+      const { data, error } = await dataLayerClient.from('job_required_roles_summary')
+        .select('job_id, department, roles')
+        .eq('job_id', jobId)
+        .eq('department', department)
+        .maybeSingle()
+
+      if (error) throw error
+      return parseSummaryRow(data)
+    }
+  })
+
+  const requiredByRole = useMemo(() => {
+    return new Map(
+      (requiredRoleSummary?.roles || []).map((role) => [role.role_code, role.quantity])
+    )
+  }, [requiredRoleSummary])
+
+  const getRequiredCount = (roleCode: string) => requiredByRole.get(roleCode) ?? 0
 
   if (!campaign) {
     return (
@@ -122,25 +158,33 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
                 <div>
                   <h3 className="font-semibold text-sm mb-2">Roles to Fill</h3>
                   <div className="space-y-1 text-sm">
-                    {campaignRoles.map((role: any) => (
-                      <div
-                        key={role.id}
-                        className="flex justify-between items-center py-1"
-                      >
-                        <span className="text-gray-700">{role.role_code}</span>
-                        <span className="text-gray-600">
-                          {role.stage === 'filled' ? (
-                            <span className="text-green-600 font-semibold">✓ Filled</span>
-                          ) : (
-                            <span>
-                              {role.assigned_count} assigned
-                              {role.confirmed_availability > 0 &&
-                                ` • ${role.confirmed_availability} confirmed`}
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                    ))}
+                    {campaignRoles.map((role) => {
+                      const requiredCount = getRequiredCount(role.role_code)
+                      const assignedCount = Number(role.assigned_count || 0)
+
+                      return (
+                        <div
+                          key={role.id}
+                          className="flex flex-wrap justify-between items-center gap-2 py-1"
+                        >
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-gray-700">{role.role_code}</span>
+                            <Badge variant="outline">Required {requiredCount}</Badge>
+                          </div>
+                          <span className="text-gray-600">
+                            {role.stage === 'filled' ? (
+                              <span className="text-green-600 font-semibold">✓ Filled</span>
+                            ) : (
+                              <span>
+                                {assignedCount}/{requiredCount || '—'} assigned
+                                {role.confirmed_availability > 0 &&
+                                  ` • ${role.confirmed_availability} confirmed`}
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
               )}
@@ -157,6 +201,7 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
           <StaffingAutoModePanel
             campaign={campaign}
             campaignRoles={campaignRoles || []}
+            requiredByRole={requiredByRole}
             onStatusChange={() => refetchCampaign()}
           />
         )}
@@ -168,8 +213,8 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
           {campaignRoles && campaignRoles.length > 0 ? (
             <div className="space-y-4">
               {campaignRoles
-                .filter((r: any) => r.stage !== 'filled')
-                .map((role: any) => (
+                .filter((r) => r.stage !== 'filled')
+                .map((role) => (
                   <StaffingCandidateList
                     key={role.id}
                     campaignId={campaign.id}
@@ -177,9 +222,13 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
                     jobId={jobId}
                     department={department}
                     policy={campaign.policy}
+                    requiredCount={getRequiredCount(role.role_code)}
+                    assignedCount={Number(role.assigned_count || 0)}
+                    confirmedAvailability={Number(role.confirmed_availability || 0)}
+                    pendingAvailability={Number(role.pending_availability || 0)}
                   />
                 ))}
-              {campaignRoles.every((r: any) => r.stage === 'filled') && (
+              {campaignRoles.every((r) => r.stage === 'filled') && (
                 <Card>
                   <CardContent className="pt-6">
                     <p className="text-center text-gray-600">
@@ -204,7 +253,7 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
         <TabsContent value="offers" className="space-y-4">
           {campaignRoles && campaignRoles.length > 0 ? (
             <div className="space-y-4">
-              {campaignRoles.map((role: any) => (
+              {campaignRoles.map((role) => (
                 <StaffingOfferList
                   key={role.id}
                   campaignId={campaign.id}
@@ -212,6 +261,12 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
                   jobId={jobId}
                   department={department}
                   offerMessage={campaign.offer_message}
+                  requiredCount={getRequiredCount(role.role_code)}
+                  assignedCount={Number(role.assigned_count || 0)}
+                  confirmedAvailability={Number(role.confirmed_availability || 0)}
+                  pendingAvailability={Number(role.pending_availability || 0)}
+                  acceptedOffers={Number(role.accepted_offers || 0)}
+                  pendingOffers={Number(role.pending_offers || 0)}
                 />
               ))}
             </div>

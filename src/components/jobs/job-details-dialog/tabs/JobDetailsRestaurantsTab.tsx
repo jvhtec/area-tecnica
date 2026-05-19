@@ -77,7 +77,10 @@ export const JobDetailsRestaurantsTab: React.FC<JobDetailsRestaurantsTabProps> =
         ) : restaurants && restaurants.length > 0 ? (
           <div className="space-y-3">
             {restaurants.map((restaurant: Restaurant) => (
-              <div key={restaurant.id} className="p-3 bg-[#0f1219] border border-[#1f232e] rounded">
+              <div
+                key={restaurant.id}
+                className="p-3 bg-slate-50 dark:bg-[#0f1219] border border-slate-200 dark:border-[#1f232e] rounded"
+              >
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 min-w-0">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium break-words">{restaurant.name}</p>
@@ -138,4 +141,3 @@ export const JobDetailsRestaurantsTab: React.FC<JobDetailsRestaurantsTabProps> =
     </TabsContent>
   );
 };
-

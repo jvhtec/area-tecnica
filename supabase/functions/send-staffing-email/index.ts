@@ -145,6 +145,16 @@ async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Re
   }
 }
 
+function isServiceRoleRequest(req: Request): boolean {
+  const authHeader = req.headers.get('Authorization') || '';
+  const apikey = req.headers.get('apikey') || '';
+  const token = authHeader.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : '';
+
+  return token === SERVICE_ROLE || apikey === SERVICE_ROLE;
+}
+
 function b64url(u8: Uint8Array) {
   return btoa(String.fromCharCode(...u8)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
@@ -159,13 +169,16 @@ serve(async (req) => {
   
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
-    const actorId = await resolveActorId(supabase, req);
+    let actorId = await resolveActorId(supabase, req);
     const body = await req.json();
+    if (!actorId && isServiceRoleRequest(req) && typeof body?.actor_id === 'string') {
+      actorId = body.actor_id;
+    }
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
 
     const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, require_no_conflicts, idempotency_key } = body;
     const roleCode = typeof role === 'string' && role.trim().length > 0 ? role.trim() : null;
-    const roleCodePatch = roleCode ? { role_code: roleCode } : {};
+    const roleCodePatch = roleCode && phase === 'offer' ? { role_code: roleCode } : {};
     const datesArrayRaw: unknown = (body as any)?.dates;
     const shouldOverrideConflicts = Boolean(override_conflicts);
     const shouldRequireNoConflicts = Boolean(require_no_conflicts);
@@ -236,7 +249,7 @@ serve(async (req) => {
       if (idempotencyError) {
         console.warn('⚠️ Idempotency check failed (non-blocking):', idempotencyError);
       } else if (existing) {
-        if (roleCode && !existing.role_code) {
+        if (phase === 'offer' && roleCode && !existing.role_code) {
           const { error: roleUpdateError } = await supabase
             .from('staffing_requests')
             .update({ role_code: roleCode })
@@ -430,6 +443,7 @@ serve(async (req) => {
           targetAssignmentResult,
           activeAssignmentResult,
           sameRoleRequestResult,
+          jobAvailabilityRequestResult,
           rolelessDeclineResult,
         ] = await Promise.all([
           supabase
@@ -449,7 +463,16 @@ serve(async (req) => {
               .eq('job_id', job_id)
               .eq('profile_id', profile_id)
               .eq('role_code', roleCode)
-              .in('phase', ['availability', 'offer'])
+              .in('phase', phase === 'offer' ? ['offer'] : ['availability', 'offer'])
+              .in('status', ['pending', 'confirmed', 'declined'])
+            : Promise.resolve({ data: [], error: null }),
+          phase === 'availability'
+            ? supabase
+              .from('staffing_requests')
+              .select('id, phase, status, role_code, target_date, single_day, updated_at')
+              .eq('job_id', job_id)
+              .eq('profile_id', profile_id)
+              .eq('phase', 'availability')
               .in('status', ['pending', 'confirmed', 'declined'])
             : Promise.resolve({ data: [], error: null }),
           supabase
@@ -466,6 +489,7 @@ serve(async (req) => {
           targetAssignmentResult.error,
           activeAssignmentResult.error,
           sameRoleRequestResult.error,
+          jobAvailabilityRequestResult.error,
           rolelessDeclineResult.error,
         ].filter(Boolean);
 
@@ -497,6 +521,13 @@ serve(async (req) => {
           ));
 
         const sameRoleRequests = sameRoleRequestResult.data || [];
+        const jobAvailabilityRequests = (jobAvailabilityRequestResult.data || [])
+          .filter((request: any) => (
+            request.status !== 'declined'
+            || request.single_day === false
+            || !request.target_date
+            || targetDates.includes(request.target_date)
+          ));
         const rolelessDeclines = (rolelessDeclineResult.data || [])
           .filter((request: any) => (
             request.single_day === false
@@ -508,6 +539,7 @@ serve(async (req) => {
           activeTargetAssignments.length > 0
           || overlappingAssignments.length > 0
           || sameRoleRequests.length > 0
+          || jobAvailabilityRequests.length > 0
           || rolelessDeclines.length > 0
         ) {
           const blockDetails = {
@@ -522,6 +554,7 @@ serve(async (req) => {
               end_time: assignment.job?.end_time,
             })),
             same_role_requests: sameRoleRequests,
+            job_availability_requests: jobAvailabilityRequests,
             roleless_declines: rolelessDeclines,
             target_dates: targetDates,
             target_job: {

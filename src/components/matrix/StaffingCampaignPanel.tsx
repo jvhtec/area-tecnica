@@ -65,7 +65,8 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     availabilityTtl: 24,
     offerTtl: 4,
     offerMessage: '',
-    tickInterval: 300
+    tickInterval: 300,
+    channel: 'email' as 'email' | 'whatsapp'
   })
 
   // Fetch active campaign for this job+department
@@ -94,7 +95,8 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         availabilityTtl: campaign.policy?.availability_ttl_hours ?? 24,
         offerTtl: campaign.policy?.offer_ttl_hours ?? 4,
         offerMessage: campaign.offer_message ?? '',
-        tickInterval: campaign.policy?.tick_interval_seconds ?? 300
+        tickInterval: campaign.policy?.tick_interval_seconds ?? 300,
+        channel: campaign.policy?.channel === 'whatsapp' ? 'whatsapp' : 'email'
       })
     }
   }, [campaign])
@@ -131,6 +133,8 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         exclude_fridge: formData.excludeFridge,
         soft_conflict_policy: formData.softConflictPolicy,
         tick_interval_seconds: formData.tickInterval,
+        channel: formData.channel,
+        assisted_handoff_priority: true,
         escalation_steps: ['increase_wave', 'include_fridge', 'allow_soft_conflicts']
       }
 
@@ -195,6 +199,8 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         exclude_fridge: formData.excludeFridge,
         soft_conflict_policy: formData.softConflictPolicy,
         tick_interval_seconds: formData.tickInterval,
+        channel: formData.channel,
+        assisted_handoff_priority: true,
         escalation_steps: ['increase_wave', 'include_fridge', 'allow_soft_conflicts']
       }
 
@@ -474,6 +480,18 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                   </select>
                 </div>
 
+                <div>
+                  <label className="text-sm font-medium">Send Channel</label>
+                  <select
+                    value={formData.channel}
+                    onChange={(e) => setFormData({ ...formData, channel: e.target.value as 'email' | 'whatsapp' })}
+                    className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+                  >
+                    <option value="email">Email</option>
+                    <option value="whatsapp">WhatsApp</option>
+                  </select>
+                </div>
+
                 {/* Fridge toggle */}
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -687,6 +705,23 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                 <option value="warn">Warn (Assisted mode)</option>
                 <option value="allow">Allow (Escalation only)</option>
               </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Send Channel</label>
+              <select
+                value={formData.channel}
+                onChange={(e) => setFormData({ ...formData, channel: e.target.value as 'email' | 'whatsapp' })}
+                className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+              >
+                <option value="email">Email</option>
+                <option value="whatsapp">WhatsApp</option>
+              </select>
+              {campaign.mode === 'assisted' && formData.mode === 'auto' && (
+                <p className="text-xs text-gray-600 mt-1">
+                  Auto mode will use existing assisted availability and offer responses before contacting new candidates.
+                </p>
+              )}
             </div>
 
             {/* Fridge toggle */}

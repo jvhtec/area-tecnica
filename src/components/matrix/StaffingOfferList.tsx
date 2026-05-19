@@ -4,9 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
+import { Mail, MessageCircle } from 'lucide-react'
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -16,7 +18,15 @@ interface StaffingOfferListProps {
   jobId: string
   department: string
   offerMessage?: string
+  requiredCount?: number
+  assignedCount?: number
+  confirmedAvailability?: number
+  pendingAvailability?: number
+  acceptedOffers?: number
+  pendingOffers?: number
 }
+
+type StaffingChannel = 'email' | 'whatsapp'
 
 interface AvailabilityResponse {
   profile_id: string
@@ -30,54 +40,91 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
   roleCode,
   jobId,
   department,
-  offerMessage
+  offerMessage,
+  requiredCount = 0,
+  assignedCount = 0,
+  confirmedAvailability = 0,
+  pendingAvailability = 0,
+  acceptedOffers = 0,
+  pendingOffers = 0
 }) => {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [selectedForOffer, setSelectedForOffer] = useState<Set<string>>(new Set())
+  const [channel, setChannel] = useState<StaffingChannel>('email')
 
-  // Fetch availability responses for this role
+  // Availability responses are job-scoped, but the original send event carries
+  // manager intent for which role card should display the response.
   const { data: responses, isLoading } = useQuery({
     queryKey: queryKeys.scope('staffing_availability_responses', jobId, roleCode),
     queryFn: async () => {
-      // Role information is stored in staffing_events.meta.role (from send-staffing-email).
-      const { data: sentEvents, error: sentError } = await dataLayerClient.from('staffing_events')
-        .select('staffing_request_id')
-        .in('event', ['email_sent', 'whatsapp_sent'])
-        .contains('meta', { phase: 'availability', role: roleCode })
-        .order('created_at', { ascending: false })
-        .limit(500)
-
-      if (sentError) throw sentError
-
-      const requestIds = Array.from(
-        new Set((sentEvents || []).map((e: any) => e.staffing_request_id).filter(Boolean))
-      )
-
-      if (requestIds.length === 0) return [] as AvailabilityResponse[]
-
-      const { data, error } = await dataLayerClient.from('staffing_requests')
-        .select('id, profile_id, status, created_at, updated_at, profiles(first_name,last_name,nickname)')
-        .in('id', requestIds)
+      const { data: directRequests, error: directError } = await dataLayerClient.from('staffing_requests')
+        .select('id, profile_id, status, created_at, updated_at')
         .eq('job_id', jobId)
         .eq('phase', 'availability')
         .order('updated_at', { ascending: false })
 
-      if (error) throw error
+      if (directError) throw directError
 
-      return (data || []).map((item: any) => {
-        const profiles = item.profiles || {}
-        const fullName = `${profiles.first_name || ''} ${profiles.last_name || ''}`.trim()
+      const requestRows = directRequests || []
+      const requestIds = requestRows.map((item: any) => item.id).filter(Boolean)
+      if (requestIds.length === 0) return []
+
+      const { data: sentEvents, error: sentEventsError } = await dataLayerClient.from('staffing_events')
+        .select('staffing_request_id, event, meta, created_at')
+        .in('staffing_request_id', requestIds)
+        .in('event', ['email_sent', 'whatsapp_sent'])
+        .order('created_at', { ascending: false })
+
+      if (sentEventsError) throw sentEventsError
+
+      const latestAvailabilityRoleByRequestId = new Map<string, string>()
+      ;[...(sentEvents || [])]
+        .sort((a: any, b: any) => (
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        ))
+        .forEach((event: any) => {
+        const requestId = String(event.staffing_request_id || '')
+        const meta = event?.meta || {}
+        if (!requestId || latestAvailabilityRoleByRequestId.has(requestId)) return
+        if (meta.phase !== 'availability' || !meta.role) return
+        latestAvailabilityRoleByRequestId.set(requestId, String(meta.role))
+      })
+
+      const latestRequestByProfileId = new Map<string, any>()
+      requestRows.forEach((item: any) => {
+        if (latestAvailabilityRoleByRequestId.get(String(item.id)) !== roleCode) return
+        const profileId = String(item.profile_id || '')
+        if (!profileId || latestRequestByProfileId.has(profileId)) return
+        latestRequestByProfileId.set(profileId, item)
+      })
+
+      const profileIds = Array.from(latestRequestByProfileId.keys())
+      if (profileIds.length === 0) return []
+
+      const { data: profiles, error: profilesError } = await dataLayerClient.from('profiles')
+        .select('id, first_name, last_name, nickname, email')
+        .in('id', profileIds)
+
+      if (profilesError) throw profilesError
+
+      const profilesById = new Map(
+        (profiles || []).map((profile: any) => [String(profile.id), profile])
+      )
+
+      return Array.from(latestRequestByProfileId.entries()).map(([profileId, item]) => {
+        const profile: any = profilesById.get(profileId) || {}
+        const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
         const respondedAt =
           item.status && String(item.status).toLowerCase() !== 'pending'
             ? (item.updated_at || item.created_at)
             : null
 
         return {
-          profile_id: item.profile_id,
-          full_name: fullName || profiles.nickname || 'Unknown',
+          profile_id: profileId,
+          full_name: fullName || profile.nickname || profile.email || 'Unknown',
           status: item.status,
-          responded_at: respondedAt
+          responded_at: respondedAt,
         } as AvailabilityResponse
       })
     }
@@ -109,7 +156,8 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
               phase: 'offer',
               role: roleCode,
               message: offerMessage || null,
-              idempotency_key: `campaign:${campaignId}:${roleCode}:${profileId}:offer`
+              channel,
+              idempotency_key: `campaign:${campaignId}:${roleCode}:${profileId}:offer:${channel}`
             })
           }
         )
@@ -133,10 +181,11 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
     onSuccess: (data: any) => {
       toast({
         title: 'Offers sent',
-        description: `Sent offers to ${data?.sent ?? selectedForOffer.size} candidates`
+        description: `Sent offers to ${data?.sent ?? selectedForOffer.size} candidates by ${channel}`
       })
       setSelectedForOffer(new Set())
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_availability_responses', jobId, roleCode) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_availability_responses', jobId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_requests', jobId) })
     },
     onError: (error: any) => {
@@ -151,6 +200,23 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
   const confirmedResponses = responses?.filter((r: any) => r.status === 'confirmed') || []
   const declinedResponses = responses?.filter((r: any) => r.status === 'declined') || []
   const pendingResponses = responses?.filter((r: any) => r.status === 'pending') || []
+  const hasResponseRows = Boolean(responses && responses.length > 0)
+  const displayedConfirmedAvailability = hasResponseRows ? confirmedResponses.length : confirmedAvailability
+  const displayedPendingAvailability = hasResponseRows ? pendingResponses.length : pendingAvailability
+  const displayedDeclinedAvailability = hasResponseRows ? declinedResponses.length : 0
+
+  const statusSummary = (
+    <div className="flex flex-wrap gap-2 pt-2">
+      <Badge variant="outline">Required {requiredCount}</Badge>
+      <Badge variant="secondary">{assignedCount}/{requiredCount || '—'} assigned</Badge>
+      <Badge variant="outline">Availability: {displayedConfirmedAvailability} yes</Badge>
+      <Badge variant="outline">{displayedPendingAvailability} pending</Badge>
+      <Badge variant="outline">{displayedDeclinedAvailability} no</Badge>
+      {(acceptedOffers > 0 || pendingOffers > 0) && (
+        <Badge variant="outline">Offers: {acceptedOffers} accepted / {pendingOffers} pending</Badge>
+      )}
+    </div>
+  )
 
   const toggleForOffer = (profileId: string) => {
     const newSelected = new Set(selectedForOffer)
@@ -166,6 +232,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
     return (
       <Card>
         <CardContent className="pt-6">
+          {statusSummary}
           <p className="text-gray-500">Loading responses...</p>
         </CardContent>
       </Card>
@@ -179,9 +246,26 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
         <CardDescription>
           Manage offers for candidates who confirmed availability
         </CardDescription>
+        {statusSummary}
       </CardHeader>
 
       <CardContent className="space-y-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded border bg-background p-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {channel === 'whatsapp' ? <MessageCircle size={16} /> : <Mail size={16} />}
+            Send offers by
+          </div>
+          <Select value={channel} onValueChange={(value) => setChannel(value as StaffingChannel)}>
+            <SelectTrigger aria-label="Select offer channel" className="w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="whatsapp">WhatsApp</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Confirmed responses */}
         <div>
           <div className="flex items-center gap-2 mb-3">
@@ -199,11 +283,16 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
                   className="flex items-center gap-3 p-2 bg-white rounded hover:bg-green-50 cursor-pointer"
                 >
                   <Checkbox
+                    aria-label={`Select ${response.full_name} for offer`}
                     checked={selectedForOffer.has(response.profile_id)}
                     onCheckedChange={() => toggleForOffer(response.profile_id)}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm">{response.full_name}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-sm">{response.full_name}</p>
+                      <Badge className="bg-green-100 text-green-800">Availability yes</Badge>
+                      <Badge variant="outline">Job availability</Badge>
+                    </div>
                     <p className="text-xs text-gray-600">
                       {response.responded_at
                         ? format(new Date(response.responded_at), 'PPp')
@@ -234,7 +323,10 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
                   className="flex items-center justify-between p-2 bg-white rounded"
                 >
                   <p className="text-sm font-medium">{response.full_name}</p>
-                  <span className="text-xs text-gray-600">Waiting for response...</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Job availability</Badge>
+                    <Badge className="bg-yellow-100 text-yellow-800">Availability pending</Badge>
+                  </div>
                 </div>
               ))}
             </div>
@@ -257,7 +349,10 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
                   className="flex items-center justify-between p-2 bg-white rounded"
                 >
                   <p className="text-sm font-medium">{response.full_name}</p>
-                  <span className="text-xs text-gray-600">Declined</span>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Job availability</Badge>
+                    <Badge className="bg-red-100 text-red-800">Availability no</Badge>
+                  </div>
                 </div>
               ))}
             </div>
@@ -273,7 +368,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
             >
               {sendOffersMutation.isPending
                 ? 'Sending...'
-                : `Send Offers (${selectedForOffer.size})`}
+                : `Send Offers (${selectedForOffer.size}) by ${channel === 'whatsapp' ? 'WhatsApp' : 'Email'}`}
             </Button>
             <p className="text-xs text-gray-600 self-center">
               First candidate to accept will be auto-assigned
