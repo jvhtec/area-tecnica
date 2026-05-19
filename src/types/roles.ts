@@ -27,10 +27,18 @@ const ROLE_REGISTRY: Record<Discipline, RoleOption[]> = {
     { code: 'SND-MNT-T', label: 'Montador — Técnico', discipline: 'sound', position: 'MNT', level: 'T' },
   ],
   lights: [
+    { code: 'LGT-BRD-R', label: 'Mesa — Responsable', discipline: 'lights', position: 'BRD', level: 'R' },
+    { code: 'LGT-SYS-R', label: 'Sistema/Rig — Responsable', discipline: 'lights', position: 'SYS', level: 'R' },
     { code: 'LGT-ASST-R', label: 'Asistente — Responsable', discipline: 'lights', position: 'ASST', level: 'R' },
+
+    { code: 'LGT-BRD-E', label: 'Mesa — Especialista', discipline: 'lights', position: 'BRD', level: 'E' },
+    { code: 'LGT-SYS-E', label: 'Sistema/Rig — Especialista', discipline: 'lights', position: 'SYS', level: 'E' },
+    { code: 'LGT-FOLO-E', label: 'Follow Spot — Especialista', discipline: 'lights', position: 'FOLO', level: 'E' },
     { code: 'LGT-ASST-E', label: 'Asistente — Especialista', discipline: 'lights', position: 'ASST', level: 'E' },
     { code: 'LGT-DIM-R', label: 'Dimmer — Responsable', discipline: 'lights', position: 'DIM', level: 'R' },
     { code: 'LGT-DIM-E', label: 'Dimmer — Especialista', discipline: 'lights', position: 'DIM', level: 'E' },
+
+    { code: 'LGT-PA-T', label: 'PA — Técnico', discipline: 'lights', position: 'PA', level: 'T' },
     { code: 'LGT-CAN-T', label: 'Cañón — Técnico', discipline: 'lights', position: 'CAN', level: 'T' },
     { code: 'LGT-MON-T', label: 'Montador — Técnico', discipline: 'lights', position: 'MON', level: 'T' },
   ],

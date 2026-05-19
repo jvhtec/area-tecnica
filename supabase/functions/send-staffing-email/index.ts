@@ -50,6 +50,48 @@ function labelForRoleCode(value?: string | null): string | null {
   return CODE_TO_LABEL[value] ?? value
 }
 
+function dateOnly(value?: string | null): string | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().split('T')[0];
+}
+
+function datesBetween(start?: string | null, end?: string | null): string[] {
+  const startDate = dateOnly(start);
+  const endDate = dateOnly(end);
+  if (!startDate || !endDate) return [];
+
+  const dates: string[] = [];
+  const cursor = new Date(`${startDate}T00:00:00.000Z`);
+  const last = new Date(`${endDate}T00:00:00.000Z`);
+  while (cursor <= last) {
+    dates.push(cursor.toISOString().split('T')[0]);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+function rangesOverlapInclusive(
+  leftStart?: string | null,
+  leftEnd?: string | null,
+  rightStart?: string | null,
+  rightEnd?: string | null
+): boolean {
+  if (!leftStart || !leftEnd || !rightStart || !rightEnd) return false;
+  const aStart = new Date(leftStart).getTime();
+  const aEnd = new Date(leftEnd).getTime();
+  const bStart = new Date(rightStart).getTime();
+  const bEnd = new Date(rightEnd).getTime();
+  if ([aStart, aEnd, bStart, bEnd].some(Number.isNaN)) return false;
+  return aStart <= bEnd && aEnd >= bStart;
+}
+
+function joinedSingle<T>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const TOKEN_SECRET = Deno.env.get("STAFFING_TOKEN_SECRET")!;
@@ -121,11 +163,12 @@ serve(async (req) => {
     const body = await req.json();
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
 
-    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, idempotency_key } = body;
+    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, require_no_conflicts, idempotency_key } = body;
     const roleCode = typeof role === 'string' && role.trim().length > 0 ? role.trim() : null;
     const roleCodePatch = roleCode ? { role_code: roleCode } : {};
     const datesArrayRaw: unknown = (body as any)?.dates;
     const shouldOverrideConflicts = Boolean(override_conflicts);
+    const shouldRequireNoConflicts = Boolean(require_no_conflicts);
     const desiredChannel = (typeof channel === 'string' && channel.toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
     const rawTargetDate = typeof target_date === 'string' && target_date ? target_date : null;
     let normalizedTargetDate = rawTargetDate ? (() => {
@@ -158,6 +201,7 @@ serve(async (req) => {
       target_date: { value: target_date ?? null, normalized: normalizedTargetDate },
       single_day: { value: single_day ?? null, effective: isSingleDayRequest },
       dates: normalizedDates,
+      require_no_conflicts: shouldRequireNoConflicts,
       idempotency_key: { value: idempotency_key ?? null }
     });
     
@@ -376,16 +420,140 @@ serve(async (req) => {
       const fullName = `${tech.first_name || ''} ${tech.last_name || ''}`.trim();
       console.log('👤 TECH INFO:', { fullName, email: '***@***.***' });
 
+      if (shouldRequireNoConflicts) {
+        console.log('🛡️ RECOMMENDATION GUARD: verifying candidate is still eligible...');
+        const targetDates = normalizedDates.length > 0
+          ? normalizedDates
+          : (normalizedTargetDate ? [normalizedTargetDate] : datesBetween(job.start_time, job.end_time));
+
+        const [
+          targetAssignmentResult,
+          activeAssignmentResult,
+          sameRoleRequestResult,
+          rolelessDeclineResult,
+        ] = await Promise.all([
+          supabase
+            .from('job_assignments')
+            .select('id, job_id, status')
+            .eq('job_id', job_id)
+            .eq('technician_id', profile_id),
+          supabase
+            .from('job_assignments')
+            .select('id, job_id, status, jobs(id, title, start_time, end_time)')
+            .eq('technician_id', profile_id)
+            .neq('job_id', job_id),
+          roleCode
+            ? supabase
+              .from('staffing_requests')
+              .select('id, phase, status, role_code, target_date, single_day, updated_at')
+              .eq('job_id', job_id)
+              .eq('profile_id', profile_id)
+              .eq('role_code', roleCode)
+              .in('phase', ['availability', 'offer'])
+              .in('status', ['pending', 'confirmed', 'declined'])
+            : Promise.resolve({ data: [], error: null }),
+          supabase
+            .from('staffing_requests')
+            .select('id, phase, status, role_code, target_date, single_day, updated_at')
+            .eq('job_id', job_id)
+            .eq('profile_id', profile_id)
+            .in('phase', ['availability', 'offer'])
+            .eq('status', 'declined')
+            .or('role_code.is.null,role_code.eq.'),
+        ]);
+
+        const guardErrors = [
+          targetAssignmentResult.error,
+          activeAssignmentResult.error,
+          sameRoleRequestResult.error,
+          rolelessDeclineResult.error,
+        ].filter(Boolean);
+
+        if (guardErrors.length > 0) {
+          console.error('❌ RECOMMENDATION GUARD FAILED:', guardErrors);
+          return new Response(JSON.stringify({
+            error: 'Unable to verify technician availability',
+            details: { errors: guardErrors },
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const activeTargetAssignments = (targetAssignmentResult.data || [])
+          .filter((assignment: any) => assignment.status !== 'declined');
+
+        const overlappingAssignments = (activeAssignmentResult.data || [])
+          .filter((assignment: any) => assignment.status !== 'declined')
+          .map((assignment: any) => ({
+            ...assignment,
+            job: joinedSingle(assignment.jobs),
+          }))
+          .filter((assignment: any) => rangesOverlapInclusive(
+            assignment.job?.start_time,
+            assignment.job?.end_time,
+            job.start_time,
+            job.end_time
+          ));
+
+        const sameRoleRequests = sameRoleRequestResult.data || [];
+        const rolelessDeclines = (rolelessDeclineResult.data || [])
+          .filter((request: any) => (
+            request.single_day === false
+            || !request.target_date
+            || targetDates.includes(request.target_date)
+          ));
+
+        if (
+          activeTargetAssignments.length > 0
+          || overlappingAssignments.length > 0
+          || sameRoleRequests.length > 0
+          || rolelessDeclines.length > 0
+        ) {
+          const blockDetails = {
+            conflict_type: 'stale_recommendation',
+            target_assignments: activeTargetAssignments,
+            overlapping_assignments: overlappingAssignments.map((assignment: any) => ({
+              id: assignment.id,
+              status: assignment.status,
+              job_id: assignment.job_id,
+              title: assignment.job?.title,
+              start_time: assignment.job?.start_time,
+              end_time: assignment.job?.end_time,
+            })),
+            same_role_requests: sameRoleRequests,
+            roleless_declines: rolelessDeclines,
+            target_dates: targetDates,
+            target_job: {
+              id: job.id,
+              title: job.title,
+            },
+            technician: { id: tech.id, name: fullName },
+          };
+
+          console.log('⛔ BLOCKING SEND: stale candidate is no longer eligible', blockDetails);
+          return new Response(JSON.stringify({
+            error: 'Technician is no longer available for this recommendation',
+            details: blockDetails,
+          }), {
+            status: 409,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Step 2b: Enhanced conflict check using RPC function
       // Checks for both hard conflicts (confirmed) and soft conflicts (pending)
-      // Changed to warning-only mode: conflicts are logged but don't block sending
-      // This allows different departments to start at different times without false positives
+      // Manual sends stay warning-only; recommendation sends can opt into hard blocking
+      // with require_no_conflicts so stale candidate lists do not create collisions.
       const conflictWarnings: any[] = [];
-      if (shouldOverrideConflicts) {
+      if (shouldOverrideConflicts && !shouldRequireNoConflicts) {
         console.log('⚠️ CONFLICT CHECK OVERRIDDEN by user - skipping conflict detection');
       } else {
         try {
-          console.log('🕒 CONFLICT CHECK: using enhanced RPC conflict checker (warning mode)...');
+          console.log('🕒 CONFLICT CHECK: using enhanced RPC conflict checker...', {
+            mode: shouldRequireNoConflicts ? 'blocking hard conflicts' : 'warning'
+          });
 
           // Check conflicts for each date if multi-date, otherwise for single date or whole job
           const datesToCheck = normalizedDates.length > 0 ? normalizedDates : [normalizedTargetDate];
@@ -403,19 +571,61 @@ serve(async (req) => {
             );
 
             if (conflictErr) {
-              console.warn('⚠️ Conflict check failed, continuing to send email:', conflictErr);
-            } else if (conflictResult && (conflictResult.hasHardConflict || conflictResult.hasSoftConflict)) {
-              const hasJobConflicts = (conflictResult.hardConflicts?.length > 0) || (conflictResult.softConflicts?.length > 0);
-              const hasUnavailability = conflictResult.unavailabilityConflicts?.length > 0;
+              console.warn('⚠️ Conflict check failed:', conflictErr);
+              if (shouldRequireNoConflicts) {
+                return new Response(JSON.stringify({
+                  error: 'Unable to verify technician availability',
+                  details: conflictErr,
+                }), {
+                  status: 500,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+              }
+            } else if (conflictResult) {
+              const hardConflicts = Array.isArray(conflictResult.hardConflicts) ? conflictResult.hardConflicts : [];
+              const softConflicts = Array.isArray(conflictResult.softConflicts) ? conflictResult.softConflicts : [];
+              const unavailabilityConflicts = Array.isArray(conflictResult.unavailabilityConflicts)
+                ? conflictResult.unavailabilityConflicts
+                : [];
+              const hasHardConflict = Boolean(conflictResult.hasHardConflict) || hardConflicts.length > 0;
+              const hasSoftConflict = Boolean(conflictResult.hasSoftConflict) || softConflicts.length > 0;
+              const hasUnavailability = unavailabilityConflicts.length > 0;
 
-              const conflictType = conflictResult.hasHardConflict ? 'confirmed' : 'pending';
-              const conflicts = conflictResult.hasHardConflict
-                ? conflictResult.hardConflicts
-                : conflictResult.softConflicts;
+              if (shouldRequireNoConflicts && (hasHardConflict || hasUnavailability)) {
+                const blockDetails = {
+                  conflict_type: hasHardConflict ? 'hard_conflict' : 'unavailability',
+                  hard_conflicts: hardConflicts,
+                  unavailability_conflicts: unavailabilityConflicts,
+                  unavailability: unavailabilityConflicts,
+                  target_date: dateToCheck,
+                  target_job: {
+                    id: job.id,
+                    title: job.title,
+                  },
+                  technician: { id: tech.id, name: fullName },
+                };
+
+                console.log('⛔ BLOCKING SEND: candidate no longer has clean availability', blockDetails);
+
+                return new Response(JSON.stringify({
+                  error: 'Technician is no longer available for this recommendation',
+                  details: blockDetails,
+                }), {
+                  status: 409,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
+              }
+
+              if (!hasHardConflict && !hasSoftConflict && !hasUnavailability) {
+                continue;
+              }
+
+              const conflictType = hasHardConflict ? 'confirmed' : (hasUnavailability ? 'unavailability' : 'pending');
+              const conflicts = hasHardConflict ? hardConflicts : softConflicts;
 
               console.log(`⚠️ ${conflictType} conflict detected (warning only - not blocking):`, {
                 jobConflicts: conflicts,
-                unavailability: conflictResult.unavailabilityConflicts,
+                unavailability: unavailabilityConflicts,
                 note: 'Different departments may start at different times, so whole job span conflicts are treated as warnings'
               });
 
@@ -423,7 +633,7 @@ serve(async (req) => {
               conflictWarnings.push({
                 conflict_type: conflictType,
                 conflicts: conflicts,
-                unavailability: conflictResult.unavailabilityConflicts,
+                unavailability: unavailabilityConflicts,
                 target_date: dateToCheck
               });
             }
