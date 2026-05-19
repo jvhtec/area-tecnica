@@ -185,6 +185,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
               profile_id: profileId,
               phase: 'availability',
               role: roleCode,
+              require_no_conflicts: true,
               idempotency_key: `campaign:${campaignId}:${roleCode}:${profileId}:availability`
             })
           }
@@ -280,7 +281,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
       <CardHeader>
         <CardTitle>{roleCode} - Candidate Recommendations</CardTitle>
         <CardDescription>
-          Top {candidates.length} candidates ranked by skills, proximity, and reliability
+          Top {candidates.length} candidates ranked by skills, role experience, proximity, and reliability
         </CardDescription>
       </CardHeader>
 

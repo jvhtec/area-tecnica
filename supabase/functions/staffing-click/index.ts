@@ -398,6 +398,7 @@ serve(async (req) => {
           if (prof.department === 'sound') rolePatch['sound_role'] = chosenRole;
           else if (prof.department === 'lights') rolePatch['lights_role'] = chosenRole;
           else if (prof.department === 'video') rolePatch['video_role'] = chosenRole;
+          else if (prof.department === 'production' || prof.department === 'logistics') rolePatch['production_role'] = chosenRole;
 
           // 5) Check for conflicts before auto-assigning
           const targetDate = (row as any).target_date ?? null;

@@ -13,7 +13,10 @@ const baseCandidate = {
   soft_conflict: false,
   hard_conflict: false,
   final_score: 76,
-  reasons: ["Primary skill: PA technician (lvl 5)"],
+  reasons: [
+    "Primary skill: PA technician (lvl 5)",
+    "Role experience: 4 completed SND-PA jobs",
+  ],
 };
 
 test("auto-staffing shows role-less consultations and refreshes candidates after same-role sends", async ({
@@ -150,6 +153,8 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
   await expect(page.getByText("Expired Same Role")).toBeVisible();
   await expect(page.getByText("No-role request")).toBeVisible();
   await expect(page.getByText(/Prior manager availability request without role is pending/)).toBeVisible();
+  await page.getByRole("button", { name: /show reasons/i }).first().click();
+  await expect(page.getByText("Role experience: 4 completed SND-PA jobs")).toBeVisible();
   await expect(page.getByText("Same Role Pending")).toHaveCount(0);
   await expect(page.getByText("Roleless Declined")).toHaveCount(0);
 
@@ -174,6 +179,7 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
           profile_id: "roleless-pending",
           phase: "availability",
           role: "SND-PA-T",
+          require_no_conflicts: true,
         }),
       }),
     ]),

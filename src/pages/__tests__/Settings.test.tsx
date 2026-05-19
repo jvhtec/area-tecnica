@@ -102,6 +102,10 @@ vi.mock("@/components/settings/DryHireFolderManager", () => ({
   DryHireFolderManager: () => <div>Dry hire</div>,
 }));
 
+vi.mock("@/components/settings/SkillRoleMappingManager", () => ({
+  SkillRoleMappingManager: () => <div>Skill role mappings</div>,
+}));
+
 vi.mock("@/components/CompanyLogoUploader", () => ({
   CompanyLogoUploader: () => <div>Company logo</div>,
 }));

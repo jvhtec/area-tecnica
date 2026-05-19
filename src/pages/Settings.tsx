@@ -30,6 +30,7 @@ import { PushNotificationSchedule } from '@/components/settings/PushNotification
 import { MorningSummarySubscription } from '@/components/settings/MorningSummarySubscription'
 import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
 import { DryHireFolderManager } from '@/components/settings/DryHireFolderManager'
+import { SkillRoleMappingManager } from '@/components/settings/SkillRoleMappingManager'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown } from "lucide-react"
 import { VersionDisplay } from "@/components/VersionDisplay"
@@ -226,6 +227,7 @@ const Settings = () => {
     'users': false,
     'company-settings': false,
     'dryhire-folders': false,
+    'skill-role-mappings': false,
     'version-info': false,
   });
 
@@ -487,6 +489,18 @@ const Settings = () => {
             </CollapsibleCard>
 
 
+
+            {isManagementUser && (
+              <CollapsibleCard
+                id="skill-role-mappings"
+                title="Skill catalog & role mappings"
+                description="Manage staffing skills and how they influence role-prefix recommendations."
+                isOpen={collapsibleStates['skill-role-mappings']}
+                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'skill-role-mappings': open }))}
+              >
+                <SkillRoleMappingManager />
+              </CollapsibleCard>
+            )}
 
             {isManagementUser && (
               <CollapsibleCard
