@@ -1200,7 +1200,7 @@ function JobCardNewFull({
 
     setIsGeneratingCrewReportPdf(true);
     try {
-      const { downloadProjectCrewReportPdf } = await import("@/utils/projectCrewReportPdf");
+      const { downloadProjectCrewReportPdf } = await import("@/utils/pdf/projectCrewReportPdf");
       const result = await downloadProjectCrewReportPdf(job);
 
       toast({
