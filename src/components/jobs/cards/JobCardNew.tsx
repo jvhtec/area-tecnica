@@ -216,6 +216,7 @@ function JobCardNewFull({
   const [routeSheetOpen, setRouteSheetOpen] = useState(false);
   const [taskManagerOpen, setTaskManagerOpen] = useState(false);
   const [isGeneratingTransportPdf, setIsGeneratingTransportPdf] = useState(false);
+  const [isGeneratingCrewReportPdf, setIsGeneratingCrewReportPdf] = useState(false);
 
   // Add folder creation loading state
   const [isCreatingFolders, setIsCreatingFolders] = useState(false);
@@ -319,6 +320,13 @@ function JobCardNewFull({
 
     return ['logistics', 'production', 'produccion', 'producción'].includes(normalizedDepartment);
   }, [currentUserDepartment, userRole]);
+
+  const canGenerateCrewReportPdf = React.useMemo(() => (
+    isProjectManagementPage &&
+    department === "production" &&
+    job.job_type !== "dryhire" &&
+    isManagementRole(userRole)
+  ), [department, isProjectManagementPage, job.job_type, userRole]);
 
   const {
     appliedBorderColor,
@@ -1186,6 +1194,31 @@ function JobCardNewFull({
     }
   }, [canGenerateTransportPdf, isGeneratingTransportPdf, job.id, job.start_time, job.title, toast]);
 
+  const handleGenerateCrewReportPdf = React.useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!canGenerateCrewReportPdf || isGeneratingCrewReportPdf) return;
+
+    setIsGeneratingCrewReportPdf(true);
+    try {
+      const { downloadProjectCrewReportPdf } = await import("@/utils/pdf/projectCrewReportPdf");
+      const result = await downloadProjectCrewReportPdf(job);
+
+      toast({
+        title: "PDF de personal generado",
+        description: `Informe creado con ${result.crewCount} persona${result.crewCount === 1 ? "" : "s"} asignada${result.crewCount === 1 ? "" : "s"}.`,
+      });
+    } catch (error) {
+      console.error("JobCardNew: Error generating crew report PDF:", error);
+      toast({
+        title: "Error al generar PDF",
+        description: "No se pudo generar el informe de personal para este trabajo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingCrewReportPdf(false);
+    }
+  }, [canGenerateCrewReportPdf, isGeneratingCrewReportPdf, job, toast]);
+
   // Show loading state if job is being deleted
   const cardOpacity = isJobBeingDeleted ? "opacity-50" : "";
   const pointerEvents = isJobBeingDeleted ? "pointer-events-none" : "";
@@ -1211,6 +1244,9 @@ function JobCardNewFull({
       canGenerateTransportPdf={canGenerateTransportPdf}
       isGeneratingTransportPdf={isGeneratingTransportPdf}
       handleGenerateTransportPdf={handleGenerateTransportPdf}
+      canGenerateCrewReportPdf={canGenerateCrewReportPdf}
+      isGeneratingCrewReportPdf={isGeneratingCrewReportPdf}
+      handleGenerateCrewReportPdf={handleGenerateCrewReportPdf}
       foldersAreCreated={foldersAreCreated}
       isFoldersLoading={isFoldersLoading}
       showUpload={showUpload}
