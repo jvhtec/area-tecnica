@@ -745,6 +745,9 @@ async function tickCampaign(
           const profileId = String(request.profile_id || '');
           if (!profileId) continue;
 
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
           try {
             const response = await fetch(SEND_STAFFING_EMAIL_URL, {
               method: 'POST',
@@ -764,6 +767,7 @@ async function tickCampaign(
                 actor_id: campaign.created_by || null,
                 idempotency_key: `campaign:${campaign_id}:${roleCode}:${profileId}:offer:auto:${autoChannel}`,
               }),
+              signal: controller.signal,
             });
 
             const payload = await response.json().catch(() => ({}));
@@ -798,6 +802,8 @@ async function tickCampaign(
               status: 'failed',
               error: err instanceof Error ? err.message : String(err),
             });
+          } finally {
+            clearTimeout(timeoutId);
           }
         }
       }

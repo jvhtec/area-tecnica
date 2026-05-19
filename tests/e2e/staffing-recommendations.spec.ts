@@ -239,7 +239,7 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
     p_role_code: "SND-PA-T",
   });
 
-  await page.getByRole("combobox").click();
+  await page.getByRole("combobox", { name: "Select availability channel" }).click();
   await page.getByRole("option", { name: "WhatsApp" }).click();
   await page.getByRole("checkbox", { name: /select all/i }).click();
   await page.getByRole("button", { name: /send availability/i }).click();

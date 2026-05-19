@@ -268,7 +268,10 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
         ) : riderFiles.length > 0 ? (
           <div className="space-y-2">
             {riderFiles.map((file) => (
-              <div key={file.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-muted rounded min-w-0">
+              <div
+                key={file.id}
+                className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-slate-50 dark:bg-[#0f1219] border border-slate-200 dark:border-[#1f232e] rounded min-w-0"
+              >
                 <div className="min-w-0 flex-1">
                   <p className="font-medium break-words">{file.file_name}</p>
                   <p className="text-sm text-muted-foreground break-words">

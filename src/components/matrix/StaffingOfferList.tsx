@@ -256,7 +256,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
             Send offers by
           </div>
           <Select value={channel} onValueChange={(value) => setChannel(value as StaffingChannel)}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger aria-label="Select offer channel" className="w-[160px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
