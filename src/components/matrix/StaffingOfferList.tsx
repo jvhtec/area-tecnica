@@ -53,77 +53,80 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
   const [selectedForOffer, setSelectedForOffer] = useState<Set<string>>(new Set())
   const [channel, setChannel] = useState<StaffingChannel>('email')
 
-  // Fetch availability responses for this role
+  // Availability responses are job-scoped, but the original send event carries
+  // manager intent for which role card should display the response.
   const { data: responses, isLoading } = useQuery({
     queryKey: queryKeys.scope('staffing_availability_responses', jobId, roleCode),
     queryFn: async () => {
-      const mapRequestToResponse = (item: any): AvailabilityResponse => {
-        const profiles = item.profiles || {}
-        const fullName = `${profiles.first_name || ''} ${profiles.last_name || ''}`.trim()
+      const { data: directRequests, error: directError } = await dataLayerClient.from('staffing_requests')
+        .select('id, profile_id, status, created_at, updated_at')
+        .eq('job_id', jobId)
+        .eq('phase', 'availability')
+        .order('updated_at', { ascending: false })
+
+      if (directError) throw directError
+
+      const requestRows = directRequests || []
+      const requestIds = requestRows.map((item: any) => item.id).filter(Boolean)
+      if (requestIds.length === 0) return []
+
+      const { data: sentEvents, error: sentEventsError } = await dataLayerClient.from('staffing_events')
+        .select('staffing_request_id, event, meta, created_at')
+        .in('staffing_request_id', requestIds)
+        .in('event', ['email_sent', 'whatsapp_sent'])
+        .order('created_at', { ascending: false })
+
+      if (sentEventsError) throw sentEventsError
+
+      const latestAvailabilityRoleByRequestId = new Map<string, string>()
+      ;[...(sentEvents || [])]
+        .sort((a: any, b: any) => (
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        ))
+        .forEach((event: any) => {
+        const requestId = String(event.staffing_request_id || '')
+        const meta = event?.meta || {}
+        if (!requestId || latestAvailabilityRoleByRequestId.has(requestId)) return
+        if (meta.phase !== 'availability' || !meta.role) return
+        latestAvailabilityRoleByRequestId.set(requestId, String(meta.role))
+      })
+
+      const latestRequestByProfileId = new Map<string, any>()
+      requestRows.forEach((item: any) => {
+        if (latestAvailabilityRoleByRequestId.get(String(item.id)) !== roleCode) return
+        const profileId = String(item.profile_id || '')
+        if (!profileId || latestRequestByProfileId.has(profileId)) return
+        latestRequestByProfileId.set(profileId, item)
+      })
+
+      const profileIds = Array.from(latestRequestByProfileId.keys())
+      if (profileIds.length === 0) return []
+
+      const { data: profiles, error: profilesError } = await dataLayerClient.from('profiles')
+        .select('id, first_name, last_name, nickname, email')
+        .in('id', profileIds)
+
+      if (profilesError) throw profilesError
+
+      const profilesById = new Map(
+        (profiles || []).map((profile: any) => [String(profile.id), profile])
+      )
+
+      return Array.from(latestRequestByProfileId.entries()).map(([profileId, item]) => {
+        const profile: any = profilesById.get(profileId) || {}
+        const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
         const respondedAt =
           item.status && String(item.status).toLowerCase() !== 'pending'
             ? (item.updated_at || item.created_at)
             : null
 
         return {
-          profile_id: item.profile_id,
-          full_name: fullName || profiles.nickname || 'Unknown',
+          profile_id: profileId,
+          full_name: fullName || profile.nickname || profile.email || 'Unknown',
           status: item.status,
-          responded_at: respondedAt
+          responded_at: respondedAt,
         } as AvailabilityResponse
-      }
-
-      const { data: directRequests, error: directError } = await dataLayerClient.from('staffing_requests')
-        .select('id, profile_id, status, role_code, created_at, updated_at, profiles(first_name,last_name,nickname)')
-        .eq('job_id', jobId)
-        .eq('phase', 'availability')
-        .eq('role_code', roleCode)
-        .order('updated_at', { ascending: false })
-
-      if (directError) throw directError
-
-      const directRows = (directRequests || [])
-        .filter((item: any) => String(item.role_code || '').trim() === roleCode)
-
-      const responsesByRequestId = new Map<string, AvailabilityResponse>()
-      directRows.forEach((item: any) => {
-        if (!item.id) return
-        responsesByRequestId.set(String(item.id), mapRequestToResponse(item))
       })
-
-      // Legacy rows may only have role information in staffing_events.meta.role.
-      const { data: sentEvents, error: sentError } = await dataLayerClient.from('staffing_events')
-        .select('staffing_request_id')
-        .in('event', ['email_sent', 'whatsapp_sent'])
-        .contains('meta', { phase: 'availability', role: roleCode })
-        .order('created_at', { ascending: false })
-        .limit(500)
-
-      if (sentError) throw sentError
-
-      const requestIds = Array.from(
-        new Set((sentEvents || []).map((e: any) => e.staffing_request_id).filter(Boolean))
-      ).filter((id) => !responsesByRequestId.has(String(id)))
-
-      if (requestIds.length === 0) {
-        return Array.from(responsesByRequestId.values())
-      }
-
-      const { data: legacyRequests, error } = await dataLayerClient.from('staffing_requests')
-        .select('id, profile_id, status, role_code, created_at, updated_at, profiles(first_name,last_name,nickname)')
-        .in('id', requestIds)
-        .eq('job_id', jobId)
-        .eq('phase', 'availability')
-        .order('updated_at', { ascending: false })
-
-      if (error) throw error
-
-      ;(legacyRequests || []).forEach((item: any) => {
-        if (!item.id) return
-        responsesByRequestId.set(String(item.id), mapRequestToResponse(item))
-      })
-
-      return Array.from(responsesByRequestId.values())
     }
   })
 
@@ -182,6 +185,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
       })
       setSelectedForOffer(new Set())
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_availability_responses', jobId, roleCode) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_availability_responses', jobId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_requests', jobId) })
     },
     onError: (error: any) => {
@@ -287,6 +291,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium text-sm">{response.full_name}</p>
                       <Badge className="bg-green-100 text-green-800">Availability yes</Badge>
+                      <Badge variant="outline">Job availability</Badge>
                     </div>
                     <p className="text-xs text-gray-600">
                       {response.responded_at
@@ -318,7 +323,10 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
                   className="flex items-center justify-between p-2 bg-white rounded"
                 >
                   <p className="text-sm font-medium">{response.full_name}</p>
-                  <Badge className="bg-yellow-100 text-yellow-800">Availability pending</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Job availability</Badge>
+                    <Badge className="bg-yellow-100 text-yellow-800">Availability pending</Badge>
+                  </div>
                 </div>
               ))}
             </div>
@@ -341,7 +349,10 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
                   className="flex items-center justify-between p-2 bg-white rounded"
                 >
                   <p className="text-sm font-medium">{response.full_name}</p>
-                  <Badge className="bg-red-100 text-red-800">Availability no</Badge>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="outline">Job availability</Badge>
+                    <Badge className="bg-red-100 text-red-800">Availability no</Badge>
+                  </div>
                 </div>
               ))}
             </div>

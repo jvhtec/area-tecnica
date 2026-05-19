@@ -184,7 +184,7 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
               return (
                 <div
                   key={doc.id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-[#0f1219] border border-[#1f232e] rounded min-w-0"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 bg-slate-50 dark:bg-[#0f1219] border border-slate-200 dark:border-[#1f232e] rounded min-w-0"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="font-medium flex items-center gap-2 break-words">
@@ -309,4 +309,3 @@ export const JobDetailsDocumentsTab: React.FC<JobDetailsDocumentsTabProps> = ({
     </TabsContent>
   );
 };
-

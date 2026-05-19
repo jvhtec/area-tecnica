@@ -96,6 +96,22 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
       "profiles": [
         { id: "roleless-pending", profile_picture_url: null },
         { id: "expired-same-role", profile_picture_url: null },
+        {
+          id: "confirmed-tech",
+          first_name: "Confirmed",
+          last_name: "Tech",
+          nickname: null,
+          email: "confirmed@example.com",
+          profile_picture_url: null,
+        },
+        {
+          id: "other-role-tech",
+          first_name: "Other",
+          last_name: "Role",
+          nickname: null,
+          email: "other@example.com",
+          profile_picture_url: null,
+        },
       ],
       "staffing_requests": [
         {
@@ -110,17 +126,53 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
           id: "availability-confirmed-1",
           job_id: "staffing-job-1",
           profile_id: "confirmed-tech",
-          role_code: "SND-PA-T",
+          role_code: null,
           phase: "availability",
           status: "confirmed",
           target_date: null,
           single_day: false,
           created_at: "2026-05-12T10:00:00.000Z",
           updated_at: "2026-05-12T10:10:00.000Z",
-          profiles: {
-            first_name: "Confirmed",
-            last_name: "Tech",
-            nickname: null,
+        },
+        {
+          id: "availability-confirmed-other-role",
+          job_id: "staffing-job-1",
+          profile_id: "other-role-tech",
+          role_code: null,
+          phase: "availability",
+          status: "confirmed",
+          target_date: null,
+          single_day: false,
+          created_at: "2026-05-12T10:00:00.000Z",
+          updated_at: "2026-05-12T10:12:00.000Z",
+        },
+      ],
+      "staffing_events": [
+        {
+          staffing_request_id: "availability-confirmed-1",
+          event: "email_sent",
+          created_at: "2026-05-12T09:55:00.000Z",
+          meta: {
+            phase: "availability",
+            role: "SND-FOH-R",
+          },
+        },
+        {
+          staffing_request_id: "availability-confirmed-1",
+          event: "whatsapp_sent",
+          created_at: "2026-05-12T10:00:00.000Z",
+          meta: {
+            phase: "availability",
+            role: "SND-PA-T",
+          },
+        },
+        {
+          staffing_request_id: "availability-confirmed-other-role",
+          event: "whatsapp_sent",
+          created_at: "2026-05-12T10:00:00.000Z",
+          meta: {
+            phase: "availability",
+            role: "SND-FOH-R",
           },
         },
       ],
@@ -197,11 +249,13 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
   await page.getByRole("tab", { name: "Offers" }).click();
   await expect(page.getByText("Availability: 1 yes")).toBeVisible();
   await expect(page.getByText("Confirmed Tech")).toBeVisible();
+  await expect(page.getByText("Other Role")).toHaveCount(0);
   await expect(page.getByText("Availability yes")).toBeVisible();
+  await expect(page.getByText("Job availability").first()).toBeVisible();
   await page.getByRole("checkbox", { name: /select confirmed tech for offer/i }).click();
   await page.getByRole("button", { name: /send offers \(1\) by email/i }).click();
 
-  expect(calls.functionCalls).toEqual(
+  await expect.poll(() => calls.functionCalls).toEqual(
     expect.arrayContaining([
       expect.objectContaining({
         name: "send-staffing-email",

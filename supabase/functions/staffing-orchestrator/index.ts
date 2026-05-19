@@ -598,7 +598,9 @@ async function tickCampaign(
     const requestIdToRole = new Map<string, string>();
     requestRows.forEach((request) => {
       const directRole = typeof request.role_code === 'string' ? request.role_code.trim() : '';
-      if (request.id && directRole) requestIdToRole.set(String(request.id), directRole);
+      if (request.id && request.phase !== 'availability' && directRole) {
+        requestIdToRole.set(String(request.id), directRole);
+      }
     });
 
     if (requestIds.length > 0) {
@@ -607,7 +609,7 @@ async function tickCampaign(
         .select('staffing_request_id, meta, created_at, event')
         .in('staffing_request_id', requestIds)
         .in('event', ['email_sent', 'whatsapp_sent'])
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false });
 
       if (sendEventsError) {
         return { status: 500, body: { error: sendEventsError.message } };
@@ -638,12 +640,13 @@ async function tickCampaign(
       };
     }
 
-    const confirmedAvailabilityByRole = new Map<string, any[]>();
+    const confirmedAvailabilityRowsForJob: any[] = [];
+    const confirmedAvailabilityByRequestedRole = new Map<string, any[]>();
     const offerRequestProfilesByRole = new Map<string, Set<string>>();
+    const offerRequestProfilesForJob = new Set<string>();
 
     for (const r of requestRows) {
       const roleCode = requestIdToRole.get(String(r.id));
-      if (!roleCode || !campaignRoleCodes.has(roleCode)) continue;
       const phase = String(r.phase || '') as 'availability' | 'offer';
       if (phase !== 'availability' && phase !== 'offer') continue;
 
@@ -651,14 +654,30 @@ async function tickCampaign(
       const profileId = String(r.profile_id || '');
       if (!profileId) continue;
 
+      if (phase === 'offer' && ['pending', 'confirmed', 'declined'].includes(status)) {
+        offerRequestProfilesForJob.add(profileId);
+      }
+
+      if (phase === 'availability') {
+        const availabilityRow = { ...r, requested_role_code: roleCode || null };
+        if (status === 'confirmed') {
+          confirmedAvailabilityRowsForJob.push(availabilityRow);
+          if (roleCode && campaignRoleCodes.has(roleCode)) {
+            const rows = confirmedAvailabilityByRequestedRole.get(roleCode) || [];
+            rows.push(availabilityRow);
+            confirmedAvailabilityByRequestedRole.set(roleCode, rows);
+          }
+        }
+        if (roleCode && campaignRoleCodes.has(roleCode) && status === 'pending') {
+          countsByRole[roleCode].availability.pending.add(profileId);
+        }
+        continue;
+      }
+
+      if (!campaignRoleCodes.has(roleCode)) continue;
+
       if (status === 'pending') countsByRole[roleCode][phase].pending.add(profileId);
       if (status === 'confirmed') countsByRole[roleCode][phase].confirmed.add(profileId);
-
-      if (phase === 'availability' && status === 'confirmed') {
-        const rows = confirmedAvailabilityByRole.get(roleCode) || [];
-        rows.push(r);
-        confirmedAvailabilityByRole.set(roleCode, rows);
-      }
 
       if (phase === 'offer' && ['pending', 'confirmed', 'declined'].includes(status)) {
         const profiles = offerRequestProfilesByRole.get(roleCode) || new Set<string>();
@@ -679,14 +698,23 @@ async function tickCampaign(
       const required = requiredByRole.get(roleCode) || 0;
       const assigned = assignedCounts.get(roleCode) || 0;
       const pendingAvailability = countsByRole[roleCode]?.availability.pending.size || 0;
-      const confirmedAvailability = countsByRole[roleCode]?.availability.confirmed.size || 0;
+      const matchingRequestedRole = confirmedAvailabilityByRequestedRole.get(roleCode) || [];
+      const confirmedAvailability = new Set(
+        matchingRequestedRole
+          .map((request: any) => String(request.profile_id || ''))
+          .filter(Boolean),
+      ).size;
       let pendingOffers = countsByRole[roleCode]?.offer.pending.size || 0;
       const acceptedOffers = countsByRole[roleCode]?.offer.confirmed.size || 0;
+      const hasConfirmedAvailabilityForRole = matchingRequestedRole.some((request: any) => {
+        const profileId = String(request.profile_id || '');
+        return profileId && !offerRequestProfilesForJob.has(profileId);
+      });
 
       let stage = 'idle';
       if (required <= 0 || assigned >= required) {
         stage = 'filled';
-      } else if (pendingOffers > 0 || acceptedOffers > 0 || confirmedAvailability > 0) {
+      } else if (pendingOffers > 0 || acceptedOffers > 0 || hasConfirmedAvailabilityForRole) {
         stage = 'offer';
       } else {
         stage = 'availability';
@@ -697,15 +725,19 @@ async function tickCampaign(
       if (shouldPrioritizeAssistedHandoff && stage === 'offer') {
         const capacity = Math.max(0, required - assigned - acceptedOffers - pendingOffers);
         const profilesWithOffer = offerRequestProfilesByRole.get(roleCode) || new Set<string>();
-        const confirmedAvailabilityRows = (confirmedAvailabilityByRole.get(roleCode) || [])
+        const confirmedAvailabilityRows = matchingRequestedRole
           .filter((request: any) => {
             const profileId = String(request.profile_id || '');
-            return profileId && !profilesWithOffer.has(profileId);
+            return profileId && !profilesWithOffer.has(profileId) && !offerRequestProfilesForJob.has(profileId);
           })
           .sort((a: any, b: any) => {
             const aTime = new Date(a.updated_at || 0).getTime();
             const bTime = new Date(b.updated_at || 0).getTime();
             return aTime - bTime;
+          })
+          .filter((request: any, index: number, rows: any[]) => {
+            const profileId = String(request.profile_id || '');
+            return rows.findIndex((row: any) => String(row.profile_id || '') === profileId) === index;
           })
           .slice(0, capacity);
 
@@ -748,6 +780,7 @@ async function tickCampaign(
             }
 
             profilesWithOffer.add(profileId);
+            offerRequestProfilesForJob.add(profileId);
             pendingOffers += 1;
             autoActions.push({
               role_code: roleCode,
