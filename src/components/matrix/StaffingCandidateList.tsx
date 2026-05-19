@@ -281,7 +281,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
       <CardHeader>
         <CardTitle>{roleCode} - Candidate Recommendations</CardTitle>
         <CardDescription>
-          Top {candidates.length} candidates ranked by skills, role experience, proximity, and reliability
+          Top {candidates.length} candidatos clasificados por habilidades, experiencia en el rol, proximidad y confiabilidad
         </CardDescription>
       </CardHeader>
 

@@ -31,7 +31,7 @@ vi.mock('@/hooks/use-toast', () => ({
   toast: (...args: any[]) => toastMock(...args),
 }))
 
-import { SkillRoleMappingManager } from '../SkillRoleMappingManager'
+import { SkillRoleMappingManager } from '@/components/settings/SkillRoleMappingManager'
 
 type SkillRow = {
   id: string
@@ -195,8 +195,8 @@ describe('SkillRoleMappingManager', () => {
     const user = userEvent.setup()
     const { state } = setup({ skills: [], userRole: 'admin' })
 
-    await user.type(screen.getByLabelText(/^Name$/), 'RF coordination')
-    await user.click(screen.getByRole('button', { name: /create/i }))
+    await user.type(screen.getByLabelText(/^Nombre$/), 'RF coordination')
+    await user.click(screen.getByRole('button', { name: /crear/i }))
 
     await waitFor(() => {
       expect(state.skills).toEqual(
@@ -220,7 +220,7 @@ describe('SkillRoleMappingManager', () => {
     })
 
     await screen.findByText('SND-FOH')
-    const addButton = screen.getByRole('button', { name: /add mapping/i })
+    const addButton = screen.getByRole('button', { name: /agregar mapeo/i })
     await waitFor(() => expect(addButton).toBeEnabled())
     await user.click(addButton)
 
@@ -250,7 +250,7 @@ describe('SkillRoleMappingManager', () => {
     })
 
     await screen.findByText('foh')
-    await user.click(screen.getByRole('button', { name: /remove snd-foh foh mapping/i }))
+    await user.click(screen.getByRole('button', { name: /eliminar mapeo snd-foh foh/i }))
 
     await waitFor(() => {
       expect(state.mappings).toHaveLength(0)
@@ -274,7 +274,7 @@ describe('SkillRoleMappingManager', () => {
     const lightMapping = screen.getByText('LGT-DIM')
     const mappingPanel = lightMapping.closest('.rounded-md')
     expect(mappingPanel).not.toBeNull()
-    expect(within(mappingPanel as HTMLElement).getByText('Read only')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /remove lgt-dim dimmer mapping/i })).toBeDisabled()
+    expect(within(mappingPanel as HTMLElement).getByText('Solo lectura')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /eliminar mapeo lgt-dim dimmer/i })).toBeDisabled()
   })
 })

@@ -56,9 +56,9 @@ const ROLE_PREFIX_DEPARTMENTS: Record<string, TechnicalDepartment> = {
 }
 
 export const WEIGHT_PRESETS = [
-  { label: 'Primary', value: 1 },
-  { label: 'Related', value: 0.6 },
-  { label: 'Bonus', value: 0.3 },
+  { label: 'Principal', value: 1 },
+  { label: 'Relacionada', value: 0.6 },
+  { label: 'Bono', value: 0.3 },
 ] as const
 
 const BASE_CATEGORY_OPTIONS = [
@@ -298,9 +298,9 @@ export function SkillRoleMappingManager() {
   const createSkillMutation = useMutation({
     mutationFn: async () => {
       const name = normalizeSkillName(newSkillName)
-      if (!name) throw new Error('Skill name is required')
+      if (!name) throw new Error('El nombre de la habilidad es obligatorio')
       if (!canManageSkillCategory(newSkillCategory, userRole, userDepartment)) {
-        throw new Error('You cannot create skills in that category')
+        throw new Error('No puedes crear habilidades en esa categoria')
       }
 
       const { error } = await dataLayerClient
@@ -317,12 +317,12 @@ export function SkillRoleMappingManager() {
       setNewSkillName('')
       setNewSkillActive(true)
       await invalidateCatalog()
-      toast({ title: 'Skill created' })
+      toast({ title: 'Habilidad creada' })
     },
     onError: (error) => {
       toast({
-        title: 'Skill not created',
-        description: error instanceof Error ? error.message : 'Unable to create skill',
+        title: 'No se pudo crear la habilidad',
+        description: error instanceof Error ? error.message : 'No se pudo crear la habilidad',
         variant: 'destructive',
       })
     },
@@ -331,15 +331,15 @@ export function SkillRoleMappingManager() {
   const updateSkillMutation = useMutation({
     mutationFn: async (skill: Skill) => {
       const draft = skillDrafts[skill.id]
-      if (!draft) throw new Error('No changes to save')
+      if (!draft) throw new Error('No hay cambios para guardar')
 
       const name = normalizeSkillName(draft.name)
-      if (!name) throw new Error('Skill name is required')
+      if (!name) throw new Error('El nombre de la habilidad es obligatorio')
       if (
         !canManageSkillCategory(skill.category, userRole, userDepartment)
         || !canManageSkillCategory(draft.category, userRole, userDepartment)
       ) {
-        throw new Error('You cannot edit skills in that category')
+        throw new Error('No puedes editar habilidades en esa categoria')
       }
 
       const { error } = await dataLayerClient
@@ -355,12 +355,12 @@ export function SkillRoleMappingManager() {
     },
     onSuccess: async () => {
       await invalidateCatalog()
-      toast({ title: 'Skill saved' })
+      toast({ title: 'Habilidad guardada' })
     },
     onError: (error) => {
       toast({
-        title: 'Skill not saved',
-        description: error instanceof Error ? error.message : 'Unable to update skill',
+        title: 'No se pudo guardar la habilidad',
+        description: error instanceof Error ? error.message : 'No se pudo actualizar la habilidad',
         variant: 'destructive',
       })
     },
@@ -372,15 +372,15 @@ export function SkillRoleMappingManager() {
       const rolePrefix = selectedRolePrefix.trim().toUpperCase()
       const weight = Number(selectedWeight)
 
-      if (!rolePrefix || !skillName) throw new Error('Choose a role prefix and skill')
-      if (!Number.isFinite(weight) || weight <= 0) throw new Error('Choose a valid mapping weight')
+      if (!rolePrefix || !skillName) throw new Error('Elige un prefijo de rol y una habilidad')
+      if (!Number.isFinite(weight) || weight <= 0) throw new Error('Elige un peso valido para el mapeo')
       if (!canManageRolePrefix(rolePrefix, userRole, userDepartment)) {
-        throw new Error('You cannot manage that role prefix')
+        throw new Error('No puedes gestionar ese prefijo de rol')
       }
 
       const skill = skillByName.get(skillName)
       if (!skill || !canManageSkillCategory(skill.category, userRole, userDepartment)) {
-        throw new Error('You cannot map that skill')
+        throw new Error('No puedes mapear esa habilidad')
       }
 
       const { error } = await dataLayerClient
@@ -395,12 +395,12 @@ export function SkillRoleMappingManager() {
     },
     onSuccess: async () => {
       await invalidateCatalog()
-      toast({ title: 'Mapping added' })
+      toast({ title: 'Mapeo agregado' })
     },
     onError: (error) => {
       toast({
-        title: 'Mapping not added',
-        description: error instanceof Error ? error.message : 'Unable to add mapping',
+        title: 'No se pudo agregar el mapeo',
+        description: error instanceof Error ? error.message : 'No se pudo agregar el mapeo',
         variant: 'destructive',
       })
     },
@@ -408,8 +408,8 @@ export function SkillRoleMappingManager() {
 
   const updateMappingWeightMutation = useMutation({
     mutationFn: async ({ mapping, weight }: { mapping: RoleSkillMapping; weight: number }) => {
-      if (!canEditMapping(mapping)) throw new Error('You cannot edit that mapping')
-      if (!Number.isFinite(weight) || weight <= 0) throw new Error('Choose a valid mapping weight')
+      if (!canEditMapping(mapping)) throw new Error('No puedes editar ese mapeo')
+      if (!Number.isFinite(weight) || weight <= 0) throw new Error('Elige un peso valido para el mapeo')
 
       const { error } = await dataLayerClient
         .from('role_skill_mapping')
@@ -420,12 +420,12 @@ export function SkillRoleMappingManager() {
     },
     onSuccess: async () => {
       await invalidateCatalog()
-      toast({ title: 'Mapping saved' })
+      toast({ title: 'Mapeo guardado' })
     },
     onError: (error) => {
       toast({
-        title: 'Mapping not saved',
-        description: error instanceof Error ? error.message : 'Unable to update mapping',
+        title: 'No se pudo guardar el mapeo',
+        description: error instanceof Error ? error.message : 'No se pudo actualizar el mapeo',
         variant: 'destructive',
       })
     },
@@ -433,7 +433,7 @@ export function SkillRoleMappingManager() {
 
   const removeMappingMutation = useMutation({
     mutationFn: async (mapping: RoleSkillMapping) => {
-      if (!canEditMapping(mapping)) throw new Error('You cannot remove that mapping')
+      if (!canEditMapping(mapping)) throw new Error('No puedes eliminar ese mapeo')
 
       const { error } = await dataLayerClient
         .from('role_skill_mapping')
@@ -444,12 +444,12 @@ export function SkillRoleMappingManager() {
     },
     onSuccess: async () => {
       await invalidateCatalog()
-      toast({ title: 'Mapping removed' })
+      toast({ title: 'Mapeo eliminado' })
     },
     onError: (error) => {
       toast({
-        title: 'Mapping not removed',
-        description: error instanceof Error ? error.message : 'Unable to remove mapping',
+        title: 'No se pudo eliminar el mapeo',
+        description: error instanceof Error ? error.message : 'No se pudo eliminar el mapeo',
         variant: 'destructive',
       })
     },
@@ -481,7 +481,7 @@ export function SkillRoleMappingManager() {
     <div className="space-y-5">
       <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
         <div className="space-y-1.5">
-          <Label htmlFor="new-skill-name">Name</Label>
+          <Label htmlFor="new-skill-name">Nombre</Label>
           <Input
             id="new-skill-name"
             value={newSkillName}
@@ -490,7 +490,7 @@ export function SkillRoleMappingManager() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="new-skill-category">Category</Label>
+          <Label htmlFor="new-skill-category">Categoria</Label>
           <Select value={newSkillCategory} onValueChange={setNewSkillCategory}>
             <SelectTrigger id="new-skill-category">
               <SelectValue />
@@ -510,7 +510,7 @@ export function SkillRoleMappingManager() {
             checked={newSkillActive}
             onCheckedChange={setNewSkillActive}
           />
-          <Label htmlFor="new-skill-active">Active</Label>
+          <Label htmlFor="new-skill-active">Activa</Label>
         </div>
         <Button
           type="button"
@@ -519,18 +519,18 @@ export function SkillRoleMappingManager() {
           disabled={createSkillMutation.isPending || !newSkillName.trim()}
         >
           <Plus className="mr-2 h-4 w-4" />
-          Create
+          Crear
         </Button>
       </div>
 
       <div className="rounded-md border">
-        <div className="border-b px-3 py-2 text-sm font-medium">Skills</div>
+        <div className="border-b px-3 py-2 text-sm font-medium">Habilidades</div>
         <div className="max-h-96 divide-y overflow-y-auto">
           {isLoading && (
-            <div className="px-3 py-3 text-sm text-muted-foreground">Loading skills...</div>
+            <div className="px-3 py-3 text-sm text-muted-foreground">Cargando habilidades...</div>
           )}
           {!isLoading && skills.length === 0 && (
-            <div className="px-3 py-3 text-sm text-muted-foreground">No skills found.</div>
+            <div className="px-3 py-3 text-sm text-muted-foreground">No hay habilidades.</div>
           )}
           {skills.map((skill) => {
             const draft = skillDrafts[skill.id] ?? {
@@ -544,7 +544,7 @@ export function SkillRoleMappingManager() {
             return (
               <div key={skill.id} className="grid gap-2 px-3 py-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
                 <Input
-                  aria-label={`${skill.name} skill name`}
+                  aria-label={`${skill.name} nombre de habilidad`}
                   value={draft.name}
                   onChange={(event) => updateSkillDraft(skill.id, { name: event.target.value })}
                   disabled={!canEditSkill}
@@ -554,7 +554,7 @@ export function SkillRoleMappingManager() {
                   onValueChange={(value) => updateSkillDraft(skill.id, { category: value })}
                   disabled={!canManageSkillCategory(skill.category, userRole, userDepartment)}
                 >
-                  <SelectTrigger aria-label={`${skill.name} category`}>
+                  <SelectTrigger aria-label={`${skill.name} categoria`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -573,7 +573,7 @@ export function SkillRoleMappingManager() {
                     disabled={!canEditSkill}
                   />
                   <Label htmlFor={`skill-active-${skill.id}`} className="text-sm">
-                    Active
+                    Activa
                   </Label>
                 </div>
                 <Button
@@ -583,7 +583,7 @@ export function SkillRoleMappingManager() {
                   disabled={!canEditSkill || updateSkillMutation.isPending}
                 >
                   <Save className="mr-2 h-4 w-4" />
-                  Save
+                  Guardar
                 </Button>
               </div>
             )
@@ -593,7 +593,7 @@ export function SkillRoleMappingManager() {
 
       <div className="grid gap-3 rounded-md border p-3 [grid-template-columns:repeat(auto-fit,minmax(150px,1fr))]">
         <div className="space-y-1.5">
-          <Label htmlFor="mapping-role-prefix">Role prefix</Label>
+          <Label htmlFor="mapping-role-prefix">Prefijo de rol</Label>
           <Select value={selectedRolePrefix} onValueChange={setSelectedRolePrefix}>
             <SelectTrigger id="mapping-role-prefix">
               <SelectValue />
@@ -608,7 +608,7 @@ export function SkillRoleMappingManager() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="mapping-skill">Skill</Label>
+          <Label htmlFor="mapping-skill">Habilidad</Label>
           <Select value={selectedSkillName} onValueChange={setSelectedSkillName}>
             <SelectTrigger id="mapping-skill">
               <SelectValue />
@@ -623,7 +623,7 @@ export function SkillRoleMappingManager() {
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="mapping-weight">Weight</Label>
+          <Label htmlFor="mapping-weight">Peso</Label>
           <Select value={selectedWeight} onValueChange={setSelectedWeight}>
             <SelectTrigger id="mapping-weight">
               <SelectValue />
@@ -649,7 +649,7 @@ export function SkillRoleMappingManager() {
           }
         >
           <Link2 className="mr-2 h-4 w-4" />
-          Add mapping
+          Agregar mapeo
         </Button>
       </div>
 
@@ -672,12 +672,12 @@ export function SkillRoleMappingManager() {
                         <Badge variant="secondary">{option.prefix}</Badge>
                         <span className="text-sm font-medium">{option.label}</span>
                         {!canManagePrefix && userRole !== 'admin' && (
-                          <Badge variant="outline">Read only</Badge>
+                          <Badge variant="outline">Solo lectura</Badge>
                         )}
                       </div>
                       <div className="space-y-2">
                         {prefixMappings.length === 0 && (
-                          <p className="text-sm text-muted-foreground">No mapped skills.</p>
+                          <p className="text-sm text-muted-foreground">Sin habilidades mapeadas.</p>
                         )}
                         {prefixMappings.map((mapping) => {
                           const canEdit = canEditMapping(mapping)
@@ -691,7 +691,7 @@ export function SkillRoleMappingManager() {
                             >
                               <div className="min-w-0">
                                 <div className="truncate text-sm font-medium">{mapping.skill_name}</div>
-                                <div className="text-xs text-muted-foreground">Weight {mapping.weight}</div>
+                                <div className="text-xs text-muted-foreground">Peso {mapping.weight}</div>
                               </div>
                               <Select
                                 value={currentWeight}
@@ -701,12 +701,12 @@ export function SkillRoleMappingManager() {
                                 })}
                                 disabled={!canEdit || updateMappingWeightMutation.isPending}
                               >
-                                <SelectTrigger aria-label={`${mapping.role_prefix} ${mapping.skill_name} weight`}>
+                                <SelectTrigger aria-label={`${mapping.role_prefix} ${mapping.skill_name} peso`}>
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
                                   {hasCustomWeight && (
-                                    <SelectItem value={currentWeight}>Custom {currentWeight}</SelectItem>
+                                    <SelectItem value={currentWeight}>Personalizado {currentWeight}</SelectItem>
                                   )}
                                   {WEIGHT_PRESETS.map((preset) => (
                                     <SelectItem key={preset.value} value={String(preset.value)}>
@@ -719,7 +719,7 @@ export function SkillRoleMappingManager() {
                                 type="button"
                                 variant="outline"
                                 size="icon"
-                                aria-label={`Remove ${mapping.role_prefix} ${mapping.skill_name} mapping`}
+                                aria-label={`Eliminar mapeo ${mapping.role_prefix} ${mapping.skill_name}`}
                                 onClick={() => removeMappingMutation.mutate(mapping)}
                                 disabled={!canEdit || removeMappingMutation.isPending}
                               >

@@ -493,8 +493,8 @@ const Settings = () => {
             {isManagementUser && (
               <CollapsibleCard
                 id="skill-role-mappings"
-                title="Skill catalog & role mappings"
-                description="Manage staffing skills and how they influence role-prefix recommendations."
+                title="Catalogo de habilidades y mapeos de rol"
+                description="Gestiona habilidades de staffing y como influyen en las recomendaciones por prefijo de rol."
                 isOpen={collapsibleStates['skill-role-mappings']}
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'skill-role-mappings': open }))}
               >
