@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { useReducedMotion } from "framer-motion";
-import { ChevronDown, ChevronRight, Download, Eye } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Eye, FileText, Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -56,6 +56,9 @@ export interface JobCardNewViewProps {
   canGenerateTransportPdf: boolean;
   isGeneratingTransportPdf: boolean;
   handleGenerateTransportPdf: (e: React.MouseEvent) => void;
+  canGenerateCrewReportPdf: boolean;
+  isGeneratingCrewReportPdf: boolean;
+  handleGenerateCrewReportPdf: (e: React.MouseEvent) => void;
 
   foldersAreCreated: boolean;
   isFoldersLoading: boolean;
@@ -167,6 +170,9 @@ export function JobCardNewView({
   canGenerateTransportPdf,
   isGeneratingTransportPdf,
   handleGenerateTransportPdf,
+  canGenerateCrewReportPdf,
+  isGeneratingCrewReportPdf,
+  handleGenerateCrewReportPdf,
   foldersAreCreated,
   isFoldersLoading,
   showUpload,
@@ -328,8 +334,8 @@ export function JobCardNewView({
           userRole={userRole}
         />
 
-        <div className="flex items-center justify-between px-6">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 px-6">
+          <div className="flex flex-wrap items-center gap-2">
             {isProjectManagementPage && job.job_type !== "dryhire" && (
               <button
                 type="button"
@@ -353,6 +359,24 @@ export function JobCardNewView({
               >
                 {isGeneratingTransportPdf ? "Generando PDF..." : "Hoja de Transportes PDF"}
               </button>
+            )}
+            {canGenerateCrewReportPdf && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleGenerateCrewReportPdf}
+                disabled={isGeneratingCrewReportPdf}
+                className="h-7 gap-1.5 px-3 text-xs"
+                title="Generar informe PDF de personal"
+              >
+                {isGeneratingCrewReportPdf ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <FileText className="h-3.5 w-3.5" />
+                )}
+                <span>{isGeneratingCrewReportPdf ? "Generando..." : "Personal PDF"}</span>
+              </Button>
             )}
             {job.job_type === "dryhire" && <Badge variant="destructive">RECOGIDA CLIENTE</Badge>}
             <div className="flex-1" />
