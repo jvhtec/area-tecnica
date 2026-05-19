@@ -3,6 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SEND_STAFFING_EMAIL_URL = Deno.env.get("SEND_STAFFING_EMAIL_URL") ||
+  `${SUPABASE_URL}/functions/v1/send-staffing-email`;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,6 +28,8 @@ interface CampaignPolicy {
   exclude_fridge: boolean;
   soft_conflict_policy: 'warn' | 'block' | 'allow';
   tick_interval_seconds: number;
+  channel?: 'email' | 'whatsapp';
+  assisted_handoff_priority?: boolean;
   escalation_steps: string[];
 }
 
@@ -561,7 +565,7 @@ async function tickCampaign(
         .eq('job_id', campaign.job_id),
       supabase
         .from('staffing_requests')
-        .select('id, profile_id, phase, status, batch_id')
+        .select('id, profile_id, phase, status, batch_id, role_code, updated_at')
         .eq('job_id', campaign.job_id)
         .in('phase', ['availability', 'offer']),
     ]);
@@ -592,6 +596,10 @@ async function tickCampaign(
     const requestRows = (requests || []) as any[];
     const requestIds = requestRows.map((r) => r.id).filter(Boolean) as string[];
     const requestIdToRole = new Map<string, string>();
+    requestRows.forEach((request) => {
+      const directRole = typeof request.role_code === 'string' ? request.role_code.trim() : '';
+      if (request.id && directRole) requestIdToRole.set(String(request.id), directRole);
+    });
 
     if (requestIds.length > 0) {
       const { data: sendEvents, error: sendEventsError } = await supabase
@@ -608,6 +616,7 @@ async function tickCampaign(
       (sendEvents || []).forEach((evt: any) => {
         const role = (evt?.meta as any)?.role;
         if (!evt?.staffing_request_id || !role) return;
+        if (requestIdToRole.has(String(evt.staffing_request_id))) return;
         requestIdToRole.set(String(evt.staffing_request_id), String(role));
       });
     }
@@ -629,6 +638,9 @@ async function tickCampaign(
       };
     }
 
+    const confirmedAvailabilityByRole = new Map<string, any[]>();
+    const offerRequestProfilesByRole = new Map<string, Set<string>>();
+
     for (const r of requestRows) {
       const roleCode = requestIdToRole.get(String(r.id));
       if (!roleCode || !campaignRoleCodes.has(roleCode)) continue;
@@ -641,10 +653,26 @@ async function tickCampaign(
 
       if (status === 'pending') countsByRole[roleCode][phase].pending.add(profileId);
       if (status === 'confirmed') countsByRole[roleCode][phase].confirmed.add(profileId);
+
+      if (phase === 'availability' && status === 'confirmed') {
+        const rows = confirmedAvailabilityByRole.get(roleCode) || [];
+        rows.push(r);
+        confirmedAvailabilityByRole.set(roleCode, rows);
+      }
+
+      if (phase === 'offer' && ['pending', 'confirmed', 'declined'].includes(status)) {
+        const profiles = offerRequestProfilesByRole.get(roleCode) || new Set<string>();
+        profiles.add(profileId);
+        offerRequestProfilesByRole.set(roleCode, profiles);
+      }
     }
 
     const updates = [];
+    const autoActions: Array<{ role_code: string; profile_id: string; phase: string; channel: string; status: string; error?: string }> = [];
     let allFilled = true;
+    const policy = (campaign.policy || {}) as CampaignPolicy;
+    const autoChannel = policy.channel === 'whatsapp' ? 'whatsapp' : 'email';
+    const shouldPrioritizeAssistedHandoff = campaign.mode === 'auto' && policy.assisted_handoff_priority !== false;
 
     for (const role of (campaignRoles || []) as any[]) {
       const roleCode = String(role.role_code).trim();
@@ -652,19 +680,94 @@ async function tickCampaign(
       const assigned = assignedCounts.get(roleCode) || 0;
       const pendingAvailability = countsByRole[roleCode]?.availability.pending.size || 0;
       const confirmedAvailability = countsByRole[roleCode]?.availability.confirmed.size || 0;
-      const pendingOffers = countsByRole[roleCode]?.offer.pending.size || 0;
+      let pendingOffers = countsByRole[roleCode]?.offer.pending.size || 0;
       const acceptedOffers = countsByRole[roleCode]?.offer.confirmed.size || 0;
 
       let stage = 'idle';
       if (required <= 0 || assigned >= required) {
         stage = 'filled';
-      } else if (pendingOffers > 0 || acceptedOffers > 0 || confirmedAvailability >= required) {
+      } else if (pendingOffers > 0 || acceptedOffers > 0 || confirmedAvailability > 0) {
         stage = 'offer';
       } else {
         stage = 'availability';
       }
 
       if (stage !== 'filled') allFilled = false;
+
+      if (shouldPrioritizeAssistedHandoff && stage === 'offer') {
+        const capacity = Math.max(0, required - assigned - acceptedOffers - pendingOffers);
+        const profilesWithOffer = offerRequestProfilesByRole.get(roleCode) || new Set<string>();
+        const confirmedAvailabilityRows = (confirmedAvailabilityByRole.get(roleCode) || [])
+          .filter((request: any) => {
+            const profileId = String(request.profile_id || '');
+            return profileId && !profilesWithOffer.has(profileId);
+          })
+          .sort((a: any, b: any) => {
+            const aTime = new Date(a.updated_at || 0).getTime();
+            const bTime = new Date(b.updated_at || 0).getTime();
+            return aTime - bTime;
+          })
+          .slice(0, capacity);
+
+        for (const request of confirmedAvailabilityRows) {
+          const profileId = String(request.profile_id || '');
+          if (!profileId) continue;
+
+          try {
+            const response = await fetch(SEND_STAFFING_EMAIL_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${SERVICE_ROLE}`,
+                'apikey': SERVICE_ROLE,
+              },
+              body: JSON.stringify({
+                job_id: campaign.job_id,
+                profile_id: profileId,
+                phase: 'offer',
+                role: roleCode,
+                message: campaign.offer_message || null,
+                channel: autoChannel,
+                require_no_conflicts: true,
+                actor_id: campaign.created_by || null,
+                idempotency_key: `campaign:${campaign_id}:${roleCode}:${profileId}:offer:auto:${autoChannel}`,
+              }),
+            });
+
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              autoActions.push({
+                role_code: roleCode,
+                profile_id: profileId,
+                phase: 'offer',
+                channel: autoChannel,
+                status: 'failed',
+                error: payload?.error || `HTTP ${response.status}`,
+              });
+              continue;
+            }
+
+            profilesWithOffer.add(profileId);
+            pendingOffers += 1;
+            autoActions.push({
+              role_code: roleCode,
+              profile_id: profileId,
+              phase: 'offer',
+              channel: autoChannel,
+              status: 'sent',
+            });
+          } catch (err) {
+            autoActions.push({
+              role_code: roleCode,
+              profile_id: profileId,
+              phase: 'offer',
+              channel: autoChannel,
+              status: 'failed',
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+      }
 
       updates.push({
         id: role.id,
@@ -724,6 +827,7 @@ async function tickCampaign(
         campaign_id,
         tick_completed: true,
         roles_processed: updates.length,
+        auto_actions: autoActions,
         all_filled: allFilled,
         next_run_at: nextRun?.toISOString() || null,
       },

@@ -13,12 +13,14 @@ import { queryKeys } from "@/lib/react-query";
 interface StaffingAutoModePanelProps {
   campaign: any
   campaignRoles: any[]
+  requiredByRole?: Map<string, number>
   onStatusChange?: () => void
 }
 
 export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
   campaign,
   campaignRoles,
+  requiredByRole,
   onStatusChange
 }) => {
   const { toast } = useToast()
@@ -252,59 +254,64 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {campaignRoles.map((role: any) => (
-                <div
-                  key={role.id}
-                  className="p-3 bg-gray-50 rounded border border-gray-200"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">{getStageIcon(role.stage)}</span>
-                      <p className="font-semibold text-sm">{role.role_code}</p>
-                    </div>
-                    <Badge
-                      className={`text-xs ${
-                        role.stage === 'filled'
-                          ? 'bg-green-100 text-green-800'
-                          : role.stage === 'offer'
-                            ? 'bg-blue-100 text-blue-800'
-                            : role.stage === 'availability'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-gray-100 text-gray-800'
-                      }`}
-                    >
-                      {role.stage}
-                    </Badge>
-                  </div>
+              {campaignRoles.map((role: any) => {
+                const requiredCount = requiredByRole?.get(role.role_code) ?? 0
 
-                  {/* Counters */}
-                  <div className="grid grid-cols-4 gap-2 text-xs">
-                    <div className="bg-white p-1 rounded text-center">
-                      <p className="text-gray-600">Assigned</p>
-                      <p className="font-bold">{role.assigned_count}</p>
+                return (
+                  <div
+                    key={role.id}
+                    className="p-3 bg-gray-50 rounded border border-gray-200"
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{getStageIcon(role.stage)}</span>
+                        <p className="font-semibold text-sm">{role.role_code}</p>
+                        <Badge variant="outline" className="text-xs">Required {requiredCount}</Badge>
+                      </div>
+                      <Badge
+                        className={`text-xs ${
+                          role.stage === 'filled'
+                            ? 'bg-green-100 text-green-800'
+                            : role.stage === 'offer'
+                              ? 'bg-blue-100 text-blue-800'
+                              : role.stage === 'availability'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {role.stage}
+                      </Badge>
                     </div>
-                    <div className="bg-white p-1 rounded text-center">
-                      <p className="text-gray-600">Avail ✓</p>
-                      <p className="font-bold">{role.confirmed_availability}</p>
-                    </div>
-                    <div className="bg-white p-1 rounded text-center">
-                      <p className="text-gray-600">Offers ⧐</p>
-                      <p className="font-bold">{role.pending_offers}</p>
-                    </div>
-                    <div className="bg-white p-1 rounded text-center">
-                      <p className="text-gray-600">Accept ✓</p>
-                      <p className="font-bold">{role.accepted_offers}</p>
-                    </div>
-                  </div>
 
-                  {/* Last wave info */}
-                  {role.last_wave_at && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Wave {role.wave_number} at {format(new Date(role.last_wave_at), 'HH:mm')}
-                    </p>
-                  )}
-                </div>
-              ))}
+                    {/* Counters */}
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                      <div className="bg-white p-1 rounded text-center">
+                        <p className="text-gray-600">Assigned</p>
+                        <p className="font-bold">{role.assigned_count}/{requiredCount || '—'}</p>
+                      </div>
+                      <div className="bg-white p-1 rounded text-center">
+                        <p className="text-gray-600">Avail ✓</p>
+                        <p className="font-bold">{role.confirmed_availability}</p>
+                      </div>
+                      <div className="bg-white p-1 rounded text-center">
+                        <p className="text-gray-600">Offers ⧐</p>
+                        <p className="font-bold">{role.pending_offers}</p>
+                      </div>
+                      <div className="bg-white p-1 rounded text-center">
+                        <p className="text-gray-600">Accept ✓</p>
+                        <p className="font-bold">{role.accepted_offers}</p>
+                      </div>
+                    </div>
+
+                    {/* Last wave info */}
+                    {role.last_wave_at && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        Wave {role.wave_number} at {format(new Date(role.last_wave_at), 'HH:mm')}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </CardContent>
         </Card>

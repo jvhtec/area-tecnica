@@ -145,6 +145,16 @@ async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Re
   }
 }
 
+function isServiceRoleRequest(req: Request): boolean {
+  const authHeader = req.headers.get('Authorization') || '';
+  const apikey = req.headers.get('apikey') || '';
+  const token = authHeader.startsWith('Bearer ')
+    ? authHeader.slice('Bearer '.length).trim()
+    : '';
+
+  return token === SERVICE_ROLE || apikey === SERVICE_ROLE;
+}
+
 function b64url(u8: Uint8Array) {
   return btoa(String.fromCharCode(...u8)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
@@ -159,8 +169,11 @@ serve(async (req) => {
   
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
-    const actorId = await resolveActorId(supabase, req);
+    let actorId = await resolveActorId(supabase, req);
     const body = await req.json();
+    if (!actorId && isServiceRoleRequest(req) && typeof body?.actor_id === 'string') {
+      actorId = body.actor_id;
+    }
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
 
     const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, require_no_conflicts, idempotency_key } = body;

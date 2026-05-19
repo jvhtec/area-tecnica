@@ -85,8 +85,8 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
           campaign_id: "campaign-1",
           role_code: "SND-PA-T",
           assigned_count: 0,
-          pending_availability: 0,
-          confirmed_availability: 0,
+          pending_availability: 1,
+          confirmed_availability: 1,
           pending_offers: 0,
           accepted_offers: 0,
           stage: "availability",
@@ -105,6 +105,23 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
           target_date: null,
           single_day: false,
           updated_at: "2026-05-12T10:05:00.000Z",
+        },
+        {
+          id: "availability-confirmed-1",
+          job_id: "staffing-job-1",
+          profile_id: "confirmed-tech",
+          role_code: "SND-PA-T",
+          phase: "availability",
+          status: "confirmed",
+          target_date: null,
+          single_day: false,
+          created_at: "2026-05-12T10:00:00.000Z",
+          updated_at: "2026-05-12T10:10:00.000Z",
+          profiles: {
+            first_name: "Confirmed",
+            last_name: "Tech",
+            nickname: null,
+          },
         },
       ],
     },
@@ -146,9 +163,14 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
 
   await page.getByRole("button", { name: /ver recordatorio de staffing/i }).click();
   await page.getByRole("button", { name: "Auto staffing" }).click();
+  await expect(page.getByText("Required 2")).toBeVisible();
+  await expect(page.getByText("0/2 assigned")).toBeVisible();
+
   await page.getByRole("tab", { name: "Candidates" }).click();
 
   await expect(page.getByText("SND-PA-T - Candidate Recommendations")).toBeVisible();
+  await expect(page.getByText("1 available")).toBeVisible();
+  await expect(page.getByText("1 pending")).toBeVisible();
   await expect(page.getByText("Roleless Pending")).toBeVisible();
   await expect(page.getByText("Expired Same Role")).toBeVisible();
   await expect(page.getByText("No-role request")).toBeVisible();
@@ -165,10 +187,19 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
     p_role_code: "SND-PA-T",
   });
 
+  await page.getByRole("combobox").click();
+  await page.getByRole("option", { name: "WhatsApp" }).click();
   await page.getByRole("checkbox", { name: /select all/i }).click();
   await page.getByRole("button", { name: /send availability/i }).click();
 
   await expect(page.getByText("No candidates available for SND-PA-T")).toBeVisible();
+
+  await page.getByRole("tab", { name: "Offers" }).click();
+  await expect(page.getByText("Availability: 1 yes")).toBeVisible();
+  await expect(page.getByText("Confirmed Tech")).toBeVisible();
+  await expect(page.getByText("Availability yes")).toBeVisible();
+  await page.getByRole("checkbox", { name: /select confirmed tech for offer/i }).click();
+  await page.getByRole("button", { name: /send offers \(1\) by email/i }).click();
 
   expect(calls.functionCalls).toEqual(
     expect.arrayContaining([
@@ -179,7 +210,18 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
           profile_id: "roleless-pending",
           phase: "availability",
           role: "SND-PA-T",
+          channel: "whatsapp",
           require_no_conflicts: true,
+        }),
+      }),
+      expect.objectContaining({
+        name: "send-staffing-email",
+        body: expect.objectContaining({
+          job_id: "staffing-job-1",
+          profile_id: "confirmed-tech",
+          phase: "offer",
+          role: "SND-PA-T",
+          channel: "email",
         }),
       }),
     ]),

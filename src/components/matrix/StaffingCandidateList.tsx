@@ -5,9 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
-import { Info } from 'lucide-react'
+import { Info, Mail, MessageCircle } from 'lucide-react'
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -17,7 +18,13 @@ interface StaffingCandidateListProps {
   jobId: string
   department: string
   policy: any
+  requiredCount?: number
+  assignedCount?: number
+  confirmedAvailability?: number
+  pendingAvailability?: number
 }
+
+type StaffingChannel = 'email' | 'whatsapp'
 
 interface Candidate {
   profile_id: string
@@ -69,12 +76,17 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   roleCode,
   jobId,
   department,
-  policy
+  policy,
+  requiredCount = 0,
+  assignedCount = 0,
+  confirmedAvailability = 0,
+  pendingAvailability = 0
 }) => {
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set())
   const [expandedReasons, setExpandedReasons] = useState<string | null>(null)
+  const [channel, setChannel] = useState<StaffingChannel>('email')
 
   // Fetch ranked candidates
   const { data: candidates, isLoading } = useQuery({
@@ -185,8 +197,9 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
               profile_id: profileId,
               phase: 'availability',
               role: roleCode,
+              channel,
               require_no_conflicts: true,
-              idempotency_key: `campaign:${campaignId}:${roleCode}:${profileId}:availability`
+              idempotency_key: `campaign:${campaignId}:${roleCode}:${profileId}:availability:${channel}`
             })
           }
         )
@@ -210,7 +223,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
     onSuccess: (data: any) => {
       toast({
         title: 'Availability sent',
-        description: `Contacted ${data?.sent ?? selectedCandidates.size} candidates`
+        description: `Contacted ${data?.sent ?? selectedCandidates.size} candidates by ${channel}`
       })
       setSelectedCandidates(new Set())
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_requests', jobId) })
@@ -256,10 +269,22 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
     }
   }
 
+  const roleSummary = (
+    <div className="flex flex-wrap gap-2 pt-2">
+      <Badge variant="outline">Required {requiredCount}</Badge>
+      <Badge variant="secondary">{assignedCount}/{requiredCount || '—'} assigned</Badge>
+      <Badge variant="outline">{confirmedAvailability} available</Badge>
+      {pendingAvailability > 0 && (
+        <Badge variant="outline">{pendingAvailability} pending</Badge>
+      )}
+    </div>
+  )
+
   if (isLoading) {
     return (
       <Card>
         <CardContent className="pt-6">
+          {roleSummary}
           <p className="text-muted-foreground">Loading candidates...</p>
         </CardContent>
       </Card>
@@ -270,6 +295,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
     return (
       <Card>
         <CardContent className="pt-6">
+          {roleSummary}
           <p className="text-muted-foreground">No candidates available for {roleCode}</p>
         </CardContent>
       </Card>
@@ -283,9 +309,26 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
         <CardDescription>
           Top {candidates.length} candidatos clasificados por habilidades, experiencia en el rol, proximidad y confiabilidad
         </CardDescription>
+        {roleSummary}
       </CardHeader>
 
       <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded border bg-background p-3">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            {channel === 'whatsapp' ? <MessageCircle size={16} /> : <Mail size={16} />}
+            Send availability by
+          </div>
+          <Select value={channel} onValueChange={(value) => setChannel(value as StaffingChannel)}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="whatsapp">WhatsApp</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* Select all checkbox */}
         <div className="flex items-center gap-2 p-2 bg-muted rounded">
           <Checkbox
@@ -407,7 +450,9 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
             onClick={() => sendAvailabilityMutation.mutate()}
             disabled={selectedCandidates.size === 0 || sendAvailabilityMutation.isPending}
           >
-            {sendAvailabilityMutation.isPending ? 'Sending...' : `Send Availability (${selectedCandidates.size})`}
+            {sendAvailabilityMutation.isPending
+              ? 'Sending...'
+              : `Send Availability (${selectedCandidates.size}) by ${channel === 'whatsapp' ? 'WhatsApp' : 'Email'}`}
           </Button>
         </div>
       </CardContent>

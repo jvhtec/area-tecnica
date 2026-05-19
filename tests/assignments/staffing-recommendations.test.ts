@@ -17,6 +17,11 @@ const sendStaffingEmailFunction = readFileSync(
   "utf-8",
 );
 
+const staffingOrchestratorFunction = readFileSync(
+  join(process.cwd(), "supabase/functions/staffing-orchestrator/index.ts"),
+  "utf-8",
+);
+
 describe("staffing recommendation consultation guards", () => {
   it("stores a structured role_code on staffing requests", () => {
     expect(migration).toContain("ADD COLUMN IF NOT EXISTS role_code text");
@@ -85,5 +90,19 @@ describe("smarter staffing recommendation migration", () => {
     expect(sendStaffingEmailFunction).toContain("same_role_requests");
     expect(sendStaffingEmailFunction).toContain("roleless_declines");
     expect(sendStaffingEmailFunction).toContain("status: 409");
+  });
+
+  it("lets service-role automation send WhatsApp as the campaign creator", () => {
+    expect(sendStaffingEmailFunction).toContain("isServiceRoleRequest");
+    expect(sendStaffingEmailFunction).toContain("body?.actor_id");
+    expect(staffingOrchestratorFunction).toContain("actor_id: campaign.created_by");
+  });
+
+  it("prioritizes confirmed assisted availability before auto mode contacts new candidates", () => {
+    expect(staffingOrchestratorFunction).toContain("assisted_handoff_priority");
+    expect(staffingOrchestratorFunction).toContain("confirmedAvailabilityByRole");
+    expect(staffingOrchestratorFunction).toContain("phase: 'offer'");
+    expect(staffingOrchestratorFunction).toContain("require_no_conflicts: true");
+    expect(staffingOrchestratorFunction).toContain("auto_actions");
   });
 });
