@@ -882,6 +882,14 @@ async function tickCampaign(
     // Assigned counts (matches JobAssignmentMatrix logic)
     const assignedCounts = new Map<string, number>();
     const assignedProfilesByRole = new Map<string, Set<string>>();
+    const anonymousAssignedCountsByRole = new Map<string, number>();
+    const refreshAssignedCount = (roleCode: string) => {
+      assignedCounts.set(
+        roleCode,
+        (assignedProfilesByRole.get(roleCode)?.size || 0) +
+          (anonymousAssignedCountsByRole.get(roleCode) || 0),
+      );
+    };
     (assignments || []).forEach((row: any) => {
       const status = String(row.status || '').toLowerCase();
       if (status === 'declined') return;
@@ -894,9 +902,10 @@ async function tickCampaign(
         const profiles = assignedProfilesByRole.get(key) || new Set<string>();
         profiles.add(profileId);
         assignedProfilesByRole.set(key, profiles);
-        assignedCounts.set(key, profiles.size);
+        refreshAssignedCount(key);
       } else {
-        assignedCounts.set(key, (assignedCounts.get(key) || 0) + 1);
+        anonymousAssignedCountsByRole.set(key, (anonymousAssignedCountsByRole.get(key) || 0) + 1);
+        refreshAssignedCount(key);
       }
     });
 
@@ -953,6 +962,7 @@ async function tickCampaign(
     const contactedProfilesByRole = new Map<string, Set<string>>();
     const offerRequestProfilesByRole = new Map<string, Set<string>>();
     const offerRequestProfilesForJob = new Set<string>();
+    const activeOfferProfilesForJob = new Set<string>();
 
     for (const r of requestRows) {
       const roleCode = requestIdToRole.get(String(r.id));
@@ -965,6 +975,9 @@ async function tickCampaign(
 
       if (phase === 'offer' && ['pending', 'confirmed', 'declined'].includes(status)) {
         offerRequestProfilesForJob.add(profileId);
+      }
+      if (phase === 'offer' && ['pending', 'confirmed'].includes(status)) {
+        activeOfferProfilesForJob.add(profileId);
       }
 
       if (phase === 'availability') {
@@ -1038,7 +1051,8 @@ async function tickCampaign(
         .filter((profileId) =>
           !assignedProfiles.has(profileId) &&
           !acceptedOfferProfiles.has(profileId) &&
-          !pendingOfferProfiles.has(profileId)
+          !pendingOfferProfiles.has(profileId) &&
+          !activeOfferProfilesForJob.has(profileId)
         )
         .length;
       const hasConfirmedAvailabilityForRole = matchingRequestedRole.some((request: any) => {
