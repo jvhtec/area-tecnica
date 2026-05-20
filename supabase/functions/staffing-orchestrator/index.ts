@@ -960,7 +960,7 @@ async function tickCampaign(
 
       if (phase === 'availability') {
         const availabilityRow = { ...r, requested_role_code: roleCode || null };
-        if (roleCode && campaignRoleCodes.has(roleCode)) {
+        if (roleCode && campaignRoleCodes.has(roleCode) && ['pending', 'confirmed'].includes(status)) {
           const contactedProfiles = contactedProfilesByRole.get(roleCode) || new Set<string>();
           contactedProfiles.add(profileId);
           contactedProfilesByRole.set(roleCode, contactedProfiles);
@@ -1093,9 +1093,12 @@ async function tickCampaign(
                   profile_id: profileId,
                   phase: 'availability',
                   role: roleCode,
+                  department: campaign.department,
                   channel: autoChannel,
                   require_no_conflicts: true,
                   actor_id: campaign.created_by || null,
+                  request_origin: 'auto_staffing',
+                  campaign_id,
                   idempotency_key: `campaign:${campaign_id}:${roleCode}:${profileId}:availability:auto:${autoChannel}`,
                 }),
                 signal: controller.signal,
@@ -1184,10 +1187,13 @@ async function tickCampaign(
                 profile_id: profileId,
                 phase: 'offer',
                 role: roleCode,
+                department: campaign.department,
                 message: campaign.offer_message || null,
                 channel: autoChannel,
                 require_no_conflicts: true,
                 actor_id: campaign.created_by || null,
+                request_origin: 'auto_staffing',
+                campaign_id,
                 idempotency_key: `campaign:${campaign_id}:${roleCode}:${profileId}:offer:auto:${autoChannel}`,
               }),
               signal: controller.signal,
