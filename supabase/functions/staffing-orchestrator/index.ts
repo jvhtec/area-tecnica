@@ -960,7 +960,7 @@ async function tickCampaign(
 
       if (phase === 'availability') {
         const availabilityRow = { ...r, requested_role_code: roleCode || null };
-        if (roleCode && campaignRoleCodes.has(roleCode)) {
+        if (roleCode && campaignRoleCodes.has(roleCode) && ['pending', 'confirmed'].includes(status)) {
           const contactedProfiles = contactedProfilesByRole.get(roleCode) || new Set<string>();
           contactedProfiles.add(profileId);
           contactedProfilesByRole.set(roleCode, contactedProfiles);

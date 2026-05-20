@@ -115,6 +115,7 @@ const AT_LOGO_URL = Deno.env.get("AT_LOGO_URL") || `${SUPABASE_URL}/storage/v1/o
 const DAILY_CAP = parseInt(Deno.env.get("STAFFING_DAILY_CAP") ?? "100", 10);
 // Company-local timezone for end-user display (email/WhatsApp)
 const COMPANY_TZ = Deno.env.get('COMPANY_TZ') || 'Europe/Madrid';
+const STAFFING_SYSTEM_ACTOR_ID = Deno.env.get('STAFFING_SYSTEM_ACTOR_ID') || null;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -159,6 +160,10 @@ function b64url(u8: Uint8Array) {
   return btoa(String.fromCharCode(...u8)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
 
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -173,6 +178,9 @@ serve(async (req) => {
     const body = await req.json();
     if (!actorId && isServiceRoleRequest(req) && typeof body?.actor_id === 'string') {
       actorId = body.actor_id;
+    }
+    if (!actorId && isServiceRoleRequest(req) && isUuid(STAFFING_SYSTEM_ACTOR_ID)) {
+      actorId = STAFFING_SYSTEM_ACTOR_ID;
     }
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
 
@@ -1366,6 +1374,22 @@ serve(async (req) => {
 
         if (waOk) {
           try {
+            await fetch(`${SUPABASE_URL}/functions/v1/push`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+              body: JSON.stringify({
+                type: phase === 'availability' ? 'staffing.availability.requested' : 'staffing.offer.requested',
+                job_id,
+                actor_id: actorId || null,
+                department: job.department || null,
+                recipients: [profile_id],
+                data: { staffing_request_id: insertedId, phase, channel: 'whatsapp', role_code: roleCode, target_date: normalizedTargetDate },
+              }),
+            });
+          } catch (pushError) {
+            console.warn('[send-staffing-email] Failed to emit push (whatsapp)', pushError);
+          }
+          try {
             const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';
             await supabase.rpc('log_activity_as', {
               _actor_id: actorId,
@@ -1412,6 +1436,22 @@ serve(async (req) => {
           }
         });
         if (sendRes.ok) {
+          try {
+            await fetch(`${SUPABASE_URL}/functions/v1/push`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
+              body: JSON.stringify({
+                type: phase === 'availability' ? 'staffing.availability.requested' : 'staffing.offer.requested',
+                job_id,
+                actor_id: actorId || null,
+                department: job.department || null,
+                recipients: [profile_id],
+                data: { staffing_request_id: insertedId, phase, channel: 'email', role_code: roleCode, target_date: normalizedTargetDate },
+              }),
+            });
+          } catch (pushError) {
+            console.warn('[send-staffing-email] Failed to emit push (email)', pushError);
+          }
           try {
             const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';
             await supabase.rpc('log_activity_as', {
