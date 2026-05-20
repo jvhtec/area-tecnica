@@ -10,11 +10,17 @@ const {
   useQueryMock,
   useOptimizedAuthMock,
   useVirtualizedDateRangeMock,
+  queryClientMock,
   supabaseMock,
 } = vi.hoisted(() => ({
   useQueryMock: vi.fn(),
   useOptimizedAuthMock: vi.fn(),
   useVirtualizedDateRangeMock: vi.fn(),
+  queryClientMock: {
+    invalidateQueries: vi.fn(),
+    prefetchQuery: vi.fn(),
+    getQueryData: vi.fn(),
+  },
   supabaseMock: {
     from: vi.fn(),
     rpc: vi.fn(),
@@ -33,11 +39,7 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
   return {
     ...actual,
     useQuery: useQueryMock,
-    useQueryClient: () => ({
-      invalidateQueries: vi.fn(),
-      prefetchQuery: vi.fn(),
-      getQueryData: vi.fn(),
-    }),
+    useQueryClient: () => queryClientMock,
   };
 });
 
@@ -382,7 +384,16 @@ describe('JobAssignmentMatrix', () => {
     const refreshButton = screen.getByText(/Refrescar/i);
     await user.click(refreshButton);
 
-    // Should dispatch assignment-updated event
+    // Should refresh the roster queries before dispatching assignment-updated.
+    await waitFor(() => {
+      expect(queryClientMock.invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['optimized-matrix-technicians'],
+      });
+      expect(queryClientMock.invalidateQueries).toHaveBeenCalledWith({
+        queryKey: ['technician-fridge-status'],
+      });
+    });
+
     await waitFor(() => {
       expect(refreshButton).not.toBeDisabled();
     });
