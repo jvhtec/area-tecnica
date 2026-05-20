@@ -220,6 +220,21 @@ export default function JobAssignmentMatrix() {
     return () => { try { (dataLayerClient as any).removeChannel(ch); } catch { } };
   }, [qc]);
 
+  // Keep the technician roster fresh when users are added or edited in settings.
+  React.useEffect(() => {
+    const ch = (dataLayerClient as any)
+      .channel('rt-matrix-profiles')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles' }, () => {
+        qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-technicians') });
+        qc.invalidateQueries({ queryKey: queryKeys.scope('technician-fridge-status') });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profile_skills' }, () => {
+        qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-technicians') });
+      })
+      .subscribe();
+    return () => { try { (dataLayerClient as any).removeChannel(ch); } catch { } };
+  }, [qc]);
+
   // Filter technicians based on search term
   const filteredTechnicians = useMemo(() => {
     const arr = technicians.filter((tech: any) => {
@@ -563,6 +578,11 @@ export default function JobAssignmentMatrix() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
+
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-technicians') }),
+      qc.invalidateQueries({ queryKey: queryKeys.scope('technician-fridge-status') }),
+    ]);
 
     // Dispatch the assignment update event to force refresh
     window.dispatchEvent(new CustomEvent('assignment-updated'));
