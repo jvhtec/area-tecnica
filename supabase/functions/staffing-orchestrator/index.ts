@@ -1021,8 +1021,9 @@ async function tickCampaign(
         const remainingNeeded = Math.max(0, required - assigned - acceptedOffers);
         const waveMode = policy.waves?.mode || 'controlled_waves';
         const waveBuffer = Number(policy.waves?.buffer ?? policy.offer_buffer ?? 1);
+        const fixedWaveSize = Math.max(1, Number(policy.waves?.fixed_size || 50));
         const waveSize = waveMode === 'blast_all_eligible'
-          ? 50
+          ? fixedWaveSize
           : Math.max(1, remainingNeeded + waveBuffer);
 
         const { data: rankedCandidates, error: rankError } = await supabase.rpc('rank_staffing_candidates', {

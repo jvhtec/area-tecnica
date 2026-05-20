@@ -56,24 +56,24 @@ interface RolelessConsultation {
 }
 
 const ROLELESS_PHASE_LABELS: Record<string, string> = {
-  availability: 'availability',
-  offer: 'offer'
+  availability: 'disponibilidad',
+  offer: 'oferta'
 }
 
 const ROLELESS_STATUS_LABELS: Record<string, string> = {
-  pending: 'pending',
-  confirmed: 'confirmed',
-  declined: 'declined'
+  pending: 'pendiente',
+  confirmed: 'confirmada',
+  declined: 'rechazada'
 }
 
 const getRolelessConsultationLabel = (consultation: RolelessConsultation) => {
   const phase = ROLELESS_PHASE_LABELS[consultation.phase] ?? consultation.phase
   const status = ROLELESS_STATUS_LABELS[consultation.status] ?? consultation.status
   const scope = consultation.single_day && consultation.target_date
-    ? ` for ${consultation.target_date}`
+    ? ` para ${consultation.target_date}`
     : ''
 
-  return `Prior manager ${phase} request without role is ${status}${scope}`
+  return `Solicitud previa de ${phase} sin rol: ${status}${scope}`
 }
 
 export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
@@ -280,11 +280,11 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
 
   const roleSummary = (
     <div className="flex flex-wrap gap-2 pt-2">
-      <Badge variant="outline">Required {requiredCount}</Badge>
-      <Badge variant="secondary">{assignedCount}/{requiredCount || '—'} assigned</Badge>
-      <Badge variant="outline">{confirmedAvailability} available</Badge>
+      <Badge variant="outline">Requeridos {requiredCount}</Badge>
+      <Badge variant="secondary">{assignedCount}/{requiredCount || '—'} asignados</Badge>
+      <Badge variant="outline">{confirmedAvailability} disponibles</Badge>
       {pendingAvailability > 0 && (
-        <Badge variant="outline">{pendingAvailability} pending</Badge>
+        <Badge variant="outline">{pendingAvailability} pendientes</Badge>
       )}
     </div>
   )
@@ -298,10 +298,10 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   const waveMode = String(policy?.waves?.mode || 'manual_selection')
   const maxWaves = Number(policy?.waves?.max_waves || 3)
   const waveLabelForIndex = (index: number) => {
-    if (waveMode === 'blast_all_eligible') return 'All eligible'
-    if (waveMode === 'manual_selection') return 'Manual wave'
+    if (waveMode === 'blast_all_eligible') return 'Todos elegibles'
+    if (waveMode === 'manual_selection') return 'Oleada manual'
     const wave = recommendedWaveNumber(index, requiredCount, waveBuffer)
-    return wave > maxWaves ? `After Wave ${maxWaves}` : `Wave ${wave}`
+    return wave > maxWaves ? `Tras oleada ${maxWaves}` : `Oleada ${wave}`
   }
 
   if (isLoading) {
@@ -309,7 +309,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
       <Card>
         <CardContent className="pt-6">
           {roleSummary}
-          <p className="text-muted-foreground">Loading candidates...</p>
+          <p className="text-muted-foreground">Cargando candidatos...</p>
         </CardContent>
       </Card>
     )
@@ -320,7 +320,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
       <Card>
         <CardContent className="pt-6">
           {roleSummary}
-          <p className="text-muted-foreground">No candidates available for {roleCode}</p>
+          <p className="text-muted-foreground">No hay candidatos disponibles para {roleCode}</p>
         </CardContent>
       </Card>
     )
@@ -329,9 +329,9 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{roleCode} - Candidate Recommendations</CardTitle>
+        <CardTitle>{roleCode} - Recomendaciones de candidatos</CardTitle>
         <CardDescription>
-          Top {candidates.length} candidatos clasificados por habilidades, experiencia en el rol, proximidad y confiabilidad
+          Los {candidates.length} candidatos mejor clasificados por habilidades, experiencia en el rol, proximidad y confiabilidad
         </CardDescription>
         {roleSummary}
       </CardHeader>
@@ -340,10 +340,10 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
         <div className="flex flex-wrap items-center justify-between gap-3 rounded border bg-background p-3">
           <div className="flex items-center gap-2 text-sm font-medium">
             {channel === 'whatsapp' ? <MessageCircle size={16} /> : <Mail size={16} />}
-            Send availability by
+            Enviar disponibilidad por
           </div>
           <Select value={channel} onValueChange={(value) => setChannel(value as StaffingChannel)}>
-            <SelectTrigger aria-label="Select availability channel" className="w-[160px]">
+            <SelectTrigger aria-label="Seleccionar canal de disponibilidad" className="w-[160px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -356,12 +356,12 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
         {/* Select all checkbox */}
         <div className="flex items-center gap-2 p-2 bg-muted rounded">
           <Checkbox
-            aria-label="Select all candidates"
+            aria-label="Seleccionar todos los candidatos"
             checked={selectedCandidates.size === candidates.length && candidates.length > 0}
             onCheckedChange={toggleSelectAll}
           />
           <span className="text-sm font-medium">
-            Select all ({selectedCandidates.size} selected)
+            Seleccionar todos ({selectedCandidates.size} seleccionados)
           </span>
         </div>
 
@@ -379,7 +379,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                 className="flex items-start gap-3 p-3 border rounded hover:bg-muted"
               >
                 <Checkbox
-                  aria-label={`Select ${candidate.full_name}`}
+                  aria-label={`Seleccionar ${candidate.full_name}`}
                   checked={selectedCandidates.has(candidate.profile_id)}
                   onCheckedChange={() => toggleCandidate(candidate.profile_id)}
                   className="mt-1"
@@ -398,15 +398,15 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <p className="font-medium text-sm">{candidate.full_name}</p>
-                    <Badge variant="outline">Rank #{index + 1}</Badge>
-                    <Badge variant="secondary">Profile: {JOB_PROFILE_LABELS[roleProfileName] || roleProfileName}</Badge>
+                    <Badge variant="outline">Puesto #{index + 1}</Badge>
+                    <Badge variant="secondary">Perfil: {JOB_PROFILE_LABELS[roleProfileName] || roleProfileName}</Badge>
                     <Badge variant="outline">{waveLabel}</Badge>
-                    <Badge variant="outline">Status: Not contacted</Badge>
+                    <Badge variant="outline">Estado: No contactado</Badge>
                     {candidate.final_score >= 80 && (
-                      <Badge className="bg-green-100 text-green-800">⭐ Top</Badge>
+                      <Badge className="bg-green-100 text-green-800">⭐ Destacado</Badge>
                     )}
                     {candidate.soft_conflict && (
-                      <Badge className="bg-yellow-100 text-yellow-800">⚠ Soft Conflict</Badge>
+                      <Badge className="bg-yellow-100 text-yellow-800">⚠ Conflicto blando</Badge>
                     )}
                     {rolelessConsultation && (
                       <Badge
@@ -414,16 +414,16 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                         className="text-[10px]"
                         title={getRolelessConsultationLabel(rolelessConsultation)}
                       >
-                        No-role request
+                        Solicitud sin rol
                       </Badge>
                     )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground mb-2">
-                    <div>Skills: <span className="font-semibold">{candidate.skills_score}</span>pts</div>
-                    <div>Reliability: <span className="font-semibold">{candidate.reliability_score}</span>pts</div>
+                    <div>Habilidades: <span className="font-semibold">{candidate.skills_score}</span>pts</div>
+                    <div>Fiabilidad: <span className="font-semibold">{candidate.reliability_score}</span>pts</div>
                     <div>
-                      Proximity:{' '}
+                      Proximidad:{' '}
                       <span className="font-semibold">
                         {typeof candidate.distance_to_madrid_km === 'number'
                           ? candidate.distance_to_madrid_km.toFixed(1)
@@ -431,12 +431,12 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                       </span>
                       km
                     </div>
-                    <div>Fairness: <span className="font-semibold">{candidate.fairness_score}</span>pts</div>
-                    <div>Experience: <span className="font-semibold">{candidate.experience_score}</span>pts</div>
+                    <div>Equidad: <span className="font-semibold">{candidate.fairness_score}</span>pts</div>
+                    <div>Experiencia: <span className="font-semibold">{candidate.experience_score}</span>pts</div>
                     <div>
-                      Rate:{' '}
+                      Tarifa:{' '}
                       <span className="font-semibold">
-                        {rateReason ? rateReason.replace(/^Rate adjustment:\s*/i, '') : 'standard'}
+                        {rateReason ? rateReason.replace(/^Rate adjustment:\s*/i, '') : 'estándar'}
                       </span>
                     </div>
                   </div>
@@ -465,20 +465,20 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                       className="text-xs text-blue-600 hover:text-blue-800 mt-1 flex items-center gap-1"
                     >
                       <Info size={14} />
-                      {expandedReasons === candidate.profile_id ? 'Hide' : 'Show'} reasons
+                      {expandedReasons === candidate.profile_id ? 'Ocultar' : 'Ver'} motivos
                     </button>
                   )}
 
                   {expandedReasons === candidate.profile_id && (
                     <div className="mt-2 p-2 bg-blue-500/10 rounded text-xs space-y-1">
-                      <p className="font-semibold text-foreground">Score Breakdown</p>
+                      <p className="font-semibold text-foreground">Desglose de puntuación</p>
                       {reasons.map((reason, idx) => (
                         <div key={idx} className="text-muted-foreground">• {reason}</div>
                       ))}
-                      <p className="pt-2 font-semibold text-foreground">Plain Explanation</p>
+                      <p className="pt-2 font-semibold text-foreground">Explicación</p>
                       <p className="text-muted-foreground">
-                        Ranked with the {JOB_PROFILE_LABELS[roleProfileName] || roleProfileName} profile using role skill,
-                        reliability, fairness, proximity, completed role history, availability signals, and configured cost rules.
+                        Clasificado con el perfil {JOB_PROFILE_LABELS[roleProfileName] || roleProfileName} usando habilidad de rol,
+                        fiabilidad, equidad, proximidad, historial completado, señales de disponibilidad y reglas de coste configuradas.
                       </p>
                     </div>
                   )}
@@ -495,8 +495,8 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
             disabled={selectedCandidates.size === 0 || sendAvailabilityMutation.isPending}
           >
             {sendAvailabilityMutation.isPending
-              ? 'Sending...'
-              : `Send Availability (${selectedCandidates.size}) by ${channel === 'whatsapp' ? 'WhatsApp' : 'Email'}`}
+              ? 'Enviando...'
+              : `Enviar disponibilidad (${selectedCandidates.size}) por ${channel === 'whatsapp' ? 'WhatsApp' : 'Email'}`}
           </Button>
         </div>
       </CardContent>

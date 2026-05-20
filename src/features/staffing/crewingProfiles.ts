@@ -82,19 +82,19 @@ export type BuildCampaignPolicyInput = {
 };
 
 export const JOB_PROFILE_LABELS: Record<JobProfileName, string> = {
-  standard: 'Standard',
-  high_risk_critical: 'High-Risk / Critical',
-  training_friendly: 'Training-Friendly',
-  emergency_fill: 'Emergency Fill',
-  local_low_complexity: 'Local Low-Complexity',
-  multi_day_tour: 'Multi-Day / Tour',
-  custom: 'Custom',
+  standard: 'Estándar',
+  high_risk_critical: 'Alto riesgo / Crítico',
+  training_friendly: 'Apto para formación',
+  emergency_fill: 'Cobertura urgente',
+  local_low_complexity: 'Local baja complejidad',
+  multi_day_tour: 'Multi-día / Gira',
+  custom: 'Personalizado',
 };
 
 export const PROFILE_DEFAULTS: Record<JobProfileName, ProfileDefaults> = {
   standard: {
     label: JOB_PROFILE_LABELS.standard,
-    description: 'Balanced one-off crew selection.',
+    description: 'Selección equilibrada para trabajos puntuales.',
     weights: {
       roleSkill: 0.32,
       reliability: 0.23,
@@ -115,7 +115,7 @@ export const PROFILE_DEFAULTS: Record<JobProfileName, ProfileDefaults> = {
   },
   high_risk_critical: {
     label: JOB_PROFILE_LABELS.high_risk_critical,
-    description: 'Prioritizes proven people for complex or critical roles.',
+    description: 'Prioriza personal probado para roles complejos o críticos.',
     weights: {
       roleSkill: 0.4,
       reliability: 0.35,
@@ -136,7 +136,7 @@ export const PROFILE_DEFAULTS: Record<JobProfileName, ProfileDefaults> = {
   },
   training_friendly: {
     label: JOB_PROFILE_LABELS.training_friendly,
-    description: 'Biases toward rotation and role progression on low-risk work.',
+    description: 'Favorece rotación y progresión de rol en trabajos de bajo riesgo.',
     weights: {
       roleSkill: 0.23,
       reliability: 0.18,
@@ -157,7 +157,7 @@ export const PROFILE_DEFAULTS: Record<JobProfileName, ProfileDefaults> = {
   },
   emergency_fill: {
     label: JOB_PROFILE_LABELS.emergency_fill,
-    description: 'Favors fast, close, available, reliable responders.',
+    description: 'Favorece respuestas rápidas, cercanas, disponibles y fiables.',
     weights: {
       roleSkill: 0.15,
       reliability: 0.3,
@@ -178,7 +178,7 @@ export const PROFILE_DEFAULTS: Record<JobProfileName, ProfileDefaults> = {
   },
   local_low_complexity: {
     label: JOB_PROFILE_LABELS.local_low_complexity,
-    description: 'Avoids overusing top-tier or premium-rate crew on simple local work.',
+    description: 'Evita sobreusar personal premium en trabajo local sencillo.',
     weights: {
       roleSkill: 0.18,
       reliability: 0.18,
@@ -199,7 +199,7 @@ export const PROFILE_DEFAULTS: Record<JobProfileName, ProfileDefaults> = {
   },
   multi_day_tour: {
     label: JOB_PROFILE_LABELS.multi_day_tour,
-    description: 'Prioritizes continuity and commitment across repeated dates.',
+    description: 'Prioriza continuidad y compromiso en fechas repetidas.',
     weights: {
       roleSkill: 0.28,
       reliability: 0.28,
@@ -220,7 +220,7 @@ export const PROFILE_DEFAULTS: Record<JobProfileName, ProfileDefaults> = {
   },
   custom: {
     label: JOB_PROFILE_LABELS.custom,
-    description: 'Manager-tuned settings.',
+    description: 'Ajustes personalizados por gestión.',
     weights: {
       roleSkill: 0.32,
       reliability: 0.23,

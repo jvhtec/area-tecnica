@@ -548,13 +548,13 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     <div className="space-y-4 rounded border bg-muted/30 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-semibold">Auto Profile</p>
+          <p className="text-sm font-semibold">Perfil automático</p>
           <p className="text-xs text-muted-foreground">
-            Job type {jobMeta?.job_type || 'single'} suggests {JOB_PROFILE_LABELS[inferredJobProfile]}.
+            Tipo de trabajo {jobMeta?.job_type || 'single'}: perfil sugerido {JOB_PROFILE_LABELS[inferredJobProfile]}.
           </p>
         </div>
         {profileOverrideActive && (
-          <Badge variant="outline">Manual profile override active</Badge>
+          <Badge variant="outline">Perfil manual activo</Badge>
         )}
       </div>
 
@@ -564,18 +564,18 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           checked={formData.inferProfileFromJobType}
           onChange={(e) => setFormData({ ...formData, inferProfileFromJobType: e.target.checked })}
         />
-        <span className="text-sm">Infer profile from job type and role</span>
+        <span className="text-sm">Inferir perfil por tipo de trabajo y rol</span>
       </label>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="text-sm font-medium">Suggested Job Profile</label>
+          <label className="text-sm font-medium">Perfil de trabajo sugerido</label>
           <div className="mt-1 rounded border bg-background px-2 py-1 text-sm">
             {JOB_PROFILE_LABELS[inferredJobProfile]}
           </div>
         </div>
         <div>
-          <label className="text-sm font-medium">Selected Job Profile</label>
+          <label className="text-sm font-medium">Perfil de trabajo seleccionado</label>
           <select
             value={formData.selectedJobProfile}
             onChange={(e) => applyProfileDefaults(e.target.value as JobProfileName)}
@@ -590,11 +590,11 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
 
       {profileOverrideActive && (
         <div>
-          <label className="text-sm font-medium">Override reason</label>
+          <label className="text-sm font-medium">Motivo del cambio</label>
           <input
             value={formData.profileOverrideReason}
             onChange={(e) => setFormData({ ...formData, profileOverrideReason: e.target.value })}
-            placeholder="Why this campaign should use a different profile"
+            placeholder="Por qué esta campaña debe usar otro perfil"
             className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
           />
         </div>
@@ -602,7 +602,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
 
       {roleCodes.length > 0 && (
         <div>
-          <p className="text-sm font-medium">Role-Level Profiles</p>
+          <p className="text-sm font-medium">Perfiles por rol</p>
           <div className="mt-2 space-y-2">
             {roleCodes.map((roleCode) => {
               const roleProfile = roleProfiles[roleCode]
@@ -613,11 +613,11 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm font-medium">{roleCode}</span>
-                      <Badge variant="outline">Required {roleProfile.required_count}</Badge>
-                      {roleProfile.is_critical && <Badge variant="secondary">Critical</Badge>}
+                      <Badge variant="outline">Requeridos {roleProfile.required_count}</Badge>
+                      {roleProfile.is_critical && <Badge variant="secondary">Crítico</Badge>}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      Suggested: {JOB_PROFILE_LABELS[roleProfile.inferred_profile]}
+                      Sugerido: {JOB_PROFILE_LABELS[roleProfile.inferred_profile]}
                     </p>
                   </div>
                   <select
@@ -637,16 +637,16 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
       )}
 
       <div className="rounded border bg-background p-3">
-        <p className="text-sm font-medium">Profile Weights</p>
+        <p className="text-sm font-medium">Pesos del perfil</p>
         <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
-          <span>Role skill: {selectedProfileDefaults.weights.roleSkill.toFixed(2)}</span>
-          <span>Reliability: {formData.historyWeight.toFixed(2)}</span>
-          <span>Fairness: {selectedProfileDefaults.weights.fairness.toFixed(2)}</span>
-          <span>Proximity: {formData.proximityWeight.toFixed(2)}</span>
-          <span>Cost: {selectedProfileDefaults.weights.costEfficiency.toFixed(2)}</span>
-          <span>House tech: {selectedProfileDefaults.weights.houseTechBonus.toFixed(2)}</span>
-          <span>Progression: {selectedProfileDefaults.weights.roleProgression.toFixed(2)}</span>
-          <span>Availability: {selectedProfileDefaults.weights.availabilityConfidence.toFixed(2)}</span>
+          <span>Habilidad de rol: {selectedProfileDefaults.weights.roleSkill.toFixed(2)}</span>
+          <span>Fiabilidad: {formData.historyWeight.toFixed(2)}</span>
+          <span>Equidad: {selectedProfileDefaults.weights.fairness.toFixed(2)}</span>
+          <span>Proximidad: {formData.proximityWeight.toFixed(2)}</span>
+          <span>Coste: {selectedProfileDefaults.weights.costEfficiency.toFixed(2)}</span>
+          <span>Técnico de casa: {selectedProfileDefaults.weights.houseTechBonus.toFixed(2)}</span>
+          <span>Progresión: {selectedProfileDefaults.weights.roleProgression.toFixed(2)}</span>
+          <span>Disponibilidad: {selectedProfileDefaults.weights.availabilityConfidence.toFixed(2)}</span>
         </div>
       </div>
     </div>
@@ -654,32 +654,32 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
 
   const renderCostAndWaveSettings = () => (
     <div className="space-y-4 rounded border bg-muted/30 p-3">
-      <p className="text-sm font-semibold">Cost / Rate Scoring</p>
+      <p className="text-sm font-semibold">Puntuación de coste/tarifa</p>
       <label className="flex items-center gap-2 cursor-pointer">
         <input
           type="checkbox"
           checked={formData.costScoringEnabled}
           onChange={(e) => setFormData({ ...formData, costScoringEnabled: e.target.checked })}
         />
-        <span className="text-sm">Apply custom rate adjustment</span>
+        <span className="text-sm">Aplicar ajuste por tarifa personalizada</span>
       </label>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="text-sm font-medium">Rate penalty strength</label>
+          <label className="text-sm font-medium">Intensidad de penalización de tarifa</label>
           <select
             value={formData.ratePenaltyStrength}
             onChange={(e) => setFormData({ ...formData, ratePenaltyStrength: e.target.value as RatePenaltyStrength })}
             className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
           >
-            <option value="disabled">Disabled</option>
-            <option value="low">Low</option>
+            <option value="disabled">Desactivado</option>
+            <option value="low">Baja</option>
             <option value="normal">Normal</option>
-            <option value="high">High</option>
+            <option value="high">Alta</option>
           </select>
         </div>
         <div>
-          <label className="text-sm font-medium">Maximum rate penalty</label>
+          <label className="text-sm font-medium">Penalización máxima de tarifa</label>
           <input
             type="number"
             min="0"
@@ -691,22 +691,22 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         </div>
       </div>
 
-      <p className="text-sm font-semibold pt-2">Contact Waves</p>
+      <p className="text-sm font-semibold pt-2">Oleadas de contacto</p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="text-sm font-medium">Wave Mode</label>
+          <label className="text-sm font-medium">Modo de oleada</label>
           <select
             value={formData.waveMode}
             onChange={(e) => setFormData({ ...formData, waveMode: e.target.value as WaveMode })}
             className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
           >
-            <option value="manual_selection">Manual Selection</option>
-            <option value="controlled_waves">Controlled Waves</option>
-            <option value="blast_all_eligible">Blast All Eligible</option>
+            <option value="manual_selection">Selección manual</option>
+            <option value="controlled_waves">Oleadas controladas</option>
+            <option value="blast_all_eligible">Contactar todos los elegibles</option>
           </select>
         </div>
         <div>
-          <label className="text-sm font-medium">Wave Size</label>
+          <label className="text-sm font-medium">Tamaño de oleada</label>
           <input
             type="number"
             min="0"
@@ -715,10 +715,10 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
             onChange={(e) => setFormData({ ...formData, waveBuffer: parseInt(e.target.value) })}
             className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
           />
-          <p className="text-xs text-muted-foreground mt-1">Required count + this buffer</p>
+          <p className="text-xs text-muted-foreground mt-1">Requeridos + este margen</p>
         </div>
         <div>
-          <label className="text-sm font-medium">Wave Wait Window (minutes)</label>
+          <label className="text-sm font-medium">Espera entre oleadas (minutos)</label>
           <input
             type="number"
             min="3"
@@ -729,7 +729,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           />
         </div>
         <div>
-          <label className="text-sm font-medium">Max Waves</label>
+          <label className="text-sm font-medium">Máximo de oleadas</label>
           <input
             type="number"
             min="1"
@@ -747,11 +747,11 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           checked={formData.autoSendNextWave}
           onChange={(e) => setFormData({ ...formData, autoSendNextWave: e.target.checked })}
         />
-        <span className="text-sm">Auto-send next wave in Auto mode</span>
+        <span className="text-sm">Enviar siguiente oleada automáticamente en modo Auto</span>
       </label>
 
       <div className="rounded border bg-background p-3 text-xs text-muted-foreground">
-        Auto-close is enabled: close filled roles, stop future waves, block extra acceptances, confirm booked crew, and notify late or pending responders.
+        Cierre automático activo: cierra roles completos, detiene futuras oleadas, bloquea aceptaciones extra, confirma el equipo reservado y avisa a respuestas tardías o pendientes.
       </div>
     </div>
   )
