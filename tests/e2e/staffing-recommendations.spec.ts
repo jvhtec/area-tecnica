@@ -214,7 +214,7 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
   await page.goto("/job-assignment-matrix");
 
   await page.getByRole("button", { name: /ver recordatorio de staffing/i }).click();
-  await page.getByRole("button", { name: "Auto staffing" }).click();
+  await page.getByRole("button", { name: "C.A.R.L.O.S." }).click();
   await expect(page.getByText("Required 2")).toBeVisible();
   await expect(page.getByText("0/2 assigned")).toBeVisible();
 

@@ -7,9 +7,14 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
 import { Play, Pause, Square, Zap } from 'lucide-react'
+import {
+  CARLOS_AGENT_DESCRIPTION,
+  CARLOS_AGENT_NAME,
+} from '@/features/staffing/carlos'
 
 
 import { queryKeys } from "@/lib/react-query";
+
 interface StaffingAutoModePanelProps {
   campaign: any
   campaignRoles: any[]
@@ -55,7 +60,7 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       return payload
     },
     onSuccess: () => {
-      toast({ title: 'Campaign paused' })
+      toast({ title: `${CARLOS_AGENT_NAME} pausado` })
       invalidateAll()
     },
     onError: (error: any) => {
@@ -79,7 +84,7 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       return payload
     },
     onSuccess: () => {
-      toast({ title: 'Campaign resumed' })
+      toast({ title: `${CARLOS_AGENT_NAME} reanudado` })
       invalidateAll()
     },
     onError: (error: any) => {
@@ -103,7 +108,10 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       return payload
     },
     onSuccess: () => {
-      toast({ title: 'Campaign nudged', description: 'Auto staffing tick executed' })
+      toast({
+        title: `Oleada de ${CARLOS_AGENT_NAME} ejecutada`,
+        description: `Se ejecutó un ciclo de ${CARLOS_AGENT_NAME}`,
+      })
       invalidateAll()
     },
     onError: (error: any) => {
@@ -127,7 +135,7 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       return payload
     },
     onSuccess: () => {
-      toast({ title: 'Campaign stopped' })
+      toast({ title: `${CARLOS_AGENT_NAME} detenido` })
       invalidateAll()
     },
     onError: (error: any) => {
@@ -154,7 +162,10 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       return response.json()
     },
     onSuccess: () => {
-      toast({ title: 'Campaign escalated', description: 'Next escalation step activated' })
+      toast({
+        title: `${CARLOS_AGENT_NAME} escalado`,
+        description: 'Siguiente nivel de escalado activado',
+      })
       setShowEscalationWarning(false)
       invalidateAll()
     },
@@ -197,8 +208,8 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Auto Mode Campaign</CardTitle>
-              <CardDescription>System-driven staffing automation</CardDescription>
+              <CardTitle>{CARLOS_AGENT_NAME}</CardTitle>
+              <CardDescription>{CARLOS_AGENT_DESCRIPTION}</CardDescription>
             </div>
             <div className="text-right">
               <Badge className="mb-2 block bg-blue-100 text-blue-800">

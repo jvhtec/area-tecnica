@@ -1,6 +1,10 @@
 import { StaffingOrchestratorPanel } from '@/components/matrix/StaffingOrchestratorPanel';
 import { Button } from '@/components/ui/button';
 import {
+  CARLOS_AGENT_DESCRIPTION,
+  CARLOS_AGENT_NAME,
+} from '@/features/staffing/carlos';
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -72,7 +76,7 @@ export const StaffingReminderDialogs = ({
                           setShowStaffingReminder(false);
                         }}
                       >
-                        Auto staffing
+                        {CARLOS_AGENT_NAME}
                       </Button>
                     </div>
                     <ul className="ml-4 mt-1 list-disc space-y-1 text-sm text-muted-foreground">
@@ -105,11 +109,13 @@ export const StaffingReminderDialogs = ({
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            Auto staffing{staffingOrchestratorTarget?.jobTitle ? ` — ${staffingOrchestratorTarget.jobTitle}` : ''}
+            {CARLOS_AGENT_NAME}
+            {staffingOrchestratorTarget?.jobTitle ? ` - ${staffingOrchestratorTarget.jobTitle}` : ''}
           </DialogTitle>
           <DialogDescription>
+            {CARLOS_AGENT_DESCRIPTION}
             {staffingOrchestratorTarget?.department
-              ? `Departamento: ${DEPARTMENT_LABELS[staffingOrchestratorTarget.department] || formatLabel(staffingOrchestratorTarget.department)}`
+              ? ` - Departamento: ${DEPARTMENT_LABELS[staffingOrchestratorTarget.department] || formatLabel(staffingOrchestratorTarget.department)}`
               : null}
           </DialogDescription>
         </DialogHeader>
