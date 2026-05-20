@@ -22,6 +22,11 @@ const declinedPenaltyMigration = readFileSync(
   "utf-8",
 );
 
+const profileRateScoringMigration = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260520110000_crewing_profile_rate_scoring.sql"),
+  "utf-8",
+);
+
 const sendStaffingEmailFunction = readFileSync(
   join(process.cwd(), "supabase/functions/send-staffing-email/index.ts"),
   "utf-8",
@@ -77,6 +82,18 @@ describe("smarter staffing recommendation migration", () => {
     expect(declinedPenaltyMigration).toContain("Declined role requests:");
   });
 
+  it("applies profile cost/rate scoring without changing the candidate RPC shape", () => {
+    expect(profileRateScoringMigration).toContain("rank_staffing_candidates(uuid,text,text,text,jsonb)");
+    expect(profileRateScoringMigration).not.toContain("RETURNS TABLE");
+    expect(profileRateScoringMigration).toContain("p_policy->'cost_scoring'->>'enabled'");
+    expect(profileRateScoringMigration).toContain("p_policy->'weights'->>'cost_efficiency'");
+    expect(profileRateScoringMigration).toContain("rate_adjustments AS");
+    expect(profileRateScoringMigration).toContain("custom_tech_rates");
+    expect(profileRateScoringMigration).toContain("rate_cards_2025");
+    expect(profileRateScoringMigration).toContain("cost_efficiency_score");
+    expect(profileRateScoringMigration).toContain("Rate adjustment:");
+  });
+
   it("filters hard collisions and unavailability before candidates are returned", () => {
     expect(smarterMigration).toMatch(/FROM technician_availability ta/);
     expect(smarterMigration).toMatch(/JOIN target_dates td ON td\.target_date = ta\.date/);
@@ -126,6 +143,11 @@ describe("smarter staffing recommendation migration", () => {
 
   it("prioritizes confirmed assisted availability before auto mode contacts new candidates", () => {
     expect(staffingOrchestratorFunction).toContain("assisted_handoff_priority");
+    expect(staffingOrchestratorFunction).toContain("normalizeCampaignPolicy");
+    expect(staffingOrchestratorFunction).toContain("selected_job_profile");
+    expect(staffingOrchestratorFunction).toContain("role_profiles");
+    expect(staffingOrchestratorFunction).toContain("cost_scoring");
+    expect(staffingOrchestratorFunction).toContain("waveWaitSeconds");
     expect(staffingOrchestratorFunction).toContain("confirmedAvailabilityRowsForJob");
     expect(staffingOrchestratorFunction).toContain("confirmedAvailabilityByRequestedRole");
     expect(staffingOrchestratorFunction).toContain(".order('created_at', { ascending: false })");
@@ -134,5 +156,13 @@ describe("smarter staffing recommendation migration", () => {
     expect(staffingOrchestratorFunction).toContain("phase: 'offer'");
     expect(staffingOrchestratorFunction).toContain("require_no_conflicts: true");
     expect(staffingOrchestratorFunction).toContain("auto_actions");
+  });
+
+  it("lets auto mode send availability waves from the same ranked candidate workflow", () => {
+    expect(staffingOrchestratorFunction).toContain("rank_staffing_candidates");
+    expect(staffingOrchestratorFunction).toContain("phase: 'availability'");
+    expect(staffingOrchestratorFunction).toContain("idempotency_key: `campaign:${campaign_id}:${roleCode}:${profileId}:availability:auto:${autoChannel}`");
+    expect(staffingOrchestratorFunction).toContain("contactedProfilesByRole");
+    expect(staffingOrchestratorFunction).toContain("wave_number: nextWaveNumber");
   });
 });

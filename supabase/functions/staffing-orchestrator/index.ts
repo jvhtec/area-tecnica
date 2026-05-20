@@ -16,21 +16,290 @@ const corsHeaders = {
 interface CampaignPolicy {
   weights: {
     skills: number;
+    role_skill?: number;
     proximity: number;
     reliability: number;
     fairness: number;
     experience: number;
+    cost_efficiency?: number;
+    house_tech_bonus?: number;
+    role_progression?: number;
+    availability_confidence?: number;
   };
   availability_ttl_hours: number;
   offer_ttl_hours: number;
   availability_multiplier: number;
   offer_buffer: number;
   exclude_fridge: boolean;
-  soft_conflict_policy: 'warn' | 'block' | 'allow';
+  soft_conflict_policy: 'warn' | 'block' | 'allow' | 'manager_approval' | 'ignore';
   tick_interval_seconds: number;
   channel?: 'email' | 'whatsapp';
   assisted_handoff_priority?: boolean;
+  profile?: Record<string, unknown>;
+  role_profiles?: Record<string, unknown>;
+  cost_scoring?: {
+    enabled?: boolean;
+    penalty_strength?: 'disabled' | 'low' | 'normal' | 'high';
+    max_rate_penalty?: number;
+  };
+  waves?: {
+    mode?: 'manual_selection' | 'controlled_waves' | 'blast_all_eligible';
+    size_mode?: 'required_plus_buffer' | 'fixed' | 'all';
+    buffer?: number;
+    fixed_size?: number;
+    max_waves?: number;
+    wait_minutes?: number;
+    auto_send_next_wave?: boolean;
+  };
+  auto_close?: Record<string, boolean>;
+  audit?: Record<string, boolean>;
+  escalation?: Record<string, unknown>;
   escalation_steps: string[];
+}
+
+type JobProfileName =
+  | 'standard'
+  | 'high_risk_critical'
+  | 'training_friendly'
+  | 'emergency_fill'
+  | 'local_low_complexity'
+  | 'multi_day_tour'
+  | 'custom';
+
+const PROFILE_WEIGHTS: Record<JobProfileName, CampaignPolicy['weights']> = {
+  standard: {
+    skills: 0.32,
+    role_skill: 0.32,
+    reliability: 0.23,
+    fairness: 0.15,
+    proximity: 0.1,
+    experience: 0.04,
+    role_progression: 0.04,
+    cost_efficiency: 0.08,
+    house_tech_bonus: 0.05,
+    availability_confidence: 0.03,
+  },
+  high_risk_critical: {
+    skills: 0.4,
+    role_skill: 0.4,
+    reliability: 0.35,
+    fairness: 0.05,
+    proximity: 0.05,
+    experience: 0.02,
+    role_progression: 0.02,
+    cost_efficiency: 0.03,
+    house_tech_bonus: 0.1,
+    availability_confidence: 0,
+  },
+  training_friendly: {
+    skills: 0.23,
+    role_skill: 0.23,
+    reliability: 0.18,
+    fairness: 0.25,
+    proximity: 0.05,
+    experience: 0.18,
+    role_progression: 0.18,
+    cost_efficiency: 0.08,
+    house_tech_bonus: 0.03,
+    availability_confidence: 0,
+  },
+  emergency_fill: {
+    skills: 0.15,
+    role_skill: 0.15,
+    reliability: 0.3,
+    fairness: 0,
+    proximity: 0.2,
+    experience: 0,
+    role_progression: 0,
+    cost_efficiency: 0.02,
+    house_tech_bonus: 0.03,
+    availability_confidence: 0.3,
+  },
+  local_low_complexity: {
+    skills: 0.18,
+    role_skill: 0.18,
+    reliability: 0.18,
+    fairness: 0.23,
+    proximity: 0.23,
+    experience: 0.04,
+    role_progression: 0.04,
+    cost_efficiency: 0.12,
+    house_tech_bonus: 0.02,
+    availability_confidence: 0,
+  },
+  multi_day_tour: {
+    skills: 0.28,
+    role_skill: 0.28,
+    reliability: 0.28,
+    fairness: 0.04,
+    proximity: 0.04,
+    experience: 0,
+    role_progression: 0,
+    cost_efficiency: 0.1,
+    house_tech_bonus: 0.08,
+    availability_confidence: 0.18,
+  },
+  custom: {
+    skills: 0.32,
+    role_skill: 0.32,
+    reliability: 0.23,
+    fairness: 0.15,
+    proximity: 0.1,
+    experience: 0.04,
+    role_progression: 0.04,
+    cost_efficiency: 0.08,
+    house_tech_bonus: 0.05,
+    availability_confidence: 0.03,
+  },
+};
+
+const PROFILE_TIMING: Record<JobProfileName, { availability: number; offer: number; waveWait: number; buffer: number; maxWaves: number }> = {
+  standard: { availability: 24, offer: 4, waveWait: 20, buffer: 2, maxWaves: 3 },
+  high_risk_critical: { availability: 24, offer: 2, waveWait: 15, buffer: 1, maxWaves: 3 },
+  training_friendly: { availability: 24, offer: 4, waveWait: 30, buffer: 3, maxWaves: 3 },
+  emergency_fill: { availability: 4, offer: 1, waveWait: 5, buffer: 4, maxWaves: 4 },
+  local_low_complexity: { availability: 24, offer: 3, waveWait: 20, buffer: 2, maxWaves: 3 },
+  multi_day_tour: { availability: 48, offer: 4, waveWait: 30, buffer: 1, maxWaves: 3 },
+  custom: { availability: 24, offer: 4, waveWait: 20, buffer: 2, maxWaves: 3 },
+};
+
+function normalizeProfileName(value: unknown): JobProfileName {
+  const name = String(value || 'standard') as JobProfileName;
+  return Object.prototype.hasOwnProperty.call(PROFILE_WEIGHTS, name) ? name : 'standard';
+}
+
+function inferJobProfile(job: any, totalRequired: number): JobProfileName {
+  const startsAt = job?.start_time ? new Date(job.start_time) : null;
+  const startsWithinHours = startsAt && !Number.isNaN(startsAt.getTime())
+    ? (startsAt.getTime() - Date.now()) / 36e5
+    : null;
+  const type = String(job?.job_type || 'single').toLowerCase();
+
+  if (startsWithinHours !== null && startsWithinHours <= 6) return 'emergency_fill';
+  if (type === 'tourdate' || type === 'ciclo') return 'multi_day_tour';
+  if (type === 'festival' || totalRequired >= 10) return 'high_risk_critical';
+  return 'standard';
+}
+
+function isCriticalRole(roleCode: string): boolean {
+  return [
+    /\bA1\b/i,
+    /\bV1\b/i,
+    /\bPM\b/i,
+    /\bRF\b/i,
+    /CREW[\s_-]*CHIEF/i,
+    /SYSTEM/i,
+    /LEAD/i,
+    /^SND-PA(?:-|$)/i,
+    /^LGT-MON(?:-|$)/i,
+  ].some((pattern) => pattern.test(roleCode));
+}
+
+function inferRoleProfile(jobProfile: JobProfileName, roleCode: string): JobProfileName {
+  if (jobProfile === 'multi_day_tour') return 'multi_day_tour';
+  if (isCriticalRole(roleCode)) return 'high_risk_critical';
+  if (/ASSIST|HELP|RUNNER|STAGEHAND|AUX/i.test(roleCode) && jobProfile !== 'emergency_fill') {
+    return 'training_friendly';
+  }
+  return jobProfile;
+}
+
+function normalizeCampaignPolicy(
+  policy: Partial<CampaignPolicy> | null | undefined,
+  job: any,
+  roles: any[],
+  mode: 'assisted' | 'auto',
+): CampaignPolicy {
+  const basePolicy = policy || {};
+  const totalRequired = roles.reduce((sum, role) => sum + Number(role.quantity || 0), 0);
+  const inferredJobProfile = inferJobProfile(job, totalRequired);
+  const selectedJobProfile = normalizeProfileName((basePolicy.profile as any)?.selected_job_profile || inferredJobProfile);
+  const timing = PROFILE_TIMING[selectedJobProfile];
+  const roleProfiles = roles.reduce<Record<string, unknown>>((acc, role) => {
+    const roleCode = String(role.role_code || '').trim();
+    if (!roleCode) return acc;
+    const existing = (basePolicy.role_profiles as Record<string, any> | undefined)?.[roleCode];
+    const inferred = normalizeProfileName(existing?.inferred_profile || inferRoleProfile(selectedJobProfile, roleCode));
+    const selected = normalizeProfileName(existing?.selected_profile || inferred);
+    acc[roleCode] = {
+      role_code: roleCode,
+      inferred_profile: inferred,
+      selected_profile: selected,
+      manual_override: selected !== inferred,
+      required_count: Number(role.quantity || 0),
+      assigned_count: Number(existing?.assigned_count || 0),
+      is_critical: isCriticalRole(roleCode),
+    };
+    return acc;
+  }, {});
+
+  return {
+    ...basePolicy,
+    profile: {
+      infer_from_job_type: (basePolicy.profile as any)?.infer_from_job_type ?? true,
+      job_type: String(job?.job_type || 'single').toLowerCase(),
+      inferred_job_profile: inferredJobProfile,
+      selected_job_profile: selectedJobProfile,
+      manual_profile_override: selectedJobProfile !== inferredJobProfile,
+      override_reason: (basePolicy.profile as any)?.override_reason || null,
+    },
+    role_profiles: roleProfiles,
+    weights: {
+      ...PROFILE_WEIGHTS[selectedJobProfile],
+      ...(basePolicy.weights || {}),
+    },
+    availability_ttl_hours: Number(basePolicy.availability_ttl_hours || timing.availability),
+    offer_ttl_hours: Number(basePolicy.offer_ttl_hours || timing.offer),
+    availability_multiplier: Number(basePolicy.availability_multiplier || timing.buffer + 1),
+    offer_buffer: Number(basePolicy.offer_buffer ?? timing.buffer),
+    exclude_fridge: basePolicy.exclude_fridge ?? true,
+    soft_conflict_policy: basePolicy.soft_conflict_policy || (mode === 'auto' ? 'block' : 'warn'),
+    tick_interval_seconds: Number(basePolicy.tick_interval_seconds || 300),
+    channel: basePolicy.channel === 'whatsapp' ? 'whatsapp' : 'email',
+    assisted_handoff_priority: basePolicy.assisted_handoff_priority !== false,
+    cost_scoring: {
+      enabled: basePolicy.cost_scoring?.enabled ?? true,
+      penalty_strength: basePolicy.cost_scoring?.penalty_strength || 'normal',
+      max_rate_penalty: Number(basePolicy.cost_scoring?.max_rate_penalty || 10),
+    },
+    waves: {
+      mode: basePolicy.waves?.mode || 'controlled_waves',
+      size_mode: basePolicy.waves?.size_mode || 'required_plus_buffer',
+      buffer: Number(basePolicy.waves?.buffer ?? timing.buffer),
+      max_waves: Number(basePolicy.waves?.max_waves || timing.maxWaves),
+      wait_minutes: Number(basePolicy.waves?.wait_minutes || timing.waveWait),
+      auto_send_next_wave: basePolicy.waves?.auto_send_next_wave ?? mode === 'auto',
+    },
+    auto_close: {
+      close_when_filled: true,
+      stop_future_waves: true,
+      block_extra_acceptances: true,
+      confirm_booked_crew: true,
+      notify_late_responders: true,
+      notify_pending_contacted: true,
+      ...(basePolicy.auto_close || {}),
+    },
+    escalation: {
+      escalate_after_wave: timing.maxWaves,
+      minimum_auto_book_score: selectedJobProfile === 'high_risk_critical' ? 75 : 70,
+      escalate_soft_conflicts: true,
+      escalate_weak_critical_pool: true,
+      require_manager_approval_for_low_confidence: true,
+      ...(basePolicy.escalation || {}),
+    },
+    audit: {
+      log_inferred_profile: true,
+      log_profile_override: true,
+      log_score_breakdown: true,
+      log_eligibility_failures: true,
+      log_wave_contact_history: true,
+      log_rate_adjustment: true,
+      require_manual_override_reason: true,
+      generate_crew_facing_explanation: true,
+      ...(basePolicy.audit || {}),
+    },
+    escalation_steps: basePolicy.escalation_steps || ['increase_wave', 'include_fridge', 'allow_soft_conflicts'],
+  };
 }
 
 function assignmentRoleColumnForDepartment(department: string): string | null {
@@ -183,7 +452,7 @@ async function startCampaign(
     console.log('[staffing-orchestrator] Fetching job:', job_id);
     const { data: job, error: jobError } = await supabase
       .from('jobs')
-      .select('id, start_time, title')
+      .select('id, start_time, end_time, title, job_type')
       .eq('id', job_id)
       .single();
 
@@ -194,32 +463,16 @@ async function startCampaign(
       return { status: 404, body: { error: 'Job not found', job_id, jobError: jobError?.message || null, debug: { received_body: body } } };
     }
 
-    // Create campaign
-    const { data: campaign, error: createError } = await supabase
-      .from('staffing_campaigns')
-      .insert({
-        job_id,
-        department,
-        created_by: user.user_id,
-        mode,
-        status: 'active',
-        policy,
-        offer_message,
-        next_run_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-
-    if (createError) {
-      return { status: 400, body: { error: createError.message } };
-    }
-
     // Get required roles for this job+department
-    const { data: requiredRoles } = await supabase
+    const { data: requiredRoles, error: requiredRolesError } = await supabase
       .from('job_required_roles')
       .select('role_code, quantity')
       .eq('job_id', job_id)
       .eq('department', department);
+
+    if (requiredRolesError) {
+      return { status: 400, body: { error: requiredRolesError.message } };
+    }
 
     // Filter to outstanding roles only if scope='outstanding'
     let rolesToCreate = requiredRoles || [];
@@ -254,6 +507,29 @@ async function startCampaign(
         const assigned = assignedCounts.get(String(r.role_code).trim()) || 0;
         return assigned < required;
       });
+    }
+
+    const normalizedMode = mode === 'auto' ? 'auto' : 'assisted';
+    const normalizedPolicy = normalizeCampaignPolicy(policy, job, rolesToCreate, normalizedMode);
+
+    // Create campaign
+    const { data: campaign, error: createError } = await supabase
+      .from('staffing_campaigns')
+      .insert({
+        job_id,
+        department,
+        created_by: user.user_id,
+        mode: normalizedMode,
+        status: 'active',
+        policy: normalizedPolicy,
+        offer_message,
+        next_run_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      return { status: 400, body: { error: createError.message } };
     }
 
     // Create campaign roles
@@ -642,6 +918,7 @@ async function tickCampaign(
 
     const confirmedAvailabilityRowsForJob: any[] = [];
     const confirmedAvailabilityByRequestedRole = new Map<string, any[]>();
+    const contactedProfilesByRole = new Map<string, Set<string>>();
     const offerRequestProfilesByRole = new Map<string, Set<string>>();
     const offerRequestProfilesForJob = new Set<string>();
 
@@ -660,6 +937,11 @@ async function tickCampaign(
 
       if (phase === 'availability') {
         const availabilityRow = { ...r, requested_role_code: roleCode || null };
+        if (roleCode && campaignRoleCodes.has(roleCode)) {
+          const contactedProfiles = contactedProfilesByRole.get(roleCode) || new Set<string>();
+          contactedProfiles.add(profileId);
+          contactedProfilesByRole.set(roleCode, contactedProfiles);
+        }
         if (status === 'confirmed') {
           confirmedAvailabilityRowsForJob.push(availabilityRow);
           if (roleCode && campaignRoleCodes.has(roleCode)) {
@@ -675,6 +957,10 @@ async function tickCampaign(
       }
 
       if (!campaignRoleCodes.has(roleCode)) continue;
+
+      const contactedProfiles = contactedProfilesByRole.get(roleCode) || new Set<string>();
+      contactedProfiles.add(profileId);
+      contactedProfilesByRole.set(roleCode, contactedProfiles);
 
       if (status === 'pending') countsByRole[roleCode][phase].pending.add(profileId);
       if (status === 'confirmed') countsByRole[roleCode][phase].confirmed.add(profileId);
@@ -697,7 +983,7 @@ async function tickCampaign(
       const roleCode = String(role.role_code).trim();
       const required = requiredByRole.get(roleCode) || 0;
       const assigned = assignedCounts.get(roleCode) || 0;
-      const pendingAvailability = countsByRole[roleCode]?.availability.pending.size || 0;
+      let pendingAvailability = countsByRole[roleCode]?.availability.pending.size || 0;
       const matchingRequestedRole = confirmedAvailabilityByRequestedRole.get(roleCode) || [];
       const confirmedAvailability = new Set(
         matchingRequestedRole
@@ -721,6 +1007,119 @@ async function tickCampaign(
       }
 
       if (stage !== 'filled') allFilled = false;
+
+      let nextWaveNumber = Number(role.wave_number || 0);
+      let nextLastWaveAt = role.last_wave_at || null;
+
+      if (
+        campaign.mode === 'auto' &&
+        stage === 'availability' &&
+        (policy.waves?.auto_send_next_wave ?? true) &&
+        pendingAvailability === 0
+      ) {
+        const alreadyContacted = contactedProfilesByRole.get(roleCode) || new Set<string>();
+        const remainingNeeded = Math.max(0, required - assigned - acceptedOffers);
+        const waveMode = policy.waves?.mode || 'controlled_waves';
+        const waveBuffer = Number(policy.waves?.buffer ?? policy.offer_buffer ?? 1);
+        const waveSize = waveMode === 'blast_all_eligible'
+          ? 50
+          : Math.max(1, remainingNeeded + waveBuffer);
+
+        const { data: rankedCandidates, error: rankError } = await supabase.rpc('rank_staffing_candidates', {
+          p_job_id: campaign.job_id,
+          p_department: campaign.department,
+          p_role_code: roleCode,
+          p_mode: 'auto',
+          p_policy: policy,
+        });
+
+        if (rankError) {
+          autoActions.push({
+            role_code: roleCode,
+            profile_id: '',
+            phase: 'availability',
+            channel: autoChannel,
+            status: 'failed',
+            error: rankError.message,
+          });
+        } else {
+          const candidatesToContact = ((rankedCandidates || []) as any[])
+            .filter((candidate) => {
+              const profileId = String(candidate.profile_id || '');
+              return profileId && !alreadyContacted.has(profileId);
+            })
+            .slice(0, waveSize);
+
+          let sentInWave = 0;
+          for (const candidate of candidatesToContact) {
+            const profileId = String(candidate.profile_id || '');
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
+            try {
+              const response = await fetch(SEND_STAFFING_EMAIL_URL, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${SERVICE_ROLE}`,
+                  'apikey': SERVICE_ROLE,
+                },
+                body: JSON.stringify({
+                  job_id: campaign.job_id,
+                  profile_id: profileId,
+                  phase: 'availability',
+                  role: roleCode,
+                  channel: autoChannel,
+                  require_no_conflicts: true,
+                  actor_id: campaign.created_by || null,
+                  idempotency_key: `campaign:${campaign_id}:${roleCode}:${profileId}:availability:auto:${autoChannel}`,
+                }),
+                signal: controller.signal,
+              });
+
+              const payload = await response.json().catch(() => ({}));
+              if (!response.ok) {
+                autoActions.push({
+                  role_code: roleCode,
+                  profile_id: profileId,
+                  phase: 'availability',
+                  channel: autoChannel,
+                  status: 'failed',
+                  error: payload?.error || `HTTP ${response.status}`,
+                });
+                continue;
+              }
+
+              alreadyContacted.add(profileId);
+              sentInWave += 1;
+              pendingAvailability += 1;
+              autoActions.push({
+                role_code: roleCode,
+                profile_id: profileId,
+                phase: 'availability',
+                channel: autoChannel,
+                status: 'sent',
+              });
+            } catch (err) {
+              autoActions.push({
+                role_code: roleCode,
+                profile_id: profileId,
+                phase: 'availability',
+                channel: autoChannel,
+                status: 'failed',
+                error: err instanceof Error ? err.message : String(err),
+              });
+            } finally {
+              clearTimeout(timeoutId);
+            }
+          }
+
+          if (sentInWave > 0) {
+            nextWaveNumber += 1;
+            nextLastWaveAt = now.toISOString();
+          }
+        }
+      }
 
       if (shouldPrioritizeAssistedHandoff && stage === 'offer') {
         const capacity = Math.max(0, required - assigned - acceptedOffers - pendingOffers);
@@ -816,6 +1215,8 @@ async function tickCampaign(
         pending_offers: pendingOffers,
         accepted_offers: acceptedOffers,
         stage,
+        wave_number: nextWaveNumber,
+        last_wave_at: nextLastWaveAt,
         updated_at: now.toISOString(),
       });
     }
@@ -831,6 +1232,8 @@ async function tickCampaign(
           pending_offers: update.pending_offers,
           accepted_offers: update.accepted_offers,
           stage: update.stage,
+          wave_number: update.wave_number,
+          last_wave_at: update.last_wave_at,
           updated_at: update.updated_at,
         })
         .eq('id', update.id);
@@ -841,7 +1244,11 @@ async function tickCampaign(
     }
 
     const tickIntervalSeconds = Number(campaign.policy?.tick_interval_seconds || 300);
-    const nextRun = allFilled ? null : new Date(now.getTime() + tickIntervalSeconds * 1000);
+    const waveWaitSeconds = Number(campaign.policy?.waves?.wait_minutes || 0) * 60;
+    const runIntervalSeconds = campaign.mode === 'auto' && waveWaitSeconds > 0
+      ? waveWaitSeconds
+      : tickIntervalSeconds;
+    const nextRun = allFilled ? null : new Date(now.getTime() + runIntervalSeconds * 1000);
 
     const { error: campaignUpdateError } = await supabase
       .from('staffing_campaigns')

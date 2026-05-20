@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,6 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
 import { Info, Mail, MessageCircle } from 'lucide-react'
+import {
+  JOB_PROFILE_LABELS,
+  JobProfileName,
+  recommendedWaveNumber,
+} from '@/features/staffing/crewingProfiles'
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -87,6 +92,10 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   const [selectedCandidates, setSelectedCandidates] = useState<Set<string>>(new Set())
   const [expandedReasons, setExpandedReasons] = useState<string | null>(null)
   const [channel, setChannel] = useState<StaffingChannel>('email')
+
+  useEffect(() => {
+    setChannel(policy?.channel === 'whatsapp' ? 'whatsapp' : 'email')
+  }, [policy?.channel])
 
   // Fetch ranked candidates
   const { data: candidates, isLoading } = useQuery({
@@ -280,6 +289,21 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
     </div>
   )
 
+  const roleProfileName = (
+    policy?.role_profiles?.[roleCode]?.selected_profile ||
+    policy?.profile?.selected_job_profile ||
+    'standard'
+  ) as JobProfileName
+  const waveBuffer = Number(policy?.waves?.buffer ?? policy?.offer_buffer ?? 1)
+  const waveMode = String(policy?.waves?.mode || 'manual_selection')
+  const maxWaves = Number(policy?.waves?.max_waves || 3)
+  const waveLabelForIndex = (index: number) => {
+    if (waveMode === 'blast_all_eligible') return 'All eligible'
+    if (waveMode === 'manual_selection') return 'Manual wave'
+    const wave = recommendedWaveNumber(index, requiredCount, waveBuffer)
+    return wave > maxWaves ? `After Wave ${maxWaves}` : `Wave ${wave}`
+  }
+
   if (isLoading) {
     return (
       <Card>
@@ -343,8 +367,11 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
 
         {/* Candidate list */}
         <div className="space-y-2 max-h-96 overflow-y-auto">
-          {candidates.map((candidate) => {
+          {candidates.map((candidate, index) => {
             const rolelessConsultation = rolelessConsultations[candidate.profile_id]
+            const reasons = Array.isArray(candidate.reasons) ? candidate.reasons.map(String) : []
+            const rateReason = reasons.find((reason) => /rate adjustment|custom rate|candidate rate|standard role rate/i.test(reason))
+            const waveLabel = waveLabelForIndex(index)
 
             return (
               <div
@@ -371,6 +398,10 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-1">
                     <p className="font-medium text-sm">{candidate.full_name}</p>
+                    <Badge variant="outline">Rank #{index + 1}</Badge>
+                    <Badge variant="secondary">Profile: {JOB_PROFILE_LABELS[roleProfileName] || roleProfileName}</Badge>
+                    <Badge variant="outline">{waveLabel}</Badge>
+                    <Badge variant="outline">Status: Not contacted</Badge>
                     {candidate.final_score >= 80 && (
                       <Badge className="bg-green-100 text-green-800">⭐ Top</Badge>
                     )}
@@ -401,6 +432,13 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                       km
                     </div>
                     <div>Fairness: <span className="font-semibold">{candidate.fairness_score}</span>pts</div>
+                    <div>Experience: <span className="font-semibold">{candidate.experience_score}</span>pts</div>
+                    <div>
+                      Rate:{' '}
+                      <span className="font-semibold">
+                        {rateReason ? rateReason.replace(/^Rate adjustment:\s*/i, '') : 'standard'}
+                      </span>
+                    </div>
                   </div>
 
                   <div className="flex items-center gap-1">
@@ -419,7 +457,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                     </p>
                   )}
 
-                  {(Array.isArray(candidate.reasons) ? candidate.reasons : []).length > 0 && (
+                  {reasons.length > 0 && (
                     <button
                       onClick={() => setExpandedReasons(
                         expandedReasons === candidate.profile_id ? null : candidate.profile_id
@@ -433,9 +471,15 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
 
                   {expandedReasons === candidate.profile_id && (
                     <div className="mt-2 p-2 bg-blue-500/10 rounded text-xs space-y-1">
-                      {(Array.isArray(candidate.reasons) ? candidate.reasons : []).map((reason, idx) => (
+                      <p className="font-semibold text-foreground">Score Breakdown</p>
+                      {reasons.map((reason, idx) => (
                         <div key={idx} className="text-muted-foreground">• {reason}</div>
                       ))}
+                      <p className="pt-2 font-semibold text-foreground">Plain Explanation</p>
+                      <p className="text-muted-foreground">
+                        Ranked with the {JOB_PROFILE_LABELS[roleProfileName] || roleProfileName} profile using role skill,
+                        reliability, fairness, proximity, completed role history, availability signals, and configured cost rules.
+                      </p>
                     </div>
                   )}
                 </div>
