@@ -220,14 +220,14 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
 
   await page.getByRole("tab", { name: "Candidates" }).click();
 
-  await expect(page.getByText("SND-PA-T - Candidate Recommendations")).toBeVisible();
-  await expect(page.getByText("1 available")).toBeVisible();
-  await expect(page.getByText("1 pending")).toBeVisible();
+  await expect(page.getByText("SND-PA-T - Recomendaciones de candidatos")).toBeVisible();
+  await expect(page.getByText("1 disponibles")).toBeVisible();
+  await expect(page.getByText("1 pendientes")).toBeVisible();
   await expect(page.getByText("Roleless Pending")).toBeVisible();
   await expect(page.getByText("Expired Same Role")).toBeVisible();
-  await expect(page.getByText("No-role request")).toBeVisible();
-  await expect(page.getByText(/Prior manager availability request without role is pending/)).toBeVisible();
-  await page.getByRole("button", { name: /show reasons/i }).first().click();
+  await expect(page.getByText("Solicitud sin rol")).toBeVisible();
+  await expect(page.getByText(/Solicitud previa de disponibilidad sin rol: pendiente/)).toBeVisible();
+  await page.getByRole("button", { name: /ver motivos/i }).first().click();
   await expect(page.getByText("Role experience: 4 completed SND-PA jobs")).toBeVisible();
   await expect(page.getByText("Same Role Pending")).toHaveCount(0);
   await expect(page.getByText("Roleless Declined")).toHaveCount(0);
@@ -239,12 +239,12 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
     p_role_code: "SND-PA-T",
   });
 
-  await page.getByRole("combobox", { name: "Select availability channel" }).click();
+  await page.getByRole("combobox", { name: "Seleccionar canal de disponibilidad" }).click();
   await page.getByRole("option", { name: "WhatsApp" }).click();
-  await page.getByRole("checkbox", { name: /select all/i }).click();
-  await page.getByRole("button", { name: /send availability/i }).click();
+  await page.getByRole("checkbox", { name: /seleccionar todos/i }).click();
+  await page.getByRole("button", { name: /enviar disponibilidad/i }).click();
 
-  await expect(page.getByText("No candidates available for SND-PA-T")).toBeVisible();
+  await expect(page.getByText("No hay candidatos disponibles para SND-PA-T")).toBeVisible();
 
   await page.getByRole("tab", { name: "Offers" }).click();
   await expect(page.getByText("Availability: 1 yes")).toBeVisible();
