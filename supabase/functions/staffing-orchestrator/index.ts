@@ -860,7 +860,7 @@ async function tickCampaign(
         .eq('department', campaign.department),
       supabase
         .from('job_assignments')
-        .select(`status, ${assignmentColumn}`)
+        .select(`status, technician_id, ${assignmentColumn}`)
         .eq('job_id', campaign.job_id),
       supabase
         .from('staffing_requests')
@@ -881,6 +881,15 @@ async function tickCampaign(
 
     // Assigned counts (matches JobAssignmentMatrix logic)
     const assignedCounts = new Map<string, number>();
+    const assignedProfilesByRole = new Map<string, Set<string>>();
+    const anonymousAssignedCountsByRole = new Map<string, number>();
+    const refreshAssignedCount = (roleCode: string) => {
+      assignedCounts.set(
+        roleCode,
+        (assignedProfilesByRole.get(roleCode)?.size || 0) +
+          (anonymousAssignedCountsByRole.get(roleCode) || 0),
+      );
+    };
     (assignments || []).forEach((row: any) => {
       const status = String(row.status || '').toLowerCase();
       if (status === 'declined') return;
@@ -888,7 +897,16 @@ async function tickCampaign(
       if (!roleCode) return;
       const key = String(roleCode).trim();
       if (!key) return;
-      assignedCounts.set(key, (assignedCounts.get(key) || 0) + 1);
+      const profileId = String(row.technician_id || '');
+      if (profileId) {
+        const profiles = assignedProfilesByRole.get(key) || new Set<string>();
+        profiles.add(profileId);
+        assignedProfilesByRole.set(key, profiles);
+        refreshAssignedCount(key);
+      } else {
+        anonymousAssignedCountsByRole.set(key, (anonymousAssignedCountsByRole.get(key) || 0) + 1);
+        refreshAssignedCount(key);
+      }
     });
 
     // Resolve role_code per staffing_request via the latest send event (email/whatsapp)
@@ -944,6 +962,7 @@ async function tickCampaign(
     const contactedProfilesByRole = new Map<string, Set<string>>();
     const offerRequestProfilesByRole = new Map<string, Set<string>>();
     const offerRequestProfilesForJob = new Set<string>();
+    const activeOfferProfilesForJob = new Set<string>();
 
     for (const r of requestRows) {
       const roleCode = requestIdToRole.get(String(r.id));
@@ -956,6 +975,9 @@ async function tickCampaign(
 
       if (phase === 'offer' && ['pending', 'confirmed', 'declined'].includes(status)) {
         offerRequestProfilesForJob.add(profileId);
+      }
+      if (phase === 'offer' && ['pending', 'confirmed'].includes(status)) {
+        activeOfferProfilesForJob.add(profileId);
       }
 
       if (phase === 'availability') {
@@ -1005,25 +1027,52 @@ async function tickCampaign(
     for (const role of (campaignRoles || []) as any[]) {
       const roleCode = String(role.role_code).trim();
       const required = requiredByRole.get(roleCode) || 0;
+      const assignedProfiles = assignedProfilesByRole.get(roleCode) || new Set<string>();
       const assigned = assignedCounts.get(roleCode) || 0;
-      let pendingAvailability = countsByRole[roleCode]?.availability.pending.size || 0;
+      const pendingAvailabilityProfiles = countsByRole[roleCode]?.availability.pending || new Set<string>();
+      const pendingOfferProfiles = countsByRole[roleCode]?.offer.pending || new Set<string>();
+      const acceptedOfferProfiles = countsByRole[roleCode]?.offer.confirmed || new Set<string>();
+      let pendingAvailability = pendingAvailabilityProfiles.size;
       const matchingRequestedRole = confirmedAvailabilityByRequestedRole.get(roleCode) || [];
       const confirmedAvailability = new Set(
         matchingRequestedRole
           .map((request: any) => String(request.profile_id || ''))
           .filter(Boolean),
       ).size;
-      let pendingOffers = countsByRole[roleCode]?.offer.pending.size || 0;
-      const acceptedOffers = countsByRole[roleCode]?.offer.confirmed.size || 0;
+      let pendingOffers = pendingOfferProfiles.size;
+      const acceptedOffers = acceptedOfferProfiles.size;
+      const acceptedOffersNotAssigned = Array.from(acceptedOfferProfiles)
+        .filter((profileId) => !assignedProfiles.has(profileId))
+        .length;
+      const pendingOffersForCapacity = Array.from(pendingOfferProfiles)
+        .filter((profileId) => !assignedProfiles.has(profileId) && !acceptedOfferProfiles.has(profileId))
+        .length;
+      const pendingAvailabilityForCapacity = Array.from(pendingAvailabilityProfiles)
+        .filter((profileId) =>
+          !assignedProfiles.has(profileId) &&
+          !acceptedOfferProfiles.has(profileId) &&
+          !pendingOfferProfiles.has(profileId) &&
+          !activeOfferProfilesForJob.has(profileId)
+        )
+        .length;
       const hasConfirmedAvailabilityForRole = matchingRequestedRole.some((request: any) => {
         const profileId = String(request.profile_id || '');
-        return profileId && !offerRequestProfilesForJob.has(profileId);
+        return profileId && !assignedProfiles.has(profileId) && !offerRequestProfilesForJob.has(profileId);
       });
+      const confirmedAvailabilityReadyCount = new Set(
+        matchingRequestedRole
+          .map((request: any) => String(request.profile_id || ''))
+          .filter((profileId) =>
+            profileId &&
+            !assignedProfiles.has(profileId) &&
+            !offerRequestProfilesForJob.has(profileId)
+          ),
+      ).size;
 
       let stage = 'idle';
       if (required <= 0 || assigned >= required) {
         stage = 'filled';
-      } else if (pendingOffers > 0 || acceptedOffers > 0 || hasConfirmedAvailabilityForRole) {
+      } else if (pendingOffersForCapacity > 0 || acceptedOffersNotAssigned > 0 || hasConfirmedAvailabilityForRole) {
         stage = 'offer';
       } else {
         stage = 'availability';
@@ -1033,21 +1082,26 @@ async function tickCampaign(
 
       let nextWaveNumber = Number(role.wave_number || 0);
       let nextLastWaveAt = role.last_wave_at || null;
+      const pipelineCoverage = assigned +
+        acceptedOffersNotAssigned +
+        pendingOffersForCapacity +
+        confirmedAvailabilityReadyCount +
+        pendingAvailabilityForCapacity;
+      const availabilityShortfall = Math.max(0, required - pipelineCoverage);
 
       if (
         campaign.mode === 'auto' &&
-        stage === 'availability' &&
+        stage !== 'filled' &&
         (policy.waves?.auto_send_next_wave ?? true) &&
-        pendingAvailability === 0
+        availabilityShortfall > 0
       ) {
         const alreadyContacted = contactedProfilesByRole.get(roleCode) || new Set<string>();
-        const remainingNeeded = Math.max(0, required - assigned - acceptedOffers);
         const waveMode = policy.waves?.mode || 'controlled_waves';
         const waveBuffer = Number(policy.waves?.buffer ?? policy.offer_buffer ?? 1);
         const fixedWaveSize = Math.max(1, Number(policy.waves?.fixed_size || 50));
         const waveSize = waveMode === 'blast_all_eligible'
           ? fixedWaveSize
-          : Math.max(1, remainingNeeded + waveBuffer);
+          : Math.max(1, availabilityShortfall + waveBuffer);
 
         const { data: rankedCandidates, error: rankError } = await supabase.rpc('rank_staffing_candidates', {
           p_job_id: campaign.job_id,
@@ -1149,12 +1203,12 @@ async function tickCampaign(
       }
 
       if (shouldPrioritizeAssistedHandoff && stage === 'offer') {
-        const capacity = Math.max(0, required - assigned - acceptedOffers - pendingOffers);
+        const capacity = Math.max(0, required - assigned - acceptedOffersNotAssigned - pendingOffersForCapacity);
         const profilesWithOffer = offerRequestProfilesByRole.get(roleCode) || new Set<string>();
         const confirmedAvailabilityRows = matchingRequestedRole
           .filter((request: any) => {
             const profileId = String(request.profile_id || '');
-            return profileId && !profilesWithOffer.has(profileId) && !offerRequestProfilesForJob.has(profileId);
+            return profileId && !assignedProfiles.has(profileId) && !profilesWithOffer.has(profileId) && !offerRequestProfilesForJob.has(profileId);
           })
           .sort((a: any, b: any) => {
             const aTime = new Date(a.updated_at || 0).getTime();
