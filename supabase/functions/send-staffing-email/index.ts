@@ -164,6 +164,88 @@ function isUuid(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+type StaffingPushChannel = 'email' | 'whatsapp';
+
+function emitStaffingPush(params: {
+  channel: StaffingPushChannel;
+  jobId: string;
+  profileId: string;
+  actorId: string | null;
+  department: string | null;
+  staffingRequestId: string;
+  phase: string;
+  roleCode: string | null;
+  targetDate: string | null;
+  singleDay: boolean;
+  requestOrigin: unknown;
+  campaignId: unknown;
+}) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 2_000);
+  const eventType = params.phase === 'availability'
+    ? 'staffing.availability.sent'
+    : 'staffing.offer.sent';
+
+  const pushPromise = fetch(`${SUPABASE_URL}/functions/v1/push`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${SERVICE_ROLE}`,
+      apikey: SERVICE_ROLE,
+    },
+    signal: controller.signal,
+    body: JSON.stringify({
+      action: 'broadcast',
+      type: eventType,
+      job_id: params.jobId,
+      actor_id: params.actorId,
+      recipient_id: params.profileId,
+      department: params.department,
+      channel: params.channel,
+      target_date: params.targetDate,
+      single_day: params.singleDay,
+      staffing_request_id: params.staffingRequestId,
+      role_code: params.roleCode,
+      request_origin: params.requestOrigin ?? null,
+      campaign_id: params.campaignId ?? null,
+    }),
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        const body = await response.text().catch(() => '');
+        console.warn('[send-staffing-email] Push broadcast returned non-OK', {
+          channel: params.channel,
+          status: response.status,
+          body: body.slice(0, 500),
+          staffing_request_id: params.staffingRequestId,
+          phase: params.phase,
+          role_code: params.roleCode,
+          target_date: params.targetDate,
+        });
+      }
+    })
+    .catch((pushError) => {
+      const timedOut = controller.signal.aborted;
+      console.warn('[send-staffing-email] Failed to emit push', {
+        channel: params.channel,
+        message: timedOut
+          ? 'timeout'
+          : pushError instanceof Error ? pushError.message : String(pushError),
+        staffing_request_id: params.staffingRequestId,
+        phase: params.phase,
+        role_code: params.roleCode,
+        target_date: params.targetDate,
+      });
+    })
+    .finally(() => clearTimeout(timeoutId));
+
+  if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
+    EdgeRuntime.waitUntil(pushPromise);
+  } else {
+    void pushPromise;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -184,8 +266,9 @@ serve(async (req) => {
     }
     console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
 
-    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, require_no_conflicts, idempotency_key } = body;
+    const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, require_no_conflicts, idempotency_key, request_origin, campaign_id, department } = body;
     const roleCode = typeof role === 'string' && role.trim().length > 0 ? role.trim() : null;
+    const departmentHint = typeof department === 'string' && department.trim().length > 0 ? department.trim() : null;
     const roleCodePatch = roleCode && phase === 'offer' ? { role_code: roleCode } : {};
     const datesArrayRaw: unknown = (body as any)?.dates;
     const shouldOverrideConflicts = Boolean(override_conflicts);
@@ -346,7 +429,7 @@ serve(async (req) => {
 
       // Step 2: Fetch job and profile data
       console.log('🔍 FETCHING JOB AND PROFILE DATA...');
-      const [jobResult, techResult, actorResult] = await Promise.all([
+      const [jobResult, techResult, actorResult, roleDepartmentResult] = await Promise.all([
         supabase.from("jobs")
           .select(`
             id,
@@ -358,7 +441,15 @@ serve(async (req) => {
           .eq("id", job_id)
           .maybeSingle(),
         supabase.from("profiles").select("id,first_name,last_name,email,phone").eq("id", profile_id).maybeSingle(),
-        actorId ? supabase.from("profiles").select("waha_endpoint").eq("id", actorId).maybeSingle() : Promise.resolve({ data: null, error: null })
+        actorId ? supabase.from("profiles").select("waha_endpoint").eq("id", actorId).maybeSingle() : Promise.resolve({ data: null, error: null }),
+        roleCode && !departmentHint
+          ? supabase.from("job_required_roles")
+            .select("department")
+            .eq("job_id", job_id)
+            .eq("role_code", roleCode)
+            .order("department", { ascending: true })
+            .limit(1)
+          : Promise.resolve({ data: null, error: null }),
       ]);
       
       console.log('📋 JOB RESULT:', { data: jobResult.data, error: jobResult.error });
@@ -366,6 +457,9 @@ serve(async (req) => {
         data: techResult.data ? { ...techResult.data, email: techResult.data.email ? '***@***.***' : null } : null, 
         error: techResult.error 
       });
+      if (roleDepartmentResult.error) {
+        console.warn('⚠️ ROLE DEPARTMENT LOOKUP FAILED (non-blocking):', roleDepartmentResult.error);
+      }
 
       if (jobResult.error) {
         console.error('❌ JOB FETCH ERROR:', jobResult.error);
@@ -391,6 +485,11 @@ serve(async (req) => {
       
       const job = jobResult.data;
       const tech = techResult.data;
+      const roleDepartmentRows = Array.isArray(roleDepartmentResult.data)
+        ? roleDepartmentResult.data as Array<{ department?: string | null }>
+        : [];
+      const roleDepartment = roleDepartmentRows[0]?.department ?? null;
+      const staffingDepartment = departmentHint || roleDepartment;
       
       if (!job) {
         console.error('❌ JOB NOT FOUND:', job_id);
@@ -1365,6 +1464,8 @@ serve(async (req) => {
             phase,
             status: waOk ? 200 : (lastStatus ?? 0),
             role: roleCode,
+            request_origin: request_origin ?? null,
+            campaign_id: campaign_id ?? null,
             single_day: isSingleDayRequest || isBatch,
             target_date: normalizedTargetDate,
             dates: normalizedDates,
@@ -1373,22 +1474,20 @@ serve(async (req) => {
         });
 
         if (waOk) {
-          try {
-            await fetch(`${SUPABASE_URL}/functions/v1/push`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
-              body: JSON.stringify({
-                type: phase === 'availability' ? 'staffing.availability.requested' : 'staffing.offer.requested',
-                job_id,
-                actor_id: actorId || null,
-                department: job.department || null,
-                recipients: [profile_id],
-                data: { staffing_request_id: insertedId, phase, channel: 'whatsapp', role_code: roleCode, target_date: normalizedTargetDate },
-              }),
-            });
-          } catch (pushError) {
-            console.warn('[send-staffing-email] Failed to emit push (whatsapp)', pushError);
-          }
+          emitStaffingPush({
+            channel: 'whatsapp',
+            jobId: job_id,
+            profileId: profile_id,
+            actorId: actorId || null,
+            department: staffingDepartment,
+            staffingRequestId: insertedId,
+            phase,
+            roleCode,
+            targetDate: normalizedTargetDate,
+            singleDay: isSingleDayRequest || isBatch,
+            requestOrigin: request_origin,
+            campaignId: campaign_id,
+          });
           try {
             const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';
             await supabase.rpc('log_activity_as', {
@@ -1429,6 +1528,8 @@ serve(async (req) => {
             status: sendRes.status,
             role: roleCode,
             message: message ?? null,
+            request_origin: request_origin ?? null,
+            campaign_id: campaign_id ?? null,
             single_day: isSingleDayRequest || isBatch,
             target_date: normalizedTargetDate,
             dates: normalizedDates,
@@ -1436,22 +1537,20 @@ serve(async (req) => {
           }
         });
         if (sendRes.ok) {
-          try {
-            await fetch(`${SUPABASE_URL}/functions/v1/push`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SERVICE_ROLE}`, apikey: SERVICE_ROLE },
-              body: JSON.stringify({
-                type: phase === 'availability' ? 'staffing.availability.requested' : 'staffing.offer.requested',
-                job_id,
-                actor_id: actorId || null,
-                department: job.department || null,
-                recipients: [profile_id],
-                data: { staffing_request_id: insertedId, phase, channel: 'email', role_code: roleCode, target_date: normalizedTargetDate },
-              }),
-            });
-          } catch (pushError) {
-            console.warn('[send-staffing-email] Failed to emit push (email)', pushError);
-          }
+          emitStaffingPush({
+            channel: 'email',
+            jobId: job_id,
+            profileId: profile_id,
+            actorId: actorId || null,
+            department: staffingDepartment,
+            staffingRequestId: insertedId,
+            phase,
+            roleCode,
+            targetDate: normalizedTargetDate,
+            singleDay: isSingleDayRequest || isBatch,
+            requestOrigin: request_origin,
+            campaignId: campaign_id,
+          });
           try {
             const activityCode = phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent';
             await supabase.rpc('log_activity_as', {

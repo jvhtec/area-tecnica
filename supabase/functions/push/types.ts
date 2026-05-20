@@ -84,6 +84,10 @@ export type BroadcastBody = {
   assignment_status?: string; // confirmed | invited (for direct assignments)
   target_date?: string;
   single_day?: boolean;
+  staffing_request_id?: string;
+  role_code?: string | null;
+  request_origin?: string | null;
+  campaign_id?: string | null;
   changes?: Record<string, { from?: unknown; to?: unknown } | unknown> | Record<string, unknown>;
   message_preview?: string;
   message_id?: string;
