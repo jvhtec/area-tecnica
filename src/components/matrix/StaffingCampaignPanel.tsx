@@ -398,6 +398,10 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
       })
       setShowStartDialog(false)
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', jobId, department) })
+      if (data?.campaign?.id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign_roles', data.campaign.id) })
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_availability_responses', jobId) })
     },
     onError: (error: any) => {
       toast({
@@ -412,8 +416,9 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
   const updateMutation = useMutation({
     mutationFn: async () => {
       const policy = buildPolicyPayload()
+      const switchingToAuto = formData.mode === 'auto' && campaign?.mode !== 'auto'
 
-      const nextRunUpdate = formData.mode === 'auto' && campaign?.mode === 'assisted'
+      const nextRunUpdate = switchingToAuto
         ? { next_run_at: new Date().toISOString() }
         : {}
 
@@ -430,11 +435,34 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         .single()
 
       if (error) throw error
+
+      if (switchingToAuto) {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/staffing-orchestrator?action=nudge`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${(await dataLayerClient.auth.getSession()).data.session?.access_token}`
+            },
+            body: JSON.stringify({ campaign_id: campaign?.id })
+          }
+        )
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Failed to start auto staffing tick')
+        }
+      }
+
       return data
     },
     onSuccess: () => {
       toast({ title: 'Settings updated' })
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', jobId, department) })
+      if (campaign?.id) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign_roles', campaign.id) })
+      }
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_availability_responses', jobId) })
     },
     onError: (error: any) => {
       toast({
