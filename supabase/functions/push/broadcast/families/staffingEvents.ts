@@ -1,10 +1,15 @@
 import type { BroadcastEventContext, BroadcastHandlerResult } from "../eventContext.ts";
 import { setBroadcastMessage } from "../eventContext.ts";
+import {
+  CARLOS_AGENT_NAME,
+  isCarlosStaffingRequest,
+} from "../staffingIdentity.ts";
 
 export async function handleStaffingEvents(context: BroadcastEventContext): Promise<BroadcastHandlerResult> {
   const { type, body, actor, recipName, channelLabel, jobTitle, state, audience } = context;
   const isStaffingEvent = type.startsWith('staffing.');
   const recipientId = body.recipient_id?.trim();
+  const sentByCarlos = isCarlosStaffingRequest(body.request_origin);
 
   if (isStaffingEvent && !recipientId) {
     audience.clearAllRecipients();
@@ -12,14 +17,22 @@ export async function handleStaffingEvents(context: BroadcastEventContext): Prom
   }
 
   if (type === 'staffing.availability.sent') {
-    setBroadcastMessage(state, 'Solicitud de disponibilidad enviada', `${actor} envió solicitud a ${recipName || 'técnico'} (${channelLabel}).`);
+    setBroadcastMessage(
+      state,
+      sentByCarlos ? `Solicitud enviada por ${CARLOS_AGENT_NAME}` : 'Solicitud de disponibilidad enviada',
+      `${actor} envió solicitud a ${recipName || 'técnico'} (${channelLabel}).`,
+    );
     audience.addNaturalRecipients(await context.getScopedManagementIds(recipientId, 'staffing.availability.sent'));
     audience.addRecipients([recipientId]);
     return true;
   }
 
   if (type === 'staffing.offer.sent') {
-    setBroadcastMessage(state, 'Oferta enviada', `${actor} envió oferta a ${recipName || 'técnico'} (${channelLabel}).`);
+    setBroadcastMessage(
+      state,
+      sentByCarlos ? `Oferta enviada por ${CARLOS_AGENT_NAME}` : 'Oferta enviada',
+      `${actor} envió oferta a ${recipName || 'técnico'} (${channelLabel}).`,
+    );
     audience.addNaturalRecipients(await context.getScopedManagementIds(recipientId, 'staffing.offer.sent'));
     audience.addRecipients([recipientId]);
     return true;

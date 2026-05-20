@@ -24,6 +24,76 @@ import {
   buildTourDateTypeChangedMessage,
 } from "../messages/tourMessages.ts";
 import type { BroadcastBody } from "../../types.ts";
+import type { BroadcastEventContext } from "../eventContext.ts";
+import { handleStaffingEvents } from "../families/staffingEvents.ts";
+import { CARLOS_AGENT_NAME } from "../staffingIdentity.ts";
+
+function createStaffingContext(overrides: Partial<BroadcastEventContext> = {}): BroadcastEventContext {
+  const state = { title: "", text: "", url: "/jobs/job-1", metaExtras: {} };
+  const recipients = new Set<string>();
+  const naturalRecipients = new Set<string>();
+  const management = new Set<string>();
+  const soundDept = new Set<string>();
+  const admin = new Set<string>();
+  const mgmt = new Set<string>();
+  const participants = new Set<string>();
+  const audience = {
+    recipients,
+    naturalRecipients,
+    management,
+    soundDept,
+    admin,
+    mgmt,
+    participants,
+    addRecipients: (ids: (string | null | undefined)[]) => {
+      ids.forEach((id) => {
+        if (id) recipients.add(id);
+      });
+    },
+    addNaturalRecipients: (ids: (string | null | undefined)[]) => {
+      ids.forEach((id) => {
+        if (id) naturalRecipients.add(id);
+      });
+    },
+    clearAllRecipients: () => {
+      recipients.clear();
+      naturalRecipients.clear();
+      management.clear();
+      soundDept.clear();
+      admin.clear();
+      mgmt.clear();
+      participants.clear();
+    },
+  };
+
+  return {
+    client: {} as BroadcastEventContext["client"],
+    userId: "manager-1",
+    body: {
+      action: "broadcast",
+      type: "staffing.offer.sent",
+      recipient_id: "tech-1",
+      request_origin: "auto_staffing",
+    },
+    type: "staffing.offer.sent",
+    jobId: "job-1",
+    jobTitle: "RBF",
+    jobDepartment: "sound",
+    jobType: null,
+    tourName: null,
+    routes: [],
+    actor: CARLOS_AGENT_NAME,
+    recipName: "Ana",
+    channelLabel: "email",
+    normalizedTargetDate: null,
+    formattedTargetDate: null,
+    singleDayFlag: false,
+    state,
+    audience,
+    getScopedManagementIds: async () => ["manager-2"],
+    ...overrides,
+  };
+}
 
 describe("push broadcast event message builders", () => {
   it("summarizes job update fields with Spanish labels", () => {
@@ -142,5 +212,32 @@ describe("push broadcast event message builders", () => {
       title: "Fecha cambiada a Viaje",
       text: 'Eva cambió "Madrid" a Viaje en "Gira Primavera".',
     });
+  });
+
+  it("brands auto-staffing offer sends as C.A.R.L.O.S.", async () => {
+    const context = createStaffingContext();
+
+    await expect(handleStaffingEvents(context)).resolves.toBe(true);
+
+    expect(context.state.title).toBe("Oferta enviada por C.A.R.L.O.S.");
+    expect(context.state.text).toBe("C.A.R.L.O.S. envió oferta a Ana (email).");
+    expect(context.audience.recipients.has("tech-1")).toBe(true);
+    expect(context.audience.naturalRecipients.has("manager-2")).toBe(true);
+  });
+
+  it("keeps manual staffing offer sends attributed to the user", async () => {
+    const context = createStaffingContext({
+      actor: "Laura",
+      body: {
+        action: "broadcast",
+        type: "staffing.offer.sent",
+        recipient_id: "tech-1",
+      },
+    });
+
+    await expect(handleStaffingEvents(context)).resolves.toBe(true);
+
+    expect(context.state.title).toBe("Oferta enviada");
+    expect(context.state.text).toBe("Laura envió oferta a Ana (email).");
   });
 });

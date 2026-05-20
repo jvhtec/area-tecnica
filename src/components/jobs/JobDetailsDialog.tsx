@@ -20,6 +20,7 @@ import { JobDetailsPersonnelTab } from "./job-details-dialog/tabs/JobDetailsPers
 import { JobDetailsRestaurantsTab } from "./job-details-dialog/tabs/JobDetailsRestaurantsTab";
 import { JobDetailsWeatherTab } from "./job-details-dialog/tabs/JobDetailsWeatherTab";
 import { StaffingOrchestratorPanel } from "@/components/matrix/StaffingOrchestratorPanel";
+import { CARLOS_AGENT_NAME } from "@/features/staffing/carlos";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
 import { canAccessExpenses, canAssignPersonnel, canManagePayouts, isManagementRole, isTechnicianRole } from "@/utils/permissions";
 import { getVisibleFinancialTechnicianIds } from "@/components/jobs/financialViewerScope";
@@ -237,7 +238,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
               )}
               {!isDryhire && canSeeAutoStaffing && (
                 <TabsTrigger value="staffing" className="py-2">
-                  Auto staffing
+                  {CARLOS_AGENT_NAME}
                 </TabsTrigger>
               )}
               {!isDryhire && (

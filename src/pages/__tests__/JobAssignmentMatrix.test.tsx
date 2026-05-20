@@ -598,10 +598,10 @@ describe('JobAssignmentMatrix', () => {
     await user.click(reminderButton);
 
     await waitFor(() => {
-      expect(screen.getByText(/Auto staffing/i)).toBeInTheDocument();
+      expect(screen.getByText(/C\.A\.R\.L\.O\.S\./i)).toBeInTheDocument();
     });
 
-    const autoStaffingButton = screen.getByText(/Auto staffing/i);
+    const autoStaffingButton = screen.getByText(/C\.A\.R\.L\.O\.S\./i);
     await user.click(autoStaffingButton);
 
     await waitFor(() => {

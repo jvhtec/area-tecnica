@@ -20,9 +20,14 @@ import {
   inferJobProfile,
   JobProfileName,
 } from '@/features/staffing/crewingProfiles'
+import {
+  CARLOS_AGENT_NAME,
+  CARLOS_AUTO_MODE_LABEL,
+} from '@/features/staffing/carlos'
 
 
 import { queryKeys } from "@/lib/react-query";
+
 interface StaffingCampaignPanelProps {
   jobId: string
   department: string
@@ -450,7 +455,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         )
         const payload = await response.json().catch(() => ({}))
         if (!response.ok) {
-          throw new Error(payload?.error || 'Failed to start auto staffing tick')
+          throw new Error(payload?.error || `No se pudo iniciar el ciclo de ${CARLOS_AGENT_NAME}`)
         }
       }
 
@@ -775,7 +780,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           checked={formData.autoSendNextWave}
           onChange={(e) => setFormData({ ...formData, autoSendNextWave: e.target.checked })}
         />
-        <span className="text-sm">Enviar siguiente oleada automáticamente en modo Auto</span>
+        <span className="text-sm">Enviar siguiente oleada automáticamente con {CARLOS_AGENT_NAME}</span>
       </label>
 
       <div className="rounded border bg-background p-3 text-xs text-muted-foreground">
@@ -810,9 +815,10 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                 {/* Mode Selection */}
                 <div>
                   <label className="text-sm font-medium">Mode</label>
-                  <div className="flex gap-4 mt-2">
-                    <label className="flex items-center gap-2 cursor-pointer">
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-4">
+                    <label className="flex min-w-0 items-start gap-2 cursor-pointer">
                       <input
+                        className="mt-1"
                         type="radio"
                         name="mode"
                         value="assisted"
@@ -821,15 +827,16 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                       />
                       <span className="text-sm">Assisted (Manager-controlled)</span>
                     </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
+                    <label className="flex min-w-0 items-start gap-2 cursor-pointer">
                       <input
+                        className="mt-1"
                         type="radio"
                         name="mode"
                         value="auto"
                         checked={formData.mode === 'auto'}
                         onChange={() => updateMode('auto')}
                       />
-                      <span className="text-sm">Auto (System-driven)</span>
+                      <span className="text-sm leading-snug">{CARLOS_AUTO_MODE_LABEL}</span>
                     </label>
                   </div>
                 </div>
@@ -927,11 +934,11 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                     onChange={(e) => setFormData({ ...formData, softConflictPolicy: e.target.value as any })}
                     className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
                   >
-                    <option value="block">Block (Auto mode default)</option>
-                    <option value="warn">Warn (Assisted mode)</option>
-                    <option value="manager_approval">Manager approval</option>
-                    <option value="ignore">Ignore</option>
-                    <option value="allow">Allow (legacy escalation)</option>
+                    <option value="block">Bloquear (predeterminado de {CARLOS_AGENT_NAME})</option>
+                    <option value="warn">Avisar (modo asistido)</option>
+                    <option value="manager_approval">Aprobación de responsable</option>
+                    <option value="ignore">Ignorar</option>
+                    <option value="allow">Permitir (escalado heredado)</option>
                   </select>
                 </div>
 
@@ -1020,7 +1027,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-gray-600">Mode</p>
-            <p className="font-medium">{campaign.mode === 'assisted' ? 'Assisted' : 'Automatic'}</p>
+            <p className="font-medium">{campaign.mode === 'assisted' ? 'Asistido' : CARLOS_AGENT_NAME}</p>
           </div>
           <div>
             <p className="text-gray-600">Created</p>
@@ -1070,9 +1077,10 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
             {/* Mode Selection */}
             <div>
               <label className="text-sm font-medium">Mode</label>
-              <div className="flex gap-4 mt-2">
-                <label className="flex items-center gap-2 cursor-pointer">
+              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:gap-4">
+                <label className="flex min-w-0 items-start gap-2 cursor-pointer">
                   <input
+                    className="mt-1"
                     type="radio"
                     name="active_mode"
                     value="assisted"
@@ -1081,15 +1089,16 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                   />
                   <span className="text-sm">Assisted (Manager-controlled)</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer">
+                <label className="flex min-w-0 items-start gap-2 cursor-pointer">
                   <input
+                    className="mt-1"
                     type="radio"
                     name="active_mode"
                     value="auto"
                     checked={formData.mode === 'auto'}
                     onChange={() => updateMode('auto')}
                   />
-                  <span className="text-sm">Auto (System-driven)</span>
+                  <span className="text-sm leading-snug">{CARLOS_AUTO_MODE_LABEL}</span>
                 </label>
               </div>
             </div>
@@ -1160,11 +1169,11 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                 onChange={(e) => setFormData({ ...formData, softConflictPolicy: e.target.value as any })}
                 className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
               >
-                <option value="block">Block (Auto mode default)</option>
-                <option value="warn">Warn (Assisted mode)</option>
-                <option value="manager_approval">Manager approval</option>
-                <option value="ignore">Ignore</option>
-                <option value="allow">Allow (legacy escalation)</option>
+                <option value="block">Bloquear (predeterminado de {CARLOS_AGENT_NAME})</option>
+                <option value="warn">Avisar (modo asistido)</option>
+                <option value="manager_approval">Aprobación de responsable</option>
+                <option value="ignore">Ignorar</option>
+                <option value="allow">Permitir (escalado heredado)</option>
               </select>
             </div>
 
@@ -1180,7 +1189,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
               </select>
               {campaign.mode === 'assisted' && formData.mode === 'auto' && (
                 <p className="text-xs text-gray-600 mt-1">
-                  Auto mode will use existing assisted availability and offer responses before contacting new candidates.
+                  {CARLOS_AGENT_NAME} usará respuestas existentes de disponibilidad y oferta en modo asistido antes de contactar nuevos candidatos.
                 </p>
               )}
             </div>

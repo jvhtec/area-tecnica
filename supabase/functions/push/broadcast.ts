@@ -23,6 +23,11 @@ import {
 import { formatSpanishMediumDate, normalizeDateKey } from "./broadcast/date.ts";
 import { routeBroadcastEvent } from "./broadcast/eventRouter.ts";
 import { getScopedManagementIds as resolveScopedManagementIds } from "./broadcast/recipients.ts";
+import {
+  CARLOS_AGENT_DESCRIPTION,
+  CARLOS_AGENT_NAME,
+  isCarlosStaffingRequest,
+} from "./broadcast/staffingIdentity.ts";
 import type {
   BroadcastEventContext,
   BroadcastMessageState,
@@ -60,6 +65,7 @@ export async function handleBroadcast(
   const tourId = body.tour_id;
   const tourName = body.tour_name || (await getTourName(client, tourId)) || null;
   const routes = await getPushNotificationRoutes(client, type);
+  const sentByCarlos = isCarlosStaffingRequest(body.request_origin);
 
   const recipients = new Set<string>();
   const naturalRecipients = new Set<string>();
@@ -95,7 +101,9 @@ export async function handleBroadcast(
 
   const url = validateInternalUrl(body.url) || resolveNotificationUrl(type, jobId, tourId, jobType);
   const actorIdForLookup = body.actor_id || userId;
-  const actor = body.actor_name || (await getProfileDisplayName(client, actorIdForLookup)) || 'Alguien';
+  const actor = sentByCarlos
+    ? CARLOS_AGENT_NAME
+    : body.actor_name || (await getProfileDisplayName(client, actorIdForLookup)) || 'Alguien';
   const recipName = body.recipient_name || (await getProfileDisplayName(client, body.recipient_id)) || '';
   const channelLabel = channelEs(body.channel);
   const rawTargetDate = typeof body.target_date === 'string' ? body.target_date : undefined;
@@ -199,6 +207,7 @@ export async function handleBroadcast(
       tourId,
       tourName: tourName ?? undefined,
       actor,
+      ...(sentByCarlos ? { actorDescription: CARLOS_AGENT_DESCRIPTION } : {}),
       recipient: recipName,
       channel: channelLabel,
       ...(body.department ? { department: body.department } : {}),
