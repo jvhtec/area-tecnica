@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -7,6 +7,19 @@ import { Badge } from '@/components/ui/badge'
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
 import { format } from 'date-fns'
+import {
+  JOB_PROFILE_LABELS,
+  PROFILE_DEFAULTS,
+  PROFILE_OPTIONS,
+  RatePenaltyStrength,
+  SoftConflictPolicy,
+  StaffingChannel,
+  WaveMode,
+  buildCampaignPolicy,
+  buildRoleProfiles,
+  inferJobProfile,
+  JobProfileName,
+} from '@/features/staffing/crewingProfiles'
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -46,6 +59,19 @@ interface CampaignRole {
   last_wave_at?: string
 }
 
+interface JobMeta {
+  id: string
+  title?: string | null
+  job_type?: string | null
+  start_time?: string | null
+  end_time?: string | null
+}
+
+interface RequiredRole {
+  role_code: string
+  quantity: number
+}
+
 export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
   jobId,
   department,
@@ -55,18 +81,31 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const [showStartDialog, setShowStartDialog] = useState(false)
+  const [profileDefaultsApplied, setProfileDefaultsApplied] = useState(false)
   const [formData, setFormData] = useState({
     mode: 'assisted' as 'assisted' | 'auto',
     scope: 'outstanding' as 'outstanding' | 'all',
     proximityWeight: 0.1,
     historyWeight: 0.2, // Will be mapped to reliability
-    softConflictPolicy: 'block' as 'warn' | 'block' | 'allow',
+    softConflictPolicy: 'block' as SoftConflictPolicy,
     excludeFridge: true,
     availabilityTtl: 24,
     offerTtl: 4,
     offerMessage: '',
     tickInterval: 300,
-    channel: 'email' as 'email' | 'whatsapp'
+    channel: 'email' as StaffingChannel,
+    inferProfileFromJobType: true,
+    selectedJobProfile: 'standard' as JobProfileName,
+    profileOverrideReason: '',
+    roleProfileOverrides: {} as Record<string, JobProfileName>,
+    costScoringEnabled: true,
+    ratePenaltyStrength: 'normal' as RatePenaltyStrength,
+    maxRatePenalty: 10,
+    waveMode: 'controlled_waves' as WaveMode,
+    waveBuffer: 2,
+    waveWaitMinutes: 20,
+    maxWaves: 3,
+    autoSendNextWave: false
   })
 
   // Fetch active campaign for this job+department
@@ -82,24 +121,28 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     }
   })
 
-  // Initialize formData from active campaign
-  useEffect(() => {
-    if (campaign) {
-      setFormData({
-        mode: campaign.mode,
-        scope: 'outstanding',
-        proximityWeight: campaign.policy?.weights?.proximity ?? 0.1,
-        historyWeight: campaign.policy?.weights?.reliability ?? 0.2,
-        softConflictPolicy: campaign.policy?.soft_conflict_policy ?? 'block',
-        excludeFridge: campaign.policy?.exclude_fridge ?? true,
-        availabilityTtl: campaign.policy?.availability_ttl_hours ?? 24,
-        offerTtl: campaign.policy?.offer_ttl_hours ?? 4,
-        offerMessage: campaign.offer_message ?? '',
-        tickInterval: campaign.policy?.tick_interval_seconds ?? 300,
-        channel: campaign.policy?.channel === 'whatsapp' ? 'whatsapp' : 'email'
-      })
+  const { data: jobMeta } = useQuery({
+    queryKey: queryKeys.scope('staffing_job_meta', jobId),
+    queryFn: async () => {
+      const { data } = await dataLayerClient.from('jobs')
+        .select('id, title, job_type, start_time, end_time')
+        .eq('id', jobId)
+        .maybeSingle()
+      return data as JobMeta | null
     }
-  }, [campaign])
+  })
+
+  const { data: requiredRoles } = useQuery({
+    queryKey: queryKeys.scope('staffing_required_role_rows', jobId, department),
+    queryFn: async () => {
+      const { data } = await dataLayerClient.from('job_required_roles')
+        .select('role_code, quantity')
+        .eq('job_id', jobId)
+        .eq('department', department)
+        .order('role_code')
+      return (data || []) as RequiredRole[]
+    }
+  })
 
   // Fetch campaign roles if campaign exists
   const { data: campaignRoles } = useQuery({
@@ -115,28 +158,212 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     enabled: !!campaign?.id
   })
 
+  const requiredByRole = useMemo(() => (
+    (requiredRoles || []).reduce<Record<string, number>>((acc, role) => {
+      if (role.role_code) acc[String(role.role_code).trim()] = Number(role.quantity || 0)
+      return acc
+    }, {})
+  ), [requiredRoles])
+
+  const assignedByRole = useMemo(() => (
+    (campaignRoles || []).reduce<Record<string, number>>((acc, role) => {
+      if (role.role_code) acc[String(role.role_code).trim()] = Number(role.assigned_count || 0)
+      return acc
+    }, {})
+  ), [campaignRoles])
+
+  const roleCodes = useMemo(() => {
+    const codes = new Set<string>()
+    ;(requiredRoles || []).forEach((role) => {
+      const code = String(role.role_code || '').trim()
+      if (code) codes.add(code)
+    })
+    ;(campaignRoles || []).forEach((role) => {
+      const code = String(role.role_code || '').trim()
+      if (code) codes.add(code)
+    })
+    return Array.from(codes).sort()
+  }, [campaignRoles, requiredRoles])
+
+  const totalRequired = useMemo(
+    () => Object.values(requiredByRole).reduce((sum, quantity) => sum + quantity, 0),
+    [requiredByRole]
+  )
+
+  const inferredJobProfile = useMemo(() => inferJobProfile({
+    jobType: jobMeta?.job_type,
+    startTime: jobMeta?.start_time,
+    endTime: jobMeta?.end_time,
+    requiredCrewCount: totalRequired
+  }), [jobMeta?.end_time, jobMeta?.job_type, jobMeta?.start_time, totalRequired])
+
+  const roleProfiles = useMemo(() => buildRoleProfiles({
+    roleCodes,
+    requiredByRole,
+    assignedByRole,
+    selectedJobProfile: formData.selectedJobProfile,
+    startTime: jobMeta?.start_time,
+    overrides: formData.roleProfileOverrides
+  }), [
+    assignedByRole,
+    formData.roleProfileOverrides,
+    formData.selectedJobProfile,
+    jobMeta?.start_time,
+    requiredByRole,
+    roleCodes
+  ])
+
+  // Initialize formData from active campaign
+  useEffect(() => {
+    if (campaign) {
+      const selectedProfile = campaign.policy?.profile?.selected_job_profile || 'standard'
+      const selectedDefaults = PROFILE_DEFAULTS[selectedProfile as JobProfileName] || PROFILE_DEFAULTS.standard
+      const savedRoleProfiles = campaign.policy?.role_profiles || {}
+      const roleProfileOverrides = Object.entries(savedRoleProfiles).reduce<Record<string, JobProfileName>>(
+        (acc, [roleCode, profile]: [string, any]) => {
+          const selected = profile?.selected_profile as JobProfileName | undefined
+          const inferred = profile?.inferred_profile as JobProfileName | undefined
+          if (selected && selected !== inferred) acc[roleCode] = selected
+          return acc
+        },
+        {}
+      )
+
+      setFormData({
+        mode: campaign.mode,
+        scope: 'outstanding',
+        proximityWeight: campaign.policy?.weights?.proximity ?? selectedDefaults.weights.proximity,
+        historyWeight: campaign.policy?.weights?.reliability ?? selectedDefaults.weights.reliability,
+        softConflictPolicy: (campaign.policy?.soft_conflict_policy ?? 'block') as SoftConflictPolicy,
+        excludeFridge: campaign.policy?.exclude_fridge ?? true,
+        availabilityTtl: campaign.policy?.availability_ttl_hours ?? 24,
+        offerTtl: campaign.policy?.offer_ttl_hours ?? 4,
+        offerMessage: campaign.offer_message ?? '',
+        tickInterval: campaign.policy?.tick_interval_seconds ?? 300,
+        channel: campaign.policy?.channel === 'whatsapp' ? 'whatsapp' : 'email',
+        inferProfileFromJobType: campaign.policy?.profile?.infer_from_job_type ?? true,
+        selectedJobProfile: selectedProfile as JobProfileName,
+        profileOverrideReason: campaign.policy?.profile?.override_reason ?? '',
+        roleProfileOverrides,
+        costScoringEnabled: campaign.policy?.cost_scoring?.enabled ?? true,
+        ratePenaltyStrength: (campaign.policy?.cost_scoring?.penalty_strength ?? 'normal') as RatePenaltyStrength,
+        maxRatePenalty: campaign.policy?.cost_scoring?.max_rate_penalty ?? 10,
+        waveMode: (campaign.policy?.waves?.mode ?? 'controlled_waves') as WaveMode,
+        waveBuffer: campaign.policy?.waves?.buffer ?? selectedDefaults.waveBuffer,
+        waveWaitMinutes: campaign.policy?.waves?.wait_minutes ?? selectedDefaults.waveWaitMinutes,
+        maxWaves: campaign.policy?.waves?.max_waves ?? selectedDefaults.maxWaves,
+        autoSendNextWave: campaign.policy?.waves?.auto_send_next_wave ?? campaign.mode === 'auto'
+      })
+      setProfileDefaultsApplied(true)
+    }
+  }, [campaign])
+
+  useEffect(() => {
+    if (campaign || profileDefaultsApplied || !jobMeta || requiredRoles === undefined) return
+
+    const defaults = PROFILE_DEFAULTS[inferredJobProfile] || PROFILE_DEFAULTS.standard
+    setFormData((current) => ({
+      ...current,
+      selectedJobProfile: inferredJobProfile,
+      proximityWeight: defaults.weights.proximity,
+      historyWeight: defaults.weights.reliability,
+      availabilityTtl: defaults.availabilityTtlHours,
+      offerTtl: defaults.offerTtlHours,
+      softConflictPolicy: defaults.defaultSoftConflictPolicy,
+      waveBuffer: defaults.waveBuffer,
+      waveWaitMinutes: defaults.waveWaitMinutes,
+      maxWaves: defaults.maxWaves,
+      autoSendNextWave: current.mode === 'auto'
+    }))
+    setProfileDefaultsApplied(true)
+  }, [campaign, inferredJobProfile, jobMeta, profileDefaultsApplied, requiredRoles])
+
+  const selectedProfileDefaults = PROFILE_DEFAULTS[formData.selectedJobProfile] || PROFILE_DEFAULTS.standard
+  const profileOverrideActive = formData.selectedJobProfile !== inferredJobProfile
+
+  const applyProfileDefaults = (profile: JobProfileName) => {
+    const defaults = PROFILE_DEFAULTS[profile] || PROFILE_DEFAULTS.standard
+    setFormData((current) => ({
+      ...current,
+      selectedJobProfile: profile,
+      proximityWeight: defaults.weights.proximity,
+      historyWeight: defaults.weights.reliability,
+      availabilityTtl: defaults.availabilityTtlHours,
+      offerTtl: defaults.offerTtlHours,
+      softConflictPolicy: defaults.defaultSoftConflictPolicy,
+      waveBuffer: defaults.waveBuffer,
+      waveWaitMinutes: defaults.waveWaitMinutes,
+      maxWaves: defaults.maxWaves,
+      autoSendNextWave: current.mode === 'auto'
+    }))
+  }
+
+  const updateMode = (mode: 'assisted' | 'auto') => {
+    setFormData((current) => ({
+      ...current,
+      mode,
+      autoSendNextWave: mode === 'auto',
+      softConflictPolicy: mode === 'auto' && current.softConflictPolicy === 'warn'
+        ? 'block'
+        : current.softConflictPolicy
+    }))
+  }
+
+  const updateRoleProfileOverride = (roleCode: string, profile: JobProfileName) => {
+    setFormData((current) => {
+      const inferred = roleProfiles[roleCode]?.inferred_profile
+      const next = { ...current.roleProfileOverrides }
+
+      if (!inferred || profile === inferred) {
+        delete next[roleCode]
+      } else {
+        next[roleCode] = profile
+      }
+
+      return { ...current, roleProfileOverrides: next }
+    })
+  }
+
+  const buildPolicyPayload = () => buildCampaignPolicy({
+    mode: formData.mode,
+    jobType: jobMeta?.job_type,
+    jobStartTime: jobMeta?.start_time,
+    jobEndTime: jobMeta?.end_time,
+    requiredCrewCount: totalRequired,
+    selectedJobProfile: formData.selectedJobProfile,
+    inferredJobProfile,
+    inferProfileFromJobType: formData.inferProfileFromJobType,
+    profileOverrideReason: formData.profileOverrideReason,
+    roleProfiles,
+    roleProfileOverrides: formData.roleProfileOverrides,
+    availabilityTtlHours: formData.availabilityTtl,
+    offerTtlHours: formData.offerTtl,
+    softConflictPolicy: formData.softConflictPolicy,
+    excludeFridge: formData.excludeFridge,
+    sendChannel: formData.channel,
+    costScoring: {
+      enabled: formData.costScoringEnabled,
+      penaltyStrength: formData.ratePenaltyStrength,
+      maxRatePenalty: formData.maxRatePenalty
+    },
+    waves: {
+      mode: formData.waveMode,
+      buffer: formData.waveBuffer,
+      waitMinutes: formData.waveWaitMinutes,
+      maxWaves: formData.maxWaves,
+      autoSendNextWave: formData.autoSendNextWave
+    },
+    tickIntervalSeconds: formData.tickInterval,
+    weightOverrides: {
+      proximity: formData.proximityWeight,
+      reliability: formData.historyWeight
+    }
+  })
+
   // Start campaign mutation
   const startMutation = useMutation({
     mutationFn: async () => {
-      const policy = {
-        weights: {
-          skills: 0.5,
-          proximity: formData.proximityWeight,
-          reliability: formData.historyWeight,
-          fairness: 0.1,
-          experience: 0.1
-        },
-        availability_ttl_hours: formData.availabilityTtl,
-        offer_ttl_hours: formData.offerTtl,
-        availability_multiplier: 4,
-        offer_buffer: 1,
-        exclude_fridge: formData.excludeFridge,
-        soft_conflict_policy: formData.softConflictPolicy,
-        tick_interval_seconds: formData.tickInterval,
-        channel: formData.channel,
-        assisted_handoff_priority: true,
-        escalation_steps: ['increase_wave', 'include_fridge', 'allow_soft_conflicts']
-      }
+      const policy = buildPolicyPayload()
 
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/staffing-orchestrator?action=start`,
@@ -184,25 +411,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
   // Update campaign settings mutation
   const updateMutation = useMutation({
     mutationFn: async () => {
-      const policy = {
-        weights: {
-          skills: 0.5,
-          proximity: formData.proximityWeight,
-          reliability: formData.historyWeight,
-          fairness: 0.1,
-          experience: 0.1
-        },
-        availability_ttl_hours: formData.availabilityTtl,
-        offer_ttl_hours: formData.offerTtl,
-        availability_multiplier: 4,
-        offer_buffer: 1,
-        exclude_fridge: formData.excludeFridge,
-        soft_conflict_policy: formData.softConflictPolicy,
-        tick_interval_seconds: formData.tickInterval,
-        channel: formData.channel,
-        assisted_handoff_priority: true,
-        escalation_steps: ['increase_wave', 'include_fridge', 'allow_soft_conflicts']
-      }
+      const policy = buildPolicyPayload()
 
       const nextRunUpdate = formData.mode === 'auto' && campaign?.mode === 'assisted'
         ? { next_run_at: new Date().toISOString() }
@@ -335,6 +544,218 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
     }
   }
 
+  const renderCrewingProfileSettings = () => (
+    <div className="space-y-4 rounded border bg-muted/30 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold">Perfil automático</p>
+          <p className="text-xs text-muted-foreground">
+            Tipo de trabajo {jobMeta?.job_type || 'single'}: perfil sugerido {JOB_PROFILE_LABELS[inferredJobProfile]}.
+          </p>
+        </div>
+        {profileOverrideActive && (
+          <Badge variant="outline">Perfil manual activo</Badge>
+        )}
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={formData.inferProfileFromJobType}
+          onChange={(e) => setFormData({ ...formData, inferProfileFromJobType: e.target.checked })}
+        />
+        <span className="text-sm">Inferir perfil por tipo de trabajo y rol</span>
+      </label>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="text-sm font-medium">Perfil de trabajo sugerido</label>
+          <div className="mt-1 rounded border bg-background px-2 py-1 text-sm">
+            {JOB_PROFILE_LABELS[inferredJobProfile]}
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium">Perfil de trabajo seleccionado</label>
+          <select
+            value={formData.selectedJobProfile}
+            onChange={(e) => applyProfileDefaults(e.target.value as JobProfileName)}
+            className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+          >
+            {PROFILE_OPTIONS.map((profile) => (
+              <option key={profile} value={profile}>{JOB_PROFILE_LABELS[profile]}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {profileOverrideActive && (
+        <div>
+          <label className="text-sm font-medium">Motivo del cambio</label>
+          <input
+            value={formData.profileOverrideReason}
+            onChange={(e) => setFormData({ ...formData, profileOverrideReason: e.target.value })}
+            placeholder="Por qué esta campaña debe usar otro perfil"
+            className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+          />
+        </div>
+      )}
+
+      {roleCodes.length > 0 && (
+        <div>
+          <p className="text-sm font-medium">Perfiles por rol</p>
+          <div className="mt-2 space-y-2">
+            {roleCodes.map((roleCode) => {
+              const roleProfile = roleProfiles[roleCode]
+              if (!roleProfile) return null
+
+              return (
+                <div key={roleCode} className="grid grid-cols-1 md:grid-cols-[1fr_220px] gap-2 items-center rounded border bg-background p-2">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-medium">{roleCode}</span>
+                      <Badge variant="outline">Requeridos {roleProfile.required_count}</Badge>
+                      {roleProfile.is_critical && <Badge variant="secondary">Crítico</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Sugerido: {JOB_PROFILE_LABELS[roleProfile.inferred_profile]}
+                    </p>
+                  </div>
+                  <select
+                    value={roleProfile.selected_profile}
+                    onChange={(e) => updateRoleProfileOverride(roleCode, e.target.value as JobProfileName)}
+                    className="w-full px-2 py-1 border rounded text-sm bg-background"
+                  >
+                    {PROFILE_OPTIONS.map((profile) => (
+                      <option key={profile} value={profile}>{JOB_PROFILE_LABELS[profile]}</option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded border bg-background p-3">
+        <p className="text-sm font-medium">Pesos del perfil</p>
+        <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-muted-foreground">
+          <span>Habilidad de rol: {selectedProfileDefaults.weights.roleSkill.toFixed(2)}</span>
+          <span>Fiabilidad: {formData.historyWeight.toFixed(2)}</span>
+          <span>Equidad: {selectedProfileDefaults.weights.fairness.toFixed(2)}</span>
+          <span>Proximidad: {formData.proximityWeight.toFixed(2)}</span>
+          <span>Coste: {selectedProfileDefaults.weights.costEfficiency.toFixed(2)}</span>
+          <span>Técnico de casa: {selectedProfileDefaults.weights.houseTechBonus.toFixed(2)}</span>
+          <span>Progresión: {selectedProfileDefaults.weights.roleProgression.toFixed(2)}</span>
+          <span>Disponibilidad: {selectedProfileDefaults.weights.availabilityConfidence.toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  )
+
+  const renderCostAndWaveSettings = () => (
+    <div className="space-y-4 rounded border bg-muted/30 p-3">
+      <p className="text-sm font-semibold">Puntuación de coste/tarifa</p>
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={formData.costScoringEnabled}
+          onChange={(e) => setFormData({ ...formData, costScoringEnabled: e.target.checked })}
+        />
+        <span className="text-sm">Aplicar ajuste por tarifa personalizada</span>
+      </label>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="text-sm font-medium">Intensidad de penalización de tarifa</label>
+          <select
+            value={formData.ratePenaltyStrength}
+            onChange={(e) => setFormData({ ...formData, ratePenaltyStrength: e.target.value as RatePenaltyStrength })}
+            className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+          >
+            <option value="disabled">Desactivado</option>
+            <option value="low">Baja</option>
+            <option value="normal">Normal</option>
+            <option value="high">Alta</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-sm font-medium">Penalización máxima de tarifa</label>
+          <input
+            type="number"
+            min="0"
+            max="20"
+            value={formData.maxRatePenalty}
+            onChange={(e) => setFormData({ ...formData, maxRatePenalty: parseFloat(e.target.value) })}
+            className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+          />
+        </div>
+      </div>
+
+      <p className="text-sm font-semibold pt-2">Oleadas de contacto</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="text-sm font-medium">Modo de oleada</label>
+          <select
+            value={formData.waveMode}
+            onChange={(e) => setFormData({ ...formData, waveMode: e.target.value as WaveMode })}
+            className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+          >
+            <option value="manual_selection">Selección manual</option>
+            <option value="controlled_waves">Oleadas controladas</option>
+            <option value="blast_all_eligible">Contactar todos los elegibles</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-sm font-medium">Tamaño de oleada</label>
+          <input
+            type="number"
+            min="0"
+            max="20"
+            value={formData.waveBuffer}
+            onChange={(e) => setFormData({ ...formData, waveBuffer: parseInt(e.target.value) })}
+            className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+          />
+          <p className="text-xs text-muted-foreground mt-1">Requeridos + este margen</p>
+        </div>
+        <div>
+          <label className="text-sm font-medium">Espera entre oleadas (minutos)</label>
+          <input
+            type="number"
+            min="3"
+            max="120"
+            value={formData.waveWaitMinutes}
+            onChange={(e) => setFormData({ ...formData, waveWaitMinutes: parseInt(e.target.value) })}
+            className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+          />
+        </div>
+        <div>
+          <label className="text-sm font-medium">Máximo de oleadas</label>
+          <input
+            type="number"
+            min="1"
+            max="10"
+            value={formData.maxWaves}
+            onChange={(e) => setFormData({ ...formData, maxWaves: parseInt(e.target.value) })}
+            className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
+          />
+        </div>
+      </div>
+
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={formData.autoSendNextWave}
+          onChange={(e) => setFormData({ ...formData, autoSendNextWave: e.target.checked })}
+        />
+        <span className="text-sm">Enviar siguiente oleada automáticamente en modo Auto</span>
+      </label>
+
+      <div className="rounded border bg-background p-3 text-xs text-muted-foreground">
+        Cierre automático activo: cierra roles completos, detiene futuras oleadas, bloquea aceptaciones extra, confirma el equipo reservado y avisa a respuestas tardías o pendientes.
+      </div>
+    </div>
+  )
+
   if (!campaign) {
     return (
       <Card>
@@ -349,7 +770,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           <Button onClick={() => setShowStartDialog(true)}>Start Campaign</Button>
 
           <Dialog open={showStartDialog} onOpenChange={setShowStartDialog}>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Start Staffing Campaign</DialogTitle>
                 <DialogDescription>
@@ -368,7 +789,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                         name="mode"
                         value="assisted"
                         checked={formData.mode === 'assisted'}
-                        onChange={() => setFormData({ ...formData, mode: 'assisted' })}
+                        onChange={() => updateMode('assisted')}
                       />
                       <span className="text-sm">Assisted (Manager-controlled)</span>
                     </label>
@@ -378,7 +799,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                         name="mode"
                         value="auto"
                         checked={formData.mode === 'auto'}
-                        onChange={() => setFormData({ ...formData, mode: 'auto' })}
+                        onChange={() => updateMode('auto')}
                       />
                       <span className="text-sm">Auto (System-driven)</span>
                     </label>
@@ -411,6 +832,8 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                     </label>
                   </div>
                 </div>
+
+                {renderCrewingProfileSettings()}
 
                 {/* Weights */}
                 <div className="grid grid-cols-2 gap-4">
@@ -466,6 +889,8 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                   </div>
                 </div>
 
+                {renderCostAndWaveSettings()}
+
                 {/* Conflict policy */}
                 <div>
                   <label className="text-sm font-medium">Soft Conflict Policy</label>
@@ -476,7 +901,9 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                   >
                     <option value="block">Block (Auto mode default)</option>
                     <option value="warn">Warn (Assisted mode)</option>
-                    <option value="allow">Allow (Escalation only)</option>
+                    <option value="manager_approval">Manager approval</option>
+                    <option value="ignore">Ignore</option>
+                    <option value="allow">Allow (legacy escalation)</option>
                   </select>
                 </div>
 
@@ -484,7 +911,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                   <label className="text-sm font-medium">Send Channel</label>
                   <select
                     value={formData.channel}
-                    onChange={(e) => setFormData({ ...formData, channel: e.target.value as 'email' | 'whatsapp' })}
+                    onChange={(e) => setFormData({ ...formData, channel: e.target.value as StaffingChannel })}
                     className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
                   >
                     <option value="email">Email</option>
@@ -622,7 +1049,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                     name="active_mode"
                     value="assisted"
                     checked={formData.mode === 'assisted'}
-                    onChange={() => setFormData({ ...formData, mode: 'assisted' })}
+                    onChange={() => updateMode('assisted')}
                   />
                   <span className="text-sm">Assisted (Manager-controlled)</span>
                 </label>
@@ -632,12 +1059,14 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                     name="active_mode"
                     value="auto"
                     checked={formData.mode === 'auto'}
-                    onChange={() => setFormData({ ...formData, mode: 'auto' })}
+                    onChange={() => updateMode('auto')}
                   />
                   <span className="text-sm">Auto (System-driven)</span>
                 </label>
               </div>
             </div>
+
+            {renderCrewingProfileSettings()}
 
             {/* Weights */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -693,6 +1122,8 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
               </div>
             </div>
 
+            {renderCostAndWaveSettings()}
+
             {/* Conflict policy */}
             <div>
               <label className="text-sm font-medium">Soft Conflict Policy</label>
@@ -703,7 +1134,9 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
               >
                 <option value="block">Block (Auto mode default)</option>
                 <option value="warn">Warn (Assisted mode)</option>
-                <option value="allow">Allow (Escalation only)</option>
+                <option value="manager_approval">Manager approval</option>
+                <option value="ignore">Ignore</option>
+                <option value="allow">Allow (legacy escalation)</option>
               </select>
             </div>
 
@@ -711,7 +1144,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
               <label className="text-sm font-medium">Send Channel</label>
               <select
                 value={formData.channel}
-                onChange={(e) => setFormData({ ...formData, channel: e.target.value as 'email' | 'whatsapp' })}
+                onChange={(e) => setFormData({ ...formData, channel: e.target.value as StaffingChannel })}
                 className="w-full mt-1 px-2 py-1 border rounded text-sm bg-background"
               >
                 <option value="email">Email</option>
