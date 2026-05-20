@@ -27,6 +27,11 @@ const profileRateScoringMigration = readFileSync(
   "utf-8",
 );
 
+const staffingSweeperScheduleMigration = readFileSync(
+  join(process.cwd(), "supabase/migrations/20260520130000_schedule_staffing_sweeper.sql"),
+  "utf-8",
+);
+
 const sendStaffingEmailFunction = readFileSync(
   join(process.cwd(), "supabase/functions/send-staffing-email/index.ts"),
   "utf-8",
@@ -164,5 +169,15 @@ describe("smarter staffing recommendation migration", () => {
     expect(staffingOrchestratorFunction).toContain("idempotency_key: `campaign:${campaign_id}:${roleCode}:${profileId}:availability:auto:${autoChannel}`");
     expect(staffingOrchestratorFunction).toContain("contactedProfilesByRole");
     expect(staffingOrchestratorFunction).toContain("wave_number: nextWaveNumber");
+  });
+
+  it("executes auto mode immediately and keeps future waves scheduled", () => {
+    expect(staffingOrchestratorFunction).toContain("normalizedMode === 'auto'");
+    expect(staffingOrchestratorFunction).toContain("initialTickResult = await tickCampaign(supabase, campaign.id)");
+    expect(staffingOrchestratorFunction).toContain("const tickResult = await tickCampaign(supabase, campaign_id)");
+    expect(staffingSweeperScheduleMigration).toContain("CREATE OR REPLACE FUNCTION public.invoke_staffing_sweeper()");
+    expect(staffingSweeperScheduleMigration).toContain("'/functions/v1/staffing-sweeper'");
+    expect(staffingSweeperScheduleMigration).toContain("PERFORM cron.schedule(");
+    expect(staffingSweeperScheduleMigration).toContain("'* * * * *'");
   });
 });

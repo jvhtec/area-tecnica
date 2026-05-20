@@ -555,9 +555,18 @@ async function startCampaign(
       }
     }
 
+    let initialTickResult: Awaited<ReturnType<typeof tickCampaign>> | null = null;
+    if (normalizedMode === 'auto' && campaignRoles.length > 0) {
+      initialTickResult = await tickCampaign(supabase, campaign.id);
+    }
+
     return {
       status: 200,
-      body: { campaign, roles_created: campaignRoles.length }
+      body: {
+        campaign,
+        roles_created: campaignRoles.length,
+        auto_tick: initialTickResult?.body || null,
+      }
     };
   } catch (err) {
     console.error('[staffing-orchestrator] Start campaign error:', err);
@@ -746,7 +755,21 @@ async function nudgeCampaign(
       .select()
       .single();
 
-    return { status: 200, body: { message: 'Campaign nudged', campaign: updated } };
+    if (campaign.status !== 'active') {
+      return { status: 200, body: { message: 'Campaign nudged', campaign: updated } };
+    }
+
+    const tickResult = await tickCampaign(supabase, campaign_id);
+    return {
+      status: tickResult.status,
+      body: {
+        message: tickResult.status >= 200 && tickResult.status < 300
+          ? 'Campaign ticked'
+          : 'Campaign tick failed',
+        campaign: updated,
+        tick_result: tickResult.body,
+      },
+    };
   } catch (err) {
     console.error('[staffing-orchestrator] Nudge campaign error:', err);
     return { status: 500, body: { error: 'Internal server error' } };

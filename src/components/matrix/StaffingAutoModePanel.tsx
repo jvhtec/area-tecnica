@@ -103,7 +103,7 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       return payload
     },
     onSuccess: () => {
-      toast({ title: 'Campaign nudged', description: 'Next tick scheduled immediately' })
+      toast({ title: 'Campaign nudged', description: 'Auto staffing tick executed' })
       invalidateAll()
     },
     onError: (error: any) => {
