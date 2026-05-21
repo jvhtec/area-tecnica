@@ -163,7 +163,8 @@ describe("smarter staffing recommendation migration", () => {
 
   it("scopes staffing push notifications to the staffing department", () => {
     expect(sendStaffingEmailFunction).toContain("department: staffingDepartment");
-    expect(staffingPushEvents).toContain("body.department || jobDepartment");
+    expect(staffingPushEvents).toContain("typeof body.department === 'string' ? body.department.trim() : ''");
+    expect(staffingPushEvents).toContain("bodyDepartment || jobDepartment");
     expect(staffingPushFunction).toContain("resolveStaffingDepartment");
     expect(staffingPushFunction).toContain("filterStaffingRoutesForDepartment");
     expect(staffingPushFunction).toContain("getStaffingRoutingManagementIds");

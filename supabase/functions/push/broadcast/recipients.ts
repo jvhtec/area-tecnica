@@ -25,7 +25,7 @@ export async function getScopedManagementIds(
 
   if (!techDepartment && technicianId) {
     const result = await lookupTechnicianDepartment(client, technicianId);
-    techDepartment = result.department?.toLowerCase() ?? null;
+    techDepartment = result.department?.trim().toLowerCase() || null;
 
     if (!result.error && !techDepartment) {
       console.warn(

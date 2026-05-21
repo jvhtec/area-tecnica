@@ -10,7 +10,8 @@ export async function handleStaffingEvents(context: BroadcastEventContext): Prom
   const isStaffingEvent = type.startsWith('staffing.');
   const recipientId = body.recipient_id?.trim();
   const sentByCarlos = isCarlosStaffingRequest(body.request_origin);
-  const staffingDepartment = body.department || jobDepartment;
+  const bodyDepartment = typeof body.department === 'string' ? body.department.trim() : '';
+  const staffingDepartment = bodyDepartment || jobDepartment;
 
   if (isStaffingEvent && !recipientId) {
     audience.clearAllRecipients();
