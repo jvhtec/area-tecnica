@@ -41,6 +41,7 @@ type StaffingEmailPayload = {
   target_date?: string | null;
   single_day?: boolean;
   dates?: string[];
+  department?: string | null;
   override_conflicts?: boolean;
 };
 
@@ -59,6 +60,7 @@ export const OptimizedAssignmentMatrix = ({
   technicianWidth,
   headerHeight,
   mobile = false,
+  staffingDepartment = null,
   hideStaffingEmailButtons = false,
   hideStaffingWhatsappButtons = false,
 }: OptimizedAssignmentMatrixExtendedProps) => {
@@ -574,7 +576,7 @@ export const OptimizedAssignmentMatrix = ({
     TECHNICIAN_WIDTH, HEADER_HEIGHT, CELL_WIDTH, CELL_HEIGHT, matrixWidth, matrixHeight,
     dateHeadersRef, technicianScrollRef, mainScrollRef, visibleCols, visibleRows,
     dates, technicians, orderedTechnicians,
-    fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile,
+    fridgeSet, allowDirectAssign, allowMarkUnavailable, mobile, staffingDepartment,
     hideStaffingEmailButtons, hideStaffingWhatsappButtons,
     canNavLeft, canNavRight, handleMobileNav,
     handleDateHeadersScroll, handleTechnicianScroll, handleMainScroll, cycleTechSort, getSortLabel,

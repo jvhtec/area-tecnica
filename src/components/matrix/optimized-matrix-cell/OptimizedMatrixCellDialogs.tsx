@@ -16,6 +16,7 @@ type OptimizedMatrixCellDialogsProps = {
   date: Date;
   technicianId: string;
   displayName: string;
+  staffingDepartment?: string | null;
   pendingRetry: PendingRetry;
   setPendingRetry: (value: PendingRetry) => void;
   retryChannel: 'email' | 'whatsapp';
@@ -37,6 +38,7 @@ export const OptimizedMatrixCellDialogs = ({
   date,
   technicianId,
   displayName,
+  staffingDepartment = null,
   pendingRetry,
   setPendingRetry,
   retryChannel,
@@ -95,6 +97,7 @@ export const OptimizedMatrixCellDialogs = ({
                   profile_id: technicianId,
                   phase: 'availability',
                   channel: retryChannel,
+                  department: staffingDepartment,
                   target_date: format(date, 'yyyy-MM-dd'),
                   single_day: true,
                 } as any),

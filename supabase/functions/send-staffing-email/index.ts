@@ -429,11 +429,25 @@ serve(async (req) => {
 
       // Step 2: Fetch job and profile data
       console.log('🔍 FETCHING JOB AND PROFILE DATA...');
+      const roleDepartmentPromise = !departmentHint
+        ? (() => {
+          let query = supabase.from("job_required_roles")
+            .select("department")
+            .eq("job_id", job_id)
+            .order("department", { ascending: true });
+          if (roleCode) {
+            query = query.eq("role_code", roleCode);
+          }
+          return query;
+        })()
+        : Promise.resolve({ data: null, error: null });
+
       const [jobResult, techResult, actorResult, roleDepartmentResult] = await Promise.all([
         supabase.from("jobs")
           .select(`
             id,
             title,
+            department,
             start_time,
             end_time,
             locations(formatted_address)
@@ -441,15 +455,8 @@ serve(async (req) => {
           .eq("id", job_id)
           .maybeSingle(),
         supabase.from("profiles").select("id,first_name,last_name,email,phone").eq("id", profile_id).maybeSingle(),
-        actorId ? supabase.from("profiles").select("waha_endpoint").eq("id", actorId).maybeSingle() : Promise.resolve({ data: null, error: null }),
-        roleCode && !departmentHint
-          ? supabase.from("job_required_roles")
-            .select("department")
-            .eq("job_id", job_id)
-            .eq("role_code", roleCode)
-            .order("department", { ascending: true })
-            .limit(1)
-          : Promise.resolve({ data: null, error: null }),
+        actorId ? supabase.from("profiles").select("waha_endpoint, department").eq("id", actorId).maybeSingle() : Promise.resolve({ data: null, error: null }),
+        roleDepartmentPromise,
       ]);
       
       console.log('📋 JOB RESULT:', { data: jobResult.data, error: jobResult.error });
@@ -488,8 +495,17 @@ serve(async (req) => {
       const roleDepartmentRows = Array.isArray(roleDepartmentResult.data)
         ? roleDepartmentResult.data as Array<{ department?: string | null }>
         : [];
-      const roleDepartment = roleDepartmentRows[0]?.department ?? null;
-      const staffingDepartment = departmentHint || roleDepartment;
+      const uniqueRoleDepartments = Array.from(new Set(
+        roleDepartmentRows
+          .map((row) => typeof row.department === 'string' ? row.department.trim() : '')
+          .filter(Boolean)
+      ));
+      const roleDepartment = roleCode
+        ? roleDepartmentRows[0]?.department ?? null
+        : uniqueRoleDepartments.length === 1 ? uniqueRoleDepartments[0] : null;
+      const actorDepartment = (actorResult.data as any)?.department ?? null;
+      const jobDepartment = (job as any)?.department ?? null;
+      const staffingDepartment = departmentHint || roleDepartment || actorDepartment || jobDepartment || null;
       
       if (!job) {
         console.error('❌ JOB NOT FOUND:', job_id);

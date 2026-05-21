@@ -24,6 +24,12 @@ import { formatSpanishMediumDate, normalizeDateKey } from "./broadcast/date.ts";
 import { routeBroadcastEvent } from "./broadcast/eventRouter.ts";
 import { getScopedManagementIds as resolveScopedManagementIds } from "./broadcast/recipients.ts";
 import {
+  filterStaffingRoutesForDepartment,
+  getStaffingRoutingManagementIds,
+  isStaffingEventCode,
+  resolveStaffingDepartment,
+} from "./broadcast/staffingRouting.ts";
+import {
   CARLOS_AGENT_DESCRIPTION,
   CARLOS_AGENT_NAME,
   isCarlosStaffingRequest,
@@ -152,8 +158,8 @@ export async function handleBroadcast(
     singleDayFlag,
     state,
     audience,
-    getScopedManagementIds: (technicianId, scopeContext) =>
-      resolveScopedManagementIds(client, technicianId, scopeContext),
+    getScopedManagementIds: (technicianId, scopeContext, departmentHint) =>
+      resolveScopedManagementIds(client, technicianId, scopeContext, departmentHint),
   };
 
   const routeResult = await routeBroadcastEvent(context);
@@ -161,11 +167,19 @@ export async function handleBroadcast(
     return routeResult;
   }
 
+  let routesForOverrides = routes;
+  let managementForOverrides = mgmt;
+  if (isStaffingEventCode(type)) {
+    const staffingDepartment = await resolveStaffingDepartment(client, body, jobDepartment);
+    routesForOverrides = await filterStaffingRoutesForDepartment(client, routes, staffingDepartment);
+    managementForOverrides = new Set(await getStaffingRoutingManagementIds(client, staffingDepartment));
+  }
+
   await applyRoutingOverrides({
-    routes,
+    routes: routesForOverrides,
     recipients,
     naturalRecipients,
-    management: mgmt,
+    management: managementForOverrides,
     getDepartmentRecipients: async (department: string) =>
       getManagementByDepartmentUserIds(client, department),
     participants,

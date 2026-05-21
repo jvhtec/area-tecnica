@@ -31,6 +31,7 @@ export interface OptimizedAssignmentMatrixViewProps {
   allowDirectAssign: boolean;
   allowMarkUnavailable?: boolean;
   mobile: boolean;
+  staffingDepartment?: string | null;
   hideStaffingEmailButtons?: boolean;
   hideStaffingWhatsappButtons?: boolean;
   canNavLeft: boolean;
@@ -110,6 +111,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
   allowDirectAssign,
   allowMarkUnavailable = false,
   mobile,
+  staffingDepartment = null,
   hideStaffingEmailButtons = false,
   hideStaffingWhatsappButtons = false,
   canNavLeft,
@@ -381,6 +383,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
                             profileNamesMap={profileNamesMap}
                             isFridge={fridgeSet?.has(technician.id) || false}
                             mobile={mobile}
+                            staffingDepartment={staffingDepartment}
                             hideStaffingEmailButtons={hideStaffingEmailButtons}
                             hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
                           />
@@ -406,6 +409,7 @@ export const OptimizedAssignmentMatrixView: React.FC<OptimizedAssignmentMatrixVi
         getJobsForDate={getJobsForDate}
         declinedJobsByTech={declinedJobsByTech}
         jobs={jobs}
+        staffingDepartment={staffingDepartment}
         offerChannel={offerChannel}
         toast={toast}
         sendStaffingEmail={sendStaffingEmail}

@@ -63,7 +63,7 @@ export class ConflictError extends Error {
 export function useSendStaffingEmail() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null, channel?: 'email' | 'whatsapp', target_date?: string | null, single_day?: boolean, dates?: string[], override_conflicts?: boolean, require_no_conflicts?: boolean }) => {
+    mutationFn: async (payload: { job_id: string, profile_id: string, phase: 'availability'|'offer', role?: string | null, message?: string | null, channel?: 'email' | 'whatsapp', target_date?: string | null, single_day?: boolean, dates?: string[], department?: string | null, override_conflicts?: boolean, require_no_conflicts?: boolean }) => {
       console.log('🚀 SENDING STAFFING EMAIL:', {
         payload,
         job_id_type: typeof payload.job_id,
@@ -123,19 +123,6 @@ export function useSendStaffingEmail() {
       qc.invalidateQueries({ queryKey: queryKeys.scope('assignment-matrix') })
       qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
       try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
-      // Fan out push notification (fire-and-forget)
-      try {
-        const type = vars.phase === 'availability' ? 'staffing.availability.sent' : 'staffing.offer.sent'
-        void supabase.functions.invoke('push', {
-          body: {
-            action: 'broadcast',
-            type,
-            job_id: vars.job_id,
-            recipient_id: vars.profile_id,
-            channel: vars.channel || 'email'
-          }
-        })
-      } catch {}
     }
   })
 }

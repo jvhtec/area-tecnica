@@ -240,4 +240,26 @@ describe("push broadcast event message builders", () => {
     expect(context.state.title).toBe("Oferta enviada");
     expect(context.state.text).toBe("Laura envió oferta a Ana (email).");
   });
+
+  it("uses the staffing department instead of the technician department for management recipients", async () => {
+    let scopedDepartment: string | null | undefined;
+    const context = createStaffingContext({
+      actor: "Laura",
+      body: {
+        action: "broadcast",
+        type: "staffing.offer.sent",
+        recipient_id: "tech-1",
+        department: "sound",
+      },
+      getScopedManagementIds: async (_technicianId, _eventContext, departmentHint) => {
+        scopedDepartment = departmentHint;
+        return ["sound-manager"];
+      },
+    });
+
+    await expect(handleStaffingEvents(context)).resolves.toBe(true);
+
+    expect(scopedDepartment).toBe("sound");
+    expect(context.audience.naturalRecipients.has("sound-manager")).toBe(true);
+  });
 });
