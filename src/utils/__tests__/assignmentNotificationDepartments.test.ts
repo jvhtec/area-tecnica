@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getAssignmentNotificationDepartments } from "../assignmentNotificationDepartments";
+import { getAssignmentNotificationDepartments } from "@/utils/assignmentNotificationDepartments";
 
 describe("getAssignmentNotificationDepartments", () => {
   it("derives departments from active assignment role columns", () => {

@@ -331,7 +331,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             recipient_name: recipientName || undefined,
             assignment_status: options?.addAsConfirmed ? 'confirmed' : 'invited',
             target_date: options?.singleDayDate ? `${options.singleDayDate}T00:00:00Z` : undefined,
-            single_day: options?.singleDay || false,
+            single_day: payload.single_day,
             department: assignmentDepartments[0],
             departments: assignmentDepartments,
           }
