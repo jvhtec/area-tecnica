@@ -112,6 +112,20 @@ export async function getManagementByDepartmentUserIds(client: ReturnType<typeof
   return data.map((r: any) => r.id).filter(Boolean);
 }
 
+export async function getManagementAndAdminByDepartmentUserIds(
+  client: ReturnType<typeof createClient>,
+  department: string,
+): Promise<string[]> {
+  if (!department) return [];
+  const { data, error } = await client
+    .from('profiles')
+    .select('id')
+    .in('role', ['admin', 'management'])
+    .eq('department', department);
+  if (error || !data) return [];
+  return data.map((r: any) => r.id).filter(Boolean);
+}
+
 /**
  * Retrieve the department name for a technician identified by user ID.
  *
@@ -274,6 +288,53 @@ export function normalizeDepartmentRolesPayload(value: unknown): DepartmentRoleS
   return value
     .map(parseDepartmentRoleSummary)
     .filter((item): item is DepartmentRoleSummary => Boolean(item));
+}
+
+function hasActiveAssignmentRole(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 && normalized !== 'none';
+}
+
+export function getActiveAssignmentDepartmentsFromRow(
+  row: {
+    sound_role?: unknown;
+    lights_role?: unknown;
+    video_role?: unknown;
+    production_role?: unknown;
+  } | null | undefined,
+): string[] {
+  if (!row) return [];
+  const departments = new Set<string>();
+  if (hasActiveAssignmentRole(row.sound_role)) departments.add('sound');
+  if (hasActiveAssignmentRole(row.lights_role)) departments.add('lights');
+  if (hasActiveAssignmentRole(row.video_role)) departments.add('video');
+  if (hasActiveAssignmentRole(row.production_role)) departments.add('production');
+  return Array.from(departments);
+}
+
+export async function getAssignmentRoleDepartments(
+  client: ReturnType<typeof createClient>,
+  jobId?: string | null,
+  technicianId?: string | null,
+): Promise<string[]> {
+  if (!jobId || !technicianId) return [];
+  try {
+    const { data, error } = await client
+      .from('job_assignments')
+      .select('sound_role, lights_role, video_role, production_role')
+      .eq('job_id', jobId)
+      .eq('technician_id', technicianId)
+      .maybeSingle();
+    if (error) {
+      console.error('⚠️ Failed to fetch assignment role departments:', { jobId, technicianId, error });
+      return [];
+    }
+    return getActiveAssignmentDepartmentsFromRow(data);
+  } catch (err) {
+    console.error('⚠️ Exception fetching assignment role departments:', { jobId, technicianId, err });
+    return [];
+  }
 }
 
 export function formatDepartmentRolesSummary(summary: DepartmentRoleSummary[]): string {

@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 
 import { dataLayerClient } from '@/services/dataLayerClient';
+import { getAssignmentNotificationDepartments } from '@/utils/assignmentNotificationDepartments';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
 import { readAssignmentLifecycleResult } from '@/components/matrix/optimized-matrix-cell/helpers';
 import type { MultiDateRemovalState, TimesheetDateRow } from '@/components/matrix/optimized-matrix-cell/types';
@@ -114,6 +115,7 @@ export const useMatrixCellAssignmentRemoval = ({
         }
 
         try {
+          const assignmentDepartments = getAssignmentNotificationDepartments(assignment, technician.department);
           const { error: pushError } = await dataLayerClient.functions.invoke('push', {
             body: {
               action: 'broadcast',
@@ -121,6 +123,8 @@ export const useMatrixCellAssignmentRemoval = ({
               job_id: assignment.job_id,
               recipient_id: technician.id,
               technician_id: technician.id,
+              department: assignmentDepartments[0],
+              departments: assignmentDepartments,
             },
           });
           if (pushError) throw pushError;

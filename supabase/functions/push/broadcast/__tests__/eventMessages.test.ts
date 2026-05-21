@@ -1,4 +1,16 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../delivery.ts", () => ({
+  sendPayloadToUsers: vi.fn(async (_client, userIds: string[]) =>
+    userIds.map((id) => ({ endpoint: `mock:${id}`, ok: true })),
+  ),
+}));
+
+vi.mock("../../config.ts", () => ({
+  EVENT_TYPES: {
+    ASSIGNMENT_REMOVED: "assignment.removed",
+  },
+}));
 
 import {
   buildJobDateTypeChangedMessage,
@@ -25,9 +37,14 @@ import {
 } from "../messages/tourMessages.ts";
 import type { BroadcastBody } from "../../types.ts";
 import type { BroadcastEventContext } from "../eventContext.ts";
+import { sendPayloadToUsers } from "../delivery.ts";
+import { handleAssignmentEvents } from "../families/assignmentEvents.ts";
 import { handleStaffingEvents } from "../families/staffingEvents.ts";
 import { CARLOS_AGENT_NAME } from "../staffingIdentity.ts";
-import { getJobDepartment } from "../../data.ts";
+import {
+  getActiveAssignmentDepartmentsFromRow,
+  getJobDepartment,
+} from "../../data.ts";
 
 function createStaffingContext(overrides: Partial<BroadcastEventContext> = {}): BroadcastEventContext {
   const state = { title: "", text: "", url: "/jobs/job-1", metaExtras: {} };
@@ -95,6 +112,83 @@ function createStaffingContext(overrides: Partial<BroadcastEventContext> = {}): 
     ...overrides,
   };
 }
+
+function createAssignmentContext(overrides: Partial<BroadcastEventContext> = {}): BroadcastEventContext {
+  const state = { title: "", text: "", url: "/jobs/job-1", metaExtras: {} };
+  const recipients = new Set<string>();
+  const naturalRecipients = new Set<string>();
+  const management = new Set<string>();
+  const soundDept = new Set<string>();
+  const admin = new Set<string>();
+  const mgmt = new Set<string>();
+  const participants = new Set<string>();
+  const audience = {
+    recipients,
+    naturalRecipients,
+    management,
+    soundDept,
+    admin,
+    mgmt,
+    participants,
+    addRecipients: (ids: (string | null | undefined)[]) => {
+      ids.forEach((id) => {
+        if (id) recipients.add(id);
+      });
+    },
+    addNaturalRecipients: (ids: (string | null | undefined)[]) => {
+      ids.forEach((id) => {
+        if (id) {
+          recipients.add(id);
+          naturalRecipients.add(id);
+        }
+      });
+    },
+    clearAllRecipients: () => {
+      recipients.clear();
+      naturalRecipients.clear();
+      management.clear();
+      soundDept.clear();
+      admin.clear();
+      mgmt.clear();
+      participants.clear();
+    },
+  };
+
+  return {
+    client: {} as BroadcastEventContext["client"],
+    userId: "manager-1",
+    body: {
+      action: "broadcast",
+      type: "job.assignment.direct",
+      job_id: "job-1",
+      recipient_id: "tech-1",
+      recipient_name: "Ana",
+      department: "lights",
+      departments: ["lights"],
+    },
+    type: "job.assignment.direct",
+    jobId: "job-1",
+    jobTitle: "RBF",
+    jobDepartment: null,
+    jobType: null,
+    tourName: null,
+    routes: [],
+    actor: "Laura",
+    recipName: "Ana",
+    channelLabel: "push",
+    normalizedTargetDate: null,
+    formattedTargetDate: null,
+    singleDayFlag: false,
+    state,
+    audience,
+    getScopedManagementIds: async () => ["lights-admin"],
+    ...overrides,
+  };
+}
+
+beforeEach(() => {
+  vi.mocked(sendPayloadToUsers).mockClear();
+});
 
 describe("push broadcast event message builders", () => {
   it("summarizes job update fields with Spanish labels", () => {
@@ -242,6 +336,59 @@ describe("push broadcast event message builders", () => {
     expect(context.state.text).toBe("Laura envió oferta a Ana (email).");
   });
 
+  it("strictly scopes direct assignment management pushes to the assignment department", async () => {
+    const scopedCalls: Array<{ departmentHint: string | null | undefined; strict: boolean | undefined }> = [];
+    const context = createAssignmentContext({
+      getScopedManagementIds: async (_technicianId, _eventContext, departmentHint, options) => {
+        scopedCalls.push({ departmentHint, strict: options?.includeCrossDepartmentAdmins === false });
+        return departmentHint === "lights" ? ["lights-admin"] : ["sound-admin"];
+      },
+    });
+
+    await expect(handleAssignmentEvents(context)).resolves.not.toBe(false);
+
+    expect(scopedCalls).toEqual([{ departmentHint: "lights", strict: true }]);
+    expect(sendPayloadToUsers).toHaveBeenCalledWith(
+      context.client,
+      ["tech-1"],
+      expect.objectContaining({ title: "Nueva asignación" }),
+    );
+    expect(sendPayloadToUsers).toHaveBeenCalledWith(
+      context.client,
+      ["lights-admin"],
+      expect.objectContaining({ title: "Asignación directa" }),
+    );
+  });
+
+  it("strictly scopes assignment removal management pushes to the removed assignment department", async () => {
+    const scopedCalls: Array<{ departmentHint: string | null | undefined; strict: boolean | undefined }> = [];
+    const context = createAssignmentContext({
+      type: "assignment.removed",
+      body: {
+        action: "broadcast",
+        type: "assignment.removed",
+        job_id: "job-1",
+        recipient_id: "tech-1",
+        technician_id: "tech-1",
+        department: "lights",
+        departments: ["lights"],
+      },
+      getScopedManagementIds: async (_technicianId, _eventContext, departmentHint, options) => {
+        scopedCalls.push({ departmentHint, strict: options?.includeCrossDepartmentAdmins === false });
+        return departmentHint === "lights" ? ["lights-admin"] : ["sound-admin"];
+      },
+    });
+
+    await expect(handleAssignmentEvents(context)).resolves.not.toBe(false);
+
+    expect(scopedCalls).toEqual([{ departmentHint: "lights", strict: true }]);
+    expect(sendPayloadToUsers).toHaveBeenCalledWith(
+      context.client,
+      ["lights-admin"],
+      expect.objectContaining({ title: "Asignación eliminada" }),
+    );
+  });
+
   it("uses the staffing department instead of the technician department for management recipients", async () => {
     let scopedDepartment: string | null | undefined;
     const context = createStaffingContext({
@@ -262,6 +409,15 @@ describe("push broadcast event message builders", () => {
 
     expect(scopedDepartment).toBe("sound");
     expect(context.audience.naturalRecipients.has("sound-manager")).toBe(true);
+  });
+
+  it("derives assignment departments from active role columns", () => {
+    expect(getActiveAssignmentDepartmentsFromRow({
+      sound_role: "none",
+      lights_role: "lighting_designer",
+      video_role: null,
+      production_role: "pm",
+    })).toEqual(["lights", "production"]);
   });
 
   it("resolves unambiguous job departments from job_departments", async () => {

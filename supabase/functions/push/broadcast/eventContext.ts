@@ -35,6 +35,10 @@ export type BroadcastRecipients = {
   clearAllRecipients: () => void;
 };
 
+export type ScopedManagementOptions = {
+  includeCrossDepartmentAdmins?: boolean;
+};
+
 export type BroadcastEventContext = {
   client: BroadcastClient;
   userId: string;
@@ -56,7 +60,12 @@ export type BroadcastEventContext = {
   singleDayFlag: boolean;
   state: BroadcastMessageState;
   audience: BroadcastRecipients;
-  getScopedManagementIds: (technicianId: string | undefined, context?: string, departmentHint?: string | null) => Promise<string[]>;
+  getScopedManagementIds: (
+    technicianId: string | undefined,
+    context?: string,
+    departmentHint?: string | null,
+    options?: ScopedManagementOptions,
+  ) => Promise<string[]>;
 };
 
 export type BroadcastHandlerResult = false | true | Response;

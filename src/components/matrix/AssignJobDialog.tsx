@@ -42,6 +42,7 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
 import { roleOptionsForDiscipline, codeForLabel, isRoleCode, labelForCode } from '@/utils/roles';
 import { determineFlexDepartmentsForAssignment } from '@/utils/flexCrewAssignments';
+import { getAssignmentNotificationDepartments } from '@/utils/assignmentNotificationDepartments';
 import { checkTimeConflictEnhanced, ConflictCheckResult } from '@/utils/technicianAvailability';
 import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment';
@@ -608,6 +609,7 @@ export const AssignJobDialog = ({
       );
 
       const recipientName = `${technician.first_name ?? ''} ${technician.last_name ?? ''}`.trim();
+      const assignmentDepartments = getAssignmentNotificationDepartments(basePayload, technician.department);
       try {
         void dataLayerClient.functions.invoke('push', {
           body: {
@@ -618,7 +620,9 @@ export const AssignJobDialog = ({
             recipient_name: recipientName || undefined,
             assignment_status: assignAsConfirmed ? 'confirmed' : 'invited',
             target_date: coverageMode === 'single' ? `${assignmentDate}T00:00:00Z` : undefined,
-            single_day: coverageMode !== 'full'
+            single_day: coverageMode !== 'full',
+            department: assignmentDepartments[0],
+            departments: assignmentDepartments,
           }
         });
       } catch (_) {

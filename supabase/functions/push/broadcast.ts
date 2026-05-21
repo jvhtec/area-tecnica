@@ -158,8 +158,8 @@ export async function handleBroadcast(
     singleDayFlag,
     state,
     audience,
-    getScopedManagementIds: (technicianId, scopeContext, departmentHint) =>
-      resolveScopedManagementIds(client, technicianId, scopeContext, departmentHint),
+    getScopedManagementIds: (technicianId, scopeContext, departmentHint, options) =>
+      resolveScopedManagementIds(client, technicianId, scopeContext, departmentHint, options),
   };
 
   const routeResult = await routeBroadcastEvent(context);
