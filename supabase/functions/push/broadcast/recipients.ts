@@ -1,11 +1,15 @@
 import type { createClient } from "../deps.ts";
 import {
   getAdminUserIdsForStaffingNotifications,
+  getManagementAndAdminByDepartmentUserIds,
   getManagementByDepartmentUserIds,
   lookupTechnicianDepartment,
 } from "../data.ts";
 
 type BroadcastClient = ReturnType<typeof createClient>;
+type ScopedManagementOptions = {
+  includeCrossDepartmentAdmins?: boolean;
+};
 
 /**
  * Resolve department-scoped management + admin IDs for a technician.
@@ -17,6 +21,7 @@ export async function getScopedManagementIds(
   technicianId: string | undefined,
   context?: string,
   departmentHint?: string | null,
+  options: ScopedManagementOptions = {},
 ): Promise<string[]> {
   let techDepartment: string | null =
     typeof departmentHint === 'string' && departmentHint.trim().length > 0
@@ -34,6 +39,12 @@ export async function getScopedManagementIds(
           ' - department-scoped management recipients will be empty',
       );
     }
+  }
+
+  if (options.includeCrossDepartmentAdmins === false) {
+    return techDepartment
+      ? await getManagementAndAdminByDepartmentUserIds(client, techDepartment)
+      : [];
   }
 
   const deptMgmt = techDepartment

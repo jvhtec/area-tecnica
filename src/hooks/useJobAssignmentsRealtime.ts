@@ -6,6 +6,7 @@ import { Assignment } from "@/types/assignment";
 import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
+import { getAssignmentNotificationDepartments } from "@/utils/assignmentNotificationDepartments";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -319,6 +320,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
         const recipientName = techProfile
           ? `${techProfile.first_name ?? ''} ${techProfile.last_name ?? ''}`.trim()
           : undefined;
+        const assignmentDepartments = getAssignmentNotificationDepartments(payload);
 
         void supabase.functions.invoke('push', {
           body: {
@@ -329,7 +331,9 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             recipient_name: recipientName || undefined,
             assignment_status: options?.addAsConfirmed ? 'confirmed' : 'invited',
             target_date: options?.singleDayDate ? `${options.singleDayDate}T00:00:00Z` : undefined,
-            single_day: options?.singleDay || false
+            single_day: payload.single_day,
+            department: assignmentDepartments[0],
+            departments: assignmentDepartments,
           }
         });
       } catch (pushError) {
