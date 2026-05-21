@@ -37,6 +37,21 @@ const sendStaffingEmailFunction = readFileSync(
   "utf-8",
 );
 
+const staffingPushFunction = readFileSync(
+  join(process.cwd(), "supabase/functions/push/broadcast.ts"),
+  "utf-8",
+);
+
+const staffingPushEvents = readFileSync(
+  join(process.cwd(), "supabase/functions/push/broadcast/families/staffingEvents.ts"),
+  "utf-8",
+);
+
+const staffingHook = readFileSync(
+  join(process.cwd(), "src/features/staffing/hooks/useStaffing.ts"),
+  "utf-8",
+);
+
 const staffingOrchestratorFunction = readFileSync(
   join(process.cwd(), "supabase/functions/staffing-orchestrator/index.ts"),
   "utf-8",
@@ -144,6 +159,15 @@ describe("smarter staffing recommendation migration", () => {
     expect(sendStaffingEmailFunction).toContain("isServiceRoleRequest");
     expect(sendStaffingEmailFunction).toContain("body?.actor_id");
     expect(staffingOrchestratorFunction).toContain("actor_id: campaign.created_by");
+  });
+
+  it("scopes staffing push notifications to the staffing department", () => {
+    expect(sendStaffingEmailFunction).toContain("department: staffingDepartment");
+    expect(staffingPushEvents).toContain("body.department || jobDepartment");
+    expect(staffingPushFunction).toContain("resolveStaffingDepartment");
+    expect(staffingPushFunction).toContain("filterStaffingRoutesForDepartment");
+    expect(staffingPushFunction).toContain("getStaffingRoutingManagementIds");
+    expect(staffingHook).not.toContain("Fan out push notification");
   });
 
   it("prioritizes confirmed assisted availability before auto mode contacts new candidates", () => {

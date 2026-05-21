@@ -71,6 +71,7 @@ export interface OptimizedAssignmentMatrixExtendedProps extends OptimizedAssignm
   technicianWidth?: number;
   headerHeight?: number;
   mobile?: boolean;
+  staffingDepartment?: string | null;
   hideStaffingEmailButtons?: boolean;
   hideStaffingWhatsappButtons?: boolean;
 }

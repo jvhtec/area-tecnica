@@ -30,6 +30,7 @@ type MatrixDialogsProps = Pick<
   | "getJobsForDate"
   | "declinedJobsByTech"
   | "jobs"
+  | "staffingDepartment"
   | "offerChannel"
   | "toast"
   | "sendStaffingEmail"
@@ -65,6 +66,7 @@ export const MatrixDialogs = ({
   getJobsForDate,
   declinedJobsByTech,
   jobs,
+  staffingDepartment,
   offerChannel,
   toast,
   sendStaffingEmail,
@@ -183,6 +185,7 @@ export const MatrixDialogs = ({
                   role,
                   message,
                   channel: via,
+                  department: staffingDepartment,
                   single_day: true,
                   dates: selectedDates,
                 };
@@ -222,7 +225,7 @@ export const MatrixDialogs = ({
                 return;
               }
               sendStaffingEmail(
-                ({ job_id: jobId, profile_id: profileId, phase: "offer", role, message, channel: via, single_day: false } as any),
+                ({ job_id: jobId, profile_id: profileId, phase: "offer", role, message, channel: via, department: staffingDepartment, single_day: false } as any),
                 {
                   onSuccess: (data: any) => {
                     const ch = data?.channel || via;
@@ -357,7 +360,7 @@ export const MatrixDialogs = ({
                 const profileId = availabilityDialog.profileId;
                 const via = availabilityDialog.channel;
                 if (availabilityCoverage === "full") {
-                  const payload = { job_id: jobId, profile_id: profileId, phase: "availability", channel: via, single_day: false };
+                  const payload = { job_id: jobId, profile_id: profileId, phase: "availability", channel: via, department: staffingDepartment, single_day: false };
                   sendStaffingEmail(payload as any, {
                     onSuccess: (data: any) => {
                       setAvailabilitySending(false);
@@ -392,6 +395,7 @@ export const MatrixDialogs = ({
                   profile_id: profileId,
                   phase: "availability",
                   channel: via,
+                  department: staffingDepartment,
                   single_day: true,
                   dates,
                 };

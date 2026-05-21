@@ -685,6 +685,7 @@ export default function JobAssignmentMatrix() {
             allowMarkUnavailable={allowMarkUnavailable}
             hideStaffingEmailButtons={hideStaffingEmailButtons}
             hideStaffingWhatsappButtons={hideStaffingWhatsappButtons}
+            staffingDepartment={selectedDepartment}
             mobile={isMobile}
             cellWidth={isMobile ? 140 : undefined}
             cellHeight={isMobile ? 80 : undefined}

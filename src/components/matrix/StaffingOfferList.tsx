@@ -155,6 +155,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
               profile_id: profileId,
               phase: 'offer',
               role: roleCode,
+              department,
               message: offerMessage || null,
               channel,
               idempotency_key: `campaign:${campaignId}:${roleCode}:${profileId}:offer:${channel}`

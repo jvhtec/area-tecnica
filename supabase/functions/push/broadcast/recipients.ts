@@ -16,12 +16,16 @@ export async function getScopedManagementIds(
   client: BroadcastClient,
   technicianId: string | undefined,
   context?: string,
+  departmentHint?: string | null,
 ): Promise<string[]> {
-  let techDepartment: string | null = null;
+  let techDepartment: string | null =
+    typeof departmentHint === 'string' && departmentHint.trim().length > 0
+      ? departmentHint.trim().toLowerCase()
+      : null;
 
-  if (technicianId) {
+  if (!techDepartment && technicianId) {
     const result = await lookupTechnicianDepartment(client, technicianId);
-    techDepartment = result.department;
+    techDepartment = result.department?.toLowerCase() ?? null;
 
     if (!result.error && !techDepartment) {
       console.warn(

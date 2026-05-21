@@ -66,6 +66,7 @@ export interface OptimizedMatrixCellProps {
   profileNamesMap?: Map<string, string>;
   isFridge?: boolean;
   mobile?: boolean;
+  staffingDepartment?: string | null;
   hideStaffingEmailButtons?: boolean;
   hideStaffingWhatsappButtons?: boolean;
 }

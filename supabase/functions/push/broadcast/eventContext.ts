@@ -56,7 +56,7 @@ export type BroadcastEventContext = {
   singleDayFlag: boolean;
   state: BroadcastMessageState;
   audience: BroadcastRecipients;
-  getScopedManagementIds: (technicianId: string | undefined, context?: string) => Promise<string[]>;
+  getScopedManagementIds: (technicianId: string | undefined, context?: string, departmentHint?: string | null) => Promise<string[]>;
 };
 
 export type BroadcastHandlerResult = false | true | Response;
