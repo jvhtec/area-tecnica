@@ -441,13 +441,18 @@ serve(async (req) => {
           return query;
         })()
         : Promise.resolve({ data: null, error: null });
+      const jobDepartmentsPromise = !departmentHint
+        ? supabase.from("job_departments")
+          .select("department")
+          .eq("job_id", job_id)
+          .order("department", { ascending: true })
+        : Promise.resolve({ data: null, error: null });
 
-      const [jobResult, techResult, actorResult, roleDepartmentResult] = await Promise.all([
+      const [jobResult, techResult, actorResult, roleDepartmentResult, jobDepartmentsResult] = await Promise.all([
         supabase.from("jobs")
           .select(`
             id,
             title,
-            department,
             start_time,
             end_time,
             locations(formatted_address)
@@ -457,6 +462,7 @@ serve(async (req) => {
         supabase.from("profiles").select("id,first_name,last_name,email,phone").eq("id", profile_id).maybeSingle(),
         actorId ? supabase.from("profiles").select("waha_endpoint, department").eq("id", actorId).maybeSingle() : Promise.resolve({ data: null, error: null }),
         roleDepartmentPromise,
+        jobDepartmentsPromise,
       ]);
       
       console.log('📋 JOB RESULT:', { data: jobResult.data, error: jobResult.error });
@@ -466,6 +472,9 @@ serve(async (req) => {
       });
       if (roleDepartmentResult.error) {
         console.warn('⚠️ ROLE DEPARTMENT LOOKUP FAILED (non-blocking):', roleDepartmentResult.error);
+      }
+      if (jobDepartmentsResult.error) {
+        console.warn('⚠️ JOB DEPARTMENTS LOOKUP FAILED (non-blocking):', jobDepartmentsResult.error);
       }
 
       if (jobResult.error) {
@@ -495,16 +504,27 @@ serve(async (req) => {
       const roleDepartmentRows = Array.isArray(roleDepartmentResult.data)
         ? roleDepartmentResult.data as Array<{ department?: string | null }>
         : [];
+      const jobDepartmentRows = Array.isArray(jobDepartmentsResult.data)
+        ? jobDepartmentsResult.data as Array<{ department?: string | null }>
+        : [];
       const uniqueRoleDepartments = Array.from(new Set(
         roleDepartmentRows
           .map((row) => typeof row.department === 'string' ? row.department.trim() : '')
           .filter(Boolean)
       ));
+      const uniqueJobDepartments = Array.from(new Set(
+        jobDepartmentRows
+          .map((row) => typeof row.department === 'string' ? row.department.trim() : '')
+          .filter(Boolean)
+      ));
       const roleDepartment = roleCode
-        ? roleDepartmentRows[0]?.department ?? null
+        ? (typeof roleDepartmentRows[0]?.department === 'string' ? roleDepartmentRows[0].department.trim() || null : null)
         : uniqueRoleDepartments.length === 1 ? uniqueRoleDepartments[0] : null;
-      const actorDepartment = (actorResult.data as any)?.department ?? null;
-      const jobDepartment = (job as any)?.department ?? null;
+      const actorRow = actorResult.data as { department?: unknown } | null;
+      const actorDepartment = typeof actorRow?.department === 'string'
+        ? actorRow.department.trim() || null
+        : null;
+      const jobDepartment = uniqueJobDepartments.length === 1 ? uniqueJobDepartments[0] : null;
       const staffingDepartment = departmentHint || roleDepartment || actorDepartment || jobDepartment || null;
       
       if (!job) {
