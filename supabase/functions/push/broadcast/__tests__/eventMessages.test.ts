@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildJobDateTypeChangedMessage,
@@ -27,6 +27,7 @@ import type { BroadcastBody } from "../../types.ts";
 import type { BroadcastEventContext } from "../eventContext.ts";
 import { handleStaffingEvents } from "../families/staffingEvents.ts";
 import { CARLOS_AGENT_NAME } from "../staffingIdentity.ts";
+import { getJobDepartment } from "../../data.ts";
 
 function createStaffingContext(overrides: Partial<BroadcastEventContext> = {}): BroadcastEventContext {
   const state = { title: "", text: "", url: "/jobs/job-1", metaExtras: {} };
@@ -261,5 +262,51 @@ describe("push broadcast event message builders", () => {
 
     expect(scopedDepartment).toBe("sound");
     expect(context.audience.naturalRecipients.has("sound-manager")).toBe(true);
+  });
+
+  it("resolves unambiguous job departments from job_departments", async () => {
+    const query = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      order: vi.fn(),
+    };
+    query.select.mockReturnValue(query);
+    query.eq.mockReturnValue(query);
+    query.order.mockResolvedValue({ data: [{ department: " sound " }], error: null });
+    const client = {
+      from: vi.fn(() => query),
+    };
+
+    await expect(
+      getJobDepartment(client as unknown as Parameters<typeof getJobDepartment>[0], "job-1"),
+    ).resolves.toBe("sound");
+
+    expect(client.from).toHaveBeenCalledWith("job_departments");
+    expect(query.select).toHaveBeenCalledWith("department");
+    expect(query.eq).toHaveBeenCalledWith("job_id", "job-1");
+  });
+
+  it("does not guess a job department when a job spans multiple departments", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const query = {
+      select: vi.fn(),
+      eq: vi.fn(),
+      order: vi.fn(),
+    };
+    query.select.mockReturnValue(query);
+    query.eq.mockReturnValue(query);
+    query.order.mockResolvedValue({
+      data: [{ department: "sound" }, { department: "lights" }],
+      error: null,
+    });
+    const client = {
+      from: vi.fn(() => query),
+    };
+
+    await expect(
+      getJobDepartment(client as unknown as Parameters<typeof getJobDepartment>[0], "job-1"),
+    ).resolves.toBeNull();
+    expect(warn).toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

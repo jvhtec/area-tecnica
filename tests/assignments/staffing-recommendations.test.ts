@@ -163,6 +163,8 @@ describe("smarter staffing recommendation migration", () => {
 
   it("scopes staffing push notifications to the staffing department", () => {
     expect(sendStaffingEmailFunction).toContain("department: staffingDepartment");
+    expect(sendStaffingEmailFunction).toContain('supabase.from("job_departments")');
+    expect(sendStaffingEmailFunction).not.toContain("            department,\n            start_time");
     expect(staffingPushEvents).toContain("typeof body.department === 'string' ? body.department.trim() : ''");
     expect(staffingPushEvents).toContain("bodyDepartment || jobDepartment");
     expect(staffingPushFunction).toContain("resolveStaffingDepartment");

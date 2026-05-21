@@ -321,12 +321,28 @@ export async function getJobTitle(client: ReturnType<typeof createClient>, jobId
 export async function getJobDepartment(client: ReturnType<typeof createClient>, jobId?: string): Promise<string | null> {
   if (!jobId) return null;
   try {
-    const { data, error } = await client.from('jobs').select('department').eq('id', jobId).maybeSingle();
+    const { data, error } = await client
+      .from('job_departments')
+      .select('department')
+      .eq('job_id', jobId)
+      .order('department', { ascending: true });
     if (error) {
       console.error('⚠️ Failed to fetch job department:', { jobId, error });
       return null;
     }
-    return data?.department ?? null;
+    const departments = Array.from(new Set(
+      (data || [])
+        .map((row: { department?: unknown }) => typeof row.department === 'string' ? row.department.trim() : '')
+        .filter(Boolean)
+    ));
+    if (departments.length === 1) return departments[0];
+    if (departments.length > 1) {
+      console.warn('⚠️ Job has multiple departments; skipping ambiguous job department fallback:', {
+        jobId,
+        departments,
+      });
+    }
+    return null;
   } catch (err) {
     console.error('⚠️ Exception fetching job department:', { jobId, err });
     return null;
@@ -417,4 +433,3 @@ export async function resolveSoundVisionVenueName(
 
   return null;
 }
-
