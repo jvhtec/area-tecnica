@@ -31,9 +31,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { Database } from "@/integrations/supabase/types";
 
 
 import { queryKeys } from "@/lib/react-query";
+type SoundJobPersonnelUpdate = Database["public"]["Tables"]["sound_job_personnel"]["Update"];
+type SoundPersonnelField = "foh_engineers" | "mon_engineers" | "pa_techs" | "rf_techs";
+
 interface SoundTaskDialogProps {
   jobId: string;
   open: boolean;
@@ -281,14 +285,15 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
     }
   };
 
-  const updatePersonnel = (key: string, value: number) => {
+  const updatePersonnel = (key: SoundPersonnelField, value: number) => {
     setPersonnel((prev) => ({ ...prev, [key]: isNaN(value) ? 0 : value }));
   };
 
-  const updatePersonnelField = async (field: string, value: number) => {
+  const updatePersonnelField = async (field: SoundPersonnelField, value: number) => {
     try {
+      const payload = { [field]: value } as SoundJobPersonnelUpdate;
       const { error } = await dataLayerClient.from('sound_job_personnel')
-        .update({ [field]: value })
+        .update(payload)
         .eq('job_id', jobId);
       if (error) throw error;
       toast({
@@ -372,8 +377,8 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
 
    return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-4xl h-[90vh] flex flex-col p-0">
-        <DialogHeader className="px-4 py-2 flex flex-row items-center justify-between border-b">
+      <DialogContent className="w-full max-w-4xl h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] md:h-[90dvh] flex flex-col p-0">
+        <DialogHeader className="px-4 pb-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex flex-row items-center justify-between border-b">
           <DialogTitle className="flex items-center gap-2">
             <Table className="h-5 w-5" />
             <span>Sound Department Tasks</span>
@@ -409,7 +414,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="space-y-6">
             {/* Personnel Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

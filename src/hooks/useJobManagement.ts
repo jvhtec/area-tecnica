@@ -24,16 +24,28 @@ export const useJobManagement = (
       .from("jobs")
       .select(`
         *,
-        location:locations(name),
+        location:locations(id, name, formatted_address, latitude, longitude),
         job_departments!inner(department),
         job_assignments(
+          id,
           technician_id,
           sound_role,
           lights_role,
           video_role,
+          production_role,
+          external_technician_name,
+          assignment_source,
+          status,
+          single_day,
+          assignment_date,
+          assigned_at,
+          assigned_by,
           profiles!job_assignments_technician_id_fkey(
+            id,
             first_name,
-            last_name
+            last_name,
+            nickname,
+            department
           )
         ),
         job_documents(

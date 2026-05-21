@@ -396,7 +396,7 @@ const Layout = () => {
 
   // Routes that should be full-screen on mobile but have Layout on desktop
   const mobileFullscreenRoutes = useMemo(() => {
-    const routes = ["/sound"]
+    const routes = ["/sound", "/lights", "/video"]
     return isMobile && routes.some((route) => location.pathname.startsWith(route))
   }, [isMobile, location.pathname])
 

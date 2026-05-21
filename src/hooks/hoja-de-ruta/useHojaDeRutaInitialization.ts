@@ -142,7 +142,7 @@ export const useHojaDeRutaInitialization = (
         name: assignment.profiles?.first_name || "",
         surname1: assignment.profiles?.last_name || "",
         surname2: "",
-        position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico",
+        position: assignment.sound_role || assignment.lights_role || assignment.video_role || assignment.production_role || "Técnico",
         dni: assignment.profiles?.dni || "",
         phone: assignment.profiles?.phone || "",
         role: "house_tech",

@@ -237,13 +237,13 @@ export const ManageMilestonesDialog = ({ open, onOpenChange, jobId }: ManageMile
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[800px] h-[80vh] flex flex-col p-0">
-        <DialogHeader className="p-6 pb-2">
+      <DialogContent className="max-w-[800px] h-[min(80dvh,calc(100dvh-1rem))] flex flex-col p-0">
+        <DialogHeader className="px-6 pb-2 pt-[max(1.5rem,env(safe-area-inset-top))]">
           <DialogTitle>Manage Milestone Definitions</DialogTitle>
         </DialogHeader>
 
         <ScrollArea className="flex-1 px-6">
-          <div className="space-y-4 pb-6">
+          <div className="space-y-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             <div className="flex justify-between items-center">
               <Button
                 onClick={() => {

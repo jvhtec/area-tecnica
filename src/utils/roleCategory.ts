@@ -8,8 +8,8 @@ export function getCategoryFromRole(roleCode: string | null | undefined): 'respo
   
   const normalized = roleCode.trim().toUpperCase();
   
-  // Check if it's a valid role code format such as SND-FOH-R.
-  if (!normalized.match(/^[A-Z]{3}-[A-Z]+-[RET]$/)) {
+  // Check if it's a valid role code format such as SND-FOH-R or PROD-RESP-R.
+  if (!normalized.match(/^[A-Z]{3,4}-[A-Z]+-[RET]$/)) {
     return null;
   }
   
@@ -36,8 +36,9 @@ export function getCategoryFromAssignment(assignment: {
   sound_role?: string | null;
   lights_role?: string | null;
   video_role?: string | null;
+  production_role?: string | null;
 }): 'responsable' | 'especialista' | 'tecnico' | null {
-  const roles = [assignment.sound_role, assignment.lights_role, assignment.video_role];
+  const roles = [assignment.sound_role, assignment.lights_role, assignment.video_role, assignment.production_role];
   const categories = roles.map(role => getCategoryFromRole(role)).filter(cat => cat !== null);
 
   if (categories.length === 0) return null;

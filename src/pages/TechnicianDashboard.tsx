@@ -66,6 +66,7 @@ interface TechnicianAssignment {
   sound_role?: string | null;
   lights_role?: string | null;
   video_role?: string | null;
+  production_role?: string | null;
   jobs: TechnicianJobData;
 }
 
@@ -156,7 +157,7 @@ const TechnicianDashboard = () => {
 
       // Step 1: Fetch confirmed job assignments to get role/status info
       const { data: assignmentsData, error: assignmentsError } = await dataLayerClient.from('job_assignments')
-        .select('job_id, sound_role, lights_role, video_role, status, assigned_at')
+        .select('job_id, sound_role, lights_role, video_role, production_role, status, assigned_at')
         .eq('technician_id', user.id)
         .eq('status', 'confirmed');
 
@@ -262,11 +263,13 @@ const TechnicianDashboard = () => {
           if (assignment?.sound_role) department = "sound";
           else if (assignment?.lights_role) department = "lights";
           else if (assignment?.video_role) department = "video";
+          else if (assignment?.production_role) department = "production";
 
           const category = getCategoryFromAssignment({
             sound_role: assignment?.sound_role,
             lights_role: assignment?.lights_role,
-            video_role: assignment?.video_role
+            video_role: assignment?.video_role,
+            production_role: assignment?.production_role
           });
 
           return {
@@ -274,11 +277,12 @@ const TechnicianDashboard = () => {
             job_id: row.job_id,
             technician_id: row.technician_id,
             department,
-            role: assignment?.sound_role || assignment?.lights_role || assignment?.video_role || "Assigned",
+            role: assignment?.sound_role || assignment?.lights_role || assignment?.video_role || assignment?.production_role || "Assigned",
             category,
             sound_role: assignment?.sound_role,
             lights_role: assignment?.lights_role,
             video_role: assignment?.video_role,
+            production_role: assignment?.production_role,
             jobs: {
               ...job,
               location,

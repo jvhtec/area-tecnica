@@ -302,19 +302,19 @@ export function MobileAvailabilityView({
             </div>
 
             {/* Floating Action Button / Bottom Sheet */}
-            <div className="fixed bottom-6 right-6 z-50">
+            <div className="fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-[max(1.5rem,env(safe-area-inset-right))] z-50">
                 <Sheet>
                     <SheetTrigger asChild>
                         <Button
                             size="icon"
-                            className="h-14 w-14 rounded-full shadow-xl bg-blue-600 hover:bg-blue-500 text-white border-0"
+                            className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 text-primary-foreground border-0"
                         >
                             <Plus className="h-6 w-6" />
                         </Button>
                     </SheetTrigger>
-                    <SheetContent side="bottom" className="h-[80vh] bg-[#0f1219] border-t border-[#1f232e] rounded-t-2xl">
+                    <SheetContent side="bottom" className="h-[min(80dvh,calc(100dvh-1rem))] bg-card border-t border-border rounded-t-2xl">
                         <SheetHeader className="mb-4">
-                            <SheetTitle className="text-white">Asignar Preset Rápido</SheetTitle>
+                            <SheetTitle>Asignar Preset Rápido</SheetTitle>
                         </SheetHeader>
                         <QuickPresetAssignment
                             selectedDate={selectedDate}
@@ -335,7 +335,7 @@ export function MobileAvailabilityView({
             <Sheet open={showWeeklySummary} onOpenChange={setShowWeeklySummary}>
                 <SheetContent
                     side="bottom"
-                    className="h-[90vh] bg-[#0f1219] border-t border-[#1f232e] rounded-t-2xl overflow-y-auto"
+                    className="h-[calc(100dvh-1rem)] md:h-[90dvh] bg-card border-t border-border rounded-t-2xl overflow-y-auto"
                 >
                     <SheetHeader className="mb-4 flex flex-row items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -347,7 +347,7 @@ export function MobileAvailabilityView({
                             >
                                 <ChevronLeft className="h-5 w-5" />
                             </Button>
-                            <SheetTitle className="text-white">Resumen Semanal</SheetTitle>
+                            <SheetTitle>Resumen Semanal</SheetTitle>
                         </div>
                         <Button
                             variant="ghost"
@@ -358,7 +358,7 @@ export function MobileAvailabilityView({
                             <X className="h-5 w-5" />
                         </Button>
                     </SheetHeader>
-                    <div className="pb-6">
+                    <div className="pb-[max(1.5rem,env(safe-area-inset-bottom))]">
                         <WeeklySummary
                             selectedDate={selectedDate}
                             onDateChange={onDateSelect}

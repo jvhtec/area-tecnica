@@ -752,15 +752,15 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] flex flex-col gap-0 p-0">
-          <DialogHeader className="px-4 pt-4 pb-2 md:px-6 md:pt-6 md:pb-4 border-b">
+        <DialogContent className="max-w-3xl w-[95vw] md:w-full max-h-[calc(100dvh-1rem)] md:max-h-[90dvh] flex flex-col gap-0 p-0">
+          <DialogHeader className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-2 md:px-6 md:pt-6 md:pb-4 border-b">
             <DialogTitle className="text-base md:text-lg">
               {readOnly ? 'Tour Dates' : 'Manage Tour Dates'}
             </DialogTitle>
           </DialogHeader>
 
           <ScrollArea className="flex-1 overflow-auto px-4 md:px-6">
-            <div className="space-y-3 md:space-y-4 py-4 pb-6">
+            <div className="space-y-3 md:space-y-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
               {/* Bulk folders button removed; availability moved to Team Assignments */}
 
               <div className="space-y-4">

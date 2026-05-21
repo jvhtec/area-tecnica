@@ -65,10 +65,10 @@ export const useJobIntegration = (jobId: string) => {
     }
 
     const staff = jobDetails.job_assignments?.map((assignment: any) => ({
-      name: assignment.profiles?.first_name || "",
+      name: assignment.profiles?.first_name || assignment.external_technician_name || "",
       surname1: assignment.profiles?.last_name || "",
       surname2: "",
-      position: assignment.sound_role || assignment.lights_role || assignment.video_role || "Técnico"
+      position: assignment.sound_role || assignment.lights_role || assignment.video_role || assignment.production_role || "Técnico"
     })) || [];
 
     return {

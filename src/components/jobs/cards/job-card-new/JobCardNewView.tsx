@@ -591,8 +591,8 @@ export function JobCardNewView({
 
           {isProjectManagementPage && (
             <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
-              <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
-                <div className="h-full overflow-auto">
+              <DialogContent className="max-w-[96vw] w-[96vw] h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] p-0 overflow-hidden">
+                <div className="h-full overflow-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
                   <ModernHojaDeRuta jobId={job.id} />
                 </div>
               </DialogContent>

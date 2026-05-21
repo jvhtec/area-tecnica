@@ -15,6 +15,10 @@ import { useQuery } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useTechnicianTheme } from '@/hooks/useTechnicianTheme';
 import { canManageJobAssignments } from '@/utils/permissions';
+import {
+  buildAssignmentRoleInputForDepartment,
+  getAssignmentRoleForDepartment,
+} from '@/utils/assignmentRoles';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -153,10 +157,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
 
     setIsSaving(true);
     try {
-      const soundRole = department === 'sound' ? selectedRole : 'none';
-      const lightsRole = department === 'lights' ? selectedRole : 'none';
-
-      await addAssignment(selectedTech, soundRole, lightsRole, {
+      await addAssignment(selectedTech, buildAssignmentRoleInputForDepartment(department, selectedRole), {
         singleDay,
         singleDayDate: singleDay && selectedJobDate ? format(selectedJobDate, 'yyyy-MM-dd') : null,
       });
@@ -176,7 +177,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 border-none bg-transparent shadow-none">
-        <div className={`${theme.bg} ${theme.textMain} rounded-2xl border ${theme.card} w-[95vw] max-w-xl max-h-[85vh] overflow-hidden flex flex-col`}>
+        <div className={`${theme.bg} ${theme.textMain} rounded-2xl border ${theme.card} w-[95vw] max-w-xl max-h-[calc(100dvh-1rem)] overflow-hidden flex flex-col pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]`}>
           <div className={`flex items-center justify-between p-4 border-b ${theme.divider}`}>
             <div>
               <p className={`text-xs ${theme.textMuted} uppercase tracking-[0.08em]`}>Asignaciones</p>
@@ -230,8 +231,11 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
               ) : (
                 <div className="space-y-2">
                   {assignments.map((assignment: any) => {
-                    const name = `${assignment.profiles?.first_name ?? ''} ${assignment.profiles?.last_name ?? ''}`.trim() || 'Técnico';
-                    const roleCode = department === 'sound' ? assignment.sound_role : assignment.lights_role || assignment.video_role;
+                    const name = `${assignment.profiles?.first_name ?? ''} ${assignment.profiles?.last_name ?? ''}`.trim()
+                      || assignment.external_technician_name
+                      || 'Técnico';
+                    const roleCode = getAssignmentRoleForDepartment(assignment, department);
+                    if (!roleCode) return null;
                     const roleLabel = labelForCode(roleCode) || 'Asignado';
                     const singleDayLabel = assignment.single_day && assignment.assignment_date
                       ? format(new Date(`${assignment.assignment_date}T00:00:00`), "d 'de' MMM", { locale: es })

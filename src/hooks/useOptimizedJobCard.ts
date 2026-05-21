@@ -176,6 +176,7 @@ export const useOptimizedJobCard = (
           sound_role: null,
           lights_role: null,
           video_role: null,
+          production_role: null,
           status: null,
           single_day: null,
           assignment_date: null,
@@ -269,6 +270,7 @@ export const useOptimizedJobCard = (
     const soundSet = new Set<string>();
     const lightsSet = new Set<string>();
     const videoSet = new Set<string>();
+    const productionSet = new Set<string>();
     const roleSets: Record<string, Set<string>> = {};
 
     const rows = Array.isArray(assignments) ? assignments : [];
@@ -289,12 +291,18 @@ export const useOptimizedJobCard = (
         roleSets[a.video_role] = roleSets[a.video_role] || new Set<string>();
         roleSets[a.video_role].add(techId);
       }
+      if (a.production_role) {
+        productionSet.add(techId);
+        roleSets[a.production_role] = roleSets[a.production_role] || new Set<string>();
+        roleSets[a.production_role].add(techId);
+      }
     }
 
     const countsByDept: Record<string, number> = {
       sound: soundSet.size,
       lights: lightsSet.size,
-      video: videoSet.size
+      video: videoSet.size,
+      production: productionSet.size
     } as any;
 
     const countsByRole: Record<string, number> = {};
@@ -306,7 +314,7 @@ export const useOptimizedJobCard = (
   // Compute shortages per department/role
   const requiredVsAssigned = useMemo(() => {
     const byDept: Record<string, { required: number; assigned: number; roles: Array<{ role_code: string; required: number; assigned: number }> }> = {};
-    for (const dept of ['sound', 'lights', 'video']) {
+    for (const dept of ['sound', 'lights', 'video', 'production']) {
       const sum = reqByDept.get?.(dept as any) || (reqSummary.find(r => r.department === dept) ?? null);
       const required = sum?.total_required ?? 0;
       const roles = (sum?.roles || []).map((r) => ({

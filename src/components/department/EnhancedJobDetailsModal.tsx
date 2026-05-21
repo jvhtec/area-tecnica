@@ -51,6 +51,8 @@ interface StaffAssignment {
     sound_role?: string | null;
     lights_role?: string | null;
     video_role?: string | null;
+    production_role?: string | null;
+    external_technician_name?: string | null;
     technician: {
         id: string;
         first_name: string;
@@ -110,6 +112,8 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
           sound_role,
           lights_role,
           video_role,
+          production_role,
+          external_technician_name,
           technician:profiles(id, first_name, last_name, email, department)
         `)
                 .eq('job_id', job.id)
@@ -370,11 +374,12 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
         if (assignment.sound_role) return 'sound';
         if (assignment.lights_role) return 'lights';
         if (assignment.video_role) return 'video';
+        if (assignment.production_role) return 'production';
         return 'unknown';
     };
 
     const getRoleFromAssignment = (assignment: StaffAssignment): string => {
-        const role = assignment.sound_role || assignment.lights_role || assignment.video_role;
+        const role = assignment.sound_role || assignment.lights_role || assignment.video_role || assignment.production_role;
         return role ? (labelForCode(role) || role) : 'Técnico';
     };
 
@@ -397,8 +402,8 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     };
 
     return (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
-            <div className={`w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] h-[90vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden overflow-x-hidden animate-in zoom-in-95 duration-200`}>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
+            <div className={`w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] h-[calc(100dvh-2rem)] md:h-[90dvh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden overflow-x-hidden animate-in zoom-in-95 duration-200`}>
 
                 {/* Header */}
                 <div className={`p-4 border-b ${theme.divider} flex justify-between items-center shrink-0`}>
@@ -429,7 +434,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                     ))}
                 </div>
 
-                <ScrollArea className="flex-1 p-5 overflow-x-hidden min-w-0">
+                <ScrollArea className="flex-1 px-5 pt-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] overflow-x-hidden min-w-0">
 
                     {/* TAB: INFO */}
                     {activeTab === 'Info' && (
@@ -615,11 +620,12 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
                                             sound: 'text-blue-400 bg-blue-900/30 border-blue-900/50',
                                             lights: 'text-amber-400 bg-amber-900/30 border-amber-900/50',
                                             video: 'text-purple-400 bg-purple-900/30 border-purple-900/50',
+                                            production: 'text-emerald-400 bg-emerald-900/30 border-emerald-900/50',
                                         };
                                         return (
                                             <div key={idx} className={`${isDark ? 'bg-[#0f1219] border-[#1f232e]' : 'bg-slate-50 border-slate-200'} border rounded-lg p-4 min-w-0 overflow-hidden`}>
                                                 <div className={`font-bold text-sm ${theme.textMain} mb-1 break-words`}>
-                                                    {tech?.first_name} {tech?.last_name}
+                                                    {tech ? `${tech.first_name} ${tech.last_name}` : assignment.external_technician_name || 'Técnico externo'}
                                                 </div>
                                                 <div className={`text-xs ${theme.textMuted} break-words`}>{role}</div>
                                                 <div className={`mt-2 inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${deptColors[dept] || theme.textMuted}`}>

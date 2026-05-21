@@ -21,6 +21,11 @@ export interface JobSelection {
   end_time: string;
 }
 
+const oneOrFirst = <T,>(value: T | T[] | null | undefined): T | null => {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+};
+
 export const useJobSelection = () => {
   return useQuery({
     queryKey: queryKeys.scope("jobs-for-selection"),
@@ -49,9 +54,10 @@ export const useJobSelection = () => {
             )
           )
         `)
-        .gte('start_time', today.toISOString()) // Filter to present/future jobs only
+        .gte('end_time', today.toISOString()) // Include ongoing multi-day jobs
         .in('job_type', ['single', 'festival', 'ciclo', 'tourdate']) // Only include relevant job types
         .neq('status', 'Completado') // Exclude completed/deleted jobs
+        .neq('status', 'Cancelado')
         .order("start_time", { ascending: true });
 
       if (error) {
@@ -62,20 +68,25 @@ export const useJobSelection = () => {
       console.log("Raw jobs data:", jobs);
 
       // Transform the data to match our expected types
-      const transformedJobs = jobs?.map(job => ({
-        id: job.id,
-        title: job.title,
-        start_time: job.start_time,
-        end_time: job.end_time,
-        tour_date_id: job.tour_date_id,
-        tour_date: job.tour_date ? {
-          id: job.tour_date[0]?.id, // Access first element of tour_date array
-          tour: {
-            id: job.tour_date[0]?.tour[0]?.id, // Access first tour from the first tour_date
-            name: job.tour_date[0]?.tour[0]?.name
-          }
-        } : null
-      })) as JobSelection[];
+      const transformedJobs = jobs?.map(job => {
+        const tourDate = oneOrFirst(job.tour_date);
+        const tour = oneOrFirst(tourDate?.tour);
+
+        return {
+          id: job.id,
+          title: job.title,
+          start_time: job.start_time,
+          end_time: job.end_time,
+          tour_date_id: job.tour_date_id,
+          tour_date: tourDate ? {
+            id: tourDate.id,
+            tour: {
+              id: tour?.id ?? "",
+              name: tour?.name ?? ""
+            }
+          } : null
+        };
+      }) as JobSelection[];
 
       console.log("Transformed jobs:", transformedJobs);
       return transformedJobs;

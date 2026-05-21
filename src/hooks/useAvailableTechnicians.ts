@@ -88,7 +88,7 @@ export function useAvailableTechnicians({
           console.log('Job assignment changed, refreshing available technicians:', payload);
           // Invalidate and refetch the available technicians query
           queryClient.invalidateQueries({
-            queryKey: queryKeys.scope("available-technicians", department, jobId, jobStartTime, jobEndTime)
+            queryKey: queryKeys.scope("available-technicians", department, jobId, jobStartTime, jobEndTime, assignmentDate ?? null)
           });
         }
       )

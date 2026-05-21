@@ -13,6 +13,10 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { toast } from "sonner";
 import { formatBandOptionLabel, getBandOptionsEU, isFrequencyBandSelection } from "@/lib/frequencyBands";
 import type { MobileArtistRiderFile, MobileConfigCategory } from "./MobileArtistCard";
+import type { Database } from "@/integrations/supabase/types";
+
+type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
+type ProviderType = Database["public"]["Enums"]["provider_type"];
 
 interface Artist {
   id: string;
@@ -451,15 +455,15 @@ export const MobileArtistConfigEditor = ({
     setIsSaving(true);
     try {
       // Build the update payload based on category
-      let updatePayload: Record<string, any> = {};
+      let updatePayload: FestivalArtistUpdate = {};
 
       switch (category) {
         case 'consoles':
           updatePayload = {
             foh_console: formData.foh_console,
-            foh_console_provided_by: formData.foh_console_provided_by,
+            foh_console_provided_by: formData.foh_console_provided_by as ProviderType,
             mon_console: formData.mon_console,
-            mon_console_provided_by: formData.mon_console_provided_by,
+            mon_console_provided_by: formData.mon_console_provided_by as ProviderType,
             monitors_from_foh: formData.monitors_from_foh,
             foh_waves_outboard: formData.foh_waves_outboard || null,
             mon_waves_outboard: formData.mon_waves_outboard || null,
@@ -470,9 +474,9 @@ export const MobileArtistConfigEditor = ({
         case 'wireless':
           updatePayload = {
             wireless_systems: formData.wireless_systems,
-            wireless_provided_by: formData.wireless_provided_by,
+            wireless_provided_by: formData.wireless_provided_by as ProviderType,
             iem_systems: formData.iem_systems,
-            iem_provided_by: formData.iem_provided_by,
+            iem_provided_by: formData.iem_provided_by as ProviderType,
           };
           break;
         case 'microphones':
@@ -502,7 +506,7 @@ export const MobileArtistConfigEditor = ({
             infra_opticalcon_duo: formData.infra_opticalcon_duo,
             infra_opticalcon_duo_quantity: formData.infra_opticalcon_duo_quantity,
             infra_analog: formData.infra_analog,
-            infrastructure_provided_by: formData.infrastructure_provided_by,
+            infrastructure_provided_by: formData.infrastructure_provided_by as ProviderType,
             other_infrastructure: formData.other_infrastructure || null,
           };
           break;

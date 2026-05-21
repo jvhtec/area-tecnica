@@ -67,8 +67,8 @@ export const ArtistManagementDialog = ({
   // Desktop: standard dialog
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="flex h-[100vh] max-h-[100vh] md:max-h-[100vh] w-[100vw] max-w-[100vw] flex-col gap-0 overflow-hidden rounded-none sm:rounded-none p-0">
-        <DialogHeader className="border-b px-4 py-3 sm:px-6">
+      <DialogContent className="flex h-[100dvh] max-h-[100dvh] md:max-h-[100dvh] w-[100vw] max-w-[100vw] flex-col gap-0 overflow-hidden rounded-none sm:rounded-none p-0">
+        <DialogHeader className="border-b px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:px-6 sm:pt-3">
           <DialogTitle>
             {artist ? "Editar Artista" : "Agregar Artista"}
           </DialogTitle>
@@ -83,7 +83,7 @@ export const ArtistManagementDialog = ({
             formId={formId}
           />
         </div>
-        <div className="border-t bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6">
+        <div className="border-t bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:px-6 sm:pb-3">
           <div className="flex justify-end">
             <Button
               type="submit"

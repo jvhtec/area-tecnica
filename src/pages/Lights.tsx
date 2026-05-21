@@ -301,7 +301,7 @@ const Lights = () => {
 
       {/* Mobile FAB */}
       <Button 
-        className="sm:hidden fixed bottom-6 right-6 rounded-full h-12 w-12 p-0 shadow-lg"
+        className="sm:hidden fixed bottom-[max(1.5rem,env(safe-area-inset-bottom))] right-[max(1.5rem,env(safe-area-inset-right))] rounded-full h-12 w-12 p-0 shadow-lg"
         onClick={() => handleCreateJob(undefined)}
       >
         <Plus className="h-6 w-6" />

@@ -51,6 +51,11 @@ import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 import { isDepartmentManagementRole, isManagementRole } from '@/utils/permissions';
+import {
+  buildAssignmentRoleInputForDepartment,
+  getAssignmentRoleForDepartment,
+  hasAssignmentRoleForDepartment,
+} from '@/utils/assignmentRoles';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -84,6 +89,8 @@ interface Assignment {
   technician_id: string;
   sound_role: string;
   lights_role: string;
+  video_role?: string | null;
+  production_role?: string | null;
 }
 
 // Role options from centralized registry (codes with labels)
@@ -130,7 +137,7 @@ const formatAssignmentTechnicianName = (assignment: any) => {
     const fullName = `${firstName} ${lastName}`.trim();
     return fullName || 'Unnamed Technician';
   }
-  return 'Unknown Technician';
+  return assignment.external_technician_name || 'Unknown Technician';
 };
 
 // Helper function to format available technician name
@@ -162,7 +169,8 @@ const formatDepartmentName = (department: string) => {
   const names: Record<string, string> = {
     'sound': 'Sonido',
     'lights': 'Luces',
-    'video': 'Video'
+    'video': 'Video',
+    'production': 'Producción'
   };
   return names[department.toLowerCase()] || department;
 };
@@ -173,6 +181,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const [selectedTechnician, setSelectedTechnician] = useState<string | null>(null);
   const [soundRole, setSoundRole] = useState<string>("none");
   const [lightsRole, setLightsRole] = useState<string>("none");
+  const [videoRole, setVideoRole] = useState<string>("none");
+  const [productionRole, setProductionRole] = useState<string>("none");
   const [singleDay, setSingleDay] = useState(false);
   const [addAsConfirmed, setAddAsConfirmed] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
@@ -188,14 +198,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   // Filter assignments to only show those for the current department
   const departmentAssignments = useMemo(() => {
     return (assignments || []).filter((assignment: any) => {
-      if (currentDepartment === 'sound') {
-        return assignment.sound_role && assignment.sound_role !== 'none';
-      } else if (currentDepartment === 'lights') {
-        return assignment.lights_role && assignment.lights_role !== 'none';
-      } else if (currentDepartment === 'video') {
-        return assignment.video_role && assignment.video_role !== 'none';
-      }
-      return false;
+      return hasAssignmentRoleForDepartment(assignment, currentDepartment);
     });
   }, [assignments, currentDepartment]);
 
@@ -308,7 +311,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const assignedByRole = useMemo(() => {
     const m = new Map<string, number>();
     (assignments || []).forEach((a: any) => {
-      const code = currentDepartment === 'sound' ? a.sound_role : currentDepartment === 'lights' ? a.lights_role : a.video_role;
+      const code = getAssignmentRoleForDepartment(a, currentDepartment);
       if (code) m.set(code, (m.get(code) || 0) + 1);
     });
     return m;
@@ -355,7 +358,12 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
     try {
       // Guard against over-assignment when requirements exist and no override
-      const selectedCode = currentDepartment === 'sound' ? soundRole : currentDepartment === 'lights' ? lightsRole : 'none';
+      const selectedCode = getAssignmentRoleForDepartment({
+        sound_role: soundRole,
+        lights_role: lightsRole,
+        video_role: videoRole,
+        production_role: productionRole,
+      }, currentDepartment);
       if (reqForDept && selectedCode && selectedCode !== 'none' && !isManagementRole(userRole)) {
         const left = remainingByRole.get(selectedCode) ?? 0;
         if (left <= 0) {
@@ -366,8 +374,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       }
       await addAssignment(
         selectedTechnician,
-        soundRole,
-        lightsRole,
+        buildAssignmentRoleInputForDepartment(currentDepartment, selectedCode),
         singleDay
           ? {
             singleDay: true,
@@ -387,6 +394,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       setSelectedTechnician(null);
       setSoundRole("none");
       setLightsRole("none");
+      setVideoRole("none");
+      setProductionRole("none");
       setSingleDay(false);
       setAddAsConfirmed(false);
       setSelectedJobDate(null);
@@ -412,6 +421,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
         technician_id: assignment.technician_id,
         sound_role: assignment.sound_role,
         lights_role: assignment.lights_role,
+        video_role: assignment.video_role,
+        production_role: assignment.production_role,
       });
     });
 
@@ -431,13 +442,17 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       for (const assignment of assignmentsToProcess) {
         const technicianId = assignment.technician_id;
 
-        // Add to Flex crew calls for sound and lights departments
+        // Add to Flex crew calls for supported technical departments
         if (assignment.sound_role && assignment.sound_role !== 'none') {
           await manageFlexCrewAssignment(jobId, technicianId, 'sound', 'add');
         }
 
         if (assignment.lights_role && assignment.lights_role !== 'none') {
           await manageFlexCrewAssignment(jobId, technicianId, 'lights', 'add');
+        }
+
+        if (assignment.video_role && assignment.video_role !== 'none') {
+          await manageFlexCrewAssignment(jobId, technicianId, 'video', 'add');
         }
       }
 
@@ -522,7 +537,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="w-[95vw] max-w-[625px] max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="w-[95vw] max-w-[625px] max-h-[calc(100dvh-1rem)] md:max-h-[90dvh] flex flex-col overflow-hidden">
         {isClosureLocked && (
           <Alert className="border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-500/40 dark:bg-amber-500/10 dark:text-amber-50">
             <AlertCircle className="h-4 w-4" />
@@ -576,7 +591,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto px-1">
+        <div className="flex-1 overflow-y-auto px-1 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <div className="py-3 md:py-4">
             <h3 className="text-base md:text-lg font-semibold mb-2">Asignaciones Actuales de {formatDepartmentName(currentDepartment)}</h3>
             {departmentAssignments.length === 0 ? (
@@ -784,6 +799,53 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                             <SelectContent>
                               <SelectItem value="none">Ninguno</SelectItem>
                               {roleOptionsForDiscipline('video').map((opt) => (
+                                <SelectItem key={opt.code} value={opt.code}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {currentDepartment === "production" && (
+                        <div>
+                          <Label htmlFor={`production-role-${assignment.technician_id}`} className="text-xs md:text-sm mb-1">
+                            Rol de Producción
+                          </Label>
+                          <Select
+                            value={assignment.production_role || "none"}
+                            disabled={isClosureLocked}
+                            onValueChange={async (newRole) => {
+                              try {
+                                const { error } = await dataLayerClient.from('job_assignments')
+                                  .update({ production_role: newRole === 'none' ? null : newRole })
+                                  .eq('job_id', jobId)
+                                  .eq('technician_id', assignment.technician_id);
+
+                                if (error) throw error;
+
+                                toast({
+                                  title: "Rol actualizado",
+                                  description: "El rol de producción se ha actualizado exitosamente",
+                                });
+                                onAssignmentChange();
+                              } catch (error: any) {
+                                console.error("Error updating role:", error);
+                                toast({
+                                  title: "Error",
+                                  description: error.message || "No se pudo actualizar el rol",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            <SelectTrigger id={`production-role-${assignment.technician_id}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">Ninguno</SelectItem>
+                              {roleOptionsForDiscipline('production').map((opt) => (
                                 <SelectItem key={opt.code} value={opt.code}>
                                   {opt.label}
                                 </SelectItem>
