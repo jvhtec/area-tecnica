@@ -16,10 +16,16 @@ export type StageProfileRecipientRow = {
   department?: string | null;
 };
 
+export type WahaParticipantObject = {
+  id: string;
+};
+
 const normalizeDepartment = (value?: string | null): Dept | null => {
   const normalized = (value || '').trim().toLowerCase();
   return normalized === 'sound' || normalized === 'lights' || normalized === 'video' ? normalized : null;
 };
+
+export const phoneToWahaJid = (phone: string) => `${phone.replace(/^\+/, '').replace(/\D/g, '')}@c.us`;
 
 export const inferDepartmentFromFestivalAssignmentRole = (role?: string | null): Dept | null => {
   const normalized = (role || '').trim().toUpperCase();
@@ -82,4 +88,22 @@ export const resolveFestivalWhatsappStageTechnicianIds = ({
   }
 
   return Array.from(ids);
+};
+
+export const buildWahaGroupParticipants = ({
+  actorJid,
+  participants,
+}: {
+  actorJid?: string | null;
+  participants: string[];
+}) => {
+  const allParticipants = participants.map<WahaParticipantObject>((phone) => ({ id: phoneToWahaJid(phone) }));
+  const groupParticipants = actorJid
+    ? allParticipants.filter((participant) => participant.id !== actorJid)
+    : allParticipants;
+
+  return {
+    allParticipants,
+    groupParticipants,
+  };
 };

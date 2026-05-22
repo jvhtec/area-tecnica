@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
+  buildWahaGroupParticipants,
+  phoneToWahaJid,
   resolveFestivalWhatsappStageTechnicianIds,
 } from "./recipientUtils.ts";
 import type {
@@ -407,19 +409,24 @@ serve(async (req: Request) => {
 
     // WAHA expects JIDs like 34900111222@c.us and an object list
     const session = (cfg?.[0] as any)?.session || Deno.env.get('WAHA_SESSION') || 'default';
-    const participantObjects = uniqueParticipants.map((p) => {
-      const jid = p.replace(/^\+/, '').replace(/\D/g, '') + '@c.us';
-      return { id: jid };
-    });
     const actorJidCandidate = (() => {
       if (actor?.phone && actor.department === department) {
         const norm = normalizePhone(actor.phone, defaultCC);
-        if (norm.ok) return norm.value.replace(/^\+/, '') + '@c.us';
+        if (norm.ok) return phoneToWahaJid(norm.value);
       }
       return null;
     })();
+    const { allParticipants: participantObjects, groupParticipants } = buildWahaGroupParticipants({
+      actorJid: actorJidCandidate,
+      participants: uniqueParticipants,
+    });
+
+    if (groupParticipants.length === 0) {
+      return new Response(JSON.stringify({ error: 'No valid non-actor phone numbers found', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     let usedFallback = false;
+    let fallbackSeedParticipant: { id: string } | null = null;
     let wa_group_id = '';
     let groupText = '';
     if (!finalizeOnly) {
@@ -430,30 +437,43 @@ serve(async (req: Request) => {
         groupRes = await fetch(groupUrl, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ name: subject, participants: participantObjects })
+          body: JSON.stringify({ name: subject, participants: groupParticipants })
         });
       } catch (fe) {
         return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group', url: groupUrl, message: (fe as Error)?.message || String(fe) }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       if (!groupRes.ok) {
         const txt = await groupRes.text().catch(() => '');
-        if (groupRes.status >= 500 && groupRes.status < 600 && participantObjects.length > 1) {
-          // Fallback: try create group with a single participant when WAHA rejects bulk creation.
-          const first = actorJidCandidate ? { id: actorJidCandidate } : participantObjects[0];
-          try {
+        if (groupRes.status >= 500 && groupRes.status < 600 && groupParticipants.length > 1) {
+          // Fallback: try real assigned participants one by one when WAHA rejects bulk creation.
+          const fallbackErrors: Array<{ id: string; status?: number; body?: string; message?: string }> = [];
+          for (const candidate of groupParticipants) {
             const fallbackRes = await fetch(groupUrl, {
               method: 'POST',
               headers,
-              body: JSON.stringify({ name: subject, participants: [first] })
+              body: JSON.stringify({ name: subject, participants: [candidate] })
+            }).catch((err) => {
+              fallbackErrors.push({ id: candidate.id, message: (err as Error)?.message || String(err) });
+              return null;
             });
-            if (!fallbackRes.ok) {
-              const fbTxt = await fallbackRes.text().catch(() => '');
-              return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: fallbackRes.status, url: groupUrl, response: fbTxt, firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+            if (!fallbackRes) {
+              continue;
             }
-            usedFallback = true;
-            groupRes = fallbackRes;
-          } catch (fe2) {
-            return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group-fallback', url: groupUrl, message: (fe2 as Error)?.message || String(fe2), firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+            if (fallbackRes.ok) {
+              usedFallback = true;
+              fallbackSeedParticipant = candidate;
+              groupRes = fallbackRes;
+              break;
+            }
+
+            const fbTxt = await fallbackRes.text().catch(() => '');
+            fallbackErrors.push({ id: candidate.id, status: fallbackRes.status, body: fbTxt });
+          }
+
+          if (!usedFallback) {
+            return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: groupRes.status, url: groupUrl, response: txt, fallbackAttempts: fallbackErrors, firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
         } else {
           return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: groupRes.status, url: groupUrl, response: txt }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -568,10 +588,10 @@ serve(async (req: Request) => {
     }
 
     // If fallback creation used with only 1 participant, add the rest now (best effort)
-    if (participantObjects.length > 1) {
+    if (groupParticipants.length > 1) {
       try {
-        const first = actorJidCandidate ? { id: actorJidCandidate } : participantObjects[0];
-        const toAdd = participantObjects.filter((p) => p.id !== first.id);
+        const first = fallbackSeedParticipant || groupParticipants[0];
+        const toAdd = groupParticipants.filter((p) => p.id !== first.id);
         if (toAdd.length) {
           const addUrl = `${base}/api/${encodeURIComponent(session)}/groups/${encodeURIComponent(wa_group_id)}/participants/add`;
           const tryAdd = async () => {

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildWahaGroupParticipants,
   inferDepartmentFromFestivalAssignmentRole,
+  phoneToWahaJid,
   resolveFestivalWhatsappStageTechnicianIds,
   type StageAssignmentRecipientRow,
   type StageProfileRecipientRow,
@@ -47,5 +49,19 @@ describe("festival WhatsApp stage recipient resolution", () => {
         shiftsById: shifts,
       }),
     ).toEqual(["tech-1", "tech-3"]);
+  });
+
+  it("excludes the actor/session JID from WAHA group creation participants", () => {
+    const actorJid = phoneToWahaJid("+34611111111");
+
+    expect(
+      buildWahaGroupParticipants({
+        actorJid,
+        participants: ["+34611111111", "+34622222222", "+34633333333"],
+      }),
+    ).toEqual({
+      allParticipants: [{ id: actorJid }, { id: "34622222222@c.us" }, { id: "34633333333@c.us" }],
+      groupParticipants: [{ id: "34622222222@c.us" }, { id: "34633333333@c.us" }],
+    });
   });
 });
