@@ -144,7 +144,14 @@ export const JobCardActionButtons = ({
         {transportButtonLabel}
       </Button>
     )}
-    {isProjectManagementPage && department !== "production" && isManagementUser && onCreateWhatsappGroup && job.job_type !== "dryhire" && (
+    {(
+      isProjectManagementPage &&
+      department !== "production" &&
+      isManagementUser &&
+      onCreateWhatsappGroup &&
+      job.job_type !== "dryhire" &&
+      !isFestivalLike
+    ) && (
       <>
         {whatsappRequest && !whatsappGroup && onRetryWhatsappGroup ? (
           <Button

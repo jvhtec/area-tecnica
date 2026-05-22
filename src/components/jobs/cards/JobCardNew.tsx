@@ -510,7 +510,7 @@ function JobCardNewFull({
   // WhatsApp group existence for this job + department (for management only)
   const { data: waGroup, refetch: refetchWaGroup } = useQuery({
     queryKey: queryKeys.scope('job-whatsapp-group', job.id, department, 0),
-    enabled: !!job?.id && !!department && isManagementUser,
+    enabled: !!job?.id && !!department && isManagementUser && !isFestivalLike,
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('job_whatsapp_groups')
         .select('id, wa_group_id')
@@ -525,7 +525,7 @@ function JobCardNewFull({
 
   const { data: waRequest, refetch: refetchWaRequest } = useQuery({
     queryKey: queryKeys.scope('job-whatsapp-group-request', job.id, department, 0),
-    enabled: !!job?.id && !!department && isManagementUser,
+    enabled: !!job?.id && !!department && isManagementUser && !isFestivalLike,
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('job_whatsapp_group_requests')
         .select('id, created_at')

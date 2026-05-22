@@ -105,7 +105,6 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
     isBackfilling,
 
     userRole,
-    setIsWhatsappDialogOpen,
     setWaMessage,
     setIsAlmacenDialogOpen,
 
@@ -619,22 +618,6 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                       variant="outline"
                     >
                       {isBackfilling ? "Rellenando..." : "Abrir Relleno"}
-                    </Button>
-                  </div>
-                )}
-
-                {/* WhatsApp Group */}
-                {isManagementUser && (
-                  <div className="rounded-lg border p-3 md:p-4 space-y-2 md:space-y-3 bg-gradient-to-br from-background to-green-500/5">
-                    <div className="flex items-center gap-2 text-xs md:text-sm font-semibold text-foreground">
-                      <MessageCircle className="h-4 w-4 flex-shrink-0 text-green-500" />
-                      Grupo de WhatsApp
-                    </div>
-                    <p className="text-xs md:text-sm text-muted-foreground">
-                      Crea grupo de WhatsApp para coordinación del trabajo.
-                    </p>
-                    <Button onClick={() => setIsWhatsappDialogOpen(true)} size="sm" className="w-full" variant="outline">
-                      Crear Grupo
                     </Button>
                   </div>
                 )}

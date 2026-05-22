@@ -26,6 +26,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
     isSchedulingRoute,
     jobDates,
     isViewOnly,
+    isManagementUser,
 
     isAssignmentDialogOpen,
     setIsAssignmentDialogOpen,
@@ -156,7 +157,12 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
           </div>
 
           {jobDates.length > 0 ? (
-            <FestivalScheduling jobId={jobId} jobDates={jobDates} isViewOnly={isViewOnly} />
+            <FestivalScheduling
+              jobId={jobId}
+              jobDates={jobDates}
+              isViewOnly={isViewOnly}
+              onCreateWhatsappGroup={isManagementUser ? () => setIsWhatsappDialogOpen(true) : undefined}
+            />
           ) : (
             <Card>
               <CardContent className="p-8 text-center">

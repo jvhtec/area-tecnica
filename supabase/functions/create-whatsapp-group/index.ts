@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-type Dept = 'sound' | 'lights' | 'video';
+import {
+  buildWahaGroupParticipants,
+  phoneToWahaJid,
+} from "./recipientUtils.ts";
+import type { Dept } from "./recipientUtils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -143,17 +146,6 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ success: true, wa_group_id: null, note: 'Group request already recorded (locked)' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Record request to lock further attempts
-    if (!priorReq) {
-      const { error: lockErr } = await supabaseAdmin
-        .from('job_whatsapp_group_requests')
-        .insert({ job_id, department, stage_number: effectiveStageNumber });
-      if (lockErr && !(lockErr as any)?.code?.includes?.('23505')) {
-        // Not a unique violation; fail explicitly
-        return new Response(JSON.stringify({ error: 'Failed to record group request', details: lockErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-    }
-
     // Fetch job details
     const { data: job, error: jobErr } = await supabaseAdmin
       .from('jobs')
@@ -185,99 +177,38 @@ serve(async (req: Request) => {
     const participants: string[] = [];
     const missing: string[] = [];
     const invalid: string[] = [];
-    if (effectiveStageNumber > 0) {
-      const { data: stageAssignments, error: stageAssignmentsErr } = await supabaseAdmin
-        .from('festival_shift_assignments')
-        .select(`
-          technician_id,
-          festival_shifts!inner (
-            job_id,
-            department,
-            stage
-          )
-        `)
-        .eq('festival_shifts.job_id', job_id)
-        .eq('festival_shifts.department', department)
-        .eq('festival_shifts.stage', effectiveStageNumber)
-        .not('technician_id', 'is', null);
 
-      if (stageAssignmentsErr) {
-        console.warn('festival_shift_assignments fetch error', stageAssignmentsErr);
+    // Recipients intentionally come from job assignments for every job type.
+    // Festival stage selection only scopes the group name and persistence key.
+    const { data: assigns, error: assignsErr } = await supabaseAdmin
+      .from('job_assignments')
+      .select(`
+        technician_id,
+        sound_role, lights_role, video_role,
+        profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
+      `)
+      .eq('job_id', job_id);
+    if (assignsErr) {
+      console.warn('job_assignments fetch error', assignsErr);
+    }
+
+    const rows = (assigns ?? []).filter((r: any) => {
+      if (department === 'sound') return !!r.sound_role;
+      if (department === 'lights') return !!r.lights_role;
+      if (department === 'video') return !!r.video_role;
+      return false;
+    });
+
+    for (const r of rows) {
+      const fullName = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Tecnico';
+      const rawPhone = (r.profiles?.phone || '').trim();
+      if (!rawPhone) {
+        missing.push(fullName);
+        continue;
       }
-
-      const technicianIds = Array.from(
-        new Set(
-          (stageAssignments || [])
-            .map((row: any) => row.technician_id)
-            .filter((id: string | null) => !!id)
-        )
-      );
-
-      if (technicianIds.length === 0) {
-        return new Response(
-          JSON.stringify({
-            error: 'No technicians assigned to selected stage',
-            stage_number: effectiveStageNumber,
-            department,
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const { data: stageProfiles, error: stageProfilesErr } = await supabaseAdmin
-        .from('profiles')
-        .select('id, first_name, last_name, phone')
-        .in('id', technicianIds);
-
-      if (stageProfilesErr) {
-        console.warn('profiles fetch error for stage participants', stageProfilesErr);
-      }
-
-      const profileById = new Map((stageProfiles || []).map((p: any) => [p.id, p]));
-      for (const technicianId of technicianIds) {
-        const profile = profileById.get(technicianId);
-        const fullName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Tecnico';
-        const rawPhone = (profile?.phone || '').trim();
-        if (!rawPhone) {
-          missing.push(fullName);
-          continue;
-        }
-        const norm = normalizePhone(rawPhone, defaultCC);
-        if (norm.ok) participants.push(norm.value);
-        else invalid.push(`${fullName} (${rawPhone})`);
-      }
-    } else {
-      // Default behavior: recipients come from job assignments by department.
-      const { data: assigns, error: assignsErr } = await supabaseAdmin
-        .from('job_assignments')
-        .select(`
-          technician_id,
-          sound_role, lights_role, video_role,
-          profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
-        `)
-        .eq('job_id', job_id);
-      if (assignsErr) {
-        console.warn('job_assignments fetch error', assignsErr);
-      }
-
-      const rows = (assigns ?? []).filter((r: any) => {
-        if (department === 'sound') return !!r.sound_role;
-        if (department === 'lights') return !!r.lights_role;
-        if (department === 'video') return !!r.video_role;
-        return false;
-      });
-
-      for (const r of rows) {
-        const fullName = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Tecnico';
-        const rawPhone = (r.profiles?.phone || '').trim();
-        if (!rawPhone) {
-          missing.push(fullName);
-          continue;
-        }
-        const norm = normalizePhone(rawPhone, defaultCC);
-        if (norm.ok) participants.push(norm.value);
-        else invalid.push(`${fullName} (${rawPhone})`);
-      }
+      const norm = normalizePhone(rawPhone, defaultCC);
+      if (norm.ok) participants.push(norm.value);
+      else invalid.push(`${fullName} (${rawPhone})`);
     }
 
     // Always include management user for the department (if phone exists and matches department)
@@ -314,6 +245,20 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'No valid phone numbers found', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // Record request to lock further attempts only after recipient validation succeeds.
+    if (!priorReq) {
+      const { error: lockErr } = await supabaseAdmin
+        .from('job_whatsapp_group_requests')
+        .insert({ job_id, department, stage_number: effectiveStageNumber });
+      if (lockErr) {
+        const isDuplicateLock = lockErr.code === '23505';
+        if (isDuplicateLock && !finalizeOnly) {
+          return new Response(JSON.stringify({ success: true, wa_group_id: null, note: 'Group request already recorded (locked)' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({ error: 'Failed to record group request', details: lockErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
     // WAHA config - use actor's endpoint
     const normalizeBase = (s: string) => {
       let b = (s || '').trim();
@@ -332,19 +277,24 @@ serve(async (req: Request) => {
 
     // WAHA expects JIDs like 34900111222@c.us and an object list
     const session = (cfg?.[0] as any)?.session || Deno.env.get('WAHA_SESSION') || 'default';
-    const participantObjects = uniqueParticipants.map((p) => {
-      const jid = p.replace(/^\+/, '').replace(/\D/g, '') + '@c.us';
-      return { id: jid };
-    });
     const actorJidCandidate = (() => {
       if (actor?.phone && actor.department === department) {
         const norm = normalizePhone(actor.phone, defaultCC);
-        if (norm.ok) return norm.value.replace(/^\+/, '') + '@c.us';
+        if (norm.ok) return phoneToWahaJid(norm.value);
       }
       return null;
     })();
+    const { allParticipants: participantObjects, groupParticipants } = buildWahaGroupParticipants({
+      actorJid: actorJidCandidate,
+      participants: uniqueParticipants,
+    });
+
+    if (groupParticipants.length === 0) {
+      return new Response(JSON.stringify({ error: 'No valid non-actor phone numbers found', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     let usedFallback = false;
+    let fallbackSeedParticipant: { id: string } | null = null;
     let wa_group_id = '';
     let groupText = '';
     if (!finalizeOnly) {
@@ -355,30 +305,43 @@ serve(async (req: Request) => {
         groupRes = await fetch(groupUrl, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ name: subject, participants: participantObjects })
+          body: JSON.stringify({ name: subject, participants: groupParticipants })
         });
       } catch (fe) {
         return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group', url: groupUrl, message: (fe as Error)?.message || String(fe) }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       if (!groupRes.ok) {
         const txt = await groupRes.text().catch(() => '');
-        if (groupRes.status === 500 && participantObjects.length > 1) {
-          // Fallback: try create group with a single participant (WAHA bug workaround)
-          const first = actorJidCandidate ? { id: actorJidCandidate } : participantObjects[0];
-          try {
+        if (groupRes.status >= 500 && groupRes.status < 600 && groupParticipants.length > 1) {
+          // Fallback: try real assigned participants one by one when WAHA rejects bulk creation.
+          const fallbackErrors: Array<{ id: string; status?: number; body?: string; message?: string }> = [];
+          for (const candidate of groupParticipants) {
             const fallbackRes = await fetch(groupUrl, {
               method: 'POST',
               headers,
-              body: JSON.stringify({ name: subject, participants: [first] })
+              body: JSON.stringify({ name: subject, participants: [candidate] })
+            }).catch((err) => {
+              fallbackErrors.push({ id: candidate.id, message: (err as Error)?.message || String(err) });
+              return null;
             });
-            if (!fallbackRes.ok) {
-              const fbTxt = await fallbackRes.text().catch(() => '');
-              return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: fallbackRes.status, url: groupUrl, response: fbTxt, firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+            if (!fallbackRes) {
+              continue;
             }
-            usedFallback = true;
-            groupRes = fallbackRes;
-          } catch (fe2) {
-            return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group-fallback', url: groupUrl, message: (fe2 as Error)?.message || String(fe2), firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+
+            if (fallbackRes.ok) {
+              usedFallback = true;
+              fallbackSeedParticipant = candidate;
+              groupRes = fallbackRes;
+              break;
+            }
+
+            const fbTxt = await fallbackRes.text().catch(() => '');
+            fallbackErrors.push({ id: candidate.id, status: fallbackRes.status, body: fbTxt });
+          }
+
+          if (!usedFallback) {
+            return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: groupRes.status, url: groupUrl, response: txt, fallbackAttempts: fallbackErrors, firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
         } else {
           return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: groupRes.status, url: groupUrl, response: txt }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -493,10 +456,10 @@ serve(async (req: Request) => {
     }
 
     // If fallback creation used with only 1 participant, add the rest now (best effort)
-    if (participantObjects.length > 1) {
+    if (groupParticipants.length > 1) {
       try {
-        const first = actorJidCandidate ? { id: actorJidCandidate } : participantObjects[0];
-        const toAdd = participantObjects.filter((p) => p.id !== first.id);
+        const first = fallbackSeedParticipant || groupParticipants[0];
+        const toAdd = groupParticipants.filter((p) => p.id !== first.id);
         if (toAdd.length) {
           const addUrl = `${base}/api/${encodeURIComponent(session)}/groups/${encodeURIComponent(wa_group_id)}/participants/add`;
           const tryAdd = async () => {

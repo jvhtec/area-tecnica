@@ -14,7 +14,7 @@ const festivalJob = {
 };
 
 test.describe("festival management smoke", () => {
-  test("loads the overview and opens the WhatsApp dialog", async ({ page }) => {
+  test("loads scheduling and opens the WhatsApp dialog", async ({ page }) => {
     await bootstrapApp(page, {
       auth: {
         role: "management",
@@ -62,11 +62,11 @@ test.describe("festival management smoke", () => {
       },
     });
 
-    await page.goto("/festival-management/festival-job-1");
+    await page.goto("/festival-management/festival-job-1/scheduling");
 
     await expect(page.getByRole("heading", { name: "Festival Smoke" })).toBeVisible();
-    await expect(page.getByText("Acciones Rápidas")).toBeVisible();
-    await page.getByRole("button", { name: "Crear Grupo" }).click();
+    await expect(page.getByRole("heading", { name: "Programación del Festival" })).toBeVisible();
+    await page.getByRole("button", { name: "WhatsApp" }).click();
     await expect(page.getByRole("heading", { name: "Crear Grupo de WhatsApp" })).toBeVisible();
   });
 
