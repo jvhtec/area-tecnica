@@ -90,7 +90,9 @@ export const useFestivalWhatsappActions = ({
       await createWhatsappGroup({ department: waDepartment, jobId, stageNumber: waStageNumber });
       toast({
         title: "Éxito",
-        description: "Grupo de WhatsApp creado exitosamente",
+        description: waGroup
+          ? "Participantes de WhatsApp actualizados"
+          : "Grupo de WhatsApp creado exitosamente",
       });
       setIsWhatsappDialogOpen(false);
       await refreshWhatsappState();
@@ -105,7 +107,7 @@ export const useFestivalWhatsappActions = ({
     } finally {
       setIsSendingWa(false);
     }
-  }, [jobId, refreshWhatsappState, toast, waDepartment, waStageNumber]);
+  }, [jobId, refreshWhatsappState, toast, waDepartment, waGroup, waStageNumber]);
 
   const handleRetryWhatsappGroup = useCallback(async () => {
     if (!jobId) {

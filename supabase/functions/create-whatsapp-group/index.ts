@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   buildWahaGroupParticipants,
   phoneToWahaJid,
+  resolveFestivalStageTechnicianIds,
 } from "./recipientUtils.ts";
 import type { Dept } from "./recipientUtils.ts";
 
@@ -130,7 +131,9 @@ serve(async (req: Request) => {
     if (existingErr && existingErr.message) {
       console.warn('job_whatsapp_groups lookup error', existingErr);
     }
-    if (existing && !finalizeOnly) {
+    const existingWaGroupId = existing?.wa_group_id || null;
+    const shouldSyncExistingStageGroup = !!existingWaGroupId && effectiveStageNumber > 0 && !finalizeOnly;
+    if (existing && !shouldSyncExistingStageGroup && !finalizeOnly) {
       return new Response(JSON.stringify({ success: true, wa_group_id: existing.wa_group_id, note: 'Group already exists' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -142,7 +145,7 @@ serve(async (req: Request) => {
       .eq('department', department)
       .eq('stage_number', effectiveStageNumber)
       .maybeSingle();
-    if (priorReq && !finalizeOnly) {
+    if (priorReq && !shouldSyncExistingStageGroup && !finalizeOnly) {
       return new Response(JSON.stringify({ success: true, wa_group_id: null, note: 'Group request already recorded (locked)' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
@@ -178,37 +181,104 @@ serve(async (req: Request) => {
     const missing: string[] = [];
     const invalid: string[] = [];
 
-    // Recipients intentionally come from job assignments for every job type.
-    // Festival stage selection only scopes the group name and persistence key.
-    const { data: assigns, error: assignsErr } = await supabaseAdmin
-      .from('job_assignments')
-      .select(`
-        technician_id,
-        sound_role, lights_role, video_role,
-        profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
-      `)
-      .eq('job_id', job_id);
-    if (assignsErr) {
-      console.warn('job_assignments fetch error', assignsErr);
-    }
-
-    const rows = (assigns ?? []).filter((r: any) => {
-      if (department === 'sound') return !!r.sound_role;
-      if (department === 'lights') return !!r.lights_role;
-      if (department === 'video') return !!r.video_role;
-      return false;
-    });
-
-    for (const r of rows) {
-      const fullName = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Tecnico';
-      const rawPhone = (r.profiles?.phone || '').trim();
+    const addProfilePhoneRecipient = (
+      profile: { first_name?: string | null; last_name?: string | null; phone?: string | null } | null | undefined,
+      fallbackName = 'Tecnico',
+    ) => {
+      const fullName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || fallbackName;
+      const rawPhone = (profile?.phone || '').trim();
       if (!rawPhone) {
         missing.push(fullName);
-        continue;
+        return false;
       }
       const norm = normalizePhone(rawPhone, defaultCC);
-      if (norm.ok) participants.push(norm.value);
-      else invalid.push(`${fullName} (${rawPhone})`);
+      if (norm.ok) {
+        participants.push(norm.value);
+        return true;
+      }
+
+      invalid.push(`${fullName} (${rawPhone})`);
+      return false;
+    };
+
+    let scheduledStageParticipantCount = 0;
+
+    if (effectiveStageNumber > 0) {
+      let stageRecipients;
+      try {
+        stageRecipients = await resolveFestivalStageTechnicianIds({
+          department,
+          jobId: job_id,
+          stageNumber: effectiveStageNumber,
+          supabase: supabaseAdmin,
+        });
+      } catch (stageRecipientError) {
+        console.warn('festival stage recipient lookup error', stageRecipientError);
+        return new Response(JSON.stringify({ error: 'Failed to fetch festival stage schedule', details: String(stageRecipientError) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      for (const externalName of stageRecipients.externalNames) {
+        missing.push(`${externalName} (external technician without profile phone)`);
+      }
+
+      console.info('Festival stage WhatsApp recipients resolved', {
+        assignmentCount: stageRecipients.assignmentCount,
+        department,
+        externalCount: stageRecipients.externalNames.length,
+        job_id,
+        shiftCount: stageRecipients.shiftCount,
+        stage_number: effectiveStageNumber,
+        technicianCount: stageRecipients.technicianIds.length,
+      });
+
+      if (stageRecipients.technicianIds.length === 0) {
+        return new Response(JSON.stringify({ error: 'No scheduled technicians found for this festival stage', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const { data: scheduledProfiles, error: scheduledProfilesError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, first_name, last_name, phone')
+        .in('id', stageRecipients.technicianIds);
+
+      if (scheduledProfilesError) {
+        console.warn('profiles fetch error for festival stage recipients', scheduledProfilesError);
+        return new Response(JSON.stringify({ error: 'Failed to fetch scheduled technician profiles', details: scheduledProfilesError.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      const profilesById = new Map((scheduledProfiles ?? []).map((profile: any) => [profile.id, profile]));
+      for (const technicianId of stageRecipients.technicianIds) {
+        const profile = profilesById.get(technicianId);
+        if (addProfilePhoneRecipient(profile, 'Scheduled technician')) {
+          scheduledStageParticipantCount++;
+        }
+      }
+
+      if (scheduledStageParticipantCount === 0) {
+        return new Response(JSON.stringify({ error: 'No valid phone numbers found for scheduled technicians on this festival stage', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    } else {
+      const { data: assigns, error: assignsErr } = await supabaseAdmin
+        .from('job_assignments')
+        .select(`
+          technician_id,
+          sound_role, lights_role, video_role,
+          profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
+        `)
+        .eq('job_id', job_id);
+      if (assignsErr) {
+        console.warn('job_assignments fetch error', assignsErr);
+      }
+
+      const rows = (assigns ?? []).filter((r: any) => {
+        if (department === 'sound') return !!r.sound_role;
+        if (department === 'lights') return !!r.lights_role;
+        if (department === 'video') return !!r.video_role;
+        return false;
+      });
+
+      for (const r of rows) {
+        addProfilePhoneRecipient(r.profiles);
+      }
     }
 
     // Always include management user for the department (if phone exists and matches department)
@@ -246,7 +316,7 @@ serve(async (req: Request) => {
     }
 
     // Record request to lock further attempts only after recipient validation succeeds.
-    if (!priorReq) {
+    if (!priorReq && !existingWaGroupId) {
       const { error: lockErr } = await supabaseAdmin
         .from('job_whatsapp_group_requests')
         .insert({ job_id, department, stage_number: effectiveStageNumber });
@@ -284,7 +354,7 @@ serve(async (req: Request) => {
       }
       return null;
     })();
-    const { allParticipants: participantObjects, groupParticipants } = buildWahaGroupParticipants({
+    const { groupParticipants } = buildWahaGroupParticipants({
       actorJid: actorJidCandidate,
       participants: uniqueParticipants,
     });
@@ -295,9 +365,9 @@ serve(async (req: Request) => {
 
     let usedFallback = false;
     let fallbackSeedParticipant: { id: string } | null = null;
-    let wa_group_id = '';
+    let wa_group_id = existingWaGroupId || '';
     let groupText = '';
-    if (!finalizeOnly) {
+    if (!finalizeOnly && !existingWaGroupId) {
       // Create the group per WAHA API: POST /api/{session}/groups { name, participants: [{id}] }
       const groupUrl = `${base}/api/${encodeURIComponent(session)}/groups`;
       let groupRes: Response;
@@ -423,12 +493,14 @@ serve(async (req: Request) => {
     }
 
     // Persist
-    const { error: insErr } = await supabaseAdmin
-      .from('job_whatsapp_groups')
-      .insert({ job_id, department, stage_number: effectiveStageNumber, wa_group_id });
-    if (insErr) {
-      // Best effort to not leave group untracked, still respond with success but include warning
-      console.warn('Failed to persist job_whatsapp_groups:', insErr);
+    if (!existingWaGroupId) {
+      const { error: insErr } = await supabaseAdmin
+        .from('job_whatsapp_groups')
+        .insert({ job_id, department, stage_number: effectiveStageNumber, wa_group_id });
+      if (insErr) {
+        // Best effort to not leave group untracked, still respond with success but include warning
+        console.warn('Failed to persist job_whatsapp_groups:', insErr);
+      }
     }
 
     // Turn OFF "admins-only" so all members can send (best effort)
@@ -455,123 +527,137 @@ serve(async (req: Request) => {
       console.warn('⚠️ Error toggling group send permissions:', err);
     }
 
-    // If fallback creation used with only 1 participant, add the rest now (best effort)
-    if (groupParticipants.length > 1) {
+    const addParticipantsBestEffort = async (participantsToAdd: Array<{ id: string }>, context: string) => {
+      if (!participantsToAdd.length) return;
+      const addUrl = `${base}/api/${encodeURIComponent(session)}/groups/${encodeURIComponent(wa_group_id)}/participants/add`;
+
+      const tryBulkAdd = async () => {
+        const res = await fetch(addUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ participants: participantsToAdd })
+        });
+        if (!res.ok) {
+          const addTxt = await res.text().catch(() => '');
+          throw new Error(`add participants failed ${res.status}: ${addTxt}`);
+        }
+      };
+
       try {
-        const first = fallbackSeedParticipant || groupParticipants[0];
-        const toAdd = groupParticipants.filter((p) => p.id !== first.id);
-        if (toAdd.length) {
-          const addUrl = `${base}/api/${encodeURIComponent(session)}/groups/${encodeURIComponent(wa_group_id)}/participants/add`;
-          const tryAdd = async () => {
+        await tryBulkAdd();
+      } catch (bulkError) {
+        console.warn('⚠️ Bulk participant add failed; trying one by one', { context, error: String(bulkError) });
+        for (const participant of participantsToAdd) {
+          try {
             const res = await fetch(addUrl, {
               method: 'POST',
               headers,
-              body: JSON.stringify({ participants: toAdd })
+              body: JSON.stringify({ participants: [participant] })
             });
             if (!res.ok) {
               const addTxt = await res.text().catch(() => '');
               throw new Error(`add participants failed ${res.status}: ${addTxt}`);
             }
-          };
-          try {
-            await tryAdd();
-          } catch (e1) {
-            // small wait then retry once
-            await new Promise((r) => setTimeout(r, 1000));
-            try {
-              await tryAdd();
-            } catch (e2) {
-              console.warn('⚠️ Could not add remaining participants after fallback', { error: String(e2) });
-            }
+          } catch (singleError) {
+            console.warn('⚠️ Could not add participant to group', { context, participant: participant.id, error: String(singleError) });
           }
         }
-      } catch (e) {
-        console.warn('⚠️ Error adding remaining participants:', e);
       }
+    };
+
+    // Existing festival stage groups may have been created before stage recipients were enabled.
+    if (shouldSyncExistingStageGroup) {
+      await addParticipantsBestEffort(groupParticipants, 'existing-stage-group-sync');
+    } else if (usedFallback && groupParticipants.length > 1) {
+      const first = fallbackSeedParticipant || groupParticipants[0];
+      const toAdd = groupParticipants.filter((p) => p.id !== first.id);
+      await addParticipantsBestEffort(toAdd, 'fallback-create');
     }
 
-    // Try to set group picture from job or tour logo (best effort)
-    try {
-      // 1) Festival logo by job
-      let logoUrl: string | null = null;
+    if (!existingWaGroupId) {
+      // Try to set group picture from job or tour logo (best effort)
       try {
-        const { data: festLogo } = await supabaseAdmin
-          .from('festival_logos')
-          .select('file_path')
-          .eq('job_id', job_id)
-          .maybeSingle();
-        if (festLogo?.file_path) {
-          const { data: pub } = supabaseAdmin.storage
-            .from('festival-logos')
-            .getPublicUrl(festLogo.file_path);
-          if (pub?.publicUrl) logoUrl = pub.publicUrl;
-        }
-      } catch { /* ignore */ }
-
-      // 2) Fallback to tour logo
-      if (!logoUrl && job?.tour_id) {
+        // 1) Festival logo by job
+        let logoUrl: string | null = null;
         try {
-          const { data: tourLogo } = await supabaseAdmin
-            .from('tour_logos')
+          const { data: festLogo } = await supabaseAdmin
+            .from('festival_logos')
             .select('file_path')
-            .eq('tour_id', job.tour_id)
+            .eq('job_id', job_id)
             .maybeSingle();
-          if (tourLogo?.file_path) {
+          if (festLogo?.file_path) {
             const { data: pub } = supabaseAdmin.storage
-              .from('tour-logos')
-              .getPublicUrl(tourLogo.file_path);
+              .from('festival-logos')
+              .getPublicUrl(festLogo.file_path);
             if (pub?.publicUrl) logoUrl = pub.publicUrl;
           }
         } catch { /* ignore */ }
-      }
 
-      if (logoUrl) {
-        // Infer mimetype/filename from URL
-        const lower = logoUrl.toLowerCase();
-        const mimetype = lower.endsWith('.png') ? 'image/png' : 'image/jpeg';
-        const filename = (() => {
-          try { return new URL(logoUrl).pathname.split('/').pop() || 'logo'; } catch { return 'logo'; }
-        })();
-
-        const picUrl = `${base}/api/${encodeURIComponent(session)}/groups/${encodeURIComponent(wa_group_id)}/picture`;
-        const body = { file: { mimetype, filename, url: logoUrl } } as const;
-        const picRes = await fetch(picUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
-        if (!picRes.ok) {
-          const txt = await picRes.text().catch(() => '');
-          console.warn('⚠️ Failed to set group picture', { status: picRes.status, url: picUrl, body: txt });
-        } else {
-          console.log(`🖼️ Group ${wa_group_id} picture set from ${filename}`);
+        // 2) Fallback to tour logo
+        if (!logoUrl && job?.tour_id) {
+          try {
+            const { data: tourLogo } = await supabaseAdmin
+              .from('tour_logos')
+              .select('file_path')
+              .eq('tour_id', job.tour_id)
+              .maybeSingle();
+            if (tourLogo?.file_path) {
+              const { data: pub } = supabaseAdmin.storage
+                .from('tour-logos')
+                .getPublicUrl(tourLogo.file_path);
+              if (pub?.publicUrl) logoUrl = pub.publicUrl;
+            }
+          } catch { /* ignore */ }
         }
-      } else {
-        console.log('No festival/tour logo found for group picture');
-      }
-    } catch (e) {
-      console.warn('⚠️ Error setting group picture:', e);
-    }
 
-    // Send welcome message (best effort) using WAHA /api/sendText
-    const message = `👋 Bienvenidos al grupo de ${job.title} - ${deptNameEs}${stageSuffix}.\nUsad este chat para la coordinación.`;
-    try {
-      const msgBody = { chatId: wa_group_id, text: message, session } as const;
-      const sendUrl = `${base}/api/sendText`;
-      const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
-      const controller = new AbortController();
-      const to = setTimeout(() => controller.abort(new DOMException('timeout','AbortError')), timeoutMs);
-      try {
-        const sendRes = await fetch(sendUrl, { method: 'POST', headers, body: JSON.stringify(msgBody), signal: controller.signal });
-        if (!sendRes.ok) {
-          const errTxt = await sendRes.text().catch(() => '');
-          if (sendRes.status === 524) {
-            const ray = (errTxt.match(/Cloudflare Ray ID:\s*<strong[^>]*>([^<]+)/i)?.[1]) || null;
-            console.warn('WAHA sendText timeout via Cloudflare (524)', { status: sendRes.status, url: sendUrl, rayId: ray });
+        if (logoUrl) {
+          // Infer mimetype/filename from URL
+          const lower = logoUrl.toLowerCase();
+          const mimetype = lower.endsWith('.png') ? 'image/png' : 'image/jpeg';
+          const filename = (() => {
+            try { return new URL(logoUrl).pathname.split('/').pop() || 'logo'; } catch { return 'logo'; }
+          })();
+
+          const picUrl = `${base}/api/${encodeURIComponent(session)}/groups/${encodeURIComponent(wa_group_id)}/picture`;
+          const body = { file: { mimetype, filename, url: logoUrl } } as const;
+          const picRes = await fetch(picUrl, { method: 'PUT', headers, body: JSON.stringify(body) });
+          if (!picRes.ok) {
+            const txt = await picRes.text().catch(() => '');
+            console.warn('⚠️ Failed to set group picture', { status: picRes.status, url: picUrl, body: txt });
           } else {
-            console.warn('WAHA sendText failed', { status: sendRes.status, url: sendUrl, body: errTxt });
+            console.log(`🖼️ Group ${wa_group_id} picture set from ${filename}`);
           }
+        } else {
+          console.log('No festival/tour logo found for group picture');
         }
-      } finally {
-        clearTimeout(to);
+      } catch (e) {
+        console.warn('⚠️ Error setting group picture:', e);
       }
-    } catch (_) { /* ignore */ }
+
+      // Send welcome message (best effort) using WAHA /api/sendText
+      const message = `👋 Bienvenidos al grupo de ${job.title} - ${deptNameEs}${stageSuffix}.\nUsad este chat para la coordinación.`;
+      try {
+        const msgBody = { chatId: wa_group_id, text: message, session } as const;
+        const sendUrl = `${base}/api/sendText`;
+        const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
+        const controller = new AbortController();
+        const to = setTimeout(() => controller.abort(new DOMException('timeout','AbortError')), timeoutMs);
+        try {
+          const sendRes = await fetch(sendUrl, { method: 'POST', headers, body: JSON.stringify(msgBody), signal: controller.signal });
+          if (!sendRes.ok) {
+            const errTxt = await sendRes.text().catch(() => '');
+            if (sendRes.status === 524) {
+              const ray = (errTxt.match(/Cloudflare Ray ID:\s*<strong[^>]*>([^<]+)/i)?.[1]) || null;
+              console.warn('WAHA sendText timeout via Cloudflare (524)', { status: sendRes.status, url: sendUrl, rayId: ray });
+            } else {
+              console.warn('WAHA sendText failed', { status: sendRes.status, url: sendUrl, body: errTxt });
+            }
+          }
+        } finally {
+          clearTimeout(to);
+        }
+      } catch (_) { /* ignore */ }
+    }
 
     const resp: any = {
       success: true,
@@ -580,7 +666,8 @@ serve(async (req: Request) => {
       warnings: { missing, invalid },
       participants: uniqueParticipants
     };
-    if (usedFallback) resp.note = 'Grupo creado con 1 participante por fallback; añadiremos el resto en una futura sincronización.';
+    if (shouldSyncExistingStageGroup) resp.note = 'Grupo ya existia; participantes programados sincronizados.';
+    else if (usedFallback) resp.note = 'Grupo creado con 1 participante por fallback; añadiremos el resto en una futura sincronización.';
     return new Response(JSON.stringify(resp), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err) {
     console.error('create-whatsapp-group error:', err);

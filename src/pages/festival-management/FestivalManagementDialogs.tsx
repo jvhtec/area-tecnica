@@ -116,6 +116,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
   } = vm;
   const festivalWhatsappStageOptions = buildFestivalWhatsappStageOptions(festivalStageOptions, maxStages);
   const requiresStageScopedWhatsapp = requiresFestivalWhatsappStage(maxStages, waDepartment);
+  const canUpdateExistingWaGroup = !!waGroup && requiresStageScopedWhatsapp;
 
   return (
     <>
@@ -429,9 +430,13 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
             ) : (
               <Button
                 onClick={handleCreateWhatsappGroup}
-                disabled={isSendingWa || !!waGroup || (requiresStageScopedWhatsapp && waStageNumber < 1)}
+                disabled={isSendingWa || (!!waGroup && !canUpdateExistingWaGroup) || (requiresStageScopedWhatsapp && waStageNumber < 1)}
               >
-                {isSendingWa ? "Creando..." : waGroup ? "Grupo Creado" : "Crear Grupo"}
+                {isSendingWa
+                  ? (waGroup ? "Actualizando..." : "Creando...")
+                  : waGroup
+                    ? (canUpdateExistingWaGroup ? "Actualizar Participantes" : "Grupo Creado")
+                    : "Crear Grupo"}
               </Button>
             )}
           </DialogFooter>
