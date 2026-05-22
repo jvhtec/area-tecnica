@@ -1,7 +1,14 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-
-type Dept = 'sound' | 'lights' | 'video';
+import {
+  resolveFestivalWhatsappStageTechnicianIds,
+} from "./recipientUtils.ts";
+import type {
+  Dept,
+  StageAssignmentRecipientRow,
+  StageProfileRecipientRow,
+  StageShiftRecipientRow,
+} from "./recipientUtils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -143,17 +150,6 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ success: true, wa_group_id: null, note: 'Group request already recorded (locked)' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Record request to lock further attempts
-    if (!priorReq) {
-      const { error: lockErr } = await supabaseAdmin
-        .from('job_whatsapp_group_requests')
-        .insert({ job_id, department, stage_number: effectiveStageNumber });
-      if (lockErr && !(lockErr as any)?.code?.includes?.('23505')) {
-        // Not a unique violation; fail explicitly
-        return new Response(JSON.stringify({ error: 'Failed to record group request', details: lockErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-    }
-
     // Fetch job details
     const { data: job, error: jobErr } = await supabaseAdmin
       .from('jobs')
@@ -186,39 +182,77 @@ serve(async (req: Request) => {
     const missing: string[] = [];
     const invalid: string[] = [];
     if (effectiveStageNumber > 0) {
+      const { data: stageShifts, error: stageShiftsErr } = await supabaseAdmin
+        .from('festival_shifts')
+        .select('id, department')
+        .eq('job_id', job_id)
+        .eq('stage', effectiveStageNumber);
+
+      if (stageShiftsErr) {
+        console.warn('festival_shifts fetch error', stageShiftsErr);
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to fetch scheduled shifts for selected stage',
+            details: stageShiftsErr.message,
+            source: 'festival_shifts',
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const shiftsById = new Map<string, StageShiftRecipientRow>(
+        ((stageShifts || []) as StageShiftRecipientRow[])
+          .filter((shift) => !!shift.id)
+          .map((shift) => [shift.id, shift]),
+      );
+
+      const shiftIds = Array.from(shiftsById.keys());
+      if (shiftIds.length === 0) {
+        return new Response(
+          JSON.stringify({
+            error: 'No scheduled shifts found for selected stage',
+            stage_number: effectiveStageNumber,
+            department,
+            source: 'festival_shifts',
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const { data: stageAssignments, error: stageAssignmentsErr } = await supabaseAdmin
         .from('festival_shift_assignments')
-        .select(`
-          technician_id,
-          festival_shifts!inner (
-            job_id,
-            department,
-            stage
-          )
-        `)
-        .eq('festival_shifts.job_id', job_id)
-        .eq('festival_shifts.department', department)
-        .eq('festival_shifts.stage', effectiveStageNumber)
+        .select('shift_id, technician_id, role')
+        .in('shift_id', shiftIds)
         .not('technician_id', 'is', null);
 
       if (stageAssignmentsErr) {
         console.warn('festival_shift_assignments fetch error', stageAssignmentsErr);
+        return new Response(
+          JSON.stringify({
+            error: 'Failed to fetch scheduled assignments for selected stage',
+            details: stageAssignmentsErr.message,
+            source: 'festival_shift_assignments',
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
-      const technicianIds = Array.from(
+      const stageAssignmentRows = (stageAssignments || []) as StageAssignmentRecipientRow[];
+      const scheduledTechnicianIds = Array.from(
         new Set(
-          (stageAssignments || [])
-            .map((row: any) => row.technician_id)
-            .filter((id: string | null) => !!id)
+          stageAssignmentRows
+            .map((row) => row.technician_id)
+            .filter((id): id is string => !!id)
         )
       );
 
-      if (technicianIds.length === 0) {
+      if (scheduledTechnicianIds.length === 0) {
         return new Response(
           JSON.stringify({
             error: 'No technicians assigned to selected stage',
             stage_number: effectiveStageNumber,
             department,
+            source: 'festival_shift_assignments',
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -226,14 +260,41 @@ serve(async (req: Request) => {
 
       const { data: stageProfiles, error: stageProfilesErr } = await supabaseAdmin
         .from('profiles')
-        .select('id, first_name, last_name, phone')
-        .in('id', technicianIds);
+        .select('id, first_name, last_name, department, phone')
+        .in('id', scheduledTechnicianIds);
 
       if (stageProfilesErr) {
         console.warn('profiles fetch error for stage participants', stageProfilesErr);
       }
 
-      const profileById = new Map((stageProfiles || []).map((p: any) => [p.id, p]));
+      type StageProfileWithContact = StageProfileRecipientRow & {
+        first_name?: string | null;
+        last_name?: string | null;
+        phone?: string | null;
+      };
+      const stageProfileRows = (stageProfiles || []) as StageProfileWithContact[];
+      const profileById = new Map<string, StageProfileWithContact>(
+        stageProfileRows.map((p) => [p.id, p]),
+      );
+      const technicianIds = resolveFestivalWhatsappStageTechnicianIds({
+        assignments: stageAssignmentRows,
+        department,
+        profilesById,
+        shiftsById,
+      });
+
+      if (technicianIds.length === 0) {
+        return new Response(
+          JSON.stringify({
+            error: 'No technicians assigned to selected stage and department',
+            stage_number: effectiveStageNumber,
+            department,
+            source: 'festival_shifts/festival_shift_assignments',
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       for (const technicianId of technicianIds) {
         const profile = profileById.get(technicianId);
         const fullName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Tecnico';
@@ -312,6 +373,20 @@ serve(async (req: Request) => {
     const uniqueParticipants = Array.from(new Set(participants));
     if (uniqueParticipants.length === 0) {
       return new Response(JSON.stringify({ error: 'No valid phone numbers found', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Record request to lock further attempts only after recipient validation succeeds.
+    if (!priorReq) {
+      const { error: lockErr } = await supabaseAdmin
+        .from('job_whatsapp_group_requests')
+        .insert({ job_id, department, stage_number: effectiveStageNumber });
+      if (lockErr) {
+        const isDuplicateLock = lockErr.code === '23505';
+        if (isDuplicateLock && !finalizeOnly) {
+          return new Response(JSON.stringify({ success: true, wa_group_id: null, note: 'Group request already recorded (locked)' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        return new Response(JSON.stringify({ error: 'Failed to record group request', details: lockErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     // WAHA config - use actor's endpoint
