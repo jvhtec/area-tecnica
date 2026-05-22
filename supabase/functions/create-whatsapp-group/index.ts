@@ -3,14 +3,8 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   buildWahaGroupParticipants,
   phoneToWahaJid,
-  resolveFestivalWhatsappStageTechnicianIds,
 } from "./recipientUtils.ts";
-import type {
-  Dept,
-  StageAssignmentRecipientRow,
-  StageProfileRecipientRow,
-  StageShiftRecipientRow,
-} from "./recipientUtils.ts";
+import type { Dept } from "./recipientUtils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -183,164 +177,38 @@ serve(async (req: Request) => {
     const participants: string[] = [];
     const missing: string[] = [];
     const invalid: string[] = [];
-    if (effectiveStageNumber > 0) {
-      const { data: stageShifts, error: stageShiftsErr } = await supabaseAdmin
-        .from('festival_shifts')
-        .select('id, department')
-        .eq('job_id', job_id)
-        .eq('stage', effectiveStageNumber);
 
-      if (stageShiftsErr) {
-        console.warn('festival_shifts fetch error', stageShiftsErr);
-        return new Response(
-          JSON.stringify({
-            error: 'Failed to fetch scheduled shifts for selected stage',
-            details: stageShiftsErr.message,
-            source: 'festival_shifts',
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+    // Recipients intentionally come from job assignments for every job type.
+    // Festival stage selection only scopes the group name and persistence key.
+    const { data: assigns, error: assignsErr } = await supabaseAdmin
+      .from('job_assignments')
+      .select(`
+        technician_id,
+        sound_role, lights_role, video_role,
+        profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
+      `)
+      .eq('job_id', job_id);
+    if (assignsErr) {
+      console.warn('job_assignments fetch error', assignsErr);
+    }
+
+    const rows = (assigns ?? []).filter((r: any) => {
+      if (department === 'sound') return !!r.sound_role;
+      if (department === 'lights') return !!r.lights_role;
+      if (department === 'video') return !!r.video_role;
+      return false;
+    });
+
+    for (const r of rows) {
+      const fullName = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Tecnico';
+      const rawPhone = (r.profiles?.phone || '').trim();
+      if (!rawPhone) {
+        missing.push(fullName);
+        continue;
       }
-
-      const shiftsById = new Map<string, StageShiftRecipientRow>(
-        ((stageShifts || []) as StageShiftRecipientRow[])
-          .filter((shift) => !!shift.id)
-          .map((shift) => [shift.id, shift]),
-      );
-
-      const shiftIds = Array.from(shiftsById.keys());
-      if (shiftIds.length === 0) {
-        return new Response(
-          JSON.stringify({
-            error: 'No scheduled shifts found for selected stage',
-            stage_number: effectiveStageNumber,
-            department,
-            source: 'festival_shifts',
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const { data: stageAssignments, error: stageAssignmentsErr } = await supabaseAdmin
-        .from('festival_shift_assignments')
-        .select('shift_id, technician_id, role')
-        .in('shift_id', shiftIds)
-        .not('technician_id', 'is', null);
-
-      if (stageAssignmentsErr) {
-        console.warn('festival_shift_assignments fetch error', stageAssignmentsErr);
-        return new Response(
-          JSON.stringify({
-            error: 'Failed to fetch scheduled assignments for selected stage',
-            details: stageAssignmentsErr.message,
-            source: 'festival_shift_assignments',
-          }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const stageAssignmentRows = (stageAssignments || []) as StageAssignmentRecipientRow[];
-      const scheduledTechnicianIds = Array.from(
-        new Set(
-          stageAssignmentRows
-            .map((row) => row.technician_id)
-            .filter((id): id is string => !!id)
-        )
-      );
-
-      if (scheduledTechnicianIds.length === 0) {
-        return new Response(
-          JSON.stringify({
-            error: 'No technicians assigned to selected stage',
-            stage_number: effectiveStageNumber,
-            department,
-            source: 'festival_shift_assignments',
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      const { data: stageProfiles, error: stageProfilesErr } = await supabaseAdmin
-        .from('profiles')
-        .select('id, first_name, last_name, department, phone')
-        .in('id', scheduledTechnicianIds);
-
-      if (stageProfilesErr) {
-        console.warn('profiles fetch error for stage participants', stageProfilesErr);
-      }
-
-      type StageProfileWithContact = StageProfileRecipientRow & {
-        first_name?: string | null;
-        last_name?: string | null;
-        phone?: string | null;
-      };
-      const stageProfileRows = (stageProfiles || []) as StageProfileWithContact[];
-      const profileById = new Map<string, StageProfileWithContact>(
-        stageProfileRows.map((p) => [p.id, p]),
-      );
-      const technicianIds = resolveFestivalWhatsappStageTechnicianIds({
-        assignments: stageAssignmentRows,
-        department,
-        profilesById,
-        shiftsById,
-      });
-
-      if (technicianIds.length === 0) {
-        return new Response(
-          JSON.stringify({
-            error: 'No technicians assigned to selected stage and department',
-            stage_number: effectiveStageNumber,
-            department,
-            source: 'festival_shifts/festival_shift_assignments',
-          }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      for (const technicianId of technicianIds) {
-        const profile = profileById.get(technicianId);
-        const fullName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || 'Tecnico';
-        const rawPhone = (profile?.phone || '').trim();
-        if (!rawPhone) {
-          missing.push(fullName);
-          continue;
-        }
-        const norm = normalizePhone(rawPhone, defaultCC);
-        if (norm.ok) participants.push(norm.value);
-        else invalid.push(`${fullName} (${rawPhone})`);
-      }
-    } else {
-      // Default behavior: recipients come from job assignments by department.
-      const { data: assigns, error: assignsErr } = await supabaseAdmin
-        .from('job_assignments')
-        .select(`
-          technician_id,
-          sound_role, lights_role, video_role,
-          profiles!job_assignments_technician_id_fkey ( first_name, last_name, phone )
-        `)
-        .eq('job_id', job_id);
-      if (assignsErr) {
-        console.warn('job_assignments fetch error', assignsErr);
-      }
-
-      const rows = (assigns ?? []).filter((r: any) => {
-        if (department === 'sound') return !!r.sound_role;
-        if (department === 'lights') return !!r.lights_role;
-        if (department === 'video') return !!r.video_role;
-        return false;
-      });
-
-      for (const r of rows) {
-        const fullName = `${r.profiles?.first_name ?? ''} ${r.profiles?.last_name ?? ''}`.trim() || 'Tecnico';
-        const rawPhone = (r.profiles?.phone || '').trim();
-        if (!rawPhone) {
-          missing.push(fullName);
-          continue;
-        }
-        const norm = normalizePhone(rawPhone, defaultCC);
-        if (norm.ok) participants.push(norm.value);
-        else invalid.push(`${fullName} (${rawPhone})`);
-      }
+      const norm = normalizePhone(rawPhone, defaultCC);
+      if (norm.ok) participants.push(norm.value);
+      else invalid.push(`${fullName} (${rawPhone})`);
     }
 
     // Always include management user for the department (if phone exists and matches department)

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, FileDown, RefreshCw } from "lucide-react";
+import { MessageCircle, Plus, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
@@ -19,9 +19,10 @@ interface FestivalSchedulingProps {
   jobId: string;
   jobDates: Date[];
   isViewOnly?: boolean;
+  onCreateWhatsappGroup?: () => void;
 }
 
-export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: FestivalSchedulingProps) => {
+export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false, onCreateWhatsappGroup }: FestivalSchedulingProps) => {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isCreateShiftOpen, setIsCreateShiftOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "table">("table");
@@ -215,6 +216,17 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false }: Fest
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
           <CardTitle className="text-base sm:text-lg">Programación del Festival</CardTitle>
           <div className="flex gap-2">
+            {!isViewOnly && onCreateWhatsappGroup && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={onCreateWhatsappGroup}
+                className="flex items-center gap-1"
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">WhatsApp</span>
+              </Button>
+            )}
             {!isViewOnly && (
               <Button
                 size="sm"
