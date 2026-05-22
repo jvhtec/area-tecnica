@@ -566,7 +566,7 @@ serve(async (req: Request) => {
     };
 
     // Existing festival stage groups may have been created before stage recipients were enabled.
-    if (existingWaGroupId) {
+    if (shouldSyncExistingStageGroup) {
       await addParticipantsBestEffort(groupParticipants, 'existing-stage-group-sync');
     } else if (usedFallback && groupParticipants.length > 1) {
       const first = fallbackSeedParticipant || groupParticipants[0];
@@ -666,7 +666,7 @@ serve(async (req: Request) => {
       warnings: { missing, invalid },
       participants: uniqueParticipants
     };
-    if (existingWaGroupId) resp.note = 'Grupo ya existia; participantes programados sincronizados.';
+    if (shouldSyncExistingStageGroup) resp.note = 'Grupo ya existia; participantes programados sincronizados.';
     else if (usedFallback) resp.note = 'Grupo creado con 1 participante por fallback; añadiremos el resto en una futura sincronización.';
     return new Response(JSON.stringify(resp), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err) {
