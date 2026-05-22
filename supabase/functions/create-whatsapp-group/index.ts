@@ -437,8 +437,8 @@ serve(async (req: Request) => {
       }
       if (!groupRes.ok) {
         const txt = await groupRes.text().catch(() => '');
-        if (groupRes.status === 500 && participantObjects.length > 1) {
-          // Fallback: try create group with a single participant (WAHA bug workaround)
+        if (groupRes.status >= 500 && groupRes.status < 600 && participantObjects.length > 1) {
+          // Fallback: try create group with a single participant when WAHA rejects bulk creation.
           const first = actorJidCandidate ? { id: actorJidCandidate } : participantObjects[0];
           try {
             const fallbackRes = await fetch(groupUrl, {
