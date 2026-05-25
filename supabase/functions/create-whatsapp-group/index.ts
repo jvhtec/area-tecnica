@@ -177,13 +177,15 @@ serve(async (req: Request) => {
     }
 
     const defaultCC = Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34';
-    const participants: string[] = [];
+    const crewParticipants: string[] = [];
+    const supplementalParticipants: string[] = [];
     const missing: string[] = [];
     const invalid: string[] = [];
 
     const addProfilePhoneRecipient = (
       profile: { first_name?: string | null; last_name?: string | null; phone?: string | null } | null | undefined,
       fallbackName = 'Tecnico',
+      target: string[] = crewParticipants,
     ) => {
       const fullName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || fallbackName;
       const rawPhone = (profile?.phone || '').trim();
@@ -193,7 +195,7 @@ serve(async (req: Request) => {
       }
       const norm = normalizePhone(rawPhone, defaultCC);
       if (norm.ok) {
-        participants.push(norm.value);
+        target.push(norm.value);
         return true;
       }
 
@@ -284,7 +286,7 @@ serve(async (req: Request) => {
     // Always include management user for the department (if phone exists and matches department)
     if (actor?.phone && actor?.department && actor.department === department) {
       const norm = normalizePhone(actor.phone, defaultCC);
-      if (norm.ok) participants.push(norm.value);
+      if (norm.ok) supplementalParticipants.push(norm.value);
     }
 
     // Buddy system: Javier auto-adds Carlos, Carlos auto-adds Javier (department sound)
@@ -303,14 +305,18 @@ serve(async (req: Request) => {
             .maybeSingle();
           if (buddy?.phone) {
             const norm = normalizePhone(buddy.phone, defaultCC);
-            if (norm.ok) participants.push(norm.value);
+            if (norm.ok) supplementalParticipants.push(norm.value);
           }
         } catch { /* ignore */ }
       }
     }
 
     // De-duplicate
-    const uniqueParticipants = Array.from(new Set(participants));
+    const crewParticipantPhones = Array.from(new Set(crewParticipants));
+    const supplementalParticipantPhones = Array.from(
+      new Set(supplementalParticipants.filter((phone) => !crewParticipantPhones.includes(phone))),
+    );
+    const uniqueParticipants = Array.from(new Set([...crewParticipantPhones, ...supplementalParticipantPhones]));
     if (uniqueParticipants.length === 0) {
       return new Response(JSON.stringify({ error: 'No valid phone numbers found', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -354,13 +360,25 @@ serve(async (req: Request) => {
       }
       return null;
     })();
-    const { groupParticipants } = buildWahaGroupParticipants({
+    const creationParticipantPhones = effectiveStageNumber > 0 ? crewParticipantPhones : uniqueParticipants;
+    const { groupParticipants: creationGroupParticipants } = buildWahaGroupParticipants({
+      actorJid: actorJidCandidate,
+      participants: creationParticipantPhones,
+    });
+    const { groupParticipants: allGroupParticipants } = buildWahaGroupParticipants({
       actorJid: actorJidCandidate,
       participants: uniqueParticipants,
     });
+    const { groupParticipants: supplementalGroupParticipants } = buildWahaGroupParticipants({
+      actorJid: actorJidCandidate,
+      participants: supplementalParticipantPhones,
+    });
 
-    if (groupParticipants.length === 0) {
-      return new Response(JSON.stringify({ error: 'No valid non-actor phone numbers found', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (creationGroupParticipants.length === 0) {
+      const message = effectiveStageNumber > 0
+        ? 'No valid non-actor scheduled phone numbers found for this festival stage'
+        : 'No valid non-actor phone numbers found';
+      return new Response(JSON.stringify({ error: message, warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     let usedFallback = false;
@@ -375,17 +393,17 @@ serve(async (req: Request) => {
         groupRes = await fetch(groupUrl, {
           method: 'POST',
           headers,
-          body: JSON.stringify({ name: subject, participants: groupParticipants })
+          body: JSON.stringify({ name: subject, participants: creationGroupParticipants })
         });
       } catch (fe) {
         return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group', url: groupUrl, message: (fe as Error)?.message || String(fe) }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       if (!groupRes.ok) {
         const txt = await groupRes.text().catch(() => '');
-        if (groupRes.status >= 500 && groupRes.status < 600 && groupParticipants.length > 1) {
+        if (groupRes.status >= 500 && groupRes.status < 600 && creationGroupParticipants.length > 1) {
           // Fallback: try real assigned participants one by one when WAHA rejects bulk creation.
           const fallbackErrors: Array<{ id: string; status?: number; body?: string; message?: string }> = [];
-          for (const candidate of groupParticipants) {
+          for (const candidate of creationGroupParticipants) {
             const fallbackRes = await fetch(groupUrl, {
               method: 'POST',
               headers,
@@ -567,11 +585,13 @@ serve(async (req: Request) => {
 
     // Existing festival stage groups may have been created before stage recipients were enabled.
     if (shouldSyncExistingStageGroup) {
-      await addParticipantsBestEffort(groupParticipants, 'existing-stage-group-sync');
-    } else if (usedFallback && groupParticipants.length > 1) {
-      const first = fallbackSeedParticipant || groupParticipants[0];
-      const toAdd = groupParticipants.filter((p) => p.id !== first.id);
+      await addParticipantsBestEffort(allGroupParticipants, 'existing-stage-group-sync');
+    } else if (usedFallback && allGroupParticipants.length > 1) {
+      const first = fallbackSeedParticipant || creationGroupParticipants[0];
+      const toAdd = allGroupParticipants.filter((p) => p.id !== first.id);
       await addParticipantsBestEffort(toAdd, 'fallback-create');
+    } else if (effectiveStageNumber > 0 && supplementalGroupParticipants.length > 0) {
+      await addParticipantsBestEffort(supplementalGroupParticipants, 'stage-supplemental-participants');
     }
 
     if (!existingWaGroupId) {
