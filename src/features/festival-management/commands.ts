@@ -17,6 +17,31 @@ import { resolveJobDocLocation } from "@/utils/jobDocuments";
 import { generateAndMergeFestivalPDFs } from "@/utils/pdf/festivalPdfGenerator";
 import { generateIndividualStagePDFs } from "@/utils/pdf/individualStagePdfGenerator";
 
+const extractFunctionErrorMessage = async (error: unknown) => {
+  const fallback = error instanceof Error ? error.message : "Edge Function request failed";
+  const response = (error as { context?: Response })?.context;
+  if (!response || typeof response.clone !== "function") return fallback;
+
+  try {
+    const payload = await response.clone().json();
+    if (!payload || typeof payload !== "object") return fallback;
+    const data = payload as {
+      details?: string;
+      error?: string;
+      message?: string;
+      reason?: string;
+      response?: string;
+      status?: number;
+    };
+    const title = data.error || data.message || fallback;
+    const detail = data.reason || data.details || data.response;
+    const status = data.status ? ` (${data.status})` : "";
+    return detail ? `${title}${status}: ${detail}` : `${title}${status}`;
+  } catch {
+    return fallback;
+  }
+};
+
 export const getJobDocumentSignedUrl = async (docEntry: JobDocumentEntry) => {
   const { bucket, path } = resolveJobDocLocation(docEntry.file_path);
   const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, 3600);
@@ -248,7 +273,7 @@ export const createWhatsappGroup = async ({
     body: { job_id: jobId, department, stage_number: stageNumber },
   });
 
-  if (error) throw error;
+  if (error) throw new Error(await extractFunctionErrorMessage(error));
 };
 
 export const clearWhatsappGroupRequest = async ({
