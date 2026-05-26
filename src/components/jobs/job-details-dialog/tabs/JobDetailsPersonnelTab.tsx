@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { labelForCode } from "@/utils/roles";
 import { getScheduledWorkDateKeys, resolveAssignmentWorkDateKeys } from "@/utils/assignmentWorkDates";
+import { hasAssignmentRoleForDepartment } from "@/utils/assignmentRoles";
 
 const MADRID_TIME_ZONE = "Europe/Madrid";
 
@@ -31,16 +32,7 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
       if (profileDept === normalizedDepartment) {
         return true;
       }
-      if (normalizedDepartment === "sound" && assignment.sound_role) {
-        return true;
-      }
-      if (normalizedDepartment === "lights" && assignment.lights_role) {
-        return true;
-      }
-      if (normalizedDepartment === "video" && assignment.video_role) {
-        return true;
-      }
-      return false;
+      return hasAssignmentRoleForDepartment(assignment, normalizedDepartment);
     });
   }, [jobDetails?.job_assignments, normalizedDepartment]);
 
@@ -146,6 +138,11 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
                   {assignment.video_role && (
                     <Badge variant="outline" className="text-xs">
                       Vídeo: {labelForCode(assignment.video_role)}
+                    </Badge>
+                  )}
+                  {assignment.production_role && (
+                    <Badge variant="outline" className="text-xs">
+                      Producción: {labelForCode(assignment.production_role)}
                     </Badge>
                   )}
                   {workDateKeys.length > 0 && (

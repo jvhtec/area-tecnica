@@ -432,9 +432,9 @@ const ProjectManagement = () => {
           department: selectedDepartment,
           date: currentDate
         })}
-        className="fixed bottom-20 right-6 md:bottom-8 md:right-8
+        className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-[max(1.5rem,env(safe-area-inset-right))] md:bottom-8 md:right-8
                    w-12 h-12 md:w-14 md:h-14
-                   bg-blue-600 hover:bg-blue-500
+                   bg-primary hover:bg-primary/90
                    text-white rounded-full shadow-lg
                    flex items-center justify-center
                    transition-all hover:scale-110

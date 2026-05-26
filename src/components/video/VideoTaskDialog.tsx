@@ -145,7 +145,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
 
       const { error: dbError } = await dataLayerClient.from('task_documents')
         .insert({
-          task_id: taskId,
+          video_task_id: taskId,
           file_name: file.name,
           file_path: filePath,
         });

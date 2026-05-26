@@ -1,6 +1,30 @@
 
 import { supabase } from "@/lib/supabase";
 import { hasTechnicianSelfServiceAccess } from "@/utils/permissions";
+import { formatInTimeZone } from "date-fns-tz";
+
+const MADRID_TIME_ZONE = "Europe/Madrid";
+
+const toMadridDateKey = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  return formatInTimeZone(new Date(value), MADRID_TIME_ZONE, "yyyy-MM-dd");
+};
+
+const addDaysToDateKey = (dateKey: string, days: number) => {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+};
+
+const getDateKeysBetween = (startDateKey: string, endDateKey: string) => {
+  const dates: string[] = [];
+  let cursor = startDateKey;
+  while (cursor <= endDateKey) {
+    dates.push(cursor);
+    cursor = addDaysToDateKey(cursor, 1);
+  }
+  return dates;
+};
 
 export interface TechnicianJobConflict {
   id: string;
@@ -8,6 +32,13 @@ export interface TechnicianJobConflict {
   start_time: string;
   end_time: string;
 }
+
+type AvailabilityJob = {
+  id: string;
+  start_time: string;
+  end_time: string;
+  title: string;
+};
 
 /**
  * Enhanced conflict check result with hard/soft conflict distinction
@@ -79,12 +110,14 @@ export async function getAvailableTechnicians(
     const technicianIds = eligibleTechnicians.map((tech: any) => tech.id);
 
     // OPTIMIZED: Query timesheets directly to see which days technicians are actually working
-    const normalizedTargetDate = assignmentDate
-      ? new Date(assignmentDate).toISOString().split('T')[0]
-      : null;
+    const normalizedTargetDate = toMadridDateKey(assignmentDate);
 
-    const jobStartDate = normalizedTargetDate || new Date(jobStartTime).toISOString().split('T')[0];
-    const jobEndDate = normalizedTargetDate || new Date(jobEndTime).toISOString().split('T')[0];
+    const jobStartDate = normalizedTargetDate || toMadridDateKey(jobStartTime);
+    const jobEndDate = normalizedTargetDate || toMadridDateKey(jobEndTime);
+
+    if (!jobStartDate || !jobEndDate) {
+      return eligibleTechnicians;
+    }
 
     // Get all ACTIVE timesheets for these technicians in the relevant date range
     // Filter by is_active to exclude voided timesheets (day-off/travel dates)
@@ -100,16 +133,32 @@ export async function getAvailableTechnicians(
       throw timesheetsError;
     }
 
+    const { data: currentJobAssignments, error: currentAssignmentsError } = await supabase
+      .from("job_assignments")
+      .select("technician_id")
+      .eq("job_id", jobId)
+      .in("technician_id", technicianIds);
+
+    if (currentAssignmentsError) {
+      throw currentAssignmentsError;
+    }
+
+    const alreadyAssignedToCurrentJob = new Set(
+      (currentJobAssignments || [])
+        .map((assignment) => assignment.technician_id)
+        .filter(Boolean)
+    );
+
     // Get job info for conflicting jobs
     const conflictingJobIds = Array.from(new Set((timesheets || []).map(ts => ts.job_id)));
-    const { data: jobs, error: jobsError } = await supabase
-      .from("jobs")
-      .select("id, start_time, end_time, title")
-      .in("id", conflictingJobIds);
+    const { data: jobs, error: jobsError } = conflictingJobIds.length > 0
+      ? await supabase
+        .from("jobs")
+        .select("id, start_time, end_time, title")
+        .in("id", conflictingJobIds)
+      : { data: [] as AvailabilityJob[], error: null };
 
-    if (jobsError) {
-      throw jobsError;
-    }
+    if (jobsError) throw jobsError;
 
     const jobMap = new Map<string, any>();
     (jobs || []).forEach(job => jobMap.set(job.id, job));
@@ -151,7 +200,7 @@ export async function getAvailableTechnicians(
     const availableTechnicians = eligibleTechnicians.filter((technician: any) => {
       // Check if already assigned to current job
       const assignedJobs = technicianJobs.get(technician.id);
-      if (assignedJobs?.has(jobId)) {
+      if (assignedJobs?.has(jobId) || alreadyAssignedToCurrentJob.has(technician.id)) {
         return false; // Already assigned to this job
       }
 
@@ -171,12 +220,7 @@ export async function getAvailableTechnicians(
         // Single date check
         targetDates.push(normalizedTargetDate);
       } else {
-        // Whole job - check all dates in range
-        const start = new Date(jobStartDate);
-        const end = new Date(jobEndDate);
-        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-          targetDates.push(d.toISOString().split('T')[0]);
-        }
+        targetDates.push(...getDateKeysBetween(jobStartDate, jobEndDate));
       }
 
       // Check if any target date conflicts with existing work dates
@@ -224,8 +268,8 @@ export async function checkTimeConflict(
     }
 
     // Determine date range to check
-    const startDate = targetDateIso || (targetJob.start_time ? new Date(targetJob.start_time).toISOString().split('T')[0] : null);
-    const endDate = targetDateIso || (targetJob.end_time ? new Date(targetJob.end_time).toISOString().split('T')[0] : null);
+    const startDate = toMadridDateKey(targetDateIso || targetJob.start_time);
+    const endDate = toMadridDateKey(targetDateIso || targetJob.end_time);
 
     if (!startDate || !endDate) {
       return null;
@@ -284,8 +328,15 @@ export async function getTechnicianConflicts(
   jobEndTime: string
 ) {
   try {
-    const jobStartDate = new Date(jobStartTime).toISOString().split('T')[0];
-    const jobEndDate = new Date(jobEndTime).toISOString().split('T')[0];
+    const jobStartDate = toMadridDateKey(jobStartTime);
+    const jobEndDate = toMadridDateKey(jobEndTime);
+
+    if (!jobStartDate || !jobEndDate) {
+      return {
+        jobConflicts: [],
+        unavailabilityConflicts: []
+      };
+    }
 
     // OPTIMIZED: Query ACTIVE timesheets to see which days technician is working
     // Filter by is_active to exclude voided timesheets (day-off/travel dates)
@@ -305,10 +356,12 @@ export async function getTechnicianConflicts(
     const jobIds = Array.from(new Set((timesheets || []).map(ts => ts.job_id)));
 
     // Fetch job details
-    const { data: jobs, error: jobsError } = await supabase
-      .from("jobs")
-      .select("id, start_time, end_time, title")
-      .in("id", jobIds);
+    const { data: jobs, error: jobsError } = jobIds.length > 0
+      ? await supabase
+        .from("jobs")
+        .select("id, start_time, end_time, title")
+        .in("id", jobIds)
+      : { data: [] as AvailabilityJob[], error: null };
 
     if (jobsError) {
       throw jobsError;

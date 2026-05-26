@@ -302,7 +302,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-1rem)] md:max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Crear Nuevo Trabajo</DialogTitle>
         </DialogHeader>
@@ -452,7 +452,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
                   onClick={() => toggleDepartment(department)}
                   className={
                     selectedDepartments.includes(department)
-                      ? "bg-blue-600 hover:bg-blue-500 text-white"
+                      ? "bg-primary hover:bg-primary/90 text-primary-foreground"
                       : "border-border"
                   }
                 >
@@ -551,8 +551,8 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
             </div>
           )}
 
-          <div className="w-full flex justify-end">
-            <Button type="submit" disabled={isSubmitting} className="gap-2 bg-blue-600 hover:bg-blue-500 text-white">
+          <div className="w-full flex justify-end pb-[max(0px,env(safe-area-inset-bottom))]">
+            <Button type="submit" disabled={isSubmitting} className="gap-2">
               {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
               {isSubmitting ? "Creando..." : "Crear Trabajo"}
             </Button>

@@ -48,17 +48,20 @@ type AssignmentWithProfile = {
   profiles?: ProfileContact | ProfileContact[] | null;
 };
 
-type AssignmentRoleKey = "sound_role" | "lights_role" | "video_role";
+type AssignmentRoleKey = "sound_role" | "lights_role" | "video_role" | "production_role";
 const ASSIGNMENT_ROLE_BY_DEPARTMENT: Partial<Record<Department, AssignmentRoleKey>> = {
   sound: "sound_role",
   lights: "lights_role",
   video: "video_role",
+  production: "production_role",
 };
 
 type JobAssignmentContactRow = {
   sound_role?: string | null;
   lights_role?: string | null;
   video_role?: string | null;
+  production_role?: string | null;
+  external_technician_name?: string | null;
   profiles?: ProfileContact | ProfileContact[] | null;
 };
 
@@ -581,10 +584,10 @@ function JobCardNewFull({
     try {
       // Pre-check: warn for missing phones
       const { data: rows } = await dataLayerClient.from('job_assignments')
-        .select('sound_role, lights_role, video_role, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
+        .select('sound_role, lights_role, video_role, production_role, external_technician_name, profiles!job_assignments_technician_id_fkey(first_name,last_name,phone)')
         .eq('job_id', job.id);
       const deptKey = ASSIGNMENT_ROLE_BY_DEPARTMENT[department];
-      if (!deptKey) {
+      if (!deptKey || deptKey === "production_role") {
         toast({ title: 'Departamento no soportado', description: 'Solo sonido, luces o vídeo pueden crear grupos de WhatsApp.', variant: 'destructive' });
         return;
       }

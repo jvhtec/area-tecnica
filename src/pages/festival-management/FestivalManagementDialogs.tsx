@@ -144,8 +144,8 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
       />
 
       <Dialog open={isRouteSheetOpen} onOpenChange={setIsRouteSheetOpen}>
-        <DialogContent className="max-w-[96vw] w-[96vw] max-h-[90vh] md:h-[90vh] p-0 overflow-hidden flex flex-col">
-          <div className="h-full overflow-auto">{jobId && <ModernHojaDeRuta jobId={jobId} />}</div>
+        <DialogContent className="max-w-[96vw] w-[96vw] h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] md:h-[90dvh] p-0 overflow-hidden flex flex-col">
+          <div className="h-full overflow-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">{jobId && <ModernHojaDeRuta jobId={jobId} />}</div>
         </DialogContent>
       </Dialog>
 

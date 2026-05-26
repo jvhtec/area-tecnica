@@ -730,7 +730,7 @@ export function useGlobalTaskMutations(department: Dept) {
       .upload(taskKey, file, { upsert: false });
     if (upErr) throw upErr;
 
-    const { error: insErr } = await supabase.from('task_documents').insert({
+    const { error: insErr } = await fromDynamicTable('task_documents').insert({
       [docFk]: taskId,
       file_name: file.name,
       file_path: taskKey,

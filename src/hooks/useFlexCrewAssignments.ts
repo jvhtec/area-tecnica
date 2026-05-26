@@ -11,7 +11,7 @@ export const useFlexCrewAssignments = () => {
   const manageFlexCrewAssignment = async (
     jobId: string,
     technicianId: string,
-    department: 'sound' | 'lights',
+    department: 'sound' | 'lights' | 'video',
     action: 'add' | 'remove'
   ) => {
     try {

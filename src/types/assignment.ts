@@ -2,6 +2,7 @@ export interface Assignment {
   id: string;
   job_id: string;
   technician_id: string;
+  external_technician_name?: string | null;
   assigned_by: string | null;
   assigned_at: string;
   // DEPRECATED: Use timesheets to determine which days a technician works
@@ -18,5 +19,5 @@ export interface Assignment {
     last_name: string;
     email: string;
     department: string;
-  };
+  } | null;
 }

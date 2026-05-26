@@ -11,6 +11,7 @@ import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useEffect, useState } from "react";
 import { labelForCode } from '@/utils/roles';
 import { format } from "date-fns";
+import { getAssignmentRoleForDepartment, hasAssignmentRoleForDepartment } from "@/utils/assignmentRoles";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -134,8 +135,8 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
   // Filter assignments based on department if specified
   const filteredAssignments = department
     ? assignments.filter(assignment => {
-        // Add null check for profiles
-        return assignment.profiles && assignment.profiles.department === department;
+        const profileDepartment = assignment.profiles?.department;
+        return profileDepartment === department || hasAssignmentRoleForDepartment(assignment, department);
       })
     : assignments;
 
@@ -144,13 +145,12 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
   const getRoleForDepartment = (assignment: Assignment) => {
     switch (department) {
       case "sound":
-        return assignment.sound_role;
       case "lights":
-        return assignment.lights_role;
       case "video":
-        return assignment.video_role;
+      case "production":
+        return getAssignmentRoleForDepartment(assignment, department);
       default:
-        return assignment.sound_role || assignment.lights_role || assignment.video_role;
+        return assignment.sound_role || assignment.lights_role || assignment.video_role || assignment.production_role;
     }
   };
 
@@ -190,11 +190,9 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
         const displayRole = role ? labelForCode(role) : null;
         if (!displayRole) return null;
         
-        // Add null check for profiles before rendering
-        if (!assignment.profiles) {
-          console.warn("Assignment missing profiles data:", assignment);
-          return null;
-        }
+        const technicianName = assignment.profiles
+          ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`.trim()
+          : (assignment as any).external_technician_name || "External technician";
         
         return (
           <div
@@ -206,7 +204,7 @@ export const JobAssignments = ({ jobId, department, userRole }: JobAssignmentsPr
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <span className="font-medium">
-                    {assignment.profiles.first_name} {assignment.profiles.last_name}
+                    {technicianName}
                   </span>
                   <span className="text-xs">({displayRole})</span>
                 </div>

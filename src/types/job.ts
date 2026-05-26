@@ -33,6 +33,8 @@ export interface StaffAssignment {
   sound_role?: string;
   lights_role?: string;
   video_role?: string;
+  production_role?: string;
+  external_technician_name?: string | null;
   technician?: TechnicianProfile;
 }
 

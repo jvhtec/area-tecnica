@@ -61,16 +61,20 @@ export const useOptimizedJobs = (
           department
         ),
         job_assignments(
+          id,
           technician_id,
           sound_role,
           lights_role,
           video_role,
+          production_role,
+          external_technician_name,
           assignment_source,
           single_day,
           assignment_date,
           status,
           assigned_at,
-          profiles!job_assignments_technician_id_fkey!inner(
+          assigned_by,
+          profiles!job_assignments_technician_id_fkey(
             id,
             first_name,
             nickname,
@@ -94,10 +98,19 @@ export const useOptimizedJobs = (
           type
         ),
         tour_date:tour_dates(
+          id,
           date,
           start_date,
           end_date,
-          tour_date_type
+          tour_date_type,
+          is_tour_pack_only,
+          location:locations(
+            id,
+            name,
+            formatted_address,
+            latitude,
+            longitude
+          )
         ),
         flex_folders(
           id,

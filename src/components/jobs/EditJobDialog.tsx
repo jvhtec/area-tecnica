@@ -412,7 +412,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
+        <DialogContent className="max-h-[calc(100dvh-1rem)] md:max-h-none md:h-auto overflow-y-auto md:overflow-visible">
           <DialogHeader>
             <DialogTitle>Edit Job</DialogTitle>
           </DialogHeader>
@@ -620,7 +620,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                 </div>
               )}
             </div>
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-end gap-2 pb-[max(0px,env(safe-area-inset-bottom))]">
               <Button
                 type="button"
                 variant="outline"
@@ -629,7 +629,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading || isVenueBusy} className="bg-blue-600 hover:bg-blue-500 text-white">
+              <Button type="submit" disabled={isLoading || isVenueBusy}>
                 {isLoading ? "Saving..." : "Save Changes"}
               </Button>
             </div>

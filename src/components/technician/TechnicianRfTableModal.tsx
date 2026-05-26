@@ -582,7 +582,7 @@ export function TechnicianRfTableModal({
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
-        className={`w-[calc(100vw-1rem)] max-w-lg h-[92vh] rounded-2xl border shadow-2xl p-0 gap-0 overflow-hidden [&>button]:hidden ${
+        className={`w-[calc(100vw-1rem)] max-w-lg h-[calc(100dvh-1rem)] max-h-[calc(100dvh-1rem)] rounded-2xl border shadow-2xl p-0 gap-0 overflow-hidden [&>button]:hidden ${
           isDark
             ? "bg-black border-zinc-800"
             : "bg-slate-50 border-slate-200"
@@ -594,7 +594,7 @@ export function TechnicianRfTableModal({
         <div className="flex h-full flex-col">
         {/* Header */}
         <div
-          className={`p-4 pb-3 flex justify-between items-center shrink-0 border-b ${
+          className={`px-4 pb-3 pt-[max(1rem,env(safe-area-inset-top))] flex justify-between items-center shrink-0 border-b ${
             isDark ? "border-zinc-800 bg-black/80" : "border-slate-200 bg-white"
           }`}
         >
@@ -749,7 +749,7 @@ export function TechnicianRfTableModal({
 
         {/* Card list */}
         <ScrollArea className="flex-1">
-          <div className="p-4">
+          <div className="px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
             {isLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-6 w-6 animate-spin text-blue-500" />

@@ -60,8 +60,9 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
           *,
           locations(id, name, formatted_address, latitude, longitude),
           job_assignments(
-            job_id, technician_id, assigned_by, assigned_at,
-            sound_role, lights_role, video_role, status,
+            id, job_id, technician_id, assigned_by, assigned_at,
+            sound_role, lights_role, video_role, production_role, status,
+            external_technician_name,
             single_day, assignment_date, assignment_source,
             profiles!job_assignments_technician_id_fkey(id, first_name, last_name, department, role, profile_picture_url)
           ),
@@ -199,7 +200,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
   if (isJobLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[calc(100dvh-1rem)] md:max-h-[90dvh] flex flex-col overflow-y-auto">
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
@@ -212,7 +213,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] max-h-[92vh] flex flex-col overflow-y-auto overflow-x-hidden px-3 sm:px-6">
+      <DialogContent className="w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] max-h-[calc(100dvh-1rem)] md:max-h-[92dvh] flex flex-col overflow-y-auto overflow-x-hidden px-3 sm:px-6">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-base md:text-lg">
             <Calendar className="h-4 w-4 md:h-5 md:w-5" />
@@ -220,7 +221,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
           </DialogTitle>
         </DialogHeader>
 
-        <div className="min-h-0 overflow-y-auto overflow-x-hidden max-h-[75vh]">
+        <div className="min-h-0 overflow-y-auto overflow-x-hidden max-h-[calc(100dvh-12rem)] md:max-h-[75dvh] pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           <Tabs value={selectedTab} onValueChange={setSelectedTab} className="flex flex-col min-w-0">
             <TabsList className={`grid w-full ${gridColsClass} flex-shrink-0 h-auto text-xs md:text-sm overflow-x-auto no-scrollbar`}>
               <TabsTrigger value="info" className="py-2">

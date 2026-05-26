@@ -42,6 +42,7 @@ export interface MatrixTimesheetAssignment {
   sound_role?: string | null;
   lights_role?: string | null;
   video_role?: string | null;
+  production_role?: string | null;
   is_schedule_only?: boolean | null;
   source?: string | null;
 }
@@ -87,7 +88,7 @@ interface TimesheetAssignmentRow {
 
 type AssignmentMetadataRow = Pick<
   MatrixTimesheetAssignment,
-  'job_id' | 'technician_id' | 'sound_role' | 'lights_role' | 'video_role' | 'single_day' | 'assignment_date' | 'status' | 'assigned_at' | 'assigned_by'
+  'job_id' | 'technician_id' | 'sound_role' | 'lights_role' | 'video_role' | 'production_role' | 'single_day' | 'assignment_date' | 'status' | 'assigned_at' | 'assigned_by'
 >;
 
 type StaffingSummaryRow = {
@@ -154,7 +155,7 @@ export const fetchMatrixTimesheetAssignments = async ({
         .from('job_assignments')
         // NOTE: single_day and assignment_date are deprecated after simplification migration
         // They're kept in the query for backwards compatibility but should eventually be removed
-        .select('job_id, technician_id, sound_role, lights_role, video_role, single_day, assignment_date, status, assigned_at, assigned_by')
+        .select('job_id, technician_id, sound_role, lights_role, video_role, production_role, single_day, assignment_date, status, assigned_at, assigned_by')
         .in('job_id', jobBatch)
         .in('technician_id', technicianIds)
     ));
@@ -224,6 +225,7 @@ export const fetchMatrixTimesheetAssignments = async ({
         sound_role: meta?.sound_role ?? null,
         lights_role: meta?.lights_role ?? null,
         video_role: meta?.video_role ?? null,
+        production_role: meta?.production_role ?? null,
         is_schedule_only: row.is_schedule_only ?? null,
         source: row.source ?? null,
       });

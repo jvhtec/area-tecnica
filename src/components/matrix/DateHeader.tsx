@@ -172,7 +172,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
       const [{ data: req }, { data: assignments }] = await Promise.all([
         dataLayerClient.from('job_required_roles_summary').select('total_required, job_id').in('job_id', jobIds),
         dataLayerClient.from('job_assignments')
-          .select('job_id, technician_id, sound_role, lights_role, video_role')
+          .select('job_id, technician_id, sound_role, lights_role, video_role, production_role')
           .in('job_id', jobIds)
           .in('technician_id', Array.from(allScheduledTechs)),
       ]);
@@ -187,6 +187,7 @@ const DateHeaderComp = ({ date, width, jobs = [], technicianIds, onJobClick }: D
           if (a.sound_role != null) assigned++;
           if (a.lights_role != null) assigned++;
           if (a.video_role != null) assigned++;
+          if (a.production_role != null) assigned++;
         }
       });
 
