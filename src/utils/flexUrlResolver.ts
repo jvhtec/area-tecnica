@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { FLEX_API_BASE_URL } from '@/lib/api-config';
 import { FLEX_FOLDER_IDS } from './flex-folders/constants';
+import { onFlexTokenInvalidate } from '@/utils/flexTokenCache';
 
 export const FLEX_UI_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
 
@@ -124,7 +125,19 @@ interface SchemaResolution {
 
 let cachedFlexToken: string | null = null;
 let pendingTokenPromise: Promise<string> | null = null;
+let tokenVersion = 0;
+onFlexTokenInvalidate(() => {
+  tokenVersion += 1;
+  cachedFlexToken = null;
+  pendingTokenPromise = null;
+});
 
+/**
+ * Trim whitespace from a string and treat empty results as absent.
+ *
+ * @param value - Value to coerce; only string inputs are considered
+ * @returns The trimmed string if `value` is a non-empty string, `undefined` otherwise
+ */
 function coerceString(value: unknown): string | undefined {
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -162,6 +175,15 @@ function pickPrimaryElementId(node: FlexTreeNode): string | null {
   return null;
 }
 
+/**
+ * Retrieve the Flex X_AUTH_TOKEN, caching the result and deduplicating concurrent fetches.
+ *
+ * If a token is already cached this returns it; concurrent callers share a single in-flight request.
+ * The resolved token is cached for subsequent calls unless invalidation occurs during fetch.
+ *
+ * @returns The Flex `X_AUTH_TOKEN` string.
+ * @throws If the token fetch fails or the response does not contain `X_AUTH_TOKEN`.
+ */
 async function getFlexAuthToken(): Promise<string> {
   if (cachedFlexToken) {
     return cachedFlexToken;
@@ -171,6 +193,8 @@ async function getFlexAuthToken(): Promise<string> {
     return pendingTokenPromise;
   }
 
+  const requestVersion = tokenVersion;
+  
   pendingTokenPromise = (async () => {
     console.log('[flexUrlResolver] Fetching Flex auth token');
     const { data, error } = await supabase.functions.invoke('get-secret', {
@@ -188,7 +212,10 @@ async function getFlexAuthToken(): Promise<string> {
       throw new Error('Flex auth token response missing X_AUTH_TOKEN');
     }
 
-    cachedFlexToken = token;
+    // Only cache if version hasn't changed (no invalidation during fetch)
+    if (requestVersion === tokenVersion) {
+      cachedFlexToken = token;
+    }
     pendingTokenPromise = null;
     return token;
   })();
