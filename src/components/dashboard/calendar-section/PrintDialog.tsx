@@ -32,12 +32,13 @@ export const PrintDialog: React.FC<PrintDialogProps> = ({
 }) => {
   useEffect(() => {
     if (showDialog) {
+      const includeAllJobTypes = selectedJobTypes.length === 0;
       const newJobTypes = {
-        tourdate: selectedJobTypes.includes("tourdate"),
-        tour: selectedJobTypes.includes("tour"),
-        single: selectedJobTypes.includes("single"),
-        dryhire: selectedJobTypes.includes("dryhire"),
-        festival: selectedJobTypes.includes("festival"),
+        tourdate: includeAllJobTypes || selectedJobTypes.includes("tourdate"),
+        tour: includeAllJobTypes || selectedJobTypes.includes("tour"),
+        single: includeAllJobTypes || selectedJobTypes.includes("single"),
+        dryhire: includeAllJobTypes || selectedJobTypes.includes("dryhire"),
+        festival: includeAllJobTypes || selectedJobTypes.includes("festival"),
       };
       setPrintSettings((prev) => ({ ...prev, jobTypes: newJobTypes }));
     }

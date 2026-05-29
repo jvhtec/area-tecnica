@@ -12,6 +12,7 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { getCalendarArtistsForDate, getCalendarJobDisplayTitle } from "@/utils/calendarArtists";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { getDateTypeMeta } from "@/constants/dateTypes";
 
@@ -79,6 +80,8 @@ export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dat
   const currentlyAssigned = job.job_assignments?.length || 0;
   const jobTimezone = job.timezone || "Europe/Madrid";
   const dateTypeIcon = getDateTypeIcon(job.id, date);
+  const artistsForDate = getCalendarArtistsForDate(job, date);
+  const displayTitle = getCalendarJobDisplayTitle(job, date);
 
   return (
     <DateTypeContextMenu
@@ -94,14 +97,14 @@ export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dat
         <Tooltip>
           <TooltipTrigger asChild>
             <div
-              className="px-1.5 py-0.5 rounded text-xs truncate hover:bg-accent/50 transition-colors flex items-center gap-1 cursor-pointer"
+              className="px-1.5 py-0.5 rounded text-xs hover:bg-accent/50 transition-colors flex items-center gap-1 cursor-pointer min-w-0"
               style={{
                 backgroundColor: `${job.color}20`,
                 color: job.color,
               }}
             >
               {dateTypeIcon}
-              <span>{job.title}</span>
+              <span className="min-w-0 truncate">{displayTitle}</span>
             </div>
           </TooltipTrigger>
           <TooltipContent className="w-64 p-2">
@@ -119,6 +122,22 @@ export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dat
                 <div className="flex items-center gap-2 text-sm">
                   <MapPin className="h-4 w-4" />
                   <span>{job.location.name}</span>
+                </div>
+              )}
+              {artistsForDate.length > 0 && (
+                <div className="space-y-1">
+                  <div className="text-sm font-medium">Artists:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {artistsForDate.map((artist) => (
+                      <Badge
+                        key={artist.id || `${artist.name}-${artist.stage}-${artist.show_start}`}
+                        variant="outline"
+                        className="max-w-full"
+                      >
+                        <span className="truncate">{artist.name}</span>
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               )}
               <div className="space-y-1">

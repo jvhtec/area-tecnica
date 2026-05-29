@@ -41,6 +41,7 @@ import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQueryClient } from "@tanstack/react-query";
 import { openFlexElement } from "@/utils/flex-folders";
+import { getCalendarJobDisplayTitle } from "@/utils/calendarArtists";
 import { isFestivalLikeJobType } from "@/utils/jobType";
 import { DateType, DATE_TYPE_OPTIONS, getDateTypeMeta } from "@/constants/dateTypes";
 
@@ -130,9 +131,10 @@ export function MobileJobCard({
 
   const currentDateTypeEmoji = getDateTypeMeta(currentTypeValue)?.emoji || '🎭';
 
-  const jobTitle = (job.title || job.job_name || 'Untitled Job').length > 26 
-    ? (job.title || job.job_name || 'Untitled Job').substring(0, 26) + '...'
-    : (job.title || job.job_name || 'Untitled Job');
+  const fullJobTitle = getCalendarJobDisplayTitle(job, currentDate);
+  const jobTitle = fullJobTitle.length > 26
+    ? fullJobTitle.substring(0, 26) + '...'
+    : fullJobTitle;
   const jobVenue = (job.location?.name || job.venue || 'No venue').length > 26
     ? (job.location?.name || job.venue || 'No venue').substring(0, 26) + '...'
     : (job.location?.name || job.venue || 'No venue');

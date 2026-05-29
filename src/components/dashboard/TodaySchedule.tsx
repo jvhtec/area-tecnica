@@ -103,6 +103,7 @@ export const TodaySchedule = ({
               hideTasks={hideTasks}
               showManageArtists={isFestivalJob}
               detailsOnlyMode={detailsOnlyMode}
+              selectedDate={selectedDate}
             />
           );
         })}
@@ -160,6 +161,7 @@ export const TodaySchedule = ({
                 hideTasks={hideTasks}
                 showManageArtists={isFestivalJob}
                 detailsOnlyMode={detailsOnlyMode}
+                selectedDate={selectedDate}
               />
             );
           })}
