@@ -28,6 +28,7 @@ export const useOptimizedJobs = (
     { table: 'job_assignments', queryKey: queryKeys.scope('optimized-jobs'), priority: 'high' },
     { table: 'job_departments', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' },
     { table: 'job_date_types', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' },
+    { table: 'festival_artists', queryKey: queryKeys.scope('optimized-jobs'), priority: 'medium' },
     { table: 'job_documents', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
     { table: 'flex_folders', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
     { table: 'locations', queryKey: queryKeys.scope('optimized-jobs'), priority: 'low' },
@@ -93,6 +94,14 @@ export const useOptimizedJobs = (
           date,
           type
         ),
+        festival_artists(
+          id,
+          name,
+          date,
+          show_start,
+          stage,
+          isaftermidnight
+        ),
         tour_date:tour_dates(
           date,
           start_date,
@@ -136,6 +145,7 @@ export const useOptimizedJobs = (
     const processedJobs = jobs.map(job => ({
       ...job,
       job_documents: job.job_documents || [],
+      festival_artists: job.festival_artists || [],
       flex_folders_exist: (job.flex_folders?.length || 0) > 0,
     }));
 

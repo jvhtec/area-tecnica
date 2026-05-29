@@ -154,6 +154,7 @@ export interface JobCardNewProps {
   isProjectManagementPage?: boolean;
   hideTasks?: boolean;
   detailsOnlyMode?: boolean;
+  selectedDate?: Date;
   openHojaDeRuta?: boolean;
   onHojaDeRutaOpened?: () => void;
 }
@@ -161,6 +162,7 @@ export interface JobCardNewProps {
 function JobCardNewDetailsOnlyCard({
   job,
   department = "sound",
+  selectedDate,
 }: JobCardNewProps) {
   const { theme } = useTheme();
   const isJobBeingDeleted = useDeletionState((state) => state.deletingJobs.has(job.id));
@@ -183,6 +185,7 @@ function JobCardNewDetailsOnlyCard({
       isJobBeingDeleted={isJobBeingDeleted}
       cardOpacity={cardOpacity}
       pointerEvents={pointerEvents}
+      selectedDate={selectedDate}
       jobDetailsDialogOpen={jobDetailsDialogOpen}
       setJobDetailsDialogOpen={setJobDetailsDialogOpen}
     />

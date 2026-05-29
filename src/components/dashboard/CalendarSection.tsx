@@ -29,6 +29,7 @@ import { toZonedTime } from "date-fns-tz";
 import { useOptimizedDateTypes } from "@/hooks/useOptimizedDateTypes";
 import { useToast } from "@/hooks/use-toast";
 import { isJobOnDate } from "@/utils/timezoneUtils";
+import { getCalendarJobDisplayTitle } from "@/utils/calendarArtists";
 import { DateType, DATE_TYPE_META, DATE_TYPE_ORDER, getDateTypeMeta } from "@/constants/dateTypes";
 
 type PrintableJobType = keyof PrintSettings["jobTypes"];
@@ -490,7 +491,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
             const maxTitleWidth = cellWidth - (titleX - x) - 2;
             const maxTitleLength = Math.floor(maxTitleWidth / 1.2);
 
-            let displayTitle = job.title;
+            let displayTitle = getCalendarJobDisplayTitle(job, day);
             if (displayTitle.length > maxTitleLength) {
               displayTitle = displayTitle.substring(0, maxTitleLength - 3) + "...";
             }
@@ -730,7 +731,7 @@ export const CalendarSection: React.FC<CalendarSectionProps> = ({
 
               const cell = ws.getRow(startExcelRow + i + 1).getCell(col);
               const label = dtInfo ? `${dtInfo.label} ` : "";
-              cell.value = `${label}${job.title}`;
+              cell.value = `${label}${getCalendarJobDisplayTitle(job, day)}`;
 
               // Use job color as tinted background (20% opacity equivalent)
               const bgHex = dtInfo ? dtInfo.bg : tintColor(jobColor, 0.2);

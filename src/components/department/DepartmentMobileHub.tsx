@@ -21,6 +21,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Badge } from "@/components/ui/badge";
 import { isManagementRole } from "@/utils/permissions";
+import { getCalendarJobDisplayTitle } from "@/utils/calendarArtists";
 
 interface ToolDefinition {
   label: string;
@@ -495,7 +496,9 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex-1">
-                      <h3 className={cn("font-bold text-lg", t.textMain)}>{job.title}</h3>
+                      <h3 className={cn("font-bold text-lg", t.textMain)}>
+                        {getCalendarJobDisplayTitle(job, selectedDate)}
+                      </h3>
                       <div className={cn("text-xs flex items-center gap-1 mt-0.5", t.textMuted)}>
                         <MapPin size={12} />
                         {job.location?.name || "Sin ubicación"}

@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { getOptimizedProfilePictureUrl } from "@/utils/imageOptimization";
 import { isManagementRole } from "@/utils/permissions";
+import { getCalendarJobDisplayTitle } from "@/utils/calendarArtists";
 
 interface DashboardMobileHubProps {
   jobs: any[];
@@ -452,7 +453,9 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div className="flex-1">
-                      <h3 className={cn("font-bold text-lg", themeTokens.textMain)}>{job.title}</h3>
+                      <h3 className={cn("font-bold text-lg", themeTokens.textMain)}>
+                        {getCalendarJobDisplayTitle(job, selectedDate)}
+                      </h3>
                       <div className={cn("text-xs mt-1", themeTokens.textMuted)}>
                         {job.location_data?.name || "Sin ubicación"}
                       </div>

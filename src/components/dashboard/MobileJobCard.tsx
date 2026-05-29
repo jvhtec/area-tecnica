@@ -41,6 +41,7 @@ import { useFlexUuidLazy } from "@/hooks/useFlexUuidLazy";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useQueryClient } from "@tanstack/react-query";
 import { openFlexElement } from "@/utils/flex-folders";
+import { getCalendarJobDisplayTitle } from "@/utils/calendarArtists";
 import { isFestivalLikeJobType } from "@/utils/jobType";
 import { DateType, DATE_TYPE_OPTIONS, getDateTypeMeta } from "@/constants/dateTypes";
 
@@ -130,12 +131,13 @@ export function MobileJobCard({
 
   const currentDateTypeEmoji = getDateTypeMeta(currentTypeValue)?.emoji || '🎭';
 
-  const jobTitle = (job.title || job.job_name || 'Untitled Job').length > 26 
-    ? (job.title || job.job_name || 'Untitled Job').substring(0, 26) + '...'
-    : (job.title || job.job_name || 'Untitled Job');
-  const jobVenue = (job.location?.name || job.venue || 'No venue').length > 26
-    ? (job.location?.name || job.venue || 'No venue').substring(0, 26) + '...'
-    : (job.location?.name || job.venue || 'No venue');
+  const fullJobTitle = getCalendarJobDisplayTitle(job, currentDate);
+  const jobTitle = fullJobTitle.length > 26
+    ? fullJobTitle.substring(0, 26) + '...'
+    : fullJobTitle;
+  const jobVenue = (job.location?.name || job.venue || 'Sin ubicación').length > 26
+    ? (job.location?.name || job.venue || 'Sin ubicación').substring(0, 26) + '...'
+    : (job.location?.name || job.venue || 'Sin ubicación');
   const startTime = job.start_time ? format(new Date(job.start_time), 'HH:mm') : '';
   const endTime = job.end_time ? format(new Date(job.end_time), 'HH:mm') : '';
   const timeRange = startTime && endTime ? `${startTime} - ${endTime}` : startTime;
@@ -180,8 +182,8 @@ export function MobileJobCard({
       if (error) throw error;
 
       toast({
-        title: "Date type updated",
-        description: `Set to ${DATE_TYPE_OPTIONS.find(opt => opt.value === newType)?.label}`
+        title: "Tipo de fecha actualizado",
+        description: `Cambiado a ${DATE_TYPE_OPTIONS.find(opt => opt.value === newType)?.label}`
       });
 
       // Ensure both mobile and desktop calendars refresh their caches
@@ -197,7 +199,7 @@ export function MobileJobCard({
       console.error('Error updating date type:', error);
       toast({
         title: "Error",
-        description: "Failed to update date type",
+        description: "No se pudo actualizar el tipo de fecha",
         variant: "destructive"
       });
     }
@@ -218,7 +220,7 @@ export function MobileJobCard({
       }
 
       if (isLoadingFlexUuid) {
-        toast({ title: "Loading", description: "Please wait while we load the Flex folder..." });
+        toast({ title: "Cargando", description: "Espera mientras cargamos la carpeta de Flex..." });
         return;
       }
 
@@ -231,13 +233,13 @@ export function MobileJobCard({
           onError: (error) => {
             toast({
               title: "Error",
-              description: error.message || "Failed to open Flex",
+              description: error.message || "No se pudo abrir Flex",
               variant: "destructive",
             });
           },
           onWarning: (message) => {
             toast({
-              title: "Warning",
+              title: "Aviso",
               description: message,
             });
           },
@@ -245,7 +247,7 @@ export function MobileJobCard({
       } else if (flexError) {
         toast({ title: "Error", description: String(flexError), variant: "destructive" });
       } else {
-        toast({ title: "Info", description: "Flex folder not available for this job" });
+        toast({ title: "Información", description: "La carpeta de Flex no está disponible para este trabajo" });
       }
     } catch (err: any) {
       console.error('Flex navigation error', err);
@@ -253,9 +255,9 @@ export function MobileJobCard({
   };
 
   const getFlexMenuText = () => {
-    if (!hasChecked) return 'Check Flex';
-    if (isLoadingFlexUuid) return 'Loading Flex...';
-    if (flexUuid) return 'Open Flex';
+    if (!hasChecked) return 'Comprobar Flex';
+    if (isLoadingFlexUuid) return 'Cargando Flex...';
+    if (flexUuid) return 'Abrir Flex';
     return 'Flex';
   };
 
@@ -282,7 +284,7 @@ export function MobileJobCard({
         {isJobBeingDeleted && (
           <div className="absolute inset-0 bg-black bg-opacity-20 flex items-center justify-center z-10 rounded">
             <div className="bg-background px-3 py-2 rounded shadow-lg">
-              <span className="text-sm font-medium">Deleting job...</span>
+              <span className="text-sm font-medium">Eliminando trabajo...</span>
             </div>
           </div>
         )}
@@ -312,7 +314,7 @@ export function MobileJobCard({
                 >
                   <DropdownMenuItem onClick={handleDateTypeBadgeClick}>
                     <Calendar className="mr-2 h-4 w-4" />
-                    Change Date Type
+                    Cambiar tipo de fecha
                   </DropdownMenuItem>
 
                   <DropdownMenuItem 
@@ -325,7 +327,7 @@ export function MobileJobCard({
                   
                   <DropdownMenuSeparator />
                   
-                  {/* View Details */}
+                  {/* View details */}
                   {canViewJobDetails && (
                     <DropdownMenuItem 
                       onClick={(e) => {
@@ -334,7 +336,7 @@ export function MobileJobCard({
                       }}
                     >
                       <FileText className="mr-2 h-4 w-4" />
-                      View Details
+                      Ver detalles
                     </DropdownMenuItem>
                   )}
                   
@@ -345,18 +347,18 @@ export function MobileJobCard({
                     }}
                   >
                     <Users className="mr-2 h-4 w-4" />
-                    Assign Users
+                    Asignar usuarios
                   </DropdownMenuItem>
                   
                   <DropdownMenuItem onClick={handleTimesheetClick}>
                     <Clock className="mr-2 h-4 w-4" />
-                    Timesheets
+                    Partes de horas
                   </DropdownMenuItem>
                   
                   {isFestival && canManageArtists && (
                     <DropdownMenuItem onClick={handleFestivalArtistsClick}>
                       <Star className="mr-2 h-4 w-4" />
-                      Manage Artists
+                      Gestionar artistas
                     </DropdownMenuItem>
                   )}
                   
@@ -366,7 +368,7 @@ export function MobileJobCard({
                     <DropdownMenuItem asChild>
                       <label className="cursor-pointer">
                         <FileUp className="mr-2 h-4 w-4" />
-                        Upload Document
+                        Subir documento
                         <input
                           type="file"
                           className="hidden"
@@ -397,7 +399,7 @@ export function MobileJobCard({
                       ) : (
                         <FolderPlus className="mr-2 h-4 w-4" />
                       )}
-                      {isCreatingFolders ? 'Creating...' : foldersAreCreated ? 'Flex Folders Created' : 'Create Flex Folders'}
+                      {isCreatingFolders ? 'Creando...' : foldersAreCreated ? 'Carpetas Flex creadas' : 'Crear carpetas Flex'}
                     </DropdownMenuItem>
                   )}
                   
@@ -410,14 +412,14 @@ export function MobileJobCard({
                       disabled={isCreatingLocalFolders}
                     >
                       <HardDrive className="mr-2 h-4 w-4" />
-                      {isCreatingLocalFolders ? 'Creating...' : 'Create Local Folders'}
+                      {isCreatingLocalFolders ? 'Creando...' : 'Crear carpetas locales'}
                     </DropdownMenuItem>
                   )}
                   
                   {canEditJobs && (
                     <DropdownMenuItem onClick={handleEditButtonClick}>
                       <Edit className="mr-2 h-4 w-4" />
-                      Edit Job
+                      Editar trabajo
                     </DropdownMenuItem>
                   )}
                   
@@ -427,7 +429,7 @@ export function MobileJobCard({
                       className="text-destructive focus:text-destructive"
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Job
+                      Eliminar trabajo
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -475,7 +477,7 @@ export function MobileJobCard({
       <Dialog open={dateTypeDialogOpen} onOpenChange={setDateTypeDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Change Date Type</DialogTitle>
+            <DialogTitle>Cambiar tipo de fecha</DialogTitle>
           </DialogHeader>
           <div className="grid gap-2">
             {DATE_TYPE_OPTIONS.map((option) => (
