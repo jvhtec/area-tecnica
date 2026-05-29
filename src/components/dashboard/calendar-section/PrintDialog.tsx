@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { format } from "date-fns";
 import { Printer, Table } from "lucide-react";
 
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { usePrintJobTypeInitialization } from "@/hooks/usePrintJobTypeInitialization";
 
 import type { CalendarExportRange, PrintSettings } from "./types";
 
@@ -30,19 +31,7 @@ export const PrintDialog: React.FC<PrintDialogProps> = ({
   currentMonth,
   selectedJobTypes,
 }) => {
-  useEffect(() => {
-    if (showDialog) {
-      const includeAllJobTypes = selectedJobTypes.length === 0;
-      const newJobTypes = {
-        tourdate: includeAllJobTypes || selectedJobTypes.includes("tourdate"),
-        tour: includeAllJobTypes || selectedJobTypes.includes("tour"),
-        single: includeAllJobTypes || selectedJobTypes.includes("single"),
-        dryhire: includeAllJobTypes || selectedJobTypes.includes("dryhire"),
-        festival: includeAllJobTypes || selectedJobTypes.includes("festival"),
-      };
-      setPrintSettings((prev) => ({ ...prev, jobTypes: newJobTypes }));
-    }
-  }, [showDialog, selectedJobTypes, setPrintSettings]);
+  usePrintJobTypeInitialization(showDialog, selectedJobTypes, setPrintSettings);
 
   return (
     <Dialog open={showDialog} onOpenChange={setShowDialog}>

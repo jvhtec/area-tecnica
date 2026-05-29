@@ -126,7 +126,7 @@ export const CalendarJobCard: React.FC<CalendarJobCardProps> = ({ job, date, dat
               )}
               {artistsForDate.length > 0 && (
                 <div className="space-y-1">
-                  <div className="text-sm font-medium">Artists:</div>
+                  <div className="text-sm font-medium">Artistas:</div>
                   <div className="flex flex-wrap gap-1">
                     {artistsForDate.map((artist) => (
                       <Badge

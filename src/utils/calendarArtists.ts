@@ -81,7 +81,7 @@ export const getCalendarJobDisplayTitle = (
   date: Date,
   maxVisibleArtists = 2,
 ) => {
-  const title = (job.title || job.job_name || "Untitled Job").trim();
+  const title = (job.title || job.job_name || "Trabajo sin título").trim();
   const artistSummary = formatCalendarArtistSummary(
     getCalendarArtistNamesForDate(job, date),
     maxVisibleArtists,

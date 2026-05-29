@@ -60,6 +60,10 @@ describe("calendar artist helpers", () => {
     expect(getCalendarJobDisplayTitle(job, new Date(2026, 5, 20))).toBe("Fiestas Populares Torrejon");
   });
 
+  it("uses a Spanish fallback title when a job title is missing", () => {
+    expect(getCalendarJobDisplayTitle({ festival_artists: [] }, new Date(2026, 5, 20))).toBe("Trabajo sin título");
+  });
+
   it("formats all artists when the summary fits inside the visible limit", () => {
     expect(formatCalendarArtistSummary(["Alpha", "Beta"], 2)).toBe("Alpha, Beta");
   });
