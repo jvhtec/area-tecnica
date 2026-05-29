@@ -11,6 +11,7 @@ import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUti
 import { appendAutonomoLabel } from '@/utils/autonomo';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
+import { labelForJobExtraType } from '@/types/jobExtras';
 import type jsPDF from 'jspdf';
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
@@ -1221,7 +1222,7 @@ export async function generateJobPayoutPDF(
 
       payout.extras_breakdown!.items!.forEach((item: any) => {
         const houseTechLabel = item.is_house_tech_rate ? ' (plantilla)' : '';
-        const itemText = `• ${item.extra_type.replace('_', ' ')}${houseTechLabel} × ${item.quantity} = ${formatCurrency(item.amount_eur)}`;
+        const itemText = `• ${labelForJobExtraType(item.extra_type)}${houseTechLabel} × ${item.quantity} = ${formatCurrency(item.amount_eur)}`;
         doc.text(itemText, 18, currentY);
         currentY += 5;
 

@@ -4510,6 +4510,9 @@ export type Database = {
             | null
           job_type: Database["public"]["Enums"]["job_type"]
           location_id: string | null
+          preventive_resource_assigned_at: string | null
+          preventive_resource_assigned_by: string | null
+          preventive_resource_technician_id: string | null
           rates_approved: boolean
           rates_approved_at: string | null
           rates_approved_by: string | null
@@ -4534,6 +4537,9 @@ export type Database = {
             | null
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
+          preventive_resource_assigned_at?: string | null
+          preventive_resource_assigned_by?: string | null
+          preventive_resource_technician_id?: string | null
           rates_approved?: boolean
           rates_approved_at?: string | null
           rates_approved_by?: string | null
@@ -4558,6 +4564,9 @@ export type Database = {
             | null
           job_type?: Database["public"]["Enums"]["job_type"]
           location_id?: string | null
+          preventive_resource_assigned_at?: string | null
+          preventive_resource_assigned_by?: string | null
+          preventive_resource_technician_id?: string | null
           rates_approved?: boolean
           rates_approved_at?: string | null
           rates_approved_by?: string | null
@@ -4575,6 +4584,34 @@ export type Database = {
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_preventive_resource_assigned_by_fkey"
+            columns: ["preventive_resource_assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_preventive_resource_assigned_by_fkey"
+            columns: ["preventive_resource_assigned_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_preventive_resource_technician_id_fkey"
+            columns: ["preventive_resource_technician_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "jobs_preventive_resource_technician_id_fkey"
+            columns: ["preventive_resource_technician_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
           },
           {

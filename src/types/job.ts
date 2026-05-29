@@ -51,6 +51,9 @@ export interface Job {
   job_type: JobType;
   flex_folders_created?: boolean;
   invoicing_company?: InvoicingCompany | null;
+  preventive_resource_technician_id?: string | null;
+  preventive_resource_assigned_at?: string | null;
+  preventive_resource_assigned_by?: string | null;
 }
 
 export interface JobWithLocationAndDocs extends Job {

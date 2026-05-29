@@ -27,6 +27,7 @@ export interface TechnicianJobData {
   status?: string;
   created_at?: string;
   artist_count?: number;
+  preventive_resource_technician_id?: string | null;
   location?: { name: string } | null;
   job_documents?: Array<{
     id: string;

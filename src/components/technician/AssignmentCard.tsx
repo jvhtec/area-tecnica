@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import { formatInJobTimezone } from "@/utils/timezoneUtils";
 import { formatInTimeZone } from "date-fns-tz";
 import { es } from "date-fns/locale";
-import { RefreshCw, Clock, Eye, Download, FileText, ChevronDown, ChevronRight, Info, Dice5, Receipt } from "lucide-react";
+import { RefreshCw, Clock, Eye, Download, FileText, ChevronDown, ChevronRight, Info, Dice5, Receipt, ShieldCheck } from "lucide-react";
 import { TechnicianIncidentReportDialog } from "@/components/incident-reports/TechnicianIncidentReportDialog";
 import { JobDetailsDialog } from "@/components/jobs/JobDetailsDialog";
 import { useExpensePermissions, isPermissionActive } from "@/hooks/useExpensePermissions";
@@ -20,6 +20,7 @@ import { createSignedUrl } from '@/utils/jobDocuments';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { OBLIQUE_STRATEGIES } from "./obliqueStrategies";
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
+import { isPreventiveResourceForJob } from '@/utils/preventiveResource';
 
 type Assignment = any;
 
@@ -87,6 +88,7 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
 
   const jobData = assignment.jobs || assignment.festival_jobs;
   if (!jobData) return null;
+  const isPreventiveResource = isPreventiveResourceForJob(jobData, assignment.technician_id);
 
   const jobTimezone = jobData.timezone || 'Europe/Madrid';
   let formattedDate = "Fecha desconocida";
@@ -168,6 +170,12 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
             <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
               {role}
             </span>
+            {isPreventiveResource && (
+              <Badge variant="outline" className="ml-2 border-amber-500/40 text-amber-700 dark:text-amber-200">
+                <ShieldCheck className="mr-1 h-3 w-3" />
+                Recurso preventivo
+              </Badge>
+            )}
           </div>
         </div>
 

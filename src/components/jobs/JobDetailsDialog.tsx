@@ -68,6 +68,7 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
           timesheets(technician_id, date, is_active, is_schedule_only),
           job_date_types(date, type),
           tour_date:tour_dates(date, start_date, end_date, tour_date_type),
+          preventive_resource:profiles!jobs_preventive_resource_technician_id_fkey(id, first_name, last_name, department, role, profile_picture_url),
           job_documents(id, file_name, file_path, uploaded_at, file_size, visible_to_tech, read_only, template_type),
           logistics_events(id, event_type, transport_type, event_date, event_time, license_plate)
         `
@@ -294,7 +295,12 @@ const JobDetailsDialogComponent: React.FC<JobDetailsDialogProps> = ({ open, onOp
               )}
 
               {!isDryhire && (
-                <JobDetailsPersonnelTab jobDetails={jobDetails} isJobLoading={isJobLoading} department={department} />
+                <JobDetailsPersonnelTab
+                  jobDetails={jobDetails}
+                  isJobLoading={isJobLoading}
+                  department={department}
+                  canManagePreventiveResource={canSeeAutoStaffing}
+                />
               )}
 
               {!isDryhire && canSeeAutoStaffing && (
