@@ -13,7 +13,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { getAutonomoBadgeLabel } from '@/utils/autonomo';
 import { JobPayoutOverrideSection, type JobPayoutOverride } from '@/components/jobs/JobPayoutOverrideSection';
 import type { TechnicianDateRateMode } from '@/hooks/useTechnicianRateModeDates';
-import type { JobPayoutTotals } from '@/types/jobExtras';
+import { labelForJobExtraType, type JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { surface, controlButton, NON_AUTONOMO_DEDUCTION_EUR } from './types';
@@ -397,7 +397,7 @@ export function TechnicianPayoutCard({
                 {payout.extras_breakdown.items.map((item, idx) => (
                   <div key={idx} className="flex justify-between text-xs text-muted-foreground">
                     <span>
-                      {item.extra_type.replace(/_/g, ' ')} x {item.quantity}
+                      {labelForJobExtraType(item.extra_type)} x {item.quantity}
                     </span>
                     <span>{formatCurrency(item.amount_eur)}</span>
                   </div>

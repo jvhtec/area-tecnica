@@ -1,4 +1,7 @@
+import { PREVENTIVE_RESOURCE_EXTRA_TYPE } from '@/utils/preventiveResource';
+
 export type JobExtraType = 'travel_half' | 'travel_full' | 'day_off' | 'conduccion';
+export type JobExtraBreakdownType = JobExtraType | typeof PREVENTIVE_RESOURCE_EXTRA_TYPE;
 
 export interface JobExtra {
   job_id: string;
@@ -12,7 +15,7 @@ export interface JobExtra {
 }
 
 export interface JobExtraItem {
-  extra_type: JobExtraType;
+  extra_type: JobExtraBreakdownType;
   quantity: number;
   unit_eur: number;
   amount_eur: number;
@@ -65,6 +68,19 @@ export const EXTRA_TYPE_LABELS: Record<JobExtraType, string> = {
   day_off: 'Day Off',
   conduccion: 'Conducción'
 };
+
+export const JOB_EXTRA_BREAKDOWN_LABELS: Record<JobExtraBreakdownType, string> = {
+  ...EXTRA_TYPE_LABELS,
+  [PREVENTIVE_RESOURCE_EXTRA_TYPE]: 'Recurso preventivo',
+};
+
+export function labelForJobExtraType(extraType: string): string {
+  if (extraType === PREVENTIVE_RESOURCE_EXTRA_TYPE) {
+    return JOB_EXTRA_BREAKDOWN_LABELS[PREVENTIVE_RESOURCE_EXTRA_TYPE];
+  }
+
+  return extraType.replace(/_/g, ' ');
+}
 
 export const EXTRA_TYPE_LIMITS: Record<JobExtraType, number> = {
   travel_half: 2,

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { formatInTimeZone } from 'date-fns-tz';
-import { MapPin, Clock, User, FileText, Lightbulb, Receipt, Users, Radio } from 'lucide-react';
+import { MapPin, Clock, User, FileText, Lightbulb, Receipt, Users, Radio, ShieldCheck } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { labelForCode } from '@/utils/roles';
 import { TechnicianIncidentReportDialog } from '@/components/incident-reports/TechnicianIncidentReportDialog';
@@ -11,6 +11,7 @@ import { useJobExpenses } from '@/hooks/useJobExpenses';
 import { ExpenseForm, ExpenseList, ExpenseSummaryCard } from '@/components/expenses';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { JobCardProps } from './types';
+import { isPreventiveResourceForJob } from '@/utils/preventiveResource';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -48,6 +49,7 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
     else if (job.role) roleLabel = job.role;
 
     const location = jobData?.location?.name || 'Sin ubicación';
+    const isPreventiveResource = isPreventiveResourceForJob(jobData, job.technician_id);
 
     // Status color
     const statusColors: Record<string, string> = {
@@ -125,6 +127,11 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
                 <div className={`flex items-center gap-1.5 px-2 py-1 rounded ${isDark ? 'bg-white/5 border border-white/5' : 'bg-slate-100 border border-slate-200'}`}>
                     <User size={12} /> {roleLabel}
                 </div>
+                {isPreventiveResource && (
+                    <div className={`flex items-center gap-1.5 px-2 py-1 rounded font-semibold ${isDark ? 'bg-amber-500/10 border border-amber-500/20 text-amber-300' : 'bg-amber-50 border border-amber-200 text-amber-800'}`}>
+                        <ShieldCheck size={12} /> Recurso preventivo
+                    </div>
+                )}
             </div>
 
             {/* Action Grid */}

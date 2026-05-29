@@ -20,6 +20,7 @@ import { sendTourJobEmails } from "@/lib/tour-payout-email";
 import { getAutonomoBadgeLabel } from "@/utils/autonomo";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import type { TechnicianProfile } from "@/utils/rates-pdf-export";
+import { labelForJobExtraType } from "@/types/jobExtras";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -503,7 +504,7 @@ export const TourRatesPanel: React.FC<TourRatesPanelProps> = ({
                           {quote.extras.items.map((item, idx) => (
                             <div key={idx} className="flex justify-between text-sm text-green-700">
                               <span>
-                                {item.extra_type.replace('_', ' ')} × {item.quantity}
+                                {labelForJobExtraType(item.extra_type)} × {item.quantity}
                                 {item.is_house_tech_rate && (
                                   <span className="ml-1 text-xs text-blue-600">(plantilla)</span>
                                 )}

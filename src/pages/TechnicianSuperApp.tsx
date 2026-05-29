@@ -212,6 +212,7 @@ export default function TechnicianSuperApp() {
             job_type,
             color,
             status,
+            preventive_resource_technician_id,
             location:locations(name),
             job_documents(
               id,

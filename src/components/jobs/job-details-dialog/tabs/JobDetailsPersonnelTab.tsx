@@ -7,7 +7,9 @@ import { TabsContent } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { PreventiveResourceSelector } from "@/components/jobs/job-details-dialog/PreventiveResourceSelector";
 import { labelForCode } from "@/utils/roles";
+import { isPreventiveResourceForJob } from "@/utils/preventiveResource";
 import { getScheduledWorkDateKeys, resolveAssignmentWorkDateKeys } from "@/utils/assignmentWorkDates";
 
 const MADRID_TIME_ZONE = "Europe/Madrid";
@@ -16,9 +18,15 @@ interface JobDetailsPersonnelTabProps {
   jobDetails: any;
   isJobLoading: boolean;
   department?: string;
+  canManagePreventiveResource?: boolean;
 }
 
-export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ jobDetails, isJobLoading, department }) => {
+export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({
+  jobDetails,
+  isJobLoading,
+  department,
+  canManagePreventiveResource = false,
+}) => {
   const normalizedDepartment = department?.toLowerCase?.() ?? null;
 
   const filteredAssignments = useMemo(() => {
@@ -83,6 +91,16 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
 
   return (
     <TabsContent value="personnel" className="space-y-4 min-w-0 overflow-x-hidden">
+      {jobDetails?.id && (
+        <PreventiveResourceSelector
+          jobId={jobDetails.id}
+          assignments={jobDetails.job_assignments ?? []}
+          selectedTechnicianId={jobDetails.preventive_resource_technician_id}
+          selectedProfile={jobDetails.preventive_resource}
+          canManage={canManagePreventiveResource}
+        />
+      )}
+
       <Card className="p-4 w-full min-w-0 overflow-hidden">
         <h3 className="font-semibold mb-4 flex items-center gap-2">
           <Users className="h-4 w-4" />
@@ -146,6 +164,11 @@ export const JobDetailsPersonnelTab: React.FC<JobDetailsPersonnelTabProps> = ({ 
                   {assignment.video_role && (
                     <Badge variant="outline" className="text-xs">
                       Vídeo: {labelForCode(assignment.video_role)}
+                    </Badge>
+                  )}
+                  {isPreventiveResourceForJob(jobDetails, assignment.technician_id) && (
+                    <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-700 dark:text-amber-200">
+                      Recurso preventivo
                     </Badge>
                   )}
                   {workDateKeys.length > 0 && (
