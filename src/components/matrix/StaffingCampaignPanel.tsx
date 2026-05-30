@@ -520,7 +520,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
       return payload
     },
     onSuccess: () => {
-      toast({ title: campaign?.status === 'stopped' ? 'Campaign restarted' : 'Campaign resumed' })
+      toast({ title: campaign?.status === 'stopped' ? 'Campaña reiniciada' : 'Campaña reanudada' })
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', jobId, department) })
     }
   })
@@ -1287,7 +1287,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
               onClick={() => resumeMutation.mutate()}
               disabled={resumeMutation.isPending}
             >
-              Restart
+              Reiniciar
             </Button>
           ) : null}
         </div>

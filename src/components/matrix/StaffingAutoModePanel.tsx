@@ -206,7 +206,7 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
   const progress = calculateProgress()
   const canResumeCampaign = campaign.status === 'paused' || campaign.status === 'stopped'
   const canStopCampaign = campaign.status === 'active' || campaign.status === 'paused'
-  const resumeActionLabel = campaign.status === 'stopped' ? 'Restart' : 'Resume'
+  const resumeActionLabel = campaign.status === 'stopped' ? 'Reiniciar' : 'Reanudar'
 
   return (
     <div className="space-y-4">
