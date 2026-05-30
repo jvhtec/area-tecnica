@@ -149,7 +149,7 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
                       : campaign.status === 'completed'
                         ? 'Campaign completed - all roles filled!'
                         : campaign.status === 'stopped'
-                          ? 'Campaign has been stopped.'
+                          ? 'Campaign has been stopped. Restart it from the Settings tab.'
                           : 'Campaign encountered an error.'}
                 </p>
               </div>

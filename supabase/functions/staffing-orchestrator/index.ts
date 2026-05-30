@@ -620,7 +620,7 @@ async function pauseCampaign(
   }
 }
 
-// RESUME action: Resume paused campaign
+// RESUME action: Resume paused or stopped campaign
 async function resumeCampaign(
   supabase: ReturnType<typeof createClient>,
   user: any,
@@ -648,8 +648,8 @@ async function resumeCampaign(
       return { status: 403, body: { error: 'Not authorized' } };
     }
 
-    if (campaign.status !== 'paused') {
-      return { status: 400, body: { error: 'Campaign must be paused to resume' } };
+    if (!['paused', 'stopped'].includes(campaign.status)) {
+      return { status: 400, body: { error: 'Campaign must be paused or stopped to resume' } };
     }
 
     const { data: updated } = await supabase

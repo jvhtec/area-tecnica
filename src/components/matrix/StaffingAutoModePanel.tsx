@@ -84,7 +84,11 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
       return payload
     },
     onSuccess: () => {
-      toast({ title: `${CARLOS_AGENT_NAME} reanudado` })
+      toast({
+        title: campaign.status === 'stopped'
+          ? `${CARLOS_AGENT_NAME} reiniciado`
+          : `${CARLOS_AGENT_NAME} reanudado`,
+      })
       invalidateAll()
     },
     onError: (error: any) => {
@@ -200,6 +204,9 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
   }
 
   const progress = calculateProgress()
+  const canResumeCampaign = campaign.status === 'paused' || campaign.status === 'stopped'
+  const canStopCampaign = campaign.status === 'active' || campaign.status === 'paused'
+  const resumeActionLabel = campaign.status === 'stopped' ? 'Restart' : 'Resume'
 
   return (
     <div className="space-y-4">
@@ -371,7 +378,7 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
               </>
             )}
 
-            {campaign.status === 'paused' && (
+            {canResumeCampaign && (
               <Button
                 size="sm"
                 onClick={() => {
@@ -381,22 +388,24 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
                 className="gap-2"
               >
                 <Play size={16} />
-                Resume
+                {resumeActionLabel}
               </Button>
             )}
 
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => {
-                stopMutation.mutate()
-              }}
-              disabled={stopMutation.isPending}
-              className="gap-2 ml-auto"
-            >
-              <Square size={16} />
-              Stop
-            </Button>
+            {canStopCampaign && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  stopMutation.mutate()
+                }}
+                disabled={stopMutation.isPending}
+                className="gap-2 ml-auto"
+              >
+                <Square size={16} />
+                Stop
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
