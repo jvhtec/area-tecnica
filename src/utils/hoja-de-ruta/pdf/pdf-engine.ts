@@ -6,13 +6,19 @@ import { HeaderSection } from './sections/header-section';
 import { CoverSection } from './sections/cover-section';
 import { ContentSections } from './sections/content-sections';
 import { FooterService } from './services/footer-service';
+import {
+  getHojaDeRutaPdfSectionFilenameLabel,
+  getHojaDeRutaPdfSelectionLabel,
+} from '@/utils/hoja-de-ruta/pdf/section-options';
+import type { HojaDeRutaPdfSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
 
 export class PDFEngine {
   private pdfDoc: PDFDocument;
   private headerSection: HeaderSection;
-  private coverSection: CoverSection;
   private contentSections: ContentSections;
   private logoData?: string;
+  private hasCoverPage = true;
+  private renderedSectionCount = 0;
 
   constructor(private options: PDFGenerationOptions) {
     this.pdfDoc = new PDFDocument();
@@ -22,14 +28,17 @@ export class PDFEngine {
 
   async generate(): Promise<void> {
     const {
-      eventData,
       selectedJobId,
       jobTitle,
       toast,
-      travelArrangements,
-      accommodations = [],
-      venueMapPreview
     } = this.options;
+    const selectedSections = this.options.sections?.length ? this.options.sections : undefined;
+    const sectionSelection = selectedSections ? new Set(selectedSections) : undefined;
+    const selectedSectionLabel = selectedSections
+      ? getHojaDeRutaPdfSelectionLabel(selectedSections) ?? "Secciones seleccionadas"
+      : undefined;
+    this.hasCoverPage = !sectionSelection;
+    this.renderedSectionCount = 0;
 
     try {
       // Load logo first (used on cover and in page header)
@@ -62,146 +71,38 @@ export class PDFEngine {
         this.pdfDoc,
         jobTitle,
         this.options.jobDate,
-        'Hoja de Ruta',
+        selectedSections
+          ? `Hoja de Ruta - ${selectedSectionLabel}`
+          : 'Hoja de Ruta',
         this.logoData || undefined,
         headerLogoDims
       );
       
-      // Generate cover page
-      const coverSection = new CoverSection(this.pdfDoc, this.options.eventData, this.options.jobTitle, this.logoData);
-      await coverSection.generateCoverPage();
-
-      // Each major section starts on a new page as per requirements
-      // 2. Job Details and Venue (combined on same page)
-      if (this.contentSections.hasEventDetailsData(this.options.eventData) || this.contentSections.hasVenueData(this.options.eventData)) {
-        let currentY = this.headerSection.addSectionHeader("Detalles y Venue");
-        
-        if (this.contentSections.hasEventDetailsData(this.options.eventData)) {
-          currentY = this.contentSections.addEventDetailsSection(this.options.eventData, currentY);
-        }
-        
-        if (this.contentSections.hasVenueData(this.options.eventData)) {
-          currentY = await this.contentSections.addVenueSection(
-            this.options.eventData, 
-            this.options.venueMapPreview, 
-            currentY,
-            this.options.imagePreviews?.venue
-          );
-        }
+      if (this.hasCoverPage) {
+        const coverSection = new CoverSection(this.pdfDoc, this.options.eventData, this.options.jobTitle, this.logoData);
+        await coverSection.generateCoverPage();
       }
 
-      // 3. Weather section
-      if (this.contentSections.hasWeatherData(this.options.eventData)) {
-        const currentY = this.headerSection.addSectionHeader("Clima");
-        this.contentSections.addWeatherSection(this.options.eventData, currentY);
+      if (sectionSelection) {
+        await this.generateSelectedSections(sectionSelection);
+        if (this.renderedSectionCount === 0) {
+          this.addEmptySectionPage(selectedSections);
+        }
       } else {
-        // Attempt to fetch weather on-the-fly if missing
-        try {
-          const { getWeatherForJob } = await import('@/utils/weather/weatherApi');
-          if (this.options.eventData?.venue && this.options.eventData?.eventDates) {
-            const weather = await getWeatherForJob(
-              this.options.eventData.venue,
-              this.options.eventData.eventDates
-            );
-            if (weather && weather.length > 0) {
-              (this.options.eventData as any).weather = weather;
-              const currentY = this.headerSection.addSectionHeader("Clima");
-              this.contentSections.addWeatherSection(this.options.eventData, currentY);
-            }
-          }
-        } catch (e) {
-          console.warn('Weather fetch during PDF generation failed:', e);
-        }
-      }
-
-      // 4. Contactos
-      if (this.contentSections.hasContactsData(this.options.eventData)) {
-        const currentY = this.headerSection.addSectionHeader("Contactos");
-        this.contentSections.addContactsSection(this.options.eventData, currentY);
-      }
-
-      // 5. Personal
-      if (this.contentSections.hasStaffData(this.options.eventData)) {
-        const currentY = this.headerSection.addSectionHeader("Personal");
-        this.contentSections.addStaffSection(this.options.eventData, currentY);
-      }
-
-      // Defaults for rendering options
-      const includeAccommodationRooming = this.options.includeAccommodationRooming ?? true;
-      const includeAggregatedRooming = this.options.includeAggregatedRooming ?? false;
-      const includeTravelArrangements = this.options.includeTravelArrangements ?? true;
-      const includeLogisticsTransport = this.options.includeLogisticsTransport ?? true;
-
-      // 6. Viajes
-      if (includeTravelArrangements && this.contentSections.hasTravelData(this.options.travelArrangements)) {
-        const currentY = this.headerSection.addSectionHeader("Viajes");
-        await this.contentSections.addTravelSection(
-          this.options.travelArrangements, 
-          this.options.eventData?.venue?.address,
-          currentY
-        );
-      }
-
-      // 7. Alojamientos
-      if (this.contentSections.hasAccommodationData(this.options.accommodations)) {
-        const currentY = this.headerSection.addSectionHeader("Alojamientos");
-        await this.contentSections.addAccommodationSection(
-          this.options.accommodations || [], 
-          this.options.eventData, 
-          currentY,
-          includeAccommodationRooming === false && includeAggregatedRooming === true // suppress per-hotel rooms when we show aggregated
-        );
-      }
-
-      // 8. Rooming (aggregated)
-      if (includeAggregatedRooming && this.contentSections.hasRoomingData(this.options.accommodations)) {
-        const currentY = this.headerSection.addSectionHeader("Rooming");
-        this.contentSections.addRoomingSection(
-          this.options.accommodations || [], 
-          this.options.eventData, 
-          currentY
-        );
-      }
-
-      // 9. Transportes
-      if (includeLogisticsTransport && this.contentSections.hasLogisticsData(this.options.eventData)) {
-        const currentY = this.headerSection.addSectionHeader("Transportes");
-        this.contentSections.addLogisticsSection(this.options.eventData, currentY);
-      }
-
-      // 10. Power Requirements
-      if (this.contentSections.hasPowerData(this.options.eventData)) {
-        const currentY = this.headerSection.addSectionHeader("Requerimientos eléctricos");
-        this.contentSections.addPowerSection(this.options.eventData, currentY);
-      }
-
-      // 11. Necesidades Auxiliares
-      if (this.contentSections.hasAuxNeedsData(this.options.eventData)) {
-        const currentY = this.headerSection.addSectionHeader("Necesidades auxiliares");
-        this.contentSections.addAuxNeedsSection(this.options.eventData, currentY);
-      }
-
-      // 12. Programa
-      if (this.contentSections.hasProgramData(this.options.eventData)) {
-        const currentY = this.headerSection.addSectionHeader("Programa");
-        this.contentSections.addProgramSection(this.options.eventData, currentY);
-      }
-
-      // 13. Restaurantes
-      if (this.contentSections.hasRestaurantsData(this.options.eventData)) {
-        const currentY = this.headerSection.addSectionHeader("Restaurantes");
-        await this.contentSections.addRestaurantsSection(this.options.eventData, currentY);
+        await this.generateFullDocument();
       }
 
       // Add Sector-Pro footer to all pages with page numbers and job name
-      await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle);
+      await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle, { hasCoverPage: this.hasCoverPage });
 
       // Save and upload PDF
       await this.saveAndUploadPDF();
-      
+
       toast?.({
         title: "✅ Documento generado",
-        description: "La hoja de ruta ha sido generada y descargada correctamente.",
+        description: selectedSectionLabel
+          ? `${selectedSectionLabel} se ha generado y descargado correctamente.`
+          : "La hoja de ruta ha sido generada y descargada correctamente.",
       });
 
     } catch (error) {
@@ -215,8 +116,228 @@ export class PDFEngine {
     }
   }
 
+  private async generateFullDocument(): Promise<void> {
+    // Each major section starts on a new page as per requirements.
+    if (this.contentSections.hasEventDetailsData(this.options.eventData) || this.contentSections.hasVenueData(this.options.eventData)) {
+      let currentY = this.addSectionHeader("Detalles y Venue");
+
+      if (this.contentSections.hasEventDetailsData(this.options.eventData)) {
+        currentY = this.contentSections.addEventDetailsSection(this.options.eventData, currentY);
+      }
+
+      if (this.contentSections.hasVenueData(this.options.eventData)) {
+        await this.contentSections.addVenueSection(
+          this.options.eventData,
+          this.options.venueMapPreview,
+          currentY,
+          this.options.imagePreviews?.venue
+        );
+      }
+    }
+
+    await this.addWeatherSectionIfAvailable();
+
+    if (this.contentSections.hasContactsData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Contactos");
+      this.contentSections.addContactsSection(this.options.eventData, currentY);
+    }
+
+    if (this.contentSections.hasStaffData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Personal");
+      this.contentSections.addStaffSection(this.options.eventData, currentY);
+    }
+
+    const includeAccommodationRooming = this.options.includeAccommodationRooming ?? true;
+    const includeAggregatedRooming = this.options.includeAggregatedRooming ?? false;
+    const includeTravelArrangements = this.options.includeTravelArrangements ?? true;
+    const includeLogisticsTransport = this.options.includeLogisticsTransport ?? true;
+
+    if (includeTravelArrangements && this.contentSections.hasTravelData(this.options.travelArrangements)) {
+      const currentY = this.addSectionHeader("Viajes");
+      await this.contentSections.addTravelSection(
+        this.options.travelArrangements,
+        this.options.eventData?.venue?.address,
+        currentY
+      );
+    }
+
+    if (this.contentSections.hasAccommodationData(this.options.accommodations)) {
+      const currentY = this.addSectionHeader("Alojamientos");
+      await this.contentSections.addAccommodationSection(
+        this.options.accommodations || [],
+        this.options.eventData,
+        currentY,
+        includeAccommodationRooming === false && includeAggregatedRooming === true
+      );
+    }
+
+    if (includeAggregatedRooming && this.contentSections.hasRoomingData(this.options.accommodations)) {
+      const currentY = this.addSectionHeader("Rooming");
+      this.contentSections.addRoomingSection(
+        this.options.accommodations || [],
+        this.options.eventData,
+        currentY
+      );
+    }
+
+    if (includeLogisticsTransport && this.contentSections.hasLogisticsData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Transportes");
+      this.contentSections.addLogisticsSection(this.options.eventData, currentY);
+    }
+
+    if (this.contentSections.hasPowerData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Requerimientos eléctricos");
+      this.contentSections.addPowerSection(this.options.eventData, currentY);
+    }
+
+    if (this.contentSections.hasAuxNeedsData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Necesidades auxiliares");
+      this.contentSections.addAuxNeedsSection(this.options.eventData, currentY);
+    }
+
+    if (this.contentSections.hasProgramData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Programa");
+      this.contentSections.addProgramSection(this.options.eventData, currentY);
+    }
+
+    if (this.contentSections.hasRestaurantsData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Restaurantes");
+      await this.contentSections.addRestaurantsSection(this.options.eventData, currentY);
+    }
+  }
+
+  private async generateSelectedSections(sectionSelection: Set<HojaDeRutaPdfSectionId>): Promise<void> {
+    if (sectionSelection.has("event")) {
+      if (this.contentSections.hasEventDetailsData(this.options.eventData)) {
+        const currentY = this.addSectionHeader("Evento");
+        this.contentSections.addEventDetailsSection(this.options.eventData, currentY);
+      }
+
+      if (this.contentSections.hasAuxNeedsData(this.options.eventData)) {
+        const currentY = this.addSectionHeader("Necesidades auxiliares");
+        this.contentSections.addAuxNeedsSection(this.options.eventData, currentY);
+      }
+    }
+
+    if (sectionSelection.has("venue") && this.hasVenueExportData()) {
+      const currentY = this.addSectionHeader("Venue");
+      await this.contentSections.addVenueSection(
+        this.options.eventData,
+        this.options.venueMapPreview,
+        currentY,
+        this.options.imagePreviews?.venue
+      );
+    }
+
+    if (sectionSelection.has("weather")) {
+      await this.addWeatherSectionIfAvailable();
+    }
+
+    if (sectionSelection.has("contacts") && this.contentSections.hasContactsData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Contactos");
+      this.contentSections.addContactsSection(this.options.eventData, currentY);
+    }
+
+    if (sectionSelection.has("staff") && this.contentSections.hasStaffData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Personal");
+      this.contentSections.addStaffSection(this.options.eventData, currentY);
+    }
+
+    if (sectionSelection.has("travel") && this.contentSections.hasTravelData(this.options.travelArrangements)) {
+      const currentY = this.addSectionHeader("Viajes");
+      await this.contentSections.addTravelSection(
+        this.options.travelArrangements,
+        this.options.eventData?.venue?.address,
+        currentY
+      );
+    }
+
+    if (sectionSelection.has("accommodation") && this.contentSections.hasAccommodationData(this.options.accommodations)) {
+      const currentY = this.addSectionHeader("Alojamiento");
+      await this.contentSections.addAccommodationSection(
+        this.options.accommodations || [],
+        this.options.eventData,
+        currentY
+      );
+    }
+
+    if (sectionSelection.has("logistics") && this.contentSections.hasLogisticsData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Logística");
+      this.contentSections.addLogisticsSection(this.options.eventData, currentY);
+    }
+
+    if (sectionSelection.has("schedule")) {
+      if (this.contentSections.hasProgramData(this.options.eventData)) {
+        const currentY = this.addSectionHeader("Programa");
+        this.contentSections.addProgramSection(this.options.eventData, currentY);
+      }
+
+      if (this.contentSections.hasPowerData(this.options.eventData)) {
+        const currentY = this.addSectionHeader("Requerimientos eléctricos");
+        this.contentSections.addPowerSection(this.options.eventData, currentY);
+      }
+    }
+
+    if (sectionSelection.has("restaurants") && this.contentSections.hasRestaurantsData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Restaurantes");
+      await this.contentSections.addRestaurantsSection(this.options.eventData, currentY);
+    }
+  }
+
+  private async addWeatherSectionIfAvailable(): Promise<void> {
+    if (this.contentSections.hasWeatherData(this.options.eventData)) {
+      const currentY = this.addSectionHeader("Clima");
+      this.contentSections.addWeatherSection(this.options.eventData, currentY);
+      return;
+    }
+
+    try {
+      const { getWeatherForJob } = await import('@/utils/weather/weatherApi');
+      if (this.options.eventData?.venue && this.options.eventData?.eventDates) {
+        const weather = await getWeatherForJob(
+          this.options.eventData.venue,
+          this.options.eventData.eventDates
+        );
+        if (weather && weather.length > 0) {
+          const eventDataWithWeather = {
+            ...this.options.eventData,
+            weather,
+          };
+          const currentY = this.addSectionHeader("Clima");
+          this.contentSections.addWeatherSection(eventDataWithWeather, currentY);
+        }
+      }
+    } catch (e) {
+      console.warn('Weather fetch during PDF generation failed:', e);
+    }
+  }
+
+  private addSectionHeader(title: string): number {
+    const currentY = this.headerSection.addSectionHeader(title, 55, {
+      startOnNewPage: this.hasCoverPage || this.renderedSectionCount > 0,
+    });
+    this.renderedSectionCount += 1;
+    return currentY;
+  }
+
+  private addEmptySectionPage(sectionIds: readonly HojaDeRutaPdfSectionId[] | undefined): void {
+    const title = getHojaDeRutaPdfSelectionLabel(sectionIds) ?? "Hoja de Ruta";
+    const currentY = this.addSectionHeader(title);
+    this.pdfDoc.setText(11, [80, 80, 80]);
+    this.pdfDoc.addText("No hay datos disponibles para esta sección.", 20, currentY);
+  }
+
+  private hasVenueExportData(): boolean {
+    return this.contentSections.hasVenueData(this.options.eventData) ||
+      Boolean(this.options.venueMapPreview) ||
+      Boolean(this.options.imagePreviews?.venue?.length);
+  }
+
   private async saveAndUploadPDF(): Promise<void> {
     const { eventData, selectedJobId, jobTitle } = this.options;
+    const sectionFilenameLabel = this.options.sections?.length === 1
+      ? getHojaDeRutaPdfSectionFilenameLabel(this.options.sections[0])
+      : undefined;
     
     // Generate filename
     const eventName = eventData.eventName || jobTitle || 'Evento';
@@ -224,7 +345,8 @@ export class PDFEngine {
     const nowIso = new Date().toISOString();
     const datePart = nowIso.slice(0, 10); // YYYY-MM-DD (UTC)
     const timePart = nowIso.slice(11, 19).replace(/:/g, '-'); // HH-MM-SS (UTC)
-    const filename = `Hoja de Ruta - ${safeEventName} - ${datePart} ${timePart}.pdf`;
+    const sectionPart = sectionFilenameLabel ? ` - ${sectionFilenameLabel}` : "";
+    const filename = `Hoja de Ruta${sectionPart} - ${safeEventName} - ${datePart} ${timePart}.pdf`;
 
     // Save locally
     this.pdfDoc.save(filename);

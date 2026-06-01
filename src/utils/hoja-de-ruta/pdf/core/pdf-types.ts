@@ -7,6 +7,7 @@ import type {
   WeatherData,
   ImagePreviews
 } from '@/types/hoja-de-ruta';
+import type { HojaDeRutaPdfSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
 
 export type {
   EventData,
@@ -35,6 +36,7 @@ export interface PDFGenerationOptions {
   includeTravelArrangements?: boolean;
   includeLogisticsTransport?: boolean;
   dedupeTransportAcrossSections?: boolean;
+  sections?: HojaDeRutaPdfSectionId[];
 }
 
 export interface DriverCertificatePDFGenerationOptions {

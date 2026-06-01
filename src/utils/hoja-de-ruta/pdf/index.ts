@@ -1,8 +1,14 @@
-export { PDFEngine } from './pdf-engine';
-export type { DriverCertificatePDFGenerationOptions, PDFGenerationOptions } from './core/pdf-types';
-import { PDFEngine } from './pdf-engine';
-import { DriverCertificatePDFEngine } from './driver-certificate-pdf-engine';
-import type { DriverCertificatePDFGenerationOptions } from './core/pdf-types';
+export { PDFEngine } from '@/utils/hoja-de-ruta/pdf/pdf-engine';
+export {
+  getHojaDeRutaPdfSectionLabel,
+  getHojaDeRutaPdfSelectionLabel,
+  HOJA_DE_RUTA_PDF_SECTIONS
+} from '@/utils/hoja-de-ruta/pdf/section-options';
+export type { DriverCertificatePDFGenerationOptions, PDFGenerationOptions } from '@/utils/hoja-de-ruta/pdf/core/pdf-types';
+export type { HojaDeRutaPdfSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
+import { PDFEngine } from '@/utils/hoja-de-ruta/pdf/pdf-engine';
+import { DriverCertificatePDFEngine } from '@/utils/hoja-de-ruta/pdf/driver-certificate-pdf-engine';
+import type { DriverCertificatePDFGenerationOptions, PDFGenerationOptions } from '@/utils/hoja-de-ruta/pdf/core/pdf-types';
 
 // Main export function for backward compatibility
 export const generatePDF = async (
@@ -16,7 +22,8 @@ export const generatePDF = async (
   // Optional parameters to enhance headers without breaking callers
   jobDate?: string,
   toast?: any,
-  accommodations?: any[]
+  accommodations?: any[],
+  pdfOptions?: Pick<PDFGenerationOptions, 'sections'>
 ): Promise<void> => {
   const engine = new PDFEngine({
     eventData,
@@ -28,7 +35,8 @@ export const generatePDF = async (
     jobTitle,
     jobDate,
     toast,
-    accommodations
+    accommodations,
+    ...pdfOptions
   });
   
   return engine.generate();
