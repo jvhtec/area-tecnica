@@ -8,11 +8,17 @@ export class FooterService {
   private static cachedLogoData: string | null = null;
   private static cachedLogoDims: { width: number; height: number } | null = null;
 
-  static async addFooterToAllPages(pdfDoc: PDFDocument, jobName?: string): Promise<void> {
+  static async addFooterToAllPages(
+    pdfDoc: PDFDocument,
+    jobName?: string,
+    options: { hasCoverPage?: boolean } = {}
+  ): Promise<void> {
     try {
+      const hasCoverPage = options.hasCoverPage ?? true;
       // Load Sector Pro logo from public assets
       const logoData = await this.loadSectorProLogo();
       const totalPages = pdfDoc.document.getNumberOfPages();
+      const totalContentPages = hasCoverPage ? Math.max(totalPages - 1, 0) : totalPages;
       const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
       const bottomMargin = 12;
 
@@ -32,8 +38,8 @@ export class FooterService {
       for (let i = 1; i <= totalPages; i++) {
         pdfDoc.document.setPage(i);
 
-        // Skip cover page (page 1) for page numbers and footer
-        const isContentPage = i > 1;
+        // Skip cover page for full PDFs; section-only PDFs start content on page 1.
+        const isContentPage = hasCoverPage ? i > 1 : true;
 
         // Only add footer elements to content pages (skip cover page)
         if (isContentPage) {
@@ -57,7 +63,8 @@ export class FooterService {
         if (isContentPage) {
           pdfDoc.setText(8, [120, 120, 120]);
           // Page number on left
-          pdfDoc.addText(`Pág. ${i - 1} de ${totalPages - 1}`, 20, pageHeight - bottomMargin);
+          const pageNumber = hasCoverPage ? i - 1 : i;
+          pdfDoc.addText(`Pág. ${pageNumber} de ${totalContentPages}`, 20, pageHeight - bottomMargin);
           
           // Job name on right (if provided)
           if (jobName) {
@@ -69,7 +76,9 @@ export class FooterService {
     } catch (error) {
       console.error('Error adding footer to pages:', error);
       // Add fallback text footer
+      const hasCoverPage = options.hasCoverPage ?? true;
       const totalPages = pdfDoc.document.getNumberOfPages();
+      const totalContentPages = hasCoverPage ? Math.max(totalPages - 1, 0) : totalPages;
       const { width: pageWidth, height: pageHeight } = pdfDoc.dimensions;
       const bottomMargin = 12;
 
@@ -78,9 +87,10 @@ export class FooterService {
         pdfDoc.setText(8, [125, 1, 1]);
         pdfDoc.addText('Sector-Pro', pageWidth / 2, pageHeight - bottomMargin, { align: 'center' });
         
-        if (i > 1) {
+        if (hasCoverPage ? i > 1 : true) {
           pdfDoc.setText(8, [120, 120, 120]);
-          pdfDoc.addText(`Pág. ${i - 1} de ${totalPages - 1}`, 20, pageHeight - bottomMargin);
+          const pageNumber = hasCoverPage ? i - 1 : i;
+          pdfDoc.addText(`Pág. ${pageNumber} de ${totalContentPages}`, 20, pageHeight - bottomMargin);
         }
       }
     }

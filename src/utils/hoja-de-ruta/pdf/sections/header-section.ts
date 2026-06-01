@@ -11,9 +11,15 @@ export class HeaderSection {
     private smallLogoDims?: { width: number; height: number }
   ) {}
 
-  addSectionHeader(title: string, yPosition: number = 55): number {
-    // New page per section
-    this.pdfDoc.addPage();
+  addSectionHeader(
+    title: string,
+    yPosition: number = 55,
+    options: { startOnNewPage?: boolean } = {}
+  ): number {
+    // New page per section unless this is the first page of a section-only PDF.
+    if (options.startOnNewPage ?? true) {
+      this.pdfDoc.addPage();
+    }
 
     // Draw a consistent header at the very top (matches PesosTool styling)
     HeaderService.addHeaderToCurrentPage(
