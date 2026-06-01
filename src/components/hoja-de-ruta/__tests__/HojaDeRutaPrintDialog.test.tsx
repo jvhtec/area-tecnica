@@ -8,11 +8,11 @@ import { describe, expect, it, vi } from "vitest";
 import {
   HojaDeRutaPrintDialog,
   type HojaDeRutaPrintSection,
-} from "../HojaDeRutaPrintDialog";
+} from "@/components/hoja-de-ruta/HojaDeRutaPrintDialog";
 
 const sections: HojaDeRutaPrintSection[] = [
   { id: "event", label: "Evento", icon: Calendar },
-  { id: "venue", label: "Venue", icon: MapPin },
+  { id: "venue", label: "Lugar", icon: MapPin },
 ];
 
 describe("HojaDeRutaPrintDialog", () => {

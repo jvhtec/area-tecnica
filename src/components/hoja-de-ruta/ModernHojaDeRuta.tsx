@@ -65,7 +65,10 @@ import { ModernWeatherSection } from "./sections/ModernWeatherSection";
 import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
 import { HojaDeRutaPrintDialog } from "./HojaDeRutaPrintDialog";
 import { generateHojaDeRutaXLS } from "@/utils/hojaDeRutaExport";
-import type { HojaDeRutaPdfSectionId } from "@/utils/hoja-de-ruta/pdf";
+import {
+  getHojaDeRutaPdfSectionLabel,
+  type HojaDeRutaPdfSectionId,
+} from "@/utils/hoja-de-ruta/pdf";
 import type { LucideIcon } from "lucide-react";
 
 type ModernHojaDeRutaProps = {
@@ -465,18 +468,23 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     }
   };
 
-  const tabConfig: Array<{ id: HojaDeRutaPdfSectionId; label: string; icon: LucideIcon; color: string }> = [
-    { id: "event", label: "Evento", icon: Calendar, color: "text-blue-600" },
-    { id: "venue", label: "Venue", icon: MapPin, color: "text-green-600" },
-    { id: "weather", label: "Clima", icon: CloudSun, color: "text-sky-600" },
-    { id: "contacts", label: "Contactos", icon: Phone, color: "text-purple-600" },
-    { id: "staff", label: "Personal", icon: Users, color: "text-orange-600" },
-    { id: "travel", label: "Viajes", icon: Car, color: "text-cyan-600" },
-    { id: "accommodation", label: "Alojamiento", icon: Bed, color: "text-pink-600" },
-    { id: "logistics", label: "Logística", icon: Building2, color: "text-indigo-600" },
-    { id: "schedule", label: "Programa", icon: Activity, color: "text-red-600" },
-    { id: "restaurants", label: "Restaurantes", icon: UtensilsCrossed, color: "text-emerald-600" },
+  const tabPresentationConfig: Array<{ id: HojaDeRutaPdfSectionId; icon: LucideIcon; color: string }> = [
+    { id: "event", icon: Calendar, color: "text-blue-600" },
+    { id: "venue", icon: MapPin, color: "text-green-600" },
+    { id: "weather", icon: CloudSun, color: "text-sky-600" },
+    { id: "contacts", icon: Phone, color: "text-purple-600" },
+    { id: "staff", icon: Users, color: "text-orange-600" },
+    { id: "travel", icon: Car, color: "text-cyan-600" },
+    { id: "accommodation", icon: Bed, color: "text-pink-600" },
+    { id: "logistics", icon: Building2, color: "text-indigo-600" },
+    { id: "schedule", icon: Activity, color: "text-red-600" },
+    { id: "restaurants", icon: UtensilsCrossed, color: "text-emerald-600" },
   ];
+
+  const tabConfig: Array<{ id: HojaDeRutaPdfSectionId; label: string; icon: LucideIcon; color: string }> = tabPresentationConfig.map((section) => ({
+    ...section,
+    label: getHojaDeRutaPdfSectionLabel(section.id),
+  }));
 
   if (isLoadingHojaDeRuta) {
     return (

@@ -1,6 +1,6 @@
 export const HOJA_DE_RUTA_PDF_SECTIONS = [
   { id: "event", label: "Evento", filenameLabel: "Evento" },
-  { id: "venue", label: "Venue", filenameLabel: "Venue" },
+  { id: "venue", label: "Lugar", filenameLabel: "Lugar" },
   { id: "weather", label: "Clima", filenameLabel: "Clima" },
   { id: "contacts", label: "Contactos", filenameLabel: "Contactos" },
   { id: "staff", label: "Personal", filenameLabel: "Personal" },

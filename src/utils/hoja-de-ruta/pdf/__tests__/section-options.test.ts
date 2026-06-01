@@ -6,7 +6,7 @@ import {
   getHojaDeRutaPdfSelectionLabel,
   HOJA_DE_RUTA_PDF_SECTIONS,
   isHojaDeRutaPdfSectionId,
-} from "../section-options";
+} from "@/utils/hoja-de-ruta/pdf/section-options";
 
 describe("hoja de ruta PDF section options", () => {
   it("matches the quick navigation sections", () => {
@@ -27,6 +27,8 @@ describe("hoja de ruta PDF section options", () => {
   it("labels single and multi-section exports", () => {
     expect(getHojaDeRutaPdfSectionLabel("logistics")).toBe("Logística");
     expect(getHojaDeRutaPdfSectionFilenameLabel("logistics")).toBe("Logistica");
+    expect(getHojaDeRutaPdfSectionLabel("venue")).toBe("Lugar");
+    expect(getHojaDeRutaPdfSectionFilenameLabel("venue")).toBe("Lugar");
     expect(getHojaDeRutaPdfSelectionLabel(["contacts"])).toBe("Contactos");
     expect(getHojaDeRutaPdfSelectionLabel(["contacts", "staff"])).toBe("Secciones seleccionadas");
     expect(getHojaDeRutaPdfSelectionLabel()).toBeUndefined();

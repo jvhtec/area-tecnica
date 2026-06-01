@@ -9,8 +9,8 @@ import { FooterService } from './services/footer-service';
 import {
   getHojaDeRutaPdfSectionFilenameLabel,
   getHojaDeRutaPdfSelectionLabel,
-} from './section-options';
-import type { HojaDeRutaPdfSectionId } from './section-options';
+} from '@/utils/hoja-de-ruta/pdf/section-options';
+import type { HojaDeRutaPdfSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
 
 export class PDFEngine {
   private pdfDoc: PDFDocument;
@@ -299,9 +299,12 @@ export class PDFEngine {
           this.options.eventData.eventDates
         );
         if (weather && weather.length > 0) {
-          (this.options.eventData as any).weather = weather;
+          const eventDataWithWeather = {
+            ...this.options.eventData,
+            weather,
+          };
           const currentY = this.addSectionHeader("Clima");
-          this.contentSections.addWeatherSection(this.options.eventData, currentY);
+          this.contentSections.addWeatherSection(eventDataWithWeather, currentY);
         }
       }
     } catch (e) {

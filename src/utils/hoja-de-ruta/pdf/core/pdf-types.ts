@@ -7,7 +7,7 @@ import type {
   WeatherData,
   ImagePreviews
 } from '@/types/hoja-de-ruta';
-import type { HojaDeRutaPdfSectionId } from '../section-options';
+import type { HojaDeRutaPdfSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
 
 export type {
   EventData,
