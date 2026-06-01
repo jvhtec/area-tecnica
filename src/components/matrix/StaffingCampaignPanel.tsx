@@ -515,11 +515,12 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
           body: JSON.stringify({ campaign_id: campaign?.id })
         }
       )
-      if (!response.ok) throw new Error('Failed to resume campaign')
-      return response.json()
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.error || 'Failed to resume campaign')
+      return payload
     },
     onSuccess: () => {
-      toast({ title: 'Campaign resumed' })
+      toast({ title: campaign?.status === 'stopped' ? 'Campaña reiniciada' : 'Campaña reanudada' })
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', jobId, department) })
     }
   })
@@ -1280,6 +1281,14 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                 Stop
               </Button>
             </>
+          ) : campaign.status === 'stopped' ? (
+            <Button
+              size="sm"
+              onClick={() => resumeMutation.mutate()}
+              disabled={resumeMutation.isPending}
+            >
+              Reiniciar
+            </Button>
           ) : null}
         </div>
       </CardContent>
