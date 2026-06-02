@@ -4,6 +4,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPowerRequirementsText } from '@/utils/powerSummaryData';
 
+export const resolvePowerRequirementsForHojaInitialization = ({
+  savedPowerRequirements,
+  generatedPowerRequirements,
+}: {
+  savedPowerRequirements?: string | null;
+  generatedPowerRequirements?: string | null;
+}) => {
+  const saved = savedPowerRequirements ?? "";
+  if (saved.trim().length > 0) return saved;
+
+  return generatedPowerRequirements ?? "";
+};
+
 export const useHojaDeRutaInitialization = (
   selectedJobId: string,
   hojaDeRuta: any,
@@ -378,8 +391,10 @@ export const useHojaDeRutaInitialization = (
           // Structured program schedules
           programSchedule: savedEventData?.programSchedule || undefined,
           programScheduleDays: savedEventData?.programScheduleDays || undefined,
-          // Use fresh power requirements from database, fallback to saved if none found
-          powerRequirements: powerRequirementsText || savedEventData?.powerRequirements || "",
+          powerRequirements: resolvePowerRequirementsForHojaInitialization({
+            savedPowerRequirements: savedEventData?.powerRequirements,
+            generatedPowerRequirements: powerRequirementsText,
+          }),
           auxiliaryNeeds: savedEventData?.auxiliaryNeeds || "",
           auxiliaryStaffSetupQty: savedEventData?.auxiliaryStaffSetupQty ?? 0,
           auxiliaryStaffDismantleQty: savedEventData?.auxiliaryStaffDismantleQty ?? 0,
