@@ -15,14 +15,8 @@ export class PowerSection {
       return yPosition;
     }
 
-    const powerLines = eventData.powerRequirements!.split('\n');
-    for (const line of powerLines) {
-      if (line.trim()) {
-        this.pdfDoc.addText(line.trim(), 30, yPosition);
-        yPosition += 5;
-      }
-    }
-
-    return yPosition + 10;
+    return this.pdfDoc.addWrappedLines(eventData.powerRequirements!, 30, yPosition, {
+      lineHeight: 5,
+    }) + 10;
   }
 }
