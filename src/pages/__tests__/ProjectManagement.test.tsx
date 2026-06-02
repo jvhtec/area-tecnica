@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import ProjectManagement from "../ProjectManagement";
@@ -39,8 +40,9 @@ vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: vi.fn() }),
 }));
 
+let mockIsMobile = false;
 vi.mock("@/hooks/use-mobile", () => ({
-  useIsMobile: () => false,
+  useIsMobile: () => mockIsMobile,
 }));
 
 vi.mock("@/components/project-management/MonthNavigation", () => ({
@@ -85,6 +87,7 @@ describe("ProjectManagement department tabs", () => {
     mockUseOptimizedAuth.mockReset();
     mockUseOptimizedJobs.mockReset();
     mockAutoCompleteJobs.mockClear();
+    mockIsMobile = false;
     mockGetSession.mockResolvedValue({
       data: { session: { user: { id: "user-1" } } },
     });
@@ -163,5 +166,40 @@ describe("ProjectManagement department tabs", () => {
 
     const videoTab = await screen.findByRole("tab", { name: /video/i });
     await waitFor(() => expect(videoTab).toHaveAttribute("data-state", "active"));
+  });
+
+  it("renders mobile filters inline inside the sheet", async () => {
+    mockIsMobile = true;
+    mockUseOptimizedAuth.mockReturnValue({
+      userDepartment: "sound",
+      isLoading: false,
+    });
+    mockUseOptimizedJobs.mockReturnValue({
+      data: [
+        {
+          id: "job-1",
+          title: "Mobile Filter Job",
+          job_type: "single",
+          status: "Confirmado",
+          start_time: "2026-06-03T08:00:00.000Z",
+          end_time: "2026-06-03T23:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <ProjectManagement />
+      </MemoryRouter>
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: /filters/i }));
+
+    expect(screen.queryByTestId("job-type-filter")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("status-filter")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /single/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /confirmed/i })).toBeInTheDocument();
   });
 });
