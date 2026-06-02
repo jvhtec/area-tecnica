@@ -72,11 +72,7 @@ export class AuxNeedsSection {
     this.pdfDoc.addText("Notas:", 30, yPosition);
     yPosition += lineHeight;
 
-    for (const line of auxLines) {
-      yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);
-      this.pdfDoc.addText(line, 30, yPosition);
-      yPosition += lineHeight;
-    }
+    yPosition = this.pdfDoc.addWrappedLines(auxLines, 30, yPosition, { lineHeight });
 
     return yPosition + 4;
   }

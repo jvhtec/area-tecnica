@@ -5,6 +5,17 @@ export interface AutoTableJsPDF extends jsPDF {
   lastAutoTable: { finalY: number };
 }
 
+type PdfTextOptions = Parameters<jsPDF['text']>[3];
+
+interface WrappedLinesOptions {
+  maxWidth?: number;
+  rightMargin?: number;
+  lineHeight?: number;
+  trim?: boolean;
+  skipEmpty?: boolean;
+  textOptions?: PdfTextOptions;
+}
+
 export class PDFDocument {
   private doc: AutoTableJsPDF;
   private pageWidth: number;
@@ -76,6 +87,38 @@ export class PDFDocument {
       this.doc.text(line, centerX, y, { align });
     });
     return lines.length;
+  }
+
+  addWrappedLines(
+    text: string | string[],
+    x: number,
+    yPosition: number,
+    options: WrappedLinesOptions = {}
+  ): number {
+    const lineHeight = options.lineHeight ?? 6;
+    const maxWidth = options.maxWidth ?? this.pageWidth - x - (options.rightMargin ?? 20);
+    const lines = Array.isArray(text) ? text : text.split(/\r?\n/);
+    const shouldTrim = options.trim ?? true;
+    const skipEmpty = options.skipEmpty ?? true;
+
+    for (const rawLine of lines) {
+      const line = shouldTrim ? rawLine.trim() : rawLine.trimEnd();
+      if (!line) {
+        if (!skipEmpty) {
+          yPosition = this.checkPageBreak(yPosition, lineHeight + 2);
+          yPosition += lineHeight;
+        }
+        continue;
+      }
+
+      for (const wrappedLine of this.splitText(line, maxWidth)) {
+        yPosition = this.checkPageBreak(yPosition, lineHeight + 2);
+        this.addText(wrappedLine, x, yPosition, options.textOptions);
+        yPosition += lineHeight;
+      }
+    }
+
+    return yPosition;
   }
 
   addTable(options: any): void {

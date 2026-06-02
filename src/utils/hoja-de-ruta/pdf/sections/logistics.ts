@@ -67,11 +67,7 @@ export class LogisticsSection {
         .map((line) => line.trim())
         .filter(Boolean);
 
-      for (const line of loadingLines) {
-        yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);
-        this.pdfDoc.addText(line, 30, yPosition);
-        yPosition += lineHeight;
-      }
+      yPosition = this.pdfDoc.addWrappedLines(loadingLines, 30, yPosition, { lineHeight });
       yPosition += 6;
     }
 
@@ -89,11 +85,7 @@ export class LogisticsSection {
         .map((line) => line.trim())
         .filter(Boolean);
 
-      for (const line of unloadingLines) {
-        yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);
-        this.pdfDoc.addText(line, 30, yPosition);
-        yPosition += lineHeight;
-      }
+      yPosition = this.pdfDoc.addWrappedLines(unloadingLines, 30, yPosition, { lineHeight });
       yPosition += 6;
     }
 
@@ -111,11 +103,7 @@ export class LogisticsSection {
         .map((line) => line.trim())
         .filter(Boolean);
 
-      for (const line of equipmentLines) {
-        yPosition = this.pdfDoc.checkPageBreak(yPosition, lineHeight + 2);
-        this.pdfDoc.addText(line, 30, yPosition);
-        yPosition += lineHeight;
-      }
+      yPosition = this.pdfDoc.addWrappedLines(equipmentLines, 30, yPosition, { lineHeight });
       yPosition += 6;
     }
 
