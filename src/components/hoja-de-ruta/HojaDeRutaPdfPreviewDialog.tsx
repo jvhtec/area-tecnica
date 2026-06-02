@@ -31,7 +31,7 @@ export const HojaDeRutaPdfPreviewDialog: React.FC<HojaDeRutaPdfPreviewDialogProp
   onDownload,
   onOpenInNewTab,
 }) => {
-  const iframeSrc = preview ? `${preview.url}#toolbar=1&navpanes=0` : undefined;
+  const pdfSrc = preview ? `${preview.url}#toolbar=1&navpanes=0&scrollbar=1&view=FitH` : undefined;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,13 +76,21 @@ export const HojaDeRutaPdfPreviewDialog: React.FC<HojaDeRutaPdfPreviewDialogProp
             </div>
           </div>
         </DialogHeader>
-        <div className="min-h-0 flex-1 bg-muted">
-          {iframeSrc && (
-            <iframe
-              src={iframeSrc}
-              title={preview?.title ?? "Vista previa PDF"}
-              className="h-full w-full border-0 bg-background"
-            />
+        <div className="min-h-0 flex-1 overflow-auto bg-muted">
+          {pdfSrc && (
+            <object
+              data={pdfSrc}
+              type="application/pdf"
+              className="block h-full min-h-[72vh] w-full bg-background"
+              aria-label={preview?.title ?? "Vista previa PDF"}
+            >
+              <iframe
+                src={pdfSrc}
+                title={preview?.title ?? "Vista previa PDF"}
+                className="block h-[72vh] w-full border-0 bg-background"
+                scrolling="yes"
+              />
+            </object>
           )}
         </div>
       </DialogContent>

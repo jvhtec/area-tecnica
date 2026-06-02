@@ -714,6 +714,22 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
               </Button>
 
               <Button
+                onClick={() => { void handlePreviewPDF(); }}
+                disabled={!selectedJobId || !isInitialized || isSaving || isGenerating || isPreviewing}
+                variant="outline"
+                size="sm"
+                aria-label="Vista previa PDF"
+                className="h-11 min-w-[44px] border-2 border-blue-500 text-blue-600 hover:bg-blue-50"
+              >
+                {isPreviewing && previewingTarget === "full" ? (
+                  <Loader2 className="w-4 h-4 sm:mr-2 animate-spin" />
+                ) : (
+                  <Eye className="w-4 h-4 sm:mr-2" />
+                )}
+                <span className="hidden sm:inline">Vista previa</span>
+              </Button>
+
+              <Button
                 onClick={() => setShowPrintDialog(true)}
                 disabled={!selectedJobId}
                 aria-label="Exportar"
