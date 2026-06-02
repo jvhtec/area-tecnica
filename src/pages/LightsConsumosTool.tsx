@@ -662,7 +662,7 @@ const LightsConsumosTool: React.FC = () => {
 
     if (isTourDefaults) {
       // user can review before saving defaults
-    } else if (selectedJobId) {
+    } else if (isOverrideMode || selectedJobId) {
       const powerRequirementId = await savePowerRequirementTable(newTable);
       if (powerRequirementId) {
         tableToAdd = { ...newTable, powerRequirementId };
@@ -693,9 +693,17 @@ const LightsConsumosTool: React.FC = () => {
     // Only allow removal of regular tables (numeric IDs), not default tables
     if (typeof tableId === 'number') {
       const tableToRemove = tables.find((table) => table.id === tableId);
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
+      if (!tableToRemove) {
+        toast({
+          title: "Error",
+          description: "No se encontró la tabla de requerimientos de potencia",
+          variant: "destructive",
+        });
+        return;
+      }
 
       if (!selectedJobId || isTourDefaults || isOverrideMode || !tableToRemove?.powerRequirementId) {
+        setTables((prev) => prev.filter((table) => table.id !== tableId));
         return;
       }
 
@@ -705,6 +713,7 @@ const LightsConsumosTool: React.FC = () => {
           jobId: selectedJobId,
           table: tableToRemove,
         });
+        setTables((prev) => prev.filter((table) => table.id !== tableId));
       } catch (error) {
         console.error('Error deleting power requirement table:', error);
         toast({
@@ -734,7 +743,7 @@ const LightsConsumosTool: React.FC = () => {
                 metadata: buildPowerTableMetadata(updatedTable, settings),
               },
             });
-          } else if (!isTourDefaults && selectedJobId) {
+          } else if (!isTourDefaults && (isOverrideMode || selectedJobId)) {
             void savePowerRequirementTable(updatedTable, { showToast: false })
               .then((powerRequirementId) => {
                 if (powerRequirementId && powerRequirementId !== updatedTable.powerRequirementId) {

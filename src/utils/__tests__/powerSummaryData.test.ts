@@ -142,6 +142,47 @@ describe('powerSummaryData', () => {
     expect(summary.departments.sound.rows[0].notes).toContain('CEE32A');
   });
 
+  it('uses input order instead of lexicographic ids to break duplicate save freshness ties', async () => {
+    const supabase = createMockSupabase({
+      power_requirement_tables: [
+        {
+          id: 'z-old-id',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'MAIN L',
+          total_watts: 31500,
+          current_per_phase: 57.43,
+          pdu_type: 'CEE125A 3P+N+G',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: { rows: [{ quantity: '1', componentId: '1', watts: '31500' }] },
+        },
+        {
+          id: 'a-new-id',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'MAIN L',
+          total_watts: 31500,
+          current_per_phase: 57.43,
+          pdu_type: 'CEE125A 3P+N+G',
+          custom_pdu_type: null,
+          includes_hoist: true,
+          table_data: { rows: [{ quantity: '1', componentId: '1', watts: '31500' }] },
+        },
+      ],
+    });
+
+    const summary = await loadTechnicalPowerSummaryData({
+      job: { id: 'job-1', job_type: 'single' },
+      supabase,
+    });
+
+    expect(summary.departments.sound.rows).toHaveLength(1);
+    expect(summary.departments.sound.rows[0].notes).toContain('CEE32A');
+  });
+
   it('keeps multiple current tables for the same department when they have distinct saved identities', async () => {
     const supabase = createMockSupabase({
       power_requirement_tables: [

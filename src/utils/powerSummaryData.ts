@@ -23,6 +23,10 @@ type TourDefaultSetRow = Database['public']['Tables']['tour_default_sets']['Row'
 type TourDefaultTableRow = Database['public']['Tables']['tour_default_tables']['Row'];
 type TourPowerDefaultRow = Database['public']['Tables']['tour_power_defaults']['Row'];
 type TourDatePowerOverrideRow = Database['public']['Tables']['tour_date_power_overrides']['Row'];
+type IndexedPowerRequirementTableRow = {
+  row: PowerRequirementTableRow;
+  inputIndex: number;
+};
 
 export interface TechnicalPowerSummaryJob {
   id: string;
@@ -103,23 +107,23 @@ const getPowerRequirementSourceTableId = (row: PowerRequirementTableRow) => {
 };
 
 const comparePowerRequirementTablesByFreshness = (
-  left: PowerRequirementTableRow,
-  right: PowerRequirementTableRow
+  left: IndexedPowerRequirementTableRow,
+  right: IndexedPowerRequirementTableRow
 ) => {
-  const leftTimestamp = left.created_at ? Date.parse(left.created_at) : 0;
-  const rightTimestamp = right.created_at ? Date.parse(right.created_at) : 0;
+  const leftTimestamp = left.row.created_at ? Date.parse(left.row.created_at) : 0;
+  const rightTimestamp = right.row.created_at ? Date.parse(right.row.created_at) : 0;
 
   if (leftTimestamp !== rightTimestamp) {
     return leftTimestamp - rightTimestamp;
   }
 
-  const leftCreatedAt = left.created_at || '';
-  const rightCreatedAt = right.created_at || '';
+  const leftCreatedAt = left.row.created_at || '';
+  const rightCreatedAt = right.row.created_at || '';
   if (leftCreatedAt !== rightCreatedAt) {
     return leftCreatedAt.localeCompare(rightCreatedAt);
   }
 
-  return left.id.localeCompare(right.id);
+  return left.inputIndex - right.inputIndex;
 };
 
 const getPowerRequirementTableCurrentKey = (
@@ -144,24 +148,27 @@ const getPowerRequirementTableCurrentKey = (
 export const getCurrentPowerRequirementTables = (
   rows: PowerRequirementTableRow[]
 ): PowerRequirementTableRow[] => {
-  const latestRows = new Map<string, PowerRequirementTableRow>();
+  const latestRows = new Map<string, IndexedPowerRequirementTableRow>();
 
-  for (const row of rows) {
+  rows.forEach((row, inputIndex) => {
     const department = row.department as TechnicalPowerDepartment | null;
-    if (!department) continue;
+    if (!department) return;
 
     const dedupKey = getPowerRequirementTableCurrentKey(row, department);
     const current = latestRows.get(dedupKey);
+    const indexedRow = { row, inputIndex };
 
     if (
       !current ||
-      comparePowerRequirementTablesByFreshness(row, current) >= 0
+      comparePowerRequirementTablesByFreshness(indexedRow, current) >= 0
     ) {
-      latestRows.set(dedupKey, row);
+      latestRows.set(dedupKey, indexedRow);
     }
-  }
+  });
 
-  return [...latestRows.values()].sort(comparePowerRequirementTablesByFreshness);
+  return [...latestRows.values()]
+    .sort(comparePowerRequirementTablesByFreshness)
+    .map((value) => value.row);
 };
 
 const formatPowerRequirementNumber = (value: number | string | null | undefined) => {

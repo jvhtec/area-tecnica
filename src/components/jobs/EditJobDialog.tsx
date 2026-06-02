@@ -85,7 +85,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const [invoicingCompany, setInvoicingCompany] = useState<InvoicingCompany | null>(job.invoicing_company || null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>(() => getDepartmentsFromJob(job));
-  const [departmentsLoaded, setDepartmentsLoaded] = useState(() => getDepartmentsFromJob(job).length > 0);
+  const [departmentsLoaded, setDepartmentsLoaded] = useState(false);
   const [departmentsLoadError, setDepartmentsLoadError] = useState<string | null>(null);
   const [isVenueBusy, setIsVenueBusy] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
@@ -122,7 +122,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         setInvoicingCompany(currentJob.invoicing_company || null);
         const jobDepartments = getDepartmentsFromJob(currentJob);
         setSelectedDepartments(jobDepartments);
-        setDepartmentsLoaded(jobDepartments.length > 0);
+        setDepartmentsLoaded(false);
         setDepartmentsLoadError(null);
 
         // Convert UTC times to local input format using job's timezone
@@ -249,12 +249,12 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
     try {
       if (!departmentsLoaded) {
-        throw new Error("Departments are still loading. Please wait before saving.");
+        throw new Error("Los departamentos aún se están cargando. Espera antes de guardar.");
       }
 
       const departmentsToSave = Array.from(new Set(selectedDepartments));
       if (departmentsToSave.length === 0) {
-        throw new Error("Select at least one department before saving.");
+        throw new Error("Selecciona al menos un departamento antes de guardar.");
       }
 
       // Convert local datetime-local input values to UTC using the job's timezone

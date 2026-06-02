@@ -342,9 +342,13 @@ const ConsumosTool: React.FC = () => {
 
   const removeTable = async (tableId: number | string) => {
     const tableToRemove = tables.find((table) => table.id === tableId);
-    setTables((prev) => prev.filter((table) => table.id !== tableId));
+    if (!tableToRemove) {
+      toast({ title: "Error", description: "Power requirement table not found", variant: "destructive" });
+      return;
+    }
 
     if (!selectedJobId || isTourDefaults || isJobOverrideMode || !tableToRemove?.powerRequirementId) {
+      setTables((prev) => prev.filter((table) => table.id !== tableId));
       return;
     }
 
@@ -354,6 +358,7 @@ const ConsumosTool: React.FC = () => {
         jobId: selectedJobId,
         table: tableToRemove,
       });
+      setTables((prev) => prev.filter((table) => table.id !== tableId));
     } catch (error) {
       console.error('Error deleting power requirement table:', error);
       toast({ title: "Error", description: "Failed to delete power requirement table", variant: "destructive" });

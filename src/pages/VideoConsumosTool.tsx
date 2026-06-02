@@ -266,6 +266,10 @@ const VideoConsumosTool: React.FC = () => {
       return table.powerRequirementId;
     }
 
+    if (!selectedJobId) {
+      return table.powerRequirementId;
+    }
+
     try {
       const powerRequirementId = await saveJobPowerRequirementTable({
         client: dataLayerClient,
@@ -321,7 +325,7 @@ const VideoConsumosTool: React.FC = () => {
     // Save based on mode
     if (isTourDefaults) {
       await saveTourDefault(newTable);
-    } else if (selectedJobId) {
+    } else if (isOverrideMode || selectedJobId) {
       const powerRequirementId = await savePowerRequirementTable(newTable);
       if (powerRequirementId) {
         tableToAdd = { ...newTable, powerRequirementId };
@@ -346,9 +350,17 @@ const VideoConsumosTool: React.FC = () => {
     // Only allow removal of regular tables (numeric IDs), not default tables
     if (typeof tableId === 'number') {
       const tableToRemove = tables.find((table) => table.id === tableId);
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
+      if (!tableToRemove) {
+        toast({
+          title: "Error",
+          description: "Power requirement table not found",
+          variant: "destructive",
+        });
+        return;
+      }
 
       if (!selectedJobId || isTourDefaults || isOverrideMode || !tableToRemove?.powerRequirementId) {
+        setTables((prev) => prev.filter((table) => table.id !== tableId));
         return;
       }
 
@@ -358,6 +370,7 @@ const VideoConsumosTool: React.FC = () => {
           jobId: selectedJobId,
           table: tableToRemove,
         });
+        setTables((prev) => prev.filter((table) => table.id !== tableId));
       } catch (error) {
         console.error('Error deleting power requirement table:', error);
         toast({
@@ -370,7 +383,11 @@ const VideoConsumosTool: React.FC = () => {
   };
 
   const scheduleTableSettingsSave = (table: Table) => {
-    if (isTourDefaults || !selectedJobId || table.id === undefined) {
+    if (isTourDefaults || table.id === undefined) {
+      return;
+    }
+
+    if (!isOverrideMode && !selectedJobId) {
       return;
     }
 

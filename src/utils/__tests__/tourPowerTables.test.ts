@@ -26,6 +26,11 @@ describe('tourPowerTables', () => {
     expect(computePowerTotalVa(0, { pf: 0.5 }, 'sound')).toBe(0);
   });
 
+  it('clamps stored safety margin before calculating apparent power', () => {
+    expect(computePowerTotalVa(1000, { pf: 1, safetyMargin: -100 }, 'sound')).toBe(1000);
+    expect(computePowerTotalVa(1000, { pf: 1, safetyMargin: 150 }, 'sound')).toBe(2000);
+  });
+
   it('uses department defaults when metadata is null or undefined', () => {
     expect(computePowerTotalVa(950, null, 'sound')).toBe(1000);
     expect(computePowerTotalVa(900, undefined, 'video')).toBe(1000);
@@ -54,6 +59,29 @@ describe('tourPowerTables', () => {
 
     expect(normalized.position).toBe('USL');
     expect(normalized.customPosition).toBeUndefined();
+  });
+
+  it('uses table data safety margin when default metadata is missing it', () => {
+    const normalized = normalizeTourDefaultPowerTable(
+      {
+        id: 'default-1',
+        set_id: 'set-1',
+        table_name: 'FoH',
+        table_type: 'power',
+        total_value: 950,
+        metadata: {
+          current_per_phase: 5,
+          pdu_type: '32A',
+          pf: 0.95,
+        },
+        table_data: { rows: [], safetyMargin: 20 },
+        created_at: '2026-04-08T10:00:00.000Z',
+        updated_at: '2026-04-08T10:00:00.000Z',
+      } as any,
+      'sound'
+    );
+
+    expect(normalized.totalVa).toBe(1200);
   });
 
   it('normalizes custom positions from legacy defaults and overrides', () => {
