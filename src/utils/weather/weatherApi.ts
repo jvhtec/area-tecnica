@@ -20,6 +20,7 @@ interface WeatherApiResponse {
     temperature_2m_max: number[];
     temperature_2m_min: number[];
     precipitation_probability_mean: number[];
+    precipitation_sum?: number[];
     weathercode: number[];
   };
   timezone: string;
@@ -110,7 +111,12 @@ export const geocodeAddress = async (address: string): Promise<GeocodeResult | n
  * Fetch weather data from Open-Meteo API
  */
 const fetchWeatherFromApi = async (lat: number, lng: number, startDate: Date, endDate: Date): Promise<WeatherData[]> => {
-  const formatDate = (date: Date) => date.toISOString().split('T')[0];
+  const formatDate = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
   const start = formatDate(startDate);
   const end = formatDate(endDate);
 
@@ -121,7 +127,11 @@ const fetchWeatherFromApi = async (lat: number, lng: number, startDate: Date, en
   
   if (!response.ok) {
     let detail = '';
-    try { detail = await response.text(); } catch {}
+    try {
+      detail = await response.text();
+    } catch {
+      detail = '';
+    }
     throw new Error(`Weather API failed: ${response.status}${detail ? ` - ${detail}` : ''}`);
   }
 
@@ -138,10 +148,123 @@ const fetchWeatherFromApi = async (lat: number, lng: number, startDate: Date, en
       maxTemp: Math.round(data.daily.temperature_2m_max[index]),
       minTemp: Math.round(data.daily.temperature_2m_min[index]),
       // Approximate precipitation chance: 100% if any precipitation expected, otherwise 0%
-      precipitationProbability: ((data as any).daily?.precipitation_sum?.[index] || 0) > 0 ? 100 : 0,
+      precipitationProbability: (data.daily.precipitation_sum?.[index] || 0) > 0 ? 100 : 0,
       icon: weatherInfo.icon
     };
   });
+};
+
+const SPANISH_MONTHS: Record<string, number> = {
+  enero: 0,
+  ene: 0,
+  febrero: 1,
+  feb: 1,
+  marzo: 2,
+  mar: 2,
+  abril: 3,
+  abr: 3,
+  mayo: 4,
+  may: 4,
+  junio: 5,
+  jun: 5,
+  julio: 6,
+  jul: 6,
+  agosto: 7,
+  ago: 7,
+  septiembre: 8,
+  setiembre: 8,
+  sep: 8,
+  set: 8,
+  octubre: 9,
+  oct: 9,
+  noviembre: 10,
+  nov: 10,
+  diciembre: 11,
+  dic: 11,
+};
+
+const normalizeMonthName = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+const parseYear = (value: string): number => {
+  const year = Number(value);
+  return value.length === 2 ? 2000 + year : year;
+};
+
+const createLocalDate = (year: number, monthIndex: number, day: number): Date | null => {
+  const date = new Date(year, monthIndex, day);
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== monthIndex ||
+    date.getDate() !== day
+  ) {
+    return null;
+  }
+  return date;
+};
+
+const startOfLocalDay = (date: Date) =>
+  new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+const buildDateRange = (startDate: Date | null, endDate: Date | null) => {
+  if (!startDate || !endDate) return null;
+
+  const start = startOfLocalDay(startDate);
+  const end = startOfLocalDay(endDate);
+  if (end < start) return null;
+
+  return { startDate: start, endDate: end };
+};
+
+const parseIsoDates = (value: string) => {
+  const matches = Array.from(value.matchAll(/(?:^|[^\d])(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/g));
+  if (matches.length === 0) return null;
+
+  const dates = matches
+    .slice(0, 2)
+    .map((match) => createLocalDate(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+
+  return buildDateRange(dates[0], dates[1] ?? dates[0]);
+};
+
+const parseNumericDates = (value: string) => {
+  const matches = Array.from(value.matchAll(/(?:^|[^\d])(\d{1,2})[./-](\d{1,2})[./-](\d{2}|\d{4})(?!\d)/g));
+  if (matches.length === 0) return null;
+
+  const dates = matches
+    .slice(0, 2)
+    .map((match) => createLocalDate(parseYear(match[3]), Number(match[2]) - 1, Number(match[1])));
+
+  return buildDateRange(dates[0], dates[1] ?? dates[0]);
+};
+
+const parseSpanishMonthDates = (value: string) => {
+  const dayRangeMatch = value.match(
+    /(?:^|[^\d])(\d{1,2})\s*[-–—]\s*(\d{1,2})\s+(?:de\s+)?([a-záéíóúüñ]+)\s+(?:de\s+)?(\d{2}|\d{4})(?!\d)/i
+  );
+  if (dayRangeMatch) {
+    const monthIndex = SPANISH_MONTHS[normalizeMonthName(dayRangeMatch[3])];
+    if (monthIndex == null) return null;
+
+    return buildDateRange(
+      createLocalDate(parseYear(dayRangeMatch[4]), monthIndex, Number(dayRangeMatch[1])),
+      createLocalDate(parseYear(dayRangeMatch[4]), monthIndex, Number(dayRangeMatch[2]))
+    );
+  }
+
+  const singleDateMatch = value.match(
+    /(?:^|[^\d])(\d{1,2})\s+(?:de\s+)?([a-záéíóúüñ]+)\s+(?:de\s+)?(\d{2}|\d{4})(?!\d)/i
+  );
+  if (!singleDateMatch) return null;
+
+  const monthIndex = SPANISH_MONTHS[normalizeMonthName(singleDateMatch[2])];
+  if (monthIndex == null) return null;
+
+  const date = createLocalDate(parseYear(singleDateMatch[3]), monthIndex, Number(singleDateMatch[1]));
+  return buildDateRange(date, date);
 };
 
 /**
@@ -151,43 +274,10 @@ export const parseEventDates = (eventDates: string): { startDate: Date; endDate:
   if (!eventDates?.trim()) return null;
 
   try {
-    // Handle various date formats
     const cleanDates = eventDates.trim();
-    
-    // Try to match different date patterns
-    const singleDateMatch = cleanDates.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-    const dateRangeMatch = cleanDates.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4}).*?(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-    
-    if (dateRangeMatch) {
-      // Date range found
-      const startDate = new Date(
-        parseInt(dateRangeMatch[3]), 
-        parseInt(dateRangeMatch[2]) - 1, 
-        parseInt(dateRangeMatch[1])
-      );
-      const endDate = new Date(
-        parseInt(dateRangeMatch[6]), 
-        parseInt(dateRangeMatch[5]) - 1, 
-        parseInt(dateRangeMatch[4])
-      );
-      return { startDate, endDate };
-    } else if (singleDateMatch) {
-      // Single date found
-      const date = new Date(
-        parseInt(singleDateMatch[3]), 
-        parseInt(singleDateMatch[2]) - 1, 
-        parseInt(singleDateMatch[1])
-      );
-      return { startDate: date, endDate: date };
-    }
-    
-    // Try ISO format
-    const isoDate = new Date(cleanDates);
-    if (!isNaN(isoDate.getTime())) {
-      return { startDate: isoDate, endDate: isoDate };
-    }
-    
-    return null;
+    return parseIsoDates(cleanDates) ??
+      parseNumericDates(cleanDates) ??
+      parseSpanishMonthDates(cleanDates);
   } catch (error) {
     console.error('Error parsing event dates:', error);
     return null;
@@ -209,10 +299,20 @@ export const getWeatherForJob = async (
       return null;
     }
 
-    // Respect forecast horizon (~16 days). If range starts beyond horizon, skip request.
-    const today = new Date();
+    // Respect forecast horizon (~16 days). Open-Meteo forecast does not serve old event dates.
+    const today = startOfLocalDay(new Date());
     const horizon = new Date(today);
     horizon.setDate(horizon.getDate() + 16);
+
+    if (dateRange.endDate < today) {
+      console.warn('Requested weather ends before available forecast window:', eventDates);
+      return null;
+    }
+
+    if (dateRange.startDate < today) {
+      dateRange.startDate = today;
+    }
+
     if (dateRange.startDate > horizon) {
       console.warn('Requested weather starts beyond available forecast horizon:', eventDates);
       return null;
