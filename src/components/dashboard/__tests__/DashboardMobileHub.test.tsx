@@ -2,7 +2,7 @@
 
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { DashboardMobileHub } from "../DashboardMobileHub";
+import { DashboardMobileHub } from "@/components/dashboard/DashboardMobileHub";
 
 vi.mock("@/hooks/use-mobile", () => ({
   useIsMobile: () => true,
@@ -49,6 +49,36 @@ describe("DashboardMobileHub", () => {
     );
 
     expect(await screen.findByText("Madrid Arena")).toBeInTheDocument();
+    expect(screen.queryByText("Sin ubicación")).not.toBeInTheDocument();
+  });
+
+  it("preserves legacy string location values", async () => {
+    render(
+      <DashboardMobileHub
+        jobs={[
+          {
+            id: "job-legacy-location",
+            title: "Legacy Location Job",
+            job_type: "single",
+            status: "Confirmado",
+            start_time: "2026-06-03T08:00:00.000Z",
+            end_time: "2026-06-03T23:59:00.000Z",
+            timezone: "Europe/Madrid",
+            location: "WiZink Center",
+            job_departments: [{ department: "sound" }],
+            job_assignments: [],
+          },
+        ]}
+        date={new Date("2026-06-03T12:00:00.000Z")}
+        onDateSelect={vi.fn()}
+        userRole="management"
+        onEditClick={vi.fn()}
+        onDeleteClick={vi.fn()}
+        onJobClick={vi.fn()}
+      />
+    );
+
+    expect(await screen.findByText("WiZink Center")).toBeInTheDocument();
     expect(screen.queryByText("Sin ubicación")).not.toBeInTheDocument();
   });
 });

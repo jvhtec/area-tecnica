@@ -37,20 +37,20 @@ const normalizeSearchText = (value: string) =>
 const buildSearchTokens = (query: string) => normalizeSearchText(query).split(/\s+/).filter(Boolean);
 
 const TYPE_LABELS: Record<string, string> = {
-  single: "Single",
+  single: "Sencillo",
   festival: "Festival",
   ciclo: "Ciclo",
-  tour: "Tour",
-  tourdate: "Tour Date",
+  tour: "Gira",
+  tourdate: "Fecha de gira",
   dryhire: "Dry Hire",
   evento: "Evento",
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  Tentativa: "Tentative",
-  Confirmado: "Confirmed",
-  Completado: "Completed",
-  Cancelado: "Cancelled",
+  Tentativa: "Tentativa",
+  Confirmado: "Confirmado",
+  Completado: "Completado",
+  Cancelado: "Cancelado",
 };
 
 const getTypeLabel = (type: string) => TYPE_LABELS[type?.toLowerCase()] || type;
@@ -361,14 +361,9 @@ const ProjectManagement = () => {
   };
 
   const toggleAllJobStatuses = () => {
-    if (allJobStatusesSelected) {
-      selectedJobStatuses.forEach(status => handleJobStatusSelection(status));
-      return;
-    }
-
-    allJobStatuses.forEach(status => {
-      if (!selectedJobStatuses.includes(status)) handleJobStatusSelection(status);
-    });
+    const nextStatuses = allJobStatusesSelected ? [] : allJobStatuses;
+    setSelectedJobStatuses(nextStatuses);
+    saveUserPreferences(nextStatuses);
   };
 
   const MobileFilterOption = ({
@@ -406,7 +401,7 @@ const ProjectManagement = () => {
           <AccordionTrigger className="py-3 text-sm hover:no-underline">
             <span className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
-              Types
+              Tipos
               {selectedJobTypes.length > 0 && (
                 <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
                   {selectedJobTypes.length}
@@ -422,7 +417,7 @@ const ProjectManagement = () => {
               onClick={toggleAllJobTypes}
               className="w-full justify-start"
             >
-              {allJobTypesSelected ? "Clear All" : "Select All"}
+              {allJobTypesSelected ? "Limpiar todo" : "Seleccionar todo"}
             </Button>
             <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
               {allJobTypes.length > 0 ? (
@@ -435,7 +430,7 @@ const ProjectManagement = () => {
                   />
                 ))
               ) : (
-                <div className="px-2 py-3 text-sm text-muted-foreground">No types available</div>
+                <div className="px-2 py-3 text-sm text-muted-foreground">No hay tipos disponibles</div>
               )}
             </div>
           </AccordionContent>
@@ -445,7 +440,7 @@ const ProjectManagement = () => {
           <AccordionTrigger className="py-3 text-sm hover:no-underline">
             <span className="flex items-center gap-2">
               <Filter className="h-4 w-4" />
-              Status
+              Estado
               {selectedJobStatuses.length > 0 && (
                 <span className="rounded-full bg-primary px-2 py-0.5 text-xs text-primary-foreground">
                   {selectedJobStatuses.length}
@@ -461,7 +456,7 @@ const ProjectManagement = () => {
               onClick={toggleAllJobStatuses}
               className="w-full justify-start"
             >
-              {allJobStatusesSelected ? "Clear All" : "Select All"}
+              {allJobStatusesSelected ? "Limpiar todo" : "Seleccionar todo"}
             </Button>
             <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
               {allJobStatuses.length > 0 ? (
@@ -474,7 +469,7 @@ const ProjectManagement = () => {
                   />
                 ))
               ) : (
-                <div className="px-2 py-3 text-sm text-muted-foreground">No statuses available</div>
+                <div className="px-2 py-3 text-sm text-muted-foreground">No hay estados disponibles</div>
               )}
             </div>
           </AccordionContent>
@@ -494,7 +489,7 @@ const ProjectManagement = () => {
           ) : (
             <CheckCircle className="mr-2 h-4 w-4" />
           )}
-          Auto-Complete Past Jobs
+          Autocompletar trabajos pasados
         </Button>
       )}
     </div>
@@ -551,7 +546,7 @@ const ProjectManagement = () => {
                 <SheetTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-2">
                     <Filter className="h-4 w-4" />
-                    Filters
+                    Filtros
                     {(selectedJobTypes.length > 0 || selectedJobStatuses.length > 0) && (
                       <span className="ml-1 rounded-full bg-primary text-primary-foreground text-xs px-2 py-0.5">
                         {selectedJobTypes.length + selectedJobStatuses.length}
@@ -564,9 +559,9 @@ const ProjectManagement = () => {
                   className="h-auto max-h-[85dvh] overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-5"
                 >
                   <SheetHeader className="mb-4">
-                    <SheetTitle>Filters</SheetTitle>
+                    <SheetTitle>Filtros</SheetTitle>
                     <SheetDescription className="sr-only">
-                      Choose project types and statuses to filter the project list.
+                      Selecciona tipos y estados para filtrar la lista de proyectos.
                     </SheetDescription>
                   </SheetHeader>
                   <FilterContent />

@@ -48,7 +48,15 @@ const themeTokens = {
 };
 
 const getJobLocationName = (job: any) =>
-  job.location?.name || job.location_data?.name || job.locations?.name || job.venue || "Sin ubicación";
+  (typeof job.location === "string" && job.location) ||
+  job.location?.name ||
+  job.location?.formatted_address ||
+  job.location_data?.name ||
+  job.location_data?.formatted_address ||
+  job.locations?.name ||
+  job.venue_name ||
+  job.venue ||
+  "Sin ubicación";
 
 export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   jobs,

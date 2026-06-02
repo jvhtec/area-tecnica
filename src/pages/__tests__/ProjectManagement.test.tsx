@@ -184,6 +184,14 @@ describe("ProjectManagement department tabs", () => {
           start_time: "2026-06-03T08:00:00.000Z",
           end_time: "2026-06-03T23:00:00.000Z",
         },
+        {
+          id: "job-2",
+          title: "Mobile Tentative Job",
+          job_type: "dryhire",
+          status: "Tentativa",
+          start_time: "2026-06-04T08:00:00.000Z",
+          end_time: "2026-06-04T23:00:00.000Z",
+        },
       ],
       isLoading: false,
       error: null,
@@ -195,11 +203,55 @@ describe("ProjectManagement department tabs", () => {
       </MemoryRouter>
     );
 
-    await userEvent.click(await screen.findByRole("button", { name: /filters/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /filtros/i }));
 
     expect(screen.queryByTestId("job-type-filter")).not.toBeInTheDocument();
     expect(screen.queryByTestId("status-filter")).not.toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: /single/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /confirmed/i })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /sencillo/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /confirmado/i })).toBeInTheDocument();
+  });
+
+  it("clears all selected mobile statuses in one state update", async () => {
+    mockIsMobile = true;
+    mockUseOptimizedAuth.mockReturnValue({
+      userDepartment: "sound",
+      isLoading: false,
+    });
+    mockUseOptimizedJobs.mockReturnValue({
+      data: [
+        {
+          id: "job-1",
+          title: "Confirmed Job",
+          job_type: "single",
+          status: "Confirmado",
+          start_time: "2026-06-03T08:00:00.000Z",
+          end_time: "2026-06-03T23:00:00.000Z",
+        },
+        {
+          id: "job-2",
+          title: "Tentative Job",
+          job_type: "single",
+          status: "Tentativa",
+          start_time: "2026-06-04T08:00:00.000Z",
+          end_time: "2026-06-04T23:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <ProjectManagement />
+      </MemoryRouter>
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: /filtros/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /limpiar todo/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /confirmado/i })).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByRole("button", { name: /tentativa/i })).toHaveAttribute("aria-pressed", "false");
+    });
   });
 });
