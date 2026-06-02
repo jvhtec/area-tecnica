@@ -33,10 +33,11 @@ import {
 } from '@/features/technical-tools/power/PowerTableControls';
 import {
   buildLegacyPowerOverridePayload,
-  buildPowerRequirementInsert,
   buildPowerTableData,
   buildPowerTableMetadata,
   buildTourPowerDefaultTable,
+  deleteJobPowerRequirementTable,
+  saveJobPowerRequirementTable,
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
 import {
@@ -155,6 +156,7 @@ interface TableRow {
 interface Table {
   name: string;
   rows: TableRow[];
+  powerRequirementId?: string;
   totalWatts?: number;
   adjustedWatts?: number;
   totalVa?: number;
@@ -540,7 +542,10 @@ const LightsConsumosTool: React.FC = () => {
 
   const recommendPDU = (currentLine: number) => recommendPowerPdu(currentLine, pduOptions);
 
-  const savePowerRequirementTable = async (table: Table) => {
+  const savePowerRequirementTable = async (
+    table: Table,
+    { showToast = true }: { showToast?: boolean } = {},
+  ) => {
     if (isOverrideMode && overrideData) {
       // Save as override for tour date
       const overrideSuccess = await saveOverride('power', buildLegacyPowerOverridePayload({
@@ -554,31 +559,33 @@ const LightsConsumosTool: React.FC = () => {
           description: "Override saved for tour date",
         });
       }
-      return;
+      return table.powerRequirementId;
     }
 
     // Original job-based save logic
     if (!selectedJobId) return;
 
     try {
-      const { error } = await dataLayerClient.from('power_requirement_tables')
-        .insert(buildPowerRequirementInsert({
-          department: 'lights',
-          jobId: selectedJobId,
-          settings: getPowerSettings({
-            phaseMode: table.snapshotPhaseMode,
-            safetyMargin: table.snapshotSafetyMargin,
-            voltage: table.snapshotVoltage,
-          }),
-          table,
-        }));
-
-      if (error) throw error;
-
-      toast({
-        title: "Éxito",
-        description: "La tabla de requerimientos de potencia se ha guardado exitosamente",
+      const powerRequirementId = await saveJobPowerRequirementTable({
+        client: dataLayerClient,
+        department: 'lights',
+        jobId: selectedJobId,
+        settings: getPowerSettings({
+          phaseMode: table.snapshotPhaseMode,
+          safetyMargin: table.snapshotSafetyMargin,
+          voltage: table.snapshotVoltage,
+        }),
+        table,
       });
+
+      if (showToast) {
+        toast({
+          title: "Éxito",
+          description: "La tabla de requerimientos de potencia se ha guardado exitosamente",
+        });
+      }
+
+      return powerRequirementId;
     } catch (error: unknown) {
       console.error('Error saving power requirement table:', error);
       toast({
@@ -586,10 +593,11 @@ const LightsConsumosTool: React.FC = () => {
         description: "Error al guardar la tabla de requerimientos de potencia",
         variant: "destructive",
       });
+      return table.powerRequirementId;
     }
   };
 
-  const generateTable = () => {
+  const generateTable = async () => {
     if (!tableName) {
       toast({
         title: 'Falta el nombre de la tabla',
@@ -650,14 +658,18 @@ const LightsConsumosTool: React.FC = () => {
       snapshotVoltage: voltage,
     };
 
-    setTables((prev) => [...prev, newTable]);
+    let tableToAdd = newTable;
 
     if (isTourDefaults) {
       // user can review before saving defaults
-    } else if (selectedJobId) {
-      savePowerRequirementTable(newTable);
+    } else if (isOverrideMode || selectedJobId) {
+      const powerRequirementId = await savePowerRequirementTable(newTable);
+      if (powerRequirementId) {
+        tableToAdd = { ...newTable, powerRequirementId };
+      }
     }
 
+    setTables((prev) => [...prev, tableToAdd]);
     resetCurrentTable();
   };
 
@@ -677,10 +689,39 @@ const LightsConsumosTool: React.FC = () => {
     setCustomPosition('');
   };
 
-  const removeTable = (tableId: number | string) => {
+  const removeTable = async (tableId: number | string) => {
     // Only allow removal of regular tables (numeric IDs), not default tables
     if (typeof tableId === 'number') {
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
+      const tableToRemove = tables.find((table) => table.id === tableId);
+      if (!tableToRemove) {
+        toast({
+          title: "Error",
+          description: "No se encontró la tabla de requerimientos de potencia",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!selectedJobId || isTourDefaults || isOverrideMode || !tableToRemove?.powerRequirementId) {
+        setTables((prev) => prev.filter((table) => table.id !== tableId));
+        return;
+      }
+
+      try {
+        await deleteJobPowerRequirementTable({
+          client: dataLayerClient,
+          jobId: selectedJobId,
+          table: tableToRemove,
+        });
+        setTables((prev) => prev.filter((table) => table.id !== tableId));
+      } catch (error) {
+        console.error('Error deleting power requirement table:', error);
+        toast({
+          title: "Error",
+          description: "Error al eliminar la tabla de requerimientos de potencia",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -702,8 +743,20 @@ const LightsConsumosTool: React.FC = () => {
                 metadata: buildPowerTableMetadata(updatedTable, settings),
               },
             });
-          } else if (!isTourDefaults && selectedJobId) {
-            savePowerRequirementTable(updatedTable);
+          } else if (!isTourDefaults && (isOverrideMode || selectedJobId)) {
+            void savePowerRequirementTable(updatedTable, { showToast: false })
+              .then((powerRequirementId) => {
+                if (powerRequirementId && powerRequirementId !== updatedTable.powerRequirementId) {
+                  setTables((storedTables) =>
+                    storedTables.map((storedTable) =>
+                      storedTable.id === tableId ? { ...storedTable, powerRequirementId } : storedTable
+                    )
+                  );
+                }
+              })
+              .catch((error) => {
+                console.error('Error saving table settings:', error);
+              });
           }
           return updatedTable;
         }

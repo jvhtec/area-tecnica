@@ -38,6 +38,24 @@ interface EditJobDialogProps {
   job: any;
 }
 
+const EDITABLE_JOB_DEPARTMENTS = new Set<string>(TECHNICAL_DEPARTMENTS);
+
+function isEditableJobDepartment(department: string | null | undefined): department is Department {
+  return Boolean(department) && EDITABLE_JOB_DEPARTMENTS.has(department);
+}
+
+function getDepartmentsFromJob(job: any): Department[] {
+  if (!Array.isArray(job?.job_departments)) return [];
+
+  return Array.from(
+    new Set(
+      job.job_departments
+        .map((row: { department?: string | null }) => row.department)
+        .filter(isEditableJobDepartment)
+    )
+  );
+}
+
 function isPrepDayEligibleJobType(jobType: JobType): boolean {
   return jobType !== "dryhire";
 }
@@ -66,7 +84,9 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
   const [timezone, setTimezone] = useState(job.timezone || "Europe/Madrid");
   const [invoicingCompany, setInvoicingCompany] = useState<InvoicingCompany | null>(job.invoicing_company || null);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
+  const [selectedDepartments, setSelectedDepartments] = useState<Department[]>(() => getDepartmentsFromJob(job));
+  const [departmentsLoaded, setDepartmentsLoaded] = useState(false);
+  const [departmentsLoadError, setDepartmentsLoadError] = useState<string | null>(null);
   const [isVenueBusy, setIsVenueBusy] = useState(false);
   const [requirementsOpen, setRequirementsOpen] = useState(false);
   const [prepDayDates, setPrepDayDates] = useState<string[]>([]);
@@ -100,6 +120,10 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
         setJobType(currentJob.job_type || "single");
         setTimezone(currentJob.timezone || "Europe/Madrid");
         setInvoicingCompany(currentJob.invoicing_company || null);
+        const jobDepartments = getDepartmentsFromJob(currentJob);
+        setSelectedDepartments(jobDepartments);
+        setDepartmentsLoaded(false);
+        setDepartmentsLoadError(null);
 
         // Convert UTC times to local input format using job's timezone
         if (currentJob.start_time && currentJob.end_time) {
@@ -156,23 +180,38 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
   // Fetch current departments when dialog opens
   useEffect(() => {
+    let cancelled = false;
+
     const fetchDepartments = async () => {
+      setDepartmentsLoaded(false);
+      setDepartmentsLoadError(null);
+
       const { data, error } = await dataLayerClient.from("job_departments")
         .select("department")
         .eq("job_id", job.id);
 
+      if (cancelled) return;
+
       if (error) {
         console.error("Error fetching departments:", error);
+        setDepartmentsLoadError("No se pudieron cargar los departamentos. Vuelve a intentarlo antes de guardar.");
         return;
       }
 
-      const departments = data.map(d => d.department as Department);
+      const departments = Array.from(
+        new Set((data || []).map((d) => d.department).filter(isEditableJobDepartment))
+      );
       setSelectedDepartments(departments);
+      setDepartmentsLoaded(true);
     };
 
     if (open && job.id) {
       fetchDepartments();
     }
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, job.id]);
 
   const handleDepartmentToggle = (department: Department) => {
@@ -209,6 +248,15 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
     setIsLoading(true);
 
     try {
+      if (!departmentsLoaded) {
+        throw new Error("Los departamentos aún se están cargando. Espera antes de guardar.");
+      }
+
+      const departmentsToSave = Array.from(new Set(selectedDepartments));
+      if (departmentsToSave.length === 0) {
+        throw new Error("Selecciona al menos un departamento antes de guardar.");
+      }
+
       // Convert local datetime-local input values to UTC using the job's timezone
       const startTimeUTC = localInputToUTC(startTime, timezone);
       const endTimeUTC = localInputToUTC(endTime, timezone);
@@ -282,11 +330,25 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
 
       if (currentDeptsError) throw currentDeptsError;
 
-      const currentDepartments = currentDepts?.map((d) => d.department) || [];
+      const currentDepartments = Array.from(
+        new Set((currentDepts || []).map((d) => d.department).filter(isEditableJobDepartment))
+      );
 
-      // Remove deselected departments
+      // Add new departments before removing old ones. If the save is interrupted,
+      // the job remains visible in inner-join job queries.
+      const toAdd = departmentsToSave.filter((dept) => !currentDepartments.includes(dept));
+      if (toAdd.length > 0) {
+        const { error: insertDeptError } = await dataLayerClient.from("job_departments")
+          .upsert(
+            toAdd.map((department) => ({ job_id: job.id, department })),
+            { onConflict: "job_id,department", ignoreDuplicates: true }
+          );
+        if (insertDeptError) throw insertDeptError;
+      }
+
+      // Remove deselected departments after additions have been persisted.
       const toRemove = currentDepartments.filter(
-        (dept) => !selectedDepartments.includes(dept as Department)
+        (dept) => !departmentsToSave.includes(dept)
       );
       if (toRemove.length > 0) {
         const { error: deleteDeptError } = await dataLayerClient.from("job_departments")
@@ -294,14 +356,6 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
           .eq("job_id", job.id)
           .in("department", toRemove);
         if (deleteDeptError) throw deleteDeptError;
-      }
-
-      // Add new departments
-      const toAdd = selectedDepartments.filter((dept) => !currentDepartments.includes(dept));
-      if (toAdd.length > 0) {
-        const { error: insertDeptError } = await dataLayerClient.from("job_departments")
-          .insert(toAdd.map((department) => ({ job_id: job.id, department })));
-        if (insertDeptError) throw insertDeptError;
       }
 
       // Broadcast push notification about update (summarized changes)
@@ -599,6 +653,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                     <Checkbox
                       id={`department-${department}`}
                       checked={selectedDepartments.includes(department)}
+                      disabled={!departmentsLoaded || isLoading}
                       onCheckedChange={() => handleDepartmentToggle(department)}
                     />
                     <Label htmlFor={`department-${department}`}>
@@ -607,6 +662,15 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
                   </div>
                 ))}
               </div>
+              {departmentsLoadError && (
+                <p className="text-sm text-destructive">{departmentsLoadError}</p>
+              )}
+              {!departmentsLoaded && !departmentsLoadError && (
+                <p className="text-sm text-muted-foreground">Cargando departamentos...</p>
+              )}
+              {departmentsLoaded && selectedDepartments.length === 0 && (
+                <p className="text-sm text-destructive">Selecciona al menos un departamento.</p>
+              )}
               {jobType !== 'dryhire' && (
                 <div className="pt-2">
                   <Button
@@ -629,7 +693,11 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading || isVenueBusy} className="bg-blue-600 hover:bg-blue-500 text-white">
+              <Button
+                type="submit"
+                disabled={isLoading || isVenueBusy || !departmentsLoaded || selectedDepartments.length === 0}
+                className="bg-blue-600 hover:bg-blue-500 text-white"
+              >
                 {isLoading ? "Saving..." : "Save Changes"}
               </Button>
             </div>

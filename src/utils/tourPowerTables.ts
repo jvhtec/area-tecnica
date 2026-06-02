@@ -35,6 +35,9 @@ const isRecord = (value: unknown): value is JsonRecord =>
 const getNumber = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 
+const clampSafetyMargin = (value: number): number =>
+  Math.min(Math.max(value, 0), 100);
+
 const getBoolean = (value: unknown): boolean | undefined =>
   typeof value === 'boolean' ? value : undefined;
 
@@ -68,8 +71,12 @@ export const computePowerTotalVa = (
     candidatePf <= 1
       ? candidatePf
       : DEFAULT_POWER_FACTOR[department];
+  const safetyMargin = clampSafetyMargin(
+    getNumber(isRecord(metadata) ? metadata.safetyMargin : undefined) ?? 0
+  );
+  const adjustedWatts = watts * (1 + safetyMargin / 100);
 
-  return watts / storedPf;
+  return adjustedWatts / storedPf;
 };
 
 export const sortTourPowerDefaultTables = (tables: TourDefaultTableRow[]) =>
@@ -109,7 +116,13 @@ export const normalizeTourDefaultPowerTable = (
   table: TourDefaultTableRow,
   department: TechnicalPowerDepartment
 ): NormalizedTourPowerTable => {
-  const metadata = isRecord(table.metadata) ? table.metadata : {};
+  const tableData = isRecord(table.table_data) ? table.table_data : {};
+  const metadata = {
+    ...(isRecord(table.metadata) ? table.metadata : {}),
+    safetyMargin: isRecord(table.metadata) && table.metadata.safetyMargin !== undefined
+      ? table.metadata.safetyMargin
+      : tableData.safetyMargin,
+  };
   const pduType = String(getMetadataValue(metadata, 'pdu_type', ''));
   const customPduType = String(getMetadataValue(metadata, 'custom_pdu_type', ''));
   const position = String(getMetadataValue(metadata, 'position', ''));

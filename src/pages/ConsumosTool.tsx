@@ -24,10 +24,11 @@ import {
 } from '@/features/technical-tools/power/powerCalculations';
 import {
   buildPowerOverridePayload,
-  buildPowerRequirementInsert,
   buildPowerTableData,
   buildPowerTableMetadata,
   buildTourPowerDefaultTable,
+  deleteJobPowerRequirementTable,
+  saveJobPowerRequirementTable,
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
 import {
@@ -195,22 +196,28 @@ const ConsumosTool: React.FC = () => {
   const getPowerSettings = () => ({ safetyMargin, powerFactor: pf, phaseMode, voltage });
   const PDU_TYPES = getPowerPduOptions('sound', phaseMode);
 
-  const savePowerRequirementTable = async (table: Table) => {
+  const savePowerRequirementTable = async (
+    table: Table,
+    { showToast = true }: { showToast?: boolean } = {},
+  ) => {
     try {
-      const { error } = await dataLayerClient.from('power_requirement_tables')
-        .insert(buildPowerRequirementInsert({
-          department: 'sound',
-          jobId: selectedJobId,
-          settings: getPowerSettings(),
-          table,
-        }));
+      const powerRequirementId = await saveJobPowerRequirementTable({
+        client: dataLayerClient,
+        department: 'sound',
+        jobId: selectedJobId,
+        settings: getPowerSettings(),
+        table,
+      });
 
-      if (error) throw error;
+      if (showToast) {
+        toast({ title: "Success", description: "Power requirement table saved successfully" });
+      }
 
-      toast({ title: "Success", description: "Power requirement table saved successfully" });
+      return powerRequirementId;
     } catch (error: any) {
       console.error('Error saving power requirement table:', error);
       toast({ title: "Error", description: "Failed to save power requirement table", variant: "destructive" });
+      return table.powerRequirementId;
     }
   };
 
@@ -305,16 +312,20 @@ const ConsumosTool: React.FC = () => {
       },
     }) as Table;
 
-    setTables((prev) => [...prev, newTable]);
+    let tableToAdd = newTable;
 
     if (isTourDefaults) {
       // user can tweak before saving defaults
     } else if (isJobOverrideMode) {
       await saveTourOverride(newTable);
     } else if (selectedJobId) {
-      await savePowerRequirementTable(newTable);
+      const powerRequirementId = await savePowerRequirementTable(newTable);
+      if (powerRequirementId) {
+        tableToAdd = { ...newTable, powerRequirementId };
+      }
     }
 
+    setTables((prev) => [...prev, tableToAdd]);
     resetCurrentTable();
   };
 
@@ -329,8 +340,29 @@ const ConsumosTool: React.FC = () => {
     setEditingOverride(null);
   };
 
-  const removeTable = (tableId: number | string) => {
-    setTables((prev) => prev.filter((table) => table.id !== tableId));
+  const removeTable = async (tableId: number | string) => {
+    const tableToRemove = tables.find((table) => table.id === tableId);
+    if (!tableToRemove) {
+      toast({ title: "Error", description: "Power requirement table not found", variant: "destructive" });
+      return;
+    }
+
+    if (!selectedJobId || isTourDefaults || isJobOverrideMode || !tableToRemove?.powerRequirementId) {
+      setTables((prev) => prev.filter((table) => table.id !== tableId));
+      return;
+    }
+
+    try {
+      await deleteJobPowerRequirementTable({
+        client: dataLayerClient,
+        jobId: selectedJobId,
+        table: tableToRemove,
+      });
+      setTables((prev) => prev.filter((table) => table.id !== tableId));
+    } catch (error) {
+      console.error('Error deleting power requirement table:', error);
+      toast({ title: "Error", description: "Failed to delete power requirement table", variant: "destructive" });
+    }
   };
 
   // Save unsaved default tables
@@ -363,41 +395,47 @@ const ConsumosTool: React.FC = () => {
   };
 
   const updateTableSettings = async (tableId: number | string, updates: Partial<Table>) => {
+    const existingTable = tables.find((table) => table.id === tableId);
+    if (!existingTable) return;
+
+    const updatedTable = { ...existingTable, ...updates };
     setTables((prev) =>
-      prev.map((table) => {
-        if (table.id === tableId) {
-          const updatedTable = { ...table, ...updates };
-          if (isTourDefaults && table.isDefault && table.defaultTableId && updateTourDefaultTable) {
-            updateTourDefaultTable({
-              tableId: table.defaultTableId,
-              updates: {
-                table_data: buildPowerTableData(updatedTable, getPowerSettings()),
-                total_value: updatedTable.totalWatts || 0,
-                metadata: buildPowerTableMetadata(updatedTable, getPowerSettings()),
-              }
-            });
-          } else if (isJobOverrideMode && table.isOverride && table.overrideId && updatePowerOverride) {
-            updatePowerOverride({
-              id: table.overrideId,
-              data: {
-                total_watts: updatedTable.totalWatts || 0,
-                current_per_phase: updatedTable.currentPerPhase || 0,
-                pdu_type: updatedTable.customPduType || updatedTable.pduType || '',
-                custom_pdu_type: updatedTable.customPduType,
-                position: updatedTable.position || null,
-                custom_position: updatedTable.customPosition || null,
-                includes_hoist: updatedTable.includesHoist || false,
-                override_data: buildPowerTableData(updatedTable, getPowerSettings()),
-              }
-            });
-          } else if (selectedJobId) {
-            savePowerRequirementTable(updatedTable);
-          }
-          return updatedTable;
-        }
-        return table;
-      })
+      prev.map((table) => (table.id === tableId ? updatedTable : table))
     );
+
+    if (isTourDefaults && existingTable.isDefault && existingTable.defaultTableId && updateTourDefaultTable) {
+      updateTourDefaultTable({
+        tableId: existingTable.defaultTableId,
+        updates: {
+          table_data: buildPowerTableData(updatedTable, getPowerSettings()),
+          total_value: updatedTable.totalWatts || 0,
+          metadata: buildPowerTableMetadata(updatedTable, getPowerSettings()),
+        }
+      });
+    } else if (isJobOverrideMode && existingTable.isOverride && existingTable.overrideId && updatePowerOverride) {
+      updatePowerOverride({
+        id: existingTable.overrideId,
+        data: {
+          total_watts: updatedTable.totalWatts || 0,
+          current_per_phase: updatedTable.currentPerPhase || 0,
+          pdu_type: updatedTable.customPduType || updatedTable.pduType || '',
+          custom_pdu_type: updatedTable.customPduType,
+          position: updatedTable.position || null,
+          custom_position: updatedTable.customPosition || null,
+          includes_hoist: updatedTable.includesHoist || false,
+          override_data: buildPowerTableData(updatedTable, getPowerSettings()),
+        }
+      });
+    } else if (selectedJobId) {
+      const powerRequirementId = await savePowerRequirementTable(updatedTable, { showToast: false });
+      if (powerRequirementId && powerRequirementId !== updatedTable.powerRequirementId) {
+        setTables((prev) =>
+          prev.map((table) =>
+            table.id === tableId ? { ...table, powerRequirementId } : table
+          )
+        );
+      }
+    }
   };
 
   const handleExportPDF = async () => {

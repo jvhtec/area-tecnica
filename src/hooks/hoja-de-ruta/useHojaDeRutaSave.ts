@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { EventData, TravelArrangement, Accommodation } from '@/types/hoja-de-ruta';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { formatPowerRequirementsText } from '@/utils/powerSummaryData';
 
 type SaveHojaDeRutaFn = (args: { eventData: EventData; userId: string }) => Promise<unknown>;
 type SaveTravelArrangementsFn = (travel: TravelArrangement[]) => Promise<unknown>;
@@ -63,28 +64,15 @@ export const useHojaDeRutaSave = (
       const { data: powerRequirements, error: powerError } = await supabase
         .from("power_requirement_tables")
         .select("*")
-        .eq("job_id", selectedJobId);
+        .eq("job_id", selectedJobId)
+        .order("created_at", { ascending: true });
 
       if (powerError) throw powerError;
 
       // Always update power requirements if available
       if (powerRequirements && powerRequirements.length > 0) {
         console.log("⚡ SAVE: Updating power requirements");
-        const powerText = powerRequirements
-          .map((req: {
-            department?: string | null;
-            table_name?: string | null;
-            total_watts?: number | string | null;
-            current_per_phase?: number | string | null;
-            pdu_type?: string | null;
-          }) => {
-            const department = (req.department || 'general').toUpperCase();
-            return `${department} - ${req.table_name || 'tabla'}:\n` +
-              `Potencia Total: ${req.total_watts ?? 'N/D'}W\n` +
-              `Corriente por Fase: ${req.current_per_phase ?? 'N/D'}A\n` +
-              `PDU Recomendado: ${req.pdu_type ?? 'N/D'}\n`;
-          })
-          .join("\n");
+        const powerText = formatPowerRequirementsText(powerRequirements);
 
         return { powerRequirements: powerText };
       }

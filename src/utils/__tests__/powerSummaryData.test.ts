@@ -114,6 +114,7 @@ describe('powerSummaryData', () => {
           pdu_type: 'CEE125A 3P+N+G',
           custom_pdu_type: null,
           includes_hoist: false,
+          table_data: { rows: [{ quantity: '1', componentId: '1', watts: '31500' }] },
         },
         {
           id: 'sound-new',
@@ -126,6 +127,7 @@ describe('powerSummaryData', () => {
           pdu_type: 'CEE125A 3P+N+G',
           custom_pdu_type: null,
           includes_hoist: true,
+          table_data: { rows: [{ quantity: '1', componentId: '1', watts: '31500' }] },
         },
       ],
     });
@@ -138,6 +140,133 @@ describe('powerSummaryData', () => {
     expect(summary.departments.sound.rows).toHaveLength(1);
     expect(summary.departments.sound.rows[0].name).toBe('MAIN L');
     expect(summary.departments.sound.rows[0].notes).toContain('CEE32A');
+  });
+
+  it('uses input order instead of lexicographic ids to break duplicate save freshness ties', async () => {
+    const supabase = createMockSupabase({
+      power_requirement_tables: [
+        {
+          id: 'z-old-id',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'MAIN L',
+          total_watts: 31500,
+          current_per_phase: 57.43,
+          pdu_type: 'CEE125A 3P+N+G',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: { rows: [{ quantity: '1', componentId: '1', watts: '31500' }] },
+        },
+        {
+          id: 'a-new-id',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'MAIN L',
+          total_watts: 31500,
+          current_per_phase: 57.43,
+          pdu_type: 'CEE125A 3P+N+G',
+          custom_pdu_type: null,
+          includes_hoist: true,
+          table_data: { rows: [{ quantity: '1', componentId: '1', watts: '31500' }] },
+        },
+      ],
+    });
+
+    const summary = await loadTechnicalPowerSummaryData({
+      job: { id: 'job-1', job_type: 'single' },
+      supabase,
+    });
+
+    expect(summary.departments.sound.rows).toHaveLength(1);
+    expect(summary.departments.sound.rows[0].notes).toContain('CEE32A');
+  });
+
+  it('keeps multiple current tables for the same department when they have distinct saved identities', async () => {
+    const supabase = createMockSupabase({
+      power_requirement_tables: [
+        {
+          id: 'sound-stage-1',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'Main PA',
+          total_watts: 1000,
+          current_per_phase: 4,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          position: 'Stage 1',
+          custom_position: null,
+          includes_hoist: false,
+          table_data: {
+            sourceTableId: 'stage-1-table',
+            rows: [{ quantity: '1', componentId: '1', watts: '1000' }],
+          },
+        },
+        {
+          id: 'sound-stage-2',
+          created_at: '2026-04-07T08:05:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'Main PA',
+          total_watts: 1200,
+          current_per_phase: 5,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          position: 'Stage 2',
+          custom_position: null,
+          includes_hoist: false,
+          table_data: {
+            sourceTableId: 'stage-2-table',
+            rows: [{ quantity: '1', componentId: '1', watts: '1000' }],
+          },
+        },
+      ],
+    });
+
+    const summary = await loadTechnicalPowerSummaryData({
+      job: { id: 'job-1', job_type: 'single' },
+      supabase,
+    });
+
+    expect(summary.departments.sound.rows).toHaveLength(2);
+    expect(summary.departments.sound.rows.map((row) => row.positionLabel)).toEqual([
+      'Stage 1',
+      'Stage 2',
+    ]);
+  });
+
+  it('uses saved job table electrical settings when calculating apparent power', async () => {
+    const supabase = createMockSupabase({
+      power_requirement_tables: [
+        {
+          id: 'sound-1',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'FoH',
+          total_watts: 950,
+          current_per_phase: 5,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: {
+            pf: 0.95,
+            safetyMargin: 20,
+            rows: [{ quantity: '1', componentId: '1', watts: '950' }],
+          },
+        },
+      ],
+    });
+
+    const summary = await loadTechnicalPowerSummaryData({
+      job: { id: 'job-1', job_type: 'single' },
+      supabase,
+    });
+
+    expect(summary.departments.sound.rows[0].totalVa).toBe(1200);
+    expect(summary.departments.sound.totalKva).toBe(1.2);
   });
 
   it('prefers tour date overrides over defaults for tourdate jobs', async () => {
