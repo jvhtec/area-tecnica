@@ -18,6 +18,18 @@ export type {
   ImagePreviews
 };
 
+export interface GeneratedHojaDeRutaPdf {
+  blob: Blob;
+  filename: string;
+  title: string;
+}
+
+export type HojaDeRutaPdfToast = (props: {
+  title: string;
+  description?: string;
+  variant?: string;
+}) => void;
+
 // PDF-specific types
 export interface PDFGenerationOptions {
   eventData: EventData;
@@ -28,7 +40,7 @@ export interface PDFGenerationOptions {
   selectedJobId: string;
   jobTitle: string;
   jobDate?: string;
-  toast?: any;
+  toast?: HojaDeRutaPdfToast;
   accommodations?: Accommodation[];
   // Rendering options (defaults applied in engine)
   includeAccommodationRooming?: boolean;
@@ -45,5 +57,5 @@ export interface DriverCertificatePDFGenerationOptions {
   jobTitle: string;
   jobDate?: string;
   venueMapPreview?: string | null;
-  toast?: any;
+  toast?: HojaDeRutaPdfToast;
 }
