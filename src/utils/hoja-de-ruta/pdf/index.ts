@@ -4,28 +4,62 @@ export {
   getHojaDeRutaPdfSelectionLabel,
   HOJA_DE_RUTA_PDF_SECTIONS
 } from '@/utils/hoja-de-ruta/pdf/section-options';
-export type { DriverCertificatePDFGenerationOptions, PDFGenerationOptions } from '@/utils/hoja-de-ruta/pdf/core/pdf-types';
+export type {
+  DriverCertificatePDFGenerationOptions,
+  GeneratedHojaDeRutaPdf,
+  PDFGenerationOptions,
+} from '@/utils/hoja-de-ruta/pdf/core/pdf-types';
 export type { HojaDeRutaPdfSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
 import { PDFEngine } from '@/utils/hoja-de-ruta/pdf/pdf-engine';
 import { DriverCertificatePDFEngine } from '@/utils/hoja-de-ruta/pdf/driver-certificate-pdf-engine';
-import type { DriverCertificatePDFGenerationOptions, PDFGenerationOptions } from '@/utils/hoja-de-ruta/pdf/core/pdf-types';
+import type {
+  DriverCertificatePDFGenerationOptions,
+  GeneratedHojaDeRutaPdf,
+  PDFGenerationOptions,
+} from '@/utils/hoja-de-ruta/pdf/core/pdf-types';
+
+const createPDFEngine = (
+  eventData: PDFGenerationOptions['eventData'],
+  travelArrangements: PDFGenerationOptions['travelArrangements'],
+  roomAssignments: PDFGenerationOptions['roomAssignments'],
+  imagePreviews: PDFGenerationOptions['imagePreviews'],
+  venueMapPreview: string | null,
+  selectedJobId: string,
+  jobTitle: string,
+  jobDate?: string,
+  toast?: PDFGenerationOptions['toast'],
+  accommodations?: PDFGenerationOptions['accommodations'],
+  pdfOptions?: Pick<PDFGenerationOptions, 'sections'>
+) => new PDFEngine({
+  eventData,
+  travelArrangements,
+  roomAssignments,
+  imagePreviews,
+  venueMapPreview,
+  selectedJobId,
+  jobTitle,
+  jobDate,
+  toast,
+  accommodations,
+  ...pdfOptions
+});
 
 // Main export function for backward compatibility
 export const generatePDF = async (
-  eventData: any,
-  travelArrangements: any[],
-  roomAssignments: any[],
-  imagePreviews: any,
+  eventData: PDFGenerationOptions['eventData'],
+  travelArrangements: PDFGenerationOptions['travelArrangements'],
+  roomAssignments: PDFGenerationOptions['roomAssignments'],
+  imagePreviews: PDFGenerationOptions['imagePreviews'],
   venueMapPreview: string | null,
   selectedJobId: string,
   jobTitle: string,
   // Optional parameters to enhance headers without breaking callers
   jobDate?: string,
-  toast?: any,
-  accommodations?: any[],
+  toast?: PDFGenerationOptions['toast'],
+  accommodations?: PDFGenerationOptions['accommodations'],
   pdfOptions?: Pick<PDFGenerationOptions, 'sections'>
 ): Promise<void> => {
-  const engine = new PDFEngine({
+  const engine = createPDFEngine(
     eventData,
     travelArrangements,
     roomAssignments,
@@ -36,10 +70,40 @@ export const generatePDF = async (
     jobDate,
     toast,
     accommodations,
-    ...pdfOptions
-  });
+    pdfOptions
+  );
   
   return engine.generate();
+};
+
+export const generatePDFPreview = async (
+  eventData: PDFGenerationOptions['eventData'],
+  travelArrangements: PDFGenerationOptions['travelArrangements'],
+  roomAssignments: PDFGenerationOptions['roomAssignments'],
+  imagePreviews: PDFGenerationOptions['imagePreviews'],
+  venueMapPreview: string | null,
+  selectedJobId: string,
+  jobTitle: string,
+  jobDate?: string,
+  toast?: PDFGenerationOptions['toast'],
+  accommodations?: PDFGenerationOptions['accommodations'],
+  pdfOptions?: Pick<PDFGenerationOptions, 'sections'>
+): Promise<GeneratedHojaDeRutaPdf> => {
+  const engine = createPDFEngine(
+    eventData,
+    travelArrangements,
+    roomAssignments,
+    imagePreviews,
+    venueMapPreview,
+    selectedJobId,
+    jobTitle,
+    jobDate,
+    toast,
+    accommodations,
+    pdfOptions
+  );
+
+  return engine.generatePreview();
 };
 
 export const generateDriverCertificatePDF = async (
@@ -47,4 +111,11 @@ export const generateDriverCertificatePDF = async (
 ): Promise<void> => {
   const engine = new DriverCertificatePDFEngine(options);
   return engine.generate();
+};
+
+export const generateDriverCertificatePDFPreview = async (
+  options: DriverCertificatePDFGenerationOptions
+): Promise<GeneratedHojaDeRutaPdf> => {
+  const engine = new DriverCertificatePDFEngine(options);
+  return engine.generatePreview();
 };

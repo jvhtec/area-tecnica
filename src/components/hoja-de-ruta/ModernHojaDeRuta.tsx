@@ -63,12 +63,21 @@ import { ModernStatusIndicator } from "./components/ModernStatusIndicator";
 import { ModernProgressTracker } from "./components/ModernProgressTracker";
 import { ModernWeatherSection } from "./sections/ModernWeatherSection";
 import { ModernRestaurantSection } from "./sections/ModernRestaurantSection";
-import { HojaDeRutaPrintDialog } from "./HojaDeRutaPrintDialog";
+import {
+  HojaDeRutaPrintDialog,
+  type HojaDeRutaPrintPreviewTarget,
+} from "./HojaDeRutaPrintDialog";
+import {
+  HojaDeRutaPdfPreviewDialog,
+  type HojaDeRutaPdfPreview,
+} from "./HojaDeRutaPdfPreviewDialog";
 import { generateHojaDeRutaXLS } from "@/utils/hojaDeRutaExport";
 import {
   getHojaDeRutaPdfSectionLabel,
+  type GeneratedHojaDeRutaPdf,
   type HojaDeRutaPdfSectionId,
 } from "@/utils/hoja-de-ruta/pdf";
+import type { EventData, HojaDeRutaMetadata } from "@/types/hoja-de-ruta";
 import type { LucideIcon } from "lucide-react";
 
 type ModernHojaDeRutaProps = {
@@ -84,6 +93,10 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPrintDialog, setShowPrintDialog] = useState(false);
   const [generatingSectionId, setGeneratingSectionId] = useState<HojaDeRutaPdfSectionId | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [previewingTarget, setPreviewingTarget] = useState<HojaDeRutaPrintPreviewTarget>(null);
+  const [showPdfPreviewDialog, setShowPdfPreviewDialog] = useState(false);
+  const [pdfPreview, setPdfPreview] = useState<HojaDeRutaPdfPreview | null>(null);
 
   // Get image management functions first (needed for form hook)
   const {
@@ -172,6 +185,14 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     }
   }, [routedJobId, selectedJobId, setSelectedJobId]);
 
+  useEffect(() => {
+    return () => {
+      if (pdfPreview?.url) {
+        URL.revokeObjectURL(pdfPreview.url);
+      }
+    };
+  }, [pdfPreview?.url]);
+
   // Calculate completion progress including weather and restaurants
   useEffect(() => {
     const calculateProgress = () => {
@@ -196,41 +217,89 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     calculateProgress();
   }, [eventData, travelArrangements, accommodations]);
 
-  const buildPdfEventData = () => ({
+  const normalizeHojaStatus = (status?: string | null): HojaDeRutaMetadata["status"] => {
+    if (status === "draft" || status === "review" || status === "approved" || status === "final") {
+      return status;
+    }
+    return "draft";
+  };
+
+  const buildPdfEventData = (): EventData => ({
     ...eventData,
     metadata: hojaDeRuta ? {
       id: hojaDeRuta.id,
       document_version: hojaDeRuta.document_version || 1,
-      status: hojaDeRuta.status || 'draft',
+      status: normalizeHojaStatus(hojaDeRuta.status),
       created_at: hojaDeRuta.created_at || new Date().toISOString(),
       updated_at: hojaDeRuta.updated_at || new Date().toISOString(),
       last_modified: hojaDeRuta.last_modified || new Date().toISOString(),
     } : undefined
   });
 
+  const getRequiredSelectedJobId = () => {
+    if (selectedJobId) return selectedJobId;
+
+    toast({
+      title: "Error",
+      description: "Por favor, seleccione un trabajo antes de generar el documento.",
+      variant: "destructive",
+    });
+    return null;
+  };
+
+  const getSelectedJobDetails = (jobIdToFind = selectedJobId) => jobs?.find(job => job.id === jobIdToFind);
+
+  const saveBeforePdfGeneration = async () => {
+    if (isDirty || hasSavedData) {
+      await handleSaveAll();
+    }
+  };
+
+  const openGeneratedPdfPreview = (generatedPdf: GeneratedHojaDeRutaPdf) => {
+    setPdfPreview({
+      url: URL.createObjectURL(generatedPdf.blob),
+      filename: generatedPdf.filename,
+      title: generatedPdf.title,
+    });
+    setShowPrintDialog(false);
+    setShowPdfPreviewDialog(true);
+  };
+
+  const handlePdfPreviewOpenChange = (open: boolean) => {
+    setShowPdfPreviewDialog(open);
+  };
+
+  const handleDownloadPdfPreview = () => {
+    if (!pdfPreview) return;
+
+    const link = document.createElement("a");
+    link.href = pdfPreview.url;
+    link.download = pdfPreview.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  };
+
+  const handleOpenPdfPreviewInNewTab = () => {
+    if (!pdfPreview) return;
+    window.open(pdfPreview.url, "_blank", "noopener,noreferrer");
+  };
+
   // Enhanced PDF generation using the working functionality
   const handleGeneratePDF = async () => {
-    if (!selectedJobId) {
-      toast({
-        title: "Error",
-        description: "Por favor, seleccione un trabajo antes de generar el documento.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const currentJobId = getRequiredSelectedJobId();
+    if (!currentJobId) return;
 
     setGeneratingSectionId(null);
     setIsGenerating(true);
     try {
       // Save data first if there are changes
-      if (isDirty || hasSavedData) {
-        await handleSaveAll();
-      }
+      await saveBeforePdfGeneration();
 
       const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
       const enhancedEventData = buildPdfEventData();
 
-      const jobDetails = jobs?.find(job => job.id === selectedJobId);
+      const jobDetails = getSelectedJobDetails(currentJobId);
       // Convert accommodations to legacy room assignments for PDF generation
       const legacyRoomAssignments = accommodations.flatMap(acc => acc.rooms);
       
@@ -240,7 +309,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
         legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,
-        selectedJobId,
+        currentJobId,
         jobDetails?.title || "",
         jobDetails?.start_time || undefined,
         toast,
@@ -266,24 +335,16 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
   };
 
   const handleGenerateSectionPDF = async (sectionId: HojaDeRutaPdfSectionId) => {
-    if (!selectedJobId) {
-      toast({
-        title: "Error",
-        description: "Por favor, seleccione un trabajo antes de generar el documento.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const currentJobId = getRequiredSelectedJobId();
+    if (!currentJobId) return;
 
     setGeneratingSectionId(sectionId);
     setIsGenerating(true);
     try {
-      if (isDirty || hasSavedData) {
-        await handleSaveAll();
-      }
+      await saveBeforePdfGeneration();
 
       const { generatePDF } = await import("@/utils/hoja-de-ruta/pdf");
-      const jobDetails = jobs?.find(job => job.id === selectedJobId);
+      const jobDetails = getSelectedJobDetails(currentJobId);
       const legacyRoomAssignments = accommodations.flatMap(acc => acc.rooms);
 
       await generatePDF(
@@ -292,7 +353,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
         legacyRoomAssignments,
         imagePreviews,
         venueMapPreview,
-        selectedJobId,
+        currentJobId,
         jobDetails?.title || "",
         jobDetails?.start_time || undefined,
         toast,
@@ -312,30 +373,65 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     }
   };
 
-  const handleGenerateDriverCertificatePDF = async () => {
-    if (!selectedJobId) {
+  const handlePreviewPDF = async (sectionId?: HojaDeRutaPdfSectionId) => {
+    const currentJobId = getRequiredSelectedJobId();
+    if (!currentJobId) return;
+
+    const target = sectionId ?? "full";
+    setPdfPreview(null);
+    setPreviewingTarget(target);
+    setIsPreviewing(true);
+    try {
+      await saveBeforePdfGeneration();
+
+      const { generatePDFPreview } = await import("@/utils/hoja-de-ruta/pdf");
+      const jobDetails = getSelectedJobDetails(currentJobId);
+      const legacyRoomAssignments = accommodations.flatMap(acc => acc.rooms);
+
+      const generatedPdf = await generatePDFPreview(
+        buildPdfEventData(),
+        travelArrangements,
+        legacyRoomAssignments,
+        imagePreviews,
+        venueMapPreview,
+        currentJobId,
+        jobDetails?.title || "",
+        jobDetails?.start_time || undefined,
+        undefined,
+        accommodations,
+        sectionId ? { sections: [sectionId] } : undefined
+      );
+
+      openGeneratedPdfPreview(generatedPdf);
+    } catch (error) {
+      console.error("Error previewing PDF:", error);
       toast({
-        title: "Error",
-        description: "Por favor, seleccione un trabajo antes de generar la hoja de transportes.",
+        title: "❌ Error",
+        description: "Hubo un problema al preparar la vista previa.",
         variant: "destructive",
       });
-      return;
+    } finally {
+      setIsPreviewing(false);
+      setPreviewingTarget(null);
     }
+  };
+
+  const handleGenerateDriverCertificatePDF = async () => {
+    const currentJobId = getRequiredSelectedJobId();
+    if (!currentJobId) return;
 
     setGeneratingSectionId(null);
     setIsGenerating(true);
     try {
-      if (isDirty || hasSavedData) {
-        await handleSaveAll();
-      }
+      await saveBeforePdfGeneration();
 
       const { generateDriverCertificatePDF } = await import("@/utils/hoja-de-ruta/pdf");
 
-      const jobDetails = jobs?.find(job => job.id === selectedJobId);
+      const jobDetails = getSelectedJobDetails(currentJobId);
 
       await generateDriverCertificatePDF({
         eventData,
-        selectedJobId,
+        selectedJobId: currentJobId,
         jobTitle: jobDetails?.title || "",
         jobDate: jobDetails?.start_time || undefined,
         venueMapPreview,
@@ -350,6 +446,41 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
       });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handlePreviewDriverCertificatePDF = async () => {
+    const currentJobId = getRequiredSelectedJobId();
+    if (!currentJobId) return;
+
+    setPdfPreview(null);
+    setPreviewingTarget("driver-certificate");
+    setIsPreviewing(true);
+    try {
+      await saveBeforePdfGeneration();
+
+      const { generateDriverCertificatePDFPreview } = await import("@/utils/hoja-de-ruta/pdf");
+      const jobDetails = getSelectedJobDetails(currentJobId);
+
+      const generatedPdf = await generateDriverCertificatePDFPreview({
+        eventData,
+        selectedJobId: currentJobId,
+        jobTitle: jobDetails?.title || "",
+        jobDate: jobDetails?.start_time || undefined,
+        venueMapPreview,
+      });
+
+      openGeneratedPdfPreview(generatedPdf);
+    } catch (error) {
+      console.error("Error previewing driver certificate PDF:", error);
+      toast({
+        title: "❌ Error",
+        description: "Hubo un problema al preparar la vista previa de transportes.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPreviewing(false);
+      setPreviewingTarget(null);
     }
   };
 
@@ -835,10 +966,22 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
         onGeneratePDF={handleGeneratePDF}
         onGenerateDriverCertificatePDF={handleGenerateDriverCertificatePDF}
         onGenerateSectionPDF={handleGenerateSectionPDF}
+        onPreviewPDF={() => { void handlePreviewPDF(); }}
+        onPreviewDriverCertificatePDF={handlePreviewDriverCertificatePDF}
+        onPreviewSectionPDF={handlePreviewPDF}
         onGenerateXLS={handleGenerateXLS}
         sections={tabConfig}
         isGenerating={isGenerating}
         generatingSectionId={generatingSectionId}
+        isPreviewing={isPreviewing}
+        previewingTarget={previewingTarget}
+      />
+      <HojaDeRutaPdfPreviewDialog
+        open={showPdfPreviewDialog}
+        preview={pdfPreview}
+        onOpenChange={handlePdfPreviewOpenChange}
+        onDownload={handleDownloadPdfPreview}
+        onOpenInNewTab={handleOpenPdfPreviewInNewTab}
       />
     </div>
   );

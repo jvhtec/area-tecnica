@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 
 import { uploadPdfToJob } from '../pdf-upload';
 import { PDFDocument } from './core/pdf-document';
-import { DriverCertificatePDFGenerationOptions } from './core/pdf-types';
+import type { DriverCertificatePDFGenerationOptions, GeneratedHojaDeRutaPdf } from './core/pdf-types';
 import { FooterService } from './services/footer-service';
 import { HeaderService } from './services/header-service';
 import { LogoService } from './services/logo-service';
@@ -32,6 +32,23 @@ type CertificateJobContext = {
   jobLocation?: string | null;
 };
 
+type WarehouseFallbackJobRow = {
+  id: string;
+  title: string | null;
+  start_time: string | null;
+};
+
+type DeliveryCertificateJobRow = {
+  invoicing_company: string | null;
+  location: {
+    name: string | null;
+    formatted_address: string | null;
+  } | Array<{
+    name: string | null;
+    formatted_address: string | null;
+  }> | null;
+};
+
 export class DriverCertificatePDFEngine {
   private pdfDoc: PDFDocument;
   private deliveryCertificateSection: DeliveryCertificateSection;
@@ -42,51 +59,13 @@ export class DriverCertificatePDFEngine {
   }
 
   async generate(): Promise<void> {
-    const {
-      eventData,
-      selectedJobId,
-      jobTitle,
-      jobDate,
-      venueMapPreview = null,
-      toast,
-    } = this.options;
+    const { selectedJobId, toast } = this.options;
 
     try {
-      const [logoData, logisticsEvents, certificateJobContext, sectorProStamp] = await Promise.all([
-        LogoService.loadJobLogo(selectedJobId),
-        this.fetchWarehouseLogisticsEvents(selectedJobId, eventData),
-        this.fetchDeliveryCertificateJobContext(selectedJobId),
-        StampService.loadExactSectorProStamp(),
-      ]);
+      const generatedPdf = await this.renderPDF();
 
-      const headerLogoDims = await this.getHeaderLogoDims(logoData);
-      HeaderService.addHeaderToCurrentPage(
-        this.pdfDoc,
-        'Hoja de Transportes',
-        jobTitle,
-        jobDate,
-        logoData || undefined,
-        headerLogoDims
-      );
-
-      let yPosition = 54;
-
-      yPosition = await this.addVenueSection(eventData, yPosition, venueMapPreview);
-      yPosition = this.addContactsSection(eventData, yPosition);
-      yPosition = this.addWarehouseScheduleSection(logisticsEvents, yPosition);
-
-      const logisticsTypeBySourceId = new Map<string, string>(
-        logisticsEvents.map((event) => [event.id, event.event_type])
-      );
-      yPosition = this.addVenueScheduleSection(eventData, yPosition, logisticsTypeBySourceId);
-      yPosition = this.addLegalCertificateSection(eventData, yPosition, {
-        ...certificateJobContext,
-        issueDate: new Date(),
-        stamp: sectorProStamp,
-      });
-
-      await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle);
-      await this.saveAndUploadPDF();
+      this.pdfDoc.save(generatedPdf.filename);
+      await this.uploadPDF(selectedJobId, generatedPdf.blob, generatedPdf.filename);
 
       toast?.({
         title: '✅ Documento generado',
@@ -101,6 +80,57 @@ export class DriverCertificatePDFEngine {
       });
       throw error;
     }
+  }
+
+  async generatePreview(): Promise<GeneratedHojaDeRutaPdf> {
+    return this.renderPDF();
+  }
+
+  private async renderPDF(): Promise<GeneratedHojaDeRutaPdf> {
+    const {
+      eventData,
+      selectedJobId,
+      jobTitle,
+      jobDate,
+      venueMapPreview = null,
+    } = this.options;
+
+    const [logoData, logisticsEvents, certificateJobContext, sectorProStamp] = await Promise.all([
+      LogoService.loadJobLogo(selectedJobId),
+      this.fetchWarehouseLogisticsEvents(selectedJobId, eventData),
+      this.fetchDeliveryCertificateJobContext(selectedJobId),
+      StampService.loadExactSectorProStamp(),
+    ]);
+
+    const headerLogoDims = await this.getHeaderLogoDims(logoData);
+    HeaderService.addHeaderToCurrentPage(
+      this.pdfDoc,
+      'Hoja de Transportes',
+      jobTitle,
+      jobDate,
+      logoData || undefined,
+      headerLogoDims
+    );
+
+    let yPosition = 54;
+
+    yPosition = await this.addVenueSection(eventData, yPosition, venueMapPreview);
+    yPosition = this.addContactsSection(eventData, yPosition);
+    yPosition = this.addWarehouseScheduleSection(logisticsEvents, yPosition);
+
+    const logisticsTypeBySourceId = new Map<string, string>(
+      logisticsEvents.map((event) => [event.id, event.event_type])
+    );
+    yPosition = this.addVenueScheduleSection(eventData, yPosition, logisticsTypeBySourceId);
+    yPosition = this.addLegalCertificateSection(eventData, yPosition, {
+      ...certificateJobContext,
+      issueDate: new Date(),
+      stamp: sectorProStamp,
+    });
+
+    await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle);
+
+    return this.createGeneratedPDF();
   }
 
   private async addVenueSection(eventData: EventData, yPosition: number, venueMapPreview: string | null): Promise<number> {
@@ -376,7 +406,8 @@ export class DriverCertificatePDFEngine {
 
       if (currentJobError) throw currentJobError;
 
-      const currentTitle = (currentJob as any)?.title || '';
+      const currentJobRow = currentJob as WarehouseFallbackJobRow | null;
+      const currentTitle = currentJobRow?.title || '';
       const titlePrefix = this.extractJobTitlePrefix(currentTitle);
       if (!titlePrefix) return [];
 
@@ -389,7 +420,7 @@ export class DriverCertificatePDFEngine {
 
       if (relatedJobsError) throw relatedJobsError;
 
-      const currentStartTime = (currentJob as any)?.start_time ? new Date((currentJob as any).start_time) : null;
+      const currentStartTime = currentJobRow?.start_time ? new Date(currentJobRow.start_time) : null;
 
       const candidates = ((relatedJobs || []) as Array<{ id: string; title: string | null; start_time: string | null }>)
         .map((job) => {
@@ -438,11 +469,13 @@ export class DriverCertificatePDFEngine {
 
       if (error) throw error;
 
-      const location = (data as any)?.location;
+      const jobData = data as unknown as DeliveryCertificateJobRow | null;
+      const rawLocation = jobData?.location;
+      const location = Array.isArray(rawLocation) ? rawLocation[0] : rawLocation;
       const jobLocation = (location?.formatted_address || location?.name || null) as string | null;
 
       return {
-        invoicingCompany: (data as any)?.invoicing_company || null,
+        invoicingCompany: jobData?.invoicing_company || null,
         jobLocation,
       };
     } catch (error) {
@@ -454,8 +487,8 @@ export class DriverCertificatePDFEngine {
     }
   }
 
-  private async saveAndUploadPDF(): Promise<void> {
-    const { eventData, selectedJobId, jobTitle } = this.options;
+  private createGeneratedPDF(): GeneratedHojaDeRutaPdf {
+    const { eventData, jobTitle } = this.options;
 
     const eventName = eventData.eventName || jobTitle || 'Evento';
     const safeEventName = eventName.replace(/_/g, ' ').replace(/\s+/g, ' ').trim() || 'Evento';
@@ -464,10 +497,15 @@ export class DriverCertificatePDFEngine {
     const timePart = nowIso.slice(11, 19).replace(/:/g, '-');
     const filename = `Hoja de Transportes - ${safeEventName} - ${datePart} ${timePart}.pdf`;
 
-    this.pdfDoc.save(filename);
+    return {
+      blob: this.pdfDoc.outputBlob(),
+      filename,
+      title: 'Hoja de Transportes',
+    };
+  }
 
+  private async uploadPDF(selectedJobId: string, pdfBlob: Blob, filename: string): Promise<void> {
     try {
-      const pdfBlob = this.pdfDoc.outputBlob();
       await uploadPdfToJob(selectedJobId, pdfBlob, filename, { kind: 'certificado_entrega' });
       console.log('✅ Driver certificate PDF uploaded to job storage successfully');
     } catch (uploadError) {

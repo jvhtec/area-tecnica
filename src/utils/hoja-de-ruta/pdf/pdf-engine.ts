@@ -1,5 +1,5 @@
 import { PDFDocument } from './core/pdf-document';
-import { PDFGenerationOptions } from './core/pdf-types';
+import type { GeneratedHojaDeRutaPdf, PDFGenerationOptions } from './core/pdf-types';
 import { LogoService } from './services/logo-service';
 import { uploadPdfToJob } from '../pdf-upload';
 import { HeaderSection } from './sections/header-section';
@@ -27,81 +27,18 @@ export class PDFEngine {
   }
 
   async generate(): Promise<void> {
-    const {
-      selectedJobId,
-      jobTitle,
-      toast,
-    } = this.options;
-    const selectedSections = this.options.sections?.length ? this.options.sections : undefined;
-    const sectionSelection = selectedSections ? new Set(selectedSections) : undefined;
-    const selectedSectionLabel = selectedSections
-      ? getHojaDeRutaPdfSelectionLabel(selectedSections) ?? "Secciones seleccionadas"
-      : undefined;
-    this.hasCoverPage = !sectionSelection;
-    this.renderedSectionCount = 0;
+    const { selectedJobId, toast } = this.options;
 
     try {
-      // Load logo first (used on cover and in page header)
-      this.logoData = await LogoService.loadJobLogo(selectedJobId);
+      const generatedPdf = await this.renderPDF();
 
-      // Compute header logo scaled dimensions to keep aspect ratio
-      let headerLogoDims: { width: number; height: number } | undefined = undefined;
-      if (this.logoData) {
-        headerLogoDims = await new Promise((resolve) => {
-          const img = new Image();
-          img.onload = () => {
-            const MAX_H = 28;
-            const MAX_W = 160;
-            const w = img.naturalWidth || img.width;
-            const h = img.naturalHeight || img.height;
-            if (w > 0 && h > 0) {
-              const scale = Math.min(MAX_H / h, MAX_W / w);
-              resolve({ width: Math.round(w * scale), height: Math.round(h * scale) });
-            } else {
-              resolve({ width: 84, height: 28 });
-            }
-          };
-          img.onerror = () => resolve({ width: 84, height: 28 });
-          img.src = this.logoData!;
-        });
-      }
-
-      // Initialize header section now that we have job info and logo
-      this.headerSection = new HeaderSection(
-        this.pdfDoc,
-        jobTitle,
-        this.options.jobDate,
-        selectedSections
-          ? `Hoja de Ruta - ${selectedSectionLabel}`
-          : 'Hoja de Ruta',
-        this.logoData || undefined,
-        headerLogoDims
-      );
-      
-      if (this.hasCoverPage) {
-        const coverSection = new CoverSection(this.pdfDoc, this.options.eventData, this.options.jobTitle, this.logoData);
-        await coverSection.generateCoverPage();
-      }
-
-      if (sectionSelection) {
-        await this.generateSelectedSections(sectionSelection);
-        if (this.renderedSectionCount === 0) {
-          this.addEmptySectionPage(selectedSections);
-        }
-      } else {
-        await this.generateFullDocument();
-      }
-
-      // Add Sector-Pro footer to all pages with page numbers and job name
-      await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle, { hasCoverPage: this.hasCoverPage });
-
-      // Save and upload PDF
-      await this.saveAndUploadPDF();
+      this.pdfDoc.save(generatedPdf.filename);
+      await this.uploadPDF(selectedJobId, generatedPdf.blob, generatedPdf.filename);
 
       toast?.({
         title: "✅ Documento generado",
-        description: selectedSectionLabel
-          ? `${selectedSectionLabel} se ha generado y descargado correctamente.`
+        description: generatedPdf.sectionLabel
+          ? `${generatedPdf.sectionLabel} se ha generado y descargado correctamente.`
           : "La hoja de ruta ha sido generada y descargada correctamente.",
       });
 
@@ -114,6 +51,83 @@ export class PDFEngine {
       });
       throw error;
     }
+  }
+
+  async generatePreview(): Promise<GeneratedHojaDeRutaPdf> {
+    return this.renderPDF();
+  }
+
+  private async renderPDF(): Promise<GeneratedHojaDeRutaPdf & { sectionLabel?: string }> {
+    const {
+      selectedJobId,
+      jobTitle,
+    } = this.options;
+    const selectedSections = this.options.sections?.length ? this.options.sections : undefined;
+    const sectionSelection = selectedSections ? new Set(selectedSections) : undefined;
+    const selectedSectionLabel = selectedSections
+      ? getHojaDeRutaPdfSelectionLabel(selectedSections) ?? "Secciones seleccionadas"
+      : undefined;
+    this.hasCoverPage = !sectionSelection;
+    this.renderedSectionCount = 0;
+
+    // Load logo first (used on cover and in page header)
+    this.logoData = await LogoService.loadJobLogo(selectedJobId);
+
+    // Compute header logo scaled dimensions to keep aspect ratio
+    let headerLogoDims: { width: number; height: number } | undefined = undefined;
+    if (this.logoData) {
+      headerLogoDims = await new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const MAX_H = 28;
+          const MAX_W = 160;
+          const w = img.naturalWidth || img.width;
+          const h = img.naturalHeight || img.height;
+          if (w > 0 && h > 0) {
+            const scale = Math.min(MAX_H / h, MAX_W / w);
+            resolve({ width: Math.round(w * scale), height: Math.round(h * scale) });
+          } else {
+            resolve({ width: 84, height: 28 });
+          }
+        };
+        img.onerror = () => resolve({ width: 84, height: 28 });
+        img.src = this.logoData!;
+      });
+    }
+
+    // Initialize header section now that we have job info and logo
+    this.headerSection = new HeaderSection(
+      this.pdfDoc,
+      jobTitle,
+      this.options.jobDate,
+      selectedSections
+        ? `Hoja de Ruta - ${selectedSectionLabel}`
+        : 'Hoja de Ruta',
+      this.logoData || undefined,
+      headerLogoDims
+    );
+    
+    if (this.hasCoverPage) {
+      const coverSection = new CoverSection(this.pdfDoc, this.options.eventData, this.options.jobTitle, this.logoData);
+      await coverSection.generateCoverPage();
+    }
+
+    if (sectionSelection) {
+      await this.generateSelectedSections(sectionSelection);
+      if (this.renderedSectionCount === 0) {
+        this.addEmptySectionPage(selectedSections);
+      }
+    } else {
+      await this.generateFullDocument();
+    }
+
+    // Add Sector-Pro footer to all pages with page numbers and job name
+    await FooterService.addFooterToAllPages(this.pdfDoc, jobTitle, { hasCoverPage: this.hasCoverPage });
+
+    return {
+      ...this.createGeneratedPDF(),
+      sectionLabel: selectedSectionLabel,
+    };
   }
 
   private async generateFullDocument(): Promise<void> {
@@ -333,10 +347,13 @@ export class PDFEngine {
       Boolean(this.options.imagePreviews?.venue?.length);
   }
 
-  private async saveAndUploadPDF(): Promise<void> {
-    const { eventData, selectedJobId, jobTitle } = this.options;
+  private createGeneratedPDF(): GeneratedHojaDeRutaPdf {
+    const { eventData, jobTitle } = this.options;
     const sectionFilenameLabel = this.options.sections?.length === 1
       ? getHojaDeRutaPdfSectionFilenameLabel(this.options.sections[0])
+      : undefined;
+    const sectionTitleLabel = this.options.sections?.length
+      ? getHojaDeRutaPdfSelectionLabel(this.options.sections)
       : undefined;
     
     // Generate filename
@@ -348,12 +365,15 @@ export class PDFEngine {
     const sectionPart = sectionFilenameLabel ? ` - ${sectionFilenameLabel}` : "";
     const filename = `Hoja de Ruta${sectionPart} - ${safeEventName} - ${datePart} ${timePart}.pdf`;
 
-    // Save locally
-    this.pdfDoc.save(filename);
+    return {
+      blob: this.pdfDoc.outputBlob(),
+      filename,
+      title: sectionTitleLabel ? `Hoja de Ruta - ${sectionTitleLabel}` : 'Hoja de Ruta',
+    };
+  }
 
-    // Upload to job storage
+  private async uploadPDF(selectedJobId: string, pdfBlob: Blob, filename: string): Promise<void> {
     try {
-      const pdfBlob = this.pdfDoc.outputBlob();
       await uploadPdfToJob(selectedJobId, pdfBlob, filename);
       console.log('✅ PDF uploaded to job storage successfully');
     } catch (uploadError) {
