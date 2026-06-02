@@ -58,7 +58,7 @@ export const HojaDeRutaPdfPreviewDialog: React.FC<HojaDeRutaPdfPreviewDialogProp
                 size="sm"
                 onClick={onOpenInNewTab}
                 disabled={!preview}
-                aria-label="Abrir PDF en una pestana"
+                aria-label="Abrir PDF en una pestaña"
               >
                 <ExternalLink className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Abrir</span>
