@@ -47,6 +47,17 @@ const themeTokens = {
   hover: "hover:bg-accent",
 };
 
+const getJobLocationName = (job: any) =>
+  (typeof job.location === "string" && job.location) ||
+  job.location?.name ||
+  job.location?.formatted_address ||
+  job.location_data?.name ||
+  job.location_data?.formatted_address ||
+  job.locations?.name ||
+  job.venue_name ||
+  job.venue ||
+  "Sin ubicación";
+
 export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
   jobs,
   date,
@@ -457,7 +468,7 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
                         {getCalendarJobDisplayTitle(job, selectedDate)}
                       </h3>
                       <div className={cn("text-xs mt-1", themeTokens.textMuted)}>
-                        {job.location_data?.name || "Sin ubicación"}
+                        {getJobLocationName(job)}
                       </div>
                       {departments.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import ProjectManagement from "../ProjectManagement";
@@ -39,8 +40,9 @@ vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: vi.fn() }),
 }));
 
+let mockIsMobile = false;
 vi.mock("@/hooks/use-mobile", () => ({
-  useIsMobile: () => false,
+  useIsMobile: () => mockIsMobile,
 }));
 
 vi.mock("@/components/project-management/MonthNavigation", () => ({
@@ -85,6 +87,7 @@ describe("ProjectManagement department tabs", () => {
     mockUseOptimizedAuth.mockReset();
     mockUseOptimizedJobs.mockReset();
     mockAutoCompleteJobs.mockClear();
+    mockIsMobile = false;
     mockGetSession.mockResolvedValue({
       data: { session: { user: { id: "user-1" } } },
     });
@@ -163,5 +166,92 @@ describe("ProjectManagement department tabs", () => {
 
     const videoTab = await screen.findByRole("tab", { name: /video/i });
     await waitFor(() => expect(videoTab).toHaveAttribute("data-state", "active"));
+  });
+
+  it("renders mobile filters inline inside the sheet", async () => {
+    mockIsMobile = true;
+    mockUseOptimizedAuth.mockReturnValue({
+      userDepartment: "sound",
+      isLoading: false,
+    });
+    mockUseOptimizedJobs.mockReturnValue({
+      data: [
+        {
+          id: "job-1",
+          title: "Mobile Filter Job",
+          job_type: "single",
+          status: "Confirmado",
+          start_time: "2026-06-03T08:00:00.000Z",
+          end_time: "2026-06-03T23:00:00.000Z",
+        },
+        {
+          id: "job-2",
+          title: "Mobile Tentative Job",
+          job_type: "dryhire",
+          status: "Tentativa",
+          start_time: "2026-06-04T08:00:00.000Z",
+          end_time: "2026-06-04T23:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <ProjectManagement />
+      </MemoryRouter>
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: /filtros/i }));
+
+    expect(screen.queryByTestId("job-type-filter")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("status-filter")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /sencillo/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /confirmado/i })).toBeInTheDocument();
+  });
+
+  it("clears all selected mobile statuses in one state update", async () => {
+    mockIsMobile = true;
+    mockUseOptimizedAuth.mockReturnValue({
+      userDepartment: "sound",
+      isLoading: false,
+    });
+    mockUseOptimizedJobs.mockReturnValue({
+      data: [
+        {
+          id: "job-1",
+          title: "Confirmed Job",
+          job_type: "single",
+          status: "Confirmado",
+          start_time: "2026-06-03T08:00:00.000Z",
+          end_time: "2026-06-03T23:00:00.000Z",
+        },
+        {
+          id: "job-2",
+          title: "Tentative Job",
+          job_type: "single",
+          status: "Tentativa",
+          start_time: "2026-06-04T08:00:00.000Z",
+          end_time: "2026-06-04T23:00:00.000Z",
+        },
+      ],
+      isLoading: false,
+      error: null,
+    });
+
+    render(
+      <MemoryRouter>
+        <ProjectManagement />
+      </MemoryRouter>
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: /filtros/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /limpiar todo/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /confirmado/i })).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByRole("button", { name: /tentativa/i })).toHaveAttribute("aria-pressed", "false");
+    });
   });
 });
