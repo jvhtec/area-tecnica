@@ -68,8 +68,10 @@ export const computePowerTotalVa = (
     candidatePf <= 1
       ? candidatePf
       : DEFAULT_POWER_FACTOR[department];
+  const safetyMargin = getNumber(isRecord(metadata) ? metadata.safetyMargin : undefined) ?? 0;
+  const adjustedWatts = watts * (1 + safetyMargin / 100);
 
-  return watts / storedPf;
+  return adjustedWatts / storedPf;
 };
 
 export const sortTourPowerDefaultTables = (tables: TourDefaultTableRow[]) =>

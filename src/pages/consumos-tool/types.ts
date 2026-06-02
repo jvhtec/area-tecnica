@@ -10,6 +10,7 @@ export interface TableRow {
 export interface Table {
   name: string;
   rows: TableRow[];
+  powerRequirementId?: string;
   totalWatts?: number;
   adjustedWatts?: number;
   totalVa?: number; // apparent power (VA) — used for kVA display and generator sizing

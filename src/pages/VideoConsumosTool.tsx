@@ -22,8 +22,9 @@ import {
 import { PowerTableControls } from '@/features/technical-tools/power/PowerTableControls';
 import {
   buildLegacyPowerOverridePayload,
-  buildPowerRequirementInsert,
   buildTourPowerDefaultTable,
+  deleteJobPowerRequirementTable,
+  saveJobPowerRequirementTable,
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
 import {
@@ -55,6 +56,7 @@ interface TableRow {
 interface Table {
   name: string;
   rows: TableRow[];
+  powerRequirementId?: string;
   totalWatts?: number;
   adjustedWatts?: number;
   totalVa?: number;
@@ -244,7 +246,10 @@ const VideoConsumosTool: React.FC = () => {
   const getPowerSettings = () => ({ safetyMargin, powerFactor: pf, phaseMode, voltage });
   const PDU_TYPES = getPowerPduOptions('video', phaseMode);
 
-  const savePowerRequirementTable = async (table: Table) => {
+  const savePowerRequirementTable = async (
+    table: Table,
+    { showToast = true }: { showToast?: boolean } = {},
+  ) => {
     if (isOverrideMode && overrideData) {
       // Save as override for tour date
       const overrideSuccess = await saveOverride('power', buildLegacyPowerOverridePayload({
@@ -258,24 +263,26 @@ const VideoConsumosTool: React.FC = () => {
           description: "Override saved for tour date",
         });
       }
-      return;
+      return table.powerRequirementId;
     }
 
     try {
-      const { error } = await dataLayerClient.from('power_requirement_tables')
-        .insert(buildPowerRequirementInsert({
-          department: 'video',
-          jobId: selectedJobId,
-          settings: getPowerSettings(),
-          table,
-        }));
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Power requirement table saved successfully",
+      const powerRequirementId = await saveJobPowerRequirementTable({
+        client: dataLayerClient,
+        department: 'video',
+        jobId: selectedJobId,
+        settings: getPowerSettings(),
+        table,
       });
+
+      if (showToast) {
+        toast({
+          title: "Success",
+          description: "Power requirement table saved successfully",
+        });
+      }
+
+      return powerRequirementId;
     } catch (error: any) {
       console.error('Error saving power requirement table:', error);
       toast({
@@ -283,6 +290,7 @@ const VideoConsumosTool: React.FC = () => {
         description: "Failed to save power requirement table",
         variant: "destructive"
       });
+      return table.powerRequirementId;
     }
   };
 
@@ -308,15 +316,19 @@ const VideoConsumosTool: React.FC = () => {
       },
     }) as Table;
 
-    setTables((prev) => [...prev, newTable]);
+    let tableToAdd = newTable;
     
     // Save based on mode
     if (isTourDefaults) {
       await saveTourDefault(newTable);
     } else if (selectedJobId) {
-      await savePowerRequirementTable(newTable);
+      const powerRequirementId = await savePowerRequirementTable(newTable);
+      if (powerRequirementId) {
+        tableToAdd = { ...newTable, powerRequirementId };
+      }
     }
     
+    setTables((prev) => [...prev, tableToAdd]);
     resetCurrentTable();
   };
 
@@ -330,10 +342,30 @@ const VideoConsumosTool: React.FC = () => {
     setTableName('');
   };
 
-  const removeTable = (tableId: number | string) => {
+  const removeTable = async (tableId: number | string) => {
     // Only allow removal of regular tables (numeric IDs), not default tables
     if (typeof tableId === 'number') {
+      const tableToRemove = tables.find((table) => table.id === tableId);
       setTables((prev) => prev.filter((table) => table.id !== tableId));
+
+      if (!selectedJobId || isTourDefaults || isOverrideMode || !tableToRemove?.powerRequirementId) {
+        return;
+      }
+
+      try {
+        await deleteJobPowerRequirementTable({
+          client: dataLayerClient,
+          jobId: selectedJobId,
+          table: tableToRemove,
+        });
+      } catch (error) {
+        console.error('Error deleting power requirement table:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete power requirement table",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -351,7 +383,15 @@ const VideoConsumosTool: React.FC = () => {
     pendingTableSaveTimeoutsRef.current[timeoutKey] = window.setTimeout(() => {
       delete pendingTableSaveTimeoutsRef.current[timeoutKey];
 
-      void savePowerRequirementTable(table).catch((error) => {
+      void savePowerRequirementTable(table, { showToast: false }).then((powerRequirementId) => {
+        if (powerRequirementId && powerRequirementId !== table.powerRequirementId) {
+          setTables((prev) =>
+            prev.map((storedTable) =>
+              storedTable.id === table.id ? { ...storedTable, powerRequirementId } : storedTable
+            )
+          );
+        }
+      }).catch((error) => {
         console.error('Error saving table settings:', error);
       });
     }, TABLE_SETTINGS_SAVE_DEBOUNCE_MS);

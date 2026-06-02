@@ -1,9 +1,12 @@
 import type { Json } from "@/integrations/supabase/types";
+import type { supabase as typedSupabase } from "@/integrations/supabase/client";
 import type {
   PowerElectricalSettings,
   PowerTable,
   TechnicalDepartment,
 } from "@/features/technical-tools/power/types";
+
+type PowerPersistenceClient = Pick<typeof typedSupabase, "from">;
 
 export const getPowerReportUploadCategory = (department: TechnicalDepartment) =>
   department === "lights" ? "calculators/lights-consumos" : "calculators/consumos";
@@ -11,6 +14,7 @@ export const getPowerReportUploadCategory = (department: TechnicalDepartment) =>
 export const buildPowerTableData = (table: PowerTable, settings: PowerElectricalSettings & { powerFactor?: number }) => {
   const payload = {
     rows: table.rows,
+    ...(table.id !== undefined ? { sourceTableId: String(table.id) } : {}),
     safetyMargin: settings.safetyMargin,
     phaseMode: settings.phaseMode,
     voltage: settings.voltage,
@@ -61,6 +65,69 @@ export const buildPowerRequirementInsert = ({
   table_data: (settings ? buildPowerTableData(table, settings) : ({ rows: table.rows } as unknown as Json)),
   includes_hoist: table.includesHoist || false,
 });
+
+export const saveJobPowerRequirementTable = async ({
+  client,
+  department,
+  jobId,
+  settings,
+  table,
+}: {
+  client: PowerPersistenceClient;
+  department: TechnicalDepartment;
+  jobId: string;
+  settings?: PowerElectricalSettings & { powerFactor?: number };
+  table: PowerTable;
+}): Promise<string> => {
+  const payload = buildPowerRequirementInsert({
+    department,
+    jobId,
+    settings,
+    table,
+  });
+
+  if (table.powerRequirementId) {
+    const { data, error } = await client
+      .from("power_requirement_tables")
+      .update(payload)
+      .eq("id", table.powerRequirementId)
+      .eq("job_id", jobId)
+      .select("id")
+      .maybeSingle();
+
+    if (error) throw error;
+    if (data?.id) return data.id;
+  }
+
+  const { data, error } = await client
+    .from("power_requirement_tables")
+    .insert(payload)
+    .select("id")
+    .single();
+
+  if (error) throw error;
+  return data.id as string;
+};
+
+export const deleteJobPowerRequirementTable = async ({
+  client,
+  jobId,
+  table,
+}: {
+  client: PowerPersistenceClient;
+  jobId: string;
+  table: Pick<PowerTable, "powerRequirementId">;
+}) => {
+  if (!table.powerRequirementId) return;
+
+  const { error } = await client
+    .from("power_requirement_tables")
+    .delete()
+    .eq("id", table.powerRequirementId)
+    .eq("job_id", jobId);
+
+  if (error) throw error;
+};
 
 export const buildTourPowerDefaultTable = ({
   orderIndex,

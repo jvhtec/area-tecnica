@@ -74,22 +74,74 @@ const mapPowerRequirementTable = (
   positionLabel: getResolvedPowerPosition(row.position, row.custom_position) || 'N/A',
   totalWatts: row.total_watts || 0,
   currentPerPhase: row.current_per_phase || 0,
-  totalVa: computePowerTotalVa(row.total_watts || 0, null, department),
+  totalVa: computePowerTotalVa(row.total_watts || 0, row.table_data, department),
   notes: row.includes_hoist ? 'Motor adicional CEE32A 3P+N+G' : '',
   source: 'job',
 });
 
-const getPowerRequirementTableDedupKey = (
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const getPowerRequirementRowsSignature = (row: PowerRequirementTableRow) => {
+  if (!isRecord(row.table_data) || !Array.isArray(row.table_data.rows)) {
+    return null;
+  }
+
+  try {
+    return JSON.stringify(row.table_data.rows);
+  } catch {
+    return null;
+  }
+};
+
+const getPowerRequirementSourceTableId = (row: PowerRequirementTableRow) => {
+  if (!isRecord(row.table_data)) return null;
+  const sourceTableId = row.table_data.sourceTableId;
+  return typeof sourceTableId === 'string' && sourceTableId.trim()
+    ? sourceTableId.trim()
+    : null;
+};
+
+const comparePowerRequirementTablesByFreshness = (
+  left: PowerRequirementTableRow,
+  right: PowerRequirementTableRow
+) => {
+  const leftTimestamp = left.created_at ? Date.parse(left.created_at) : 0;
+  const rightTimestamp = right.created_at ? Date.parse(right.created_at) : 0;
+
+  if (leftTimestamp !== rightTimestamp) {
+    return leftTimestamp - rightTimestamp;
+  }
+
+  const leftCreatedAt = left.created_at || '';
+  const rightCreatedAt = right.created_at || '';
+  if (leftCreatedAt !== rightCreatedAt) {
+    return leftCreatedAt.localeCompare(rightCreatedAt);
+  }
+
+  return left.id.localeCompare(right.id);
+};
+
+const getPowerRequirementTableCurrentKey = (
   row: PowerRequirementTableRow,
   department: TechnicalPowerDepartment
 ) => {
+  const sourceTableId = getPowerRequirementSourceTableId(row);
+  if (sourceTableId) {
+    return `${department}:source:${sourceTableId}`;
+  }
+
   const normalizedName = row.table_name?.trim().toLowerCase();
-  return normalizedName
-    ? `${department}:${normalizedName}`
-    : `${department}:${row.id}`;
+  const rowSignature = getPowerRequirementRowsSignature(row);
+
+  if (normalizedName && rowSignature) {
+    return `${department}:legacy:${normalizedName}:${rowSignature}`;
+  }
+
+  return `${department}:row:${row.id}`;
 };
 
-const dedupePowerRequirementTables = (
+export const getCurrentPowerRequirementTables = (
   rows: PowerRequirementTableRow[]
 ): PowerRequirementTableRow[] => {
   const latestRows = new Map<string, PowerRequirementTableRow>();
@@ -98,18 +150,51 @@ const dedupePowerRequirementTables = (
     const department = row.department as TechnicalPowerDepartment | null;
     if (!department) continue;
 
-    const dedupKey = getPowerRequirementTableDedupKey(row, department);
+    const dedupKey = getPowerRequirementTableCurrentKey(row, department);
     const current = latestRows.get(dedupKey);
-    const currentTimestamp = current?.created_at ? Date.parse(current.created_at) : 0;
-    const nextTimestamp = row.created_at ? Date.parse(row.created_at) : 0;
 
-    if (!current || nextTimestamp >= currentTimestamp) {
+    if (
+      !current ||
+      comparePowerRequirementTablesByFreshness(row, current) >= 0
+    ) {
       latestRows.set(dedupKey, row);
     }
   }
 
-  return [...latestRows.values()];
+  return [...latestRows.values()].sort(comparePowerRequirementTablesByFreshness);
 };
+
+const formatPowerRequirementNumber = (value: number | string | null | undefined) => {
+  if (typeof value === 'number') return value.toFixed(2);
+  return value ?? 'N/D';
+};
+
+export const formatPowerRequirementsText = (
+  rows: PowerRequirementTableRow[]
+) =>
+  getCurrentPowerRequirementTables(rows)
+    .map((req) => {
+      const department = (req.department || 'general').toUpperCase();
+      const pduType = req.custom_pdu_type || req.pdu_type || 'N/D';
+      const position = getResolvedPowerPosition(req.position, req.custom_position);
+      const lines = [
+        `${department} - ${req.table_name || 'tabla'}:`,
+        `Potencia Total: ${formatPowerRequirementNumber(req.total_watts)}W`,
+        `Corriente por Fase: ${formatPowerRequirementNumber(req.current_per_phase)}A`,
+        `PDU Recomendado: ${pduType}`,
+      ];
+
+      if (position) {
+        lines.push(`Posición: ${position}`);
+      }
+
+      if (req.includes_hoist) {
+        lines.push('Requiere potencia adicional de motores (CEE32A 3P+N+G)');
+      }
+
+      return `${lines.join('\n')}\n`;
+    })
+    .join('\n');
 
 const mapNormalizedTourPowerTable = (
   table: ReturnType<typeof buildNormalizedTourPowerTables>['tables'][number]
@@ -140,7 +225,8 @@ const loadStandardJobPowerData = async ({
     .from('power_requirement_tables')
     .select('*')
     .eq('job_id', jobId)
-    .in('department', [...TECHNICAL_POWER_DEPARTMENTS]);
+    .in('department', [...TECHNICAL_POWER_DEPARTMENTS])
+    .order('created_at', { ascending: true });
 
   if (error) {
     throw error;
@@ -150,7 +236,7 @@ const loadStandardJobPowerData = async ({
     TECHNICAL_POWER_DEPARTMENTS.map((department) => [department, [] as PowerRequirementTableRow[]])
   ) as Record<TechnicalPowerDepartment, PowerRequirementTableRow[]>;
 
-  for (const row of dedupePowerRequirementTables(data || [])) {
+  for (const row of getCurrentPowerRequirementTables(data || [])) {
     const department = row.department as TechnicalPowerDepartment | null;
     if (!department || !(department in rowsByDepartment)) continue;
     rowsByDepartment[department].push(row);

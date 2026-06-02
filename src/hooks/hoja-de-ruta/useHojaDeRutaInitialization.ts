@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { EventData } from '@/types/hoja-de-ruta';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { formatPowerRequirementsText } from '@/utils/powerSummaryData';
 
 export const useHojaDeRutaInitialization = (
   selectedJobId: string,
@@ -61,7 +62,8 @@ export const useHojaDeRutaInitialization = (
       const { data: powerRequirements, error } = await supabase
         .from("power_requirement_tables")
         .select("*")
-        .eq("job_id", jobId);
+        .eq("job_id", jobId)
+        .order("created_at", { ascending: true });
 
       if (error) {
         console.error("❌ INITIALIZATION: Error fetching power requirements:", error);
@@ -73,36 +75,7 @@ export const useHojaDeRutaInitialization = (
         return "";
       }
 
-      // Deduplicate requirements based on table_name and department
-      const uniqueRequirements = powerRequirements.reduce((acc: any[], current: any) => {
-        const x = acc.find(item => item.table_name === current.table_name && item.department === current.department);
-        if (!x) {
-          return acc.concat([current]);
-        } else {
-          return acc;
-        }
-      }, []);
-
-      const powerText = uniqueRequirements
-        .map((req: any) => {
-          const current = typeof req.current_per_phase === 'number' 
-            ? req.current_per_phase.toFixed(2) 
-            : req.current_per_phase;
-            
-          const pduType = req.custom_pdu_type || req.pdu_type;
-          
-          let text = `${req.department.toUpperCase()} - ${req.table_name}:\n` +
-            `Potencia Total: ${req.total_watts}W\n` +
-            `Corriente por Fase: ${current}A\n` +
-            `PDU Recomendado: ${pduType}\n`;
-
-          if (req.includes_hoist) {
-            text += `Requiere potencia adicional de motores (CEE32A 3P+N+G)\n`;
-          }
-
-          return text;
-        })
-        .join("\n");
+      const powerText = formatPowerRequirementsText(powerRequirements);
 
       console.log("✅ INITIALIZATION: Power requirements fetched successfully");
       return powerText;

@@ -21,6 +21,7 @@ export type PowerTableRow = {
 
 export type PowerTable = {
   id?: number | string;
+  powerRequirementId?: string;
   name: string;
   rows: PowerTableRow[];
   totalWatts?: number;
