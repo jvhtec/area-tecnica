@@ -6457,10 +6457,14 @@ CREATE TABLE IF NOT EXISTS "public"."power_requirement_tables" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "includes_hoist" boolean DEFAULT false,
     "custom_pdu_type" "text",
-    "department" "text"
+    "department" "text",
+    "stage_number" integer,
+    "stage_name" "text"
 );
 ALTER TABLE "public"."power_requirement_tables" OWNER TO "postgres";
 COMMENT ON COLUMN "public"."power_requirement_tables"."department" IS 'Department that created the power requirement (sound, lights, video)';
+COMMENT ON COLUMN "public"."power_requirement_tables"."stage_number" IS 'Festival stage number for multi-stage job power requirements.';
+COMMENT ON COLUMN "public"."power_requirement_tables"."stage_name" IS 'Festival stage display name captured when the power requirement was generated.';
 CREATE TABLE IF NOT EXISTS "public"."preset_items" (
     "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
     "preset_id" "uuid" NOT NULL,
@@ -8077,6 +8081,7 @@ CREATE INDEX "idx_messages_unread_sender" ON "public"."messages" USING "btree" (
 CREATE INDEX "idx_morning_subscriptions_user_id" ON "public"."morning_summary_subscriptions" USING "btree" ("user_id");
 CREATE INDEX "idx_notification_preferences_staffing_scope" ON "public"."notification_preferences" USING "btree" ("staffing_scope") WHERE ("staffing_scope" IS NOT NULL);
 CREATE INDEX "idx_notification_preferences_user_id_fk_066900" ON "public"."notification_preferences" USING "btree" ("user_id");
+CREATE INDEX "idx_power_requirement_tables_job_department_stage" ON "public"."power_requirement_tables" USING "btree" ("job_id", "department", "stage_number");
 CREATE INDEX "idx_power_requirement_tables_job_id_fk_209c8a" ON "public"."power_requirement_tables" USING "btree" ("job_id");
 CREATE INDEX "idx_preset_items_equipment_id_fk_754df4" ON "public"."preset_items" USING "btree" ("equipment_id");
 CREATE INDEX "idx_preset_items_preset_id_fk_3efc66" ON "public"."preset_items" USING "btree" ("preset_id");

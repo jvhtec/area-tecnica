@@ -1,5 +1,20 @@
 import { supabase } from "@/lib/supabase";
 
+export type JobPdfUploadOptions = {
+  cleanupScope?: string;
+};
+
+const sanitizeFileName = (fileName: string) =>
+  fileName
+    .replace(/[^a-zA-Z0-9._-]/g, "_")
+    .replace(/_{2,}/g, "_")
+    .replace(/^_|_$/g, "");
+
+const sanitizePathSegment = (value: string) =>
+  sanitizeFileName(value)
+    .replace(/\.+/g, ".")
+    .replace(/^\.+|\.+$/g, "") || "scope";
+
 /**
  * Upload a job-related PDF to the job-documents bucket under a category folder,
  * first cleaning up any previous versions for that job and category.
@@ -10,15 +25,16 @@ export const uploadJobPdfWithCleanup = async (
   jobId: string,
   pdfBlob: Blob,
   fileName: string,
-  category: string
+  category: string,
+  options: JobPdfUploadOptions = {}
 ): Promise<void> => {
   // Sanitize filename for storage
-  const sanitizedFileName = fileName
-    .replace(/[^a-zA-Z0-9._-]/g, "_")
-    .replace(/_{2,}/g, "_")
-    .replace(/^_|_$/g, "");
+  const sanitizedFileName = sanitizeFileName(fileName);
 
-  const baseFolder = `${category}/${jobId}`; // e.g. calculators/pesos/<jobId>
+  const scopeFolder = options.cleanupScope
+    ? `/${sanitizePathSegment(options.cleanupScope)}`
+    : "";
+  const baseFolder = `${category}/${jobId}${scopeFolder}`; // e.g. calculators/pesos/<jobId>/<stage>
   const objectPath = `${baseFolder}/${sanitizedFileName}`;
 
   try {

@@ -136,7 +136,7 @@ describe('technicalPowerSummaryPack', () => {
     expect(autoTableMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        head: [['Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
+        head: [['Stage', 'Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
       })
     );
   });

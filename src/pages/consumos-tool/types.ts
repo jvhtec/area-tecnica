@@ -11,6 +11,8 @@ export interface Table {
   name: string;
   rows: TableRow[];
   powerRequirementId?: string;
+  stageNumber?: number | null;
+  stageName?: string | null;
   totalWatts?: number;
   adjustedWatts?: number;
   totalVa?: number; // apparent power (VA) — used for kVA display and generator sizing

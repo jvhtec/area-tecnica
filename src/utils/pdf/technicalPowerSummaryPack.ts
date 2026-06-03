@@ -153,6 +153,7 @@ const drawFooter = ({
 const departmentTableBody = (department: DepartmentPowerSummaryData) =>
   department.rows.length > 0
     ? department.rows.map((row) => [
+        row.stageName || (row.stageNumber ? `Stage ${row.stageNumber}` : '-'),
         row.name,
         row.pduLabel || 'N/A',
         row.positionLabel || 'N/A',
@@ -160,7 +161,7 @@ const departmentTableBody = (department: DepartmentPowerSummaryData) =>
         formatAmps(row.currentPerPhase),
         row.notes || '',
       ])
-    : [['Sin datos guardados', '-', '-', formatWatts(0), formatAmps(0), '']];
+    : [['-', 'Sin datos guardados', '-', '-', formatWatts(0), formatAmps(0), '']];
 
 const drawTotalsBox = ({
   doc,
@@ -315,7 +316,7 @@ export const generateTechnicalPowerSummaryPack = async ({
 
     autoTable(doc, {
       startY: CONTENT_START_Y,
-      head: [['Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
+      head: [['Stage', 'Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
       body: departmentTableBody(department),
       theme: 'grid',
       styles: {

@@ -1,14 +1,25 @@
+import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
+import { getTechnicalStageStorageScope } from "@/features/technical-tools/stage/stageUtils";
+
 export const uploadWeightReportAndCompleteTasks = async ({
   fileName,
   jobId,
   pdfBlob,
+  stage,
 }: {
   fileName: string;
   jobId: string;
   pdfBlob: Blob;
+  stage?: TechnicalStage | null;
 }) => {
   const { uploadJobPdfWithCleanup } = await import("@/utils/jobDocumentsUpload");
-  await uploadJobPdfWithCleanup(jobId, pdfBlob, fileName, "calculators/pesos");
+  const cleanupScope = getTechnicalStageStorageScope(stage);
+
+  if (cleanupScope) {
+    await uploadJobPdfWithCleanup(jobId, pdfBlob, fileName, "calculators/pesos", { cleanupScope });
+  } else {
+    await uploadJobPdfWithCleanup(jobId, pdfBlob, fileName, "calculators/pesos");
+  }
 
   try {
     const { autoCompletePesosTasks } = await import("@/utils/taskAutoCompletion");

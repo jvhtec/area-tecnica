@@ -5,6 +5,8 @@ import type {
   PowerTable,
   TechnicalDepartment,
 } from "@/features/technical-tools/power/types";
+import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
+import { getTechnicalStageStorageScope } from "@/features/technical-tools/stage/stageUtils";
 
 type PowerPersistenceClient = Pick<typeof typedSupabase, "from">;
 
@@ -15,6 +17,8 @@ export const buildPowerTableData = (table: PowerTable, settings: PowerElectrical
   const payload = {
     rows: table.rows,
     ...(table.id !== undefined ? { sourceTableId: String(table.id) } : {}),
+    ...(table.stageNumber ? { stageNumber: table.stageNumber } : {}),
+    ...(table.stageName ? { stageName: table.stageName } : {}),
     safetyMargin: settings.safetyMargin,
     phaseMode: settings.phaseMode,
     voltage: settings.voltage,
@@ -42,47 +46,78 @@ export const buildPowerTableMetadata = (
     ...(settings.orderIndex !== undefined ? { order_index: settings.orderIndex } : {}),
   }) as unknown as Json;
 
+const getPowerTableStage = (
+  table: PowerTable,
+  stage?: TechnicalStage | null
+): TechnicalStage | null => {
+  if (stage) return stage;
+  if (!table.stageNumber) return null;
+
+  return {
+    number: table.stageNumber,
+    name: table.stageName || `Stage ${table.stageNumber}`,
+  };
+};
+
 export const buildPowerRequirementInsert = ({
   department,
   jobId,
   settings,
+  stage,
   table,
 }: {
   department: TechnicalDepartment;
   jobId: string;
   settings?: PowerElectricalSettings & { powerFactor?: number };
+  stage?: TechnicalStage | null;
   table: PowerTable;
-}) => ({
-  job_id: jobId,
-  department,
-  table_name: table.name,
-  total_watts: table.totalWatts || 0,
-  current_per_phase: table.currentPerPhase || 0,
-  pdu_type: table.customPduType || table.pduType || "",
-  custom_pdu_type: table.customPduType,
-  position: table.position || null,
-  custom_position: table.customPosition || null,
-  table_data: (settings ? buildPowerTableData(table, settings) : ({ rows: table.rows } as unknown as Json)),
-  includes_hoist: table.includesHoist || false,
-});
+}) => {
+  const tableStage = getPowerTableStage(table, stage);
+
+  return {
+    job_id: jobId,
+    department,
+    stage_number: tableStage?.number ?? null,
+    stage_name: tableStage?.name ?? null,
+    table_name: table.name,
+    total_watts: table.totalWatts || 0,
+    current_per_phase: table.currentPerPhase || 0,
+    pdu_type: table.customPduType || table.pduType || "",
+    custom_pdu_type: table.customPduType,
+    position: table.position || null,
+    custom_position: table.customPosition || null,
+    table_data: (settings ? buildPowerTableData({
+      ...table,
+      stageName: tableStage?.name ?? table.stageName,
+      stageNumber: tableStage?.number ?? table.stageNumber,
+    }, settings) : ({
+      rows: table.rows,
+      ...(tableStage ? { stageNumber: tableStage.number, stageName: tableStage.name } : {}),
+    } as unknown as Json)),
+    includes_hoist: table.includesHoist || false,
+  };
+};
 
 export const saveJobPowerRequirementTable = async ({
   client,
   department,
   jobId,
   settings,
+  stage,
   table,
 }: {
   client: PowerPersistenceClient;
   department: TechnicalDepartment;
   jobId: string;
   settings?: PowerElectricalSettings & { powerFactor?: number };
+  stage?: TechnicalStage | null;
   table: PowerTable;
 }): Promise<string> => {
   const payload = buildPowerRequirementInsert({
     department,
     jobId,
     settings,
+    stage,
     table,
   });
 
@@ -195,14 +230,23 @@ export const uploadPowerReportAndCompleteTask = async ({
   fileName,
   jobId,
   pdfBlob,
+  stage,
 }: {
   department: TechnicalDepartment;
   fileName: string;
   jobId: string;
   pdfBlob: Blob;
+  stage?: TechnicalStage | null;
 }) => {
   const { uploadJobPdfWithCleanup } = await import("@/utils/jobDocumentsUpload");
-  await uploadJobPdfWithCleanup(jobId, pdfBlob, fileName, getPowerReportUploadCategory(department));
+  const cleanupScope = getTechnicalStageStorageScope(stage);
+  const category = getPowerReportUploadCategory(department);
+
+  if (cleanupScope) {
+    await uploadJobPdfWithCleanup(jobId, pdfBlob, fileName, category, { cleanupScope });
+  } else {
+    await uploadJobPdfWithCleanup(jobId, pdfBlob, fileName, category);
+  }
 
   try {
     const { autoCompleteConsumosTasks } = await import("@/utils/taskAutoCompletion");

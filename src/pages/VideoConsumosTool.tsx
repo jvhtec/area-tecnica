@@ -28,6 +28,13 @@ import {
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
 import {
+  TechnicalStageSelector,
+  appendTechnicalStageToFilename,
+  formatTechnicalStageLabel,
+  isSameTechnicalStage,
+  useSelectedTechnicalStage,
+} from '@/features/technical-tools/stage/stageAllocation';
+import {
   CUSTOM_POWER_POSITION_VALUE,
   getPowerPositionCustomValue,
   getPowerPositionSelectValue,
@@ -57,6 +64,8 @@ interface Table {
   name: string;
   rows: TableRow[];
   powerRequirementId?: string;
+  stageNumber?: number | null;
+  stageName?: string | null;
   totalWatts?: number;
   adjustedWatts?: number;
   totalVa?: number;
@@ -99,6 +108,15 @@ const VideoConsumosTool: React.FC = () => {
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<any>(null);
+  const {
+    selectedStage,
+    selectedStageNumber,
+    setSelectedStageNumber,
+    stages: jobStages,
+  } = useSelectedTechnicalStage({
+    enabled: Boolean(selectedJobId) && !isTourDefaults && !isOverrideMode,
+    jobId: selectedJobId,
+  });
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [fohSchukoRequired, setFohSchukoRequired] = useState<boolean>(true);
@@ -245,6 +263,9 @@ const VideoConsumosTool: React.FC = () => {
 
   const getPowerSettings = () => ({ safetyMargin, powerFactor: pf, phaseMode, voltage });
   const PDU_TYPES = getPowerPduOptions('video', phaseMode);
+  const activeTables = selectedStage
+    ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
+    : tables;
 
   const savePowerRequirementTable = async (
     table: Table,
@@ -276,6 +297,7 @@ const VideoConsumosTool: React.FC = () => {
         department: 'video',
         jobId: selectedJobId,
         settings: getPowerSettings(),
+        stage: selectedStage,
         table,
       });
 
@@ -317,6 +339,8 @@ const VideoConsumosTool: React.FC = () => {
       settings: getPowerSettings(),
       tablePatch: {
         customPduType: undefined,
+        stageName: selectedStage?.name ?? null,
+        stageNumber: selectedStage?.number ?? null,
       },
     }) as Table;
 
@@ -447,7 +471,7 @@ const VideoConsumosTool: React.FC = () => {
       // Combine defaults and current tables for export
       const allTables = isOverrideMode 
         ? [...defaultTables, ...tables]
-        : tables;
+        : activeTables;
 
       // Generate power summary for consumos reports
       const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
@@ -468,11 +492,14 @@ const VideoConsumosTool: React.FC = () => {
         console.error("Error fetching logo:", logoError);
       }
 
+      const stageLabel = formatTechnicalStageLabel(selectedStage);
+      const reportTitle = stageLabel ? `${jobToUse.title} - ${stageLabel}` : jobToUse.title;
+
       const pdfBlob = await exportToPDF(
-        jobToUse.title,
+        reportTitle,
         allTables.map((table) => ({ ...table, toolType: 'consumos' })),
         'power',
-        jobToUse.title,
+        reportTitle,
         jobToUse?.start_time || new Date().toISOString(),
         undefined,
         powerSummary,
@@ -481,7 +508,10 @@ const VideoConsumosTool: React.FC = () => {
         fohSchukoRequired
       );
 
-      const fileName = `Video Power Report - ${jobToUse.title}.pdf`;
+      const fileName = appendTechnicalStageToFilename(
+        `Video Power Report - ${jobToUse.title}.pdf`,
+        selectedStage
+      );
       
       // Auto-complete video Consumos tasks only after successful upload
       // This automation is department-specific: only video department tasks are affected
@@ -492,6 +522,7 @@ const VideoConsumosTool: React.FC = () => {
           fileName,
           jobId: selectedJobId,
           pdfBlob,
+          stage: selectedStage,
         });
 
         if (completedTasksCount > 0) {
@@ -746,6 +777,15 @@ const VideoConsumosTool: React.FC = () => {
             </div>
           )}
 
+          {!isOverrideMode && !isTourDefaults && (
+            <TechnicalStageSelector
+              label="Stage"
+              selectedStageNumber={selectedStageNumber}
+              stages={jobStages}
+              onChange={setSelectedStageNumber}
+            />
+          )}
+
           <div className="flex items-center space-x-2">
             <Checkbox id="foh-schuko" checked={fohSchukoRequired} onCheckedChange={(c) => setFohSchukoRequired(!!c)} />
             <Label htmlFor="foh-schuko">Se requiere potencia de 16A en formato schuko hembra en posicion FoH</Label>
@@ -891,7 +931,7 @@ const VideoConsumosTool: React.FC = () => {
             <Button onClick={resetCurrentTable} variant="destructive">
               Reset
             </Button>
-            {tables.length > 0 && !isTourDefaults && (
+            {activeTables.length > 0 && !isTourDefaults && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="h-4 w-4" />
                 Export & Upload PDF
@@ -900,11 +940,14 @@ const VideoConsumosTool: React.FC = () => {
           </div>
 
           {/* Updated tables section to show safety margin adjusted watts */}
-          {tables.map((table) => (
+          {activeTables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-x-auto mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold">{table.name}</h3>
+                  {table.stageName && (
+                    <Badge variant="outline">{table.stageName}</Badge>
+                  )}
                   {isOverrideMode && (
                     <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
                   )}

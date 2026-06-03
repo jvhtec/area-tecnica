@@ -14,7 +14,16 @@ const getAuthStorage = (): Storage | undefined => {
   // Avoid crashing at import-time; tests can mock auth explicitly when needed.
   if (typeof window === 'undefined') return undefined;
   try {
-    return window.localStorage ?? undefined;
+    const storage = window.localStorage;
+    if (
+      storage &&
+      typeof storage.getItem === 'function' &&
+      typeof storage.setItem === 'function' &&
+      typeof storage.removeItem === 'function'
+    ) {
+      return storage;
+    }
+    return undefined;
   } catch {
     return undefined;
   }

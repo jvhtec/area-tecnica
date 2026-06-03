@@ -41,6 +41,13 @@ import {
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
 import {
+  TechnicalStageSelector,
+  appendTechnicalStageToFilename,
+  formatTechnicalStageLabel,
+  isSameTechnicalStage,
+  useSelectedTechnicalStage,
+} from '@/features/technical-tools/stage/stageAllocation';
+import {
   CUSTOM_POWER_POSITION_VALUE,
   getPowerPositionCustomValue,
   getPowerPositionSelectValue,
@@ -157,6 +164,8 @@ interface Table {
   name: string;
   rows: TableRow[];
   powerRequirementId?: string;
+  stageNumber?: number | null;
+  stageName?: string | null;
   totalWatts?: number;
   adjustedWatts?: number;
   totalVa?: number;
@@ -204,6 +213,15 @@ const LightsConsumosTool: React.FC = () => {
 
   const [selectedJobId, setSelectedJobId] = useState<string>('');
   const [selectedJob, setSelectedJob] = useState<JobSelection | null>(null);
+  const {
+    selectedStage,
+    selectedStageNumber,
+    setSelectedStageNumber,
+    stages: jobStages,
+  } = useSelectedTechnicalStage({
+    enabled: Boolean(selectedJobId) && !isTourDefaults && !isOverrideMode,
+    jobId: selectedJobId,
+  });
   const [tableName, setTableName] = useState('');
   const [tables, setTables] = useState<Table[]>([]);
   const [safetyMargin, setSafetyMargin] = useState(0);
@@ -234,6 +252,9 @@ const LightsConsumosTool: React.FC = () => {
   const pendingSetIdRef = React.useRef<Promise<string> | null>(null);
   const resolvedSetIdRef = React.useRef<string | null>(null);
   const pduOptions = getPowerPduOptions('lights', phaseMode);
+  const activeTables = selectedStage
+    ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
+    : tables;
   const getPowerSettings = (
     overrides: Partial<{ phaseMode: 'single' | 'three'; safetyMargin: number; voltage: number }> = {}
   ) => ({
@@ -575,6 +596,7 @@ const LightsConsumosTool: React.FC = () => {
           safetyMargin: table.snapshotSafetyMargin,
           voltage: table.snapshotVoltage,
         }),
+        stage: selectedStage,
         table,
       });
 
@@ -653,6 +675,8 @@ const LightsConsumosTool: React.FC = () => {
       customPosition: resolvedCustomPosition,
       includesHoist,
       id: Date.now(),
+      stageName: selectedStage?.name ?? null,
+      stageNumber: selectedStage?.number ?? null,
       snapshotSafetyMargin: safetyMargin,
       snapshotPhaseMode: phaseMode,
       snapshotVoltage: voltage,
@@ -783,7 +807,7 @@ const LightsConsumosTool: React.FC = () => {
       // Combine defaults and current tables for export
       const allTables = isOverrideMode
         ? [...defaultTables, ...tables]
-        : tables;
+        : activeTables;
 
       let logoUrl: string | undefined = undefined;
       try {
@@ -802,11 +826,14 @@ const LightsConsumosTool: React.FC = () => {
       const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
       const totalSystemKva = allTables.reduce((sum, table) => sum + (table.totalVa || table.totalWatts || 0), 0) / 1000;
 
+      const stageLabel = formatTechnicalStageLabel(selectedStage);
+      const reportTitle = stageLabel ? `${jobToUse.title} - ${stageLabel}` : jobToUse.title;
+
       const pdfBlob = await exportToPDF(
-        jobToUse.title,
+        reportTitle,
         allTables.map((table) => ({ ...table, toolType: 'consumos', phaseMode })),
         'power',
-        jobToUse.title,
+        reportTitle,
         ('start_time' in jobToUse ? jobToUse.start_time : null) || new Date().toISOString(),
         undefined,
         { totalSystemWatts, totalSystemAmps, totalSystemKva },
@@ -814,7 +841,10 @@ const LightsConsumosTool: React.FC = () => {
         logoUrl
       );
 
-      const fileName = `Informe de Potencia - ${jobToUse.title}.pdf`;
+      const fileName = appendTechnicalStageToFilename(
+        `Informe de Potencia - ${jobToUse.title}.pdf`,
+        selectedStage
+      );
 
       // Auto-complete lights Consumos tasks only after successful upload
       // This automation is department-specific: only lights department tasks are affected
@@ -825,6 +855,7 @@ const LightsConsumosTool: React.FC = () => {
           fileName,
           jobId: selectedJobId,
           pdfBlob,
+          stage: selectedStage,
         });
 
         if (completedTasksCount > 0) {
@@ -1025,6 +1056,15 @@ const LightsConsumosTool: React.FC = () => {
                 </SelectContent>
               </Select>
             </div>
+          )}
+
+          {!isOverrideMode && !isTourDefaults && (
+            <TechnicalStageSelector
+              label="Stage"
+              selectedStageNumber={selectedStageNumber}
+              stages={jobStages}
+              onChange={setSelectedStageNumber}
+            />
           )}
 
           <div className="space-y-2">
@@ -1249,7 +1289,7 @@ const LightsConsumosTool: React.FC = () => {
             <Button onClick={resetCurrentTable} variant="destructive">
               Reiniciar
             </Button>
-            {tables.length > 0 && !isTourDefaults && (
+            {activeTables.length > 0 && !isTourDefaults && (
               <Button onClick={handleExportPDF} variant="outline" className="ml-auto gap-2">
                 <FileText className="w-4 h-4" />
                 Exportar y Subir PDF
@@ -1257,11 +1297,14 @@ const LightsConsumosTool: React.FC = () => {
             )}
           </div>
 
-          {tables.map((table) => (
+          {activeTables.map((table) => (
             <div key={table.id} className="border rounded-lg overflow-x-auto mt-6">
               <div className="bg-muted px-4 py-3 flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <h3 className="font-semibold">{table.name}</h3>
+                  {table.stageName && (
+                    <Badge variant="outline">{table.stageName}</Badge>
+                  )}
                   {isOverrideMode && (
                     <Badge variant="outline" className="bg-orange-50 text-orange-700">Override</Badge>
                   )}

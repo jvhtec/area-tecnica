@@ -8,6 +8,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  TechnicalStageSelector,
+  type TechnicalStage,
+} from "@/features/technical-tools/stage/stageAllocation";
 
 export interface PesosToolViewProps {
   handleBackNavigation: () => void;
@@ -27,6 +31,9 @@ export interface PesosToolViewProps {
   selectedJobId: string;
   handleJobSelect: (jobId: string) => void;
   jobs?: any[];
+  selectedStageNumber: number | null;
+  setSelectedStageNumber: (stageNumber: number) => void;
+  jobStages: TechnicalStage[];
   tableName: string;
   setTableName: (value: string) => void;
   useDualMotors: boolean;
@@ -71,6 +78,9 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
   selectedJobId,
   handleJobSelect,
   jobs,
+  selectedStageNumber,
+  setSelectedStageNumber,
+  jobStages,
   tableName,
   setTableName,
   useDualMotors,
@@ -232,6 +242,15 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                       </SelectContent>
                     </Select>
                   </div>
+                )}
+
+                {!isTourContext && !isTourDefaults && !isJobOverrideMode && (
+                  <TechnicalStageSelector
+                    label="Stage"
+                    selectedStageNumber={selectedStageNumber}
+                    stages={jobStages}
+                    onChange={setSelectedStageNumber}
+                  />
                 )}
 
                 <div className="space-y-2">
@@ -424,6 +443,7 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                 <div className="bg-muted px-4 py-3 flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold">{table.name}</h3>
+                    {table.stageName && <Badge variant="outline">{table.stageName}</Badge>}
                     {isTourDefaults && (
                       <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                         Default
@@ -511,6 +531,7 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                 <div className="bg-muted px-4 py-3 flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <h3 className="font-semibold">{table.name}</h3>
+                    {table.stageName && <Badge variant="outline">{table.stageName}</Badge>}
                     {isTourDefaults && (
                       <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                         Default
@@ -592,4 +613,3 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
     </div>
   );
 };
-

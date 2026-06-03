@@ -40,6 +40,8 @@ export type DepartmentPowerSummarySource =
 
 export interface DepartmentPowerSummaryRow {
   name: string;
+  stageName?: string | null;
+  stageNumber?: number | null;
   pduLabel: string;
   positionLabel: string;
   totalWatts: number;
