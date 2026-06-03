@@ -14,6 +14,14 @@ const normalizePathSegment = (value: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
 
+const sanitizeFilenameLabel = (value: string) =>
+  value
+    .normalize("NFC")
+    .replace(/[\\/]+/g, " - ")
+    .replace(/[\x00-\x1F\x7F<>:"|?*]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 export const getTechnicalStageKey = (stage?: TechnicalStage | null) =>
   stage ? `stage-${stage.number}` : NO_STAGE_KEY;
 
@@ -40,8 +48,9 @@ export const appendTechnicalStageToFilename = (
   const extensionMatch = fileName.match(/(\.[^.]+)$/);
   const extension = extensionMatch?.[1] || "";
   const baseName = extension ? fileName.slice(0, -extension.length) : fileName;
+  const stageLabel = sanitizeFilenameLabel(stage.name) || `Stage ${stage.number}`;
 
-  return `${baseName} - ${stage.name}${extension}`;
+  return `${baseName} - ${stageLabel}${extension}`;
 };
 
 export const formatTechnicalStageLabel = (stage?: TechnicalStage | null) =>

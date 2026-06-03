@@ -153,7 +153,7 @@ const PesosTool: React.FC = () => {
 
     return tablesToAssign.map((table) => {
       const baseName = table.baseName || deriveBaseName(table.name);
-      const stageKey = table.stageNumber ? `stage-${table.stageNumber}` : 'default';
+      const stageKey = table.stageNumber != null ? `stage-${table.stageNumber}` : 'default';
       const counter = countersByStage.get(stageKey) || 1;
 
       if (table.dualMotors) {

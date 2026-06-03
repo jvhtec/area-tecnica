@@ -153,7 +153,7 @@ const drawFooter = ({
 const departmentTableBody = (department: DepartmentPowerSummaryData) =>
   department.rows.length > 0
     ? department.rows.map((row) => [
-        row.stageName || (row.stageNumber ? `Stage ${row.stageNumber}` : '-'),
+        row.stageName || (row.stageNumber != null ? `Stage ${row.stageNumber}` : '-'),
         row.name,
         row.pduLabel || 'N/A',
         row.positionLabel || 'N/A',

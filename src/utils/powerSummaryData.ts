@@ -133,12 +133,12 @@ const getPowerRequirementStageLabel = (row: PowerRequirementTableRow) => {
   if (stageName) return stageName;
 
   const stageNumber = getPowerRequirementStageNumber(row);
-  return stageNumber ? `Stage ${stageNumber}` : null;
+  return stageNumber !== null ? `Stage ${stageNumber}` : null;
 };
 
 const getPowerRequirementStageKey = (row: PowerRequirementTableRow) => {
   const stageNumber = getPowerRequirementStageNumber(row);
-  if (stageNumber) return `stage-${stageNumber}`;
+  if (stageNumber !== null) return `stage-${stageNumber}`;
 
   const stageName = getPowerRequirementStageName(row);
   return stageName ? `stage-name-${stageName.toLowerCase()}` : 'no-stage';

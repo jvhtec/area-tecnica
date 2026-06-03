@@ -464,7 +464,7 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                 </div>
 
                 {/* Advanced Options Display */}
-                {(table.dualMotors || table.clusterId || cablePick) && (
+                {(table.dualMotors || table.clusterId || table.cablePick) && (
                   <div className="p-4 bg-muted/50 space-y-2">
                     <h4 className="font-medium text-sm">Configuration:</h4>
                     <div className="flex flex-wrap gap-4 text-sm">
@@ -472,9 +472,9 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                       {table.clusterId && (
                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded">Mirrored Cluster</span>
                       )}
-                      {cablePick && (
+                      {table.cablePick && (
                         <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                          Cable Pick ({cablePickWeight} kg)
+                          Cable Pick ({table.cablePickWeight} kg)
                         </span>
                       )}
                     </div>
@@ -552,7 +552,7 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                 </div>
 
                 {/* Advanced Options Display */}
-                {(table.dualMotors || table.clusterId || cablePick) && (
+                {(table.dualMotors || table.clusterId || table.cablePick) && (
                   <div className="p-4 bg-muted/50 space-y-2">
                     <h4 className="font-medium text-sm">Configuration:</h4>
                     <div className="flex flex-wrap gap-4 text-sm">
@@ -560,9 +560,9 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                       {table.clusterId && (
                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded">Mirrored Cluster</span>
                       )}
-                      {cablePick && (
+                      {table.cablePick && (
                         <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                          Cable Pick ({cablePickWeight} kg)
+                          Cable Pick ({table.cablePickWeight} kg)
                         </span>
                       )}
                     </div>
