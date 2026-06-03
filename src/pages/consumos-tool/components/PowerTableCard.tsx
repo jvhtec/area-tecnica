@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import type { Table } from "../types";
 import { PowerTableControls } from "@/features/technical-tools/power/PowerTableControls";
 import {
@@ -19,7 +20,10 @@ export const PowerTableCard: React.FC<{
   return (
     <div className="border rounded-lg overflow-hidden mt-6">
       <div className="bg-muted px-4 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-        <h3 className="font-semibold">{table.name}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold">{table.name}</h3>
+          {table.stageName && <Badge variant="outline">{table.stageName}</Badge>}
+        </div>
         <Button variant="destructive" size="sm" onClick={onRemove}>
           Remove Table
         </Button>

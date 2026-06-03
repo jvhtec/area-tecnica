@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  formatPowerRequirementsText,
   getTechnicalPowerSummaryAvailability,
   loadTechnicalPowerSummaryData,
 } from '@/utils/powerSummaryData';
@@ -235,6 +236,108 @@ describe('powerSummaryData', () => {
       'Stage 1',
       'Stage 2',
     ]);
+  });
+
+  it('keeps same saved table identity separate per festival stage', async () => {
+    const supabase = createMockSupabase({
+      power_requirement_tables: [
+        {
+          id: 'sound-stage-1',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          stage_number: 1,
+          stage_name: 'Main Stage',
+          table_name: 'Main PA',
+          total_watts: 1000,
+          current_per_phase: 4,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: {
+            sourceTableId: 'same-local-table-id',
+            rows: [{ quantity: '1', componentId: '1', watts: '1000' }],
+          },
+        },
+        {
+          id: 'sound-stage-2',
+          created_at: '2026-04-07T08:05:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          stage_number: 2,
+          stage_name: 'Club Stage',
+          table_name: 'Main PA',
+          total_watts: 1200,
+          current_per_phase: 5,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: {
+            sourceTableId: 'same-local-table-id',
+            rows: [{ quantity: '1', componentId: '1', watts: '1000' }],
+          },
+        },
+      ],
+    });
+
+    const summary = await loadTechnicalPowerSummaryData({
+      job: { id: 'job-1', job_type: 'single' },
+      supabase,
+    });
+
+    expect(summary.departments.sound.rows).toHaveLength(2);
+    expect(summary.departments.sound.rows.map((row) => row.stageName)).toEqual([
+      'Main Stage',
+      'Club Stage',
+    ]);
+  });
+
+  it('includes stage labels in hoja de ruta power text', () => {
+    expect(
+      formatPowerRequirementsText([
+        {
+          id: 'sound-stage-1',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          stage_number: 1,
+          stage_name: 'Main Stage',
+          table_name: 'Main PA',
+          total_watts: 1000,
+          current_per_phase: 4,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          custom_position: null,
+          position: null,
+          includes_hoist: false,
+          table_data: { rows: [] },
+        } as any,
+      ])
+    ).toContain('SOUND - Main Stage - Main PA:');
+  });
+
+  it('keeps numeric stage zero when formatting hoja de ruta power text', () => {
+    expect(
+      formatPowerRequirementsText([
+        {
+          id: 'sound-stage-0',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          stage_number: 0,
+          stage_name: null,
+          table_name: 'Main PA',
+          total_watts: 1000,
+          current_per_phase: 4,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          custom_position: null,
+          position: null,
+          includes_hoist: false,
+          table_data: { rows: [] },
+        } as any,
+      ])
+    ).toContain('SOUND - Stage 0 - Main PA:');
   });
 
   it('uses saved job table electrical settings when calculating apparent power', async () => {

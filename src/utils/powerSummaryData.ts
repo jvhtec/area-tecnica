@@ -74,6 +74,8 @@ const mapPowerRequirementTable = (
   department: TechnicalPowerDepartment
 ): DepartmentPowerSummaryRow => ({
   name: row.table_name || 'Unnamed',
+  stageName: getPowerRequirementStageName(row),
+  stageNumber: getPowerRequirementStageNumber(row),
   pduLabel: row.custom_pdu_type || row.pdu_type || 'N/A',
   positionLabel: getResolvedPowerPosition(row.position, row.custom_position) || 'N/A',
   totalWatts: row.total_watts || 0,
@@ -106,6 +108,42 @@ const getPowerRequirementSourceTableId = (row: PowerRequirementTableRow) => {
     : null;
 };
 
+const getPowerRequirementStageNumber = (row: PowerRequirementTableRow) => {
+  if (typeof row.stage_number === 'number') return row.stage_number;
+  if (!isRecord(row.table_data)) return null;
+
+  const stageNumber = row.table_data.stageNumber;
+  return typeof stageNumber === 'number' && Number.isFinite(stageNumber)
+    ? stageNumber
+    : null;
+};
+
+const getPowerRequirementStageName = (row: PowerRequirementTableRow) => {
+  if (row.stage_name?.trim()) return row.stage_name.trim();
+  if (!isRecord(row.table_data)) return null;
+
+  const stageName = row.table_data.stageName;
+  return typeof stageName === 'string' && stageName.trim()
+    ? stageName.trim()
+    : null;
+};
+
+const getPowerRequirementStageLabel = (row: PowerRequirementTableRow) => {
+  const stageName = getPowerRequirementStageName(row);
+  if (stageName) return stageName;
+
+  const stageNumber = getPowerRequirementStageNumber(row);
+  return stageNumber !== null ? `Stage ${stageNumber}` : null;
+};
+
+const getPowerRequirementStageKey = (row: PowerRequirementTableRow) => {
+  const stageNumber = getPowerRequirementStageNumber(row);
+  if (stageNumber !== null) return `stage-${stageNumber}`;
+
+  const stageName = getPowerRequirementStageName(row);
+  return stageName ? `stage-name-${stageName.toLowerCase()}` : 'no-stage';
+};
+
 const comparePowerRequirementTablesByFreshness = (
   left: IndexedPowerRequirementTableRow,
   right: IndexedPowerRequirementTableRow
@@ -130,16 +168,17 @@ const getPowerRequirementTableCurrentKey = (
   row: PowerRequirementTableRow,
   department: TechnicalPowerDepartment
 ) => {
+  const stageKey = getPowerRequirementStageKey(row);
   const sourceTableId = getPowerRequirementSourceTableId(row);
   if (sourceTableId) {
-    return `${department}:source:${sourceTableId}`;
+    return `${department}:${stageKey}:source:${sourceTableId}`;
   }
 
   const normalizedName = row.table_name?.trim().toLowerCase();
   const rowSignature = getPowerRequirementRowsSignature(row);
 
   if (normalizedName && rowSignature) {
-    return `${department}:legacy:${normalizedName}:${rowSignature}`;
+    return `${department}:${stageKey}:legacy:${normalizedName}:${rowSignature}`;
   }
 
   return `${department}:row:${row.id}`;
@@ -182,10 +221,11 @@ export const formatPowerRequirementsText = (
   getCurrentPowerRequirementTables(rows)
     .map((req) => {
       const department = (req.department || 'general').toUpperCase();
+      const stageLabel = getPowerRequirementStageLabel(req);
       const pduType = req.custom_pdu_type || req.pdu_type || 'N/D';
       const position = getResolvedPowerPosition(req.position, req.custom_position);
       const lines = [
-        `${department} - ${req.table_name || 'tabla'}:`,
+        `${[department, stageLabel, req.table_name || 'tabla'].filter(Boolean).join(' - ')}:`,
         `Potencia Total: ${formatPowerRequirementNumber(req.total_watts)}W`,
         `Corriente por Fase: ${formatPowerRequirementNumber(req.current_per_phase)}A`,
         `PDU Recomendado: ${pduType}`,

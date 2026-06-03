@@ -40,6 +40,28 @@ describe("technical weight report persistence", () => {
     expect(mocks.autoCompletePesosTasks).toHaveBeenCalledWith("job-1");
   });
 
+  it("scopes Pesos PDF cleanup to the selected stage", async () => {
+    mocks.uploadJobPdfWithCleanup.mockResolvedValue(undefined);
+    mocks.autoCompletePesosTasks.mockResolvedValue({ completedCount: 1 });
+    const pdfBlob = new Blob(["pdf"]);
+
+    await uploadWeightReportAndCompleteTasks({
+      fileName: "Pesos - Main Stage.pdf",
+      jobId: "job-1",
+      pdfBlob,
+      stage: { number: 1, name: "Main Stage" },
+    });
+
+    expect(mocks.uploadJobPdfWithCleanup).toHaveBeenCalledWith(
+      "job-1",
+      pdfBlob,
+      "Pesos - Main Stage.pdf",
+      "calculators/pesos",
+      { cleanupScope: "stage-1-main-stage" },
+    );
+  });
+
+
   it("keeps successful uploads non-fatal when Pesos auto-completion fails", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     mocks.uploadJobPdfWithCleanup.mockResolvedValue(undefined);

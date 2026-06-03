@@ -5330,6 +5330,8 @@ export type Database = {
           job_id: string | null
           pdu_type: string
           position: string | null
+          stage_name: string | null
+          stage_number: number | null
           table_data: Json
           table_name: string
           total_watts: number
@@ -5345,6 +5347,8 @@ export type Database = {
           job_id?: string | null
           pdu_type: string
           position?: string | null
+          stage_name?: string | null
+          stage_number?: number | null
           table_data?: Json
           table_name: string
           total_watts: number
@@ -5360,6 +5364,8 @@ export type Database = {
           job_id?: string | null
           pdu_type?: string
           position?: string | null
+          stage_name?: string | null
+          stage_number?: number | null
           table_data?: Json
           table_name?: string
           total_watts?: number

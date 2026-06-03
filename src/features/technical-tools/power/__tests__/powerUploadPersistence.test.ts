@@ -41,6 +41,29 @@ describe("technical power report persistence", () => {
     expect(mocks.autoCompleteConsumosTasks).toHaveBeenCalledWith("job-1", "lights");
   });
 
+  it("scopes Consumos PDF cleanup to the selected stage", async () => {
+    mocks.uploadJobPdfWithCleanup.mockResolvedValue(undefined);
+    mocks.autoCompleteConsumosTasks.mockResolvedValue({ completedCount: 1 });
+    const pdfBlob = new Blob(["pdf"]);
+
+    await uploadPowerReportAndCompleteTask({
+      department: "sound",
+      fileName: "Sound - Main Stage.pdf",
+      jobId: "job-1",
+      pdfBlob,
+      stage: { number: 1, name: "Main Stage" },
+    });
+
+    expect(mocks.uploadJobPdfWithCleanup).toHaveBeenCalledWith(
+      "job-1",
+      pdfBlob,
+      "Sound - Main Stage.pdf",
+      "calculators/consumos",
+      { cleanupScope: "stage-1-main-stage" },
+    );
+  });
+
+
   it("keeps successful power uploads non-fatal when auto-completion fails", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
     mocks.uploadJobPdfWithCleanup.mockResolvedValue(undefined);

@@ -43,6 +43,25 @@ describe("technical power persistence payloads", () => {
     });
   });
 
+  it("builds stage-aware job inserts for multi-stage jobs", () => {
+    expect(
+      buildPowerRequirementInsert({
+        department: "sound",
+        jobId: "job-1",
+        settings,
+        stage: { number: 2, name: "Club Stage" },
+        table,
+      })
+    ).toMatchObject({
+      stage_name: "Club Stage",
+      stage_number: 2,
+      table_data: {
+        stageName: "Club Stage",
+        stageNumber: 2,
+      },
+    });
+  });
+
   it("builds tour default payloads with table data and metadata in one shape", () => {
     expect(buildTourPowerDefaultTable({ setId: "set-1", settings, table })).toMatchObject({
       set_id: "set-1",

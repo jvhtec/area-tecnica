@@ -87,6 +87,7 @@ describe('technicalPowerSummaryPack', () => {
             rows: [
               {
                 name: 'FoH',
+                stageNumber: 0,
                 pduLabel: '32A',
                 positionLabel: 'FOH',
                 totalWatts: 1000,
@@ -136,7 +137,13 @@ describe('technicalPowerSummaryPack', () => {
     expect(autoTableMock).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        head: [['Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
+        head: [['Stage', 'Nombre Cuadro', 'PDU', 'Posición', 'Potencia', 'Corriente', 'Notas']],
+      })
+    );
+    expect(autoTableMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        body: expect.arrayContaining([expect.arrayContaining(['Stage 0'])]),
       })
     );
   });

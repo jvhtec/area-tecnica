@@ -32,6 +32,13 @@ import {
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
 import {
+  TechnicalStageSelector,
+  appendTechnicalStageToFilename,
+  formatTechnicalStageLabel,
+  isSameTechnicalStage,
+  useSelectedTechnicalStage,
+} from '@/features/technical-tools/stage/stageAllocation';
+import {
   CUSTOM_POWER_POSITION_VALUE,
   getPowerPositionCustomValue,
   getPowerPositionSelectValue,
@@ -85,6 +92,15 @@ const ConsumosTool: React.FC = () => {
   // Tour override detection
   const isJobOverrideMode = Boolean(selectedJob?.tour_date_id);
   const tourDateId = selectedJob?.tour_date_id;
+  const {
+    selectedStage,
+    selectedStageNumber,
+    setSelectedStageNumber,
+    stages: jobStages,
+  } = useSelectedTechnicalStage({
+    enabled: Boolean(selectedJobId) && !isTourDefaults && !isJobOverrideMode,
+    jobId: selectedJobId,
+  });
 
   // NEW: Get tour name for tour defaults mode
   const [tourName, setTourName] = useState<string>('');
@@ -195,6 +211,9 @@ const ConsumosTool: React.FC = () => {
 
   const getPowerSettings = () => ({ safetyMargin, powerFactor: pf, phaseMode, voltage });
   const PDU_TYPES = getPowerPduOptions('sound', phaseMode);
+  const activeTables = selectedStage
+    ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
+    : tables;
 
   const savePowerRequirementTable = async (
     table: Table,
@@ -206,6 +225,7 @@ const ConsumosTool: React.FC = () => {
         department: 'sound',
         jobId: selectedJobId,
         settings: getPowerSettings(),
+        stage: selectedStage,
         table,
       });
 
@@ -309,6 +329,8 @@ const ConsumosTool: React.FC = () => {
       tablePatch: {
         isDefault: false,
         defaultTableId: undefined,
+        stageName: selectedStage?.name ?? null,
+        stageNumber: selectedStage?.number ?? null,
       },
     }) as Table;
 
@@ -452,7 +474,7 @@ const ConsumosTool: React.FC = () => {
         ? tourOverrideTables
         : isTourDefaults
           ? tourDefaultTables
-          : tables;
+          : activeTables;
 
       const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
       const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
@@ -474,7 +496,9 @@ const ConsumosTool: React.FC = () => {
 
       const jobTitle = isTourDefaults ? `${tourName} - Sound Power Defaults` : (selectedJob?.title || 'Power Report');
       const jobLocation = selectedJob?.location?.name || '';
-      const headerTitle = jobLocation ? `${jobTitle} - ${jobLocation}` : jobTitle;
+      const baseHeaderTitle = jobLocation ? `${jobTitle} - ${jobLocation}` : jobTitle;
+      const stageLabel = formatTechnicalStageLabel(selectedStage);
+      const headerTitle = stageLabel ? `${baseHeaderTitle} - ${stageLabel}` : baseHeaderTitle;
 
       const pdfBlob = await exportToPDF(
         headerTitle,
@@ -491,7 +515,10 @@ const ConsumosTool: React.FC = () => {
 
       const fileName = isTourDefaults
         ? `${tourName} - Sound Power Defaults.pdf`
-        : `Sound Power Report - ${selectedJob?.title || 'Report'}.pdf`;
+        : appendTechnicalStageToFilename(
+            `Sound Power Report - ${selectedJob?.title || 'Report'}.pdf`,
+            selectedStage
+          );
 
       // Auto-complete sound Consumos tasks only after successful upload
       // This automation is department-specific: only sound department tasks are affected
@@ -502,6 +529,7 @@ const ConsumosTool: React.FC = () => {
           fileName,
           jobId: selectedJobId,
           pdfBlob,
+          stage: selectedStage,
         });
 
         if (completedTasksCount > 0) {
@@ -669,7 +697,7 @@ const ConsumosTool: React.FC = () => {
               )}
             </div>
           </div>
-          {tables.length > 0 && (
+          {activeTables.length > 0 && (
             <Button onClick={handleExportPDF} variant="outline" className="gap-2">
               <FileText className="h-4 w-4" />
               {isTourDefaults ? 'Export PDF' : 'Export & Upload PDF'}
@@ -780,6 +808,15 @@ const ConsumosTool: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                )}
+
+                {!isTourDefaults && !isJobOverrideMode && (
+                  <TechnicalStageSelector
+                    label="Stage"
+                    selectedStageNumber={selectedStageNumber}
+                    stages={jobStages}
+                    onChange={setSelectedStageNumber}
+                  />
                 )}
 
                 {(isJobOverrideMode || isTourDefaults) && tourDefaultTables.length > 0 && (
@@ -1016,7 +1053,7 @@ const ConsumosTool: React.FC = () => {
         <div className="lg:col-span-4">
           <div className="space-y-6">
             {/* First half of tables */}
-            {tables.slice(0, Math.ceil(tables.length / 2)).map((table) => (
+            {activeTables.slice(0, Math.ceil(activeTables.length / 2)).map((table) => (
               <PowerTableCard
                 key={table.id}
                 table={table}
@@ -1034,7 +1071,7 @@ const ConsumosTool: React.FC = () => {
         <div className="lg:col-span-4">
           <div className="space-y-6">
             {/* Second half of tables */}
-            {tables.slice(Math.ceil(tables.length / 2)).map((table) => (
+            {activeTables.slice(Math.ceil(activeTables.length / 2)).map((table) => (
               <PowerTableCard
                 key={table.id}
                 table={table}

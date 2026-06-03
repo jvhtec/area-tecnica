@@ -13,6 +13,12 @@ import {
   sumWeightRows,
 } from '@/features/technical-tools/weights/weightCalculations';
 import { uploadWeightReportAndCompleteTasks } from '@/features/technical-tools/weights/weightPersistence';
+import {
+  appendTechnicalStageToFilename,
+  formatTechnicalStageLabel,
+  isSameTechnicalStage,
+  useSelectedTechnicalStage,
+} from '@/features/technical-tools/stage/stageAllocation';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -72,6 +78,8 @@ interface Table {
   rows: TableRow[];
   totalWeight?: number;
   id?: number;
+  stageNumber?: number | null;
+  stageName?: string | null;
   dualMotors?: boolean;
   riggingPoints?: string; // Stores the generated SX suffix(es)
   clusterId?: string;     // New property to group tables (e.g. mirrored pair)
@@ -118,6 +126,15 @@ const PesosTool: React.FC = () => {
   // Job-based override mode detection
   const [isJobOverrideMode, setIsJobOverrideMode] = useState(false);
   const [jobTourInfo, setJobTourInfo] = useState<{ tourName: string; date: string; location: string } | null>(null);
+  const {
+    selectedStage,
+    selectedStageNumber,
+    setSelectedStageNumber,
+    stages: jobStages,
+  } = useSelectedTechnicalStage({
+    enabled: Boolean(selectedJobId) && !isTourContext && !isTourDefaults && !isJobOverrideMode,
+    jobId: selectedJobId,
+  });
 
   const [currentTable, setCurrentTable] = useState<Table>({
     name: '',
@@ -132,14 +149,18 @@ const PesosTool: React.FC = () => {
   const formatSuffixNumber = (value: number) => formatRiggingPoint('SX', value);
 
   const assignSuffixes = (tablesToAssign: Table[]): Table[] => {
-    let counter = 1;
+    const countersByStage = new Map<string, number>();
+
     return tablesToAssign.map((table) => {
       const baseName = table.baseName || deriveBaseName(table.name);
+      const stageKey = table.stageNumber != null ? `stage-${table.stageNumber}` : 'default';
+      const counter = countersByStage.get(stageKey) || 1;
 
       if (table.dualMotors) {
-        const suffixOne = formatSuffixNumber(counter++);
-        const suffixTwo = formatSuffixNumber(counter++);
+        const suffixOne = formatSuffixNumber(counter);
+        const suffixTwo = formatSuffixNumber(counter + 1);
         const riggingPoints = `${suffixOne}, ${suffixTwo}`;
+        countersByStage.set(stageKey, counter + 2);
         return {
           ...table,
           baseName,
@@ -148,7 +169,8 @@ const PesosTool: React.FC = () => {
         };
       }
 
-      const suffix = formatSuffixNumber(counter++);
+      const suffix = formatSuffixNumber(counter);
+      countersByStage.set(stageKey, counter + 1);
       return {
         ...table,
         baseName,
@@ -188,6 +210,9 @@ const PesosTool: React.FC = () => {
   // Get tour name for display
   const [tourName, setTourName] = useState<string>('');
   const [tourDateInfo, setTourDateInfo] = useState<{ date: string; location: string } | null>(null);
+  const activeTables = selectedStage
+    ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
+    : tables;
 
   // Preselect job from query param and fetch details if not in the list
   useEffect(() => {
@@ -616,6 +641,8 @@ const PesosTool: React.FC = () => {
         rows: calculatedRows,
         totalWeight,
         id: Date.now(),
+        stageName: selectedStage?.name ?? null,
+        stageNumber: selectedStage?.number ?? null,
         dualMotors: useDualMotors,
         clusterId: newClusterId,
         cablePick,
@@ -629,6 +656,8 @@ const PesosTool: React.FC = () => {
         rows: calculatedRows,
         totalWeight,
         id: Date.now() + 1,
+        stageName: selectedStage?.name ?? null,
+        stageNumber: selectedStage?.number ?? null,
         dualMotors: useDualMotors,
         clusterId: newClusterId,
         cablePick,
@@ -645,6 +674,8 @@ const PesosTool: React.FC = () => {
         rows: calculatedRows,
         totalWeight,
         id: Date.now(),
+        stageName: selectedStage?.name ?? null,
+        stageNumber: selectedStage?.number ?? null,
         dualMotors: useDualMotors,
         clusterId: newClusterId,
         cablePick,
@@ -703,7 +734,7 @@ const PesosTool: React.FC = () => {
       return;
     }
 
-    const summaryRows: SummaryRow[] = tables.map((table) => {
+    const summaryRows: SummaryRow[] = activeTables.map((table) => {
       const cleanName = table.name.split('(')[0].trim();
       return {
         clusterName: cleanName,
@@ -713,7 +744,7 @@ const PesosTool: React.FC = () => {
     });
 
     // Group tables by clusterId to handle cable picks
-    const clusters = tables.reduce((acc, table) => {
+    const clusters = activeTables.reduce((acc, table) => {
       if (table.clusterId) {
         if (!acc[table.clusterId]) {
           acc[table.clusterId] = [];
@@ -746,12 +777,14 @@ const PesosTool: React.FC = () => {
         console.error("Error fetching logo:", logoError);
       }
 
-      // For now just use the job title - location will be added later when available
+      const stageLabel = formatTechnicalStageLabel(selectedStage);
+      const reportTitle = stageLabel ? `${selectedJob.title} - ${stageLabel}` : selectedJob.title;
+
       const pdfBlob = await exportToPDF(
-        selectedJob.title,
-        tables.map((table) => ({ ...table, toolType: 'pesos' })),
+        reportTitle,
+        activeTables.map((table) => ({ ...table, toolType: 'pesos' })),
         'weight',
-        selectedJob.title,
+        reportTitle,
         selectedJob?.start_time || new Date().toISOString(),
         summaryRows,
         undefined,
@@ -759,7 +792,10 @@ const PesosTool: React.FC = () => {
         logoUrl
       );
 
-      const fileName = `Pesos Report - ${selectedJob.title}.pdf`;
+      const fileName = appendTechnicalStageToFilename(
+        `Pesos Report - ${selectedJob.title}.pdf`,
+        selectedStage
+      );
       let completedTasksCount = 0;
 
       // Upload PDF first - only auto-complete tasks if upload succeeds
@@ -767,6 +803,7 @@ const PesosTool: React.FC = () => {
         fileName,
         jobId: selectedJobId,
         pdfBlob,
+        stage: selectedStage,
       });
 
       if (completedTasksCount > 0) {
@@ -810,13 +847,16 @@ const PesosTool: React.FC = () => {
       isTourContext={isTourContext}
       isJobOverrideMode={isJobOverrideMode}
       jobTourInfo={jobTourInfo}
-      tables={tables}
+      tables={activeTables}
       currentSetName={currentSetName}
       setCurrentSetName={setCurrentSetName}
       jobIdFromUrl={jobIdFromUrl}
       selectedJobId={selectedJobId}
       handleJobSelect={handleJobSelect}
       jobs={jobs}
+      selectedStageNumber={selectedStageNumber}
+      setSelectedStageNumber={setSelectedStageNumber}
+      jobStages={jobStages}
       tableName={tableName}
       setTableName={setTableName}
       useDualMotors={useDualMotors}

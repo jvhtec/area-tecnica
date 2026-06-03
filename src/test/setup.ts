@@ -42,7 +42,64 @@ const createUnexpectedFetchError = (input?: RequestInfo | URL) => {
   );
 };
 
+const createMemoryStorage = (): Storage => {
+  const store = new Map<string, string>();
+
+  return {
+    get length() {
+      return store.size;
+    },
+    clear: () => store.clear(),
+    getItem: (key: string) => store.get(key) ?? null,
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
+    removeItem: (key: string) => {
+      store.delete(key);
+    },
+    setItem: (key: string, value: string) => {
+      store.set(key, value);
+    },
+  };
+};
+
+const hasStorageMethods = (value: unknown): value is Storage =>
+  typeof value === "object" &&
+  value !== null &&
+  typeof (value as Storage).clear === "function" &&
+  typeof (value as Storage).getItem === "function" &&
+  typeof (value as Storage).removeItem === "function" &&
+  typeof (value as Storage).setItem === "function";
+
+const ensureTestLocalStorage = () => {
+  if (typeof window === "undefined") return;
+
+  let currentStorage: unknown;
+  try {
+    currentStorage = window.localStorage;
+  } catch {
+    currentStorage = undefined;
+  }
+
+  const storage = hasStorageMethods(currentStorage)
+    ? currentStorage
+    : createMemoryStorage();
+
+  if (storage !== currentStorage) {
+    Object.defineProperty(window, "localStorage", {
+      configurable: true,
+      value: storage,
+    });
+  }
+
+  if (!hasStorageMethods(globalThis.localStorage)) {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: storage,
+    });
+  }
+};
+
 beforeEach(() => {
+  ensureTestLocalStorage();
   resetMockSupabase();
   toast.mockClear();
   toast.error.mockClear();
