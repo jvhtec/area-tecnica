@@ -28,6 +28,46 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+  typecheck:
+    name: npm run typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run TypeScript no-emit check
+        run: npm run typecheck
+
+  governance:
+    name: Governance gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run source, Edge Function, and dependency gates
+        run: npm run governance
+
   test_critical:
     name: npm run test:critical
     runs-on: ubuntu-latest
@@ -87,6 +127,9 @@ jobs:
 
       - name: Build app
         run: npm run build
+
+      - name: Check bundle budget
+        run: npm run budget:bundle
 
   e2e_smoke:
     name: npm run test:e2e (smoke)
