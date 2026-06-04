@@ -1,4 +1,4 @@
-import { jsonResponse } from "./cors.ts";
+import { extractBearerToken, jsonResponse } from "./http.ts";
 
 export type SecurityAuditSeverity = "low" | "medium" | "high" | "critical";
 
@@ -108,16 +108,7 @@ export function sanitizeSecurityAuditMetadata(value: unknown): Record<string, un
   return sanitizeValue(value) as Record<string, unknown>;
 }
 
-export function extractBearerToken(req: Request): string | null {
-  const authorization = req.headers.get("authorization");
-
-  if (!authorization) {
-    return null;
-  }
-
-  const match = authorization.match(/^Bearer\s+(.+)$/i);
-  return match?.[1]?.trim() || null;
-}
+export { extractBearerToken };
 
 export async function resolveAuthenticatedAuditUser(
   req: Request,
