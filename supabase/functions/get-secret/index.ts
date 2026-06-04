@@ -23,6 +23,5 @@ serve(createHttpHandler(async (req) => {
   });
 }, {
   allowedMethods: ["POST"],
-  includeErrorDetails: true,
   onError: (error) => console.error("Error processing request:", error),
 }));

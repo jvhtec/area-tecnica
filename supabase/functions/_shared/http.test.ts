@@ -84,6 +84,33 @@ describe("shared Edge Function HTTP helpers", () => {
     await expect(response.json()).resolves.toEqual({ error: "Internal server error" });
   });
 
+  it("still returns an error response when the error logger throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const wrapped = createHttpHandler(
+      async () => {
+        throw new Error("database password leaked");
+      },
+      {
+        onError: () => {
+          throw new Error("logger failed");
+        },
+      },
+    );
+
+    try {
+      const response = await wrapped(new Request("https://example.com", { method: "POST" }));
+
+      expect(response.status).toBe(500);
+      await expect(response.json()).resolves.toEqual({ error: "Internal server error" });
+      expect(consoleError).toHaveBeenCalledWith(
+        "createHttpHandler onError callback failed",
+        expect.any(Error),
+      );
+    } finally {
+      consoleError.mockRestore();
+    }
+  });
+
   it("validates required environment values", () => {
     const values = requireEnvValues(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const, (name) => (
       name === "SUPABASE_URL" ? "http://localhost" : "service-role"

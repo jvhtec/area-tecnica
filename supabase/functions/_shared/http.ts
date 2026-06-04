@@ -4,6 +4,7 @@ export { corsHeaders };
 
 type JsonBody = Record<string, unknown>;
 
+/** Structured error type for HTTP responses produced by Edge Function handlers. */
 export class HttpError extends Error {
   readonly status: number;
   readonly code?: string;
@@ -28,6 +29,7 @@ export class HttpError extends Error {
   }
 }
 
+/** Creates a JSON response with the repository's default Edge Function CORS headers. */
 export function jsonResponse(body: unknown, init?: ResponseInit | number) {
   return corsJsonResponse(
     body,
@@ -35,10 +37,12 @@ export function jsonResponse(body: unknown, init?: ResponseInit | number) {
   );
 }
 
+/** Creates a CORS preflight response. */
 export function preflightResponse(status = 204) {
   return new Response(null, { status, headers: corsHeaders });
 }
 
+/** Returns a response with any missing default CORS headers added. */
 export function withCorsHeaders(response: Response) {
   const headers = new Headers(response.headers);
 
@@ -55,6 +59,7 @@ export function withCorsHeaders(response: Response) {
   });
 }
 
+/** Creates a standard method-not-allowed JSON response with an Allow header. */
 export function methodNotAllowedResponse(
   allowedMethods: readonly string[],
   options: { status?: number; body?: unknown } = {},
@@ -70,6 +75,7 @@ export function methodNotAllowedResponse(
   );
 }
 
+/** Extracts a Bearer token from the request Authorization header. */
 export function extractBearerToken(req: Request): string | null {
   const authorization = req.headers.get("authorization");
 
@@ -81,6 +87,7 @@ export function extractBearerToken(req: Request): string | null {
   return match?.[1]?.trim() || null;
 }
 
+/** Extracts a Bearer token or throws an HTTP 401 error. */
 export function requireBearerToken(
   req: Request,
   options: { message?: string; code?: string } = {},
@@ -96,6 +103,7 @@ export function requireBearerToken(
   return token;
 }
 
+/** Reads and parses the request body as JSON, converting parse failures to HTTP 400. */
 export async function readJsonBody<T = unknown>(
   req: Request,
   options: { message?: string; code?: string } = {},
@@ -113,6 +121,7 @@ function isRecord(value: unknown): value is JsonBody {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+/** Reads and parses the request body as a JSON object. */
 export async function readJsonObject<T extends JsonBody = JsonBody>(
   req: Request,
   options: { message?: string; code?: string } = {},
@@ -132,6 +141,7 @@ function getErrorObject(error: unknown) {
   return isRecord(error) ? error : {};
 }
 
+/** Resolves the HTTP status code carried by an error-like value. */
 export function getErrorStatus(error: unknown, fallbackStatus = 500) {
   if (error instanceof HttpError) {
     return error.status;
@@ -168,6 +178,7 @@ function getErrorMessage(error: unknown) {
   return typeof error === "string" ? error : null;
 }
 
+/** Converts an error-like value into a client-facing JSON body. */
 export function serializeError(
   error: unknown,
   options: {
@@ -202,6 +213,7 @@ export function serializeError(
   return body;
 }
 
+/** Creates a CORS JSON response for an error-like value. */
 export function errorResponse(
   error: unknown,
   options: {
@@ -219,6 +231,7 @@ export function errorResponse(
   );
 }
 
+/** Reads required environment values or throws a server misconfiguration error. */
 export function requireEnvValues<const TNames extends readonly string[]>(
   names: TNames,
   getEnv: (name: string) => string | undefined,
@@ -248,6 +261,7 @@ export function requireEnvValues<const TNames extends readonly string[]>(
   return values;
 }
 
+/** Wraps an Edge Function request handler with CORS, method, and error handling. */
 export function createHttpHandler(
   handler: (req: Request) => Response | Promise<Response>,
   options: {
@@ -281,7 +295,12 @@ export function createHttpHandler(
         return withCorsHeaders(error);
       }
 
-      options.onError?.(error, req);
+      try {
+        options.onError?.(error, req);
+      } catch (onErrorFailure) {
+        console.error("createHttpHandler onError callback failed", onErrorFailure);
+      }
+
       return errorResponse(error, {
         fallbackMessage: options.internalErrorMessage,
         includeDetails: options.includeErrorDetails,
