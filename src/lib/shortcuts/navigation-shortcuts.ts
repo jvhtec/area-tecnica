@@ -7,12 +7,8 @@
 
 import { useShortcutStore } from '@/stores/useShortcutStore';
 import { NavigateFunction } from 'react-router-dom';
-import {
-  DASHBOARD_ALLOWED_ROLES,
-  MANAGEMENT_ALLOWED_ROLES,
-  MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
-  PROJECT_MANAGEMENT_ALLOWED_ROLES,
-} from '@/utils/permissions';
+import { navigationShortcuts, type AccessPolicyId } from '@/routes/app-route-manifest';
+import { isManagementRole } from '@/utils/permissions';
 
 export interface NavigationShortcut {
   id: string;
@@ -20,153 +16,17 @@ export interface NavigationShortcut {
   route: string;
   keybind?: string;
   icon?: string;
-  requiredRoles?: string[];
+  access?: AccessPolicyId;
+  requiredRoles?: readonly string[];
+  allowAssignableTech?: boolean;
 }
 
-// Define all navigation shortcuts based on the routes from App.tsx
-export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = [
-  {
-    id: 'nav-dashboard',
-    label: 'Panel Principal',
-    route: '/dashboard',
-    keybind: 'Ctrl+1',
-    icon: 'LayoutDashboard',
-    requiredRoles: DASHBOARD_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-technician-dashboard',
-    label: 'Panel Técnico',
-    route: '/technician-dashboard',
-    keybind: 'Ctrl+Shift+1',
-    icon: 'Wrench',
-    requiredRoles: ['house_tech'],
-  },
-  {
-    id: 'nav-sound',
-    label: 'Sonido',
-    route: '/sound',
-    keybind: 'Ctrl+2',
-    icon: 'Volume2',
-    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-lights',
-    label: 'Luces',
-    route: '/lights',
-    keybind: 'Ctrl+3',
-    icon: 'Lightbulb',
-    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-video',
-    label: 'Video',
-    route: '/video',
-    keybind: 'Ctrl+4',
-    icon: 'Video',
-    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-logistics',
-    label: 'Logística',
-    route: '/logistics',
-    keybind: 'Ctrl+5',
-    icon: 'Truck',
-    requiredRoles: [...PROJECT_MANAGEMENT_ALLOWED_ROLES, 'house_tech'],
-  },
-  {
-    id: 'nav-tours',
-    label: 'Tours',
-    route: '/tours',
-    keybind: 'Ctrl+6',
-    icon: 'Plane',
-    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-festivals',
-    label: 'Festivales',
-    route: '/festivals',
-    keybind: 'Ctrl+7',
-    icon: 'Music',
-    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-personal',
-    label: 'Personal',
-    route: '/personal',
-    keybind: 'Ctrl+8',
-    icon: 'Users',
-    requiredRoles: [...PROJECT_MANAGEMENT_ALLOWED_ROLES, 'house_tech'],
-  },
-  {
-    id: 'nav-project-management',
-    label: 'Gestión de Proyectos',
-    route: '/project-management',
-    keybind: 'Ctrl+9',
-    icon: 'FolderKanban',
-    requiredRoles: PROJECT_MANAGEMENT_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-job-assignment-matrix',
-    label: 'Matriz de Asignaciones',
-    route: '/job-assignment-matrix',
-    keybind: 'Ctrl+0',
-    icon: 'Calendar',
-    requiredRoles: MANAGEMENT_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-rates',
-    label: 'Tarifas',
-    route: '/management/rates',
-    keybind: 'Ctrl+Shift+R',
-    icon: 'DollarSign',
-    requiredRoles: MANAGEMENT_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-expenses',
-    label: 'Gastos',
-    route: '/gastos',
-    keybind: 'Ctrl+Shift+G',
-    icon: 'Receipt',
-    requiredRoles: PROJECT_MANAGEMENT_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-timesheets',
-    label: 'Hojas de Tiempo',
-    route: '/timesheets',
-    keybind: 'Ctrl+Shift+T',
-    icon: 'Clock',
-  },
-  {
-    id: 'nav-tech-app',
-    label: 'App Técnico',
-    route: '/tech-app',
-    icon: 'Smartphone',
-    requiredRoles: ['technician'],
-  },
-  {
-    id: 'nav-hoja-de-ruta',
-    label: 'Hoja de Ruta',
-    route: '/hoja-de-ruta',
-    keybind: 'Ctrl+Shift+H',
-    icon: 'Map',
-    requiredRoles: MANAGEMENT_AND_HOUSE_TECH_ALLOWED_ROLES,
-  },
-  {
-    id: 'nav-profile',
-    label: 'Perfil',
-    route: '/profile',
-    keybind: 'Ctrl+Shift+P',
-    icon: 'User',
-  },
-  {
-    id: 'nav-settings',
-    label: 'Configuración',
-    route: '/settings',
-    keybind: 'Ctrl+,',
-    icon: 'Settings',
-    requiredRoles: MANAGEMENT_ALLOWED_ROLES,
-  },
-];
+export interface NavigationShortcutContext {
+  userRole: string | null | undefined;
+  assignableAsTech?: boolean | null;
+}
+
+export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = navigationShortcuts;
 
 /**
  * Register navigation shortcuts with the shortcut store.
@@ -195,11 +55,27 @@ export function registerNavigationShortcuts(navigate: NavigateFunction) {
 /**
  * Get navigation shortcuts filtered by user role
  */
-export function getNavigationShortcutsForRole(userRole: string): NavigationShortcut[] {
+export function getNavigationShortcutsForRole(
+  userRoleOrContext: string | NavigationShortcutContext,
+): NavigationShortcut[] {
+  const context =
+    typeof userRoleOrContext === 'string'
+      ? { userRole: userRoleOrContext, assignableAsTech: false }
+      : userRoleOrContext;
+
   return NAVIGATION_SHORTCUTS.filter((shortcut) => {
     if (!shortcut.requiredRoles || shortcut.requiredRoles.length === 0) {
       return true;
     }
-    return shortcut.requiredRoles.includes(userRole);
+
+    if (context.userRole && shortcut.requiredRoles.includes(context.userRole)) {
+      return true;
+    }
+
+    return (
+      shortcut.allowAssignableTech === true &&
+      context.assignableAsTech === true &&
+      isManagementRole(context.userRole)
+    );
   });
 }
