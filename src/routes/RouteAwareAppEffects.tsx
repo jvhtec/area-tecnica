@@ -72,7 +72,7 @@ function useDeferredNonCriticalMount(timeoutMs = 1500) {
       return () => idleWindow.cancelIdleCallback?.(idleId);
     }
 
-    const timeoutId = globalThis.setTimeout(() => setIsReady(true), Math.min(timeoutMs, 500));
+    const timeoutId = globalThis.setTimeout(() => setIsReady(true), timeoutMs);
     return () => globalThis.clearTimeout(timeoutId);
   }, [timeoutMs]);
 

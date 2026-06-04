@@ -805,7 +805,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: SoundVisionFiles,
     layout: "app",
     access: "managementAndHouseTech",
-    breadcrumb: { label: "SoundVision Files" },
+    breadcrumb: { label: "Archivos de SoundVision" },
   },
   {
     id: "manual",
@@ -899,7 +899,7 @@ export const appRoutes: readonly AppRoute[] = [
     component: StagePlot,
     layout: "app",
     access: "soundTools",
-    breadcrumb: { label: "Stage Plot" },
+    breadcrumb: { label: "Plano de escenario" },
   },
   {
     id: "sysCalc",
@@ -1093,7 +1093,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "festivalManagementGear",
     subscriptionRouteKey: "/festival-management/gear",
-    breadcrumb: { label: "Gear", parentPath: "/festivals" },
+    breadcrumb: { label: "Equipamiento", parentPath: "/festivals" },
   },
   {
     id: "festivalManagementScheduling",
@@ -1168,7 +1168,9 @@ export const navigationShortcuts = appRoutes.flatMap((route) => {
       route: route.path,
       keybind: route.nav.shortcut.keybind,
       icon: route.nav.shortcut.icon,
+      access: route.access,
       requiredRoles: policy.allowedRoles ? [...policy.allowedRoles] : undefined,
+      allowAssignableTech: policy.allowAssignableTech,
     },
   ];
 });

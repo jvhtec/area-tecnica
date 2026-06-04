@@ -7,7 +7,8 @@
 
 import { useShortcutStore } from '@/stores/useShortcutStore';
 import { NavigateFunction } from 'react-router-dom';
-import { navigationShortcuts } from '@/routes/app-route-manifest';
+import { navigationShortcuts, type AccessPolicyId } from '@/routes/app-route-manifest';
+import { isManagementRole } from '@/utils/permissions';
 
 export interface NavigationShortcut {
   id: string;
@@ -15,7 +16,14 @@ export interface NavigationShortcut {
   route: string;
   keybind?: string;
   icon?: string;
-  requiredRoles?: string[];
+  access?: AccessPolicyId;
+  requiredRoles?: readonly string[];
+  allowAssignableTech?: boolean;
+}
+
+export interface NavigationShortcutContext {
+  userRole: string | null | undefined;
+  assignableAsTech?: boolean | null;
 }
 
 export const NAVIGATION_SHORTCUTS: NavigationShortcut[] = navigationShortcuts;
@@ -47,11 +55,27 @@ export function registerNavigationShortcuts(navigate: NavigateFunction) {
 /**
  * Get navigation shortcuts filtered by user role
  */
-export function getNavigationShortcutsForRole(userRole: string): NavigationShortcut[] {
+export function getNavigationShortcutsForRole(
+  userRoleOrContext: string | NavigationShortcutContext,
+): NavigationShortcut[] {
+  const context =
+    typeof userRoleOrContext === 'string'
+      ? { userRole: userRoleOrContext, assignableAsTech: false }
+      : userRoleOrContext;
+
   return NAVIGATION_SHORTCUTS.filter((shortcut) => {
     if (!shortcut.requiredRoles || shortcut.requiredRoles.length === 0) {
       return true;
     }
-    return shortcut.requiredRoles.includes(userRole);
+
+    if (context.userRole && shortcut.requiredRoles.includes(context.userRole)) {
+      return true;
+    }
+
+    return (
+      shortcut.allowAssignableTech === true &&
+      context.assignableAsTech === true &&
+      isManagementRole(context.userRole)
+    );
   });
 }

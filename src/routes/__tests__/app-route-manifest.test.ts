@@ -15,6 +15,14 @@ describe("app route manifest", () => {
     expect(new Set(paths).size).toBe(paths.length);
   });
 
+  it("keeps route ids and nav ids unique", () => {
+    const routeIds = appRoutes.map((route) => route.id);
+    const navIds = appRoutes.flatMap((route) => (route.nav ? [route.nav.id] : []));
+
+    expect(new Set(routeIds).size).toBe(routeIds.length);
+    expect(new Set(navIds).size).toBe(navIds.length);
+  });
+
   it("keeps public access on public layout routes only", () => {
     const publicRouteIds = new Set(publicRoutes.map((route) => route.id));
 
@@ -23,6 +31,25 @@ describe("app route manifest", () => {
         expect(publicRouteIds.has(route.id)).toBe(true);
       } else {
         expect(route.layout).not.toBe("public");
+      }
+    });
+  });
+
+  it("keeps duplicate subscription route keys on the same profile", () => {
+    const profilesByRouteKey = new Map<string, string>();
+
+    appRoutes.forEach((route) => {
+      if (!route.subscriptions) {
+        return;
+      }
+
+      const routeKey = route.subscriptionRouteKey ?? route.path;
+      const existingProfile = profilesByRouteKey.get(routeKey);
+
+      if (existingProfile) {
+        expect(route.subscriptions, routeKey).toBe(existingProfile);
+      } else {
+        profilesByRouteKey.set(routeKey, route.subscriptions);
       }
     });
   });
@@ -52,7 +79,7 @@ describe("app route manifest", () => {
   it("resolves breadcrumb metadata from the manifest", () => {
     expect(getBreadcrumbsForPathname("/festival-management/job-1/gear")).toEqual([
       { label: "Festivales", path: "/festivals" },
-      { label: "Gear", path: "/festival-management/job-1/gear" },
+      { label: "Equipamiento", path: "/festival-management/job-1/gear" },
     ]);
   });
 });
