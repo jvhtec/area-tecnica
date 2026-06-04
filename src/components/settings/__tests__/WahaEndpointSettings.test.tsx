@@ -72,7 +72,7 @@ describe("WahaEndpointSettings", () => {
 
     expect(await screen.findByText(/WAHA 2 - waha2\.sector-pro\.work/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /refresh/i }));
+    await user.click(screen.getByRole("button", { name: /actualizar/i }));
 
     await waitFor(() => {
       expect(mockSupabase.functions.invoke).toHaveBeenCalledWith("waha-session", {
@@ -80,8 +80,8 @@ describe("WahaEndpointSettings", () => {
       });
     });
 
-    expect(await screen.findByText("Working")).toBeInTheDocument();
-    expect(screen.getByText((_, element) => element?.textContent === "Linked account: Sector Pro")).toBeInTheDocument();
+    expect(await screen.findByText("En funcionamiento")).toBeInTheDocument();
+    expect(screen.getByText((_, element) => element?.textContent === "Cuenta vinculada: Sector Pro")).toBeInTheDocument();
   });
 
   it("saves a selected WAHA endpoint", async () => {
@@ -115,11 +115,11 @@ describe("WahaEndpointSettings", () => {
 
     renderWithProviders(<WahaEndpointSettings />);
 
-    await screen.findByText(/No WAHA endpoint is assigned/i);
+    await screen.findByText(/No hay un endpoint WAHA asignado/i);
 
-    await user.click(screen.getByRole("combobox", { name: /waha endpoint/i }));
+    await user.click(screen.getByRole("combobox", { name: /endpoint waha/i }));
     await user.click(await screen.findByRole("option", { name: /WAHA 3 - waha3\.sector-pro\.work/i }));
-    await user.click(screen.getByRole("button", { name: /save/i }));
+    await user.click(screen.getByRole("button", { name: /guardar/i }));
 
     await waitFor(() => {
       expect(mockSupabase.functions.invoke).toHaveBeenCalledWith("waha-session", {
@@ -132,7 +132,7 @@ describe("WahaEndpointSettings", () => {
 
     expect(toastMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "WAHA endpoint saved",
+        title: "Endpoint WAHA guardado",
       }),
     );
   });
@@ -176,7 +176,7 @@ describe("WahaEndpointSettings", () => {
     await screen.findByText(/WAHA 1 - waha\.sector-pro\.work/i);
     await user.click(screen.getByRole("button", { name: "QR" }));
 
-    const qr = await screen.findByRole("img", { name: /waha pairing qr code/i });
+    const qr = await screen.findByRole("img", { name: /codigo qr de emparejamiento waha/i });
     expect(qr).toHaveAttribute("src", dataUrl);
   });
 });

@@ -38,6 +38,8 @@ type WahaSessionInfo = {
   } | null;
 };
 
+// Keep in sync with src/constants/wahaEndpoints.ts. Edge Functions cannot import
+// the frontend module directly, so the server keeps its own allow-list copy.
 const DEFAULT_ENDPOINTS = [
   "https://waha.sector-pro.work",
   "https://waha2.sector-pro.work",

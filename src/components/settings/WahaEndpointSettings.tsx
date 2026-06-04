@@ -41,21 +41,21 @@ async function invokeWahaSession(body: Record<string, unknown>) {
 function statusLabel(status: string | null | undefined) {
   switch (status) {
     case "WORKING":
-      return "Working";
+      return "En funcionamiento";
     case "SCAN_QR_CODE":
-      return "Scan QR";
+      return "Escanear QR";
     case "STARTING":
-      return "Starting";
+      return "Iniciando";
     case "STOPPED":
-      return "Stopped";
+      return "Detenida";
     case "FAILED":
-      return "Failed";
+      return "Error";
     case "NOT_CREATED":
-      return "Not started";
+      return "Sin iniciar";
     case "NOT_CONFIGURED":
-      return "Not configured";
+      return "Sin configurar";
     default:
-      return "Unknown";
+      return "Desconocido";
   }
 }
 
@@ -99,7 +99,7 @@ export function WahaEndpointSettings() {
 
     return [
       ...WAHA_ENDPOINTS,
-      { label: "Configured endpoint", value: savedEndpoint },
+      { label: "Endpoint configurado", value: savedEndpoint },
     ];
   }, [savedEndpoint]);
 
@@ -109,14 +109,14 @@ export function WahaEndpointSettings() {
       setQrDataUrl(null);
       await queryClient.setQueryData(queryKey, result);
       toast({
-        title: result.endpoint ? "WAHA endpoint saved" : "WAHA endpoint cleared",
-        description: result.endpoint ? getWahaEndpointLabel(result.endpoint) : "WhatsApp sending is disabled for this account.",
+        title: result.endpoint ? "Endpoint WAHA guardado" : "Endpoint WAHA eliminado",
+        description: result.endpoint ? getWahaEndpointLabel(result.endpoint) : "El envio por WhatsApp queda desactivado para esta cuenta.",
       });
     },
     onError: (err) => {
       toast({
-        title: "Failed to save WAHA endpoint",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: "No se pudo guardar el endpoint WAHA",
+        description: err instanceof Error ? err.message : "Error desconocido",
         variant: "destructive",
       });
     },
@@ -130,8 +130,8 @@ export function WahaEndpointSettings() {
     },
     onError: (err) => {
       toast({
-        title: "Failed to read WAHA status",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: "No se pudo leer el estado WAHA",
+        description: err instanceof Error ? err.message : "Error desconocido",
         variant: "destructive",
       });
     },
@@ -143,14 +143,14 @@ export function WahaEndpointSettings() {
       setQrDataUrl(null);
       await queryClient.setQueryData(queryKey, result);
       toast({
-        title: "WAHA session started",
-        description: `Session ${result.session || "default"} is ${statusLabel(result.status).toLowerCase()}.`,
+        title: "Sesion WAHA iniciada",
+        description: `La sesion ${result.session || "default"} esta ${statusLabel(result.status).toLowerCase()}.`,
       });
     },
     onError: (err) => {
       toast({
-        title: "Failed to start WAHA session",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: "No se pudo iniciar la sesion WAHA",
+        description: err instanceof Error ? err.message : "Error desconocido",
         variant: "destructive",
       });
     },
@@ -161,6 +161,8 @@ export function WahaEndpointSettings() {
     onSuccess: async (result) => {
       if (result.qr?.dataUrl) {
         setQrDataUrl(result.qr.dataUrl);
+      } else {
+        setQrDataUrl(null);
       }
       await queryClient.setQueryData(queryKey, {
         ...result,
@@ -170,8 +172,8 @@ export function WahaEndpointSettings() {
     onError: (err) => {
       setQrDataUrl(null);
       toast({
-        title: "Failed to load WAHA QR",
-        description: err instanceof Error ? err.message : "Unknown error",
+        title: "No se pudo cargar el QR de WAHA",
+        description: err instanceof Error ? err.message : "Error desconocido",
         variant: "destructive",
       });
     },
@@ -187,7 +189,7 @@ export function WahaEndpointSettings() {
   if (!userId) {
     return (
       <Alert>
-        <AlertDescription>Sign in again to manage WhatsApp pairing.</AlertDescription>
+        <AlertDescription>Inicia sesion de nuevo para gestionar el emparejamiento de WhatsApp.</AlertDescription>
       </Alert>
     );
   }
@@ -196,7 +198,7 @@ export function WahaEndpointSettings() {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" />
-        Loading WAHA settings...
+        Cargando configuracion WAHA...
       </div>
     );
   }
@@ -204,8 +206,8 @@ export function WahaEndpointSettings() {
   if (error) {
     return (
       <Alert variant="destructive">
-        <AlertTitle>WAHA settings unavailable</AlertTitle>
-        <AlertDescription>{error instanceof Error ? error.message : "Unknown error"}</AlertDescription>
+        <AlertTitle>Configuracion WAHA no disponible</AlertTitle>
+        <AlertDescription>{error instanceof Error ? error.message : "Error desconocido"}</AlertDescription>
       </Alert>
     );
   }
@@ -221,12 +223,12 @@ export function WahaEndpointSettings() {
             </Badge>
           </div>
           <Select value={selectedEndpoint} onValueChange={setSelectedEndpoint} disabled={saveMutation.isPending}>
-            <SelectTrigger aria-label="WAHA endpoint">
-              <SelectValue placeholder="Select WAHA endpoint" />
+            <SelectTrigger aria-label="Endpoint WAHA">
+              <SelectValue placeholder="Selecciona endpoint WAHA" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={NO_WAHA_ENDPOINT}>
-                No WAHA endpoint
+                Sin endpoint WAHA
               </SelectItem>
               {endpointOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
@@ -249,7 +251,7 @@ export function WahaEndpointSettings() {
           ) : (
             <Save className="mr-2 h-4 w-4" />
           )}
-          Save
+          Guardar
         </Button>
       </div>
 
@@ -270,7 +272,7 @@ export function WahaEndpointSettings() {
           className="w-full"
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${isFetching || statusMutation.isPending ? "animate-spin" : ""}`} />
-          Refresh
+          Actualizar
         </Button>
         <Button
           type="button"
@@ -285,7 +287,7 @@ export function WahaEndpointSettings() {
           ) : (
             <Smartphone className="mr-2 h-4 w-4" />
           )}
-          Start
+          Iniciar
         </Button>
         <Button
           type="button"
@@ -306,14 +308,14 @@ export function WahaEndpointSettings() {
 
       {hasUnsavedChange && (
         <Alert variant="info">
-          <AlertDescription>Save the endpoint before starting or pairing the WAHA session.</AlertDescription>
+          <AlertDescription>Guarda el endpoint antes de iniciar o emparejar la sesion WAHA.</AlertDescription>
         </Alert>
       )}
 
       {!savedEndpoint && (
         <div className="flex items-start gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
           <Unplug className="mt-0.5 h-4 w-4 shrink-0" />
-          <span>No WAHA endpoint is assigned to your account.</span>
+          <span>No hay un endpoint WAHA asignado a tu cuenta.</span>
         </div>
       )}
 
@@ -321,14 +323,14 @@ export function WahaEndpointSettings() {
         <div className="rounded-md border p-3 text-sm">
           <div className="grid gap-1 sm:grid-cols-2">
             <span>
-              <span className="font-medium">Host:</span> {savedEndpoint.replace(/^https?:\/\//, "")}
+              <span className="font-medium">Servidor:</span> {savedEndpoint.replace(/^https?:\/\//, "")}
             </span>
             <span>
-              <span className="font-medium">Session:</span> {data?.session || "default"}
+              <span className="font-medium">Sesion:</span> {data?.session || "default"}
             </span>
             {data?.me?.pushName && (
               <span className="sm:col-span-2">
-                <span className="font-medium">Linked account:</span> {data.me.pushName}
+                <span className="font-medium">Cuenta vinculada:</span> {data.me.pushName}
               </span>
             )}
           </div>
@@ -339,11 +341,11 @@ export function WahaEndpointSettings() {
         <div className="flex flex-col items-center gap-3 rounded-md border bg-muted/20 p-4">
           <img
             src={qrDataUrl}
-            alt="WAHA pairing QR code"
+            alt="Codigo QR de emparejamiento WAHA"
             className="h-56 w-56 rounded bg-white p-2 shadow-sm"
           />
           <p className="text-center text-xs text-muted-foreground">
-            Refresh the QR if the session remains in scan mode.
+            Actualiza el QR si la sesion sigue en modo escaneo.
           </p>
         </div>
       )}

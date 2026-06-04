@@ -18,5 +18,5 @@ export function normalizeWahaEndpoint(value: string | null | undefined) {
 export function getWahaEndpointLabel(endpoint: string | null | undefined) {
   const normalized = normalizeWahaEndpoint(endpoint);
   const match = WAHA_ENDPOINTS.find((option) => option.value === normalized);
-  return match?.label || normalized || "No endpoint";
+  return match?.label || normalized || "Sin endpoint";
 }

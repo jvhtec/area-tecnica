@@ -478,8 +478,8 @@ const Settings = () => {
             {isManagementUser && (
               <CollapsibleCard
                 id="waha-endpoint"
-                title="WAHA WhatsApp"
-                description="Configure the WhatsApp endpoint assigned to your account and pair its WAHA session."
+                title="WAHA de WhatsApp"
+                description="Configura el endpoint de WhatsApp asignado a tu cuenta y empareja su sesion WAHA."
                 isOpen={collapsibleStates['waha-endpoint']}
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'waha-endpoint': open }))}
               >
