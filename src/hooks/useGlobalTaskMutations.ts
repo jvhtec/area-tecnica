@@ -10,6 +10,15 @@ type VideoTaskUpdate = Database['public']['Tables']['video_job_tasks']['Update']
 type ProductionTaskUpdate = Database['public']['Tables']['production_job_tasks']['Update'];
 type AdministrativeTaskUpdate = Database['public']['Tables']['administrative_job_tasks']['Update'];
 type TaskDocumentsRow = Database['public']['Tables']['task_documents']['Row'];
+type TaskDocumentInsert = Database['public']['Tables']['task_documents']['Insert'];
+type TaskDocumentForeignKey = Extract<
+  keyof TaskDocumentInsert,
+  | 'sound_task_id'
+  | 'lights_task_id'
+  | 'video_task_id'
+  | 'production_task_id'
+  | 'administrative_task_id'
+>;
 type TaskUpdate =
   | SoundTaskUpdate
   | LightsTaskUpdate
@@ -81,7 +90,7 @@ const TASK_TABLE: Record<Dept, TaskTableName> = {
   administrative: 'administrative_job_tasks',
 };
 
-const DOC_FK: Record<Dept, string> = {
+const DOC_FK: Record<Dept, TaskDocumentForeignKey> = {
   sound: 'sound_task_id',
   lights: 'lights_task_id',
   video: 'video_task_id',
@@ -730,12 +739,14 @@ export function useGlobalTaskMutations(department: Dept) {
       .upload(taskKey, file, { upsert: false });
     if (upErr) throw upErr;
 
-    const { error: insErr } = await supabase.from('task_documents').insert({
-      [docFk]: taskId,
+    const taskDocumentInsert: TaskDocumentInsert = {
       file_name: file.name,
       file_path: taskKey,
       uploaded_by: uploaderId,
-    });
+    };
+    taskDocumentInsert[docFk] = taskId;
+
+    const { error: insErr } = await supabase.from('task_documents').insert(taskDocumentInsert);
     if (insErr) throw insErr;
 
     // 2. Mirror to job bucket if linked (idempotent: delete-before-insert)

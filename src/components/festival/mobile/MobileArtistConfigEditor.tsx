@@ -13,6 +13,10 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { toast } from "sonner";
 import { formatBandOptionLabel, getBandOptionsEU, isFrequencyBandSelection } from "@/lib/frequencyBands";
 import type { MobileArtistRiderFile, MobileConfigCategory } from "./MobileArtistCard";
+import type { Database, Json } from "@/integrations/supabase/types";
+
+type FestivalArtistUpdate = Database["public"]["Tables"]["festival_artists"]["Update"];
+type ProviderType = Database["public"]["Enums"]["provider_type"];
 
 interface Artist {
   id: string;
@@ -25,16 +29,16 @@ interface Artist {
   soundcheck_start?: string;
   soundcheck_end?: string;
   foh_console: string;
-  foh_console_provided_by?: string;
+  foh_console_provided_by?: ProviderType | null;
   mon_console: string;
-  mon_console_provided_by?: string;
+  mon_console_provided_by?: ProviderType | null;
   monitors_from_foh?: boolean;
   foh_waves_outboard?: string;
   mon_waves_outboard?: string;
   wireless_systems: any[];
-  wireless_provided_by?: string;
+  wireless_provided_by?: ProviderType | null;
   iem_systems: any[];
-  iem_provided_by?: string;
+  iem_provided_by?: ProviderType | null;
   monitors_enabled: boolean;
   monitors_quantity: number;
   extras_sf: boolean;
@@ -58,7 +62,7 @@ interface Artist {
   infra_opticalcon_duo_quantity?: number;
   infra_analog?: number;
   other_infrastructure?: string;
-  infrastructure_provided_by?: string;
+  infrastructure_provided_by?: ProviderType | null;
   job_id?: string;
 }
 
@@ -448,10 +452,14 @@ export const MobileArtistConfigEditor = ({
   };
 
   const handleSave = async () => {
+    if (category === 'rider') {
+      return;
+    }
+
     setIsSaving(true);
     try {
       // Build the update payload based on category
-      let updatePayload: Record<string, any> = {};
+      let updatePayload: FestivalArtistUpdate = {};
 
       switch (category) {
         case 'consoles':
@@ -469,16 +477,16 @@ export const MobileArtistConfigEditor = ({
           break;
         case 'wireless':
           updatePayload = {
-            wireless_systems: formData.wireless_systems,
+            wireless_systems: formData.wireless_systems as Json,
             wireless_provided_by: formData.wireless_provided_by,
-            iem_systems: formData.iem_systems,
+            iem_systems: formData.iem_systems as Json,
             iem_provided_by: formData.iem_provided_by,
           };
           break;
         case 'microphones':
           updatePayload = {
             mic_kit: formData.mic_kit,
-            wired_mics: formData.wired_mics,
+            wired_mics: formData.wired_mics as Json,
           };
           break;
         case 'monitors':
@@ -598,6 +606,12 @@ export const MobileArtistConfigEditor = ({
             onChange={updateFormData}
           />
         );
+      case 'rider':
+        return (
+          <div className="rounded-md border bg-muted/20 p-4 text-sm text-muted-foreground">
+            Los riders se gestionan desde el gestor de archivos del artista.
+          </div>
+        );
       default:
         return null;
     }
@@ -627,24 +641,35 @@ export const MobileArtistConfigEditor = ({
 
       {/* Footer */}
       <div className="p-4 border-t shrink-0 bg-background">
-        <Button
-          onClick={handleSave}
-          disabled={isSaving || isLoading}
-          className="w-full"
-          size="lg"
-        >
-          {isSaving ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Guardando...
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              Guardar
-            </>
-          )}
-        </Button>
+        {category === 'rider' ? (
+          <Button
+            onClick={onBack}
+            className="w-full"
+            size="lg"
+            variant="outline"
+          >
+            Volver
+          </Button>
+        ) : (
+          <Button
+            onClick={handleSave}
+            disabled={isSaving || isLoading}
+            className="w-full"
+            size="lg"
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Guardando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Guardar
+              </>
+            )}
+          </Button>
+        )}
       </div>
     </div>
   );

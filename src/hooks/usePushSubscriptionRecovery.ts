@@ -1,8 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { toast } from 'sonner';
-import { supabase } from '@/lib/supabase';
-import { getExistingPushSubscription, isPushSupported } from '@/lib/push';
-import { isNativePushSupported } from '@/lib/push-native';
 
 /**
  * Hook to detect when a user previously had push notifications enabled
@@ -23,15 +19,27 @@ export function usePushSubscriptionRecovery() {
       return;
     }
 
-    // Only run if push is supported
-    if (isNativePushSupported() || !isPushSupported()) {
-      return;
-    }
-
     isChecking.current = true;
 
     const checkForLostSubscription = async () => {
       try {
+        const [
+          { toast },
+          { supabase },
+          { getExistingPushSubscription, isPushSupported },
+          { isNativePushSupported },
+        ] = await Promise.all([
+          import('sonner'),
+          import('@/lib/supabase'),
+          import('@/lib/push'),
+          import('@/lib/push-native'),
+        ]);
+
+        // Only run if push is supported
+        if (isNativePushSupported() || !isPushSupported()) {
+          return;
+        }
+
         // Get current user
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {

@@ -117,7 +117,7 @@ export const normalizeTourDefaultPowerTable = (
   department: TechnicalPowerDepartment
 ): NormalizedTourPowerTable => {
   const tableData = isRecord(table.table_data) ? table.table_data : {};
-  const metadata = {
+  const metadata: JsonRecord = {
     ...(isRecord(table.metadata) ? table.metadata : {}),
     safetyMargin: isRecord(table.metadata) && table.metadata.safetyMargin !== undefined
       ? table.metadata.safetyMargin

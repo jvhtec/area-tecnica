@@ -10,11 +10,10 @@
 
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { registerNavigationShortcuts } from '@/lib/shortcuts/navigation-shortcuts';
-import { registerJobCardShortcuts } from '@/lib/shortcuts/job-card-shortcuts';
-import { registerGlobalShortcuts } from '@/lib/shortcuts/global-shortcuts';
-import { initializeStreamDeck, getStreamDeckClient } from '@/lib/streamdeck/websocket-server';
-import { useShortcutStore } from '@/stores/useShortcutStore';
+
+type StreamDeckClient = ReturnType<
+  typeof import('@/lib/streamdeck/websocket-server').initializeStreamDeck
+>;
 
 export function useShortcutInitialization() {
   const navigate = useNavigate();
@@ -36,74 +35,108 @@ export function useShortcutInitialization() {
 
     console.log('🚀 Initializing shortcut system...');
 
-    // Register all shortcuts using current navigate
-    registerNavigationShortcuts(navigateRef.current);
-    registerJobCardShortcuts();
-    registerGlobalShortcuts();
+    let streamDeckClient: StreamDeckClient | null = null;
+    let cleanup: (() => void) | null = null;
+    let disposed = false;
 
-    // Initialize Stream Deck connection
-    const streamDeckClient = initializeStreamDeck();
+    const setupShortcuts = async () => {
+      try {
+        const [
+          { registerNavigationShortcuts },
+          { registerJobCardShortcuts },
+          { registerGlobalShortcuts },
+          { initializeStreamDeck },
+          { useShortcutStore },
+        ] = await Promise.all([
+          import('@/lib/shortcuts/navigation-shortcuts'),
+          import('@/lib/shortcuts/job-card-shortcuts'),
+          import('@/lib/shortcuts/global-shortcuts'),
+          import('@/lib/streamdeck/websocket-server'),
+          import('@/stores/useShortcutStore'),
+        ]);
 
-    // Set up keyboard event listener for shortcuts
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input/textarea
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === 'INPUT' ||
-        target.tagName === 'TEXTAREA' ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-
-      const shortcutStore = useShortcutStore.getState();
-      const shortcuts = shortcutStore.getAllShortcuts();
-
-      // Check if any shortcut matches the key combination
-      const keybind = buildKeybind(e);
-
-      for (const shortcut of shortcuts) {
-        const targetKeybind = shortcut.customKeybind || shortcut.defaultKeybind;
-        if (targetKeybind && normalizeKeybind(targetKeybind) === normalizeKeybind(keybind)) {
-          if (shortcut.enabled) {
-            e.preventDefault();
-            e.stopPropagation();
-            e.stopImmediatePropagation();
-            shortcutStore.executeShortcut(shortcut.id);
-          }
-          break;
+        if (disposed) {
+          return;
         }
+
+        // Register all shortcuts using current navigate
+        registerNavigationShortcuts(navigateRef.current);
+        registerJobCardShortcuts();
+        registerGlobalShortcuts();
+
+        // Initialize Stream Deck connection
+        streamDeckClient = initializeStreamDeck();
+
+        // Set up keyboard event listener for shortcuts
+        const handleKeyDown = (e: KeyboardEvent) => {
+          // Ignore if user is typing in an input/textarea
+          const target = e.target as HTMLElement;
+          if (
+            target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.isContentEditable
+          ) {
+            return;
+          }
+
+          const shortcutStore = useShortcutStore.getState();
+          const shortcuts = shortcutStore.getAllShortcuts();
+
+          // Check if any shortcut matches the key combination
+          const keybind = buildKeybind(e);
+
+          for (const shortcut of shortcuts) {
+            const targetKeybind = shortcut.customKeybind || shortcut.defaultKeybind;
+            if (targetKeybind && normalizeKeybind(targetKeybind) === normalizeKeybind(keybind)) {
+              if (shortcut.enabled) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                shortcutStore.executeShortcut(shortcut.id);
+              }
+              break;
+            }
+          }
+        };
+
+        // Listen for navigation events from Stream Deck
+        const handleStreamDeckNavigate = (event: Event) => {
+          console.log('[ShortcutInit] Received streamdeck-navigate event:', event);
+          const customEvent = event as CustomEvent;
+          const route = customEvent.detail?.route;
+          console.log('[ShortcutInit] Navigating to route:', route);
+          if (route) {
+            // Use the ref to get current navigate function
+            navigateRef.current(route);
+            console.log('[ShortcutInit] Navigation called');
+          } else {
+            console.warn('[ShortcutInit] No route in event detail');
+          }
+        };
+
+        // Capture phase to intercept before browser default handlers
+        window.addEventListener('keydown', handleKeyDown, true);
+        window.addEventListener('streamdeck-navigate', handleStreamDeckNavigate);
+
+        cleanup = () => {
+          window.removeEventListener('keydown', handleKeyDown, true);
+          window.removeEventListener('streamdeck-navigate', handleStreamDeckNavigate);
+          streamDeckClient?.disconnect();
+        };
+
+        console.log('✅ Shortcut system initialized');
+        console.log('✅ Event listener registered for streamdeck-navigate');
+      } catch (error) {
+        console.error('Failed to initialize shortcut system:', error);
       }
     };
 
-    // Capture phase to intercept before browser default handlers
-    window.addEventListener('keydown', handleKeyDown, true);
-
-    // Listen for navigation events from Stream Deck
-    const handleStreamDeckNavigate = (event: Event) => {
-      console.log('[ShortcutInit] Received streamdeck-navigate event:', event);
-      const customEvent = event as CustomEvent;
-      const route = customEvent.detail?.route;
-      console.log('[ShortcutInit] Navigating to route:', route);
-      if (route) {
-        // Use the ref to get current navigate function
-        navigateRef.current(route);
-        console.log('[ShortcutInit] Navigation called');
-      } else {
-        console.warn('[ShortcutInit] No route in event detail');
-      }
-    };
-
-    window.addEventListener('streamdeck-navigate', handleStreamDeckNavigate);
-
-    console.log('✅ Shortcut system initialized');
-    console.log('✅ Event listener registered for streamdeck-navigate');
+    void setupShortcuts();
 
     return () => {
+      disposed = true;
       console.log('🧹 Cleaning up shortcut system (this should only happen on unmount)');
-      window.removeEventListener('keydown', handleKeyDown, true);
-      window.removeEventListener('streamdeck-navigate', handleStreamDeckNavigate);
-      streamDeckClient.disconnect();
+      cleanup?.();
     };
   }, []); // Empty deps - only run once on mount
 }
