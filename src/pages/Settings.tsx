@@ -422,18 +422,6 @@ const Settings = () => {
 
             {isManagementUser && (
               <CollapsibleCard
-                id="waha-endpoint"
-                title="WAHA WhatsApp"
-                description="Configure the WhatsApp endpoint assigned to your account and pair its WAHA session."
-                isOpen={collapsibleStates['waha-endpoint']}
-                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'waha-endpoint': open }))}
-              >
-                <WahaEndpointSettings />
-              </CollapsibleCard>
-            )}
-
-            {isManagementUser && (
-              <CollapsibleCard
                 id="push-schedule"
                 title="Push notification schedule"
                 isOpen={collapsibleStates['push-schedule']}
@@ -486,6 +474,18 @@ const Settings = () => {
                 isManagementUser={isManagementUser}
               />
             </CollapsibleCard>
+
+            {isManagementUser && (
+              <CollapsibleCard
+                id="waha-endpoint"
+                title="WAHA WhatsApp"
+                description="Configure the WhatsApp endpoint assigned to your account and pair its WAHA session."
+                isOpen={collapsibleStates['waha-endpoint']}
+                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'waha-endpoint': open }))}
+              >
+                <WahaEndpointSettings />
+              </CollapsibleCard>
+            )}
 
             <CollapsibleCard
               id="company-settings"
