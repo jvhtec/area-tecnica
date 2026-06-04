@@ -32,6 +32,7 @@ import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
 import { DryHireFolderManager } from '@/components/settings/DryHireFolderManager'
 import { SkillRoleMappingManager } from '@/components/settings/SkillRoleMappingManager'
 import { WahaEndpointSettings } from '@/components/settings/WahaEndpointSettings'
+import { RealtimeDebugPanel } from '@/components/settings/RealtimeDebugPanel'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown } from "lucide-react"
 import { VersionDisplay } from "@/components/VersionDisplay"
@@ -224,6 +225,7 @@ const Settings = () => {
     'push-matrix': false,
     'push-schedule': false,
     'waha-endpoint': false,
+    'realtime-debug': false,
     'morning-summary': false,
     'shortcuts': false,
     'users': false,
@@ -484,6 +486,18 @@ const Settings = () => {
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'waha-endpoint': open }))}
               >
                 <WahaEndpointSettings />
+              </CollapsibleCard>
+            )}
+
+            {isManagementUser && (
+              <CollapsibleCard
+                id="realtime-debug"
+                title="Realtime diagnostics"
+                description="Inspect route-owned subscriptions, owner routes, payload activity, and refetch counters."
+                isOpen={collapsibleStates['realtime-debug']}
+                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'realtime-debug': open }))}
+              >
+                <RealtimeDebugPanel />
               </CollapsibleCard>
             )}
 

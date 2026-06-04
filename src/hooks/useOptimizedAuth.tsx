@@ -9,6 +9,7 @@ import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { UserRole } from "@/types/user";
 import { logAuthEvent, logSecurityEvent } from "@/lib/security-audit";
 import { canAccessSoundVision } from "@/utils/permissions";
+import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from "@/runtime/app-runtime-events";
 
 interface AuthContextType {
   session: Session | null;
@@ -134,7 +135,6 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [idleTime, setIdleTime] = useState(0);
   const tokenManager = TokenManager.getInstance();
 
   // Cache profile data in localStorage
@@ -347,7 +347,6 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   const refreshSession = useCallback(async (): Promise<Session | null> => {
     try {
       console.log("Starting session refresh");
-      setIdleTime(0);
 
       const { session: refreshedSession, error } = await tokenManager.refreshToken();
 
@@ -445,32 +444,6 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
 
     return () => subscription.unsubscribe();
   }, [fetchUserProfile, clearProfileCache]);
-
-  useEffect(() => {
-    const idleInterval = setInterval(() => {
-      setIdleTime((prevIdleTime) => prevIdleTime + 1);
-    }, 60000);
-
-    return () => clearInterval(idleInterval);
-  }, []);
-
-  useEffect(() => {
-    if (idleTime >= 15) {
-      refreshSession();
-      setIdleTime(0);
-    }
-  }, [idleTime, refreshSession]);
-
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      if (session?.user?.id) {
-        console.log("Periodic session refresh");
-        await refreshSession();
-      }
-    }, 4 * 60 * 1000);
-
-    return () => clearInterval(interval);
-  }, [refreshSession, session]);
 
   const login = async (email: string, password: string) => {
     try {
@@ -812,20 +785,6 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
   };
 
   useEffect(() => {
-    if (!session) return;
-
-    const refreshTime = tokenManager.calculateRefreshTime(session);
-    console.log(`Scheduling token refresh in ${Math.round(refreshTime / 1000)} seconds`);
-
-    const refreshTimer = setTimeout(() => {
-      console.log("Executing scheduled token refresh");
-      refreshSession();
-    }, refreshTime);
-
-    return () => clearTimeout(refreshTimer);
-  }, [session, refreshSession, tokenManager]);
-
-  useEffect(() => {
     const handleOnline = () => {
       refreshSession();
       toast({
@@ -835,20 +794,18 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
       });
     };
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        if (session && tokenManager.checkTokenExpiration(session, 10 * 60 * 1000)) {
-          refreshSession();
-        }
+    const handleResume = () => {
+      if (session && tokenManager.checkTokenExpiration(session, 10 * 60 * 1000)) {
+        refreshSession();
       }
     };
 
-    window.addEventListener('online', handleOnline);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    const unsubscribeOnline = subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.ONLINE, handleOnline);
+    const unsubscribeResume = subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.RESUME, handleResume);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      unsubscribeOnline();
+      unsubscribeResume();
     };
   }, [refreshSession, session, toast, tokenManager]);
 

@@ -9,7 +9,11 @@ import React, {
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { TokenManager } from "@/lib/token-manager";
-import { UnifiedSubscriptionManager, type SubscriptionSnapshot } from "@/lib/unified-subscription-manager";
+import {
+  UnifiedSubscriptionManager,
+  type SubscriptionDebugEntry,
+  type SubscriptionSnapshot,
+} from "@/lib/unified-subscription-manager";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { isAdminRole } from "@/utils/permissions";
 
@@ -18,6 +22,7 @@ interface SubscriptionContextType {
   activeSubscriptions: string[];
   subscriptionCount: number;
   subscriptionsByTable: Record<string, string[]>;
+  debugSubscriptions: SubscriptionDebugEntry[];
   refreshSubscriptions: () => void;
   invalidateQueries: (queryKey?: string | string[]) => void;
   lastRefreshTime: number;
@@ -43,6 +48,7 @@ const noopSnapshot: SubscriptionSnapshot = {
   activeSubscriptions: [],
   subscriptionCount: 0,
   subscriptionsByTable: {},
+  debugSubscriptions: [],
   lastRefreshTime: 0,
   activeConnections: 0,
   queuedSubscriptions: 0,
@@ -61,6 +67,10 @@ const noopManager = {
     key: "noop",
     unsubscribe: () => {},
     options: { table, queryKey, priority: "low" as const },
+    ownerRoutes: new Set<string>(),
+    createdAt: 0,
+    lastPayloadAt: null,
+    invalidationCount: 0,
   }),
   markRefreshed: () => {},
 } satisfies SubscriptionContextInternal["manager"];
@@ -88,6 +98,7 @@ export const useSubscriptionContext = (): SubscriptionContextType => {
       activeSubscriptions: snapshot.activeSubscriptions,
       subscriptionCount: snapshot.subscriptionCount,
       subscriptionsByTable: snapshot.subscriptionsByTable,
+      debugSubscriptions: snapshot.debugSubscriptions,
       lastRefreshTime: snapshot.lastRefreshTime,
       refreshSubscriptions: ctx.refreshSubscriptions,
       invalidateQueries: ctx.invalidateQueries,

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
+import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runtime-events';
 
 /**
  * Token Manager - Singleton class for managing auth tokens and refresh logic
@@ -54,17 +55,12 @@ export class TokenManager {
       this.refreshToken();
     });
     
-    // Setup visibility change listener to refresh token when tab becomes visible
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') {
-        // Get time since last refresh
-        const timeSinceRefresh = Date.now() - this.lastRefresh;
-        
-        // If it's been more than 5 minutes since last refresh, refresh token
-        if (timeSinceRefresh > 5 * 60 * 1000) {
-          console.log('Tab became visible after inactivity, refreshing token');
-          this.refreshToken();
-        }
+    subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.RESUME, () => {
+      const timeSinceRefresh = Date.now() - this.lastRefresh;
+
+      if (timeSinceRefresh > 5 * 60 * 1000) {
+        console.log('Tab became visible after inactivity, refreshing token');
+        this.refreshToken();
       }
     });
   }

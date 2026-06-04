@@ -29,6 +29,7 @@ const mocks = vi.hoisted(() => {
     invalidateQueries: vi.fn(),
     lastRefreshTime: Date.now(),
     coordinator: {
+      getIsLeader: vi.fn(() => true),
       requestSubscriptions: vi.fn(),
       invalidateQueries: vi.fn(),
     },
@@ -89,6 +90,7 @@ const renderHookHarness = (route: string) => {
 describe("useEnhancedRouteSubscriptions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.coordinator.getIsLeader.mockReturnValue(true);
     mocks.manager.getSubscriptionsByTable.mockReturnValue({
       profiles: ["profiles-subscription"],
       jobs: ["jobs-subscription"],
@@ -110,5 +112,37 @@ describe("useEnhancedRouteSubscriptions", () => {
     rendered.unmount();
 
     expect(mocks.manager.cleanupRouteDependentSubscriptions).toHaveBeenCalledWith("/dashboard");
+  });
+
+  it("requests route-owned subscriptions from the leader when running as a follower", async () => {
+    mocks.coordinator.getIsLeader.mockReturnValue(false);
+    mocks.manager.getSubscriptionsByTable.mockReturnValue({
+      profiles: [],
+      jobs: [],
+      job_assignments: [],
+      job_date_types: [],
+    });
+
+    renderHookHarness("/dashboard");
+
+    await waitFor(() => {
+      expect(mocks.coordinator.requestSubscriptions).toHaveBeenCalledWith({
+        routeKey: "/dashboard",
+        subscriptions: expect.arrayContaining([
+          expect.objectContaining({
+            table: "profiles",
+            queryKey: ["profiles"],
+            priority: "medium",
+          }),
+          expect.objectContaining({
+            table: "jobs",
+            queryKey: ["optimized-jobs"],
+            priority: "high",
+          }),
+        ]),
+      });
+    });
+
+    expect(mocks.manager.subscribeToTable).not.toHaveBeenCalled();
   });
 });

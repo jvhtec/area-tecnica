@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { isAdminRole } from '@/utils/permissions';
+import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runtime-events';
 import {
   GLOBAL_SUBSCRIPTION_TABLES,
   getSubscriptionConfigForPathname,
@@ -42,6 +43,12 @@ const ROUTE_QUERY_KEY_OVERRIDES: Record<string, string | string[]> = {
 const getRouteQueryKeyForTable = (table: string): string | string[] =>
   ROUTE_QUERY_KEY_OVERRIDES[table] ?? [table];
 
+type RouteSubscriptionRequirement = {
+  table: string;
+  queryKey: string | string[];
+  priority: 'high' | 'medium' | 'low';
+};
+
 // Maximum time (in milliseconds) that a subscription can be idle before it's considered stale
 const SUBSCRIPTION_STALE_TIME = 5 * 60 * 1000; // 5 minutes
 // Inactivity threshold after which subscriptions should be refreshed when the page becomes active
@@ -62,7 +69,7 @@ export function useEnhancedRouteSubscriptions() {
   const wasInactive = useRef<boolean>(false);
   const currentRouteKey = useRef<string | null>(null);
   const multiTabCoordinator = MultiTabCoordinator.getInstance(queryClient);
-  const [isLeader, setIsLeader] = useState(true);
+  const [isLeader, setIsLeader] = useState(() => multiTabCoordinator.getIsLeader());
 
   const [status, setStatus] = useState({
     requiredTables: [] as string[],
@@ -71,7 +78,8 @@ export function useEnhancedRouteSubscriptions() {
     isFullySubscribed: false,
     isStale: false,
     routeKey: '',
-    formattedLastActivity: ''
+    formattedLastActivity: '',
+    requiredSubscriptions: [] as RouteSubscriptionRequirement[],
   });
 
   // Listen for tab role changes
@@ -97,43 +105,38 @@ export function useEnhancedRouteSubscriptions() {
     };
   }, [manager]);
 
-  // Check document visibility changes to detect when the user returns to the page (only for leader)
+  // Check app resume events to detect when the user returns to the page (only for leader)
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      const now = Date.now();
-      
-      if (document.visibilityState === 'visible' && isLeader) {
-        // Calculate time since last activity
-        const timeSinceLastActive = now - lastActiveTimestamp.current;
-        
-        // If the page was inactive for longer than the threshold, refresh subscriptions
-        if (timeSinceLastActive > INACTIVITY_THRESHOLD) {
-          wasInactive.current = true;
-          console.log(`Page was inactive for ${timeSinceLastActive}ms, refreshing subscriptions`);
-          
-          // Force refresh all subscriptions
-          const tableNames = [...status.requiredTables];
-          if (tableNames.length > 0) {
-            manager.forceRefreshSubscriptions(tableNames);
-            multiTabCoordinator.invalidateQueries();
-            
-            toast.info("Refreshing data after inactivity", {
-              description: "Reconnecting to real-time updates..."
-            });
-          }
-        }
-        
-        // Update the last active timestamp
-        lastActiveTimestamp.current = now;
+    const unsubscribe = subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.RESUME, ({ at, hiddenDurationMs }) => {
+      if (!isLeader) {
+        return;
       }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [manager, queryClient, status.requiredTables, isLeader, multiTabCoordinator]);
+
+      const timeSinceLastActive = Math.max(hiddenDurationMs, at - lastActiveTimestamp.current);
+
+      // If the page was inactive for longer than the threshold, refresh subscriptions
+      if (timeSinceLastActive > INACTIVITY_THRESHOLD) {
+        wasInactive.current = true;
+        console.log(`Page was inactive for ${timeSinceLastActive}ms, refreshing subscriptions`);
+
+        // Force refresh all subscriptions
+        const tableNames = [...status.requiredTables];
+        if (tableNames.length > 0) {
+          manager.forceRefreshSubscriptions(tableNames);
+          multiTabCoordinator.invalidateQueries();
+
+          toast.info("Refreshing data after inactivity", {
+            description: "Reconnecting to real-time updates..."
+          });
+        }
+      }
+
+      // Update the last active timestamp
+      lastActiveTimestamp.current = at;
+    });
+
+    return unsubscribe;
+  }, [manager, status.requiredTables, isLeader, multiTabCoordinator]);
 
   // Subscribe to required tables for the current route
   useEffect(() => {
@@ -176,18 +179,25 @@ export function useEnhancedRouteSubscriptions() {
       }
     });
     
+    const subscriptionRequirements: RouteSubscriptionRequirement[] = allTables.map(({ table, priority }) => ({
+      table,
+      queryKey: getRouteQueryKeyForTable(table),
+      priority,
+    }));
+
     // Subscribe to all tables (only if we're the leader)
     if (isLeader) {
-      allTables.forEach(({ table, priority }) => {
+      subscriptionRequirements.forEach(({ table, queryKey, priority }) => {
         console.log(`Subscribing to ${table} with priority ${priority}`);
-        const queryKey = getRouteQueryKeyForTable(table);
         const subscription = manager.subscribeToTable(table, queryKey, undefined, priority);
         manager.registerRouteSubscription(routeKey, subscription.key);
       });
     } else {
       // If we're a follower, request the leader to handle subscriptions
-      const tableNames = allTables.map(t => t.table);
-      multiTabCoordinator.requestSubscriptions(tableNames);
+      multiTabCoordinator.requestSubscriptions({
+        routeKey,
+        subscriptions: subscriptionRequirements,
+      });
     }
     
     // Update the local state with table information
@@ -221,7 +231,8 @@ export function useEnhancedRouteSubscriptions() {
       isFullySubscribed,
       isStale,
       routeKey,
-      formattedLastActivity
+      formattedLastActivity,
+      requiredSubscriptions: subscriptionRequirements,
     });
     
   }, [location.pathname, manager, lastRefreshTime, queryClient, isLeader, multiTabCoordinator]);
@@ -236,12 +247,7 @@ export function useEnhancedRouteSubscriptions() {
     }
   }
 
-  return {
-    ...status,
-    connectionStatus,
-    lastRefreshTime,
-    wasInactive: wasInactive.current,
-    forceRefresh: () => {
+  const forceRefresh = useCallback(() => {
       if (status.requiredTables.length > 0) {
         console.log('Manually forcing refresh of all subscriptions');
         if (isLeader) {
@@ -253,10 +259,28 @@ export function useEnhancedRouteSubscriptions() {
           }
         } else {
           // Followers can request refresh from leader
-          multiTabCoordinator.requestSubscriptions(status.requiredTables);
+          multiTabCoordinator.requestSubscriptions({
+            routeKey: status.routeKey,
+            subscriptions: status.requiredSubscriptions,
+          });
         }
         wasInactive.current = false;
       }
-    }
+  }, [
+    isAdmin,
+    isLeader,
+    manager,
+    multiTabCoordinator,
+    status.requiredSubscriptions,
+    status.requiredTables,
+    status.routeKey,
+  ]);
+
+  return {
+    ...status,
+    connectionStatus,
+    lastRefreshTime,
+    wasInactive: wasInactive.current,
+    forceRefresh,
   };
 }

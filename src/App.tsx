@@ -10,6 +10,7 @@ import { OptimizedAuthProvider } from "@/hooks/useOptimizedAuth";
 import { MultiTabCoordinator } from "@/lib/multitab-coordinator";
 import { queryClient } from "@/lib/react-query";
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
+import { AppRuntimeCoordinator } from "@/runtime/AppRuntimeCoordinator";
 import {
   RouteAwareGlobalInitializers,
   RouteAwareGlobalOverlays,
@@ -60,6 +61,7 @@ export default function App() {
             <AppBadgeProvider>
               <Router>
                 <OptimizedAuthProvider>
+                  <AppRuntimeCoordinator />
                   <RouteAwareGlobalInitializers />
                   <div className="app">
                     <Suspense fallback={<PageLoader />}>
