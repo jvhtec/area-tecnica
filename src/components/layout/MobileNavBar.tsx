@@ -1,3 +1,5 @@
+import { useEffect, useState, type CSSProperties } from "react"
+import { createPortal } from "react-dom"
 import { Link, useLocation } from "react-router-dom"
 import { MoreHorizontal } from "lucide-react"
 
@@ -20,6 +22,49 @@ interface MobileNavBarProps {
   userEmail?: string
 }
 
+function getVisualViewportBottomOffset() {
+  if (typeof window === "undefined" || !window.visualViewport) {
+    return 0
+  }
+
+  const visualViewport = window.visualViewport
+  const layoutViewportHeight = window.innerHeight
+  const visualViewportBottom = visualViewport.offsetTop + visualViewport.height
+
+  return Math.max(0, Math.round(layoutViewportHeight - visualViewportBottom))
+}
+
+function useVisualViewportBottomOffset() {
+  const [bottomOffset, setBottomOffset] = useState(0)
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined
+    }
+
+    const updateBottomOffset = () => {
+      setBottomOffset(getVisualViewportBottomOffset())
+    }
+
+    updateBottomOffset()
+
+    const visualViewport = window.visualViewport
+    window.addEventListener("resize", updateBottomOffset)
+    window.addEventListener("orientationchange", updateBottomOffset)
+    visualViewport?.addEventListener("resize", updateBottomOffset)
+    visualViewport?.addEventListener("scroll", updateBottomOffset)
+
+    return () => {
+      window.removeEventListener("resize", updateBottomOffset)
+      window.removeEventListener("orientationchange", updateBottomOffset)
+      visualViewport?.removeEventListener("resize", updateBottomOffset)
+      visualViewport?.removeEventListener("scroll", updateBottomOffset)
+    }
+  }, [])
+
+  return bottomOffset
+}
+
 export const MobileNavBar = ({
   primaryItems,
   trayItems,
@@ -30,6 +75,7 @@ export const MobileNavBar = ({
   userEmail,
 }: MobileNavBarProps) => {
   const { pathname } = useLocation()
+  const visualViewportBottomOffset = useVisualViewportBottomOffset()
   const hasNavigation = primaryItems.length > 0 || trayItems.length > 0
   // Always render the tray trigger so persistent actions like Sign Out and About
   // remain accessible for all roles, even when there are no additional tray items.
@@ -40,12 +86,17 @@ export const MobileNavBar = ({
   }
 
   const activeInTray = trayItems.some((item) => item.isActive(pathname))
+  const navStyle: CSSProperties | undefined = visualViewportBottomOffset > 0
+    ? { bottom: `${visualViewportBottomOffset}px` }
+    : undefined
 
-  return (
+  const nav = (
     <nav
       role="navigation"
       aria-label="Navegación principal"
+      data-mobile-navbar
       className="fixed inset-x-0 bottom-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 shadow-lg md:hidden"
+      style={navStyle}
     >
       <div className="mx-auto flex w-full max-w-3xl items-stretch justify-evenly gap-1">
         {primaryItems.map((item) => {
@@ -96,4 +147,6 @@ export const MobileNavBar = ({
       </div>
     </nav>
   )
+
+  return typeof document === "undefined" ? nav : createPortal(nav, document.body)
 }
