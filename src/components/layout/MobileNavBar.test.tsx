@@ -3,8 +3,8 @@ import { ClipboardList, MapPin } from "lucide-react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { MemoryRouter } from "react-router-dom"
 
-import { MobileNavBar } from "./MobileNavBar"
-import type { NavigationItem } from "./SidebarNavigation"
+import { MobileNavBar } from "@/components/layout/MobileNavBar"
+import type { NavigationItem } from "@/components/layout/SidebarNavigation"
 
 const originalInnerHeight = Object.getOwnPropertyDescriptor(window, "innerHeight")
 const originalVisualViewport = Object.getOwnPropertyDescriptor(window, "visualViewport")
