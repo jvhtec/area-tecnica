@@ -173,14 +173,16 @@ function AppInitWithRouter(): null {
       forceRefresh();
       
       // Notify the user that subscriptions are being refreshed (only leader shows toasts)
-      toast.info('Refreshing stale data...', {
-        description: 'Your connection was inactive for a while, updating now',
+      toast.info('Actualizando datos obsoletos...', {
+        description: 'La conexión estuvo inactiva, actualizando ahora',
       });
     }
   }, [forceRefresh, isStale, isLeader]);
   
   // Handle route changes with improved subscription management (only for leader)
   useEffect(() => {
+    const retryTimers: number[] = [];
+
     // When route changes, check if the new route has all required subscriptions
     if (!isFullySubscribed && isLeader) {
       console.log('Not fully subscribed to required tables for route:', location.pathname);
@@ -191,13 +193,15 @@ function AppInitWithRouter(): null {
         if (attempt > 3) return; // Maximum 3 retry attempts
         
         const delay = calculateBackoff(attempt);
-        setTimeout(() => {
+        const timerId = window.setTimeout(() => {
           if (unsubscribedTables.length > 0) {
             console.log(`Retry ${attempt + 1}: Re-establishing subscriptions for:`, unsubscribedTables);
             forceRefresh();
             retrySubscriptions(attempt + 1);
           }
         }, delay);
+
+        retryTimers.push(timerId);
       };
       
       // Start retry process after initial delay
@@ -211,6 +215,10 @@ function AppInitWithRouter(): null {
         });
       }
     }
+
+    return () => {
+      retryTimers.forEach((timerId) => window.clearTimeout(timerId));
+    };
   }, [
     forceRefresh,
     isFullySubscribed,
@@ -232,8 +240,8 @@ function AppInitWithRouter(): null {
           if (success) {
             // Use coordinator to sync invalidation across tabs
             multiTabCoordinator.invalidateQueries();
-            toast.success('Connection restored', {
-              description: 'Network is back online, refreshing data'
+            toast.success('Conexión restaurada', {
+              description: 'La red vuelve a estar disponible, actualizando datos'
             });
           }
         });

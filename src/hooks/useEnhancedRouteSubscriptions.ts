@@ -49,6 +49,8 @@ type RouteSubscriptionRequirement = {
   priority: 'high' | 'medium' | 'low';
 };
 
+type RouteOwnerMode = 'leader' | 'follower' | null;
+
 // Maximum time (in milliseconds) that a subscription can be idle before it's considered stale
 const SUBSCRIPTION_STALE_TIME = 5 * 60 * 1000; // 5 minutes
 // Inactivity threshold after which subscriptions should be refreshed when the page becomes active
@@ -69,6 +71,7 @@ export function useEnhancedRouteSubscriptions() {
   const wasInactive = useRef<boolean>(false);
   const currentRouteKey = useRef<string | null>(null);
   const multiTabCoordinator = MultiTabCoordinator.getInstance(queryClient);
+  const currentRouteOwnerMode = useRef<RouteOwnerMode>(null);
   const [isLeader, setIsLeader] = useState(() => multiTabCoordinator.getIsLeader());
 
   const [status, setStatus] = useState({
@@ -95,15 +98,27 @@ export function useEnhancedRouteSubscriptions() {
     };
   }, []);
 
+  const cleanupRouteOwner = useCallback((routeKey: string, ownerMode: RouteOwnerMode) => {
+    if (ownerMode === 'leader') {
+      manager.cleanupRouteDependentSubscriptions(routeKey);
+      return;
+    }
+
+    if (ownerMode === 'follower') {
+      multiTabCoordinator.releaseSubscriptions(routeKey);
+    }
+  }, [manager, multiTabCoordinator]);
+
   useEffect(() => {
     return () => {
       const routeKey = currentRouteKey.current;
       if (routeKey) {
-        manager.cleanupRouteDependentSubscriptions(routeKey);
+        cleanupRouteOwner(routeKey, currentRouteOwnerMode.current);
         currentRouteKey.current = null;
+        currentRouteOwnerMode.current = null;
       }
     };
-  }, [manager]);
+  }, [cleanupRouteOwner]);
 
   // Check app resume events to detect when the user returns to the page (only for leader)
   useEffect(() => {
@@ -112,7 +127,7 @@ export function useEnhancedRouteSubscriptions() {
         return;
       }
 
-      const timeSinceLastActive = Math.max(hiddenDurationMs, at - lastActiveTimestamp.current);
+      const timeSinceLastActive = hiddenDurationMs;
 
       // If the page was inactive for longer than the threshold, refresh subscriptions
       if (timeSinceLastActive > INACTIVITY_THRESHOLD) {
@@ -125,8 +140,8 @@ export function useEnhancedRouteSubscriptions() {
           manager.forceRefreshSubscriptions(tableNames);
           multiTabCoordinator.invalidateQueries();
 
-          toast.info("Refreshing data after inactivity", {
-            description: "Reconnecting to real-time updates..."
+          toast.info("Actualizando datos tras inactividad", {
+            description: "Reconectando actualizaciones en tiempo real..."
           });
         }
       }
@@ -147,15 +162,18 @@ export function useEnhancedRouteSubscriptions() {
     const pathname = location.pathname;
     const { routeKey, tables: routeTables } = getSubscriptionConfigForPathname(pathname);
     const previousRouteKey = currentRouteKey.current;
+    const previousOwnerMode = currentRouteOwnerMode.current;
+    const nextOwnerMode: RouteOwnerMode = isLeader ? 'leader' : 'follower';
     
     console.log('Configuring subscriptions for route:', pathname);
     console.log('Using route key for subscriptions:', routeKey);
     
     // Clean up subscriptions from previous routes
-    if (previousRouteKey && previousRouteKey !== routeKey) {
-      manager.cleanupRouteDependentSubscriptions(previousRouteKey);
+    if (previousRouteKey && (previousRouteKey !== routeKey || previousOwnerMode !== nextOwnerMode)) {
+      cleanupRouteOwner(previousRouteKey, previousOwnerMode);
     }
     currentRouteKey.current = routeKey;
+    currentRouteOwnerMode.current = nextOwnerMode;
     
     if (routeTables.length === 0) {
       console.log(`No subscription config found for route ${routeKey}, using global tables only`);
@@ -235,7 +253,7 @@ export function useEnhancedRouteSubscriptions() {
       requiredSubscriptions: subscriptionRequirements,
     });
     
-  }, [location.pathname, manager, lastRefreshTime, queryClient, isLeader, multiTabCoordinator]);
+  }, [cleanupRouteOwner, location.pathname, manager, lastRefreshTime, queryClient, isLeader, multiTabCoordinator]);
 
   // Helper to get priority value for comparison
   function getPriorityValue(priority: 'high' | 'medium' | 'low'): number {
@@ -255,7 +273,7 @@ export function useEnhancedRouteSubscriptions() {
           multiTabCoordinator.invalidateQueries();
           // Only show toasts to admin users
           if (isAdmin) {
-            toast.success('Subscriptions refreshed');
+            toast.success('Suscripciones actualizadas');
           }
         } else {
           // Followers can request refresh from leader

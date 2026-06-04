@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => {
     coordinator: {
       getIsLeader: vi.fn(() => true),
       requestSubscriptions: vi.fn(),
+      releaseSubscriptions: vi.fn(),
       invalidateQueries: vi.fn(),
     },
   };
@@ -144,5 +145,26 @@ describe("useEnhancedRouteSubscriptions", () => {
     });
 
     expect(mocks.manager.subscribeToTable).not.toHaveBeenCalled();
+  });
+
+  it("releases delegated subscriptions from the leader when a follower unmounts", async () => {
+    mocks.coordinator.getIsLeader.mockReturnValue(false);
+    mocks.manager.getSubscriptionsByTable.mockReturnValue({
+      profiles: [],
+      jobs: [],
+      job_assignments: [],
+      job_date_types: [],
+    });
+
+    const rendered = renderHookHarness("/dashboard");
+
+    await waitFor(() => {
+      expect(mocks.coordinator.requestSubscriptions).toHaveBeenCalled();
+    });
+
+    rendered.unmount();
+
+    expect(mocks.coordinator.releaseSubscriptions).toHaveBeenCalledWith("/dashboard");
+    expect(mocks.manager.cleanupRouteDependentSubscriptions).not.toHaveBeenCalled();
   });
 });

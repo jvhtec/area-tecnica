@@ -37,7 +37,7 @@ export class TokenManager {
       // Update cached session whenever auth state changes
       this.updateCachedSession(session);
       
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         this.lastRefresh = Date.now();
         this.notifySubscribers();
         this.scheduleNextRefresh(session);
@@ -59,6 +59,11 @@ export class TokenManager {
       const timeSinceRefresh = Date.now() - this.lastRefresh;
 
       if (timeSinceRefresh > 5 * 60 * 1000) {
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          console.log('Tab became visible while offline, skipping token refresh');
+          return;
+        }
+
         console.log('Tab became visible after inactivity, refreshing token');
         this.refreshToken();
       }
@@ -106,8 +111,14 @@ export class TokenManager {
     // Cache is invalid or empty, fetch fresh session
     console.log('🔄 Fetching fresh session (cache miss or expired)');
     const { data } = await supabase.auth.getSession();
-    this.updateCachedSession(data.session);
-    return data.session;
+    const session = data.session;
+    this.updateCachedSession(session);
+
+    if (session) {
+      this.scheduleNextRefresh(session);
+    }
+
+    return session;
   }
   
   /**

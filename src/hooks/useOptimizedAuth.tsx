@@ -788,8 +788,8 @@ export const OptimizedAuthProvider = ({ children }: { children: ReactNode }) => 
     const handleOnline = () => {
       refreshSession();
       toast({
-        title: "Connection restored",
-        description: "You are back online",
+        title: "Conexión restaurada",
+        description: "Vuelves a estar online",
         variant: "default",
       });
     };

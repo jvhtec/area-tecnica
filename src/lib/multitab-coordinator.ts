@@ -20,7 +20,7 @@ export interface RouteSubscriptionRequest {
 }
 
 interface TabMessage {
-  type: 'cache-update' | 'invalidate' | 'leader-election' | 'heartbeat' | 'subscription-request';
+  type: 'cache-update' | 'invalidate' | 'leader-election' | 'heartbeat' | 'subscription-request' | 'subscription-release';
   queryKey?: any;
   data?: any;
   tabId?: string;
@@ -133,6 +133,12 @@ export class MultiTabCoordinator {
               subscriptions,
               tables,
             });
+          }
+          break;
+
+        case 'subscription-release':
+          if (this.isLeader && routeKey) {
+            this.handleSubscriptionRelease(routeKey, tabId);
           }
           break;
       }
@@ -391,7 +397,7 @@ export class MultiTabCoordinator {
       return;
     }
 
-    const ownerRoute = routeKey ?? `delegated:${requesterTabId ?? 'unknown-tab'}`;
+    const ownerRoute = this.getDelegatedOwnerRoute(routeKey, requesterTabId);
     const manager = UnifiedSubscriptionManager.getInstance(this.queryClient);
 
     requestedSubscriptions.forEach(({ table, queryKey, filter, priority }) => {
@@ -414,6 +420,24 @@ export class MultiTabCoordinator {
         ownerRoute,
         requesterTabId,
         tables: requestedSubscriptions.map((subscription) => subscription.table),
+      });
+    }
+  }
+
+  private getDelegatedOwnerRoute(routeKey?: string, requesterTabId?: string) {
+    return `${routeKey ?? 'delegated'}:${requesterTabId ?? 'unknown-tab'}`;
+  }
+
+  private handleSubscriptionRelease(routeKey: string, requesterTabId?: string) {
+    const ownerRoute = this.getDelegatedOwnerRoute(routeKey, requesterTabId);
+    const manager = UnifiedSubscriptionManager.getInstance(this.queryClient);
+
+    manager.cleanupRouteDependentSubscriptions(ownerRoute);
+
+    if (import.meta.env.DEV) {
+      console.debug('[MultiTabCoordinator] Leader released delegated subscriptions', {
+        ownerRoute,
+        requesterTabId,
       });
     }
   }
@@ -480,6 +504,19 @@ export class MultiTabCoordinator {
     });
   }
 
+  public releaseSubscriptions(routeKey: string) {
+    if (this.isLeader) {
+      this.handleSubscriptionRelease(routeKey, this.tabId);
+      return;
+    }
+
+    this.broadcast({
+      type: 'subscription-release',
+      routeKey,
+      tabId: this.tabId,
+    });
+  }
+
   public destroy() {
     if (this.leaderElectionInterval) {
       clearInterval(this.leaderElectionInterval);
@@ -533,6 +570,7 @@ export function useMultiTabCoordinator(queryClient: QueryClient) {
     tabId: coordinator.getTabId(),
     isLeader: coordinator.getIsLeader(),
     invalidateQueries: coordinator.invalidateQueries.bind(coordinator),
-    requestSubscriptions: coordinator.requestSubscriptions.bind(coordinator)
+    requestSubscriptions: coordinator.requestSubscriptions.bind(coordinator),
+    releaseSubscriptions: coordinator.releaseSubscriptions.bind(coordinator)
   };
 }

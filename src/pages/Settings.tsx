@@ -492,8 +492,8 @@ const Settings = () => {
             {isManagementUser && (
               <CollapsibleCard
                 id="realtime-debug"
-                title="Realtime diagnostics"
-                description="Inspect route-owned subscriptions, owner routes, payload activity, and refetch counters."
+                title="Diagnósticos en tiempo real"
+                description="Inspeccionar suscripciones pertenecientes a rutas, rutas propietarias, actividad de payload y contadores de recarga."
                 isOpen={collapsibleStates['realtime-debug']}
                 onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'realtime-debug': open }))}
               >
