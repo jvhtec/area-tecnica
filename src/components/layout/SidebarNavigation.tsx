@@ -39,6 +39,7 @@ import {
   isDepartmentManagementRole,
   isManagementRole,
 } from "@/utils/permissions"
+import { routeNavigationConfigByNavId } from "@/routes/app-route-manifest"
 
 import { SidebarNavigationSkeleton } from "./SidebarNavigationSkeleton"
 
@@ -92,6 +93,15 @@ const departmentIconMap: Record<string, LucideIcon> = {
   video: Video,
 }
 
+const navPath = (id: string, fallback: string): string =>
+  routeNavigationConfigByNavId[id]?.path ?? fallback
+
+const navLabel = (id: string, fallback: string): string =>
+  routeNavigationConfigByNavId[id]?.label ?? fallback
+
+const navMobileLabel = (id: string, fallback: string): string =>
+  routeNavigationConfigByNavId[id]?.mobileLabel ?? fallback
+
 const baseNavigationConfig: NavigationItemConfig[] = [
   {
     id: "management-dashboard",
@@ -100,7 +110,7 @@ const baseNavigationConfig: NavigationItemConfig[] = [
     icon: LayoutDashboard,
     mobilePriority: 1,
     mobileSlot: "primary",
-    getPath: () => "/dashboard",
+    getPath: () => navPath("management-dashboard", "/dashboard"),
     isVisible: ({ userRole }) => isManagementRole(userRole) || userRole === "oscar",
   },
   {
@@ -165,32 +175,32 @@ const baseNavigationConfig: NavigationItemConfig[] = [
   },
   {
     id: "personal",
-    label: "Agenda personal",
-    mobileLabel: "Agenda",
+    label: navLabel("personal", "Agenda personal"),
+    mobileLabel: navMobileLabel("personal", "Agenda"),
     icon: Calendar,
     mobilePriority: 2,
     mobileSlot: "secondary",
-    getPath: () => "/personal",
+    getPath: () => navPath("personal", "/personal"),
     isVisible: ({ userRole }) => userRole !== "technician" && userRole !== "oscar",
   },
   {
     id: "job-assignment-matrix",
-    label: "Matriz de asignaciones",
-    mobileLabel: "Matriz",
+    label: navLabel("job-assignment-matrix", "Matriz de asignaciones"),
+    mobileLabel: navMobileLabel("job-assignment-matrix", "Matriz"),
     icon: Grid3X3,
     mobilePriority: 11,
     mobileSlot: "secondary",
-    getPath: () => "/job-assignment-matrix",
+    getPath: () => navPath("job-assignment-matrix", "/job-assignment-matrix"),
     isVisible: ({ userRole }) => isDepartmentManagementRole(userRole),
   },
   {
      id: "management-rates",
-     label: "Tarifas y extras",
-     mobileLabel: "Tarifas",
+     label: navLabel("management-rates", "Tarifas y extras"),
+     mobileLabel: navMobileLabel("management-rates", "Tarifas"),
      icon: Euro,
      mobilePriority: 10,
      mobileSlot: "secondary",
-     getPath: () => "/management/rates",
+     getPath: () => navPath("management-rates", "/management/rates"),
      isVisible: ({ userRole }) => isDepartmentManagementRole(userRole),
    },
    {
@@ -243,32 +253,32 @@ const baseNavigationConfig: NavigationItemConfig[] = [
   },
   {
     id: "admin-lights",
-    label: "Luces",
-    mobileLabel: "Luces",
+    label: navLabel("admin-lights", "Luces"),
+    mobileLabel: navMobileLabel("admin-lights", "Luces"),
     icon: Lightbulb,
     mobilePriority: 6,
     mobileSlot: "secondary",
-    getPath: () => "/lights",
+    getPath: () => navPath("admin-lights", "/lights"),
     isVisible: ({ userRole }) => isAdminRole(userRole),
   },
   {
     id: "admin-video",
-    label: "Vídeo",
-    mobileLabel: "Vídeo",
+    label: navLabel("admin-video", "Vídeo"),
+    mobileLabel: navMobileLabel("admin-video", "Vídeo"),
     icon: Video,
     mobilePriority: 6,
     mobileSlot: "secondary",
-    getPath: () => "/video",
+    getPath: () => navPath("admin-video", "/video"),
     isVisible: ({ userRole }) => isAdminRole(userRole),
   },
   {
     id: "admin-sound",
-    label: "Sonido",
-    mobileLabel: "Sonido",
+    label: navLabel("admin-sound", "Sonido"),
+    mobileLabel: navMobileLabel("admin-sound", "Sonido"),
     icon: Music2,
     mobilePriority: 6,
     mobileSlot: "secondary",
-    getPath: () => "/sound",
+    getPath: () => navPath("admin-sound", "/sound"),
     isVisible: ({ userRole }) => isAdminRole(userRole),
   },
   {
@@ -296,23 +306,23 @@ const baseNavigationConfig: NavigationItemConfig[] = [
   },
   {
     id: "tours",
-    label: "Giras",
-    mobileLabel: "Giras",
+    label: navLabel("tours", "Giras"),
+    mobileLabel: navMobileLabel("tours", "Giras"),
     icon: MapPin,
     mobilePriority: 4,
     mobileSlot: "primary",
-    getPath: () => "/tours",
+    getPath: () => navPath("tours", "/tours"),
     isVisible: ({ userRole }) =>
       isDepartmentManagementRole(userRole) || userRole === "house_tech",
   },
   {
     id: "festivals",
-    label: "Festivales",
-    mobileLabel: "Festivales",
+    label: navLabel("festivals", "Festivales"),
+    mobileLabel: navMobileLabel("festivals", "Festivales"),
     icon: Tent,
     mobilePriority: 6,
     mobileSlot: "secondary",
-    getPath: () => "/festivals",
+    getPath: () => navPath("festivals", "/festivals"),
     isVisible: ({ userDepartment, userRole }) =>
       userRole !== "oscar" && userDepartment?.toLowerCase() === "sound",
   },
@@ -329,12 +339,12 @@ const baseNavigationConfig: NavigationItemConfig[] = [
   },
   {
     id: "project-management",
-    label: "Gestión de proyectos",
-    mobileLabel: "Proyectos",
+    label: navLabel("project-management", "Gestión de proyectos"),
+    mobileLabel: navMobileLabel("project-management", "Proyectos"),
     icon: ClipboardList,
     mobilePriority: 8,
     mobileSlot: "secondary",
-    getPath: () => "/project-management",
+    getPath: () => navPath("project-management", "/project-management"),
     isVisible: ({ userRole }) => canAccessProjectManagement(userRole),
   },
   {
@@ -352,24 +362,24 @@ const baseNavigationConfig: NavigationItemConfig[] = [
   },
   {
     id: "logistics",
-    label: "Logística",
-    mobileLabel: "Logística",
+    label: navLabel("logistics", "Logística"),
+    mobileLabel: navMobileLabel("logistics", "Logística"),
     icon: Truck,
     mobilePriority: 3,
     mobileSlot: "primary",
-    getPath: () => "/logistics",
+    getPath: () => navPath("logistics", "/logistics"),
     isVisible: ({ userRole }) =>
       canAccessProjectManagement(userRole) ||
       userRole === "house_tech",
   },
   {
     id: "profile",
-    label: "Perfil",
-    mobileLabel: "Perfil",
+    label: navLabel("profile", "Perfil"),
+    mobileLabel: navMobileLabel("profile", "Perfil"),
     icon: UserCircle,
     mobilePriority: 5,
     mobileSlot: "primary",
-    getPath: () => "/profile",
+    getPath: () => navPath("profile", "/profile"),
     isVisible: ({ userRole }) => Boolean(userRole) && userRole !== "house_tech",
   },
   {
@@ -424,12 +434,12 @@ const baseNavigationConfig: NavigationItemConfig[] = [
   },
   {
     id: "settings",
-    label: "Ajustes",
-    mobileLabel: "Ajustes",
+    label: navLabel("settings", "Ajustes"),
+    mobileLabel: navMobileLabel("settings", "Ajustes"),
     icon: Settings,
     mobilePriority: 15,
     mobileSlot: "secondary",
-    getPath: () => "/settings",
+    getPath: () => navPath("settings", "/settings"),
     isVisible: ({ userRole }) => isManagementRole(userRole),
   },
 ]

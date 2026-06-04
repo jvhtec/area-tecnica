@@ -29,6 +29,10 @@ import { useAcknowledgedTasks } from "@/hooks/useAcknowledgedTasks"
 import { PendingTasksModal } from "@/components/tasks/PendingTasksModal"
 import { SingleTaskPopup } from "@/components/tasks/SingleTaskPopup"
 import { PendingTasksBadge } from "@/components/tasks/PendingTasksBadge"
+import {
+  isMobileFullscreenRoutePath,
+  shouldSuppressRouteChrome,
+} from "@/routes/app-route-manifest"
 
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { AboutCard } from "./AboutCard"
@@ -380,8 +384,7 @@ const Layout = () => {
   }, [userId, userRole, userDepartment])
 
   const suppressChrome = useMemo(() => {
-    const suppressedPrefixes = ["/wallboard"]
-    if (suppressedPrefixes.some((prefix) => location.pathname.startsWith(prefix))) {
+    if (shouldSuppressRouteChrome(location.pathname)) {
       return true
     }
 
@@ -395,10 +398,7 @@ const Layout = () => {
   }, [location.pathname, location.search])
 
   // Routes that should be full-screen on mobile but have Layout on desktop
-  const mobileFullscreenRoutes = useMemo(() => {
-    const routes = ["/sound"]
-    return isMobile && routes.some((route) => location.pathname.startsWith(route))
-  }, [isMobile, location.pathname])
+  const mobileFullscreenRoutes = isMobile && isMobileFullscreenRoutePath(location.pathname)
 
   const showSidebar = !isMobile || suppressChrome
 

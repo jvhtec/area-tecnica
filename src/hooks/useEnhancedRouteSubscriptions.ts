@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { useQueryClient } from '@tanstack/react-query';
@@ -9,164 +9,12 @@ import { toast } from 'sonner';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { isAdminRole } from '@/utils/permissions';
+import {
+  GLOBAL_SUBSCRIPTION_TABLES,
+  getSubscriptionConfigForPathname,
+} from '@/routes/app-route-manifest';
 
-// Define subscription requirements for each route
-export const ROUTE_SUBSCRIPTIONS: Record<string, Array<{
-  table: string,
-  priority: 'high' | 'medium' | 'low'
-}>> = {
-  // Dashboard route needs these tables for real-time updates
-  '/dashboard': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_date_types', priority: 'medium' }
-  ],
-  
-  // Department-specific routes
-  '/sound': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  '/lights': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  '/video': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  
-  // Other routes with their required tables
-  '/calendar': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  '/technician-dashboard': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }
-  ],
-  '/logistics': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'logistics_events', priority: 'high' }
-  ],
-  '/inventory': [
-    { table: 'equipment', priority: 'high' }, 
-    { table: 'stock_movements', priority: 'high' }, 
-    { table: 'global_stock_entries', priority: 'medium' }
-  ],
-  '/tours': [
-    { table: 'tours', priority: 'high' }, 
-    { table: 'tour_dates', priority: 'medium' }
-  ],
-  '/tour-management': [
-    { table: 'tours', priority: 'high' },
-    { table: 'tour_dates', priority: 'high' },
-    { table: 'tour_timeline_events', priority: 'high' },
-    { table: 'tour_travel_segments', priority: 'high' },
-    { table: 'tour_accommodations', priority: 'medium' },
-    { table: 'tour_documents', priority: 'medium' },
-    { table: 'tour_guest_links', priority: 'low' },
-    { table: 'hoja_de_ruta', priority: 'medium' },
-    { table: 'hoja_de_ruta_travel_arrangements', priority: 'medium' },
-    { table: 'hoja_de_ruta_accommodations', priority: 'medium' },
-    { table: 'hoja_de_ruta_room_assignments', priority: 'medium' },
-    { table: 'hoja_de_ruta_staff', priority: 'medium' },
-    { table: 'hoja_de_ruta_transport', priority: 'medium' },
-    { table: 'job_assignments', priority: 'medium' }
-  ],
-  '/project-management': [
-    { table: 'jobs', priority: 'high' },
-    { table: 'job_assignments', priority: 'medium' },
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  '/management/rates': [
-    { table: 'rate_cards_tour_2025', priority: 'high' },
-    { table: 'rate_extras_2025', priority: 'high' },
-    { table: 'custom_tech_rates', priority: 'high' },
-    { table: 'timesheets', priority: 'high' },
-    { table: 'tours', priority: 'medium' },
-    { table: 'jobs', priority: 'medium' },
-    { table: 'job_assignments', priority: 'medium' }
-  ],
-  '/gastos': [
-    { table: 'job_expenses', priority: 'high' },
-    { table: 'expense_permissions', priority: 'medium' },
-    { table: 'expense_categories', priority: 'low' }
-  ],
-  
-  // Festival specific routes
-  '/festivals': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'festival_artists', priority: 'medium' }, 
-    { table: 'festival_forms', priority: 'low' }
-  ],
-  '/festival-management': [
-    { table: 'festivals', priority: 'high' }, 
-    { table: 'festival_artists', priority: 'high' }, 
-    { table: 'festival_forms', priority: 'medium' },
-    { table: 'festival_shifts', priority: 'medium' },
-    { table: 'festival_shift_assignments', priority: 'medium' },
-    { table: 'festival_gear_setups', priority: 'medium' }
-  ],
-  '/festival-management/artists': [
-    { table: 'festivals', priority: 'high' }, 
-    { table: 'festival_artists', priority: 'high' }, 
-    { table: 'festival_forms', priority: 'high' }
-  ],
-  '/festival-management/gear': [
-    { table: 'festivals', priority: 'high' }, 
-    { table: 'festival_gear', priority: 'high' },
-    { table: 'festival_gear_setups', priority: 'high' }
-  ],
-  '/festival-management/scheduling': [
-    { table: 'festivals', priority: 'high' },
-    { table: 'festival_shifts', priority: 'high' },
-    { table: 'festival_shift_assignments', priority: 'high' },
-    { table: 'profiles', priority: 'medium' }
-  ],
-  '/festival-artist-management': [
-    { table: 'festivals', priority: 'high' }, 
-    { table: 'festival_artists', priority: 'high' }, 
-    { table: 'festival_forms', priority: 'high' }
-  ],
-  '/festival-gear-management': [
-    { table: 'festivals', priority: 'high' }, 
-    { table: 'festival_gear', priority: 'high' }
-  ],
-  
-  // Tool specific routes
-  '/pesos-tool': [
-    { table: 'jobs', priority: 'high' },
-    { table: 'video_memoria_tecnica_documents', priority: 'high' }
-  ],
-  '/consumos-tool': [
-    { table: 'jobs', priority: 'high' },
-    { table: 'power_requirement_tables', priority: 'high' }
-  ],
-  '/memoria-tecnica-tool': [
-    { table: 'jobs', priority: 'high' },
-    { table: 'memoria_tecnica_documents', priority: 'high' }
-  ],
-  
-  // Add more routes as needed
-  '/jobs': [{ table: 'jobs', priority: 'high' }],
-  '/job': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_assignments', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-  '/settings': [{ table: 'profiles', priority: 'medium' }],
-  '/profile': [{ table: 'profiles', priority: 'high' }],
-  '/users': [{ table: 'profiles', priority: 'high' }],
-  '/users-management': [{ table: 'profiles', priority: 'high' }],
-  '/hoja-de-ruta': [
-    { table: 'jobs', priority: 'high' }, 
-    { table: 'job_departments', priority: 'medium' }
-  ],
-};
+export { ROUTE_SUBSCRIPTIONS } from '@/routes/app-route-manifest';
 
 const ROUTE_QUERY_KEY_OVERRIDES: Record<string, string | string[]> = {
   jobs: ['optimized-jobs'],
@@ -193,11 +41,6 @@ const ROUTE_QUERY_KEY_OVERRIDES: Record<string, string | string[]> = {
 
 const getRouteQueryKeyForTable = (table: string): string | string[] =>
   ROUTE_QUERY_KEY_OVERRIDES[table] ?? [table];
-
-// Default tables that should be monitored on all routes
-const GLOBAL_TABLES: Array<{ table: string, priority: 'high' | 'medium' | 'low' }> = [
-  { table: 'profiles', priority: 'medium' }
-];
 
 // Maximum time (in milliseconds) that a subscription can be idle before it's considered stale
 const SUBSCRIPTION_STALE_TIME = 5 * 60 * 1000; // 5 minutes
@@ -254,44 +97,6 @@ export function useEnhancedRouteSubscriptions() {
     };
   }, [manager]);
 
-  // Find the most specific route match
-  const findRoutePath = useCallback((pathname: string) => {
-    // First check if we have an exact match
-    if (ROUTE_SUBSCRIPTIONS[pathname]) {
-      return pathname;
-    }
-    
-    // Handle dynamic routes for festival management
-    if (pathname.includes('/festival-management/')) {
-      // Extract the base path and check for specific sub-routes
-      if (pathname.includes('/artists')) {
-        return '/festival-management/artists';
-      } else if (pathname.includes('/gear')) {
-        return '/festival-management/gear';
-      } else if (pathname.includes('/scheduling')) {
-        return '/festival-management/scheduling';
-      } else {
-        return '/festival-management'; // Default festival management route
-      }
-    }
-    
-    // Handle dynamic routes for tool pages
-    if (pathname.includes('/pesos-tool')) {
-      return '/pesos-tool';
-    }
-    if (pathname.includes('/consumos-tool')) {
-      return '/consumos-tool';
-    }
-    if (pathname.includes('/memoria-tecnica-tool')) {
-      return '/memoria-tecnica-tool';
-    }
-    
-    // If no exact match, find the most specific parent route
-    return Object.keys(ROUTE_SUBSCRIPTIONS)
-      .filter(route => pathname.startsWith(route))
-      .sort((a, b) => b.length - a.length)[0] || pathname;
-  }, []);
-  
   // Check document visibility changes to detect when the user returns to the page (only for leader)
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -337,7 +142,7 @@ export function useEnhancedRouteSubscriptions() {
     lastActiveTimestamp.current = Date.now();
     
     const pathname = location.pathname;
-    const routeKey = findRoutePath(pathname);
+    const { routeKey, tables: routeTables } = getSubscriptionConfigForPathname(pathname);
     const previousRouteKey = currentRouteKey.current;
     
     console.log('Configuring subscriptions for route:', pathname);
@@ -349,19 +154,16 @@ export function useEnhancedRouteSubscriptions() {
     }
     currentRouteKey.current = routeKey;
     
-    // Get required tables for this route
-    const routeTables = ROUTE_SUBSCRIPTIONS[routeKey] || [];
-    
     if (routeTables.length === 0) {
       console.log(`No subscription config found for route ${routeKey}, using global tables only`);
     }
     
     // Combine with global tables, ensuring no duplicates
-    const allTables = [...GLOBAL_TABLES];
+    const allTables = GLOBAL_SUBSCRIPTION_TABLES.map((tableInfo) => ({ ...tableInfo }));
     
     routeTables.forEach(tableInfo => {
       if (!allTables.some(t => t.table === tableInfo.table)) {
-        allTables.push(tableInfo);
+        allTables.push({ ...tableInfo });
       } else {
         // If the table exists but with a lower priority, update it to the higher priority
         const existingIndex = allTables.findIndex(t => t.table === tableInfo.table);
@@ -422,7 +224,7 @@ export function useEnhancedRouteSubscriptions() {
       formattedLastActivity
     });
     
-  }, [location.pathname, manager, findRoutePath, lastRefreshTime, queryClient, isLeader, multiTabCoordinator]);
+  }, [location.pathname, manager, lastRefreshTime, queryClient, isLeader, multiTabCoordinator]);
 
   // Helper to get priority value for comparison
   function getPriorityValue(priority: 'high' | 'medium' | 'low'): number {

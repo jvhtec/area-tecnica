@@ -7,7 +7,7 @@ import { UserRole } from '@/types/user';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  allowedRoles: UserRole[];
+  allowedRoles: readonly UserRole[];
   allowAssignableTech?: boolean;
 }
 
