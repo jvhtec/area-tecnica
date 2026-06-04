@@ -27,12 +27,21 @@ function listFunctionEntrypoints() {
   return readdirSync(functionsRoot, { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
     .map((entry) => {
-      const path = join(functionsRoot, entry.name, "index.ts");
+      const candidates = ["index.ts", "index.js"].map((fileName) => {
+        const path = join(functionsRoot, entry.name, fileName);
+        return {
+          path,
+          relativePath: toPosix(relative(repoRoot, path)),
+          exists: existsSync(path),
+        };
+      });
+      const match = candidates.find((candidate) => candidate.exists) ?? candidates[0];
+
       return {
         name: entry.name,
-        path,
-        relativePath: toPosix(relative(repoRoot, path)),
-        exists: existsSync(path),
+        path: match.path,
+        relativePath: match.relativePath,
+        exists: match.exists,
       };
     })
     .filter((entry) => entry.exists)

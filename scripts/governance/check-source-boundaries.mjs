@@ -138,7 +138,7 @@ function lineAt(content, lineNumber) {
 
 function extractProtectedRouteMatches(path, content) {
   const matches = [];
-  const pattern = /<ProtectedRoute\b[\s\S]*?\ballowedRoles\s*=/g;
+  const pattern = /<ProtectedRoute\b[^>]*?\ballowedRoles\s*=/g;
   let match;
 
   while ((match = pattern.exec(content)) !== null) {

@@ -105,7 +105,13 @@ function maxAllowedBytes(baselineBytes, budget) {
 }
 
 function assetByPath(files, path) {
-  const normalized = path.startsWith("/") ? `dist${path}` : path;
+  const withoutDot = path.startsWith("./") ? path.slice(2) : path;
+  const normalized = withoutDot.startsWith("/")
+    ? `dist${withoutDot}`
+    : withoutDot.startsWith("dist/")
+      ? withoutDot
+      : `dist/${withoutDot}`;
+
   return files.find((file) => file.path === normalized);
 }
 
