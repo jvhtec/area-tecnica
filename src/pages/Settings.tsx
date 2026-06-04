@@ -31,6 +31,7 @@ import { MorningSummarySubscription } from '@/components/settings/MorningSummary
 import { ShortcutsSettings } from '@/components/settings/ShortcutsSettings'
 import { DryHireFolderManager } from '@/components/settings/DryHireFolderManager'
 import { SkillRoleMappingManager } from '@/components/settings/SkillRoleMappingManager'
+import { WahaEndpointSettings } from '@/components/settings/WahaEndpointSettings'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { ChevronDown } from "lucide-react"
 import { VersionDisplay } from "@/components/VersionDisplay"
@@ -222,6 +223,7 @@ const Settings = () => {
     'push-diagnostics': false,
     'push-matrix': false,
     'push-schedule': false,
+    'waha-endpoint': false,
     'morning-summary': false,
     'shortcuts': false,
     'users': false,
@@ -472,6 +474,18 @@ const Settings = () => {
                 isManagementUser={isManagementUser}
               />
             </CollapsibleCard>
+
+            {isManagementUser && (
+              <CollapsibleCard
+                id="waha-endpoint"
+                title="WAHA de WhatsApp"
+                description="Configura el endpoint de WhatsApp asignado a tu cuenta y empareja su sesion WAHA."
+                isOpen={collapsibleStates['waha-endpoint']}
+                onOpenChange={(open) => setCollapsibleStates(prev => ({ ...prev, 'waha-endpoint': open }))}
+              >
+                <WahaEndpointSettings />
+              </CollapsibleCard>
+            )}
 
             <CollapsibleCard
               id="company-settings"
