@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   appRoutes,
   getBreadcrumbsForPathname,
+  isMobileFullscreenRoutePath,
   getSubscriptionConfigForPathname,
   matchAppRoute,
   navigationShortcuts,
@@ -74,6 +75,12 @@ describe("app route manifest", () => {
     navigationShortcuts.forEach((shortcut) => {
       expect(matchAppRoute(shortcut.route), shortcut.id).not.toBeNull();
     });
+  });
+
+  it("applies mobile fullscreen chrome to nested sound tool routes", () => {
+    expect(isMobileFullscreenRoutePath("/sound")).toBe(true);
+    expect(isMobileFullscreenRoutePath("/sound/pesos")).toBe(true);
+    expect(isMobileFullscreenRoutePath("/sound/consumos")).toBe(true);
   });
 
   it("resolves breadcrumb metadata from the manifest", () => {

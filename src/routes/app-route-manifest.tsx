@@ -833,6 +833,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "department",
     subscriptionRouteKey: "/sound",
+    chrome: { mobileFullscreen: true },
     breadcrumb: { label: "Pesos", parentPath: "/sound" },
   },
   {
@@ -843,6 +844,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "department",
     subscriptionRouteKey: "/sound",
+    chrome: { mobileFullscreen: true },
     breadcrumb: { label: "Consumos", parentPath: "/sound" },
   },
   {
