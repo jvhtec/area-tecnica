@@ -108,4 +108,51 @@ test.describe("tour management smoke", () => {
     await page.getByRole("heading", { name: "World Tour" }).click();
     await expect(page).toHaveURL(/\/tours$/);
   });
+
+  test("anchors the mobile navbar to the viewport bottom", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await bootstrapApp(page, {
+      auth: {
+        role: "management",
+        department: "sound",
+      },
+      tables: {
+        profiles: [
+          {
+            role: "management",
+            department: "sound",
+            soundvision_access_enabled: false,
+            assignable_as_tech: false,
+          },
+        ],
+        tours: [smokeTour],
+      },
+    });
+
+    await page.goto("/tours");
+
+    await expect(page.getByText(new RegExp(`tours ${smokeTourYear}`, "i"))).toBeVisible();
+
+    const navbar = page.locator("[data-mobile-navbar]");
+    await expect(navbar).toHaveCount(1);
+    await expect(navbar).toBeVisible();
+
+    const assertPinnedToBottom = async () => {
+      const metrics = await navbar.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+
+        return {
+          bottomGap: window.innerHeight - rect.bottom,
+          parentTagName: element.parentElement?.tagName,
+        };
+      });
+
+      expect(metrics.parentTagName).toBe("BODY");
+      expect(Math.abs(metrics.bottomGap)).toBeLessThanOrEqual(1);
+    };
+
+    await assertPinnedToBottom();
+    await page.mouse.wheel(0, 900);
+    await assertPinnedToBottom();
+  });
 });
