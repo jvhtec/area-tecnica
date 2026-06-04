@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { createHttpHandler, requireEnvValues } from "../_shared/http.ts";
 import { handleGetGoogleMapsKeyRequest } from "./handler.ts";
 
 const DEFAULT_ALLOWED_ROLES = [
@@ -29,28 +29,21 @@ const getAllowedRoles = () => {
 
 const ALLOWED_ROLES = getAllowedRoles()
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+serve(createHttpHandler(async (req) => {
+  const {
+    SUPABASE_URL: supabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: serviceKey,
+  } = requireEnvValues(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const, (name) => Deno.env.get(name));
 
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabase = createClient(supabaseUrl, serviceKey);
 
-    if (!supabaseUrl || !serviceKey) {
-      throw new Error("Missing Supabase configuration");
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
-
-    return await handleGetGoogleMapsKeyRequest(req, {
-      supabase,
-      getEnv: (name) => Deno.env.get(name),
-      allowedRoles: ALLOWED_ROLES,
-    });
-  } catch (error) {
-    console.error("Error fetching Google Maps API key:", error);
-    return jsonResponse({ error: "Unable to fetch API key" }, { status: 500 });
-  }
-});
+  return await handleGetGoogleMapsKeyRequest(req, {
+    supabase,
+    getEnv: (name) => Deno.env.get(name),
+    allowedRoles: ALLOWED_ROLES,
+  });
+}, {
+  allowedMethods: ["POST"],
+  internalErrorMessage: "Unable to fetch API key",
+  onError: (error) => console.error("Error fetching Google Maps API key:", error),
+}));

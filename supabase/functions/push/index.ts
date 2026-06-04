@@ -1,9 +1,10 @@
 import { createClient, serve } from "./deps.ts";
 import { SERVICE_ROLE_KEY, SUPABASE_URL } from "./config.ts";
+import { createHttpHandler, HttpError, readJsonBody } from "../_shared/http.ts";
 import { resolveCaller } from "./auth.ts";
 import { handleBroadcast } from "./broadcast.ts";
 import { handleCheckScheduled } from "./scheduled.ts";
-import { corsHeaders, ensureAuthHeader, jsonResponse } from "./http.ts";
+import { ensureAuthHeader, jsonResponse } from "./http.ts";
 import {
   handleSubscribe,
   handleSubscribeNative,
@@ -23,26 +24,10 @@ import type {
   UnsubscribeNativeBody,
 } from "./types.ts";
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders });
-  }
-
-  if (req.method !== "POST") {
-    return jsonResponse({ error: "Not found" }, 404);
-  }
-
-  let body: RequestBody;
-
-  try {
-    body = await req.json();
-  } catch (error) {
-    console.error("push parse error", error);
-    return jsonResponse({ error: "Invalid JSON body" }, 400);
-  }
-
+serve(createHttpHandler(async (req) => {
+  const body = await readJsonBody<RequestBody>(req);
   if (!body?.action) {
-    return jsonResponse({ error: "Missing action" }, 400);
+    throw new HttpError(400, "Missing action");
   }
 
   const token = ensureAuthHeader(req);
@@ -69,4 +54,9 @@ serve(async (req) => {
     default:
       return jsonResponse({ error: "Unsupported action" }, 400);
   }
-});
+}, {
+  allowedMethods: ["POST"],
+  methodNotAllowedStatus: 404,
+  methodNotAllowedBody: { error: "Not found" },
+  onError: (error) => console.error("push request error", error),
+}));
