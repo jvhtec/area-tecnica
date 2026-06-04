@@ -3,11 +3,24 @@ import { supabase } from "./supabase";
 
 
 import { queryKeys } from "@/lib/react-query";
+export type SubscriptionDebugEntry = {
+  key: string;
+  ownerRoutes: string[];
+  table: string;
+  queryKey: string[];
+  filter?: RealtimeSubscriptionFilter;
+  priority: SubscriptionPriority;
+  createdAt: number;
+  lastPayloadAt: number | null;
+  invalidationCount: number;
+};
+
 export type SubscriptionSnapshot = {
   connectionStatus: 'connected' | 'disconnected' | 'connecting';
   activeSubscriptions: string[];
   subscriptionCount: number;
   subscriptionsByTable: Record<string, string[]>;
+  debugSubscriptions: SubscriptionDebugEntry[];
   lastRefreshTime: number;
   activeConnections: number;
   queuedSubscriptions: number;
@@ -36,6 +49,10 @@ type ManagedSubscription = {
   key: string;
   unsubscribe: () => void;
   options: SubscriptionOptions;
+  ownerRoutes: Set<string>;
+  createdAt: number;
+  lastPayloadAt: number | null;
+  invalidationCount: number;
 };
 
 /**
@@ -52,8 +69,6 @@ export class UnifiedSubscriptionManager {
   private connectionStatus: 'connected' | 'disconnected' | 'connecting';
   private pingChannel: any | null;
   private tableLastActivity: Map<string, number>;
-  private visibilityChangeHandler?: () => void;
-  private networkStatusHandler?: () => void;
   private invalidationTimers: Map<string, number>;
   private listeners: Set<() => void>;
   private snapshot: SubscriptionSnapshot;
@@ -74,6 +89,7 @@ export class UnifiedSubscriptionManager {
       activeSubscriptions: [],
       subscriptionCount: 0,
       subscriptionsByTable: {},
+      debugSubscriptions: [],
       lastRefreshTime: Date.now(),
       activeConnections: 0,
       queuedSubscriptions: 0,
@@ -154,6 +170,7 @@ export class UnifiedSubscriptionManager {
       activeConnections: this.getSubscriptionCount(),
       queuedSubscriptions: this.pendingSubscriptions.size,
       subscriptionsByTable: this.getSubscriptionsByTable(),
+      debugSubscriptions: this.getSubscriptionDebugEntries(),
       lastHealthCheck: Date.now(),
     };
     this.notify();
@@ -263,6 +280,10 @@ export class UnifiedSubscriptionManager {
     this.updateSnapshot({ lastRefreshTime: Date.now() });
   }
 
+  public refreshStaleSubscriptions(maxAgeMs = 5 * 60 * 1000) {
+    this.invalidateStaleQueries(maxAgeMs);
+  }
+
   /**
    * Reestablish all subscriptions, typically after a connection loss
    */
@@ -342,11 +363,13 @@ export class UnifiedSubscriptionManager {
         }
       } else {
         console.log(`Keeping subscription to ${key} as it's used by other routes`);
+        this.subscriptions.get(key)?.ownerRoutes.delete(route);
       }
     });
     
     // Clear the route's subscription list
     this.routeSubscriptions.delete(route);
+    this.refreshSnapshotFromState();
   }
 
   /**
@@ -402,9 +425,16 @@ export class UnifiedSubscriptionManager {
           
           // Update last activity timestamp
           this.tableLastActivity.set(subscriptionKey, Date.now());
+
+          const subscription = this.subscriptions.get(subscriptionKey);
+          if (subscription) {
+            subscription.lastPayloadAt = Date.now();
+            subscription.invalidationCount += 1;
+          }
           
           // Invalidate React Query cache based on the query key
           this.scheduleInvalidation(queryKey, priority);
+          this.refreshSnapshotFromState();
         })
         .subscribe((status) => {
           console.log(`Channel ${channelName} status:`, status);
@@ -450,8 +480,18 @@ export class UnifiedSubscriptionManager {
           this.tableLastActivity.delete(subscriptionKey);
           this.refreshSnapshotFromState();
         },
-        options: { table, queryKey, filter, priority }
+        options: { table, queryKey, filter, priority },
+        ownerRoutes: new Set(),
+        createdAt: Date.now(),
+        lastPayloadAt: null,
+        invalidationCount: 0,
       };
+
+      this.routeSubscriptions.forEach((keys, route) => {
+        if (keys.has(subscriptionKey)) {
+          subscription.ownerRoutes.add(route);
+        }
+      });
       
       // Store the subscription for later cleanup
       this.subscriptions.set(subscriptionKey, subscription);
@@ -464,7 +504,17 @@ export class UnifiedSubscriptionManager {
       return subscription;
     } catch (error) {
       console.error(`Error subscribing to ${table}:`, error);
-      return { key: subscriptionKey, unsubscribe: () => {}, options: { table, queryKey, filter, priority } };
+      const fallbackSubscription: ManagedSubscription = {
+        key: subscriptionKey,
+        unsubscribe: () => {},
+        options: { table, queryKey, filter, priority },
+        ownerRoutes: new Set(),
+        createdAt: Date.now(),
+        lastPayloadAt: null,
+        invalidationCount: 0,
+      };
+
+      return fallbackSubscription;
     }
   }
 
@@ -477,6 +527,8 @@ export class UnifiedSubscriptionManager {
     }
     
     this.routeSubscriptions.get(route)?.add(subscriptionKey);
+    this.subscriptions.get(subscriptionKey)?.ownerRoutes.add(route);
+    this.refreshSnapshotFromState();
   }
 
   /**
@@ -526,53 +578,8 @@ export class UnifiedSubscriptionManager {
     
     if (clearPending) {
       this.pendingSubscriptions.clear();
+      this.routeSubscriptions.clear();
     }
-  }
-
-  /**
-   * Setup automatic refetching when window visibility changes
-   */
-  public setupVisibilityBasedRefetching() {
-    // Clean up existing handler if it exists
-    this.teardownVisibilityBasedRefetching();
-    
-    // Create new handler
-    this.visibilityChangeHandler = () => {
-      if (document.visibilityState === 'visible') {
-        console.log('Tab became visible, checking for stale data...');
-        this.invalidateStaleQueries(5 * 60 * 1000);
-      }
-    };
-    
-    document.addEventListener('visibilitychange', this.visibilityChangeHandler);
-  }
-
-  public teardownVisibilityBasedRefetching() {
-    if (!this.visibilityChangeHandler) return;
-    document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
-    this.visibilityChangeHandler = undefined;
-  }
-
-  /**
-   * Setup automatic refetching when network status changes
-   */
-  public setupNetworkStatusRefetching() {
-    // Clean up existing handler if it exists
-    this.teardownNetworkStatusRefetching();
-    
-    // Create new handler
-    this.networkStatusHandler = () => {
-      console.log('Network connection restored, refreshing data...');
-      this.reestablishSubscriptions();
-    };
-    
-    window.addEventListener('online', this.networkStatusHandler);
-  }
-
-  public teardownNetworkStatusRefetching() {
-    if (!this.networkStatusHandler) return;
-    window.removeEventListener('online', this.networkStatusHandler);
-    this.networkStatusHandler = undefined;
   }
 
   /**
@@ -590,6 +597,20 @@ export class UnifiedSubscriptionManager {
     });
     
     return result;
+  }
+
+  public getSubscriptionDebugEntries(): SubscriptionDebugEntry[] {
+    return Array.from(this.subscriptions.values()).map((subscription) => ({
+      key: subscription.key,
+      ownerRoutes: Array.from(subscription.ownerRoutes).sort(),
+      table: subscription.options.table,
+      queryKey: this.normalizeQueryKey(subscription.options.queryKey),
+      filter: subscription.options.filter,
+      priority: subscription.options.priority,
+      createdAt: subscription.createdAt,
+      lastPayloadAt: subscription.lastPayloadAt,
+      invalidationCount: subscription.invalidationCount,
+    }));
   }
 
   /**

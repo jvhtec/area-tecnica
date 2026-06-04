@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { TokenManager } from "@/lib/token-manager";
 import { MultiTabCoordinator } from "@/lib/multitab-coordinator";
 import { updateQueryClientForRole } from "@/lib/optimized-react-query";
+import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from "@/runtime/app-runtime-events";
 
 // Exponential backoff helper
 const calculateBackoff = (attempt: number, baseMs: number = 1000, maxMs: number = 30000): number => {
@@ -116,85 +117,118 @@ function AppInitWithRouter(): null {
       intervalId = null;
     };
 
-    const handleVisibility = () => {
-      if (document.hidden) {
-        stop();
-        return;
-      }
+    const handleVisible = () => {
       checkConnectionHealth().catch(err => {
         console.error('Error in connection health check:', err);
       });
       start();
     };
 
-    document.addEventListener('visibilitychange', handleVisibility, { passive: true });
-    handleVisibility();
+    const unsubscribeHidden = subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.HIDDEN, () => {
+      stop();
+    });
+
+    const unsubscribeVisible = subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.VISIBLE, handleVisible);
+
+    if (document.hidden) {
+      stop();
+    } else {
+      handleVisible();
+    }
     
     // Return cleanup
     return () => {
       stop();
-      document.removeEventListener('visibilitychange', handleVisibility);
+      unsubscribeHidden();
+      unsubscribeVisible();
     };
   }, [isLeader, manager]);
 
-  // Only the leader should attach global invalidation/refetch triggers.
+  // Only the leader should handle global visibility stale-query refreshes.
   useEffect(() => {
-    if (isLeader) {
-      manager.setupVisibilityBasedRefetching();
-      manager.setupNetworkStatusRefetching();
+    if (!isLeader) {
       return;
     }
 
-    manager.teardownVisibilityBasedRefetching();
-    manager.teardownNetworkStatusRefetching();
+    return subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.VISIBLE, () => {
+      manager.refreshStaleSubscriptions(5 * 60 * 1000);
+    });
   }, [isLeader, manager]);
   
   // Use the enhanced route subscriptions hook to manage subscriptions
   const subscriptionStatus = useEnhancedRouteSubscriptions();
+  const {
+    forceRefresh,
+    isFullySubscribed,
+    isStale,
+    requiredSubscriptions,
+    routeKey,
+    unsubscribedTables,
+  } = subscriptionStatus;
   
   // Handle subscription staleness (only for leader)
   useEffect(() => {
-    if (subscriptionStatus.isStale && isLeader) {
+    if (isStale && isLeader) {
       console.log('Subscriptions are stale, refreshing...');
-      subscriptionStatus.forceRefresh();
+      forceRefresh();
       
       // Notify the user that subscriptions are being refreshed (only leader shows toasts)
-      toast.info('Refreshing stale data...', {
-        description: 'Your connection was inactive for a while, updating now',
+      toast.info('Actualizando datos obsoletos...', {
+        description: 'La conexión estuvo inactiva, actualizando ahora',
       });
     }
-  }, [subscriptionStatus.isStale, isLeader]);
+  }, [forceRefresh, isStale, isLeader]);
   
   // Handle route changes with improved subscription management (only for leader)
   useEffect(() => {
+    const retryTimers: number[] = [];
+
     // When route changes, check if the new route has all required subscriptions
-    if (!subscriptionStatus.isFullySubscribed && isLeader) {
+    if (!isFullySubscribed && isLeader) {
       console.log('Not fully subscribed to required tables for route:', location.pathname);
-      console.log('Missing tables:', subscriptionStatus.unsubscribedTables);
+      console.log('Missing tables:', unsubscribedTables);
       
       // Progressive retry with exponential backoff
       const retrySubscriptions = (attempt: number) => {
         if (attempt > 3) return; // Maximum 3 retry attempts
         
         const delay = calculateBackoff(attempt);
-        setTimeout(() => {
-          if (subscriptionStatus.unsubscribedTables.length > 0) {
-            console.log(`Retry ${attempt + 1}: Re-establishing subscriptions for:`, subscriptionStatus.unsubscribedTables);
-            subscriptionStatus.forceRefresh();
+        const timerId = window.setTimeout(() => {
+          if (unsubscribedTables.length > 0) {
+            console.log(`Retry ${attempt + 1}: Re-establishing subscriptions for:`, unsubscribedTables);
+            forceRefresh();
             retrySubscriptions(attempt + 1);
           }
         }, delay);
+
+        retryTimers.push(timerId);
       };
       
       // Start retry process after initial delay
       retrySubscriptions(0);
     } else if (!isLeader) {
       // If we're a follower, request the leader to handle missing subscriptions
-      if (subscriptionStatus.unsubscribedTables.length > 0) {
-        multiTabCoordinator.requestSubscriptions(subscriptionStatus.unsubscribedTables);
+      if (unsubscribedTables.length > 0) {
+        multiTabCoordinator.requestSubscriptions({
+          routeKey,
+          subscriptions: requiredSubscriptions,
+        });
       }
     }
-  }, [location.pathname, subscriptionStatus, isLeader, multiTabCoordinator]);
+
+    return () => {
+      retryTimers.forEach((timerId) => window.clearTimeout(timerId));
+    };
+  }, [
+    forceRefresh,
+    isFullySubscribed,
+    isLeader,
+    location.pathname,
+    multiTabCoordinator,
+    requiredSubscriptions,
+    routeKey,
+    unsubscribedTables,
+  ]);
   
   // Listen for network reconnection events (only for leader)
   useEffect(() => {
@@ -206,18 +240,15 @@ function AppInitWithRouter(): null {
           if (success) {
             // Use coordinator to sync invalidation across tabs
             multiTabCoordinator.invalidateQueries();
-            toast.success('Connection restored', {
-              description: 'Network is back online, refreshing data'
+            toast.success('Conexión restaurada', {
+              description: 'La red vuelve a estar disponible, actualizando datos'
             });
           }
         });
       }
     };
     
-    window.addEventListener('online', handleOnline);
-    return () => {
-      window.removeEventListener('online', handleOnline);
-    };
+    return subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.ONLINE, handleOnline);
   }, [isLeader, multiTabCoordinator]);
   
   // This component doesn't render anything

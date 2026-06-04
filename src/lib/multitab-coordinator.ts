@@ -1,12 +1,33 @@
 import { QueryClient } from '@tanstack/react-query';
+import {
+  UnifiedSubscriptionManager,
+  type RealtimeSubscriptionFilter,
+} from '@/lib/unified-subscription-manager';
+import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runtime-events';
+
+type SubscriptionPriority = 'high' | 'medium' | 'low';
+
+export interface DelegatedRouteSubscription {
+  table: string;
+  queryKey: string | string[];
+  filter?: RealtimeSubscriptionFilter;
+  priority?: SubscriptionPriority;
+}
+
+export interface RouteSubscriptionRequest {
+  routeKey: string;
+  subscriptions: DelegatedRouteSubscription[];
+}
 
 interface TabMessage {
-  type: 'cache-update' | 'invalidate' | 'leader-election' | 'heartbeat' | 'subscription-request';
+  type: 'cache-update' | 'invalidate' | 'leader-election' | 'heartbeat' | 'subscription-request' | 'subscription-release';
   queryKey?: any;
   data?: any;
   tabId?: string;
   timestamp?: number;
   tables?: string[];
+  routeKey?: string;
+  subscriptions?: DelegatedRouteSubscription[];
 }
 
 interface TabState {
@@ -28,7 +49,7 @@ export class MultiTabCoordinator {
   private broadcastChannel: BroadcastChannel;
   private leaderElectionInterval: number | null = null;
   private heartbeatInterval: number | null = null;
-  private visibilityListener: (() => void) | null = null;
+  private visibilityUnsubscribe: (() => void) | null = null;
   private queryCacheUnsubscribe: (() => void) | null = null;
   private lastBroadcastedUpdatedAt: Map<string, number> = new Map();
   private pendingBroadcasts: Map<string, { queryKey: any; data: any; updatedAt: number }> = new Map();
@@ -66,7 +87,7 @@ export class MultiTabCoordinator {
 
   private setupBroadcastChannel() {
     this.broadcastChannel.addEventListener('message', (event: MessageEvent<TabMessage>) => {
-      const { type, queryKey, data, tabId, timestamp, tables } = event.data;
+      const { type, queryKey, data, tabId, timestamp, tables, routeKey, subscriptions } = event.data;
       
       // Ignore messages from ourselves
       if (tabId === this.tabId) return;
@@ -105,8 +126,19 @@ export class MultiTabCoordinator {
           
         case 'subscription-request':
           // Only process if we're the leader
-          if (this.isLeader && tables) {
-            this.handleSubscriptionRequest(tables);
+          if (this.isLeader) {
+            this.handleSubscriptionRequest({
+              requesterTabId: tabId,
+              routeKey,
+              subscriptions,
+              tables,
+            });
+          }
+          break;
+
+        case 'subscription-release':
+          if (this.isLeader && routeKey) {
+            this.handleSubscriptionRelease(routeKey, tabId);
           }
           break;
       }
@@ -179,19 +211,25 @@ export class MultiTabCoordinator {
   }
 
   private setupVisibilityHandling() {
-    const handleVisibility = () => {
-      if (document.hidden) {
-        this.pauseIntervals();
-      } else {
-        this.resumeIntervals();
-      }
+    const unsubscribeHidden = subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.HIDDEN, () => {
+      this.pauseIntervals();
+    });
+
+    const unsubscribeVisible = subscribeAppRuntimeEvent(APP_RUNTIME_EVENTS.VISIBLE, () => {
+      this.resumeIntervals();
+    });
+
+    this.visibilityUnsubscribe = () => {
+      unsubscribeHidden();
+      unsubscribeVisible();
     };
 
-    document.addEventListener('visibilitychange', handleVisibility, { passive: true });
-    this.visibilityListener = handleVisibility;
-
     // Ensure we start in the correct state.
-    handleVisibility();
+    if (document.hidden) {
+      this.pauseIntervals();
+    } else {
+      this.resumeIntervals();
+    }
   }
 
   private pauseIntervals() {
@@ -335,10 +373,73 @@ export class MultiTabCoordinator {
     }, 75);
   }
 
-  private handleSubscriptionRequest(tables: string[]) {
-    // This would be implemented when we add Phase 2 functionality
-    // For now, just log the request
-    console.log('Subscription request received for tables:', tables);
+  private handleSubscriptionRequest({
+    requesterTabId,
+    routeKey,
+    subscriptions,
+    tables,
+  }: {
+    requesterTabId?: string;
+    routeKey?: string;
+    subscriptions?: DelegatedRouteSubscription[];
+    tables?: string[];
+  }) {
+    const requestedSubscriptions: DelegatedRouteSubscription[] =
+      subscriptions && subscriptions.length > 0
+        ? subscriptions
+        : (tables ?? []).map((table) => ({
+            table,
+            queryKey: [table],
+            priority: 'medium' as const,
+          }));
+
+    if (requestedSubscriptions.length === 0) {
+      return;
+    }
+
+    const ownerRoute = this.getDelegatedOwnerRoute(routeKey, requesterTabId);
+    const manager = UnifiedSubscriptionManager.getInstance(this.queryClient);
+
+    requestedSubscriptions.forEach(({ table, queryKey, filter, priority }) => {
+      const subscription = manager.subscribeToTable(
+        table,
+        queryKey,
+        filter,
+        priority ?? 'medium',
+      );
+
+      if (subscription?.key) {
+        manager.registerRouteSubscription(ownerRoute, subscription.key);
+      }
+    });
+
+    manager.markRefreshed();
+
+    if (import.meta.env.DEV) {
+      console.debug('[MultiTabCoordinator] Leader handled subscription request', {
+        ownerRoute,
+        requesterTabId,
+        tables: requestedSubscriptions.map((subscription) => subscription.table),
+      });
+    }
+  }
+
+  private getDelegatedOwnerRoute(routeKey?: string, requesterTabId?: string) {
+    return `${routeKey ?? 'delegated'}:${requesterTabId ?? 'unknown-tab'}`;
+  }
+
+  private handleSubscriptionRelease(routeKey: string, requesterTabId?: string) {
+    const ownerRoute = this.getDelegatedOwnerRoute(routeKey, requesterTabId);
+    const manager = UnifiedSubscriptionManager.getInstance(this.queryClient);
+
+    manager.cleanupRouteDependentSubscriptions(ownerRoute);
+
+    if (import.meta.env.DEV) {
+      console.debug('[MultiTabCoordinator] Leader released delegated subscriptions', {
+        ownerRoute,
+        requesterTabId,
+      });
+    }
   }
 
   public broadcast(message: TabMessage) {
@@ -372,15 +473,48 @@ export class MultiTabCoordinator {
     }
   }
 
-  public requestSubscriptions(tables: string[]) {
-    // If we're a follower, request the leader to handle subscriptions
-    if (!this.isLeader) {
-      this.broadcast({
-        type: 'subscription-request',
-        tables,
-        tabId: this.tabId
+  public requestSubscriptions(request: string[] | RouteSubscriptionRequest) {
+    const routeRequest: RouteSubscriptionRequest = Array.isArray(request)
+      ? {
+          routeKey: `delegated:${this.tabId}`,
+          subscriptions: request.map((table) => ({
+            table,
+            queryKey: [table],
+            priority: 'medium',
+          })),
+        }
+      : request;
+
+    if (this.isLeader) {
+      this.handleSubscriptionRequest({
+        requesterTabId: this.tabId,
+        routeKey: routeRequest.routeKey,
+        subscriptions: routeRequest.subscriptions,
       });
+      return;
     }
+
+    // If we're a follower, request the leader to handle subscriptions
+    this.broadcast({
+      type: 'subscription-request',
+      routeKey: routeRequest.routeKey,
+      subscriptions: routeRequest.subscriptions,
+      tables: routeRequest.subscriptions.map((subscription) => subscription.table),
+      tabId: this.tabId
+    });
+  }
+
+  public releaseSubscriptions(routeKey: string) {
+    if (this.isLeader) {
+      this.handleSubscriptionRelease(routeKey, this.tabId);
+      return;
+    }
+
+    this.broadcast({
+      type: 'subscription-release',
+      routeKey,
+      tabId: this.tabId,
+    });
   }
 
   public destroy() {
@@ -392,9 +526,9 @@ export class MultiTabCoordinator {
       clearInterval(this.heartbeatInterval);
     }
 
-    if (this.visibilityListener) {
-      document.removeEventListener('visibilitychange', this.visibilityListener);
-      this.visibilityListener = null;
+    if (this.visibilityUnsubscribe) {
+      this.visibilityUnsubscribe();
+      this.visibilityUnsubscribe = null;
     }
 
     if (this.queryCacheUnsubscribe) {
@@ -436,6 +570,7 @@ export function useMultiTabCoordinator(queryClient: QueryClient) {
     tabId: coordinator.getTabId(),
     isLeader: coordinator.getIsLeader(),
     invalidateQueries: coordinator.invalidateQueries.bind(coordinator),
-    requestSubscriptions: coordinator.requestSubscriptions.bind(coordinator)
+    requestSubscriptions: coordinator.requestSubscriptions.bind(coordinator),
+    releaseSubscriptions: coordinator.releaseSubscriptions.bind(coordinator)
   };
 }
