@@ -1,5 +1,13 @@
 import { useEffect, useState, useRef } from 'react';
-import { toast } from 'sonner';
+
+type SonnerToast = typeof import('sonner').toast;
+
+let sonnerToastPromise: Promise<SonnerToast> | null = null;
+
+const loadSonnerToast = async (): Promise<SonnerToast> => {
+  sonnerToastPromise ??= import('sonner').then((module) => module.toast);
+  return sonnerToastPromise;
+};
 
 /**
  * Detect if the app is running as an installed PWA
@@ -52,7 +60,14 @@ export function useServiceWorkerUpdate() {
 
     const isIOSPWA = isIOS() && isStandalone;
     let updateCheckInterval: number | null = null;
+    let isDisposed = false;
+    let toastApi: SonnerToast | null = null;
     const UPDATE_CHECK_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes (avoid battery drain)
+
+    const getToast = async () => {
+      toastApi ??= await loadSonnerToast();
+      return toastApi;
+    };
 
     const handleUpdate = (registration: ServiceWorkerRegistration) => {
       setWaitingWorker(registration.waiting);
@@ -67,31 +82,36 @@ export function useServiceWorkerUpdate() {
         ? 'Hay una actualización de la aplicación lista. Actualiza ahora para obtener las últimas mejoras.'
         : 'Hay una actualización disponible. Recarga la página para obtener la última versión.';
 
-      // Show toast notification
-      toastId.current = toast.info(title, {
-        description,
-        duration: Infinity, // Don't auto-dismiss
-        action: {
-          label: 'Actualizar',
-          onClick: () => {
-            if (registration.waiting) {
-              try {
-                // Send SKIP_WAITING message to the waiting service worker
-                registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-              } catch (error) {
-                console.error('[SW Update] Failed to send SKIP_WAITING message:', error);
-                // Fallback: just reload the page to get the new version
-                window.location.reload();
+      void getToast().then((toast) => {
+        if (isDisposed) {
+          return;
+        }
+
+        toastId.current = toast.info(title, {
+          description,
+          duration: Infinity, // Don't auto-dismiss
+          action: {
+            label: 'Actualizar',
+            onClick: () => {
+              if (registration.waiting) {
+                try {
+                  // Send SKIP_WAITING message to the waiting service worker
+                  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                } catch (error) {
+                  console.error('[SW Update] Failed to send SKIP_WAITING message:', error);
+                  // Fallback: just reload the page to get the new version
+                  window.location.reload();
+                }
               }
-            }
+            },
           },
-        },
-        cancel: isStandalone ? undefined : {
-          label: 'Más tarde',
-          onClick: () => {
-            // User dismissed the notification
+          cancel: isStandalone ? undefined : {
+            label: 'Más tarde',
+            onClick: () => {
+              // User dismissed the notification
+            },
           },
-        },
+        });
       });
     };
 
@@ -148,13 +168,13 @@ export function useServiceWorkerUpdate() {
       if (!refreshing.current) {
         refreshing.current = true;
 
-        // Dismiss the toast if it's still showing
-        if (toastId.current !== undefined) {
-          toast.dismiss(toastId.current);
-        }
+        void getToast().then((toast) => {
+          if (toastId.current !== undefined) {
+            toast.dismiss(toastId.current);
+          }
 
-        // Show a brief "updating" message
-        toast.loading('Aplicando actualización...', { duration: 1000 });
+          toast.loading('Aplicando actualización...', { duration: 1000 });
+        });
 
         // Reload the page after a brief delay
         setTimeout(() => {
@@ -195,6 +215,7 @@ export function useServiceWorkerUpdate() {
     }
 
     return () => {
+      isDisposed = true;
       navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
       
       if (isIOSPWA) {
@@ -208,8 +229,8 @@ export function useServiceWorkerUpdate() {
       }
 
       // Dismiss the toast when component unmounts
-      if (toastId.current !== undefined) {
-        toast.dismiss(toastId.current);
+      if (toastApi && toastId.current !== undefined) {
+        toastApi.dismiss(toastId.current);
       }
     };
   }, []);

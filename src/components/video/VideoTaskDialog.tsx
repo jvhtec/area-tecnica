@@ -41,6 +41,7 @@ interface VideoTaskDialogProps {
 }
 
 type TaskStatus = Database["public"]["Enums"]["task_status"];
+type TaskDocumentInsert = Database["public"]["Tables"]["task_documents"]["Insert"];
 
 type TaskDocumentRow = {
   id: string;
@@ -143,12 +144,14 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
 
       if (uploadError) throw uploadError;
 
-      const { error: dbError } = await dataLayerClient.from('task_documents')
-        .insert({
-          task_id: taskId,
+      const taskDocument: TaskDocumentInsert = {
+          video_task_id: taskId,
           file_name: file.name,
           file_path: filePath,
-        });
+        };
+
+      const { error: dbError } = await dataLayerClient.from('task_documents')
+        .insert(taskDocument);
 
       if (dbError) throw dbError;
 

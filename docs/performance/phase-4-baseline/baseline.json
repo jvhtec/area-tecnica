@@ -1,42 +1,42 @@
 {
-  "generatedAt": "2026-05-18T18:46:33.309Z",
-  "gitCommit": "9373dd93793ce7476d2434f036d0fe06ca7c3592",
+  "generatedAt": "2026-06-04T06:12:23.699Z",
+  "gitCommit": "ad13956cfc2fd353d1152599b54402fb5c2404e0",
   "previewUrl": "http://127.0.0.1:4174",
   "profilerUrl": "http://127.0.0.1:4175",
   "bundle": {
-    "totalFiles": 475,
+    "totalFiles": 511,
     "totalsByKind": {
       "image": {
         "files": 82,
         "sizeBytes": 8873444,
-        "gzipBytes": 7333241
+        "gzipBytes": 7321949
       },
       "other": {
         "files": 11,
         "sizeBytes": 114590,
-        "gzipBytes": 28581
+        "gzipBytes": 28565
       },
       "js": {
-        "files": 376,
-        "sizeBytes": 9150161,
-        "gzipBytes": 2775923
+        "files": 412,
+        "sizeBytes": 9463480,
+        "gzipBytes": 2868240
       },
       "css": {
         "files": 3,
-        "sizeBytes": 239687,
-        "gzipBytes": 36992
+        "sizeBytes": 243039,
+        "gzipBytes": 37357
       },
       "font": {
         "files": 3,
         "sizeBytes": 4641516,
-        "gzipBytes": 2730099
+        "gzipBytes": 2695508
       }
     },
     "entryScripts": [
-      "/assets/index-BgSU4hlO.js"
+      "/assets/index-CN6BNoGK.js"
     ],
     "entryStyles": [
-      "/assets/index-BM8z9z1k.css"
+      "/assets/index-7EI0iGa4.css"
     ],
     "largestAssets": [
       {
@@ -44,240 +44,240 @@
         "file": "NotoSans-Italic-VariableFont_wdth,wght.ttf",
         "kind": "font",
         "sizeBytes": 2300468,
-        "gzipBytes": 1398443
+        "gzipBytes": 1380169
       },
       {
         "path": "dist/fonts/NotoSans-VariableFont_wdth,wght.ttf",
         "file": "NotoSans-VariableFont_wdth,wght.ttf",
         "kind": "font",
         "sizeBytes": 2044548,
-        "gzipBytes": 1209033
+        "gzipBytes": 1192112
       },
       {
-        "path": "dist/assets/maps-lib-Ce1ARJmz.js",
-        "file": "maps-lib-Ce1ARJmz.js",
+        "path": "dist/assets/maps-lib-DdH6LNk6.js",
+        "file": "maps-lib-DdH6LNk6.js",
         "kind": "js",
-        "sizeBytes": 1676434,
-        "gzipBytes": 463246
+        "sizeBytes": 1800536,
+        "gzipBytes": 495773
       },
       {
-        "path": "dist/assets/pdf-libs-CmwCtmNR.js",
-        "file": "pdf-libs-CmwCtmNR.js",
+        "path": "dist/assets/pdf-libs-BvqGlGrx.js",
+        "file": "pdf-libs-BvqGlGrx.js",
         "kind": "js",
-        "sizeBytes": 948116,
-        "gzipBytes": 346502
+        "sizeBytes": 948847,
+        "gzipBytes": 345205
       },
       {
         "path": "dist/assets/spreadsheet-libs-C15GPh2f.js",
         "file": "spreadsheet-libs-C15GPh2f.js",
         "kind": "js",
         "sizeBytes": 939186,
-        "gzipBytes": 270968
+        "gzipBytes": 269573
       },
       {
         "path": "dist/stamps/sector-pro-stamp.png",
         "file": "sector-pro-stamp.png",
         "kind": "image",
         "sizeBytes": 725939,
-        "gzipBytes": 723450
+        "gzipBytes": 723068
       },
       {
         "path": "dist/lovable-uploads/IMG_7835.jpeg",
         "file": "IMG_7835.jpeg",
         "kind": "image",
         "sizeBytes": 716389,
-        "gzipBytes": 688748
+        "gzipBytes": 688816
       },
       {
-        "path": "dist/assets/index-BgSU4hlO.js",
-        "file": "index-BgSU4hlO.js",
+        "path": "dist/assets/index-CN6BNoGK.js",
+        "file": "index-CN6BNoGK.js",
         "kind": "js",
-        "sizeBytes": 634625,
-        "gzipBytes": 190160
+        "sizeBytes": 562803,
+        "gzipBytes": 163973
       },
       {
         "path": "dist/lovable-uploads/IMG_7834.jpeg",
         "file": "IMG_7834.jpeg",
         "kind": "image",
         "sizeBytes": 530046,
-        "gzipBytes": 501015
+        "gzipBytes": 501003
       },
       {
         "path": "dist/lovable-uploads/IMG_7836.jpeg",
         "file": "IMG_7836.jpeg",
         "kind": "image",
         "sizeBytes": 436854,
-        "gzipBytes": 397538
+        "gzipBytes": 397340
       },
       {
         "path": "dist/lovable-uploads/assignmentMatrix.jpg",
         "file": "assignmentMatrix.jpg",
         "kind": "image",
         "sizeBytes": 416551,
-        "gzipBytes": 242222
+        "gzipBytes": 242086
       },
       {
         "path": "dist/8067C0A4-0C71-4CDF-952B-0E699DA25A74.png",
         "file": "8067C0A4-0C71-4CDF-952B-0E699DA25A74.png",
         "kind": "image",
         "sizeBytes": 315123,
-        "gzipBytes": 304769
+        "gzipBytes": 301337
       },
       {
         "path": "dist/og-image.png",
         "file": "og-image.png",
         "kind": "image",
         "sizeBytes": 315123,
-        "gzipBytes": 304769
+        "gzipBytes": 301337
       },
       {
         "path": "dist/lovable-uploads/festivalManagement3.jpg",
         "file": "festivalManagement3.jpg",
         "kind": "image",
         "sizeBytes": 298974,
-        "gzipBytes": 226971
+        "gzipBytes": 226968
       },
       {
         "path": "dist/fonts/NotoEmoji-Regular.ttf",
         "file": "NotoEmoji-Regular.ttf",
         "kind": "font",
         "sizeBytes": 296500,
-        "gzipBytes": 122623
+        "gzipBytes": 123227
+      },
+      {
+        "path": "dist/assets/ModernHojaDeRuta-CxYxqH0z.js",
+        "file": "ModernHojaDeRuta-CxYxqH0z.js",
+        "kind": "js",
+        "sizeBytes": 279036,
+        "gzipBytes": 80789
       },
       {
         "path": "dist/lovable-uploads/dashboardHero.jpg",
         "file": "dashboardHero.jpg",
         "kind": "image",
         "sizeBytes": 266995,
-        "gzipBytes": 178885
+        "gzipBytes": 178795
       },
       {
         "path": "dist/lovable-uploads/tourManagement1.jpg",
         "file": "tourManagement1.jpg",
         "kind": "image",
         "sizeBytes": 261073,
-        "gzipBytes": 195292
-      },
-      {
-        "path": "dist/assets/ModernHojaDeRuta-C3ZgJxU4.js",
-        "file": "ModernHojaDeRuta-C3ZgJxU4.js",
-        "kind": "js",
-        "sizeBytes": 256047,
-        "gzipBytes": 74285
+        "gzipBytes": 195215
       },
       {
         "path": "dist/lovable-uploads/festivalManagement1.jpg",
         "file": "festivalManagement1.jpg",
         "kind": "image",
         "sizeBytes": 255057,
-        "gzipBytes": 185502
+        "gzipBytes": 185377
       },
       {
         "path": "dist/lovable-uploads/personalCalendar.jpg",
         "file": "personalCalendar.jpg",
         "kind": "image",
         "sizeBytes": 229804,
-        "gzipBytes": 154491
+        "gzipBytes": 154365
       },
       {
-        "path": "dist/assets/editor-lib-fUHf8ZJG.js",
-        "file": "editor-lib-fUHf8ZJG.js",
+        "path": "dist/assets/editor-lib-BfTMioMs.js",
+        "file": "editor-lib-BfTMioMs.js",
         "kind": "js",
         "sizeBytes": 216921,
-        "gzipBytes": 55657
+        "gzipBytes": 55632
       },
       {
         "path": "dist/lovable-uploads/festivalManagement4.jpg",
         "file": "festivalManagement4.jpg",
         "kind": "image",
         "sizeBytes": 212926,
-        "gzipBytes": 109717
+        "gzipBytes": 109744
       },
       {
         "path": "dist/assets/html2canvas.esm-vQ3n7XO2.js",
         "file": "html2canvas.esm-vQ3n7XO2.js",
         "kind": "js",
         "sizeBytes": 201876,
-        "gzipBytes": 47905
+        "gzipBytes": 47579
       },
       {
         "path": "dist/lovable-uploads/tourManagement2.jpg",
         "file": "tourManagement2.jpg",
         "kind": "image",
         "sizeBytes": 201374,
-        "gzipBytes": 137707
+        "gzipBytes": 137683
       },
       {
-        "path": "dist/assets/JobAssignmentMatrix-7ndaD6o9.js",
-        "file": "JobAssignmentMatrix-7ndaD6o9.js",
+        "path": "dist/assets/UserManual-BV1ErfTA.js",
+        "file": "UserManual-BV1ErfTA.js",
         "kind": "js",
-        "sizeBytes": 182124,
-        "gzipBytes": 49615
-      },
-      {
-        "path": "dist/assets/UserManual-LVO07lKh.js",
-        "file": "UserManual-LVO07lKh.js",
-        "kind": "js",
-        "sizeBytes": 181821,
-        "gzipBytes": 56377
+        "sizeBytes": 182194,
+        "gzipBytes": 56409
       },
       {
         "path": "dist/lovable-uploads/calendar.jpg",
         "file": "calendar.jpg",
         "kind": "image",
         "sizeBytes": 179058,
-        "gzipBytes": 128951
+        "gzipBytes": 128899
       },
       {
-        "path": "dist/assets/index-BM8z9z1k.css",
-        "file": "index-BM8z9z1k.css",
+        "path": "dist/assets/index-7EI0iGa4.css",
+        "file": "index-7EI0iGa4.css",
         "kind": "css",
-        "sizeBytes": 177159,
-        "gzipBytes": 27734
+        "sizeBytes": 178267,
+        "gzipBytes": 27969
       },
       {
-        "path": "dist/assets/TechnicianRfTableModal-BW2I_Zcj.js",
-        "file": "TechnicianRfTableModal-BW2I_Zcj.js",
+        "path": "dist/assets/JobAssignmentMatrix-9TzyQnET.js",
+        "file": "JobAssignmentMatrix-9TzyQnET.js",
         "kind": "js",
-        "sizeBytes": 174265,
-        "gzipBytes": 44945
+        "sizeBytes": 177839,
+        "gzipBytes": 47994
+      },
+      {
+        "path": "dist/assets/TechnicianRfTableModal-CFw-1HIi.js",
+        "file": "TechnicianRfTableModal-CFw-1HIi.js",
+        "kind": "js",
+        "sizeBytes": 174670,
+        "gzipBytes": 44998
       },
       {
         "path": "dist/lovable-uploads/IMG_8504.png",
         "file": "IMG_8504.png",
         "kind": "image",
         "sizeBytes": 160513,
-        "gzipBytes": 157802
+        "gzipBytes": 157650
       }
     ],
     "largeJsAssets": [
       {
-        "path": "dist/assets/maps-lib-Ce1ARJmz.js",
-        "file": "maps-lib-Ce1ARJmz.js",
+        "path": "dist/assets/maps-lib-DdH6LNk6.js",
+        "file": "maps-lib-DdH6LNk6.js",
         "kind": "js",
-        "sizeBytes": 1676434,
-        "gzipBytes": 463246
+        "sizeBytes": 1800536,
+        "gzipBytes": 495773
       },
       {
-        "path": "dist/assets/pdf-libs-CmwCtmNR.js",
-        "file": "pdf-libs-CmwCtmNR.js",
+        "path": "dist/assets/pdf-libs-BvqGlGrx.js",
+        "file": "pdf-libs-BvqGlGrx.js",
         "kind": "js",
-        "sizeBytes": 948116,
-        "gzipBytes": 346502
+        "sizeBytes": 948847,
+        "gzipBytes": 345205
       },
       {
         "path": "dist/assets/spreadsheet-libs-C15GPh2f.js",
         "file": "spreadsheet-libs-C15GPh2f.js",
         "kind": "js",
         "sizeBytes": 939186,
-        "gzipBytes": 270968
+        "gzipBytes": 269573
       },
       {
-        "path": "dist/assets/index-BgSU4hlO.js",
-        "file": "index-BgSU4hlO.js",
+        "path": "dist/assets/index-CN6BNoGK.js",
+        "file": "index-CN6BNoGK.js",
         "kind": "js",
-        "sizeBytes": 634625,
-        "gzipBytes": 190160
+        "sizeBytes": 562803,
+        "gzipBytes": 163973
       }
     ]
   },
@@ -289,28 +289,28 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 181,
+      "visibleReadyMs": 262,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5004,
-      "totalMeasuredMs": 5185,
+      "networkIdleWaitMs": 5003,
+      "totalMeasuredMs": 5265,
       "navigation": {
-        "domContentLoadedMs": 51.5,
-        "loadEventEndMs": 51.700000047683716,
-        "responseEndMs": 6.599999904632568
+        "domContentLoadedMs": 47.30000019073486,
+        "loadEventEndMs": 47.5,
+        "responseEndMs": 7.200000286102295
       },
       "paints": {
-        "first-paint": 32,
-        "first-contentful-paint": 80
+        "first-paint": 36,
+        "first-contentful-paint": 72
       },
       "resourceCounts": {
-        "total": 131,
-        "js": 103,
+        "total": 161,
+        "js": 133,
         "css": 1,
         "images": 1
       },
       "encodedBodyBytes": {
-        "js": 314735,
-        "css": 27734,
+        "js": 340552,
+        "css": 27969,
         "images": 11417
       },
       "profiler": {
@@ -329,28 +329,28 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 69,
+      "visibleReadyMs": 62,
       "reachedNetworkIdle": true,
-      "networkIdleWaitMs": 487,
-      "totalMeasuredMs": 556,
+      "networkIdleWaitMs": 498,
+      "totalMeasuredMs": 560,
       "navigation": {
-        "domContentLoadedMs": 23.09999990463257,
-        "loadEventEndMs": 23.299999952316284,
+        "domContentLoadedMs": 22.699999809265137,
+        "loadEventEndMs": 22.799999713897705,
         "responseEndMs": 1.5999999046325684
       },
       "paints": {
-        "first-paint": 20,
-        "first-contentful-paint": 44
+        "first-paint": 16,
+        "first-contentful-paint": 32
       },
       "resourceCounts": {
-        "total": 25,
-        "js": 22,
+        "total": 36,
+        "js": 33,
         "css": 1,
         "images": 2
       },
       "encodedBodyBytes": {
-        "js": 220077,
-        "css": 27734,
+        "js": 217596,
+        "css": 27969,
         "images": 22834
       },
       "profiler": {
@@ -369,28 +369,28 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 222,
+      "visibleReadyMs": 212,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5001,
-      "totalMeasuredMs": 5223,
+      "networkIdleWaitMs": 5003,
+      "totalMeasuredMs": 5215,
       "navigation": {
-        "domContentLoadedMs": 25.100000143051147,
-        "loadEventEndMs": 25.300000190734863,
+        "domContentLoadedMs": 22.200000286102295,
+        "loadEventEndMs": 22.40000009536743,
         "responseEndMs": 1.4000000953674316
       },
       "paints": {
-        "first-paint": 20,
-        "first-contentful-paint": 44
+        "first-paint": 12,
+        "first-contentful-paint": 32
       },
       "resourceCounts": {
         "total": 250,
-        "js": 124,
+        "js": 152,
         "css": 1,
         "images": 1
       },
       "encodedBodyBytes": {
-        "js": 390255,
-        "css": 27734,
+        "js": 418041,
+        "css": 27969,
         "images": 11417
       },
       "profiler": {
@@ -409,29 +409,29 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 229,
+      "visibleReadyMs": 234,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5001,
-      "totalMeasuredMs": 5230,
+      "networkIdleWaitMs": 5003,
+      "totalMeasuredMs": 5237,
       "navigation": {
-        "domContentLoadedMs": 22.799999952316284,
-        "loadEventEndMs": 22.90000009536743,
-        "responseEndMs": 1.7000000476837158
+        "domContentLoadedMs": 22.90000009536743,
+        "loadEventEndMs": 23.09999990463257,
+        "responseEndMs": 1.5
       },
       "paints": {
-        "first-paint": 36,
-        "first-contentful-paint": 40
+        "first-paint": 32,
+        "first-contentful-paint": 32
       },
       "resourceCounts": {
         "total": 250,
-        "js": 226,
+        "js": 247,
         "css": 1,
-        "images": 4
+        "images": 2
       },
       "encodedBodyBytes": {
-        "js": 1008182,
-        "css": 27734,
-        "images": 45668
+        "js": 694052,
+        "css": 27969,
+        "images": 22834
       },
       "profiler": {
         "samples": 0,
@@ -449,29 +449,29 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 224,
+      "visibleReadyMs": 219,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5001,
-      "totalMeasuredMs": 5225,
+      "networkIdleWaitMs": 5002,
+      "totalMeasuredMs": 5221,
       "navigation": {
-        "domContentLoadedMs": 24.90000009536743,
-        "loadEventEndMs": 25,
-        "responseEndMs": 1.4000000953674316
+        "domContentLoadedMs": 24.799999713897705,
+        "loadEventEndMs": 24.90000009536743,
+        "responseEndMs": 1.799999713897705
       },
       "paints": {
-        "first-paint": 16,
-        "first-contentful-paint": 44
+        "first-paint": 12,
+        "first-contentful-paint": 40
       },
       "resourceCounts": {
         "total": 250,
-        "js": 208,
+        "js": 240,
         "css": 1,
-        "images": 3
+        "images": 2
       },
       "encodedBodyBytes": {
-        "js": 968315,
-        "css": 27734,
-        "images": 110923
+        "js": 1019695,
+        "css": 27969,
+        "images": 22834
       },
       "profiler": {
         "samples": 0,
@@ -489,28 +489,28 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 226,
+      "visibleReadyMs": 214,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5000,
-      "totalMeasuredMs": 5226,
+      "networkIdleWaitMs": 5002,
+      "totalMeasuredMs": 5216,
       "navigation": {
-        "domContentLoadedMs": 23.300000190734863,
-        "loadEventEndMs": 23.40000009536743,
-        "responseEndMs": 1.4000000953674316
+        "domContentLoadedMs": 25,
+        "loadEventEndMs": 25.100000381469727,
+        "responseEndMs": 1.700000286102295
       },
       "paints": {
-        "first-paint": 40,
-        "first-contentful-paint": 40
+        "first-paint": 12,
+        "first-contentful-paint": 36
       },
       "resourceCounts": {
         "total": 250,
-        "js": 124,
+        "js": 152,
         "css": 1,
         "images": 2
       },
       "encodedBodyBytes": {
-        "js": 390255,
-        "css": 27734,
+        "js": 418041,
+        "css": 27969,
         "images": 22834
       },
       "profiler": {
@@ -529,28 +529,28 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 252,
+      "visibleReadyMs": 214,
       "reachedNetworkIdle": true,
-      "networkIdleWaitMs": 402,
-      "totalMeasuredMs": 654,
+      "networkIdleWaitMs": 457,
+      "totalMeasuredMs": 671,
       "navigation": {
-        "domContentLoadedMs": 24.600000143051147,
-        "loadEventEndMs": 24.700000047683716,
-        "responseEndMs": 1.7000000476837158
+        "domContentLoadedMs": 24.299999713897705,
+        "loadEventEndMs": 24.40000009536743,
+        "responseEndMs": 1.5999999046325684
       },
       "paints": {
-        "first-paint": 28,
-        "first-contentful-paint": 44
+        "first-paint": 16,
+        "first-contentful-paint": 32
       },
       "resourceCounts": {
-        "total": 169,
-        "js": 161,
+        "total": 199,
+        "js": 191,
         "css": 1,
         "images": 1
       },
       "encodedBodyBytes": {
-        "js": 816741,
-        "css": 27734,
+        "js": 843009,
+        "css": 27969,
         "images": 11417
       },
       "profiler": {
@@ -569,28 +569,28 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 120,
+      "visibleReadyMs": 114,
       "reachedNetworkIdle": true,
-      "networkIdleWaitMs": 489,
-      "totalMeasuredMs": 609,
+      "networkIdleWaitMs": 486,
+      "totalMeasuredMs": 600,
       "navigation": {
-        "domContentLoadedMs": 24.5,
-        "loadEventEndMs": 24.59999990463257,
-        "responseEndMs": 1.4000000953674316
+        "domContentLoadedMs": 24.299999713897705,
+        "loadEventEndMs": 24.40000009536743,
+        "responseEndMs": 1.6999998092651367
       },
       "paints": {
-        "first-paint": 20,
-        "first-contentful-paint": 44
+        "first-paint": 12,
+        "first-contentful-paint": 36
       },
       "resourceCounts": {
-        "total": 45,
-        "js": 39,
+        "total": 55,
+        "js": 49,
         "css": 1,
         "images": 1
       },
       "encodedBodyBytes": {
-        "js": 250879,
-        "css": 27734,
+        "js": 247327,
+        "css": 27969,
         "images": 11417
       },
       "profiler": {
@@ -609,28 +609,28 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 8899,
+      "visibleReadyMs": 8898,
       "reachedNetworkIdle": true,
       "networkIdleWaitMs": 0,
-      "totalMeasuredMs": 8899,
+      "totalMeasuredMs": 8898,
       "navigation": {
-        "domContentLoadedMs": 23.299999952316284,
-        "loadEventEndMs": 23.40000009536743,
-        "responseEndMs": 1.6000001430511475
+        "domContentLoadedMs": 23.90000009536743,
+        "loadEventEndMs": 24.100000381469727,
+        "responseEndMs": 1.6000003814697266
       },
       "paints": {
-        "first-paint": 36,
-        "first-contentful-paint": 40
+        "first-paint": 20,
+        "first-contentful-paint": 36
       },
       "resourceCounts": {
-        "total": 41,
-        "js": 19,
+        "total": 51,
+        "js": 29,
         "css": 1,
         "images": 4
       },
       "encodedBodyBytes": {
-        "js": 219509,
-        "css": 27734,
+        "js": 211742,
+        "css": 27969,
         "images": 34260
       },
       "profiler": {
@@ -651,21 +651,21 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 1305,
+      "visibleReadyMs": 1490,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5003,
-      "totalMeasuredMs": 6308,
+      "networkIdleWaitMs": 5001,
+      "totalMeasuredMs": 6491,
       "navigation": {
-        "domContentLoadedMs": 1086.5,
-        "loadEventEndMs": 1087.2000000476837,
-        "responseEndMs": 625.1000001430511
+        "domContentLoadedMs": 1294.1000003814697,
+        "loadEventEndMs": 1294.8000001907349,
+        "responseEndMs": 450.6000003814697
       },
       "paints": {
-        "first-paint": 1088,
-        "first-contentful-paint": 1108
+        "first-paint": 1304,
+        "first-contentful-paint": 1316
       },
       "resourceCounts": {
-        "total": 211,
+        "total": 213,
         "js": 0,
         "css": 0,
         "images": 1
@@ -676,10 +676,10 @@
         "images": 11417
       },
       "profiler": {
-        "samples": 39,
-        "totalActualDurationMs": 36.1,
-        "maxActualDurationMs": 8.4,
-        "p95ActualDurationMs": 6.1
+        "samples": 41,
+        "totalActualDurationMs": 36.4,
+        "maxActualDurationMs": 5.9,
+        "p95ActualDurationMs": 3.3
       },
       "pageErrors": [],
       "screenshot": "docs/performance/phase-4-baseline/screenshots/dashboard-mobile.png"
@@ -691,21 +691,21 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 151,
+      "visibleReadyMs": 178,
       "reachedNetworkIdle": true,
-      "networkIdleWaitMs": 493,
-      "totalMeasuredMs": 644,
+      "networkIdleWaitMs": 462,
+      "totalMeasuredMs": 640,
       "navigation": {
-        "domContentLoadedMs": 84.10000014305115,
-        "loadEventEndMs": 85,
-        "responseEndMs": 2.700000047683716
+        "domContentLoadedMs": 70.90000009536743,
+        "loadEventEndMs": 71.69999980926514,
+        "responseEndMs": 2.6999998092651367
       },
       "paints": {
-        "first-paint": 88,
-        "first-contentful-paint": 104
+        "first-paint": 72,
+        "first-contentful-paint": 96
       },
       "resourceCounts": {
-        "total": 117,
+        "total": 93,
         "js": 0,
         "css": 0,
         "images": 2
@@ -716,10 +716,10 @@
         "images": 22834
       },
       "profiler": {
-        "samples": 8,
-        "totalActualDurationMs": 11.3,
-        "maxActualDurationMs": 8.4,
-        "p95ActualDurationMs": 8.4
+        "samples": 10,
+        "totalActualDurationMs": 10.5,
+        "maxActualDurationMs": 5.6,
+        "p95ActualDurationMs": 5.6
       },
       "pageErrors": [],
       "screenshot": null
@@ -731,18 +731,18 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 314,
+      "visibleReadyMs": 353,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5000,
-      "totalMeasuredMs": 5314,
+      "networkIdleWaitMs": 5002,
+      "totalMeasuredMs": 5355,
       "navigation": {
-        "domContentLoadedMs": 72.09999990463257,
-        "loadEventEndMs": 72.89999985694885,
-        "responseEndMs": 2.299999952316284
+        "domContentLoadedMs": 49.59999990463257,
+        "loadEventEndMs": 50.39999961853027,
+        "responseEndMs": 2.5
       },
       "paints": {
-        "first-paint": 96,
-        "first-contentful-paint": 96
+        "first-paint": 52,
+        "first-contentful-paint": 68
       },
       "resourceCounts": {
         "total": 250,
@@ -756,10 +756,10 @@
         "images": 11417
       },
       "profiler": {
-        "samples": 184,
-        "totalActualDurationMs": 212.3,
-        "maxActualDurationMs": 11,
-        "p95ActualDurationMs": 5.3
+        "samples": 185,
+        "totalActualDurationMs": 197,
+        "maxActualDurationMs": 8.2,
+        "p95ActualDurationMs": 5
       },
       "pageErrors": [],
       "screenshot": "docs/performance/phase-4-baseline/screenshots/assignment-matrix-mobile.png"
@@ -771,18 +771,18 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 900,
+      "visibleReadyMs": 880,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5002,
-      "totalMeasuredMs": 5902,
+      "networkIdleWaitMs": 5004,
+      "totalMeasuredMs": 5884,
       "navigation": {
-        "domContentLoadedMs": 72.20000004768372,
-        "loadEventEndMs": 73,
-        "responseEndMs": 2.200000047683716
+        "domContentLoadedMs": 56.40000009536743,
+        "loadEventEndMs": 57.09999990463257,
+        "responseEndMs": 1.9000000953674316
       },
       "paints": {
-        "first-paint": 76,
-        "first-contentful-paint": 92
+        "first-paint": 60,
+        "first-contentful-paint": 72
       },
       "resourceCounts": {
         "total": 250,
@@ -797,9 +797,9 @@
       },
       "profiler": {
         "samples": 45,
-        "totalActualDurationMs": 47.4,
-        "maxActualDurationMs": 8.5,
-        "p95ActualDurationMs": 6.5
+        "totalActualDurationMs": 47.9,
+        "maxActualDurationMs": 7.9,
+        "p95ActualDurationMs": 5.5
       },
       "pageErrors": [],
       "screenshot": null
@@ -811,18 +811,18 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 421,
+      "visibleReadyMs": 379,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5001,
-      "totalMeasuredMs": 5422,
+      "networkIdleWaitMs": 4999,
+      "totalMeasuredMs": 5378,
       "navigation": {
-        "domContentLoadedMs": 79.40000009536743,
-        "loadEventEndMs": 80.30000019073486,
-        "responseEndMs": 3.4000000953674316
+        "domContentLoadedMs": 59.200000286102295,
+        "loadEventEndMs": 60,
+        "responseEndMs": 2.4000000953674316
       },
       "paints": {
-        "first-paint": 84,
-        "first-contentful-paint": 100
+        "first-paint": 64,
+        "first-contentful-paint": 72
       },
       "resourceCounts": {
         "total": 250,
@@ -836,10 +836,10 @@
         "images": 11417
       },
       "profiler": {
-        "samples": 65,
-        "totalActualDurationMs": 72.3,
-        "maxActualDurationMs": 11.6,
-        "p95ActualDurationMs": 6.7
+        "samples": 60,
+        "totalActualDurationMs": 65.1,
+        "maxActualDurationMs": 11,
+        "p95ActualDurationMs": 5.5
       },
       "pageErrors": [],
       "screenshot": null
@@ -851,18 +851,18 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 314,
+      "visibleReadyMs": 288,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5002,
-      "totalMeasuredMs": 5316,
+      "networkIdleWaitMs": 5003,
+      "totalMeasuredMs": 5291,
       "navigation": {
-        "domContentLoadedMs": 80.59999990463257,
-        "loadEventEndMs": 81.70000004768372,
-        "responseEndMs": 3
+        "domContentLoadedMs": 58.40000009536743,
+        "loadEventEndMs": 59.30000019073486,
+        "responseEndMs": 2.200000286102295
       },
       "paints": {
-        "first-paint": 84,
-        "first-contentful-paint": 104
+        "first-paint": 60,
+        "first-contentful-paint": 76
       },
       "resourceCounts": {
         "total": 250,
@@ -877,9 +877,9 @@
       },
       "profiler": {
         "samples": 183,
-        "totalActualDurationMs": 253.3,
-        "maxActualDurationMs": 12.5,
-        "p95ActualDurationMs": 5.9
+        "totalActualDurationMs": 245.3,
+        "maxActualDurationMs": 10,
+        "p95ActualDurationMs": 5.6
       },
       "pageErrors": [],
       "screenshot": null
@@ -891,18 +891,18 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 308,
+      "visibleReadyMs": 279,
       "reachedNetworkIdle": true,
-      "networkIdleWaitMs": 512,
-      "totalMeasuredMs": 820,
+      "networkIdleWaitMs": 508,
+      "totalMeasuredMs": 787,
       "navigation": {
-        "domContentLoadedMs": 90.70000004768372,
-        "loadEventEndMs": 91.5,
-        "responseEndMs": 3.5
+        "domContentLoadedMs": 58.89999961853027,
+        "loadEventEndMs": 59.59999990463257,
+        "responseEndMs": 3.1999998092651367
       },
       "paints": {
-        "first-paint": 92,
-        "first-contentful-paint": 116
+        "first-paint": 60,
+        "first-contentful-paint": 76
       },
       "resourceCounts": {
         "total": 250,
@@ -916,10 +916,10 @@
         "images": 11417
       },
       "profiler": {
-        "samples": 18,
-        "totalActualDurationMs": 19.9,
-        "maxActualDurationMs": 8.5,
-        "p95ActualDurationMs": 8.5
+        "samples": 19,
+        "totalActualDurationMs": 18,
+        "maxActualDurationMs": 5.3,
+        "p95ActualDurationMs": 5.3
       },
       "pageErrors": [],
       "screenshot": "docs/performance/phase-4-baseline/screenshots/technician-app-mobile.png"
@@ -931,21 +931,21 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 195,
+      "visibleReadyMs": 171,
       "reachedNetworkIdle": true,
-      "networkIdleWaitMs": 506,
-      "totalMeasuredMs": 701,
+      "networkIdleWaitMs": 502,
+      "totalMeasuredMs": 673,
       "navigation": {
-        "domContentLoadedMs": 71,
-        "loadEventEndMs": 71.70000004768372,
-        "responseEndMs": 2.799999952316284
+        "domContentLoadedMs": 53.40000009536743,
+        "loadEventEndMs": 54.09999990463257,
+        "responseEndMs": 3.1999998092651367
       },
       "paints": {
-        "first-paint": 72,
-        "first-contentful-paint": 92
+        "first-paint": 56,
+        "first-contentful-paint": 72
       },
       "resourceCounts": {
-        "total": 146,
+        "total": 121,
         "js": 0,
         "css": 0,
         "images": 1
@@ -956,10 +956,10 @@
         "images": 11417
       },
       "profiler": {
-        "samples": 20,
-        "totalActualDurationMs": 46.8,
-        "maxActualDurationMs": 13.1,
-        "p95ActualDurationMs": 7.9
+        "samples": 21,
+        "totalActualDurationMs": 44.3,
+        "maxActualDurationMs": 12.7,
+        "p95ActualDurationMs": 7.5
       },
       "pageErrors": [],
       "screenshot": "docs/performance/phase-4-baseline/screenshots/public-artist-form-mobile.png"
@@ -971,21 +971,21 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 8983,
+      "visibleReadyMs": 9416,
       "reachedNetworkIdle": true,
-      "networkIdleWaitMs": 0,
-      "totalMeasuredMs": 8983,
+      "networkIdleWaitMs": 1,
+      "totalMeasuredMs": 9417,
       "navigation": {
-        "domContentLoadedMs": 71.79999995231628,
-        "loadEventEndMs": 72.39999985694885,
-        "responseEndMs": 2.5
+        "domContentLoadedMs": 49.59999990463257,
+        "loadEventEndMs": 50.299999713897705,
+        "responseEndMs": 2.5999999046325684
       },
       "paints": {
-        "first-paint": 92,
-        "first-contentful-paint": 92
+        "first-paint": 52,
+        "first-contentful-paint": 64
       },
       "resourceCounts": {
-        "total": 145,
+        "total": 122,
         "js": 0,
         "css": 0,
         "images": 4
@@ -996,10 +996,10 @@
         "images": 34260
       },
       "profiler": {
-        "samples": 20,
-        "totalActualDurationMs": 15.1,
-        "maxActualDurationMs": 8.5,
-        "p95ActualDurationMs": 1.4
+        "samples": 22,
+        "totalActualDurationMs": 14.2,
+        "maxActualDurationMs": 5.6,
+        "p95ActualDurationMs": 2.6
       },
       "pageErrors": [],
       "screenshot": "docs/performance/phase-4-baseline/screenshots/wallboard-public-mobile.png"

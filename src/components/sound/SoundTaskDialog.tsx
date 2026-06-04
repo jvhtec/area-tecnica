@@ -34,6 +34,14 @@ import {
 
 
 import { queryKeys } from "@/lib/react-query";
+import type { Database } from "@/integrations/supabase/types";
+
+type SoundPersonnelUpdate = Database["public"]["Tables"]["sound_job_personnel"]["Update"];
+type SoundPersonnelField = Extract<
+  keyof SoundPersonnelUpdate,
+  "foh_engineers" | "mon_engineers" | "pa_techs" | "rf_techs"
+>;
+
 interface SoundTaskDialogProps {
   jobId: string;
   open: boolean;
@@ -281,14 +289,15 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
     }
   };
 
-  const updatePersonnel = (key: string, value: number) => {
+  const updatePersonnel = (key: SoundPersonnelField, value: number) => {
     setPersonnel((prev) => ({ ...prev, [key]: isNaN(value) ? 0 : value }));
   };
 
-  const updatePersonnelField = async (field: string, value: number) => {
+  const updatePersonnelField = async (field: SoundPersonnelField, value: number) => {
     try {
+      const update: SoundPersonnelUpdate = { [field]: value };
       const { error } = await dataLayerClient.from('sound_job_personnel')
-        .update({ [field]: value })
+        .update(update)
         .eq('job_id', jobId);
       if (error) throw error;
       toast({

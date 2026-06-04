@@ -3,21 +3,14 @@ import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '@/components/theme-provider';
-import { Toaster } from '@/components/ui/toaster';
-import { Toaster as SonnerToaster } from 'sonner';
 import { queryClient } from '@/lib/react-query';
 import { MultiTabCoordinator } from '@/lib/multitab-coordinator';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { OptimizedAuthProvider, useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { useServiceWorkerUpdate } from '@/hooks/useServiceWorkerUpdate';
-import { usePushSubscriptionRecovery } from '@/hooks/usePushSubscriptionRecovery';
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
 import { ViewportProvider } from '@/hooks/use-mobile';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { GlobalCreateJobDialog } from '@/components/jobs/GlobalCreateJobDialog';
-import { useShortcutInitialization } from '@/hooks/useShortcutInitialization';
 import {
   MANAGEMENT_ALLOWED_ROLES,
   canAccessDisponibilidad,
@@ -33,6 +26,47 @@ const ReactQueryDevtoolsLazy = import.meta.env.DEV
       })),
     )
   : null;
+
+const ServiceWorkerUpdateInitializer = lazy(() =>
+  import('@/hooks/useServiceWorkerUpdate').then((module) => ({
+    default: function ServiceWorkerUpdateInitializer(): null {
+      module.useServiceWorkerUpdate();
+      return null;
+    },
+  })),
+);
+
+const PushSubscriptionRecoveryInitializer = lazy(() =>
+  import('@/hooks/usePushSubscriptionRecovery').then((module) => ({
+    default: function PushSubscriptionRecoveryInitializer(): null {
+      module.usePushSubscriptionRecovery();
+      return null;
+    },
+  })),
+);
+
+const ShortcutSystemInitializer = lazy(() =>
+  import('@/hooks/useShortcutInitialization').then((module) => ({
+    default: function ShortcutSystemInitializer(): null {
+      module.useShortcutInitialization();
+      return null;
+    },
+  })),
+);
+
+const GlobalCreateJobDialogLazy = lazy(() =>
+  import('@/components/jobs/GlobalCreateJobDialog').then((module) => ({
+    default: module.GlobalCreateJobDialog,
+  })),
+);
+
+const AppToaster = lazy(() =>
+  import('@/components/ui/toaster').then((module) => ({ default: module.Toaster })),
+);
+
+const AppSonnerToaster = lazy(() =>
+  import('@/components/ui/sonner').then((module) => ({ default: module.Toaster })),
+);
 
 // Lazy load all pages for better initial bundle size
 const Auth = lazy(() => import('@/pages/Auth'));
@@ -98,55 +132,82 @@ const PageLoader = () => (
   </div>
 );
 
-// Initialize service worker update detection
-function ServiceWorkerUpdateInit(): null {
-  useServiceWorkerUpdate();
-  return null;
-}
-
-// Initialize push subscription recovery detection
-function PushSubscriptionRecoveryInit(): null {
-  usePushSubscriptionRecovery();
-  return null;
-}
-
-// Initialize global keyboard shortcuts and Stream Deck integration
-function ShortcutSystemInit(): null {
-  useShortcutInitialization();
-  return null;
-}
-
 const isPublicArtistFormRoute = (pathname: string) =>
   pathname === "/festival/form-submitted" ||
   pathname === "/festival/artist-form/blank" ||
   pathname.startsWith("/festival/artist-form/");
 
+const isPrivateAppRoute = (pathname: string) =>
+  !(
+    pathname === "/" ||
+    pathname === "/auth" ||
+    pathname === "/privacy" ||
+    pathname.startsWith("/wallboard/public/") ||
+    pathname.startsWith("/tour-share/") ||
+    isPublicArtistFormRoute(pathname)
+  );
+
+function useDeferredNonCriticalMount(timeoutMs = 1500) {
+  const [isReady, setIsReady] = React.useState(false);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const idleWindow = window as Window &
+      typeof globalThis & {
+        requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number;
+        cancelIdleCallback?: (handle: number) => void;
+      };
+
+    if (
+      typeof idleWindow.requestIdleCallback === "function" &&
+      typeof idleWindow.cancelIdleCallback === "function"
+    ) {
+      const idleId = idleWindow.requestIdleCallback(() => setIsReady(true), {
+        timeout: timeoutMs,
+      });
+
+      return () => idleWindow.cancelIdleCallback?.(idleId);
+    }
+
+    const timeoutId = globalThis.setTimeout(() => setIsReady(true), Math.min(timeoutMs, 500));
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [timeoutMs]);
+
+  return isReady;
+}
+
 function RouteAwareGlobalInitializers() {
   const { pathname } = useLocation();
+  const canMountNonCritical = useDeferredNonCriticalMount();
+  const isPrivateRoute = isPrivateAppRoute(pathname);
 
-  if (isPublicArtistFormRoute(pathname)) {
+  if (isPublicArtistFormRoute(pathname) || !canMountNonCritical) {
     return null;
   }
 
   return (
-    <>
-      <ServiceWorkerUpdateInit />
-      <PushSubscriptionRecoveryInit />
-      <ShortcutSystemInit />
-    </>
+    <Suspense fallback={null}>
+      <ServiceWorkerUpdateInitializer />
+      {isPrivateRoute && <PushSubscriptionRecoveryInitializer />}
+      {isPrivateRoute && <ShortcutSystemInitializer />}
+    </Suspense>
   );
 }
 
 function RouteAwareGlobalOverlays() {
   const { pathname } = useLocation();
-  const isPublicArtistForm = isPublicArtistFormRoute(pathname);
+  const isPrivateRoute = isPrivateAppRoute(pathname);
+  const canMountNonCritical = useDeferredNonCriticalMount();
 
   return (
-    <>
-      {!isPublicArtistForm && <GlobalCreateJobDialog />}
-      <Toaster />
-      {!isPublicArtistForm && <SonnerToaster richColors position="top-right" />}
-    </>
+    <Suspense fallback={null}>
+      {canMountNonCritical && isPrivateRoute && <GlobalCreateJobDialogLazy />}
+      {canMountNonCritical && <AppToaster />}
+      {canMountNonCritical && isPrivateRoute && <AppSonnerToaster position="top-right" />}
+    </Suspense>
   );
 }
 
@@ -228,14 +289,13 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <ViewportProvider>
           <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme" attribute="class">
-            <TooltipProvider>
-              <AppBadgeProvider>
-                <Router>
-                  <OptimizedAuthProvider>
-                    <RouteAwareGlobalInitializers />
-                    <div className="app">
-                      <Suspense fallback={<PageLoader />}>
-                        <Routes>
+            <AppBadgeProvider>
+              <Router>
+                <OptimizedAuthProvider>
+                  <RouteAwareGlobalInitializers />
+                  <div className="app">
+                    <Suspense fallback={<PageLoader />}>
+                      <Routes>
                           <Route path="/" element={<Auth />} />
                           <Route path="/auth" element={<Auth />} />
 
@@ -344,14 +404,13 @@ export default function App() {
                               <Route path="/festival-management/:jobId/scheduling" element={<ProtectedRoute allowedRoles={['admin', 'management', 'house_tech']}><FestivalManagement /></ProtectedRoute>} />
                             </Route>
                           </Route>
-                        </Routes>
-                      </Suspense>
-                      <RouteAwareGlobalOverlays />
-                    </div>
-                  </OptimizedAuthProvider>
-                </Router>
-              </AppBadgeProvider>
-            </TooltipProvider>
+                      </Routes>
+                    </Suspense>
+                    <RouteAwareGlobalOverlays />
+                  </div>
+                </OptimizedAuthProvider>
+              </Router>
+            </AppBadgeProvider>
           </ThemeProvider>
         </ViewportProvider>
         {ReactQueryDevtoolsLazy ? (
