@@ -22,6 +22,9 @@ interface MobileNavBarProps {
   userEmail?: string
 }
 
+/**
+ * Returns the inset between the layout viewport bottom and the visible viewport bottom.
+ */
 function getVisualViewportBottomOffset() {
   if (typeof window === "undefined" || !window.visualViewport) {
     return 0
@@ -34,6 +37,9 @@ function getVisualViewportBottomOffset() {
   return Math.max(0, Math.round(layoutViewportHeight - visualViewportBottom))
 }
 
+/**
+ * Tracks browser UI and keyboard viewport changes that can move fixed mobile chrome.
+ */
 function useVisualViewportBottomOffset() {
   const [bottomOffset, setBottomOffset] = useState(0)
 
