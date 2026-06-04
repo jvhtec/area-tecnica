@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "generatedAt": "2026-06-04T17:55:33.566Z",
+  "note": "Current npm audit advisories are grandfathered. CI fails on new advisory IDs or increased severity counts.",
+  "advisoryIds": [
+    "1098574",
+    "1102341",
+    "1112659",
+    "1113300",
+    "1113375",
+    "1113459",
+    "1113538",
+    "1113546",
+    "1114200",
+    "1114302",
+    "1114680",
+    "1116229",
+    "1116451",
+    "1119441",
+    "1120011"
+  ],
+  "vulnerabilityCounts": {
+    "info": 0,
+    "low": 0,
+    "moderate": 8,
+    "high": 6,
+    "critical": 2
+  },
+  "total": 16
+}
