@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-04T06:12:23.699Z",
-  "gitCommit": "ad13956cfc2fd353d1152599b54402fb5c2404e0",
+  "generatedAt": "2026-06-04T06:29:33.797Z",
+  "gitCommit": "afbdc748a80c47b435299741e47f6cbe08faadfb",
   "previewUrl": "http://127.0.0.1:4174",
   "profilerUrl": "http://127.0.0.1:4175",
   "bundle": {
@@ -14,12 +14,12 @@
       "other": {
         "files": 11,
         "sizeBytes": 114590,
-        "gzipBytes": 28565
+        "gzipBytes": 28564
       },
       "js": {
         "files": 412,
-        "sizeBytes": 9463480,
-        "gzipBytes": 2868240
+        "sizeBytes": 9463882,
+        "gzipBytes": 2867879
       },
       "css": {
         "files": 3,
@@ -33,7 +33,7 @@
       }
     },
     "entryScripts": [
-      "/assets/index-CN6BNoGK.js"
+      "/assets/index-CLAyxBtI.js"
     ],
     "entryStyles": [
       "/assets/index-7EI0iGa4.css"
@@ -89,11 +89,11 @@
         "gzipBytes": 688816
       },
       {
-        "path": "dist/assets/index-CN6BNoGK.js",
-        "file": "index-CN6BNoGK.js",
+        "path": "dist/assets/index-CLAyxBtI.js",
+        "file": "index-CLAyxBtI.js",
         "kind": "js",
         "sizeBytes": 562803,
-        "gzipBytes": 163973
+        "gzipBytes": 163971
       },
       {
         "path": "dist/lovable-uploads/IMG_7834.jpeg",
@@ -145,11 +145,11 @@
         "gzipBytes": 123227
       },
       {
-        "path": "dist/assets/ModernHojaDeRuta-CxYxqH0z.js",
-        "file": "ModernHojaDeRuta-CxYxqH0z.js",
+        "path": "dist/assets/ModernHojaDeRuta-D-NjnmMA.js",
+        "file": "ModernHojaDeRuta-D-NjnmMA.js",
         "kind": "js",
         "sizeBytes": 279036,
-        "gzipBytes": 80789
+        "gzipBytes": 80793
       },
       {
         "path": "dist/lovable-uploads/dashboardHero.jpg",
@@ -208,11 +208,11 @@
         "gzipBytes": 137683
       },
       {
-        "path": "dist/assets/UserManual-BV1ErfTA.js",
-        "file": "UserManual-BV1ErfTA.js",
+        "path": "dist/assets/UserManual-DYvN8aZ1.js",
+        "file": "UserManual-DYvN8aZ1.js",
         "kind": "js",
         "sizeBytes": 182194,
-        "gzipBytes": 56409
+        "gzipBytes": 56407
       },
       {
         "path": "dist/lovable-uploads/calendar.jpg",
@@ -229,18 +229,18 @@
         "gzipBytes": 27969
       },
       {
-        "path": "dist/assets/JobAssignmentMatrix-9TzyQnET.js",
-        "file": "JobAssignmentMatrix-9TzyQnET.js",
+        "path": "dist/assets/JobAssignmentMatrix-B50a1vC0.js",
+        "file": "JobAssignmentMatrix-B50a1vC0.js",
         "kind": "js",
         "sizeBytes": 177839,
-        "gzipBytes": 47994
+        "gzipBytes": 47983
       },
       {
-        "path": "dist/assets/TechnicianRfTableModal-CFw-1HIi.js",
-        "file": "TechnicianRfTableModal-CFw-1HIi.js",
+        "path": "dist/assets/TechnicianRfTableModal-BY1SAcC2.js",
+        "file": "TechnicianRfTableModal-BY1SAcC2.js",
         "kind": "js",
         "sizeBytes": 174670,
-        "gzipBytes": 44998
+        "gzipBytes": 44991
       },
       {
         "path": "dist/lovable-uploads/IMG_8504.png",
@@ -273,11 +273,11 @@
         "gzipBytes": 269573
       },
       {
-        "path": "dist/assets/index-CN6BNoGK.js",
-        "file": "index-CN6BNoGK.js",
+        "path": "dist/assets/index-CLAyxBtI.js",
+        "file": "index-CLAyxBtI.js",
         "kind": "js",
         "sizeBytes": 562803,
-        "gzipBytes": 163973
+        "gzipBytes": 163971
       }
     ]
   },
@@ -289,18 +289,18 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 262,
+      "visibleReadyMs": 263,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5003,
-      "totalMeasuredMs": 5265,
+      "networkIdleWaitMs": 5001,
+      "totalMeasuredMs": 5264,
       "navigation": {
-        "domContentLoadedMs": 47.30000019073486,
-        "loadEventEndMs": 47.5,
-        "responseEndMs": 7.200000286102295
+        "domContentLoadedMs": 47.59999990463257,
+        "loadEventEndMs": 50.40000009536743,
+        "responseEndMs": 8.699999809265137
       },
       "paints": {
-        "first-paint": 36,
-        "first-contentful-paint": 72
+        "first-paint": 52,
+        "first-contentful-paint": 68
       },
       "resourceCounts": {
         "total": 161,
@@ -309,7 +309,7 @@
         "images": 1
       },
       "encodedBodyBytes": {
-        "js": 340552,
+        "js": 340516,
         "css": 27969,
         "images": 11417
       },
@@ -329,17 +329,17 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 62,
+      "visibleReadyMs": 63,
       "reachedNetworkIdle": true,
       "networkIdleWaitMs": 498,
-      "totalMeasuredMs": 560,
+      "totalMeasuredMs": 561,
       "navigation": {
-        "domContentLoadedMs": 22.699999809265137,
-        "loadEventEndMs": 22.799999713897705,
-        "responseEndMs": 1.5999999046325684
+        "domContentLoadedMs": 23.199999809265137,
+        "loadEventEndMs": 23.299999713897705,
+        "responseEndMs": 1.799999713897705
       },
       "paints": {
-        "first-paint": 16,
+        "first-paint": 12,
         "first-contentful-paint": 32
       },
       "resourceCounts": {
@@ -349,7 +349,7 @@
         "images": 2
       },
       "encodedBodyBytes": {
-        "js": 217596,
+        "js": 217603,
         "css": 27969,
         "images": 22834
       },
@@ -369,18 +369,18 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 212,
+      "visibleReadyMs": 214,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5003,
-      "totalMeasuredMs": 5215,
+      "networkIdleWaitMs": 5000,
+      "totalMeasuredMs": 5214,
       "navigation": {
-        "domContentLoadedMs": 22.200000286102295,
-        "loadEventEndMs": 22.40000009536743,
-        "responseEndMs": 1.4000000953674316
+        "domContentLoadedMs": 22.59999990463257,
+        "loadEventEndMs": 22.700000286102295,
+        "responseEndMs": 1.5999999046325684
       },
       "paints": {
         "first-paint": 12,
-        "first-contentful-paint": 32
+        "first-contentful-paint": 36
       },
       "resourceCounts": {
         "total": 250,
@@ -389,7 +389,7 @@
         "images": 1
       },
       "encodedBodyBytes": {
-        "js": 418041,
+        "js": 418019,
         "css": 27969,
         "images": 11417
       },
@@ -409,18 +409,18 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 234,
+      "visibleReadyMs": 334,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5003,
-      "totalMeasuredMs": 5237,
+      "networkIdleWaitMs": 5001,
+      "totalMeasuredMs": 5335,
       "navigation": {
-        "domContentLoadedMs": 22.90000009536743,
-        "loadEventEndMs": 23.09999990463257,
-        "responseEndMs": 1.5
+        "domContentLoadedMs": 25,
+        "loadEventEndMs": 25.09999990463257,
+        "responseEndMs": 1.8999996185302734
       },
       "paints": {
-        "first-paint": 32,
-        "first-contentful-paint": 32
+        "first-paint": 20,
+        "first-contentful-paint": 40
       },
       "resourceCounts": {
         "total": 250,
@@ -429,7 +429,7 @@
         "images": 2
       },
       "encodedBodyBytes": {
-        "js": 694052,
+        "js": 693975,
         "css": 27969,
         "images": 22834
       },
@@ -449,18 +449,18 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 219,
+      "visibleReadyMs": 221,
       "reachedNetworkIdle": false,
       "networkIdleWaitMs": 5002,
-      "totalMeasuredMs": 5221,
+      "totalMeasuredMs": 5223,
       "navigation": {
-        "domContentLoadedMs": 24.799999713897705,
-        "loadEventEndMs": 24.90000009536743,
-        "responseEndMs": 1.799999713897705
+        "domContentLoadedMs": 24.200000286102295,
+        "loadEventEndMs": 24.40000009536743,
+        "responseEndMs": 1.6000003814697266
       },
       "paints": {
-        "first-paint": 12,
-        "first-contentful-paint": 40
+        "first-paint": 32,
+        "first-contentful-paint": 32
       },
       "resourceCounts": {
         "total": 250,
@@ -469,7 +469,7 @@
         "images": 2
       },
       "encodedBodyBytes": {
-        "js": 1019695,
+        "js": 1019632,
         "css": 27969,
         "images": 22834
       },
@@ -489,18 +489,18 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 214,
+      "visibleReadyMs": 220,
       "reachedNetworkIdle": false,
       "networkIdleWaitMs": 5002,
-      "totalMeasuredMs": 5216,
+      "totalMeasuredMs": 5222,
       "navigation": {
-        "domContentLoadedMs": 25,
-        "loadEventEndMs": 25.100000381469727,
+        "domContentLoadedMs": 24.700000286102295,
+        "loadEventEndMs": 24.90000009536743,
         "responseEndMs": 1.700000286102295
       },
       "paints": {
         "first-paint": 12,
-        "first-contentful-paint": 36
+        "first-contentful-paint": 40
       },
       "resourceCounts": {
         "total": 250,
@@ -509,7 +509,7 @@
         "images": 2
       },
       "encodedBodyBytes": {
-        "js": 418041,
+        "js": 418019,
         "css": 27969,
         "images": 22834
       },
@@ -529,17 +529,17 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 214,
+      "visibleReadyMs": 215,
       "reachedNetworkIdle": true,
-      "networkIdleWaitMs": 457,
-      "totalMeasuredMs": 671,
+      "networkIdleWaitMs": 447,
+      "totalMeasuredMs": 662,
       "navigation": {
-        "domContentLoadedMs": 24.299999713897705,
-        "loadEventEndMs": 24.40000009536743,
+        "domContentLoadedMs": 24.40000009536743,
+        "loadEventEndMs": 24.5,
         "responseEndMs": 1.5999999046325684
       },
       "paints": {
-        "first-paint": 16,
+        "first-paint": 20,
         "first-contentful-paint": 32
       },
       "resourceCounts": {
@@ -549,7 +549,7 @@
         "images": 1
       },
       "encodedBodyBytes": {
-        "js": 843009,
+        "js": 843020,
         "css": 27969,
         "images": 11417
       },
@@ -569,18 +569,18 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 114,
+      "visibleReadyMs": 116,
       "reachedNetworkIdle": true,
-      "networkIdleWaitMs": 486,
-      "totalMeasuredMs": 600,
+      "networkIdleWaitMs": 487,
+      "totalMeasuredMs": 603,
       "navigation": {
-        "domContentLoadedMs": 24.299999713897705,
-        "loadEventEndMs": 24.40000009536743,
-        "responseEndMs": 1.6999998092651367
+        "domContentLoadedMs": 24.40000009536743,
+        "loadEventEndMs": 24.600000381469727,
+        "responseEndMs": 1.6000003814697266
       },
       "paints": {
         "first-paint": 12,
-        "first-contentful-paint": 36
+        "first-contentful-paint": 40
       },
       "resourceCounts": {
         "total": 55,
@@ -589,7 +589,7 @@
         "images": 1
       },
       "encodedBodyBytes": {
-        "js": 247327,
+        "js": 247302,
         "css": 27969,
         "images": 11417
       },
@@ -609,14 +609,14 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 8898,
+      "visibleReadyMs": 8896,
       "reachedNetworkIdle": true,
       "networkIdleWaitMs": 0,
-      "totalMeasuredMs": 8898,
+      "totalMeasuredMs": 8896,
       "navigation": {
-        "domContentLoadedMs": 23.90000009536743,
-        "loadEventEndMs": 24.100000381469727,
-        "responseEndMs": 1.6000003814697266
+        "domContentLoadedMs": 22.200000286102295,
+        "loadEventEndMs": 22.300000190734863,
+        "responseEndMs": 1.5
       },
       "paints": {
         "first-paint": 20,
@@ -629,7 +629,7 @@
         "images": 4
       },
       "encodedBodyBytes": {
-        "js": 211742,
+        "js": 211753,
         "css": 27969,
         "images": 34260
       },
@@ -651,18 +651,18 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 1490,
+      "visibleReadyMs": 1331,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5001,
-      "totalMeasuredMs": 6491,
+      "networkIdleWaitMs": 5003,
+      "totalMeasuredMs": 6334,
       "navigation": {
-        "domContentLoadedMs": 1294.1000003814697,
-        "loadEventEndMs": 1294.8000001907349,
-        "responseEndMs": 450.6000003814697
+        "domContentLoadedMs": 1125.2999997138977,
+        "loadEventEndMs": 1126,
+        "responseEndMs": 372.09999990463257
       },
       "paints": {
-        "first-paint": 1304,
-        "first-contentful-paint": 1316
+        "first-paint": 1136,
+        "first-contentful-paint": 1152
       },
       "resourceCounts": {
         "total": 213,
@@ -677,7 +677,7 @@
       },
       "profiler": {
         "samples": 41,
-        "totalActualDurationMs": 36.4,
+        "totalActualDurationMs": 35.4,
         "maxActualDurationMs": 5.9,
         "p95ActualDurationMs": 3.3
       },
@@ -691,18 +691,18 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 178,
+      "visibleReadyMs": 137,
       "reachedNetworkIdle": true,
-      "networkIdleWaitMs": 462,
-      "totalMeasuredMs": 640,
+      "networkIdleWaitMs": 501,
+      "totalMeasuredMs": 638,
       "navigation": {
-        "domContentLoadedMs": 70.90000009536743,
-        "loadEventEndMs": 71.69999980926514,
-        "responseEndMs": 2.6999998092651367
+        "domContentLoadedMs": 68.80000019073486,
+        "loadEventEndMs": 69.5,
+        "responseEndMs": 2.4000000953674316
       },
       "paints": {
         "first-paint": 72,
-        "first-contentful-paint": 96
+        "first-contentful-paint": 84
       },
       "resourceCounts": {
         "total": 93,
@@ -717,7 +717,7 @@
       },
       "profiler": {
         "samples": 10,
-        "totalActualDurationMs": 10.5,
+        "totalActualDurationMs": 10.7,
         "maxActualDurationMs": 5.6,
         "p95ActualDurationMs": 5.6
       },
@@ -731,17 +731,17 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 353,
+      "visibleReadyMs": 276,
       "reachedNetworkIdle": false,
       "networkIdleWaitMs": 5002,
-      "totalMeasuredMs": 5355,
+      "totalMeasuredMs": 5278,
       "navigation": {
-        "domContentLoadedMs": 49.59999990463257,
-        "loadEventEndMs": 50.39999961853027,
-        "responseEndMs": 2.5
+        "domContentLoadedMs": 51.69999980926514,
+        "loadEventEndMs": 52.40000009536743,
+        "responseEndMs": 2.1999998092651367
       },
       "paints": {
-        "first-paint": 52,
+        "first-paint": 56,
         "first-contentful-paint": 68
       },
       "resourceCounts": {
@@ -756,10 +756,10 @@
         "images": 11417
       },
       "profiler": {
-        "samples": 185,
-        "totalActualDurationMs": 197,
-        "maxActualDurationMs": 8.2,
-        "p95ActualDurationMs": 5
+        "samples": 177,
+        "totalActualDurationMs": 181.2,
+        "maxActualDurationMs": 9.1,
+        "p95ActualDurationMs": 4.9
       },
       "pageErrors": [],
       "screenshot": "docs/performance/phase-4-baseline/screenshots/assignment-matrix-mobile.png"
@@ -773,12 +773,12 @@
       },
       "visibleReadyMs": 880,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 5004,
-      "totalMeasuredMs": 5884,
+      "networkIdleWaitMs": 5002,
+      "totalMeasuredMs": 5882,
       "navigation": {
-        "domContentLoadedMs": 56.40000009536743,
-        "loadEventEndMs": 57.09999990463257,
-        "responseEndMs": 1.9000000953674316
+        "domContentLoadedMs": 55.89999961853027,
+        "loadEventEndMs": 56.59999990463257,
+        "responseEndMs": 2.0999999046325684
       },
       "paints": {
         "first-paint": 60,
@@ -796,10 +796,10 @@
         "images": 34251
       },
       "profiler": {
-        "samples": 45,
-        "totalActualDurationMs": 47.9,
-        "maxActualDurationMs": 7.9,
-        "p95ActualDurationMs": 5.5
+        "samples": 46,
+        "totalActualDurationMs": 44,
+        "maxActualDurationMs": 7.7,
+        "p95ActualDurationMs": 5.3
       },
       "pageErrors": [],
       "screenshot": null
@@ -811,17 +811,17 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 379,
+      "visibleReadyMs": 372,
       "reachedNetworkIdle": false,
-      "networkIdleWaitMs": 4999,
-      "totalMeasuredMs": 5378,
+      "networkIdleWaitMs": 5004,
+      "totalMeasuredMs": 5376,
       "navigation": {
-        "domContentLoadedMs": 59.200000286102295,
-        "loadEventEndMs": 60,
-        "responseEndMs": 2.4000000953674316
+        "domContentLoadedMs": 58.69999980926514,
+        "loadEventEndMs": 59.5,
+        "responseEndMs": 2.3000001907348633
       },
       "paints": {
-        "first-paint": 64,
+        "first-paint": 60,
         "first-contentful-paint": 72
       },
       "resourceCounts": {
@@ -836,10 +836,10 @@
         "images": 11417
       },
       "profiler": {
-        "samples": 60,
-        "totalActualDurationMs": 65.1,
+        "samples": 61,
+        "totalActualDurationMs": 65.4,
         "maxActualDurationMs": 11,
-        "p95ActualDurationMs": 5.5
+        "p95ActualDurationMs": 5.3
       },
       "pageErrors": [],
       "screenshot": null
@@ -851,18 +851,18 @@
         "width": 1280,
         "height": 720
       },
-      "visibleReadyMs": 288,
+      "visibleReadyMs": 281,
       "reachedNetworkIdle": false,
       "networkIdleWaitMs": 5003,
-      "totalMeasuredMs": 5291,
+      "totalMeasuredMs": 5284,
       "navigation": {
-        "domContentLoadedMs": 58.40000009536743,
-        "loadEventEndMs": 59.30000019073486,
-        "responseEndMs": 2.200000286102295
+        "domContentLoadedMs": 57.69999980926514,
+        "loadEventEndMs": 58.5,
+        "responseEndMs": 2.299999713897705
       },
       "paints": {
         "first-paint": 60,
-        "first-contentful-paint": 76
+        "first-contentful-paint": 72
       },
       "resourceCounts": {
         "total": 250,
@@ -876,10 +876,10 @@
         "images": 22834
       },
       "profiler": {
-        "samples": 183,
-        "totalActualDurationMs": 245.3,
-        "maxActualDurationMs": 10,
-        "p95ActualDurationMs": 5.6
+        "samples": 182,
+        "totalActualDurationMs": 232.3,
+        "maxActualDurationMs": 8.7,
+        "p95ActualDurationMs": 5.4
       },
       "pageErrors": [],
       "screenshot": null
@@ -891,18 +891,18 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 279,
+      "visibleReadyMs": 303,
       "reachedNetworkIdle": true,
       "networkIdleWaitMs": 508,
-      "totalMeasuredMs": 787,
+      "totalMeasuredMs": 811,
       "navigation": {
-        "domContentLoadedMs": 58.89999961853027,
-        "loadEventEndMs": 59.59999990463257,
-        "responseEndMs": 3.1999998092651367
+        "domContentLoadedMs": 75.40000009536743,
+        "loadEventEndMs": 76.09999990463257,
+        "responseEndMs": 4.400000095367432
       },
       "paints": {
-        "first-paint": 60,
-        "first-contentful-paint": 76
+        "first-paint": 80,
+        "first-contentful-paint": 92
       },
       "resourceCounts": {
         "total": 250,
@@ -916,10 +916,10 @@
         "images": 11417
       },
       "profiler": {
-        "samples": 19,
-        "totalActualDurationMs": 18,
-        "maxActualDurationMs": 5.3,
-        "p95ActualDurationMs": 5.3
+        "samples": 18,
+        "totalActualDurationMs": 18.2,
+        "maxActualDurationMs": 5.8,
+        "p95ActualDurationMs": 5.8
       },
       "pageErrors": [],
       "screenshot": "docs/performance/phase-4-baseline/screenshots/technician-app-mobile.png"
@@ -931,14 +931,14 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 171,
+      "visibleReadyMs": 169,
       "reachedNetworkIdle": true,
       "networkIdleWaitMs": 502,
-      "totalMeasuredMs": 673,
+      "totalMeasuredMs": 671,
       "navigation": {
-        "domContentLoadedMs": 53.40000009536743,
-        "loadEventEndMs": 54.09999990463257,
-        "responseEndMs": 3.1999998092651367
+        "domContentLoadedMs": 53.5,
+        "loadEventEndMs": 54.19999980926514,
+        "responseEndMs": 3
       },
       "paints": {
         "first-paint": 56,
@@ -957,9 +957,9 @@
       },
       "profiler": {
         "samples": 21,
-        "totalActualDurationMs": 44.3,
+        "totalActualDurationMs": 43.8,
         "maxActualDurationMs": 12.7,
-        "p95ActualDurationMs": 7.5
+        "p95ActualDurationMs": 7
       },
       "pageErrors": [],
       "screenshot": "docs/performance/phase-4-baseline/screenshots/public-artist-form-mobile.png"
@@ -971,18 +971,18 @@
         "width": 390,
         "height": 664
       },
-      "visibleReadyMs": 9416,
+      "visibleReadyMs": 9432,
       "reachedNetworkIdle": true,
       "networkIdleWaitMs": 1,
-      "totalMeasuredMs": 9417,
+      "totalMeasuredMs": 9433,
       "navigation": {
-        "domContentLoadedMs": 49.59999990463257,
-        "loadEventEndMs": 50.299999713897705,
+        "domContentLoadedMs": 49.5,
+        "loadEventEndMs": 50.19999980926514,
         "responseEndMs": 2.5999999046325684
       },
       "paints": {
         "first-paint": 52,
-        "first-contentful-paint": 64
+        "first-contentful-paint": 68
       },
       "resourceCounts": {
         "total": 122,
@@ -997,9 +997,9 @@
       },
       "profiler": {
         "samples": 22,
-        "totalActualDurationMs": 14.2,
-        "maxActualDurationMs": 5.6,
-        "p95ActualDurationMs": 2.6
+        "totalActualDurationMs": 13.7,
+        "maxActualDurationMs": 5.2,
+        "p95ActualDurationMs": 2.3
       },
       "pageErrors": [],
       "screenshot": "docs/performance/phase-4-baseline/screenshots/wallboard-public-mobile.png"

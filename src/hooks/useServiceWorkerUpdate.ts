@@ -82,37 +82,41 @@ export function useServiceWorkerUpdate() {
         ? 'Hay una actualización de la aplicación lista. Actualiza ahora para obtener las últimas mejoras.'
         : 'Hay una actualización disponible. Recarga la página para obtener la última versión.';
 
-      void getToast().then((toast) => {
-        if (isDisposed) {
-          return;
-        }
+      void getToast()
+        .then((toast) => {
+          if (isDisposed) {
+            return;
+          }
 
-        toastId.current = toast.info(title, {
-          description,
-          duration: Infinity, // Don't auto-dismiss
-          action: {
-            label: 'Actualizar',
-            onClick: () => {
-              if (registration.waiting) {
-                try {
-                  // Send SKIP_WAITING message to the waiting service worker
-                  registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                } catch (error) {
-                  console.error('[SW Update] Failed to send SKIP_WAITING message:', error);
-                  // Fallback: just reload the page to get the new version
-                  window.location.reload();
+          toastId.current = toast.info(title, {
+            description,
+            duration: Infinity, // Don't auto-dismiss
+            action: {
+              label: 'Actualizar',
+              onClick: () => {
+                if (registration.waiting) {
+                  try {
+                    // Send SKIP_WAITING message to the waiting service worker
+                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                  } catch (error) {
+                    console.error('[SW Update] Failed to send SKIP_WAITING message:', error);
+                    // Fallback: just reload the page to get the new version
+                    window.location.reload();
+                  }
                 }
-              }
+              },
             },
-          },
-          cancel: isStandalone ? undefined : {
-            label: 'Más tarde',
-            onClick: () => {
-              // User dismissed the notification
+            cancel: isStandalone ? undefined : {
+              label: 'Más tarde',
+              onClick: () => {
+                // User dismissed the notification
+              },
             },
-          },
+          });
+        })
+        .catch((error) => {
+          console.debug('[SW Update] Failed to load toast UI:', error);
         });
-      });
     };
 
     // Function to manually trigger update check
@@ -165,19 +169,35 @@ export function useServiceWorkerUpdate() {
     // Listen for the new service worker to take control
     // When it does, reload the page to get the new assets
     const handleControllerChange = () => {
+      if (isDisposed) {
+        return;
+      }
+
       if (!refreshing.current) {
         refreshing.current = true;
 
-        void getToast().then((toast) => {
-          if (toastId.current !== undefined) {
-            toast.dismiss(toastId.current);
-          }
+        void getToast()
+          .then((toast) => {
+            if (isDisposed) {
+              return;
+            }
 
-          toast.loading('Aplicando actualización...', { duration: 1000 });
-        });
+            if (toastId.current !== undefined) {
+              toast.dismiss(toastId.current);
+            }
+
+            toast.loading('Aplicando actualización...', { duration: 1000 });
+          })
+          .catch((error) => {
+            console.debug('[SW Update] Failed to load toast UI:', error);
+          });
 
         // Reload the page after a brief delay
         setTimeout(() => {
+          if (isDisposed) {
+            return;
+          }
+
           window.location.reload();
         }, 500);
       }

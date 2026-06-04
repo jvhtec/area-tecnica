@@ -42,6 +42,10 @@ type SoundPersonnelField = Extract<
   "foh_engineers" | "mon_engineers" | "pa_techs" | "rf_techs"
 >;
 
+const sanitizePersonnelCount = (value: number) => (
+  Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
+);
+
 interface SoundTaskDialogProps {
   jobId: string;
   open: boolean;
@@ -290,21 +294,22 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
   };
 
   const updatePersonnel = (key: SoundPersonnelField, value: number) => {
-    setPersonnel((prev) => ({ ...prev, [key]: isNaN(value) ? 0 : value }));
+    setPersonnel((prev) => ({ ...prev, [key]: sanitizePersonnelCount(value) }));
   };
 
   const updatePersonnelField = async (field: SoundPersonnelField, value: number) => {
     try {
-      const update: SoundPersonnelUpdate = { [field]: value };
+      const safeCount = sanitizePersonnelCount(value);
+      const update: SoundPersonnelUpdate = { [field]: safeCount };
       const { error } = await dataLayerClient.from('sound_job_personnel')
         .update(update)
         .eq('job_id', jobId);
       if (error) throw error;
       toast({
         title: "Update successful",
-        description: `${field} updated to ${value}`,
+        description: `${field} updated to ${safeCount}`,
       });
-      setPersonnel((prev) => ({ ...prev, [field]: value }));
+      setPersonnel((prev) => ({ ...prev, [field]: safeCount }));
     } catch (error: any) {
       toast({
         title: "Update failed",
