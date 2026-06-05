@@ -21,6 +21,7 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { OBLIQUE_STRATEGIES } from "./obliqueStrategies";
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { isPreventiveResourceForJob } from '@/utils/preventiveResource';
+import { hasPrepDayDateType } from '@/utils/timesheetPrepDays';
 
 type Assignment = any;
 
@@ -89,6 +90,13 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
   const jobData = assignment.jobs || assignment.festival_jobs;
   if (!jobData) return null;
   const isPreventiveResource = isPreventiveResourceForJob(jobData, assignment.technician_id);
+  const normalizedJobType = String(jobData.job_type || '').toLowerCase();
+  const hasPrepDayTimesheets =
+    jobData.has_prep_day_timesheet === true ||
+    hasPrepDayDateType(jobData.job_date_types);
+  const showTimesheetButton = !['dryhire', 'dry_hire'].includes(normalizedJobType) && (
+    normalizedJobType !== 'tourdate' || hasPrepDayTimesheets
+  );
 
   const jobTimezone = jobData.timezone || 'Europe/Madrid';
   let formattedDate = "Fecha desconocida";
@@ -198,7 +206,7 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
             </Button>
           )}
 
-          {jobData.job_type !== "dryhire" && jobData.job_type !== "tourdate" && (
+          {showTimesheetButton && (
             <Button onClick={() => handleTimesheetClick(jobData.id)} variant="outline" size="sm" className="gap-2">
               <Clock className="h-3 w-3" />
               Tiempos

@@ -276,4 +276,46 @@ describe("Timesheets Critical Paths", () => {
     expect(screen.getByText(/total: €180\.00/i)).toBeInTheDocument();
     expect(screen.getAllByText(/aprobado/i)).not.toHaveLength(0);
   });
+
+  it("clearly labels prep-day timesheets and their hourly calculation", () => {
+    const timesheet = createTimesheet({
+      id: "ts-prep-day",
+      date: "2026-12-02",
+      status: "approved",
+      technician_id: "tech-1",
+      is_prep_day: true,
+      start_time: "09:00",
+      end_time: "14:00",
+      break_minutes: 0,
+      amount_breakdown_visible: {
+        is_prep_day: true,
+        worked_minutes: 300,
+        worked_hours_rounded: 5,
+        hours_rounded: 5,
+        billable_hours: 5,
+        prep_day_hourly_rate_eur: 15,
+        base_amount_eur: 75,
+        total_eur: 75,
+        notes: [],
+      },
+    });
+
+    renderTimesheetView({
+      timesheets: [timesheet],
+      payoutRows: [
+        {
+          technician_id: "tech-1",
+          timesheets_total_eur: 75,
+          extras_total_eur: 0,
+          total_eur: 75,
+        },
+      ],
+      ratesApproved: true,
+    });
+
+    expect(screen.getAllByText(/día de preparación/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/desglose de preparación/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/15\s*€\/h/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/total: €75\.00/i)).toBeInTheDocument();
+  });
 });

@@ -12,8 +12,17 @@ export const TimesheetEditForm: React.FC<{
   setFormData: Dispatch<SetStateAction<TimesheetFormData>>;
   onSave: () => void;
   onCancel: () => void;
-}> = ({ formData, setFormData, onSave, onCancel }) => (
+  isPrepDay?: boolean;
+}> = ({ formData, setFormData, onSave, onCancel, isPrepDay = false }) => (
   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    {isPrepDay && (
+      <div className="col-span-2 md:col-span-4 rounded-md border border-blue-500/30 bg-blue-50 p-3 text-sm text-blue-900 dark:bg-blue-950/30 dark:text-blue-100">
+        <Badge variant="secondary" className="mb-2 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+          Día de preparación · 15 €/h
+        </Badge>
+        <p>Este parte se calcula por horas redondeadas como día de preparación.</p>
+      </div>
+    )}
     <div>
       <Label htmlFor="start_time">Hora de Inicio</Label>
       <Input
@@ -59,29 +68,33 @@ export const TimesheetEditForm: React.FC<{
         </Badge>
       )}
     </div>
-    <div>
-      <Label htmlFor="category">Categoría</Label>
-      <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v as any })}>
-        <SelectTrigger>
-          <SelectValue placeholder="Seleccionar categoría" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="tecnico">técnico</SelectItem>
-          <SelectItem value="especialista">especialista</SelectItem>
-          <SelectItem value="responsable">responsable</SelectItem>
-        </SelectContent>
-      </Select>
-    </div>
-    <div>
-      <Label htmlFor="overtime_hours">Horas Extra</Label>
-      <Input
-        id="overtime_hours"
-        type="number"
-        step="0.5"
-        value={formData.overtime_hours}
-        onChange={(e) => setFormData({ ...formData, overtime_hours: parseFloat(e.target.value) || 0 })}
-      />
-    </div>
+    {!isPrepDay && (
+      <>
+        <div>
+          <Label htmlFor="category">Categoría</Label>
+          <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v as any })}>
+            <SelectTrigger>
+              <SelectValue placeholder="Seleccionar categoría" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="tecnico">técnico</SelectItem>
+              <SelectItem value="especialista">especialista</SelectItem>
+              <SelectItem value="responsable">responsable</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor="overtime_hours">Horas Extra</Label>
+          <Input
+            id="overtime_hours"
+            type="number"
+            step="0.5"
+            value={formData.overtime_hours}
+            onChange={(e) => setFormData({ ...formData, overtime_hours: parseFloat(e.target.value) || 0 })}
+          />
+        </div>
+      </>
+    )}
     <div className="col-span-2 md:col-span-4">
       <Label htmlFor="notes">Notas</Label>
       <Textarea
@@ -99,4 +112,3 @@ export const TimesheetEditForm: React.FC<{
     </div>
   </div>
 );
-

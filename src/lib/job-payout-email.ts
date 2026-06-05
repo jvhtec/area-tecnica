@@ -69,6 +69,9 @@ function buildTimesheetMap(rows: any[]): Map<string, TimesheetLine[]> {
         breakdown.overtime_amount_eur != null ? Number(breakdown.overtime_amount_eur) : undefined,
       total_eur: breakdown.total_eur != null ? Number(breakdown.total_eur) : undefined,
       is_evento: breakdown.is_evento === true,
+      is_prep_day: breakdown.is_prep_day === true,
+      prep_day_hourly_rate_eur:
+        breakdown.prep_day_hourly_rate_eur != null ? Number(breakdown.prep_day_hourly_rate_eur) : undefined,
     };
 
     const existing = map.get(row.technician_id) || [];
@@ -244,6 +247,14 @@ export async function sendJobPayoutEmails(
       ).sort();
       // Check if any timesheet is an evento type
       const hasEventoTimesheet = timesheetLines.some((line) => line.is_evento === true);
+      const prepDates = Array.from(
+        new Set(
+          timesheetLines
+            .filter((line) => line.is_prep_day === true)
+            .map((line) => line.date)
+            .filter((date): date is string => date != null)
+        )
+      ).sort();
 
       return {
         technician_id: attachment.technician_id,
@@ -262,6 +273,7 @@ export async function sendJobPayoutEmails(
         is_house_tech: attachment.is_house_tech ?? null,
         lpo_number: attachment.lpo_number ?? null,
         worked_dates: workedDates,
+        prep_dates: prepDates,
         is_evento: hasEventoTimesheet,
       };
     }),

@@ -3,6 +3,7 @@ import { Job } from '@/types/job';
 import { format, parseISO } from 'date-fns';
 import { fetchJobLogo } from '@/utils/pdf/logoUtils';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import { isPrepDayTimesheet } from '@/utils/timesheetPrepDays';
 
 interface GenerateTimesheetPDFOptions {
   job: Job;
@@ -175,6 +176,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
 
   // Prepare table data with date grouping
   const tableData = flattenedTimesheets.map((timesheet) => {
+    const isPrepDay = isPrepDayTimesheet(timesheet);
     const technicianName = `${timesheet.technician?.first_name || ''} ${timesheet.technician?.last_name || ''}`.trim();
     const startTime = formatTime(timesheet.start_time);
     const endTime = formatTime(timesheet.end_time);
@@ -211,6 +213,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
 
     const row = [
       format(parseISO(timesheet.date), 'MMM dd'),
+      isPrepDay ? 'Prep Day' : 'Work',
       technicianName, 
       startTime, 
       endTime, 
@@ -231,7 +234,7 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
   // Create the table using autoTable with updated headers
   autoTable(doc, {
     startY: yPosition,
-    head: [['Date', 'Technician', 'Start Time', 'End Time', 'Total Hours', 'Overtime', 'Signature']],
+    head: [['Date', 'Type', 'Technician', 'Start Time', 'End Time', 'Total Hours', 'Overtime', 'Signature']],
     body: tableData,
     theme: 'grid',
     headStyles: {
@@ -248,14 +251,15 @@ export const generateTimesheetPDF = async ({ job, timesheets, date }: GenerateTi
       fillColor: [248, 248, 248],
     },
     columnStyles: {
-      0: { cellWidth: 20 }, // Date (+2)
-      1: { cellWidth: 40 }, // Technician (+5)
-      2: { cellWidth: 20 }, // Start (+2)
-      3: { cellWidth: 20 }, // End (+2)
+      0: { cellWidth: 18 }, // Date
+      1: { cellWidth: 18 }, // Type
+      2: { cellWidth: 34 }, // Technician
+      3: { cellWidth: 18 }, // Start
+      4: { cellWidth: 18 }, // End
       // 4: { cellWidth: 15 }, // Break - Removed (15 width redistributed)
-      4: { cellWidth: 18 }, // Total (+3)
-      5: { cellWidth: 16 }, // Overtime (+1)
-      6: { cellWidth: 22 }, // Signature
+      5: { cellWidth: 18 }, // Total
+      6: { cellWidth: 16 }, // Overtime
+      7: { cellWidth: 22 }, // Signature
     },
     didDrawCell: (data: any) => {
       // Add signature images to the signature column

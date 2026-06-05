@@ -521,6 +521,9 @@ export const JobDetailsInfoTab: React.FC<JobDetailsInfoTabProps> = ({
                         overtime_amount_eur:
                           b.overtime_amount_eur != null ? Number(b.overtime_amount_eur) : undefined,
                         total_eur: b.total_eur != null ? Number(b.total_eur) : undefined,
+                        is_prep_day: b.is_prep_day === true,
+                        prep_day_hourly_rate_eur:
+                          b.prep_day_hourly_rate_eur != null ? Number(b.prep_day_hourly_rate_eur) : undefined,
                       };
                       const arr = tsByTech.get(row.technician_id) || [];
                       arr.push(line);

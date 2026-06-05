@@ -227,6 +227,14 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
     const deductionFormatted = formatCurrency(deductionAmount);
     const hasDeduction = deductionAmount > 0;
     const lpoNumber = selectedAttachment.lpo_number;
+    const prepServiceDates = timesheetLines
+      .filter((line) => line.is_prep_day === true)
+      .map((line) => line.date)
+      .filter((date): date is string => date != null)
+      .map((date) => parseServiceDate(date))
+      .filter((date): date is Date => date !== null)
+      .sort((a, b) => a.getTime() - b.getTime());
+    const prepDatesText = prepServiceDates.length > 0 ? formatWorkedDates(prepServiceDates) : '';
     const invoicingCompany = context.job.invoicing_company;
     const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
     const safeJobTitle = escapeHtml(context.job.title || '');
@@ -277,6 +285,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
                   <li><b>Total general:</b> ${grand}</li>
                 </ul>
                 ${hasDeduction ? `<p style="margin:10px 0 0 0;font-size:12px;color:#b91c1c;">* Se ha aplicado una deducción de 30€/día por condición de no autónomo.</p>` : ''}
+                ${prepDatesText ? `<p style="margin:10px 0 0 0;font-size:12px;color:#2563eb;">* Incluye día(s) de preparación (${escapeHtml(prepDatesText)}), calculados a 15€/h sobre horas redondeadas.</p>` : ''}
               </div>
             </td>
           </tr>
@@ -408,9 +417,20 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
                     <div className="space-y-1">
                       {(() => {
                         const lines = context.timesheetMap.get(selectedAttachment.technician_id) || [];
+                        const prepDates = new Set(
+                          lines
+                            .filter((line) => line.is_prep_day === true)
+                            .map((line) => line.date)
+                            .filter(Boolean)
+                        );
                         const dates = Array.from(new Set(lines.map(l => l.date).filter(Boolean)));
                         return dates.length > 0
-                          ? dates.map(d => <div key={d}>{formatDateLong(d) ?? d}</div>)
+                          ? dates.map(d => (
+                              <div key={d}>
+                                {formatDateLong(d) ?? d}
+                                {prepDates.has(d) && <span className="ml-2 text-blue-600">(preparación)</span>}
+                              </div>
+                            ))
                           : <div className="text-muted-foreground">Sin partes registrados</div>;
                       })()}
                     </div>

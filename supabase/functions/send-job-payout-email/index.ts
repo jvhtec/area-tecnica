@@ -49,6 +49,7 @@ interface TechnicianPayload {
   filename?: string;
   lpo_number?: string;
   worked_dates?: string[];
+  prep_dates?: string[];
   autonomo?: boolean | null;
   is_house_tech?: boolean | null;
   is_evento?: boolean;
@@ -351,7 +352,9 @@ serve(async (req) => {
       // Corporate-styled HTML, aligned with other emails
       const safeName = escapeHtml(tech.full_name || '');
       const workedServiceDates = parseWorkedDates(tech.worked_dates);
+      const prepServiceDates = parseWorkedDates(tech.prep_dates);
       const workedDatesText = formatWorkedDatesFromParsed(workedServiceDates);
+      const prepDatesText = prepServiceDates.length > 0 ? formatWorkedDatesFromParsed(prepServiceDates) : '';
       const fallbackJobDate = formatJobDate(body.job.start_time);
       const dateText =
         workedDatesText ||
@@ -435,11 +438,12 @@ serve(async (req) => {
                         <li><b>Partes aprobados:</b> ${parts}</li>
                         <li><b>Extras:</b> ${extras}</li>
                         ${hasExpenses ? `<li><b>Gastos aprobados:</b> ${expensesFormatted}</li>` : ''}
-                        ${hasDeduction ? `<li><b style="color:#b91c1c;">Deducción IRPF (estimada):</b> -${deductionFormatted}</li>` : ''}
+                       ${hasDeduction ? `<li><b style="color:#b91c1c;">Deducción IRPF (estimada):</b> -${deductionFormatted}</li>` : ''}
                         <li><b>Total general:</b> ${grand}</li>
                       </ul>
                        ${hasDeduction ? `<p style="margin:10px 0 0 0;font-size:12px;color:#b91c1c;">* Se ha aplicado una deducción de 30€/día por condición de no autónomo.</p>` : ''}
                        ${tech.is_evento ? `<p style="margin:10px 0 0 0;font-size:12px;color:#6b7280;">* Evento: tarifa fija de 12h (base + plus) independientemente de las horas trabajadas.</p>` : ''}
+                       ${prepDatesText ? `<p style="margin:10px 0 0 0;font-size:12px;color:#2563eb;">* Incluye día(s) de preparación (${escapeHtml(prepDatesText)}), calculados a 15€/h sobre horas redondeadas.</p>` : ''}
                     </div>
                   </td>
                 </tr>

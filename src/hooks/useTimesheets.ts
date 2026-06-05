@@ -5,6 +5,7 @@ import { Timesheet } from "@/types/timesheet";
 import { toast } from "sonner";
 import { RATES_QUERY_KEYS } from "@/constants/ratesQueryKeys";
 import { isManagementRole } from "@/utils/permissions";
+import { isPrepDayBreakdown } from "@/utils/timesheetPrepDays";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -51,6 +52,16 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         return;
       }
 
+      const { data: prepDayRows, error: prepDayError } = await supabase
+        .from("job_date_types")
+        .select("date")
+        .eq("job_id", jobId)
+        .eq("type", "prep_day");
+      if (prepDayError) {
+        console.warn("Error fetching prep day dates:", prepDayError);
+      }
+      const prepDayDates = new Set((prepDayRows || []).map((row) => row.date));
+
       const technicianIds = [...new Set(data.map(t => t.technician_id))];
       const { data: profiles } = await supabase
         .from("profiles")
@@ -80,6 +91,10 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
           amount_breakdown: visible?.amount_breakdown ?? undefined,
           amount_eur_visible: visible?.amount_eur_visible ?? null,
           amount_breakdown_visible: visible?.amount_breakdown_visible ?? null,
+          is_prep_day:
+            prepDayDates.has(t.date) ||
+            isPrepDayBreakdown(visible?.amount_breakdown) ||
+            isPrepDayBreakdown(visible?.amount_breakdown_visible),
           technician: profiles?.find(p => p.id === t.technician_id)
         } as unknown as Timesheet;
       });
@@ -103,7 +118,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       // Get job assignments and job details
       const { data: assignments, error: assignmentsError } = await supabase
         .from("job_assignments")
-        .select("technician_id")
+        .select("technician_id, status")
         .eq("job_id", jobId);
 
       console.log("Assignments fetched:", assignments, "Error:", assignmentsError);
@@ -133,10 +148,22 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         return;
       }
 
+      const prepDayDates = Array.from(new Set(
+        (job.job_date_types || [])
+          .filter((dateType: any) => dateType?.type === 'prep_day' && dateType.date)
+          .map((dateType: any) => dateType.date)
+      )).sort();
+
       // Skip if this job type should not create timesheets automatically
       const jtype = String(job.job_type || '').toLowerCase();
-      if (jtype === 'dryhire' || jtype === 'dry_hire' || jtype === 'tourdate') {
+      if (jtype === 'dryhire' || jtype === 'dry_hire') {
         console.log('Job type excludes auto timesheets:', jtype);
+        setIsLoading(false);
+        return;
+      }
+
+      if (jtype === 'tourdate' && prepDayDates.length === 0) {
+        console.log('Tourdate has no prep days; skipping auto timesheets');
         setIsLoading(false);
         return;
       }
@@ -153,11 +180,18 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       }
 
       // Filter out dates that are marked as "off" or "travel"
-      const dates = allDates.filter(date => {
+      const regularDates = allDates.filter(date => {
         const dateType = job.job_date_types?.find((dt: any) => dt.date === date);
-        // If no date type is defined, or if it's not "off" or "travel", include it
-        return !dateType || (dateType.type !== 'off' && dateType.type !== 'travel');
+        // If no date type is defined, or if it's not "off", "travel", or "prep_day", include it.
+        // Prep days live before the job start date and are added explicitly below.
+        return !dateType || !['off', 'travel', 'prep_day'].includes(dateType.type);
       });
+
+      const dates = Array.from(new Set(
+        jtype === 'tourdate'
+          ? prepDayDates
+          : [...prepDayDates, ...regularDates]
+      )).sort();
 
       console.log("Generated dates (filtered):", dates);
       console.log("Date types:", job.job_date_types);
@@ -179,6 +213,10 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       // Create missing timesheets
       const timesheetsToCreate = [];
       for (const assignment of assignments) {
+        if (!assignment.technician_id || assignment.status === 'declined') {
+          continue;
+        }
+
         for (const date of dates) {
           const combo = `${assignment.technician_id}-${date}`;
           if (!existingCombos.has(combo)) {

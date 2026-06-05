@@ -12,6 +12,7 @@ import { ExpenseForm, ExpenseList, ExpenseSummaryCard } from '@/components/expen
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { JobCardProps } from './types';
 import { isPreventiveResourceForJob } from '@/utils/preventiveResource';
+import { hasPrepDayDateType } from '@/utils/timesheetPrepDays';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -64,7 +65,10 @@ export const TechJobCard = ({ job, theme, isDark, onAction, isCrewChief, techNam
     const jobType = jobData?.job_type?.toLowerCase() || '';
     const isTourdate = jobType === 'tourdate';
     const isDryhire = jobType === 'dryhire' || jobType === 'dry_hire';
-    const showTimesheetButton = !isTourdate && !isDryhire;
+    const hasPrepDayTimesheets =
+        jobData?.has_prep_day_timesheet === true ||
+        hasPrepDayDateType(jobData?.job_date_types);
+    const showTimesheetButton = !isDryhire && (!isTourdate || hasPrepDayTimesheets);
     const showIncidentReport = !isDryhire;
     const artistCountFromJob = Number(jobData?.artist_count || 0);
     const shouldFetchArtistCountFallback = jobData?.artist_count == null && Boolean(jobData?.id);

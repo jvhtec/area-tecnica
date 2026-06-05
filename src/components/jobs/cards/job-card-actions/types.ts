@@ -32,6 +32,7 @@ export interface JobCardJob extends Job {
   flex_presupuesto_element_id?: string | null;
   flexPresupuestoElementId?: string | null;
   job_name?: string | null;
+  job_date_types?: Array<{ date?: string | null; type?: string | null }> | null;
   location?: JobCardLocation;
   location_data?: JobCardLocationObject | null;
   name?: string | null;

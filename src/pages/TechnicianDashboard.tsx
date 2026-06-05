@@ -15,6 +15,7 @@ import { useTechnicianDashboardSubscriptions } from '@/hooks/useMobileRealtimeSu
 import { useTourRateSubscriptions } from '@/hooks/useTourRateSubscriptions';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
+import { hasPrepDayDateTypeForDate, isPrepDayBreakdown } from '@/utils/timesheetPrepDays';
 
 import { DashboardScreen } from '@/components/technician/DashboardScreen';
 import { JobsView } from '@/components/technician/JobsView';
@@ -44,6 +45,8 @@ interface TechnicianJobData {
   status?: string;
   created_at?: string;
   artist_count?: number;
+  has_prep_day_timesheet?: boolean;
+  job_date_types?: Array<{ date?: string | null; type?: string | null }> | null;
   preventive_resource_technician_id?: string | null;
   location?: { name: string } | null;
   job_documents?: Array<{
@@ -183,6 +186,7 @@ const TechnicianDashboard = () => {
           job_id,
           technician_id,
           date,
+          amount_breakdown,
           jobs!inner (
             id,
             title,
@@ -196,6 +200,7 @@ const TechnicianDashboard = () => {
             status,
             preventive_resource_technician_id,
             location:locations(name),
+            job_date_types(date, type),
             job_documents(
               id,
               file_name,
@@ -226,6 +231,17 @@ const TechnicianDashboard = () => {
         if (seenJobIds.has(row.job_id)) return false;
         seenJobIds.add(row.job_id);
         return true;
+      });
+
+      const prepTimesheetByJobId = new Map<string, boolean>();
+      (timesheetData || []).forEach((row) => {
+        const job = Array.isArray(row.jobs) ? row.jobs[0] : row.jobs;
+        const isPrepTimesheet =
+          hasPrepDayDateTypeForDate(job?.job_date_types, row.date) ||
+          isPrepDayBreakdown(row.amount_breakdown);
+        if (isPrepTimesheet) {
+          prepTimesheetByJobId.set(row.job_id, true);
+        }
       });
 
       const dedupedJobIds = Array.from(new Set(jobAssignments.map((row) => row.job_id)));
@@ -284,7 +300,8 @@ const TechnicianDashboard = () => {
             jobs: {
               ...job,
               location,
-              artist_count: artistCountByJob.get(row.job_id) || 0
+              artist_count: artistCountByJob.get(row.job_id) || 0,
+              has_prep_day_timesheet: prepTimesheetByJobId.get(row.job_id) === true,
             } as unknown as TechnicianJobData
           };
         })
