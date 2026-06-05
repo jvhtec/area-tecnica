@@ -1,11 +1,4 @@
-import type { Timesheet } from "@/types/timesheet";
-
-type TimesheetBreakdown =
-  | Timesheet["amount_breakdown"]
-  | Timesheet["amount_breakdown_visible"]
-  | Record<string, unknown>
-  | null
-  | undefined;
+type TimesheetBreakdown = unknown;
 
 export type JobDateTypeLike = {
   date?: string | null;
@@ -18,7 +11,9 @@ export const isPrepDayBreakdown = (breakdown: TimesheetBreakdown): boolean => {
 };
 
 export const isPrepDayTimesheet = (
-  timesheet: Pick<Timesheet, "amount_breakdown" | "amount_breakdown_visible"> & {
+  timesheet: {
+    amount_breakdown?: unknown;
+    amount_breakdown_visible?: unknown;
     is_prep_day?: boolean | null;
     category?: unknown;
   },
