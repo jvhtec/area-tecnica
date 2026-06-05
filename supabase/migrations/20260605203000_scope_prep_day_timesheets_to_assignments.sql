@@ -121,6 +121,20 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.job_id IS NOT NULL
+       AND OLD.technician_id IS NOT NULL
+       AND OLD.assignment_date IS NOT NULL THEN
+      PERFORM public.deactivate_unassigned_prep_day_timesheet(
+        OLD.job_id,
+        OLD.technician_id,
+        OLD.assignment_date
+      );
+    END IF;
+
+    RETURN OLD;
+  END IF;
+
   IF TG_OP = 'UPDATE'
      AND OLD.job_id IS NOT NULL
      AND OLD.technician_id IS NOT NULL
@@ -165,8 +179,15 @@ $$;
 REVOKE EXECUTE ON FUNCTION public.trg_ensure_prep_day_timesheets_for_assignment() FROM PUBLIC;
 
 DROP TRIGGER IF EXISTS t_aiu_ensure_prep_day_timesheets_for_assignment ON public.job_assignments;
+DROP TRIGGER IF EXISTS t_ad_ensure_prep_day_timesheets_for_assignment ON public.job_assignments;
 CREATE TRIGGER t_aiu_ensure_prep_day_timesheets_for_assignment
 AFTER INSERT OR UPDATE OF job_id, technician_id, status, single_day, assignment_date
+ON public.job_assignments
+FOR EACH ROW
+EXECUTE FUNCTION public.trg_ensure_prep_day_timesheets_for_assignment();
+
+CREATE TRIGGER t_ad_ensure_prep_day_timesheets_for_assignment
+AFTER DELETE
 ON public.job_assignments
 FOR EACH ROW
 EXECUTE FUNCTION public.trg_ensure_prep_day_timesheets_for_assignment();

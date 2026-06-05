@@ -18,6 +18,7 @@ describe("prep day timesheet scope migration", () => {
     expect(migration).toMatch(
       /AFTER INSERT OR UPDATE OF job_id, technician_id, status, single_day, assignment_date/i,
     );
+    expect(migration).toMatch(/AFTER DELETE/i);
   });
 
   it("deactivates prep-day rows without a matching prep-day assignment", () => {
