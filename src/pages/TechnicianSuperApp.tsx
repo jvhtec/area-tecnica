@@ -12,6 +12,7 @@ import { format, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { labelForCode } from '@/utils/roles';
+import { hasPrepDayDateTypeForDate, isPrepDayBreakdown } from '@/utils/timesheetPrepDays';
 
 import {
   LayoutDashboard, Calendar as CalendarIcon, User, Menu,
@@ -72,6 +73,8 @@ interface TechnicianJobData extends JobWithLocationAndDocs {
   color?: string;
   status?: string;
   artist_count?: number;
+  has_prep_day_timesheet?: boolean;
+  job_date_types?: Array<{ date?: string | null; type?: string | null }> | null;
   location?: JobWithLocationAndDocs['location'];
   job_documents?: JobWithLocationAndDocs['job_documents'];
 }
@@ -200,6 +203,7 @@ export default function TechnicianSuperApp() {
           job_id,
           technician_id,
           date,
+          amount_breakdown,
           jobs!inner (
             id,
             title,
@@ -214,6 +218,7 @@ export default function TechnicianSuperApp() {
             status,
             preventive_resource_technician_id,
             location:locations(name),
+            job_date_types(date, type),
             job_documents(
               id,
               file_name,
@@ -248,6 +253,19 @@ export default function TechnicianSuperApp() {
         if (seenJobIds.has(row.job_id)) return false;
         seenJobIds.add(row.job_id);
         return true;
+      });
+
+      const prepTimesheetByJobId = new Map<string, boolean>();
+      (timesheetData || []).forEach((row) => {
+        const job = (Array.isArray(row.jobs) ? row.jobs[0] : row.jobs) as unknown as JobWithLocationAndDocs & {
+          job_date_types?: Array<{ date?: string | null; type?: string | null }> | null;
+        };
+        const isPrepTimesheet =
+          hasPrepDayDateTypeForDate(job?.job_date_types, row.date) ||
+          isPrepDayBreakdown(row.amount_breakdown);
+        if (isPrepTimesheet) {
+          prepTimesheetByJobId.set(row.job_id, true);
+        }
       });
 
       const dedupedJobIds = Array.from(new Set(jobAssignments.map((row) => row.job_id)));
@@ -305,7 +323,8 @@ export default function TechnicianSuperApp() {
               ...job,
               created_at: job.created_at || '',
               job_type: job.job_type || 'single',
-              artist_count: artistCountByJob.get(row.job_id) || 0
+              artist_count: artistCountByJob.get(row.job_id) || 0,
+              has_prep_day_timesheet: prepTimesheetByJobId.get(row.job_id) === true,
             }
           };
         }) as TechnicianAssignment[];

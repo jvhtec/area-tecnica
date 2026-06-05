@@ -35,6 +35,7 @@ import type {
   TechnicalPowerPackState,
 } from "@/components/jobs/cards/job-card-actions/types";
 import { cn } from "@/lib/utils";
+import { hasPrepDayDateType } from "@/utils/timesheetPrepDays";
 import { canSubmitTechnicianIncidentReports } from "@/utils/permissions";
 
 type JobCardActionButtonsProps = JobCardActionsProps & {
@@ -119,7 +120,13 @@ export const JobCardActionButtons = ({
   whatsappDisabled,
   whatsappGroup,
   whatsappRequest,
-}: JobCardActionButtonsProps) => (
+}: JobCardActionButtonsProps) => {
+  const normalizedJobType = String(job.job_type || "").toLowerCase();
+  const canOpenTimesheets = !["dryhire", "dry_hire"].includes(normalizedJobType) && (
+    normalizedJobType !== "tourdate" || hasPrepDayDateType(job.job_date_types)
+  );
+
+  return (
   <div className={cn("flex flex-wrap", isMobile ? "gap-1" : "gap-1.5")} onClick={(e) => e.stopPropagation()}>
     {isProjectManagementPage && job.job_type !== "dryhire" && onOpenTasks && (
       <Button
@@ -270,12 +277,12 @@ export const JobCardActionButtons = ({
         <RefreshCw className="h-4 w-4" />
       </Button>
     )}
-    {job.job_type !== "dryhire" && job.job_type !== "tourdate" && (
+    {canOpenTimesheets && (
       <Button
         variant="ghost"
         size="icon"
         onClick={handleTimesheetClick}
-        title="Gestionar Hojas de Tiempo"
+        title={normalizedJobType === "tourdate" ? "Gestionar partes de preparación" : "Gestionar Hojas de Tiempo"}
         className="hover:bg-accent/50"
       >
         <Clock className="h-4 w-4" />
@@ -502,4 +509,5 @@ export const JobCardActionButtons = ({
       </Button>
     )}
   </div>
-);
+  );
+};

@@ -1080,5 +1080,21 @@ describe('JobCardActions', () => {
       const openFlexButton = screen.getByTitle('Abrir en Flex');
       expect(openFlexButton).not.toBeDisabled();
     });
+
+    it('should show prep-day timesheet approvals for tourdate jobs with prep dates', () => {
+      const props = {
+        ...defaultProps,
+        job: {
+          ...defaultProps.job,
+          job_type: 'tourdate',
+          start_time: '2024-01-15',
+          job_date_types: [{ date: '2024-01-14', type: 'prep_day' }],
+        },
+      };
+
+      render(<JobCardActions {...props} />);
+
+      expect(screen.getByTitle('Gestionar partes de preparación')).toBeInTheDocument();
+    });
   });
 });

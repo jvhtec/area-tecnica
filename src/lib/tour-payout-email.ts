@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { buildTourPayoutPdfFilename } from '@/utils/pdfFileNames';
-import type { TechnicianProfile } from '@/utils/rates-pdf-export';
+import type { TechnicianProfile, TimesheetLine } from '@/utils/rates-pdf-export';
 import { generateRateQuotePDF } from '@/utils/rates-pdf-export';
 
 export interface TourJobEmailJobDetails {
@@ -36,6 +36,7 @@ export interface TourJobEmailContextResult {
   profiles: (TechnicianProfile & { email?: string | null })[];
   lpoMap?: Map<string, string | null>;
   timesheetDateMap: Map<string, Set<string>>;
+  prepTimesheetMap: Map<string, TimesheetLine[]>;
   expenseMap: Map<string, number>;
   attachments: TourJobEmailAttachment[];
   missingEmails: string[];
@@ -98,11 +99,42 @@ async function fetchLpoMap(
 async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<any[]> {
   const { data, error } = await client
     .from('timesheets')
-    .select('technician_id, date, approved_by_manager')
+    .select('technician_id, date, approved_by_manager, amount_breakdown, amount_breakdown_visible')
     .eq('job_id', jobId)
     .eq('is_active', true);
   if (error) throw error;
   return data || [];
+}
+
+function buildPrepTimesheetMap(rows: any[]): Map<string, TimesheetLine[]> {
+  const map = new Map<string, TimesheetLine[]>();
+
+  rows.forEach((row) => {
+    if (row.approved_by_manager !== true) return;
+    const breakdown = (row.amount_breakdown || row.amount_breakdown_visible || {}) as Record<string, any>;
+    if (breakdown.is_prep_day !== true) return;
+
+    const line: TimesheetLine = {
+      date: row.date ?? null,
+      hours_rounded: Number(breakdown.hours_rounded ?? breakdown.worked_hours_rounded ?? 0) || 0,
+      base_day_eur: breakdown.base_day_eur != null ? Number(breakdown.base_day_eur) : undefined,
+      plus_10_12_hours: 0,
+      plus_10_12_amount_eur: 0,
+      overtime_hours: 0,
+      overtime_hour_eur: 0,
+      overtime_amount_eur: 0,
+      total_eur: breakdown.total_eur != null ? Number(breakdown.total_eur) : undefined,
+      is_prep_day: true,
+      prep_day_hourly_rate_eur:
+        breakdown.prep_day_hourly_rate_eur != null ? Number(breakdown.prep_day_hourly_rate_eur) : undefined,
+    };
+
+    const existing = map.get(row.technician_id) || [];
+    existing.push(line);
+    map.set(row.technician_id, existing);
+  });
+
+  return map;
 }
 
 export async function prepareTourJobEmailContext(
@@ -112,6 +144,7 @@ export async function prepareTourJobEmailContext(
   const job = await fetchJobDetails(supabase, jobId);
   const lpoMap = await fetchLpoMap(supabase, jobId);
   const timesheetRows = await fetchTimesheets(supabase, jobId);
+  const prepTimesheetMap = buildPrepTimesheetMap(timesheetRows);
 
   // Fetch expenses for tour date jobs
   const expenseMap = new Map<string, number>();
@@ -161,8 +194,9 @@ export async function prepareTourJobEmailContext(
         profiles,
         lpoMap,
         {
-            download: false,
-            timesheetMap: timesheetDateMap
+          download: false,
+          timesheetMap: timesheetDateMap,
+          prepTimesheetMap,
         }
       )) as Blob | void;
     } catch (error) {
@@ -208,6 +242,7 @@ export async function prepareTourJobEmailContext(
     profiles,
     lpoMap,
     timesheetDateMap,
+    prepTimesheetMap,
     expenseMap,
     attachments,
     missingEmails,
@@ -264,13 +299,19 @@ export async function sendTourJobEmails(
       // Manual payout override should be the source of truth for the amount communicated to the technician.
       const techExpenses = context.expenseMap.get(attachment.technician_id) ?? 0;
       const computedGrandTotalWithExpenses = computedGrandTotal + techExpenses;
+      const prepLines = context.prepTimesheetMap.get(attachment.technician_id) || [];
+      const prepTotal = prepLines.reduce((sum, line) => sum + Number(line.total_eur ?? 0), 0);
+      const prepDates = Array.from(
+        new Set(prepLines.map((line) => line.date).filter((date): date is string => date != null))
+      ).sort();
 
       // Overrides replace the base+extras portion; expenses are always added on top
-      // since they are reimbursements, not part of the negotiated rate.
+      // since they are reimbursements, not part of the negotiated rate. Prep days are
+      // approved fixed-rate timesheets and are added on top of the tour quote.
       const grandTotal =
         q.has_override && q.override_amount_eur != null
-          ? Number(q.override_amount_eur) + techExpenses
-          : computedGrandTotalWithExpenses;
+          ? Number(q.override_amount_eur) + prepTotal + techExpenses
+          : computedGrandTotalWithExpenses + prepTotal;
       const deduction = attachment.deduction_eur || 0;
 
       // Extract unique worked dates from timesheets
@@ -282,7 +323,7 @@ export async function sendTourJobEmails(
         email: attachment.email,
         full_name: attachment.full_name,
         totals: {
-          timesheets_total_eur: baseTotal, // base portion for tour rates
+          timesheets_total_eur: baseTotal + prepTotal, // tour quote base plus approved prep-day timesheets
           extras_total_eur: extrasTotal,
           expenses_total_eur: techExpenses,
           total_eur: grandTotal - deduction,
@@ -294,6 +335,7 @@ export async function sendTourJobEmails(
         is_house_tech: attachment.is_house_tech ?? null,
         lpo_number: attachment.lpo_number ?? null,
         worked_dates: workedDates,
+        prep_dates: prepDates,
       };
     }),
     missing_emails: context.missingEmails,

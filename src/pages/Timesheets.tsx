@@ -14,6 +14,7 @@ import { es } from 'date-fns/locale';
 import { useSearchParams } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { isManagementRole } from '@/utils/permissions';
+import { hasPrepDayDateType } from '@/utils/timesheetPrepDays';
 
 export default function Timesheets() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -52,7 +53,8 @@ export default function Timesheets() {
         const type = String(job.job_type || '').toLowerCase();
         const isDryHire = type === 'dryhire' || type === 'dry_hire';
         const isTourDate = type === 'tourdate';
-        if (isDryHire || isTourDate) return false;
+        if (isDryHire) return false;
+        if (isTourDate) return hasPrepDayDateType(job.job_date_types);
         if (Array.isArray(job.job_date_types) && job.job_date_types.length > 0) {
           return job.job_date_types.some(
             (dt: { type?: string } | null | undefined) => dt?.type !== 'off' && dt?.type !== 'travel'
@@ -65,7 +67,12 @@ export default function Timesheets() {
   }, [jobs]);
 
   const selectedJob = jobs.find(job => job.id === selectedJobId);
-  const timesheetsDisabled = selectedJob && (selectedJob.job_type === 'dryhire' || selectedJob.job_type === 'tourdate');
+  const selectedJobType = String(selectedJob?.job_type || '').toLowerCase();
+  const timesheetsDisabled = selectedJob && (
+    selectedJobType === 'dryhire' ||
+    selectedJobType === 'dry_hire' ||
+    (selectedJobType === 'tourdate' && !hasPrepDayDateType(selectedJob.job_date_types))
+  );
 
 
   // Derived lists for filters

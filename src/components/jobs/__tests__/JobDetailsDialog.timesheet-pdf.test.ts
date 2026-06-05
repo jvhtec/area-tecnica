@@ -113,6 +113,7 @@ describe('JobDetailsDialog timesheet enrichment', () => {
 
     expect(autoTableCalls.length).toBeGreaterThan(0);
     const firstTable = autoTableCalls[0];
-    expect(firstTable.body[0][1]).toBe('Alice Doe');
+    expect(firstTable.body[0][1]).toBe('Work');
+    expect(firstTable.body[0][2]).toBe('Alice Doe');
   });
 });

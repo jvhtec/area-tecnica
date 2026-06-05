@@ -13,7 +13,7 @@ import {
   type TechnicianProfileWithEmail,
 } from '@/lib/job-payout-email';
 import { sendTourJobEmails, prepareTourJobEmailContext } from '@/lib/tour-payout-email';
-import { generateJobPayoutPDF, generateRateQuotePDF, type TechnicianProfile } from '@/utils/rates-pdf-export';
+import { generateJobPayoutPDF, generateRateQuotePDF, type TechnicianProfile, type TimesheetLine } from '@/utils/rates-pdf-export';
 import type { JobPayoutTotals } from '@/types/jobExtras';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import type { JobMetadata, PayoutActions } from './types';
@@ -63,6 +63,28 @@ export function usePayoutActions({
   const setOverrideMutation = useSetTechnicianPayoutOverride();
   const removeOverrideMutation = useRemoveTechnicianPayoutOverride();
   const toggleApprovalMutation = useToggleTechnicianPayoutApproval();
+
+  const buildTourPreviewTimesheetMap = React.useCallback((
+    tourContext: Awaited<ReturnType<typeof prepareTourJobEmailContext>>
+  ) => {
+    const map = new Map<string, TimesheetLine[]>(
+      Array.from(tourContext.timesheetDateMap.entries()).map(([techId, dates]) => [
+        techId,
+        Array.from(dates).sort().map((date) => ({ date, hours_rounded: 0 })),
+      ])
+    );
+
+    tourContext.prepTimesheetMap.forEach((prepLines, techId) => {
+      const prepDates = new Set(prepLines.map((line) => line.date).filter(Boolean));
+      const existing = map.get(techId) || [];
+      map.set(techId, [
+        ...prepLines,
+        ...existing.filter((line) => !prepDates.has(line.date)),
+      ]);
+    });
+
+    return map;
+  }, []);
 
   /* ── Reset on job/type change ── */
   React.useEffect(() => {
@@ -134,6 +156,13 @@ export function usePayoutActions({
       if (visibleTourQuotes.length === 0 || !jobMeta) return;
       setIsExporting(true);
       try {
+        const tourContext = await prepareTourJobEmailContext({
+          jobId,
+          supabase: dataLayerClient,
+          quotes: visibleTourQuotes,
+          profiles: profilesWithEmail as (TechnicianProfile & { email?: string | null })[],
+        });
+
         await generateRateQuotePDF(
           visibleTourQuotes,
           {
@@ -144,7 +173,11 @@ export function usePayoutActions({
             job_type: jobMeta.job_type ?? undefined,
           },
           profilesWithEmail as TechnicianProfile[],
-          lpoMap
+          lpoMap,
+          {
+            timesheetMap: tourContext.timesheetDateMap,
+            prepTimesheetMap: tourContext.prepTimesheetMap,
+          }
         );
         toast.success('PDF de tarifas generado');
       } catch (err) {
@@ -317,17 +350,13 @@ export function usePayoutActions({
           payouts: [],
           profiles: profilesWithEmail,
           lpoMap: tourContext.lpoMap,
-          timesheetMap: new Map(
-            Array.from(tourContext.timesheetDateMap.entries()).map(([techId, dates]) => [
-              techId,
-              Array.from(dates).sort().map(d => ({
-                date: d,
-                hours_rounded: 0,
-              })),
-            ])
-          ),
+          timesheetMap: buildTourPreviewTimesheetMap(tourContext),
           attachments: tourContext.attachments.map((a) => {
             const baseTotal = Number(a.quote.total_eur ?? 0);
+            const prepTotal = (tourContext.prepTimesheetMap.get(a.technician_id) || []).reduce(
+              (sum, line) => sum + Number(line.total_eur ?? 0),
+              0
+            );
             const extrasTotal = Number(
               a.quote.extras_total_eur ?? (a.quote.extras?.total_eur != null ? a.quote.extras.total_eur : 0)
             );
@@ -337,8 +366,8 @@ export function usePayoutActions({
             const expensesBreakdown = techPayout?.expenses_breakdown ?? [];
             const totalWithExtras =
               a.quote.total_with_extras_eur != null
-                ? Number(a.quote.total_with_extras_eur) + expensesTotal
-                : baseTotal + extrasTotal + expensesTotal;
+                ? Number(a.quote.total_with_extras_eur) + prepTotal + expensesTotal
+                : baseTotal + prepTotal + extrasTotal + expensesTotal;
 
             return {
               technician_id: a.technician_id,
@@ -347,7 +376,7 @@ export function usePayoutActions({
               payout: {
                 job_id: jobId,
                 technician_id: a.technician_id,
-                timesheets_total_eur: baseTotal,
+                timesheets_total_eur: baseTotal + prepTotal,
                 extras_total_eur: extrasTotal,
                 total_eur: totalWithExtras,
                 extras_breakdown: { items: a.quote.extras?.items ?? [], total_eur: extrasTotal },
@@ -395,7 +424,7 @@ export function usePayoutActions({
     } finally {
       setIsLoadingPreview(false);
     }
-  }, [jobId, isTourDate, visibleTourQuotes, standardPayoutTotals, payoutTotals, profilesWithEmail, lpoMap, jobMeta]);
+  }, [jobId, isTourDate, visibleTourQuotes, standardPayoutTotals, payoutTotals, profilesWithEmail, lpoMap, jobMeta, buildTourPreviewTimesheetMap]);
 
   /* ── Single technician email ── */
   const handleSendEmailForTech = React.useCallback(

@@ -20,6 +20,7 @@ const FIXED_TRAVEL_RATE_EUR = 20;
 const DEDUCTION_DISCLAIMER_TEXT = '* Se ha aplicado una deducción de 30€/día en concepto de IRPF por condición de no autónomo.';
 const TOUR_DEDUCTION_DISCLAIMER_TEXT = '* Deducción de 30€ en concepto de IRPF por condición de no autónomo ya aplicada a la tarifa base antes de multiplicadores.';
 const EVENTO_DISCLAIMER_TEXT = '* Evento: tarifa fija de 12h (base + plus) independientemente de las horas trabajadas.';
+const PREP_DAY_DISCLAIMER_TEXT = '* Día de preparación: importe calculado a 15€/h sobre horas redondeadas y separado de la tarifa normal del bolo.';
 const FIXED_TRAVEL_RATE_DISCLAIMER_TEXT = `* (plantilla): Tarifa fija de ${FIXED_TRAVEL_RATE_EUR}€ para días de viaje de técnicos en plantilla y gestión asignables.`;
 
 export interface TechnicianProfile {
@@ -93,6 +94,8 @@ export interface TimesheetLine {
   overtime_amount_eur?: number;
   total_eur?: number;
   is_evento?: boolean;
+  is_prep_day?: boolean;
+  prep_day_hourly_rate_eur?: number;
 }
 
 const CORPORATE_RED: [number, number, number] = [125, 1, 1];
@@ -339,7 +342,11 @@ export async function generateRateQuotePDF(
   jobDetails: JobDetails,
   profiles: TechnicianProfile[],
   lpoMap?: Map<string, string | null>,
-  options?: { download?: boolean; timesheetMap?: Map<string, Set<string>> }
+  options?: {
+    download?: boolean;
+    timesheetMap?: Map<string, Set<string>>;
+    prepTimesheetMap?: Map<string, TimesheetLine[]>;
+  }
 ): Promise<Blob | void> {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const doc = new jsPDF();
@@ -378,6 +385,10 @@ export async function generateRateQuotePDF(
   doc.setTextColor(...TEXT_PRIMARY);
 
   const getTechName = getTechNameFactory(profiles);
+  const getPrepLines = (technicianId: string) => options?.prepTimesheetMap?.get(technicianId) || [];
+  const getPrepTotal = (technicianId: string) => (
+    getPrepLines(technicianId).reduce((sum, line) => sum + Number(line.total_eur ?? 0), 0)
+  );
 
   const quotesWithComputed = quotes.map((quote) => ({
     quote,
@@ -397,6 +408,9 @@ export async function generateRateQuotePDF(
     // For tour rate quotes, server already applies autonomo discount to base before multipliers.
     // Manual overrides are applied server-side (see v_tour_job_rate_quotes_2025).
     const effectiveTotal = resolveEffectiveTotal(quote, computed);
+    const prepLines = getPrepLines(quote.technician_id);
+    const prepTotal = getPrepTotal(quote.technician_id);
+    const effectiveTotalWithPrep = effectiveTotal + prepTotal;
 
     let baseCell: string;
     if (hasError) {
@@ -443,13 +457,23 @@ export async function generateRateQuotePDF(
       }
     }
 
+    if (prepLines.length > 0) {
+      const prepSummary = prepLines
+        .map((line) => {
+          const dateLabel = line.date ? format(new Date(line.date), 'P', { locale: es }) : '—';
+          return `${dateLabel}: ${line.hours_rounded ?? 0}h = ${formatCurrency(line.total_eur ?? 0)}`;
+        })
+        .join(' · ');
+      nameCellContent += `\nDía(s) preparación: ${prepSummary}`;
+    }
+
     return [
       nameCellContent,
       quote.is_house_tech ? 'Plantilla' : quote.category || '—',
       baseCell,
       hasError ? '—' : formatMultiplier(rawMultiplier),
       hasError ? '—' : formatCurrency(extrasTotal),
-      hasError ? '€0.00' : formatCurrency(effectiveTotal),
+      hasError ? '€0.00' : formatCurrency(effectiveTotalWithPrep),
     ];
   });
 
@@ -484,6 +508,10 @@ export async function generateRateQuotePDF(
     (sum, { computed }) => sum + computed.effectiveBase,
     0
   );
+  const totalPrepDays = quotesWithComputed.reduce(
+    (sum, { quote }) => sum + getPrepTotal(quote.technician_id),
+    0
+  );
   const totalExtras = quotesWithComputed.reduce(
     (sum, { computed }) => sum + computed.extrasTotal,
     0
@@ -504,7 +532,7 @@ export async function generateRateQuotePDF(
         ? Number(quote.override_amount_eur)
         : (serverTotal ?? computedTotal);
 
-    return sum + effectiveTotal;
+    return sum + effectiveTotal + getPrepTotal(quote.technician_id);
   }, 0);
 
   // Check if any quotes have autonomo discount applied by server
@@ -514,6 +542,7 @@ export async function generateRateQuotePDF(
 
   // Check if any quotes have manual override
   const anyOverride = quotes.some(quote => quote.has_override);
+  const anyPrepDay = totalPrepDays > 0;
   const vehicleDisclaimerNotes = Array.from(
     new Set(
       quotesWithComputed
@@ -527,7 +556,7 @@ export async function generateRateQuotePDF(
   );
 
   doc.setFillColor(...SUMMARY_BACKGROUND);
-  doc.roundedRect(14, finalY, summaryWidth, 32, 3, 3, 'F');
+  doc.roundedRect(14, finalY, summaryWidth, anyPrepDay ? 38 : 32, 3, 3, 'F');
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
@@ -539,15 +568,18 @@ export async function generateRateQuotePDF(
   doc.setTextColor(...TEXT_MUTED);
   doc.text(`Total Base: ${formatCurrency(totalBase)}`, 18, finalY + 18);
   doc.text(`Total Extras: ${formatCurrency(totalExtras)}`, 18, finalY + 26);
+  if (anyPrepDay) {
+    doc.text(`Total Preparación: ${formatCurrency(totalPrepDays)}`, 18, finalY + 34);
+  }
 
   const totalText = `Total General: ${formatCurrency(grandTotal)}`;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(12);
   doc.setTextColor(...CORPORATE_RED);
   const totalWidth = doc.getTextWidth(totalText);
-  doc.text(totalText, 14 + summaryWidth - totalWidth - 6, finalY + 22);
+  doc.text(totalText, 14 + summaryWidth - totalWidth - 6, finalY + (anyPrepDay ? 25 : 22));
 
-  let disclaimerY = finalY + 38;
+  let disclaimerY = finalY + (anyPrepDay ? 44 : 38);
   if (anyDeductionApplied) {
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(8);
@@ -561,6 +593,14 @@ export async function generateRateQuotePDF(
     doc.setFontSize(8);
     doc.setTextColor(...CORPORATE_RED);
     doc.text('AVISO: Hay overrides manuales de pago (excepción). Administración debe validar con Dirección.', 14, disclaimerY);
+    disclaimerY += 6;
+  }
+
+  if (anyPrepDay) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(...CORPORATE_RED);
+    doc.text(PREP_DAY_DISCLAIMER_TEXT, 14, disclaimerY);
     disclaimerY += 6;
   }
 
@@ -1046,6 +1086,11 @@ export async function generateJobPayoutPDF(
       return lines.some(l => l.is_evento === true);
   });
 
+  const anyPrepDay = payouts.some(p => {
+      const lines = timesheetMap?.get(p.technician_id) || [];
+      return lines.some(l => l.is_prep_day === true);
+  });
+
   // Check if any extras use house tech travel rate
   const anyHouseTechTravelRate = payouts.some(p => {
       const items = (p.extras_breakdown?.items as any[]) || [];
@@ -1096,6 +1141,14 @@ export async function generateJobPayoutPDF(
       doc.setFontSize(8);
       doc.setTextColor(...CORPORATE_RED);
       doc.text(EVENTO_DISCLAIMER_TEXT, 14, disclaimerY);
+      disclaimerY += 6;
+  }
+
+  if (anyPrepDay) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(...CORPORATE_RED);
+      doc.text(PREP_DAY_DISCLAIMER_TEXT, 14, disclaimerY);
       disclaimerY += 6;
   }
 
@@ -1151,9 +1204,13 @@ export async function generateJobPayoutPDF(
       currentY += 5;
 
       const tableRows = lines.map((ln) => [
-        ln.date ? format(new Date(ln.date), 'P', { locale: es }) : '—',
+        ln.date
+          ? `${format(new Date(ln.date), 'P', { locale: es })}${ln.is_prep_day ? '\nDía preparación' : ''}`
+          : (ln.is_prep_day ? 'Día preparación' : '—'),
         `${ln.hours_rounded ?? 0}h`,
-        formatCurrency(ln.base_day_eur ?? 0),
+        ln.is_prep_day
+          ? `${formatCurrency(ln.base_day_eur ?? 0)}\n${formatCurrency(ln.prep_day_hourly_rate_eur ?? 15)}/h`
+          : formatCurrency(ln.base_day_eur ?? 0),
         ln.plus_10_12_amount_eur ? `${ln.plus_10_12_hours ?? 0}h = ${formatCurrency(ln.plus_10_12_amount_eur)}` : '—',
         (ln.overtime_hours ?? 0) > 0
           ? `${ln.overtime_hours}h × ${formatCurrency(ln.overtime_hour_eur ?? 0)} = ${formatCurrency(

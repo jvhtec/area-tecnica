@@ -21,6 +21,7 @@ import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { sendTimesheetReminder } from "@/lib/timesheet-reminder-email";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { formatCurrency } from "@/lib/utils";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import {
   AlertDialog,
@@ -41,6 +42,7 @@ import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
 import { TimesheetEditForm } from "./TimesheetEditForm";
 import { TimesheetRejectDialog } from "./TimesheetRejectDialog";
 import { calculateHours } from "./utils";
+import { isPrepDayBreakdown, isPrepDayTimesheet, prepDayHourlyRate } from "@/utils/timesheetPrepDays";
 
 interface TimesheetViewProps {
   jobId: string;
@@ -180,15 +182,16 @@ export const TimesheetView = ({
 
   const handleUpdateTimesheet = async (timesheet: Timesheet) => {
     if (!editingTimesheet || isClosureLocked) return;
+    const isPrepDay = isPrepDayTimesheet(timesheet);
 
     await updateTimesheet(editingTimesheet, {
       start_time: formData.start_time,
       end_time: formData.end_time,
       break_minutes: formData.break_minutes,
-      overtime_hours: formData.overtime_hours,
+      overtime_hours: isPrepDay ? 0 : formData.overtime_hours,
       notes: formData.notes,
       ends_next_day: formData.ends_next_day,
-      category: formData.category
+      category: isPrepDay ? undefined : formData.category
     });
     setEditingTimesheet(null);
   };
@@ -684,6 +687,7 @@ export const TimesheetView = ({
           </CardHeader>
           <CardContent className="space-y-4">
             {dayTimesheets.map((timesheet) => {
+              const isPrepDay = isPrepDayTimesheet(timesheet);
               const editableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
               const canEditTimesheet = isTechnician
                 ? (timesheet.technician_id === user?.id && editableStatuses.includes(timesheet.status) && !isClosureLocked)
@@ -728,6 +732,11 @@ export const TimesheetView = ({
                       <Badge variant={getStatusColor(timesheet.status)}>
                         {translateStatus(timesheet.status)}
                       </Badge>
+                      {isPrepDay && (
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-100">
+                          Día de preparación · 15 €/h
+                        </Badge>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -858,6 +867,7 @@ export const TimesheetView = ({
                       setFormData={setFormData}
                       onSave={() => handleUpdateTimesheet(timesheet)}
                       onCancel={() => setEditingTimesheet(null)}
+                      isPrepDay={isPrepDay}
                     />
                   ) : (
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -893,7 +903,7 @@ export const TimesheetView = ({
                       )}
                       <div>
                         <p className="text-muted-foreground">Categoría</p>
-                        <p className="font-medium">{timesheet.category || 'No establecido'}</p>
+                        <p className="font-medium">{isPrepDay ? 'Día de preparación' : (timesheet.category || 'No establecido')}</p>
                       </div>
                       {timesheet.notes && (
                         <div className="col-span-2 md:col-span-4">
@@ -917,7 +927,7 @@ export const TimesheetView = ({
                     return (
                       <div className="mt-4 p-3 rounded-md border">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="font-medium">Cálculo de Tarifa</p>
+                          <p className="font-medium">{isPrepDay ? 'Cálculo de Preparación' : 'Cálculo de Tarifa'}</p>
                           {isManagementUser && (
                             <div className="flex gap-2">
                               <Button
@@ -946,14 +956,21 @@ export const TimesheetView = ({
                               </p>
                             );
                           }
+                          const breakdownIsPrepDay = isPrepDay || isPrepDayBreakdown(breakdown);
+                          const prepRate = prepDayHourlyRate(breakdown) ?? 15;
                           return (
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                              {breakdownIsPrepDay && (
+                                <div className="col-span-2 md:col-span-5 rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-900 dark:bg-blue-950/30 dark:text-blue-100">
+                                  Día de preparación: {formatCurrency(prepRate)}/h sobre horas redondeadas.
+                                </div>
+                              )}
                               <div>
-                                <p className="text-muted-foreground">Horas Redondeadas</p>
+                                <p className="text-muted-foreground">{breakdownIsPrepDay ? 'Horas Preparación' : 'Horas Redondeadas'}</p>
                                 <p className="font-medium">{breakdown.worked_hours_rounded || 0}h</p>
                               </div>
                               <div>
-                                <p className="text-muted-foreground">Cantidad Base</p>
+                                <p className="text-muted-foreground">{breakdownIsPrepDay ? 'Importe preparación' : 'Cantidad Base'}</p>
                                 <p className="font-medium">€{(breakdown.base_amount_eur ?? 0).toFixed(2)}</p>
                               </div>
                               {(breakdown.plus_10_12_amount_eur ?? 0) > 0 && (

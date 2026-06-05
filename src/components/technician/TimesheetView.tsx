@@ -41,6 +41,7 @@ import { useJobRatesApproval } from '@/hooks/useJobRatesApproval';
 import { formatCurrency } from '@/lib/utils';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { isTechnicianRole } from '@/utils/permissions';
+import { isPrepDayBreakdown, isPrepDayTimesheet, prepDayHourlyRate } from '@/utils/timesheetPrepDays';
 import { Timesheet, TimesheetFormData } from '@/types/timesheet';
 import SignatureCanvas from 'react-signature-canvas';
 import { Theme } from './types';
@@ -171,16 +172,17 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
     setEditingId(null);
   };
 
-  const saveTimesheet = async (timesheetId: string) => {
+  const saveTimesheet = async (timesheet: Timesheet) => {
+    const isPrepDay = isPrepDayTimesheet(timesheet);
     try {
-      await updateTimesheet(timesheetId, {
+      await updateTimesheet(timesheet.id, {
         start_time: formData.start_time,
         end_time: formData.end_time,
         break_minutes: formData.break_minutes,
-        overtime_hours: formData.overtime_hours,
+        overtime_hours: isPrepDay ? 0 : formData.overtime_hours,
         notes: formData.notes,
         ends_next_day: formData.ends_next_day,
-        category: formData.category,
+        category: isPrepDay ? undefined : formData.category,
       });
       setEditingId(null);
     } catch (err: unknown) {
@@ -343,6 +345,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                   </div>
 
                   {dayTimesheets.map((timesheet) => {
+                    const isPrepDay = isPrepDayTimesheet(timesheet);
                     const isEditing = editingId === timesheet.id;
                     const statusBadge = getStatusBadge(timesheet.status, isDark);
                     const editableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
@@ -372,9 +375,16 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                       >
                         {/* Status badge */}
                         <div className="flex items-center justify-between mb-4">
-                          <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase ${statusBadge.bg} ${statusBadge.text}`}>
-                            {statusBadge.label}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`px-2.5 py-1 rounded text-[10px] font-bold uppercase ${statusBadge.bg} ${statusBadge.text}`}>
+                              {statusBadge.label}
+                            </span>
+                            {isPrepDay && (
+                              <span className="px-2.5 py-1 rounded text-[10px] font-bold uppercase bg-blue-500/20 text-blue-500">
+                                Día de preparación · 15 €/h
+                              </span>
+                            )}
+                          </div>
                           {timesheet.ends_next_day && (
                             <span className={`flex items-center gap-1 text-xs ${theme.textMuted}`}>
                               <Moon size={12} /> Noche
@@ -453,39 +463,48 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                               </div>
                             </div>
 
-                            {/* Category */}
-                            <div>
-                              <label className={`text-xs font-bold ${theme.textMuted} mb-1 block`}>Categoría</label>
-                              <Select
-                                value={formData.category || ''}
-                                onValueChange={(v) => {
-                                  const category = v === 'tecnico' || v === 'especialista' || v === 'responsable' ? v : undefined;
-                                  setFormData({ ...formData, category });
-                                }}
-                              >
-                                <SelectTrigger className={theme.input}>
-                                  <SelectValue placeholder="Seleccionar categoría" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="tecnico">Técnico</SelectItem>
-                                  <SelectItem value="especialista">Especialista</SelectItem>
-                                  <SelectItem value="responsable">Responsable</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
+                            {isPrepDay ? (
+                              <div className={`p-3 rounded-xl ${isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-100'}`}>
+                                <div className="text-xs font-bold text-blue-500 mb-1">Día de preparación</div>
+                                <div className={`text-xs ${theme.textMuted}`}>Se calcula a 15 €/h sobre horas redondeadas.</div>
+                              </div>
+                            ) : (
+                              <>
+                                {/* Category */}
+                                <div>
+                                  <label className={`text-xs font-bold ${theme.textMuted} mb-1 block`}>Categoría</label>
+                                  <Select
+                                    value={formData.category || ''}
+                                    onValueChange={(v) => {
+                                      const category = v === 'tecnico' || v === 'especialista' || v === 'responsable' ? v : undefined;
+                                      setFormData({ ...formData, category });
+                                    }}
+                                  >
+                                    <SelectTrigger className={theme.input}>
+                                      <SelectValue placeholder="Seleccionar categoría" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="tecnico">Técnico</SelectItem>
+                                      <SelectItem value="especialista">Especialista</SelectItem>
+                                      <SelectItem value="responsable">Responsable</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
 
-                            {/* Overtime */}
-                            <div>
-                              <label className={`text-xs font-bold ${theme.textMuted} mb-1 block`}>Horas extra</label>
-                              <Input
-                                type="number"
-                                value={formData.overtime_hours}
-                                onChange={(e) => setFormData({ ...formData, overtime_hours: parseFloat(e.target.value) || 0 })}
-                                className={`${theme.input} font-mono`}
-                                min={0}
-                                step={0.5}
-                              />
-                            </div>
+                                {/* Overtime */}
+                                <div>
+                                  <label className={`text-xs font-bold ${theme.textMuted} mb-1 block`}>Horas extra</label>
+                                  <Input
+                                    type="number"
+                                    value={formData.overtime_hours}
+                                    onChange={(e) => setFormData({ ...formData, overtime_hours: parseFloat(e.target.value) || 0 })}
+                                    className={`${theme.input} font-mono`}
+                                    min={0}
+                                    step={0.5}
+                                  />
+                                </div>
+                              </>
+                            )}
 
                             {/* Notes */}
                             <div>
@@ -525,7 +544,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   e.preventDefault();
-                                  saveTimesheet(timesheet.id);
+                                  saveTimesheet(timesheet);
                                 }}
                               >
                                 <Save size={16} className="mr-2" />
@@ -557,7 +576,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                               <div className="grid grid-cols-2 gap-3">
                                 <div>
                                   <div className={`text-[10px] font-bold uppercase ${theme.textMuted}`}>Categoría</div>
-                                  <div className={`font-medium ${theme.textMain}`}>{timesheet.category || 'Sin asignar'}</div>
+                                  <div className={`font-medium ${theme.textMain}`}>{isPrepDay ? 'Día de preparación' : (timesheet.category || 'Sin asignar')}</div>
                                 </div>
                                 <div>
                                   <div className={`text-[10px] font-bold uppercase ${theme.textMuted}`}>Horas totales</div>
@@ -584,7 +603,22 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                               {/* Rate breakdown (only if approved and visible) */}
                               {timesheet.amount_breakdown_visible && (
                                 <div className={`p-3 rounded-xl ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'} border border-emerald-500/20`}>
-                                  <div className={`text-xs font-bold text-emerald-600 mb-2`}>Desglose de tarifa</div>
+                                  {(() => {
+                                    const breakdownIsPrepDay = isPrepDay || isPrepDayBreakdown(timesheet.amount_breakdown_visible);
+                                    const prepRate = prepDayHourlyRate(timesheet.amount_breakdown_visible) ?? 15;
+                                    return (
+                                      <>
+                                        <div className={`text-xs font-bold text-emerald-600 mb-2`}>
+                                          {breakdownIsPrepDay ? 'Desglose de preparación' : 'Desglose de tarifa'}
+                                        </div>
+                                        {breakdownIsPrepDay && (
+                                          <div className="mb-2 rounded-md bg-blue-500/10 px-2 py-1 text-xs text-blue-500">
+                                            Día de preparación: {formatCurrency(prepRate)}/h sobre horas redondeadas.
+                                          </div>
+                                        )}
+                                      </>
+                                    );
+                                  })()}
                                   <div className="grid grid-cols-2 gap-2 text-sm">
                                     <div>
                                       <span className={theme.textMuted}>Horas: </span>

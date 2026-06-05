@@ -22,11 +22,17 @@ export interface Timesheet {
   updated_at: string;
   // New 2025 rate calculator fields
   category?: 'tecnico' | 'especialista' | 'responsable';
+  is_prep_day?: boolean;
   amount_eur?: number;
   amount_breakdown?: {
     category: string;
+    is_prep_day?: boolean;
+    worked_hours?: number;
     worked_minutes: number;
     worked_hours_rounded: number;
+    hours_rounded?: number;
+    billable_hours?: number;
+    prep_day_hourly_rate_eur?: number;
     base_day_hours: number;
     mid_tier_hours: number;
     base_amount_eur: number;
@@ -46,8 +52,13 @@ export interface Timesheet {
   amount_eur_visible?: number | null;
   amount_breakdown_visible?: {
     category: string;
+    is_prep_day?: boolean;
+    worked_hours?: number;
     worked_minutes: number;
     worked_hours_rounded: number;
+    hours_rounded?: number;
+    billable_hours?: number;
+    prep_day_hourly_rate_eur?: number;
     base_day_hours: number;
     mid_tier_hours: number;
     base_amount_eur: number;
