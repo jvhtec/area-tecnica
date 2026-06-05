@@ -106,7 +106,7 @@ async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<a
   return data || [];
 }
 
-function buildPrepTimesheetMap(rows: any[]): Map<string, TimesheetLine[]> {
+export function buildPrepTimesheetMap(rows: any[]): Map<string, TimesheetLine[]> {
   const map = new Map<string, TimesheetLine[]>();
 
   rows.forEach((row) => {
@@ -137,6 +137,24 @@ function buildPrepTimesheetMap(rows: any[]): Map<string, TimesheetLine[]> {
   return map;
 }
 
+export function buildPrepTimesheetDateMap(
+  prepTimesheetMap: Map<string, TimesheetLine[]>
+): Map<string, Set<string>> {
+  const map = new Map<string, Set<string>>();
+
+  prepTimesheetMap.forEach((lines, technicianId) => {
+    const dates = lines
+      .map((line) => line.date)
+      .filter((date): date is string => Boolean(date));
+
+    if (dates.length > 0) {
+      map.set(technicianId, new Set(dates));
+    }
+  });
+
+  return map;
+}
+
 export async function prepareTourJobEmailContext(
   input: TourJobEmailInput
 ): Promise<TourJobEmailContextResult> {
@@ -162,13 +180,7 @@ export async function prepareTourJobEmailContext(
     console.warn('[tour-payout-email] Failed to fetch expenses:', e);
   }
 
-  // Build Timesheet Date Set Map
-  const timesheetDateMap = new Map<string, Set<string>>();
-  timesheetRows.forEach(row => {
-      if (!row.technician_id || !row.date) return;
-      if (!timesheetDateMap.has(row.technician_id)) timesheetDateMap.set(row.technician_id, new Set());
-      timesheetDateMap.get(row.technician_id)!.add(row.date);
-  });
+  const timesheetDateMap = buildPrepTimesheetDateMap(prepTimesheetMap);
 
   const profileMap = new Map(profiles.map((p) => [p.id, p]));
   const attachments: TourJobEmailAttachment[] = [];

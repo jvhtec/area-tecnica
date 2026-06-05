@@ -5,7 +5,7 @@ import { Timesheet } from "@/types/timesheet";
 import { toast } from "sonner";
 import { RATES_QUERY_KEYS } from "@/constants/ratesQueryKeys";
 import { isManagementRole } from "@/utils/permissions";
-import { isPrepDayBreakdown } from "@/utils/timesheetPrepDays";
+import { getTimesheetAutoCreateDatesForAssignment, isPrepDayBreakdown } from "@/utils/timesheetPrepDays";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -33,7 +33,26 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       setIsError(false);
       console.log("Starting fetchTimesheets for jobId:", jobId);
 
-      const { data, error } = await supabase
+      const { data: jobMeta, error: jobMetaError } = await supabase
+        .from("jobs")
+        .select(`
+          job_type,
+          job_date_types(type, date)
+        `)
+        .eq("id", jobId)
+        .maybeSingle();
+      if (jobMetaError) {
+        console.warn("Error fetching timesheet job metadata:", jobMetaError);
+      }
+
+      const prepDayDates = new Set(
+        ((jobMeta?.job_date_types || []) as Array<{ type?: string | null; date?: string | null }>)
+          .filter((row) => row?.type === "prep_day" && row.date)
+          .map((row) => row.date as string),
+      );
+      const isTourDateJob = String(jobMeta?.job_type || "").toLowerCase() === "tourdate";
+
+      const { data: timesheetRows, error } = await supabase
         .from("timesheets")
         .select("*")
         .eq("job_id", jobId)
@@ -47,20 +66,14 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         return;
       }
 
+      const data = isTourDateJob
+        ? (timesheetRows || []).filter((timesheet) => prepDayDates.has(timesheet.date))
+        : (timesheetRows || []);
+
       if (!data || data.length === 0) {
         setTimesheets([]);
         return;
       }
-
-      const { data: prepDayRows, error: prepDayError } = await supabase
-        .from("job_date_types")
-        .select("date")
-        .eq("job_id", jobId)
-        .eq("type", "prep_day");
-      if (prepDayError) {
-        console.warn("Error fetching prep day dates:", prepDayError);
-      }
-      const prepDayDates = new Set((prepDayRows || []).map((row) => row.date));
 
       const technicianIds = [...new Set(data.map(t => t.technician_id))];
       const { data: profiles } = await supabase
@@ -118,7 +131,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       // Get job assignments and job details
       const { data: assignments, error: assignmentsError } = await supabase
         .from("job_assignments")
-        .select("technician_id, status")
+        .select("technician_id, status, single_day, assignment_date")
         .eq("job_id", jobId);
 
       console.log("Assignments fetched:", assignments, "Error:", assignmentsError);
@@ -187,13 +200,10 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         return !dateType || !['off', 'travel', 'prep_day'].includes(dateType.type);
       });
 
-      const dates = Array.from(new Set(
-        jtype === 'tourdate'
-          ? prepDayDates
-          : [...prepDayDates, ...regularDates]
-      )).sort();
+      const regularDatesToCreate = jtype === 'tourdate' ? [] : regularDates;
 
-      console.log("Generated dates (filtered):", dates);
+      console.log("Generated regular dates (filtered):", regularDatesToCreate);
+      console.log("Prep day dates:", prepDayDates);
       console.log("Date types:", job.job_date_types);
 
       // Check which timesheets already exist
@@ -217,7 +227,13 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
           continue;
         }
 
-        for (const date of dates) {
+        const datesForAssignment = getTimesheetAutoCreateDatesForAssignment(
+          assignment,
+          regularDatesToCreate,
+          prepDayDates,
+        );
+
+        for (const date of datesForAssignment) {
           const combo = `${assignment.technician_id}-${date}`;
           if (!existingCombos.has(combo)) {
             // Let DB trigger resolve category - don't set it here to keep creation simple
