@@ -6,25 +6,20 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProjectNotesDialog } from "./ProjectNotesDialog";
+import { getJobProjectNote, saveJobProjectNote } from "@/services/projectNotesService";
 
 const mockToast = vi.fn();
 vi.mock("@/hooks/use-toast", () => ({
   useToast: () => ({ toast: mockToast }),
 }));
 
-const mockGetUser = vi.fn();
-const mockMaybeSingle = vi.fn();
-const mockUpsert = vi.fn();
-const mockFrom = vi.fn();
-
-vi.mock("@/services/dataLayerClient", () => ({
-  dataLayerClient: {
-    auth: {
-      getUser: (...args: unknown[]) => mockGetUser(...args),
-    },
-    from: (...args: unknown[]) => mockFrom(...args),
-  },
+vi.mock("@/services/projectNotesService", () => ({
+  getJobProjectNote: vi.fn(),
+  saveJobProjectNote: vi.fn(),
 }));
+
+const mockGetJobProjectNote = vi.mocked(getJobProjectNote);
+const mockSaveJobProjectNote = vi.mocked(saveJobProjectNote);
 
 const createQueryClient = () =>
   new QueryClient({
@@ -58,37 +53,23 @@ const renderDialog = (props?: Partial<React.ComponentProps<typeof ProjectNotesDi
 describe("ProjectNotesDialog", () => {
   beforeEach(() => {
     mockToast.mockReset();
-    mockGetUser.mockReset();
-    mockMaybeSingle.mockReset();
-    mockUpsert.mockReset();
-    mockFrom.mockReset();
+    mockGetJobProjectNote.mockReset();
+    mockSaveJobProjectNote.mockReset();
 
-    mockGetUser.mockResolvedValue({ data: { user: { id: "user-1" } } });
-    mockMaybeSingle.mockResolvedValue({
-      data: {
-        job_id: "job-1",
-        notes: "Initial note",
-        updated_at: "2026-06-05T09:30:00.000Z",
-        updated_by: "user-1",
-      },
-      error: null,
+    mockGetJobProjectNote.mockResolvedValue({
+      job_id: "job-1",
+      notes: "Initial note",
+      updated_at: "2026-06-05T09:30:00.000Z",
+      updated_by: "user-1",
     });
-    mockUpsert.mockResolvedValue({ error: null });
-    mockFrom.mockReturnValue({
-      select: () => ({
-        eq: () => ({
-          maybeSingle: mockMaybeSingle,
-        }),
-      }),
-      upsert: mockUpsert,
-    });
+    mockSaveJobProjectNote.mockResolvedValue(undefined);
   });
 
   it("does not mount the notepad when the user lacks management permissions", () => {
     renderDialog({ canManageNotes: false });
 
     expect(screen.queryByText("Notas de produccion")).not.toBeInTheDocument();
-    expect(mockFrom).not.toHaveBeenCalled();
+    expect(mockGetJobProjectNote).not.toHaveBeenCalled();
   });
 
   it("loads and saves the job project note", async () => {
@@ -102,14 +83,7 @@ describe("ProjectNotesDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: /guardar/i }));
 
     await waitFor(() => {
-      expect(mockUpsert).toHaveBeenCalledWith(
-        {
-          job_id: "job-1",
-          notes: "Updated production note",
-          updated_by: "user-1",
-        },
-        { onConflict: "job_id" },
-      );
+      expect(mockSaveJobProjectNote).toHaveBeenCalledWith("job-1", "Updated production note");
     });
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });

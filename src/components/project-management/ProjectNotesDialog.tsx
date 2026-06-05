@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { queryKeys } from "@/lib/react-query";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { getJobProjectNote, saveJobProjectNote } from "@/services/projectNotesService";
 
 type ProjectNotesDialogProps = {
   open: boolean;
@@ -22,13 +22,6 @@ type ProjectNotesDialogProps = {
   jobId: string;
   jobTitle: string;
   canManageNotes: boolean;
-};
-
-type JobProjectNoteRow = {
-  job_id: string;
-  notes: string;
-  updated_at: string;
-  updated_by: string | null;
 };
 
 const formatUpdatedAt = (value?: string | null) => {
@@ -54,16 +47,7 @@ export const ProjectNotesDialog = ({
   const notesQuery = useQuery({
     queryKey: queryKeys.scope("job-project-notes", jobId),
     enabled: open && canManageNotes && Boolean(jobId),
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient
-        .from("job_project_notes")
-        .select("job_id, notes, updated_at, updated_by")
-        .eq("job_id", jobId)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data as JobProjectNoteRow | null;
-    },
+    queryFn: () => getJobProjectNote(jobId),
   });
 
   React.useEffect(() => {
@@ -72,21 +56,7 @@ export const ProjectNotesDialog = ({
   }, [notesQuery.data?.notes, notesQuery.isLoading, open]);
 
   const saveNotes = useMutation({
-    mutationFn: async (notes: string) => {
-      const { data: authData } = await dataLayerClient.auth.getUser();
-      const { error } = await dataLayerClient
-        .from("job_project_notes")
-        .upsert(
-          {
-            job_id: jobId,
-            notes,
-            updated_by: authData.user?.id ?? null,
-          },
-          { onConflict: "job_id" },
-        );
-
-      if (error) throw error;
-    },
+    mutationFn: (notes: string) => saveJobProjectNote(jobId, notes),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: queryKeys.scope("job-project-notes", jobId),
