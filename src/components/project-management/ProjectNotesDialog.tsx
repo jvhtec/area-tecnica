@@ -1,5 +1,8 @@
 import React from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 import { Loader2, NotebookPen, Save } from "lucide-react";
 
 import {
@@ -27,10 +30,7 @@ type ProjectNotesDialogProps = {
 const formatUpdatedAt = (value?: string | null) => {
   if (!value) return null;
 
-  return new Intl.DateTimeFormat("es-ES", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return format(toZonedTime(parseISO(value), "Europe/Madrid"), "Pp", { locale: es });
 };
 
 export const ProjectNotesDialog = ({
@@ -86,7 +86,7 @@ export const ProjectNotesDialog = ({
         <DialogHeader className="border-b bg-slate-50 px-5 py-4 pr-12 dark:bg-slate-900">
           <DialogTitle className="flex min-w-0 items-center gap-2">
             <NotebookPen className="h-5 w-5 shrink-0 text-slate-600 dark:text-slate-300" />
-            <span className="truncate">Notas de produccion</span>
+            <span className="truncate">Notas de producción</span>
           </DialogTitle>
           <DialogDescription className="sr-only">
             Notas internas del proyecto para usuarios admin y management.
@@ -114,7 +114,7 @@ export const ProjectNotesDialog = ({
               </div>
             ) : (
               <Textarea
-                aria-label="Notas de produccion"
+                aria-label="Notas de producción"
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 className="min-h-[45vh] resize-none whitespace-pre-wrap border-slate-300 bg-background text-base leading-7 shadow-inner dark:border-slate-700"

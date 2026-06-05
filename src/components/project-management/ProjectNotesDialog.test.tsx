@@ -68,14 +68,14 @@ describe("ProjectNotesDialog", () => {
   it("does not mount the notepad when the user lacks management permissions", () => {
     renderDialog({ canManageNotes: false });
 
-    expect(screen.queryByText("Notas de produccion")).not.toBeInTheDocument();
+    expect(screen.queryByText("Notas de producción")).not.toBeInTheDocument();
     expect(mockGetJobProjectNote).not.toHaveBeenCalled();
   });
 
   it("loads and saves the job project note", async () => {
     const { onOpenChange } = renderDialog();
 
-    const textarea = await screen.findByRole("textbox", { name: "Notas de produccion" });
+    const textarea = await screen.findByRole("textbox", { name: "Notas de producción" });
     await waitFor(() => expect(textarea).toHaveValue("Initial note"));
 
     await userEvent.clear(textarea);

@@ -41,6 +41,30 @@ for delete
 to authenticated
 using (public.get_current_user_role() = any (array['admin'::text, 'management'::text]));
 
+create or replace function public.set_job_project_notes_user_audit()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if tg_op = 'INSERT' then
+    new.created_by = auth.uid();
+  else
+    new.created_by = old.created_by;
+  end if;
+
+  new.updated_by = auth.uid();
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_set_job_project_notes_user_audit on public.job_project_notes;
+create trigger trg_set_job_project_notes_user_audit
+before insert or update on public.job_project_notes
+for each row
+execute function public.set_job_project_notes_user_audit();
+
 drop trigger if exists set_job_project_notes_updated_at on public.job_project_notes;
 create trigger set_job_project_notes_updated_at
 before update on public.job_project_notes

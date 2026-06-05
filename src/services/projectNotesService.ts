@@ -18,7 +18,12 @@ export async function getJobProjectNote(jobId: string): Promise<JobProjectNoteRo
 }
 
 export async function saveJobProjectNote(jobId: string, notes: string): Promise<void> {
-  const { data: authData } = await dataLayerClient.auth.getUser();
+  const { data: authData, error: authError } = await dataLayerClient.auth.getUser();
+
+  if (authError) throw authError;
+  if (!authData.user) {
+    throw new Error("An authenticated user is required to save project notes.");
+  }
 
   const { error } = await dataLayerClient
     .from("job_project_notes")
@@ -26,7 +31,7 @@ export async function saveJobProjectNote(jobId: string, notes: string): Promise<
       {
         job_id: jobId,
         notes,
-        updated_by: authData.user?.id ?? null,
+        updated_by: authData.user.id,
       },
       { onConflict: "job_id" },
     );

@@ -366,7 +366,7 @@ export function JobCardNewView({
                   setProjectNotesOpen(true);
                 }}
                 className="h-7 gap-1.5 px-3 text-xs"
-                title="Notas de produccion"
+                title="Notas de producción"
               >
                 <NotebookPen className="h-3.5 w-3.5" />
                 <span>Notas</span>
