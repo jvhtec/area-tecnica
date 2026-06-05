@@ -92,7 +92,6 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
           amount_eur_visible: visible?.amount_eur_visible ?? null,
           amount_breakdown_visible: visible?.amount_breakdown_visible ?? null,
           is_prep_day:
-            t.is_prep_day ||
             prepDayDates.has(t.date) ||
             isPrepDayBreakdown(visible?.amount_breakdown) ||
             isPrepDayBreakdown(visible?.amount_breakdown_visible),
