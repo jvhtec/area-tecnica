@@ -217,6 +217,7 @@ function JobCardNewFull({
   const { selectJob, clearSelection, isJobSelected } = useSelectedJobStore();
   const isSelected = isJobSelected(job.id);
   const [routeSheetOpen, setRouteSheetOpen] = useState(false);
+  const [projectNotesOpen, setProjectNotesOpen] = useState(false);
   const [taskManagerOpen, setTaskManagerOpen] = useState(false);
   const [isGeneratingTransportPdf, setIsGeneratingTransportPdf] = useState(false);
   const [isGeneratingCrewReportPdf, setIsGeneratingCrewReportPdf] = useState(false);
@@ -314,6 +315,7 @@ function JobCardNewFull({
   const [logisticsInitialEventType, setLogisticsInitialEventType] = useState<'load' | 'unload' | undefined>(undefined);
   const { user, userDepartment: currentUserDepartment } = useOptimizedAuth();
   const isManagementUser = isManagementRole(userRole);
+  const canManageProjectNotes = isProjectManagementPage && isManagementUser;
 
   const canGenerateTransportPdf = React.useMemo(() => {
     const normalizedDepartment = (currentUserDepartment || '').trim().toLowerCase();
@@ -1250,6 +1252,9 @@ function JobCardNewFull({
       canGenerateCrewReportPdf={canGenerateCrewReportPdf}
       isGeneratingCrewReportPdf={isGeneratingCrewReportPdf}
       handleGenerateCrewReportPdf={handleGenerateCrewReportPdf}
+      canManageProjectNotes={canManageProjectNotes}
+      projectNotesOpen={projectNotesOpen}
+      setProjectNotesOpen={setProjectNotesOpen}
       foldersAreCreated={foldersAreCreated}
       isFoldersLoading={isFoldersLoading}
       showUpload={showUpload}

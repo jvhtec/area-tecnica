@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { useReducedMotion } from "framer-motion";
-import { ChevronDown, ChevronRight, Download, Eye, FileText, Loader2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, Eye, FileText, Loader2, NotebookPen } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { JobRequirementsEditor } from "@/components/jobs/JobRequirementsEditor";
 import { LightsTaskDialog } from "@/components/lights/LightsTaskDialog";
 import { LogisticsEventDialog } from "@/components/logistics/LogisticsEventDialog";
+import { ProjectNotesDialog } from "@/components/project-management/ProjectNotesDialog";
 import { TransportRequestDialog } from "@/components/logistics/TransportRequestDialog";
 import { SoundTaskDialog } from "@/components/sound/SoundTaskDialog";
 import { TaskManagerDialog } from "@/components/tasks/TaskManagerDialog";
@@ -59,6 +60,9 @@ export interface JobCardNewViewProps {
   canGenerateCrewReportPdf: boolean;
   isGeneratingCrewReportPdf: boolean;
   handleGenerateCrewReportPdf: (e: React.MouseEvent) => void;
+  canManageProjectNotes: boolean;
+  projectNotesOpen: boolean;
+  setProjectNotesOpen: (open: boolean) => void;
 
   foldersAreCreated: boolean;
   isFoldersLoading: boolean;
@@ -173,6 +177,9 @@ export function JobCardNewView({
   canGenerateCrewReportPdf,
   isGeneratingCrewReportPdf,
   handleGenerateCrewReportPdf,
+  canManageProjectNotes,
+  projectNotesOpen,
+  setProjectNotesOpen,
   foldersAreCreated,
   isFoldersLoading,
   showUpload,
@@ -348,6 +355,22 @@ export function JobCardNewView({
               >
                 Hoja de Ruta
               </button>
+            )}
+            {canManageProjectNotes && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setProjectNotesOpen(true);
+                }}
+                className="h-7 gap-1.5 px-3 text-xs"
+                title="Notas de producción"
+              >
+                <NotebookPen className="h-3.5 w-3.5" />
+                <span>Notas</span>
+              </Button>
             )}
             {isProjectManagementPage && job.job_type !== "dryhire" && canGenerateTransportPdf && (
               <button
@@ -590,13 +613,22 @@ export function JobCardNewView({
           <FlexSyncLogDialog jobId={job.id} open={flexLogDialogOpen} onOpenChange={setFlexLogDialogOpen} />
 
           {isProjectManagementPage && (
-            <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
-              <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
-                <div className="h-full overflow-auto">
-                  <ModernHojaDeRuta jobId={job.id} />
-                </div>
-              </DialogContent>
-            </Dialog>
+            <>
+              <Dialog open={routeSheetOpen} onOpenChange={setRouteSheetOpen}>
+                <DialogContent className="max-w-[96vw] w-[96vw] h-[96vh] p-0 overflow-hidden">
+                  <div className="h-full overflow-auto">
+                    <ModernHojaDeRuta jobId={job.id} />
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <ProjectNotesDialog
+                open={projectNotesOpen}
+                onOpenChange={setProjectNotesOpen}
+                jobId={job.id}
+                jobTitle={job.title}
+                canManageNotes={canManageProjectNotes}
+              />
+            </>
           )}
 
           {transportDialogOpen && !canManageTransportRequests && isTechDept && userDepartment && (
