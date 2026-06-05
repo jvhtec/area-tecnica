@@ -326,14 +326,21 @@ export const TimesheetView = ({
 
     try {
       const promises = Array.from(selectedTimesheets).map(timesheetId => {
+        const timesheet = filteredTimesheets.find(t => t.id === timesheetId);
+        const isPrepDay = timesheet ? isPrepDayTimesheet(timesheet) : false;
         const updates: Partial<Timesheet> = {};
 
         if (bulkFormData.start_time) updates.start_time = bulkFormData.start_time;
         if (bulkFormData.end_time) updates.end_time = bulkFormData.end_time;
         if (bulkFormData.break_minutes !== undefined) updates.break_minutes = bulkFormData.break_minutes;
-        if (bulkFormData.overtime_hours !== undefined) updates.overtime_hours = bulkFormData.overtime_hours;
+        if (bulkFormData.overtime_hours !== undefined) {
+          updates.overtime_hours = isPrepDay ? 0 : bulkFormData.overtime_hours;
+        }
         if (bulkFormData.notes) updates.notes = bulkFormData.notes;
         if (bulkFormData.ends_next_day !== undefined) updates.ends_next_day = bulkFormData.ends_next_day;
+        if (!isPrepDay && bulkFormData.category !== undefined) {
+          updates.category = bulkFormData.category;
+        }
 
         console.log('Updating timesheet', timesheetId, 'with:', updates);
         // Skip refetch for bulk operations
