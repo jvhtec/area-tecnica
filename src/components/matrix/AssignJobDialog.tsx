@@ -36,7 +36,7 @@ import {
   AlertDialogTitle
 } from '@/components/ui/alert-dialog';
 import { Loader2, Calendar as CalendarIcon, Clock, CalendarDays, CalendarRange } from 'lucide-react';
-import { format, startOfDay } from 'date-fns';
+import { format } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { toast } from 'sonner';
@@ -86,6 +86,10 @@ const parseDateKey = fromMadridDateKey;
 
 const sortDateKeys = uniqueSortedDateKeys;
 
+/**
+ * Returns every job date that may receive an assignment, including prep/rehearsal
+ * typed dates before the main job span while excluding non-work travel/off days.
+ */
 export const getAssignableJobDateKeys = (job: AssignableJob | null | undefined) => {
   if (!job) return [] as string[];
 
@@ -395,12 +399,15 @@ export const AssignJobDialog = ({
             .single();
 
           if (jobData) {
-            const startDate = startOfDay(new Date(jobData.start_time));
-            const endDate = startOfDay(new Date(jobData.end_time));
+            const startKey = normalizeDateKey(jobData.start_time);
+            const endKey = normalizeDateKey(jobData.end_time);
+            if (!startKey || !endKey) return [];
             const dates: string[] = [];
 
-            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-              dates.push(formatDateKey(d));
+            let cursorKey = startKey;
+            while (cursorKey <= endKey) {
+              dates.push(cursorKey);
+              cursorKey = addMadridCalendarDays(cursorKey, 1);
             }
             return dates;
           }
