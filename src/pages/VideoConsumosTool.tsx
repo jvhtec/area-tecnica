@@ -23,8 +23,6 @@ import { PowerTableControls } from '@/features/technical-tools/power/PowerTableC
 import {
   buildLegacyPowerOverridePayload,
   buildTourPowerDefaultTable,
-  deleteJobPowerRequirementTable,
-  saveJobPowerRequirementTable,
   saveJobPowerRequirementTablesGeneration,
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
@@ -269,56 +267,37 @@ const VideoConsumosTool: React.FC = () => {
     ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
     : tables;
 
-  const savePowerRequirementTable = async (
+  const saveTourOverrideTable = async (
     table: Table,
     { showToast = true }: { showToast?: boolean } = {},
   ) => {
-    if (isOverrideMode && overrideData) {
-      // Save as override for tour date
+    if (!isOverrideMode || !overrideData) {
+      return table.powerRequirementId;
+    }
+
+    try {
       const overrideSuccess = await saveOverride('power', buildLegacyPowerOverridePayload({
         settings: getPowerSettings(),
         table,
       }));
 
-      if (overrideSuccess) {
+      if (overrideSuccess && showToast) {
         toast({
           title: "Success",
           description: "Override saved for tour date",
         });
       }
+
       return table.powerRequirementId;
-    }
-
-    if (!selectedJobId) {
-      return table.powerRequirementId;
-    }
-
-    try {
-      const powerRequirementId = await saveJobPowerRequirementTable({
-        client: dataLayerClient,
-        department: 'video',
-        generationTimestamp: table.generationTimestamp,
-        jobId: selectedJobId,
-        settings: getPowerSettings(),
-        stage: selectedStage,
-        table,
-      });
-
+    } catch (error: any) {
+      console.error('Error saving tour override table:', error);
       if (showToast) {
         toast({
-          title: "Success",
-          description: "Power requirement table saved successfully",
+          title: "Error",
+          description: "Failed to save power override table",
+          variant: "destructive"
         });
       }
-
-      return powerRequirementId;
-    } catch (error: any) {
-      console.error('Error saving power requirement table:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save power requirement table",
-        variant: "destructive"
-      });
       return table.powerRequirementId;
     }
   };
@@ -347,19 +326,14 @@ const VideoConsumosTool: React.FC = () => {
       },
     }) as Table;
 
-    let tableToAdd = newTable;
-    
     // Save based on mode
     if (isTourDefaults) {
       await saveTourDefault(newTable);
-    } else if (isOverrideMode || selectedJobId) {
-      const powerRequirementId = await savePowerRequirementTable(newTable);
-      if (powerRequirementId) {
-        tableToAdd = { ...newTable, powerRequirementId };
-      }
+    } else if (isOverrideMode) {
+      await saveTourOverrideTable(newTable);
     }
-    
-    setTables((prev) => [...prev, tableToAdd]);
+
+    setTables((prev) => [...prev, newTable]);
     resetCurrentTable();
   };
 
@@ -386,26 +360,7 @@ const VideoConsumosTool: React.FC = () => {
         return;
       }
 
-      if (!selectedJobId || isTourDefaults || isOverrideMode || !tableToRemove?.powerRequirementId) {
-        setTables((prev) => prev.filter((table) => table.id !== tableId));
-        return;
-      }
-
-      try {
-        await deleteJobPowerRequirementTable({
-          client: dataLayerClient,
-          jobId: selectedJobId,
-          table: tableToRemove,
-        });
-        setTables((prev) => prev.filter((table) => table.id !== tableId));
-      } catch (error) {
-        console.error('Error deleting power requirement table:', error);
-        toast({
-          title: "Error",
-          description: "Failed to delete power requirement table",
-          variant: "destructive",
-        });
-      }
+      setTables((prev) => prev.filter((table) => table.id !== tableId));
     }
   };
 
@@ -414,7 +369,7 @@ const VideoConsumosTool: React.FC = () => {
       return;
     }
 
-    if (!isOverrideMode && !selectedJobId) {
+    if (!isOverrideMode) {
       return;
     }
 
@@ -427,7 +382,7 @@ const VideoConsumosTool: React.FC = () => {
     pendingTableSaveTimeoutsRef.current[timeoutKey] = window.setTimeout(() => {
       delete pendingTableSaveTimeoutsRef.current[timeoutKey];
 
-      void savePowerRequirementTable(table, { showToast: false }).then((powerRequirementId) => {
+      void saveTourOverrideTable(table, { showToast: false }).then((powerRequirementId) => {
         if (powerRequirementId && powerRequirementId !== table.powerRequirementId) {
           setTables((prev) =>
             prev.map((storedTable) =>
@@ -476,30 +431,6 @@ const VideoConsumosTool: React.FC = () => {
         ? [...defaultTables, ...tables]
         : activeTables;
 
-      if (!isTourDefaults && !isOverrideMode && selectedJobId && allTables.length > 0) {
-        const savedTables = await saveJobPowerRequirementTablesGeneration({
-          client: dataLayerClient,
-          department: 'video',
-          jobId: selectedJobId,
-          settings: getPowerSettings(),
-          stage: selectedStage,
-          tables: allTables,
-        });
-
-        setTables((storedTables) =>
-          storedTables.map((storedTable) => {
-            const savedTable = savedTables.find((saved) => saved.tableId === storedTable.id);
-            return savedTable
-              ? {
-                  ...storedTable,
-                  generationTimestamp: savedTable.generationTimestamp,
-                  powerRequirementId: savedTable.powerRequirementId,
-                }
-              : storedTable;
-          })
-        );
-      }
-
       // Generate power summary for consumos reports
       const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
       const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
@@ -543,7 +474,7 @@ const VideoConsumosTool: React.FC = () => {
       // Auto-complete video Consumos tasks only after successful upload
       // This automation is department-specific: only video department tasks are affected
       let completedTasksCount = 0;
-      if (!isTourDefaults && selectedJobId) {
+      if (!isTourDefaults && !isOverrideMode && selectedJobId) {
         completedTasksCount = await uploadPowerReportAndCompleteTask({
           department: 'video',
           fileName,
@@ -555,6 +486,28 @@ const VideoConsumosTool: React.FC = () => {
         if (completedTasksCount > 0) {
           console.log(`Auto-completed ${completedTasksCount} video Consumos task(s)`);
         }
+
+        const savedTables = await saveJobPowerRequirementTablesGeneration({
+          client: dataLayerClient,
+          department: 'video',
+          jobId: selectedJobId,
+          settings: getPowerSettings(),
+          stage: selectedStage,
+          tables: allTables,
+        });
+
+        setTables((storedTables) =>
+          storedTables.map((storedTable) => {
+            const savedTable = savedTables.find((saved) => saved.tableId === storedTable.id);
+            return savedTable
+              ? {
+                  ...storedTable,
+                  generationTimestamp: savedTable.generationTimestamp,
+                  powerRequirementId: savedTable.powerRequirementId,
+                }
+              : storedTable;
+          })
+        );
         
         toast({
           title: 'Success',

@@ -261,4 +261,52 @@ describe("technical power persistence payloads", () => {
       expect.arrayContaining([{ method: "is", args: ["stage_number", null] }])
     );
   });
+
+  it("clears a scoped generation when the exported table batch is empty", async () => {
+    const { client, operations } = createPowerRequirementTableClient();
+
+    await expect(
+      saveJobPowerRequirementTablesGeneration({
+        client,
+        department: "lights",
+        jobId: "job-1",
+        settings,
+        stage: { number: 1, name: "Main Stage" },
+        tables: [],
+      })
+    ).resolves.toEqual([]);
+
+    expect(operations).toEqual(
+      expect.arrayContaining([
+        { method: "delete", args: [] },
+        { method: "eq", args: ["job_id", "job-1"] },
+        { method: "eq", args: ["department", "lights"] },
+        { method: "eq", args: ["stage_number", 1] },
+      ])
+    );
+    expect(operations).not.toEqual(expect.arrayContaining([{ method: "insert", args: [expect.anything()] }]));
+    expect(operations).not.toEqual(expect.arrayContaining([{ method: "not", args: expect.any(Array) }]));
+  });
+
+  it("clears the department generation when an empty export has no selected stage", async () => {
+    const { client, operations } = createPowerRequirementTableClient();
+
+    await saveJobPowerRequirementTablesGeneration({
+      client,
+      department: "video",
+      jobId: "job-1",
+      settings,
+      tables: [],
+    });
+
+    expect(operations).toEqual(
+      expect.arrayContaining([
+        { method: "delete", args: [] },
+        { method: "eq", args: ["job_id", "job-1"] },
+        { method: "eq", args: ["department", "video"] },
+      ])
+    );
+    expect(operations).not.toEqual(expect.arrayContaining([{ method: "eq", args: ["stage_number", expect.anything()] }]));
+    expect(operations).not.toEqual(expect.arrayContaining([{ method: "is", args: ["stage_number", null] }]));
+  });
 });
