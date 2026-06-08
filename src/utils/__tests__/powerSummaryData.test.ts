@@ -232,7 +232,7 @@ describe('powerSummaryData', () => {
     expect(summary.departments.sound.rows[0].notes).toContain('CEE32A');
   });
 
-  it('keeps only the newest table for the same department and stage even when table names differ', async () => {
+  it('keeps different legacy sets separate for the same department and stage', async () => {
     const supabase = createMockSupabase({
       power_requirement_tables: [
         {
@@ -279,9 +279,99 @@ describe('powerSummaryData', () => {
       supabase,
     });
 
-    expect(summary.departments.sound.rows).toHaveLength(1);
-    expect(summary.departments.sound.rows[0].name).toBe('Side PA');
-    expect(summary.departments.sound.rows[0].positionLabel).toBe('Stage 2');
+    expect(summary.departments.sound.rows).toHaveLength(2);
+    expect(summary.departments.sound.rows.map((row) => row.name)).toEqual([
+      'Main PA',
+      'Side PA',
+    ]);
+  });
+
+  it('keeps every row from the latest timestamped generation for a department and stage', async () => {
+    const supabase = createMockSupabase({
+      power_requirement_tables: [
+        {
+          id: 'sound-old-main',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'Old Main',
+          total_watts: 1000,
+          current_per_phase: 4,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: {
+            generationTimestamp: '2026-04-07T08:00:00.000Z',
+            sourceTableId: 'old-main',
+            rows: [{ quantity: '1', componentId: '1', watts: '1000' }],
+          },
+        },
+        {
+          id: 'sound-old-delay',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'Old Delay',
+          total_watts: 1200,
+          current_per_phase: 5,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: {
+            generationTimestamp: '2026-04-07T08:00:00.000Z',
+            sourceTableId: 'old-delay',
+            rows: [{ quantity: '1', componentId: '1', watts: '1200' }],
+          },
+        },
+        {
+          id: 'sound-new-main',
+          created_at: '2026-04-07T09:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'Main PA',
+          total_watts: 3000,
+          current_per_phase: 12,
+          pdu_type: '63A',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: {
+            generationTimestamp: '2026-04-07T09:00:00.000Z',
+            sourceTableId: 'new-main',
+            rows: [{ quantity: '1', componentId: '1', watts: '3000' }],
+          },
+        },
+        {
+          id: 'sound-new-delay',
+          created_at: '2026-04-07T09:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'Delay PA',
+          total_watts: 2000,
+          current_per_phase: 8,
+          pdu_type: '32A',
+          custom_pdu_type: null,
+          includes_hoist: true,
+          table_data: {
+            generationTimestamp: '2026-04-07T09:00:00.000Z',
+            sourceTableId: 'new-delay',
+            rows: [{ quantity: '1', componentId: '1', watts: '2000' }],
+          },
+        },
+      ],
+    });
+
+    const summary = await loadTechnicalPowerSummaryData({
+      job: { id: 'job-1', job_type: 'single' },
+      supabase,
+    });
+
+    expect(summary.departments.sound.rows).toHaveLength(2);
+    expect(summary.departments.sound.rows.map((row) => row.name)).toEqual([
+      'Main PA',
+      'Delay PA',
+    ]);
+    expect(summary.departments.sound.totalWatts).toBe(5000);
+    expect(summary.departments.sound.rows[1].notes).toContain('CEE32A');
   });
 
   it('keeps same saved table identity separate per festival stage', async () => {
@@ -408,6 +498,75 @@ describe('powerSummaryData', () => {
 
     expect(text).toContain('Potencia Total: 29000.00W');
     expect(text).not.toContain('Potencia Total: 31500.00W');
+  });
+
+  it('formats every row from the latest timestamped generation in hoja de ruta power text', () => {
+    const text = formatPowerRequirementsText([
+      {
+        id: 'sound-old-main',
+        created_at: '2026-04-07T08:00:00.000Z',
+        job_id: 'job-1',
+        department: 'sound',
+        stage_number: null,
+        stage_name: null,
+        table_name: 'Old Main',
+        total_watts: 1000,
+        current_per_phase: 4,
+        pdu_type: '32A',
+        custom_pdu_type: null,
+        custom_position: null,
+        position: null,
+        includes_hoist: false,
+        table_data: {
+          generationTimestamp: '2026-04-07T08:00:00.000Z',
+          rows: [],
+        },
+      } as any,
+      {
+        id: 'sound-new-main',
+        created_at: '2026-04-07T09:00:00.000Z',
+        job_id: 'job-1',
+        department: 'sound',
+        stage_number: null,
+        stage_name: null,
+        table_name: 'Main PA',
+        total_watts: 3000,
+        current_per_phase: 12,
+        pdu_type: '63A',
+        custom_pdu_type: null,
+        custom_position: null,
+        position: null,
+        includes_hoist: false,
+        table_data: {
+          generationTimestamp: '2026-04-07T09:00:00.000Z',
+          rows: [],
+        },
+      } as any,
+      {
+        id: 'sound-new-delay',
+        created_at: '2026-04-07T09:00:00.000Z',
+        job_id: 'job-1',
+        department: 'sound',
+        stage_number: null,
+        stage_name: null,
+        table_name: 'Delay PA',
+        total_watts: 2000,
+        current_per_phase: 8,
+        pdu_type: '32A',
+        custom_pdu_type: null,
+        custom_position: null,
+        position: null,
+        includes_hoist: false,
+        table_data: {
+          generationTimestamp: '2026-04-07T09:00:00.000Z',
+          rows: [],
+        },
+      } as any,
+    ]);
+
+    expect(text).toContain('SOUND - Main PA:');
+    expect(text).toContain('SOUND - Delay PA:');
+    expect(text).not.toContain('Old Main');
   });
 
   it('keeps numeric stage zero when formatting hoja de ruta power text', () => {

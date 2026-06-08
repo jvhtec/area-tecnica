@@ -29,6 +29,7 @@ import {
   buildTourPowerDefaultTable,
   deleteJobPowerRequirementTable,
   saveJobPowerRequirementTable,
+  saveJobPowerRequirementTablesGeneration,
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
 import {
@@ -223,6 +224,7 @@ const ConsumosTool: React.FC = () => {
       const powerRequirementId = await saveJobPowerRequirementTable({
         client: dataLayerClient,
         department: 'sound',
+        generationTimestamp: table.generationTimestamp,
         jobId: selectedJobId,
         settings: getPowerSettings(),
         stage: selectedStage,
@@ -475,6 +477,30 @@ const ConsumosTool: React.FC = () => {
         : isTourDefaults
           ? tourDefaultTables
           : activeTables;
+
+      if (!isTourDefaults && !isJobOverrideMode && selectedJobId && allTables.length > 0) {
+        const savedTables = await saveJobPowerRequirementTablesGeneration({
+          client: dataLayerClient,
+          department: 'sound',
+          jobId: selectedJobId,
+          settings: getPowerSettings(),
+          stage: selectedStage,
+          tables: allTables,
+        });
+
+        setTables((storedTables) =>
+          storedTables.map((storedTable) => {
+            const savedTable = savedTables.find((saved) => saved.tableId === storedTable.id);
+            return savedTable
+              ? {
+                  ...storedTable,
+                  generationTimestamp: savedTable.generationTimestamp,
+                  powerRequirementId: savedTable.powerRequirementId,
+                }
+              : storedTable;
+          })
+        );
+      }
 
       const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
       const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);

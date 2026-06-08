@@ -38,6 +38,7 @@ import {
   buildTourPowerDefaultTable,
   deleteJobPowerRequirementTable,
   saveJobPowerRequirementTable,
+  saveJobPowerRequirementTablesGeneration,
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
 import {
@@ -176,6 +177,7 @@ interface Table {
   customPosition?: string;
   includesHoist?: boolean;
   id?: number | string;
+  generationTimestamp?: string;
   isDefault?: boolean;
   defaultTableId?: string;
   // snapshot of settings at generation time, used for persisting tour defaults
@@ -590,6 +592,7 @@ const LightsConsumosTool: React.FC = () => {
       const powerRequirementId = await saveJobPowerRequirementTable({
         client: dataLayerClient,
         department: 'lights',
+        generationTimestamp: table.generationTimestamp,
         jobId: selectedJobId,
         settings: getPowerSettings({
           phaseMode: table.snapshotPhaseMode,
@@ -808,6 +811,37 @@ const LightsConsumosTool: React.FC = () => {
       const allTables = isOverrideMode
         ? [...defaultTables, ...tables]
         : activeTables;
+
+      if (!isTourDefaults && !isOverrideMode && selectedJobId && allTables.length > 0) {
+        const savedTables = await saveJobPowerRequirementTablesGeneration({
+          client: dataLayerClient,
+          department: 'lights',
+          jobId: selectedJobId,
+          settings: (table) => {
+            const lightsTable = table as Table;
+            return getPowerSettings({
+              phaseMode: lightsTable.snapshotPhaseMode,
+              safetyMargin: lightsTable.snapshotSafetyMargin,
+              voltage: lightsTable.snapshotVoltage,
+            });
+          },
+          stage: selectedStage,
+          tables: allTables,
+        });
+
+        setTables((storedTables) =>
+          storedTables.map((storedTable) => {
+            const savedTable = savedTables.find((saved) => saved.tableId === storedTable.id);
+            return savedTable
+              ? {
+                  ...storedTable,
+                  generationTimestamp: savedTable.generationTimestamp,
+                  powerRequirementId: savedTable.powerRequirementId,
+                }
+              : storedTable;
+          })
+        );
+      }
 
       let logoUrl: string | undefined = undefined;
       try {

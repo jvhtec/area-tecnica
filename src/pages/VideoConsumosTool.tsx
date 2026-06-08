@@ -25,6 +25,7 @@ import {
   buildTourPowerDefaultTable,
   deleteJobPowerRequirementTable,
   saveJobPowerRequirementTable,
+  saveJobPowerRequirementTablesGeneration,
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
 import {
@@ -75,6 +76,7 @@ interface Table {
   position?: string;
   customPosition?: string;
   id?: number | string;
+  generationTimestamp?: string;
   includesHoist?: boolean;
   isDefault?: boolean;
 }
@@ -295,6 +297,7 @@ const VideoConsumosTool: React.FC = () => {
       const powerRequirementId = await saveJobPowerRequirementTable({
         client: dataLayerClient,
         department: 'video',
+        generationTimestamp: table.generationTimestamp,
         jobId: selectedJobId,
         settings: getPowerSettings(),
         stage: selectedStage,
@@ -472,6 +475,30 @@ const VideoConsumosTool: React.FC = () => {
       const allTables = isOverrideMode 
         ? [...defaultTables, ...tables]
         : activeTables;
+
+      if (!isTourDefaults && !isOverrideMode && selectedJobId && allTables.length > 0) {
+        const savedTables = await saveJobPowerRequirementTablesGeneration({
+          client: dataLayerClient,
+          department: 'video',
+          jobId: selectedJobId,
+          settings: getPowerSettings(),
+          stage: selectedStage,
+          tables: allTables,
+        });
+
+        setTables((storedTables) =>
+          storedTables.map((storedTable) => {
+            const savedTable = savedTables.find((saved) => saved.tableId === storedTable.id);
+            return savedTable
+              ? {
+                  ...storedTable,
+                  generationTimestamp: savedTable.generationTimestamp,
+                  powerRequirementId: savedTable.powerRequirementId,
+                }
+              : storedTable;
+          })
+        );
+      }
 
       // Generate power summary for consumos reports
       const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
