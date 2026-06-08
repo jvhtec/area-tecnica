@@ -6,6 +6,10 @@ const migration = readFileSync(
   "supabase/migrations/20260605203000_scope_prep_day_timesheets_to_assignments.sql",
   "utf8",
 );
+const hotfixMigration = readFileSync(
+  "supabase/migrations/20260608120000_preserve_assignment_dialog_prep_day_timesheets.sql",
+  "utf8",
+);
 
 describe("prep day timesheet scope migration", () => {
   it("creates prep-day timesheets only for assignments scoped to that prep date", () => {
@@ -25,5 +29,12 @@ describe("prep day timesheet scope migration", () => {
     expect(migration).toMatch(/deactivate_unassigned_prep_day_timesheet/);
     expect(migration).toMatch(/SET is_active = false/);
     expect(migration).toMatch(/jdt\.type = 'prep_day'/);
+  });
+
+  it("preserves explicitly added assignment-dialog prep-day timesheets", () => {
+    expect(hotfixMigration).toMatch(/deactivate_unassigned_prep_day_timesheet/);
+    expect(hotfixMigration).toMatch(/t\.source IS DISTINCT FROM 'assignment-dialog'/);
+    expect(hotfixMigration).toMatch(/t\.source = 'assignment-dialog'/);
+    expect(hotfixMigration).toMatch(/SET is_active = true/);
   });
 });

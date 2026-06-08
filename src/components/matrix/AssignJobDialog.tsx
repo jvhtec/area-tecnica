@@ -50,22 +50,85 @@ import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCa
 
 
 import { queryKeys } from "@/lib/react-query";
+
+type AssignableJobDateType = {
+  date?: string | null;
+  type?: string | null;
+};
+
+type AssignableJob = {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  color?: string | null;
+  status: string;
+  job_date_types?: AssignableJobDateType[] | null;
+};
+
 interface AssignJobDialogProps {
   open: boolean;
   onClose: () => void;
   technicianId: string;
   date: Date;
-  availableJobs: Array<{
-    id: string;
-    title: string;
-    start_time: string;
-    end_time: string;
-    color?: string;
-    status: string;
-  }>;
+  availableJobs: AssignableJob[];
   existingAssignment?: any;
   preSelectedJobId?: string;
 }
+
+const EXCLUDED_ASSIGNABLE_DATE_TYPES = new Set(['off', 'travel']);
+
+const formatDateKey = (value: Date) => format(value, 'yyyy-MM-dd');
+
+const parseDateKey = (value: string) => new Date(`${value}T00:00:00`);
+
+const nextDateKey = (value: string) => {
+  const next = parseDateKey(value);
+  next.setDate(next.getDate() + 1);
+  return formatDateKey(next);
+};
+
+const sortDateKeys = (keys: Iterable<string>) => Array.from(new Set(keys)).sort();
+
+const normalizeDateKey = (value: string | null | undefined) => {
+  if (!value) return null;
+  const key = String(value).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
+};
+
+export const getAssignableJobDateKeys = (job: AssignableJob | null | undefined) => {
+  if (!job) return [] as string[];
+
+  const keys = new Set<string>();
+  const excludedTypedDates = new Set<string>();
+  const dateTypes = Array.isArray(job.job_date_types) ? job.job_date_types : [];
+
+  dateTypes.forEach((row) => {
+    const key = normalizeDateKey(row?.date);
+    if (!key) return;
+    const type = String(row?.type || '').toLowerCase();
+    if (EXCLUDED_ASSIGNABLE_DATE_TYPES.has(type)) {
+      excludedTypedDates.add(key);
+      return;
+    }
+    keys.add(key);
+  });
+
+  if (job.start_time) {
+    const startKey = formatDateKey(new Date(job.start_time));
+    const endKey = job.end_time ? formatDateKey(new Date(job.end_time)) : startKey;
+    let cursorKey = startKey;
+
+    while (cursorKey <= endKey) {
+      if (!excludedTypedDates.has(cursorKey)) {
+        keys.add(cursorKey);
+      }
+      cursorKey = nextDateKey(cursorKey);
+    }
+  }
+
+  return sortDateKeys(keys);
+};
 
 export const AssignJobDialog = ({
   open,
@@ -145,6 +208,11 @@ export const AssignJobDialog = ({
 
   const hasExistingTimesheetsForSelectedJob = (existingTimesheets?.length ?? 0) > 0;
   const isModifyingSelectedJob = isModifyingSameJobByContext || hasExistingTimesheetsForSelectedJob;
+  const existingTimesheetDateKeys = useMemo(
+    () => sortDateKeys((existingTimesheets || []).map((existingDate) => normalizeDateKey(existingDate)).filter((key): key is string => Boolean(key))),
+    [existingTimesheets],
+  );
+  const existingTimesheetDateSet = useMemo(() => new Set(existingTimesheetDateKeys), [existingTimesheetDateKeys]);
 
   // Set initial role if reassigning
   React.useEffect(() => {
@@ -317,6 +385,38 @@ export const AssignJobDialog = ({
         assignment_source: 'direct' as const,
       } as const;
 
+      const coverageDates: string[] = await (async () => {
+        if (coverageMode === 'multi') {
+          const uniqueKeys = sortDateKeys((multiDates || []).map((multiDate) => formatDateKey(multiDate)));
+          if (uniqueKeys.length === 0) {
+            throw new Error('Selecciona al menos una fecha');
+          }
+          return uniqueKeys;
+        }
+        if (coverageMode === 'single' && assignmentDate) {
+          return [assignmentDate];
+        }
+        if (coverageMode === 'full') {
+          // For full job coverage, get all dates from job start to end
+          const { data: jobData } = await dataLayerClient.from('jobs')
+            .select('start_time, end_time')
+            .eq('id', selectedJobId)
+            .single();
+
+          if (jobData) {
+            const startDate = startOfDay(new Date(jobData.start_time));
+            const endDate = startOfDay(new Date(jobData.end_time));
+            const dates: string[] = [];
+
+            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
+              dates.push(formatDateKey(d));
+            }
+            return dates;
+          }
+        }
+        return [];
+      })();
+
       // Before writing, check if an assignment already exists for this job + technician
       const { data: existingRow } = await dataLayerClient.from('job_assignments')
         .select('job_id, technician_id, single_day, assignment_date, status')
@@ -324,13 +424,19 @@ export const AssignJobDialog = ({
         .eq('technician_id', technicianId)
         .maybeSingle();
 
-      // For multi-date selection, mark as single_day=true with first date to avoid assigning full job span
+      // For multi-date selection, keep the base row single-day scoped without implying full job coverage.
       const desiredSingleDay = coverageMode !== 'full';
-      const desiredAssignmentDate = coverageMode === 'single'
-        ? assignmentDate
-        : coverageMode === 'multi' && multiDates && multiDates.length > 0
-          ? format(multiDates[0], 'yyyy-MM-dd')
-          : null;
+      const desiredAssignmentDate = desiredSingleDay ? coverageDates[0] ?? null : null;
+      const preserveExistingScopedDate =
+        Boolean(existingRow) &&
+        isModifyingSelectedJob &&
+        modificationMode === 'add' &&
+        coverageMode !== 'full' &&
+        Boolean(existingRow?.assignment_date);
+      const nextSingleDay = preserveExistingScopedDate ? existingRow?.single_day ?? desiredSingleDay : desiredSingleDay;
+      const nextAssignmentDate = preserveExistingScopedDate
+        ? existingRow?.assignment_date ?? desiredAssignmentDate
+        : desiredAssignmentDate;
 
       if (existingRow) {
         // Update the existing base row (whole job or single) to align with the requested coverage
@@ -343,8 +449,8 @@ export const AssignJobDialog = ({
           // Do not downgrade a confirmed assignment to invited
           status: existingRow.status === 'confirmed' && basePayload.status !== 'confirmed' ? 'confirmed' : basePayload.status,
           response_time: basePayload.status === 'confirmed' ? basePayload.response_time : existingRow.status === 'confirmed' ? (existingRow as any).response_time ?? null : null,
-          single_day: desiredSingleDay,
-          assignment_date: desiredAssignmentDate,
+          single_day: nextSingleDay,
+          assignment_date: nextAssignmentDate,
           assignment_source: basePayload.assignment_source,
         };
 
@@ -397,38 +503,6 @@ export const AssignJobDialog = ({
       } else {
         existingDates = existingTimesheets || [];
       }
-
-      const coverageDates: string[] = await (async () => {
-        if (coverageMode === 'multi') {
-          const uniqueKeys = Array.from(new Set((multiDates || []).map(d => format(d, 'yyyy-MM-dd'))));
-          if (uniqueKeys.length === 0) {
-            throw new Error('Selecciona al menos una fecha');
-          }
-          return uniqueKeys;
-        }
-        if (coverageMode === 'single' && assignmentDate) {
-          return [assignmentDate];
-        }
-        if (coverageMode === 'full') {
-          // For full job coverage, get all dates from job start to end
-          const { data: jobData } = await dataLayerClient.from('jobs')
-            .select('start_time, end_time')
-            .eq('id', selectedJobId)
-            .single();
-
-          if (jobData) {
-            const startDate = startOfDay(new Date(jobData.start_time));
-            const endDate = startOfDay(new Date(jobData.end_time));
-            const dates: string[] = [];
-
-            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-              dates.push(format(d, 'yyyy-MM-dd'));
-            }
-            return dates;
-          }
-        }
-        return [];
-      })();
 
       // Smart timesheet management based on modification mode
       if (isModifyingSelectedJob) {
@@ -708,22 +782,54 @@ export const AssignJobDialog = ({
     setAssignAsConfirmed(checked === true);
   };
 
-  // Build selected job date range to constrain calendar selection
+  // Build selected job dates to constrain calendar selection.
   const selectedJobMeta = useMemo(() => {
     const j = selectedJob;
-    if (!j) return null as null | { start?: Date; end?: Date };
-    const s = j.start_time ? new Date(j.start_time) : undefined;
-    const e = j.end_time ? new Date(j.end_time) : s;
-    if (s) s.setHours(0, 0, 0, 0);
-    if (e) e.setHours(0, 0, 0, 0);
-    return { start: s, end: e };
+    if (!j) return null as null | { dateKeys: Set<string> };
+    const dateKeys = new Set(getAssignableJobDateKeys(j));
+    return { dateKeys };
   }, [selectedJob]);
 
-  const isAllowedDate = (d: Date) => {
-    if (!selectedJobMeta?.start || !selectedJobMeta?.end) return true;
-    const t = new Date(d); t.setHours(0, 0, 0, 0);
-    return t >= selectedJobMeta.start && t <= selectedJobMeta.end;
-  };
+  const isAllowedDate = React.useCallback((d: Date) => {
+    const key = formatDateKey(d);
+    if (existingTimesheetDateSet.has(key)) return true;
+    if (!selectedJobMeta || selectedJobMeta.dateKeys.size === 0) return true;
+    return selectedJobMeta.dateKeys.has(key);
+  }, [existingTimesheetDateSet, selectedJobMeta]);
+
+  React.useEffect(() => {
+    if (!open || coverageMode !== 'multi' || !isModifyingSelectedJob || existingTimesheetDateKeys.length === 0) {
+      return;
+    }
+
+    setMultiDates((currentDates) => {
+      const nextByKey = new Map<string, Date>();
+      currentDates.forEach((currentDate) => {
+        if (isAllowedDate(currentDate)) {
+          nextByKey.set(formatDateKey(currentDate), currentDate);
+        }
+      });
+      existingTimesheetDateKeys.forEach((existingDateKey) => {
+        const existingDate = parseDateKey(existingDateKey);
+        if (isAllowedDate(existingDate)) {
+          nextByKey.set(existingDateKey, existingDate);
+        }
+      });
+
+      const nextDates = Array.from(nextByKey.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([, nextDate]) => nextDate);
+      const currentKey = currentDates.map(formatDateKey).sort().join('|');
+      const nextKey = nextDates.map(formatDateKey).join('|');
+      return currentKey === nextKey ? currentDates : nextDates;
+    });
+  }, [
+    open,
+    coverageMode,
+    isModifyingSelectedJob,
+    existingTimesheetDateKeys,
+    isAllowedDate,
+  ]);
 
   const formatJobRange = (start?: string | null, end?: string | null) => {
     if (!start || !end) return null;

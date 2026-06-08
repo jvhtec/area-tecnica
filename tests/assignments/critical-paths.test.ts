@@ -58,7 +58,7 @@ vi.mock("@/services/syncTimesheetCategories", () => ({
   syncTimesheetCategoriesForAssignment: syncTimesheetCategoriesMock,
 }));
 
-import { AssignJobDialog } from "@/components/matrix/AssignJobDialog";
+import { AssignJobDialog, getAssignableJobDateKeys } from "@/components/matrix/AssignJobDialog";
 
 async function getActualConflictCheck() {
   const actual = await vi.importActual<typeof import("@/utils/technicianAvailability")>(
@@ -122,11 +122,10 @@ const configureDialogSupabase = ({
   endTime?: string;
 } = {}) => {
   const insertMock = vi.fn().mockResolvedValue({ error: null });
+  const updateBuilder = createMockQueryBuilder({ data: null, error: null });
 
   mockSupabase.from.mockImplementation((table: string) => {
     if (table === "job_assignments") {
-      const updateBuilder = createMockQueryBuilder({ data: null, error: null });
-
       return {
         select: vi.fn((columns: string) => {
           if (columns === "job_id, technician_id, single_day, assignment_date, status") {
@@ -179,17 +178,37 @@ const configureDialogSupabase = ({
     return createMockQueryBuilder();
   });
 
-  return { insertMock };
+  return { insertMock, updateMock: updateBuilder.update };
 };
 
 const renderAssignmentDialog = async ({
   date = new Date("2026-12-01T00:00:00Z"),
   switchToSingleDay = false,
+  switchToMultiDay = false,
+  existingTimesheetDates = [],
+  availableJobs = [baseJob],
+  submit = true,
 }: {
   date?: Date;
   switchToSingleDay?: boolean;
+  switchToMultiDay?: boolean;
+  existingTimesheetDates?: string[];
+  availableJobs?: typeof baseJob[];
+  submit?: boolean;
 } = {}) => {
   const user = userEvent.setup();
+  if (existingTimesheetDates.length > 0) {
+    useQueryMock.mockImplementation(({ queryKey }: { queryKey: any[] }) => {
+      const key = queryKey[0];
+      if (key === "technician") {
+        return { data: defaultTechnician, isLoading: false };
+      }
+      if (key === "existing-timesheets") {
+        return { data: existingTimesheetDates, isLoading: false };
+      }
+      return { data: undefined, isLoading: false };
+    });
+  }
 
   render(
     React.createElement(AssignJobDialog, {
@@ -197,7 +216,7 @@ const renderAssignmentDialog = async ({
       onClose: vi.fn(),
       technicianId: "tech-1",
       date,
-      availableJobs: [baseJob],
+      availableJobs,
       preSelectedJobId: baseJob.id,
     }),
   );
@@ -210,8 +229,13 @@ const renderAssignmentDialog = async ({
   if (switchToSingleDay) {
     await user.click(screen.getByRole("tab", { name: /día suelto/i }));
   }
+  if (switchToMultiDay) {
+    await user.click(screen.getByRole("tab", { name: /varios días/i }));
+  }
 
-  await user.click(screen.getByRole("button", { name: /asignar trabajo/i }));
+  if (submit) {
+    await user.click(screen.getByRole("button", { name: /asignar trabajo/i }));
+  }
 
   return { user };
 };
@@ -379,6 +403,21 @@ describe("Assignments Critical Paths", () => {
   });
 
   describe("Coverage modes", () => {
+    it("includes prep days before the tour date in assignable picker dates", () => {
+      expect(
+        getAssignableJobDateKeys({
+          ...baseJob,
+          start_time: "2026-06-11T08:00:00Z",
+          end_time: "2026-06-11T20:00:00Z",
+          job_date_types: [
+            { date: "2026-06-08", type: "prep_day" },
+            { date: "2026-06-09", type: "prep_day" },
+            { date: "2026-06-10", type: "travel" },
+          ],
+        }),
+      ).toEqual(["2026-06-08", "2026-06-09", "2026-06-11"]);
+    });
+
     it("creates a single-day assignment and toggles only the selected date", async () => {
       const { insertMock } = configureDialogSupabase();
 
@@ -414,6 +453,66 @@ describe("Assignments Critical Paths", () => {
         dateIso: "2026-12-02",
         present: true,
         source: "assignment-dialog",
+      });
+    });
+
+    it("keeps existing scoped assignment metadata when adding a prep date", async () => {
+      const { updateMock } = configureDialogSupabase({
+        existingAssignmentRow: {
+          job_id: "job-1",
+          technician_id: "tech-1",
+          single_day: true,
+          assignment_date: "2026-12-01",
+          status: "invited",
+        },
+        existingTimesheetDates: ["2026-12-01"],
+      });
+
+      await renderAssignmentDialog({
+        date: new Date("2026-12-02T00:00:00Z"),
+        switchToSingleDay: true,
+        existingTimesheetDates: ["2026-12-01"],
+      });
+
+      await waitFor(() => {
+        expect(updateMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            single_day: true,
+            assignment_date: "2026-12-01",
+          }),
+        );
+      });
+      expect(toggleTimesheetDayMock).toHaveBeenCalledTimes(1);
+      expect(toggleTimesheetDayMock).toHaveBeenCalledWith({
+        jobId: "job-1",
+        technicianId: "tech-1",
+        dateIso: "2026-12-02",
+        present: true,
+        source: "assignment-dialog",
+      });
+    });
+
+    it("preselects existing timesheet dates when using multi-day add mode", async () => {
+      configureDialogSupabase({
+        existingAssignmentRow: {
+          job_id: "job-1",
+          technician_id: "tech-1",
+          single_day: true,
+          assignment_date: "2026-12-01",
+          status: "invited",
+        },
+        existingTimesheetDates: ["2026-12-01", "2026-12-02"],
+      });
+
+      await renderAssignmentDialog({
+        date: new Date("2026-12-01T00:00:00Z"),
+        switchToMultiDay: true,
+        existingTimesheetDates: ["2026-12-01", "2026-12-02"],
+        submit: false,
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/2 día\(s\) seleccionado\(s\)/i)).toBeInTheDocument();
       });
     });
 
