@@ -47,6 +47,8 @@ import { checkTimeConflictEnhanced, ConflictCheckResult } from '@/utils/technici
 import { toggleTimesheetDay } from '@/services/toggleTimesheetDay';
 import { removeTimesheetAssignment } from '@/services/removeTimesheetAssignment';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
+import { normalizeDateKey, uniqueSortedDateKeys } from '@/utils/assignmentWorkDates';
+import { addMadridCalendarDays, formatMadridDateKey, fromMadridDateKey } from '@/utils/timezoneUtils';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -78,23 +80,11 @@ interface AssignJobDialogProps {
 
 const EXCLUDED_ASSIGNABLE_DATE_TYPES = new Set(['off', 'travel']);
 
-const formatDateKey = (value: Date) => format(value, 'yyyy-MM-dd');
+const formatDateKey = formatMadridDateKey;
 
-const parseDateKey = (value: string) => new Date(`${value}T00:00:00`);
+const parseDateKey = fromMadridDateKey;
 
-const nextDateKey = (value: string) => {
-  const next = parseDateKey(value);
-  next.setDate(next.getDate() + 1);
-  return formatDateKey(next);
-};
-
-const sortDateKeys = (keys: Iterable<string>) => Array.from(new Set(keys)).sort();
-
-const normalizeDateKey = (value: string | null | undefined) => {
-  if (!value) return null;
-  const key = String(value).slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : null;
-};
+const sortDateKeys = uniqueSortedDateKeys;
 
 export const getAssignableJobDateKeys = (job: AssignableJob | null | undefined) => {
   if (!job) return [] as string[];
@@ -115,15 +105,16 @@ export const getAssignableJobDateKeys = (job: AssignableJob | null | undefined) 
   });
 
   if (job.start_time) {
-    const startKey = formatDateKey(new Date(job.start_time));
-    const endKey = job.end_time ? formatDateKey(new Date(job.end_time)) : startKey;
+    const startKey = normalizeDateKey(job.start_time);
+    const endKey = normalizeDateKey(job.end_time) ?? startKey;
+    if (!startKey) return sortDateKeys(keys);
     let cursorKey = startKey;
 
     while (cursorKey <= endKey) {
       if (!excludedTypedDates.has(cursorKey)) {
         keys.add(cursorKey);
       }
-      cursorKey = nextDateKey(cursorKey);
+      cursorKey = addMadridCalendarDays(cursorKey, 1);
     }
   }
 
