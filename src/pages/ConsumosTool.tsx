@@ -27,8 +27,6 @@ import {
   buildPowerTableData,
   buildPowerTableMetadata,
   buildTourPowerDefaultTable,
-  deleteJobPowerRequirementTable,
-  saveJobPowerRequirementTable,
   saveJobPowerRequirementTablesGeneration,
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
@@ -216,33 +214,6 @@ const ConsumosTool: React.FC = () => {
     ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
     : tables;
 
-  const savePowerRequirementTable = async (
-    table: Table,
-    { showToast = true }: { showToast?: boolean } = {},
-  ) => {
-    try {
-      const powerRequirementId = await saveJobPowerRequirementTable({
-        client: dataLayerClient,
-        department: 'sound',
-        generationTimestamp: table.generationTimestamp,
-        jobId: selectedJobId,
-        settings: getPowerSettings(),
-        stage: selectedStage,
-        table,
-      });
-
-      if (showToast) {
-        toast({ title: "Success", description: "Power requirement table saved successfully" });
-      }
-
-      return powerRequirementId;
-    } catch (error: any) {
-      console.error('Error saving power requirement table:', error);
-      toast({ title: "Error", description: "Failed to save power requirement table", variant: "destructive" });
-      return table.powerRequirementId;
-    }
-  };
-
   // NEW: Save as tour defaults using the new system
   const { createTable: _createTourDefaultTableInternal } = { createTable: createTourDefaultTable }; // keep name stable
   const saveTourDefault = async (table: Table) => {
@@ -336,20 +307,13 @@ const ConsumosTool: React.FC = () => {
       },
     }) as Table;
 
-    let tableToAdd = newTable;
-
     if (isTourDefaults) {
       // user can tweak before saving defaults
     } else if (isJobOverrideMode) {
       await saveTourOverride(newTable);
-    } else if (selectedJobId) {
-      const powerRequirementId = await savePowerRequirementTable(newTable);
-      if (powerRequirementId) {
-        tableToAdd = { ...newTable, powerRequirementId };
-      }
     }
 
-    setTables((prev) => [...prev, tableToAdd]);
+    setTables((prev) => [...prev, newTable]);
     resetCurrentTable();
   };
 
@@ -371,22 +335,7 @@ const ConsumosTool: React.FC = () => {
       return;
     }
 
-    if (!selectedJobId || isTourDefaults || isJobOverrideMode || !tableToRemove?.powerRequirementId) {
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
-      return;
-    }
-
-    try {
-      await deleteJobPowerRequirementTable({
-        client: dataLayerClient,
-        jobId: selectedJobId,
-        table: tableToRemove,
-      });
-      setTables((prev) => prev.filter((table) => table.id !== tableId));
-    } catch (error) {
-      console.error('Error deleting power requirement table:', error);
-      toast({ title: "Error", description: "Failed to delete power requirement table", variant: "destructive" });
-    }
+    setTables((prev) => prev.filter((table) => table.id !== tableId));
   };
 
   // Save unsaved default tables
@@ -450,15 +399,6 @@ const ConsumosTool: React.FC = () => {
           override_data: buildPowerTableData(updatedTable, getPowerSettings()),
         }
       });
-    } else if (selectedJobId) {
-      const powerRequirementId = await savePowerRequirementTable(updatedTable, { showToast: false });
-      if (powerRequirementId && powerRequirementId !== updatedTable.powerRequirementId) {
-        setTables((prev) =>
-          prev.map((table) =>
-            table.id === tableId ? { ...table, powerRequirementId } : table
-          )
-        );
-      }
     }
   };
 
@@ -477,30 +417,6 @@ const ConsumosTool: React.FC = () => {
         : isTourDefaults
           ? tourDefaultTables
           : activeTables;
-
-      if (!isTourDefaults && !isJobOverrideMode && selectedJobId && allTables.length > 0) {
-        const savedTables = await saveJobPowerRequirementTablesGeneration({
-          client: dataLayerClient,
-          department: 'sound',
-          jobId: selectedJobId,
-          settings: getPowerSettings(),
-          stage: selectedStage,
-          tables: allTables,
-        });
-
-        setTables((storedTables) =>
-          storedTables.map((storedTable) => {
-            const savedTable = savedTables.find((saved) => saved.tableId === storedTable.id);
-            return savedTable
-              ? {
-                  ...storedTable,
-                  generationTimestamp: savedTable.generationTimestamp,
-                  powerRequirementId: savedTable.powerRequirementId,
-                }
-              : storedTable;
-          })
-        );
-      }
 
       const totalSystemWatts = allTables.reduce((sum, table) => sum + (table.totalWatts || 0), 0);
       const totalSystemAmps = allTables.reduce((sum, table) => sum + (table.currentPerPhase || 0), 0);
@@ -561,6 +477,30 @@ const ConsumosTool: React.FC = () => {
         if (completedTasksCount > 0) {
           console.log(`Auto-completed ${completedTasksCount} sound Consumos task(s)`);
         }
+      }
+
+      if (!isTourDefaults && !isJobOverrideMode && selectedJobId) {
+        const savedTables = await saveJobPowerRequirementTablesGeneration({
+          client: dataLayerClient,
+          department: 'sound',
+          jobId: selectedJobId,
+          settings: getPowerSettings(),
+          stage: selectedStage,
+          tables: allTables,
+        });
+
+        setTables((storedTables) =>
+          storedTables.map((storedTable) => {
+            const savedTable = savedTables.find((saved) => saved.tableId === storedTable.id);
+            return savedTable
+              ? {
+                  ...storedTable,
+                  generationTimestamp: savedTable.generationTimestamp,
+                  powerRequirementId: savedTable.powerRequirementId,
+                }
+              : storedTable;
+          })
+        );
       }
 
       toast({

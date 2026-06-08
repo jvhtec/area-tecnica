@@ -135,19 +135,24 @@ const deleteStalePowerRequirementGenerationRows = async ({
   department: TechnicalDepartment;
   keepIds: string[];
   jobId: string;
-  stageNumber: number | null;
+  stageNumber?: number | null;
 }) => {
   let deleteQuery = client
     .from("power_requirement_tables")
     .delete()
     .eq("job_id", jobId)
-    .eq("department", department)
-    .not("id", "in", formatPostgrestInList(keepIds));
+    .eq("department", department);
 
-  deleteQuery =
-    stageNumber === null
-      ? deleteQuery.is("stage_number", null)
-      : deleteQuery.eq("stage_number", stageNumber);
+  if (keepIds.length > 0) {
+    deleteQuery = deleteQuery.not("id", "in", formatPostgrestInList(keepIds));
+  }
+
+  if (stageNumber !== undefined) {
+    deleteQuery =
+      stageNumber === null
+        ? deleteQuery.is("stage_number", null)
+        : deleteQuery.eq("stage_number", stageNumber);
+  }
 
   const { error } = await deleteQuery;
   if (error) throw error;
@@ -224,7 +229,16 @@ export const saveJobPowerRequirementTablesGeneration = async ({
   stage?: TechnicalStage | null;
   tables: PowerTable[];
 }): Promise<SavedPowerRequirementGenerationTable[]> => {
-  if (tables.length === 0) return [];
+  if (tables.length === 0) {
+    await deleteStalePowerRequirementGenerationRows({
+      client,
+      department,
+      keepIds: [],
+      jobId,
+      stageNumber: stage?.number,
+    });
+    return [];
+  }
 
   const payloads = tables.map((table) =>
     buildPowerRequirementInsert({

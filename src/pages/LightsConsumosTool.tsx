@@ -36,8 +36,6 @@ import {
   buildPowerTableData,
   buildPowerTableMetadata,
   buildTourPowerDefaultTable,
-  deleteJobPowerRequirementTable,
-  saveJobPowerRequirementTable,
   saveJobPowerRequirementTablesGeneration,
   uploadPowerReportAndCompleteTask,
 } from '@/features/technical-tools/power/powerPersistence';
@@ -565,59 +563,44 @@ const LightsConsumosTool: React.FC = () => {
 
   const recommendPDU = (currentLine: number) => recommendPowerPdu(currentLine, pduOptions);
 
-  const savePowerRequirementTable = async (
+  const saveTourOverrideTable = async (
     table: Table,
     { showToast = true }: { showToast?: boolean } = {},
   ) => {
-    if (isOverrideMode && overrideData) {
-      // Save as override for tour date
-      const overrideSuccess = await saveOverride('power', buildLegacyPowerOverridePayload({
-        settings: getPowerSettings(),
-        table,
-      }));
-
-      if (overrideSuccess) {
-        toast({
-          title: "Success",
-          description: "Override saved for tour date",
-        });
-      }
+    if (!isOverrideMode || !overrideData) {
       return table.powerRequirementId;
     }
 
-    // Original job-based save logic
-    if (!selectedJobId) return;
+    const overrideSuccess = await saveOverride('power', buildLegacyPowerOverridePayload({
+      settings: getPowerSettings(),
+      table,
+    }));
 
-    try {
-      const powerRequirementId = await saveJobPowerRequirementTable({
-        client: dataLayerClient,
-        department: 'lights',
-        generationTimestamp: table.generationTimestamp,
-        jobId: selectedJobId,
-        settings: getPowerSettings({
-          phaseMode: table.snapshotPhaseMode,
-          safetyMargin: table.snapshotSafetyMargin,
-          voltage: table.snapshotVoltage,
-        }),
-        stage: selectedStage,
-        table,
+    if (overrideSuccess && showToast) {
+      toast({
+        title: "Success",
+        description: "Override saved for tour date",
       });
+    }
 
-      if (showToast) {
+    return table.powerRequirementId;
+  };
+
+  const saveTourOverrideTableWithErrorHandling = async (
+    table: Table,
+    options: { showToast?: boolean } = {},
+  ) => {
+    try {
+      return await saveTourOverrideTable(table, options);
+    } catch (error: unknown) {
+      console.error('Error saving tour override table:', error);
+      if (options.showToast !== false) {
         toast({
-          title: "Éxito",
-          description: "La tabla de requerimientos de potencia se ha guardado exitosamente",
+          title: "Error",
+          description: "Error al guardar la anulación de potencia",
+          variant: "destructive",
         });
       }
-
-      return powerRequirementId;
-    } catch (error: unknown) {
-      console.error('Error saving power requirement table:', error);
-      toast({
-        title: "Error",
-        description: "Error al guardar la tabla de requerimientos de potencia",
-        variant: "destructive",
-      });
       return table.powerRequirementId;
     }
   };
@@ -685,18 +668,13 @@ const LightsConsumosTool: React.FC = () => {
       snapshotVoltage: voltage,
     };
 
-    let tableToAdd = newTable;
-
     if (isTourDefaults) {
       // user can review before saving defaults
-    } else if (isOverrideMode || selectedJobId) {
-      const powerRequirementId = await savePowerRequirementTable(newTable);
-      if (powerRequirementId) {
-        tableToAdd = { ...newTable, powerRequirementId };
-      }
+    } else if (isOverrideMode) {
+      await saveTourOverrideTableWithErrorHandling(newTable);
     }
 
-    setTables((prev) => [...prev, tableToAdd]);
+    setTables((prev) => [...prev, newTable]);
     resetCurrentTable();
   };
 
@@ -729,26 +707,7 @@ const LightsConsumosTool: React.FC = () => {
         return;
       }
 
-      if (!selectedJobId || isTourDefaults || isOverrideMode || !tableToRemove?.powerRequirementId) {
-        setTables((prev) => prev.filter((table) => table.id !== tableId));
-        return;
-      }
-
-      try {
-        await deleteJobPowerRequirementTable({
-          client: dataLayerClient,
-          jobId: selectedJobId,
-          table: tableToRemove,
-        });
-        setTables((prev) => prev.filter((table) => table.id !== tableId));
-      } catch (error) {
-        console.error('Error deleting power requirement table:', error);
-        toast({
-          title: "Error",
-          description: "Error al eliminar la tabla de requerimientos de potencia",
-          variant: "destructive",
-        });
-      }
+      setTables((prev) => prev.filter((table) => table.id !== tableId));
     }
   };
 
@@ -770,8 +729,8 @@ const LightsConsumosTool: React.FC = () => {
                 metadata: buildPowerTableMetadata(updatedTable, settings),
               },
             });
-          } else if (!isTourDefaults && (isOverrideMode || selectedJobId)) {
-            void savePowerRequirementTable(updatedTable, { showToast: false })
+          } else if (isOverrideMode) {
+            void saveTourOverrideTableWithErrorHandling(updatedTable, { showToast: false })
               .then((powerRequirementId) => {
                 if (powerRequirementId && powerRequirementId !== updatedTable.powerRequirementId) {
                   setTables((storedTables) =>
@@ -811,37 +770,6 @@ const LightsConsumosTool: React.FC = () => {
       const allTables = isOverrideMode
         ? [...defaultTables, ...tables]
         : activeTables;
-
-      if (!isTourDefaults && !isOverrideMode && selectedJobId && allTables.length > 0) {
-        const savedTables = await saveJobPowerRequirementTablesGeneration({
-          client: dataLayerClient,
-          department: 'lights',
-          jobId: selectedJobId,
-          settings: (table) => {
-            const lightsTable = table as Table;
-            return getPowerSettings({
-              phaseMode: lightsTable.snapshotPhaseMode,
-              safetyMargin: lightsTable.snapshotSafetyMargin,
-              voltage: lightsTable.snapshotVoltage,
-            });
-          },
-          stage: selectedStage,
-          tables: allTables,
-        });
-
-        setTables((storedTables) =>
-          storedTables.map((storedTable) => {
-            const savedTable = savedTables.find((saved) => saved.tableId === storedTable.id);
-            return savedTable
-              ? {
-                  ...storedTable,
-                  generationTimestamp: savedTable.generationTimestamp,
-                  powerRequirementId: savedTable.powerRequirementId,
-                }
-              : storedTable;
-          })
-        );
-      }
 
       let logoUrl: string | undefined = undefined;
       try {
@@ -895,6 +823,37 @@ const LightsConsumosTool: React.FC = () => {
         if (completedTasksCount > 0) {
           console.log(`Auto-completed ${completedTasksCount} lights Consumos task(s)`);
         }
+      }
+
+      if (!isTourDefaults && !isOverrideMode && selectedJobId) {
+        const savedTables = await saveJobPowerRequirementTablesGeneration({
+          client: dataLayerClient,
+          department: 'lights',
+          jobId: selectedJobId,
+          settings: (table) => {
+            const lightsTable = table as Table;
+            return getPowerSettings({
+              phaseMode: lightsTable.snapshotPhaseMode,
+              safetyMargin: lightsTable.snapshotSafetyMargin,
+              voltage: lightsTable.snapshotVoltage,
+            });
+          },
+          stage: selectedStage,
+          tables: allTables,
+        });
+
+        setTables((storedTables) =>
+          storedTables.map((storedTable) => {
+            const savedTable = savedTables.find((saved) => saved.tableId === storedTable.id);
+            return savedTable
+              ? {
+                  ...storedTable,
+                  generationTimestamp: savedTable.generationTimestamp,
+                  powerRequirementId: savedTable.powerRequirementId,
+                }
+              : storedTable;
+          })
+        );
       }
 
       toast({
