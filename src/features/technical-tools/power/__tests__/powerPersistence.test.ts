@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildPowerTableData,
@@ -24,6 +24,8 @@ const settings = {
   safetyMargin: 20,
   voltage: 400,
 };
+
+const successfulResponse = <T>(data: T): { data: T; error: null } => ({ data, error: null });
 
 const createPowerRequirementTableClient = () => {
   const operations: Array<{ method: string; args: unknown[] }> = [];
@@ -54,9 +56,9 @@ const createPowerRequirementTableClient = () => {
         operations.push({ method: "select", args: [columns] });
         return builder;
       }),
-      single: vi.fn(async () => ({ data: { id: "new-power-requirement-id" }, error: null })),
+      single: vi.fn(async () => successfulResponse({ id: "new-power-requirement-id" })),
       then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
-        Promise.resolve({ data: null, error: null }).then(resolve, reject),
+        Promise.resolve(successfulResponse(null)).then(resolve, reject),
     };
 
     return builder;
