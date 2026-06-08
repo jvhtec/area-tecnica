@@ -7,6 +7,7 @@ import {
   buildTourPowerDefaultTable,
   getPowerReportUploadCategory,
   saveJobPowerRequirementTable,
+  saveJobPowerRequirementTablesGeneration,
 } from "@/features/technical-tools/power/powerPersistence";
 
 const table = {
@@ -31,6 +32,8 @@ const createPowerRequirementTableClient = () => {
   const operations: Array<{ method: string; args: unknown[] }> = [];
 
   const createBuilder = () => {
+    let insertedPayload: unknown;
+
     const builder: any = {
       delete: vi.fn(() => {
         operations.push({ method: "delete", args: [] });
@@ -41,6 +44,7 @@ const createPowerRequirementTableClient = () => {
         return builder;
       }),
       insert: vi.fn((payload: unknown) => {
+        insertedPayload = payload;
         operations.push({ method: "insert", args: [payload] });
         return builder;
       }),
@@ -52,13 +56,25 @@ const createPowerRequirementTableClient = () => {
         operations.push({ method: "neq", args: [column, value] });
         return builder;
       }),
+      not: vi.fn((column: string, operator: string, value: unknown) => {
+        operations.push({ method: "not", args: [column, operator, value] });
+        return builder;
+      }),
       select: vi.fn((columns?: string) => {
         operations.push({ method: "select", args: [columns] });
         return builder;
       }),
       single: vi.fn(async () => successfulResponse({ id: "new-power-requirement-id" })),
-      then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) =>
-        Promise.resolve(successfulResponse(null)).then(resolve, reject),
+      then: (resolve: (value: unknown) => unknown, reject?: (reason: unknown) => unknown) => {
+        const insertedRows = Array.isArray(insertedPayload)
+          ? insertedPayload.map((payload: any, index) => ({
+              id: `new-power-requirement-id-${index + 1}`,
+              stage_number: payload.stage_number ?? null,
+            }))
+          : null;
+
+        return Promise.resolve(successfulResponse(insertedRows)).then(resolve, reject);
+      },
     };
 
     return builder;
@@ -139,7 +155,7 @@ describe("technical power persistence payloads", () => {
     expect(buildPowerTableMetadata(table, lightsSettings)).not.toHaveProperty("pf");
   });
 
-  it("removes older same-scope generations after inserting a fresh job table", async () => {
+  it("does not remove sibling sets after inserting a single job table", async () => {
     const { client, operations } = createPowerRequirementTableClient();
 
     await expect(
@@ -152,30 +168,82 @@ describe("technical power persistence payloads", () => {
       })
     ).resolves.toBe("new-power-requirement-id");
 
+    expect(operations).not.toEqual(expect.arrayContaining([{ method: "delete", args: [] }]));
+  });
+
+  it("replaces older same-scope generations after saving a timestamped table batch", async () => {
+    const { client, operations } = createPowerRequirementTableClient();
+    const generationTimestamp = "2026-04-07T09:00:00.000Z";
+
+    await expect(
+      saveJobPowerRequirementTablesGeneration({
+        client,
+        department: "sound",
+        generationTimestamp,
+        jobId: "job-1",
+        settings,
+        tables: [
+          { ...table, id: "main", name: "Main" },
+          { ...table, id: "delay", name: "Delay" },
+        ],
+      })
+    ).resolves.toEqual([
+      {
+        generationTimestamp,
+        powerRequirementId: "new-power-requirement-id-1",
+        tableId: "main",
+      },
+      {
+        generationTimestamp,
+        powerRequirementId: "new-power-requirement-id-2",
+        tableId: "delay",
+      },
+    ]);
+
     expect(operations).toEqual(
       expect.arrayContaining([
         { method: "delete", args: [] },
         { method: "eq", args: ["job_id", "job-1"] },
         { method: "eq", args: ["department", "sound"] },
-        { method: "neq", args: ["id", "new-power-requirement-id"] },
+        {
+          method: "not",
+          args: [
+            "id",
+            "in",
+            '("new-power-requirement-id-1","new-power-requirement-id-2")',
+          ],
+        },
         { method: "is", args: ["stage_number", null] },
       ])
     );
-    expect(operations).not.toEqual(
-      expect.arrayContaining([{ method: "eq", args: ["table_name", "Main"] }])
+
+    const insertOperation = operations.find((operation) => operation.method === "insert");
+    expect(insertOperation?.args[0]).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          created_at: generationTimestamp,
+          table_data: expect.objectContaining({ generationTimestamp }),
+          table_name: "Main",
+        }),
+        expect.objectContaining({
+          created_at: generationTimestamp,
+          table_data: expect.objectContaining({ generationTimestamp }),
+          table_name: "Delay",
+        }),
+      ])
     );
   });
 
-  it("limits fresh-generation cleanup to the selected stage", async () => {
+  it("limits timestamped generation cleanup to each selected stage", async () => {
     const { client, operations } = createPowerRequirementTableClient();
 
-    await saveJobPowerRequirementTable({
+    await saveJobPowerRequirementTablesGeneration({
       client,
       department: "sound",
       jobId: "job-1",
       settings,
       stage: { number: 2, name: "Club Stage" },
-      table,
+      tables: [table],
     });
 
     const deleteIndex = operations.findIndex((operation) => operation.method === "delete");
@@ -186,7 +254,7 @@ describe("technical power persistence payloads", () => {
         { method: "eq", args: ["job_id", "job-1"] },
         { method: "eq", args: ["department", "sound"] },
         { method: "eq", args: ["stage_number", 2] },
-        { method: "neq", args: ["id", "new-power-requirement-id"] },
+        { method: "not", args: ["id", "in", '("new-power-requirement-id-1")'] },
       ])
     );
     expect(cleanupOperations).not.toEqual(

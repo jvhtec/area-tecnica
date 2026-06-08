@@ -124,12 +124,49 @@ const getPowerRequirementStageKey = (row: PowerRequirementTableRow) => {
   return stageName ? `stage-name-${stageName.toLowerCase()}` : 'no-stage';
 };
 
+const getPowerRequirementGenerationTimestamp = (row: PowerRequirementTableRow) => {
+  if (!isRecord(row.table_data)) return null;
+
+  const generationTimestamp = row.table_data.generationTimestamp;
+  return typeof generationTimestamp === 'string' && generationTimestamp.trim()
+    ? generationTimestamp.trim()
+    : null;
+};
+
+const getPowerRequirementSourceTimestamp = (row: PowerRequirementTableRow) => {
+  if (!isRecord(row.table_data)) return null;
+
+  const sourceTableId = row.table_data.sourceTableId;
+  if (typeof sourceTableId === 'number' && Number.isFinite(sourceTableId)) {
+    return sourceTableId;
+  }
+
+  if (typeof sourceTableId === 'string') {
+    const parsed = Number(sourceTableId);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
+};
+
+const parseTimestampValue = (timestamp: string | null | undefined) => {
+  if (!timestamp) return 0;
+  const parsed = Date.parse(timestamp);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 const comparePowerRequirementTablesByFreshness = (
   left: IndexedPowerRequirementTableRow,
   right: IndexedPowerRequirementTableRow
 ) => {
-  const leftTimestamp = left.row.created_at ? Date.parse(left.row.created_at) : 0;
-  const rightTimestamp = right.row.created_at ? Date.parse(right.row.created_at) : 0;
+  const leftTimestamp =
+    parseTimestampValue(getPowerRequirementGenerationTimestamp(left.row)) ||
+    getPowerRequirementSourceTimestamp(left.row) ||
+    parseTimestampValue(left.row.created_at);
+  const rightTimestamp =
+    parseTimestampValue(getPowerRequirementGenerationTimestamp(right.row)) ||
+    getPowerRequirementSourceTimestamp(right.row) ||
+    parseTimestampValue(right.row.created_at);
 
   if (leftTimestamp !== rightTimestamp) {
     return leftTimestamp - rightTimestamp;
@@ -144,33 +181,94 @@ const comparePowerRequirementTablesByFreshness = (
   return left.inputIndex - right.inputIndex;
 };
 
-const getPowerRequirementTableCurrentKey = (
+const getPowerRequirementScopeKey = (
   row: PowerRequirementTableRow,
   department: TechnicalPowerDepartment
 ) => `${department}:${getPowerRequirementStageKey(row)}`;
 
+const getLegacyPowerRequirementTableIdentityKey = (
+  row: PowerRequirementTableRow,
+  department: TechnicalPowerDepartment
+) =>
+  [
+    getPowerRequirementScopeKey(row, department),
+    row.table_name?.trim().toLowerCase() || 'unnamed',
+    row.position?.trim().toLowerCase() || '',
+    row.custom_position?.trim().toLowerCase() || '',
+  ].join(':');
+
+const compareGenerationTimestamp = (left: string, right: string) => {
+  const leftTimestamp = parseTimestampValue(left);
+  const rightTimestamp = parseTimestampValue(right);
+
+  if (leftTimestamp !== rightTimestamp) {
+    return leftTimestamp - rightTimestamp;
+  }
+
+  return left.localeCompare(right);
+};
+
 export const getCurrentPowerRequirementTables = (
   rows: PowerRequirementTableRow[]
 ): PowerRequirementTableRow[] => {
-  const latestRows = new Map<string, IndexedPowerRequirementTableRow>();
+  const rowsByScope = new Map<string, IndexedPowerRequirementTableRow[]>();
 
   rows.forEach((row, inputIndex) => {
     const department = row.department as TechnicalPowerDepartment | null;
     if (!department) return;
 
-    const dedupKey = getPowerRequirementTableCurrentKey(row, department);
-    const current = latestRows.get(dedupKey);
-    const indexedRow = { row, inputIndex };
-
-    if (
-      !current ||
-      comparePowerRequirementTablesByFreshness(indexedRow, current) >= 0
-    ) {
-      latestRows.set(dedupKey, indexedRow);
-    }
+    const scopeKey = getPowerRequirementScopeKey(row, department);
+    rowsByScope.set(scopeKey, [...(rowsByScope.get(scopeKey) || []), { row, inputIndex }]);
   });
 
-  return [...latestRows.values()]
+  const currentRows: IndexedPowerRequirementTableRow[] = [];
+
+  rowsByScope.forEach((scopeRows) => {
+    const rowsWithGeneration = scopeRows.filter((value) =>
+      getPowerRequirementGenerationTimestamp(value.row)
+    );
+
+    if (rowsWithGeneration.length > 0) {
+      const latestGeneration = rowsWithGeneration.reduce<string | null>(
+        (latest, value) => {
+          const generationTimestamp = getPowerRequirementGenerationTimestamp(value.row);
+          if (!generationTimestamp) return latest;
+          if (!latest || compareGenerationTimestamp(generationTimestamp, latest) > 0) {
+            return generationTimestamp;
+          }
+          return latest;
+        },
+        null
+      );
+
+      currentRows.push(
+        ...rowsWithGeneration.filter(
+          (value) => getPowerRequirementGenerationTimestamp(value.row) === latestGeneration
+        )
+      );
+      return;
+    }
+
+    const latestLegacyRows = new Map<string, IndexedPowerRequirementTableRow>();
+    scopeRows.forEach((indexedRow) => {
+      const department = indexedRow.row.department as TechnicalPowerDepartment | null;
+      if (!department) return;
+
+      const identityKey = getLegacyPowerRequirementTableIdentityKey(indexedRow.row, department);
+      const current = latestLegacyRows.get(identityKey);
+
+      if (
+        !current ||
+        comparePowerRequirementTablesByFreshness(indexedRow, current) >= 0
+      ) {
+        latestLegacyRows.set(identityKey, indexedRow);
+      }
+    });
+
+    currentRows.push(...latestLegacyRows.values());
+  });
+
+  return currentRows
     .sort(comparePowerRequirementTablesByFreshness)
     .map((value) => value.row);
 };

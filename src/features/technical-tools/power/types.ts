@@ -22,6 +22,7 @@ export type PowerTableRow = {
 export type PowerTable = {
   id?: number | string;
   powerRequirementId?: string;
+  generationTimestamp?: string;
   stageNumber?: number | null;
   stageName?: string | null;
   name: string;

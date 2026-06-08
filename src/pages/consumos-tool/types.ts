@@ -23,6 +23,7 @@ export interface Table {
   customPosition?: string;
   id?: number | string;
   includesHoist?: boolean;
+  generationTimestamp?: string;
   isDefault?: boolean;
   isOverride?: boolean;
   overrideId?: string;

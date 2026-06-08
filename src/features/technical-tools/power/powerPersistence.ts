@@ -10,14 +10,30 @@ import { getTechnicalStageStorageScope } from "@/features/technical-tools/stage/
 
 type PowerPersistenceClient = Pick<typeof typedSupabase, "from">;
 type PowerRequirementInsertPayload = ReturnType<typeof buildPowerRequirementInsert>;
+type PowerRequirementSettingsResolver =
+  | (PowerElectricalSettings & { powerFactor?: number })
+  | ((table: PowerTable) => PowerElectricalSettings & { powerFactor?: number });
+
+type SavedPowerRequirementGenerationTable = {
+  generationTimestamp: string;
+  powerRequirementId: string;
+  tableId?: PowerTable["id"];
+};
 
 export const getPowerReportUploadCategory = (department: TechnicalDepartment) =>
   department === "lights" ? "calculators/lights-consumos" : "calculators/consumos";
 
-export const buildPowerTableData = (table: PowerTable, settings: PowerElectricalSettings & { powerFactor?: number }) => {
+export const buildPowerTableData = (
+  table: PowerTable,
+  settings: PowerElectricalSettings & { powerFactor?: number },
+  options: { generationTimestamp?: string } = {},
+) => {
   const payload = {
     rows: table.rows,
     ...(table.id !== undefined ? { sourceTableId: String(table.id) } : {}),
+    ...(options.generationTimestamp || table.generationTimestamp
+      ? { generationTimestamp: options.generationTimestamp || table.generationTimestamp }
+      : {}),
     ...(table.stageNumber ? { stageNumber: table.stageNumber } : {}),
     ...(table.stageName ? { stageName: table.stageName } : {}),
     safetyMargin: settings.safetyMargin,
@@ -62,20 +78,24 @@ const getPowerTableStage = (
 
 export const buildPowerRequirementInsert = ({
   department,
+  generationTimestamp,
   jobId,
   settings,
   stage,
   table,
 }: {
   department: TechnicalDepartment;
+  generationTimestamp?: string;
   jobId: string;
   settings?: PowerElectricalSettings & { powerFactor?: number };
   stage?: TechnicalStage | null;
   table: PowerTable;
 }) => {
   const tableStage = getPowerTableStage(table, stage);
+  const resolvedGenerationTimestamp = generationTimestamp || table.generationTimestamp;
 
   return {
+    ...(resolvedGenerationTimestamp ? { created_at: resolvedGenerationTimestamp } : {}),
     job_id: jobId,
     department,
     stage_number: tableStage?.number ?? null,
@@ -89,46 +109,59 @@ export const buildPowerRequirementInsert = ({
     custom_position: table.customPosition || null,
     table_data: (settings ? buildPowerTableData({
       ...table,
+      generationTimestamp: resolvedGenerationTimestamp,
       stageName: tableStage?.name ?? table.stageName,
       stageNumber: tableStage?.number ?? table.stageNumber,
-    }, settings) : ({
+    }, settings, { generationTimestamp: resolvedGenerationTimestamp }) : ({
       rows: table.rows,
+      ...(resolvedGenerationTimestamp ? { generationTimestamp: resolvedGenerationTimestamp } : {}),
       ...(tableStage ? { stageNumber: tableStage.number, stageName: tableStage.name } : {}),
     } as unknown as Json)),
     includes_hoist: table.includesHoist || false,
   };
 };
 
-const deletePreviousPowerRequirementGenerations = async ({
+const formatPostgrestInList = (values: string[]) =>
+  `(${values.map((value) => `"${value.replace(/"/g, '\\"')}"`).join(",")})`;
+
+const deleteStalePowerRequirementGenerationRows = async ({
   client,
-  insertedId,
+  department,
+  keepIds,
   jobId,
-  payload,
+  stageNumber,
 }: {
   client: PowerPersistenceClient;
-  insertedId: string;
+  department: TechnicalDepartment;
+  keepIds: string[];
   jobId: string;
-  payload: PowerRequirementInsertPayload;
+  stageNumber: number | null;
 }) => {
   let deleteQuery = client
     .from("power_requirement_tables")
     .delete()
     .eq("job_id", jobId)
-    .eq("department", payload.department)
-    .neq("id", insertedId);
+    .eq("department", department)
+    .not("id", "in", formatPostgrestInList(keepIds));
 
   deleteQuery =
-    payload.stage_number === null
+    stageNumber === null
       ? deleteQuery.is("stage_number", null)
-      : deleteQuery.eq("stage_number", payload.stage_number);
+      : deleteQuery.eq("stage_number", stageNumber);
 
   const { error } = await deleteQuery;
   if (error) throw error;
 };
 
+const resolvePowerRequirementSettings = (
+  settings: PowerRequirementSettingsResolver,
+  table: PowerTable,
+) => (typeof settings === "function" ? settings(table) : settings);
+
 export const saveJobPowerRequirementTable = async ({
   client,
   department,
+  generationTimestamp,
   jobId,
   settings,
   stage,
@@ -136,6 +169,7 @@ export const saveJobPowerRequirementTable = async ({
 }: {
   client: PowerPersistenceClient;
   department: TechnicalDepartment;
+  generationTimestamp?: string;
   jobId: string;
   settings?: PowerElectricalSettings & { powerFactor?: number };
   stage?: TechnicalStage | null;
@@ -143,6 +177,7 @@ export const saveJobPowerRequirementTable = async ({
 }): Promise<string> => {
   const payload = buildPowerRequirementInsert({
     department,
+    generationTimestamp,
     jobId,
     settings,
     stage,
@@ -169,15 +204,77 @@ export const saveJobPowerRequirementTable = async ({
     .single();
 
   if (error) throw error;
-  const insertedId = data.id as string;
-  await deletePreviousPowerRequirementGenerations({
-    client,
-    insertedId,
-    jobId,
-    payload,
+  return data.id as string;
+};
+
+export const saveJobPowerRequirementTablesGeneration = async ({
+  client,
+  department,
+  generationTimestamp = new Date().toISOString(),
+  jobId,
+  settings,
+  stage,
+  tables,
+}: {
+  client: PowerPersistenceClient;
+  department: TechnicalDepartment;
+  generationTimestamp?: string;
+  jobId: string;
+  settings: PowerRequirementSettingsResolver;
+  stage?: TechnicalStage | null;
+  tables: PowerTable[];
+}): Promise<SavedPowerRequirementGenerationTable[]> => {
+  if (tables.length === 0) return [];
+
+  const payloads = tables.map((table) =>
+    buildPowerRequirementInsert({
+      department,
+      generationTimestamp,
+      jobId,
+      settings: resolvePowerRequirementSettings(settings, table),
+      stage,
+      table,
+    })
+  );
+
+  const { data, error } = await client
+    .from("power_requirement_tables")
+    .insert(payloads)
+    .select("id, stage_number");
+
+  if (error) throw error;
+
+  const insertedRows = (data || []) as Array<{ id: string; stage_number: number | null }>;
+  const savedTables = insertedRows.map((row, index) => ({
+    generationTimestamp,
+    powerRequirementId: row.id,
+    tableId: tables[index]?.id,
+  }));
+
+  const keepIdsByStage = new Map<string, { ids: string[]; stageNumber: number | null }>();
+  insertedRows.forEach((row, index) => {
+    const stageNumber = typeof row.stage_number === "number"
+      ? row.stage_number
+      : payloads[index]?.stage_number ?? null;
+    const stageKey = stageNumber === null ? "no-stage" : `stage-${stageNumber}`;
+    const stageGroup = keepIdsByStage.get(stageKey) || { ids: [], stageNumber };
+    stageGroup.ids.push(row.id);
+    keepIdsByStage.set(stageKey, stageGroup);
   });
 
-  return insertedId;
+  await Promise.all(
+    [...keepIdsByStage.values()].map((stageGroup) =>
+      deleteStalePowerRequirementGenerationRows({
+        client,
+        department,
+        keepIds: stageGroup.ids,
+        jobId,
+        stageNumber: stageGroup.stageNumber,
+      })
+    )
+  );
+
+  return savedTables;
 };
 
 export const deleteJobPowerRequirementTable = async ({
