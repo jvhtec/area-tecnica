@@ -9,6 +9,7 @@ import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils
 import { getTechnicalStageStorageScope } from "@/features/technical-tools/stage/stageUtils";
 
 type PowerPersistenceClient = Pick<typeof typedSupabase, "from">;
+type PowerRequirementInsertPayload = ReturnType<typeof buildPowerRequirementInsert>;
 
 export const getPowerReportUploadCategory = (department: TechnicalDepartment) =>
   department === "lights" ? "calculators/lights-consumos" : "calculators/consumos";
@@ -98,6 +99,33 @@ export const buildPowerRequirementInsert = ({
   };
 };
 
+const deletePreviousPowerRequirementGenerations = async ({
+  client,
+  insertedId,
+  jobId,
+  payload,
+}: {
+  client: PowerPersistenceClient;
+  insertedId: string;
+  jobId: string;
+  payload: PowerRequirementInsertPayload;
+}) => {
+  let deleteQuery = client
+    .from("power_requirement_tables")
+    .delete()
+    .eq("job_id", jobId)
+    .eq("department", payload.department)
+    .neq("id", insertedId);
+
+  deleteQuery =
+    payload.stage_number === null
+      ? deleteQuery.is("stage_number", null)
+      : deleteQuery.eq("stage_number", payload.stage_number);
+
+  const { error } = await deleteQuery;
+  if (error) throw error;
+};
+
 export const saveJobPowerRequirementTable = async ({
   client,
   department,
@@ -141,7 +169,15 @@ export const saveJobPowerRequirementTable = async ({
     .single();
 
   if (error) throw error;
-  return data.id as string;
+  const insertedId = data.id as string;
+  await deletePreviousPowerRequirementGenerations({
+    client,
+    insertedId,
+    jobId,
+    payload,
+  });
+
+  return insertedId;
 };
 
 export const deleteJobPowerRequirementTable = async ({

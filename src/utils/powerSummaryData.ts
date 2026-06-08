@@ -88,26 +88,6 @@ const mapPowerRequirementTable = (
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const getPowerRequirementRowsSignature = (row: PowerRequirementTableRow) => {
-  if (!isRecord(row.table_data) || !Array.isArray(row.table_data.rows)) {
-    return null;
-  }
-
-  try {
-    return JSON.stringify(row.table_data.rows);
-  } catch {
-    return null;
-  }
-};
-
-const getPowerRequirementSourceTableId = (row: PowerRequirementTableRow) => {
-  if (!isRecord(row.table_data)) return null;
-  const sourceTableId = row.table_data.sourceTableId;
-  return typeof sourceTableId === 'string' && sourceTableId.trim()
-    ? sourceTableId.trim()
-    : null;
-};
-
 const getPowerRequirementStageNumber = (row: PowerRequirementTableRow) => {
   if (typeof row.stage_number === 'number') return row.stage_number;
   if (!isRecord(row.table_data)) return null;
@@ -167,22 +147,7 @@ const comparePowerRequirementTablesByFreshness = (
 const getPowerRequirementTableCurrentKey = (
   row: PowerRequirementTableRow,
   department: TechnicalPowerDepartment
-) => {
-  const stageKey = getPowerRequirementStageKey(row);
-  const sourceTableId = getPowerRequirementSourceTableId(row);
-  if (sourceTableId) {
-    return `${department}:${stageKey}:source:${sourceTableId}`;
-  }
-
-  const normalizedName = row.table_name?.trim().toLowerCase();
-  const rowSignature = getPowerRequirementRowsSignature(row);
-
-  if (normalizedName && rowSignature) {
-    return `${department}:${stageKey}:legacy:${normalizedName}:${rowSignature}`;
-  }
-
-  return `${department}:row:${row.id}`;
-};
+) => `${department}:${getPowerRequirementStageKey(row)}`;
 
 export const getCurrentPowerRequirementTables = (
   rows: PowerRequirementTableRow[]

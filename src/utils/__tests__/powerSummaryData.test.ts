@@ -143,6 +143,54 @@ describe('powerSummaryData', () => {
     expect(summary.departments.sound.rows[0].notes).toContain('CEE32A');
   });
 
+  it('keeps only the newest same-name generation when a corrected table changes rows', async () => {
+    const supabase = createMockSupabase({
+      power_requirement_tables: [
+        {
+          id: 'sound-old',
+          created_at: '2026-04-07T08:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'MAIN L',
+          total_watts: 31500,
+          current_per_phase: 57.43,
+          pdu_type: 'CEE125A 3P+N+G',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: {
+            sourceTableId: '1744012800000',
+            rows: [{ quantity: '1', componentId: '1', watts: '31500' }],
+          },
+        },
+        {
+          id: 'sound-new',
+          created_at: '2026-04-07T09:00:00.000Z',
+          job_id: 'job-1',
+          department: 'sound',
+          table_name: 'MAIN L',
+          total_watts: 29000,
+          current_per_phase: 52.9,
+          pdu_type: 'CEE63A 3P+N+G',
+          custom_pdu_type: null,
+          includes_hoist: false,
+          table_data: {
+            sourceTableId: '1744016400000',
+            rows: [{ quantity: '1', componentId: '1', watts: '29000' }],
+          },
+        },
+      ],
+    });
+
+    const summary = await loadTechnicalPowerSummaryData({
+      job: { id: 'job-1', job_type: 'single' },
+      supabase,
+    });
+
+    expect(summary.departments.sound.rows).toHaveLength(1);
+    expect(summary.departments.sound.rows[0].totalWatts).toBe(29000);
+    expect(summary.departments.sound.rows[0].pduLabel).toBe('CEE63A 3P+N+G');
+  });
+
   it('uses input order instead of lexicographic ids to break duplicate save freshness ties', async () => {
     const supabase = createMockSupabase({
       power_requirement_tables: [
@@ -184,7 +232,7 @@ describe('powerSummaryData', () => {
     expect(summary.departments.sound.rows[0].notes).toContain('CEE32A');
   });
 
-  it('keeps multiple current tables for the same department when they have distinct saved identities', async () => {
+  it('keeps only the newest table for the same department and stage even when table names differ', async () => {
     const supabase = createMockSupabase({
       power_requirement_tables: [
         {
@@ -210,7 +258,7 @@ describe('powerSummaryData', () => {
           created_at: '2026-04-07T08:05:00.000Z',
           job_id: 'job-1',
           department: 'sound',
-          table_name: 'Main PA',
+          table_name: 'Side PA',
           total_watts: 1200,
           current_per_phase: 5,
           pdu_type: '32A',
@@ -231,11 +279,9 @@ describe('powerSummaryData', () => {
       supabase,
     });
 
-    expect(summary.departments.sound.rows).toHaveLength(2);
-    expect(summary.departments.sound.rows.map((row) => row.positionLabel)).toEqual([
-      'Stage 1',
-      'Stage 2',
-    ]);
+    expect(summary.departments.sound.rows).toHaveLength(1);
+    expect(summary.departments.sound.rows[0].name).toBe('Side PA');
+    expect(summary.departments.sound.rows[0].positionLabel).toBe('Stage 2');
   });
 
   it('keeps same saved table identity separate per festival stage', async () => {
@@ -314,6 +360,54 @@ describe('powerSummaryData', () => {
         } as any,
       ])
     ).toContain('SOUND - Main Stage - Main PA:');
+  });
+
+  it('formats only the latest same-name generation in hoja de ruta power text', () => {
+    const text = formatPowerRequirementsText([
+      {
+        id: 'sound-old',
+        created_at: '2026-04-07T08:00:00.000Z',
+        job_id: 'job-1',
+        department: 'sound',
+        stage_number: null,
+        stage_name: null,
+        table_name: 'MAIN L',
+        total_watts: 31500,
+        current_per_phase: 57.43,
+        pdu_type: 'CEE125A 3P+N+G',
+        custom_pdu_type: null,
+        custom_position: null,
+        position: null,
+        includes_hoist: false,
+        table_data: {
+          sourceTableId: '1744012800000',
+          rows: [{ quantity: '1', componentId: '1', watts: '31500' }],
+        },
+      } as any,
+      {
+        id: 'sound-new',
+        created_at: '2026-04-07T09:00:00.000Z',
+        job_id: 'job-1',
+        department: 'sound',
+        stage_number: null,
+        stage_name: null,
+        table_name: 'MAIN L',
+        total_watts: 29000,
+        current_per_phase: 52.9,
+        pdu_type: 'CEE63A 3P+N+G',
+        custom_pdu_type: null,
+        custom_position: null,
+        position: null,
+        includes_hoist: false,
+        table_data: {
+          sourceTableId: '1744016400000',
+          rows: [{ quantity: '1', componentId: '1', watts: '29000' }],
+        },
+      } as any,
+    ]);
+
+    expect(text).toContain('Potencia Total: 29000.00W');
+    expect(text).not.toContain('Potencia Total: 31500.00W');
   });
 
   it('keeps numeric stage zero when formatting hoja de ruta power text', () => {
