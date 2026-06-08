@@ -23,6 +23,7 @@ const corsHeaders: Record<string, string> = {
 const BREVO_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
 const BREVO_FROM = Deno.env.get("BREVO_FROM") ?? "";
 const ADMIN_BCC = Deno.env.get("PAYOUT_EMAIL_BCC") ?? "";
+const INVOICE_SUBMISSION_EMAIL = "administracion@sector-pro.com";
 const MADRID_TIMEZONE = "Europe/Madrid";
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -450,15 +451,16 @@ serve(async (req) => {
                 ${(() => {
                   // Only show invoicing details for autonomo technicians (excluding house techs)
                   if (tech.autonomo !== true || tech.is_house_tech === true) return '';
-                  if (!companyDetails && !tech.lpo_number) return '';
                   return `
                 <tr>
                   <td style="padding:12px 24px 0 24px;">
                     <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:14px;">
                       <b>Nota de facturación:</b>
-                      <p style="margin:8px 0 0 0;line-height:1.55;">
-                        ${companyDetails ? `Te rogamos emitas tu factura a: <b>${escapeHtml(companyDetails.legalName)}</b> (CIF: ${escapeHtml(companyDetails.cif)}, ${escapeHtml(companyDetails.address)})` : ''}${companyDetails && tech.lpo_number ? ' e incluyas el siguiente número de referencia: ' : ''}${tech.lpo_number ? `<b>${escapeHtml(tech.lpo_number)}</b>` : ''}.
-                      </p>
+                      <ul style="margin:8px 0 0 18px;padding:0;line-height:1.55;">
+                        ${companyDetails ? `<li><b>Empresa de facturación:</b> ${escapeHtml(companyDetails.legalName)} (CIF: ${escapeHtml(companyDetails.cif)}, ${escapeHtml(companyDetails.address)})</li>` : ''}
+                        ${tech.lpo_number ? `<li><b>LPO:</b> ${escapeHtml(tech.lpo_number)}</li>` : ''}
+                        <li><b>Enviar factura a:</b> <a href="mailto:${INVOICE_SUBMISSION_EMAIL}" style="color:#1e40af;text-decoration:underline;">${INVOICE_SUBMISSION_EMAIL}</a></li>
+                      </ul>
                     </div>
                   </td>
                 </tr>

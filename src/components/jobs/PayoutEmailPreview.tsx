@@ -16,6 +16,7 @@ import { HOUSE_TECH_LABEL } from '@/utils/autonomo';
 
 const MADRID_TIMEZONE = 'Europe/Madrid';
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const INVOICE_SUBMISSION_EMAIL = 'administracion@sector-pro.com';
 
 function escapeHtml(value: string): string {
   return value
@@ -289,14 +290,16 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
               </div>
             </td>
           </tr>
-          ${selectedAttachment.autonomo && !selectedAttachment.is_house_tech && (companyDetails || lpoNumber) ? `
+          ${selectedAttachment.autonomo && !selectedAttachment.is_house_tech ? `
           <tr>
             <td style="padding:12px 24px 0 24px;">
               <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:12px 14px;color:#1e40af;font-size:14px;">
                 <b>Nota de facturación:</b>
-                <p style="margin:8px 0 0 0;line-height:1.55;">
-                  ${safeCompanyDetails ? `Te rogamos emitas tu factura a: <b>${safeCompanyDetails.legalName}</b> (CIF: ${safeCompanyDetails.cif}, ${safeCompanyDetails.address})` : ''}${safeCompanyDetails && safeLpoNumber ? ' e incluyas el siguiente número de referencia: ' : ''}${safeLpoNumber ? `<b>${safeLpoNumber}</b>` : ''}.
-                </p>
+                <ul style="margin:8px 0 0 18px;padding:0;line-height:1.55;">
+                  ${safeCompanyDetails ? `<li><b>Empresa de facturación:</b> ${safeCompanyDetails.legalName} (CIF: ${safeCompanyDetails.cif}, ${safeCompanyDetails.address})</li>` : ''}
+                  ${safeLpoNumber ? `<li><b>LPO:</b> ${safeLpoNumber}</li>` : ''}
+                  <li><b>Enviar factura a:</b> <a href="mailto:${INVOICE_SUBMISSION_EMAIL}" style="color:#1e40af;text-decoration:underline;">${INVOICE_SUBMISSION_EMAIL}</a></li>
+                </ul>
               </div>
             </td>
           </tr>
@@ -412,6 +415,12 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
                     <div className="font-semibold">Técnico:</div>
                     <div>{selectedAttachment.full_name} ({selectedAttachment.is_house_tech ? HOUSE_TECH_LABEL : selectedAttachment.autonomo ? 'Autónomo' : 'No autónomo'})</div>
                   </div>
+                  {selectedAttachment.autonomo && !selectedAttachment.is_house_tech && (
+                    <div>
+                      <div className="font-semibold">Enviar factura a:</div>
+                      <div>{INVOICE_SUBMISSION_EMAIL}</div>
+                    </div>
+                  )}
                   <div>
                     <div className="font-semibold">Fechas trabajadas:</div>
                     <div className="space-y-1">
