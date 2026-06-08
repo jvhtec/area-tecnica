@@ -1,11 +1,64 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   buildPrepTimesheetDateMap,
   buildPrepTimesheetMap,
+  fetchTourJobEmailTimesheets,
 } from "@/lib/tour-payout-email";
 
 describe("tour payout prep-day timesheet documentation", () => {
+  it("fetches tour email timesheets without selecting virtual visible amount columns", async () => {
+    type QueryResult = {
+      data: Array<Record<string, unknown>>;
+      error: null;
+    };
+    type EqQuery = {
+      eq: (column: string, value: unknown) => EqQuery | Promise<QueryResult>;
+    };
+
+    let selectedColumns = "";
+    const filters: Array<[string, unknown]> = [];
+    const query: EqQuery = {
+      eq: vi.fn((column: string, value: unknown) => {
+        filters.push([column, value]);
+        if (filters.length === 1) return query;
+        return Promise.resolve({
+          data: [
+            {
+              technician_id: "tech-1",
+              job_id: "job-1",
+              date: "2026-06-01",
+              approved_by_manager: true,
+              amount_breakdown: { is_prep_day: true, total_eur: 75 },
+            },
+          ],
+          error: null,
+        });
+      }),
+    };
+    const select = vi.fn((columns: string) => {
+      selectedColumns = columns;
+      return query;
+    });
+    const supabase = {
+      from: vi.fn(() => ({ select })),
+    };
+
+    const rows = await fetchTourJobEmailTimesheets(
+      supabase as unknown as Parameters<typeof fetchTourJobEmailTimesheets>[0],
+      "job-1"
+    );
+
+    expect(supabase.from).toHaveBeenCalledWith("timesheets");
+    expect(selectedColumns).toBe("technician_id, job_id, date, approved_by_manager, amount_breakdown");
+    expect(selectedColumns).not.toContain("amount_breakdown_visible");
+    expect(filters).toEqual([
+      ["job_id", "job-1"],
+      ["is_active", true],
+    ]);
+    expect(rows).toHaveLength(1);
+  });
+
   it("keeps only approved prep-day rows in the prep timesheet map", () => {
     const map = buildPrepTimesheetMap([
       {

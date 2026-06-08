@@ -96,10 +96,10 @@ async function fetchLpoMap(
   return new Map((data || []).map((row: any) => [row.technician_id, row.lpo_number || null]));
 }
 
-async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<any[]> {
+export async function fetchTourJobEmailTimesheets(client: SupabaseClient, jobId: string): Promise<any[]> {
   const { data, error } = await client
     .from('timesheets')
-    .select('technician_id, date, approved_by_manager, amount_breakdown, amount_breakdown_visible')
+    .select('technician_id, job_id, date, approved_by_manager, amount_breakdown')
     .eq('job_id', jobId)
     .eq('is_active', true);
   if (error) throw error;
@@ -161,7 +161,7 @@ export async function prepareTourJobEmailContext(
   const { jobId, supabase, quotes, profiles } = input;
   const job = await fetchJobDetails(supabase, jobId);
   const lpoMap = await fetchLpoMap(supabase, jobId);
-  const timesheetRows = await fetchTimesheets(supabase, jobId);
+  const timesheetRows = await fetchTourJobEmailTimesheets(supabase, jobId);
   const prepTimesheetMap = buildPrepTimesheetMap(timesheetRows);
 
   // Fetch expenses for tour date jobs
