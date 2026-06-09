@@ -43,6 +43,20 @@ serve(async (req) => {
       throw new Error('Invalid authentication')
     }
 
+    // Authorization: only admin/management may proxy Flex API calls
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if (profileError) {
+      throw new Error('Could not verify authorization')
+    }
+    if (!profile || !['admin', 'management'].includes(profile.role)) {
+      throw new Error('Forbidden - admin or management role required')
+    }
+
     // Parse request body
     const { endpoint, method = 'POST', payload } = await req.json()
     
@@ -92,14 +106,19 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error("Error in secure-flex-api:", error)
+    const message = error instanceof Error ? error.message : 'Internal server error'
+    const status = message.includes('authentication') || message.includes('Authorization header')
+      ? 401
+      : message.includes('Forbidden')
+        ? 403
+        : message.includes('Could not verify') || message.includes('Missing required environment')
+          ? 500
+          : 400
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message || 'Internal server error' 
-      }),
-      { 
+      JSON.stringify({ success: false, error: message }),
+      {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: error.message?.includes('authentication') ? 401 : 400,
+        status,
       },
     )
   }
