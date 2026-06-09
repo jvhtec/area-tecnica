@@ -106,12 +106,14 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error("Error in secure-flex-api:", error)
-    const message = error.message || 'Internal server error'
+    const message = error instanceof Error ? error.message : 'Internal server error'
     const status = message.includes('authentication') || message.includes('Authorization header')
       ? 401
       : message.includes('Forbidden')
         ? 403
-        : 400
+        : message.includes('Could not verify') || message.includes('Missing required environment')
+          ? 500
+          : 400
     return new Response(
       JSON.stringify({ success: false, error: message }),
       {
