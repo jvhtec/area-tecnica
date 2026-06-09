@@ -300,12 +300,12 @@ serve(async (req) => {
               <div style="background:#f9fafb;border:1px solid #e5e7eb;padding:16px;border-radius:6px;margin:20px 0;">
                 <div style="color:#6b7280;font-size:13px;line-height:1.5;">
                   <strong style="color:#374151;">Instrucciones de acceso:</strong><br/>
-                  Si es la primera vez que accedes a la plataforma, tus credenciales son:
+                  Si es la primera vez que accedes a la plataforma:
                   <ul style="margin:8px 0;padding-left:20px;">
                     <li><strong>Usuario:</strong> ${technician.email}</li>
-                    <li><strong>Contraseña:</strong> default</li>
+                    <li><strong>Contraseña:</strong> pulsa "Olvidé mi contraseña" en la pantalla de acceso y recibirás un enlace para crearla.</li>
                   </ul>
-                  Te recomendamos cambiar tu contraseña tras el primer acceso desde tu perfil.
+                  Después podrás cambiarla cuando quieras desde tu perfil.
                 </div>
               </div>
 

@@ -3,13 +3,14 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? Deno.env.get("VITE_WALLBOARD_TOKEN") ?? "";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform, x-wallboard-token",
         "Access-Control-Allow-Methods": "GET, OPTIONS",
   "Access-Control-Max-Age": "86400",
       },
@@ -17,6 +18,22 @@ serve(async (req) => {
   }
 
   try {
+    // Debug endpoint exposes job data; require the wallboard shared token.
+    if (!WALLBOARD_SHARED_TOKEN) {
+      return new Response(JSON.stringify({ error: "WALLBOARD_SHARED_TOKEN is not configured" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+    const url = new URL(req.url);
+    const provided = req.headers.get("x-wallboard-token") ?? url.searchParams.get("wallboardToken") ?? "";
+    if (provided !== WALLBOARD_SHARED_TOKEN) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
+      });
+    }
+
     const sb = createClient(SUPABASE_URL, SERVICE_ROLE);
     const now = new Date();
     const todayStart = new Date(now);

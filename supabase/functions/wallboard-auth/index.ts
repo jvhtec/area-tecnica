@@ -1,10 +1,9 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { create, getNumericDate, Header, Payload } from "https://deno.land/x/djwt@v3.0.2/mod.ts";
 
-// Allow fallbacks for local/dev to avoid runtime crashes; prod should set both env vars
-const FALLBACK_SHARED_TOKEN = Deno.env.get("VITE_WALLBOARD_TOKEN") ?? "demo-wallboard-token";
-const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? FALLBACK_SHARED_TOKEN;
-const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "wallboard-dev-secret";
+// No hardcoded fallbacks: if the secrets are not configured, requests fail closed.
+const WALLBOARD_SHARED_TOKEN = Deno.env.get("WALLBOARD_SHARED_TOKEN") ?? Deno.env.get("VITE_WALLBOARD_TOKEN") ?? "";
+const WALLBOARD_JWT_SECRET = Deno.env.get("WALLBOARD_JWT_SECRET") ?? "";
 const WALLBOARD_PRESET_SLUG = Deno.env.get("WALLBOARD_PRESET_SLUG") ?? "almacen";
 const missingSecrets = [
   !WALLBOARD_SHARED_TOKEN && "WALLBOARD_SHARED_TOKEN",
@@ -13,7 +12,7 @@ const missingSecrets = [
 
 if (missingSecrets.length > 0) {
   console.error(
-    `Missing required wallboard auth secrets: ${missingSecrets.join(", ")}. Using fallbacks; set env vars in production.`
+    `Missing required wallboard auth secrets: ${missingSecrets.join(", ")}. All requests will be rejected until they are set.`
   );
 }
 const MIN_TTL_SECONDS = 8 * 60 * 60; // 8 hours minimum
@@ -44,6 +43,12 @@ async function sign(payload: Payload) {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors() });
   try {
+    if (missingSecrets.length > 0) {
+      return new Response(JSON.stringify({ error: "Wallboard auth is not configured" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json", ...cors() },
+      });
+    }
     const url = new URL(req.url);
     let presetFromReq = (url.searchParams.get("presetSlug") ?? url.searchParams.get("preset") ?? "").trim().toLowerCase();
     let token = url.searchParams.get("wallboardToken");

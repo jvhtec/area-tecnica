@@ -170,8 +170,7 @@ serve(async (req) => {
                     <div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:8px;padding:12px 14px;color:#1f2937;font-size:14px;">
                       <b>Tu acceso</b><br/>
                       Usuario: <span style="font-family:monospace">${normalizedEmail}</span><br/>
-                      Contraseña inicial: <span style="font-family:monospace">default</span><br/>
-                      <span style="color:#6b7280">Por seguridad, cambia tu contraseña tras el primer inicio de sesión. Si ya la cambiaste, ignora este paso.</span>
+                      <span style="color:#6b7280">Para establecer tu contraseña, pulsa "Olvidé mi contraseña" en la pantalla de acceso y recibirás un enlace para crearla. Si ya tienes contraseña, ignora este paso.</span>
                     </div>
                     <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
                       <a href="${loginUrl}" style="display:inline-block;background:#111827;color:#ffffff;padding:10px 14px;border-radius:8px;text-decoration:none;font-weight:700;">Ir a Iniciar Sesión</a>
@@ -302,8 +301,8 @@ serve(async (req) => {
         primer día.
       </p>
       <p style="color:#dbeafe;">
-        Nota: tu contraseña actual es la predeterminada (default). Por tu seguridad, te recomendamos cambiarla la primera vez que
-        accedas a la plataforma desde la sección de <strong>Perfil</strong>.
+        Nota: si todavía no has establecido tu contraseña, pulsa "Olvidé mi contraseña" en la pantalla de acceso y
+        recibirás un enlace para crearla. Después podrás cambiarla cuando quieras desde la sección de <strong>Perfil</strong>.
       </p>
 
       <div class="card" style="background-color:#14263f;border-radius:8px;padding:15px;margin:20px 0;">
