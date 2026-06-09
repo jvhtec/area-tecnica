@@ -51,10 +51,11 @@ serve(async (req) => {
 
     for (const record of records) {
       try {
-        // Create auth user with default password
+        // Create auth user with a random throwaway password. It is never disclosed:
+        // the user sets their real password via the "Olvidé mi contraseña" reset flow.
         const { data: authData, error: authError } = await supabase.auth.admin.createUser({
           email: record.email,
-          password: 'default',
+          password: `${crypto.randomUUID()}-${crypto.randomUUID()}`,
           email_confirm: true,
           user_metadata: {
             first_name: record.firstName,

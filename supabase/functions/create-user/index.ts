@@ -94,10 +94,12 @@ serve(async (req) => {
       return jsonResponse({ error: 'Unauthorized' }, 403);
     }
 
-    // Create auth user with a standard default password
+    // Create auth user with a random throwaway password. It is never disclosed:
+    // the user sets their real password via the "Olvidé mi contraseña" reset flow.
+    const tempPassword = `${crypto.randomUUID()}-${crypto.randomUUID()}`;
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
-      password: 'default',
+      password: tempPassword,
       email_confirm: true,
       user_metadata: {
         first_name: firstName,
