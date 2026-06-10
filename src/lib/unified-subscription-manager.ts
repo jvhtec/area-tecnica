@@ -36,6 +36,17 @@ export type RealtimeSubscriptionFilter = {
   filter?: string;
 };
 
+export type RealtimeChangePayload = {
+  eventType?: 'INSERT' | 'UPDATE' | 'DELETE' | string;
+  schema?: string;
+  table?: string;
+  new?: Record<string, unknown> | null;
+  old?: Record<string, unknown> | null;
+  [key: string]: unknown;
+};
+
+export type RealtimePayloadHandler = (payload: RealtimeChangePayload) => void | Promise<void>;
+
 type SubscriptionPriority = 'high' | 'medium' | 'low';
 
 type SubscriptionOptions = {
@@ -50,9 +61,28 @@ type ManagedSubscription = {
   unsubscribe: () => void;
   options: SubscriptionOptions;
   ownerRoutes: Set<string>;
+  payloadHandlers: Map<symbol, RealtimePayloadHandler>;
+  payloadHandlerOwners: Map<string, Set<symbol>>;
+  invalidateOnPayload: boolean;
   createdAt: number;
   lastPayloadAt: number | null;
   invalidationCount: number;
+};
+
+type SubscribeToTableOptions = {
+  ownerRoute?: string;
+  onPayload?: RealtimePayloadHandler;
+  invalidateOnPayload?: boolean;
+};
+
+type PendingManagedSubscription = {
+  options: SubscriptionOptions;
+  ownerRoutes: string[];
+  payloadHandlers: Array<{
+    ownerRoute?: string;
+    handler: RealtimePayloadHandler;
+  }>;
+  invalidateOnPayload: boolean;
 };
 
 /**
@@ -63,7 +93,7 @@ export class UnifiedSubscriptionManager {
   private static instance: UnifiedSubscriptionManager;
   private queryClient: QueryClient;
   private subscriptions: Map<string, ManagedSubscription>;
-  private pendingSubscriptions: Map<string, any>;
+  private pendingSubscriptions: Map<string, PendingManagedSubscription>;
   private routeSubscriptions: Map<string, Set<string>>;
   private lastReconnectAttempt: number;
   private connectionStatus: 'connected' | 'disconnected' | 'connecting';
@@ -154,6 +184,115 @@ export class UnifiedSubscriptionManager {
     };
 
     return `${table}::${JSON.stringify(normalizedQueryKey)}::${normalizedFilter.event}::${normalizedFilter.schema}::${normalizedFilter.filter}`;
+  }
+
+  private addPayloadHandler(
+    subscription: ManagedSubscription,
+    handler: RealtimePayloadHandler,
+    ownerRoute?: string,
+  ) {
+    const handlerId = Symbol(subscription.key);
+    subscription.payloadHandlers.set(handlerId, handler);
+
+    if (ownerRoute) {
+      const ownerHandlers = subscription.payloadHandlerOwners.get(ownerRoute) ?? new Set<symbol>();
+      ownerHandlers.add(handlerId);
+      subscription.payloadHandlerOwners.set(ownerRoute, ownerHandlers);
+    }
+
+    return handlerId;
+  }
+
+  private removePayloadHandler(subscription: ManagedSubscription, handlerId: symbol) {
+    subscription.payloadHandlers.delete(handlerId);
+    subscription.payloadHandlerOwners.forEach((handlerIds, ownerRoute) => {
+      handlerIds.delete(handlerId);
+      if (handlerIds.size === 0) {
+        subscription.payloadHandlerOwners.delete(ownerRoute);
+      }
+    });
+  }
+
+  private removePayloadHandlersForOwner(subscription: ManagedSubscription, ownerRoute: string) {
+    const handlerIds = subscription.payloadHandlerOwners.get(ownerRoute);
+    if (!handlerIds) {
+      return;
+    }
+
+    handlerIds.forEach((handlerId) => {
+      subscription.payloadHandlers.delete(handlerId);
+    });
+    subscription.payloadHandlerOwners.delete(ownerRoute);
+  }
+
+  private notifyPayloadHandlers(subscription: ManagedSubscription, payload: RealtimeChangePayload) {
+    subscription.payloadHandlers.forEach((handler) => {
+      try {
+        const result = handler(payload);
+        if (result && typeof result === 'object' && 'then' in result) {
+          void Promise.resolve(result).catch((error) => {
+            console.warn('[UnifiedSubscriptionManager] payload handler failed', error);
+          });
+        }
+      } catch (error) {
+        console.warn('[UnifiedSubscriptionManager] payload handler failed', error);
+      }
+    });
+  }
+
+  private getPayloadHandlerEntries(subscription: ManagedSubscription): PendingManagedSubscription['payloadHandlers'] {
+    const handlerOwners = new Map<symbol, string>();
+
+    subscription.payloadHandlerOwners.forEach((handlerIds, ownerRoute) => {
+      handlerIds.forEach((handlerId) => {
+        handlerOwners.set(handlerId, ownerRoute);
+      });
+    });
+
+    return Array.from(subscription.payloadHandlers.entries()).map(([handlerId, handler]) => ({
+      ownerRoute: handlerOwners.get(handlerId),
+      handler,
+    }));
+  }
+
+  private snapshotManagedSubscription(subscription: ManagedSubscription): PendingManagedSubscription {
+    return {
+      options: subscription.options,
+      ownerRoutes: Array.from(subscription.ownerRoutes),
+      payloadHandlers: this.getPayloadHandlerEntries(subscription),
+      invalidateOnPayload: subscription.invalidateOnPayload,
+    };
+  }
+
+  private replayPendingSubscription(pendingSubscription: PendingManagedSubscription) {
+    const { options, ownerRoutes, payloadHandlers, invalidateOnPayload } = pendingSubscription;
+    const subscription = this.subscribeToTable(
+      options.table,
+      options.queryKey,
+      options.filter,
+      options.priority,
+      { invalidateOnPayload },
+    );
+
+    ownerRoutes.forEach((ownerRoute) => {
+      this.registerRouteSubscription(ownerRoute, subscription.key);
+    });
+
+    payloadHandlers.forEach(({ ownerRoute, handler }) => {
+      this.subscribeToTable(
+        options.table,
+        options.queryKey,
+        options.filter,
+        options.priority,
+        {
+          ownerRoute,
+          onPayload: handler,
+          invalidateOnPayload,
+        },
+      );
+    });
+
+    return subscription;
   }
   
   private updateSnapshot(partial: Partial<SubscriptionSnapshot>) {
@@ -303,15 +442,15 @@ export class UnifiedSubscriptionManager {
     
     // Copy all existing subscriptions to pending
     this.subscriptions.forEach((subscription, key) => {
-      this.pendingSubscriptions.set(key, subscription.options);
+      this.pendingSubscriptions.set(key, this.snapshotManagedSubscription(subscription));
     });
     
     // Clean up existing subscriptions
     this.unsubscribeAll(false);
     
     // Resubscribe to all tables
-    this.pendingSubscriptions.forEach((options, key) => {
-      this.subscribeToTable(options.table, options.queryKey, options.filter, options.priority);
+    this.pendingSubscriptions.forEach((pendingSubscription, key) => {
+      this.replayPendingSubscription(pendingSubscription);
       this.pendingSubscriptions.delete(key);
     });
     
@@ -358,12 +497,17 @@ export class UnifiedSubscriptionManager {
         console.log(`Unsubscribing from ${key} as it's no longer needed`);
         const subscription = this.subscriptions.get(key);
         if (subscription) {
+          this.removePayloadHandlersForOwner(subscription, route);
           subscription.unsubscribe();
           this.subscriptions.delete(key);
         }
       } else {
         console.log(`Keeping subscription to ${key} as it's used by other routes`);
-        this.subscriptions.get(key)?.ownerRoutes.delete(route);
+        const subscription = this.subscriptions.get(key);
+        if (subscription) {
+          this.removePayloadHandlersForOwner(subscription, route);
+          subscription.ownerRoutes.delete(route);
+        }
       }
     });
     
@@ -379,12 +523,38 @@ export class UnifiedSubscriptionManager {
     table: string, 
     queryKey: string | string[], 
     filter?: RealtimeSubscriptionFilter,
-    priority: SubscriptionPriority = 'medium'
+    priority: SubscriptionPriority = 'medium',
+    options: SubscribeToTableOptions = {},
   ) {
     const subscriptionKey = this.getSubscriptionKey(table, queryKey, filter);
     
     // Check if we already have this subscription (deduplication)
     if (this.subscriptions.has(subscriptionKey)) {
+      const existingSubscription = this.subscriptions.get(subscriptionKey);
+      if (existingSubscription) {
+        if (options.invalidateOnPayload !== false) {
+          existingSubscription.invalidateOnPayload = true;
+        }
+        if (options.ownerRoute) {
+          this.registerRouteSubscription(options.ownerRoute, subscriptionKey);
+        }
+        const handlerId = options.onPayload
+          ? this.addPayloadHandler(existingSubscription, options.onPayload, options.ownerRoute)
+          : null;
+
+        if (handlerId) {
+          return {
+            ...existingSubscription,
+            unsubscribe: () => {
+              const currentSubscription = this.subscriptions.get(subscriptionKey);
+              if (currentSubscription) {
+                this.removePayloadHandler(currentSubscription, handlerId);
+              }
+            },
+          };
+        }
+      }
+
       if (priority === 'high') {
         console.log(`Already subscribed to ${table} with query key ${subscriptionKey}`);
       }
@@ -430,10 +600,13 @@ export class UnifiedSubscriptionManager {
           if (subscription) {
             subscription.lastPayloadAt = Date.now();
             subscription.invalidationCount += 1;
+            this.notifyPayloadHandlers(subscription, payload as RealtimeChangePayload);
           }
           
           // Invalidate React Query cache based on the query key
-          this.scheduleInvalidation(queryKey, priority);
+          if (subscription?.invalidateOnPayload ?? true) {
+            this.scheduleInvalidation(queryKey, priority);
+          }
           this.refreshSnapshotFromState();
         })
         .subscribe((status) => {
@@ -452,14 +625,15 @@ export class UnifiedSubscriptionManager {
                 console.log(`Retrying subscription to ${table}`);
                 const sub = this.subscriptions.get(subscriptionKey);
                 if (sub) {
+                  const pendingSubscription = this.snapshotManagedSubscription(sub);
                   try {
                     sub.unsubscribe();
                   } catch (e) {
                     console.error('Error unsubscribing during retry:', e);
                   }
                   this.subscriptions.delete(subscriptionKey);
+                  this.replayPendingSubscription(pendingSubscription);
                 }
-                this.subscribeToTable(table, queryKey, filter, priority);
               }
             }, 5000); // Try again in 5 seconds
           }
@@ -478,10 +652,16 @@ export class UnifiedSubscriptionManager {
 
           this.subscriptions.delete(subscriptionKey);
           this.tableLastActivity.delete(subscriptionKey);
+          this.routeSubscriptions.forEach((keys) => {
+            keys.delete(subscriptionKey);
+          });
           this.refreshSnapshotFromState();
         },
         options: { table, queryKey, filter, priority },
         ownerRoutes: new Set(),
+        payloadHandlers: new Map(),
+        payloadHandlerOwners: new Map(),
+        invalidateOnPayload: options.invalidateOnPayload !== false,
         createdAt: Date.now(),
         lastPayloadAt: null,
         invalidationCount: 0,
@@ -492,6 +672,18 @@ export class UnifiedSubscriptionManager {
           subscription.ownerRoutes.add(route);
         }
       });
+
+      if (options.ownerRoute) {
+        if (!this.routeSubscriptions.has(options.ownerRoute)) {
+          this.routeSubscriptions.set(options.ownerRoute, new Set());
+        }
+        this.routeSubscriptions.get(options.ownerRoute)?.add(subscriptionKey);
+        subscription.ownerRoutes.add(options.ownerRoute);
+      }
+
+      const handlerId = options.onPayload
+        ? this.addPayloadHandler(subscription, options.onPayload, options.ownerRoute)
+        : null;
       
       // Store the subscription for later cleanup
       this.subscriptions.set(subscriptionKey, subscription);
@@ -501,6 +693,18 @@ export class UnifiedSubscriptionManager {
 
       this.refreshSnapshotFromState();
       
+      if (handlerId) {
+        return {
+          ...subscription,
+          unsubscribe: () => {
+            const currentSubscription = this.subscriptions.get(subscriptionKey);
+            if (currentSubscription) {
+              this.removePayloadHandler(currentSubscription, handlerId);
+            }
+          },
+        };
+      }
+
       return subscription;
     } catch (error) {
       console.error(`Error subscribing to ${table}:`, error);
@@ -509,6 +713,9 @@ export class UnifiedSubscriptionManager {
         unsubscribe: () => {},
         options: { table, queryKey, filter, priority },
         ownerRoutes: new Set(),
+        payloadHandlers: new Map(),
+        payloadHandlerOwners: new Map(),
+        invalidateOnPayload: options.invalidateOnPayload !== false,
         createdAt: Date.now(),
         lastPayloadAt: null,
         invalidationCount: 0,
@@ -663,14 +870,14 @@ export class UnifiedSubscriptionManager {
         const subscription = this.subscriptions.get(key);
         if (subscription) {
           try {
-            const { table, queryKey, filter, priority } = subscription.options;
+            const pendingSubscription = this.snapshotManagedSubscription(subscription);
             
             // Unsubscribe
             subscription.unsubscribe();
             this.subscriptions.delete(key);
             
             // Resubscribe
-            this.subscribeToTable(table, queryKey, filter, priority);
+            this.replayPendingSubscription(pendingSubscription);
             
             // Update activity timestamp to now
             this.tableLastActivity.set(key, Date.now());

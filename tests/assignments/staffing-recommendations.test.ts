@@ -57,6 +57,11 @@ const staffingOrchestratorFunction = readFileSync(
   "utf-8",
 );
 
+const staffingOrchestratorPolicyUtils = readFileSync(
+  join(process.cwd(), "supabase/functions/staffing-orchestrator/policyUtils.ts"),
+  "utf-8",
+);
+
 describe("staffing recommendation consultation guards", () => {
   it("stores a structured role_code for role-specific staffing requests", () => {
     expect(migration).toContain("ADD COLUMN IF NOT EXISTS role_code text");
@@ -174,11 +179,13 @@ describe("smarter staffing recommendation migration", () => {
   });
 
   it("prioritizes confirmed assisted availability before auto mode contacts new candidates", () => {
-    expect(staffingOrchestratorFunction).toContain("assisted_handoff_priority");
-    expect(staffingOrchestratorFunction).toContain("normalizeCampaignPolicy");
-    expect(staffingOrchestratorFunction).toContain("selected_job_profile");
-    expect(staffingOrchestratorFunction).toContain("role_profiles");
-    expect(staffingOrchestratorFunction).toContain("cost_scoring");
+    expect(staffingOrchestratorFunction).toContain("normalizeCampaignPolicy,");
+    expect(staffingOrchestratorFunction).toContain('} from "./policyUtils.ts";');
+    expect(staffingOrchestratorFunction).toContain("const normalizedPolicy = normalizeCampaignPolicy(policy, job, rolesToCreate, normalizedMode)");
+    expect(staffingOrchestratorPolicyUtils).toContain("assisted_handoff_priority");
+    expect(staffingOrchestratorPolicyUtils).toContain("selected_job_profile");
+    expect(staffingOrchestratorPolicyUtils).toContain("role_profiles");
+    expect(staffingOrchestratorPolicyUtils).toContain("cost_scoring");
     expect(staffingOrchestratorFunction).toContain("waveWaitSeconds");
     expect(staffingOrchestratorFunction).toContain("confirmedAvailabilityRowsForJob");
     expect(staffingOrchestratorFunction).toContain("confirmedAvailabilityByRequestedRole");
