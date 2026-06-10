@@ -1,6 +1,17 @@
 import { GearMismatch, EquipmentNeeds } from './gearComparisonService';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import type jsPDF from 'jspdf';
+import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import {
+  FALLBACK_BRAND_LOGO_PATH,
+  FESTIVAL_TABLE_HEAD_STYLES,
+  drawCenteredFooterLogo,
+  drawFestivalHeaderBand,
+  drawFestivalHeaderText,
+  drawFooterMetaText,
+  loadImageWithTimeout,
+  loadSectorProFooterLogo,
+} from '@/utils/pdf/shared/pdfExportShared';
 
 // Local interfaces for internal PDF generation use
 interface WirelessSystemDetail {
@@ -92,35 +103,6 @@ export interface ArtistTablePdfData {
   includeGearConflicts?: boolean;
   equipmentNeeds?: EquipmentNeeds;
 }
-
-// Enhanced image loading function
-const loadImageSafely = async (src: string, description: string): Promise<HTMLImageElement | null> => {
-  console.log(`Loading ${description} from:`, src);
-  
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    
-    const timeout = setTimeout(() => {
-      console.warn(`Timeout loading ${description} from:`, src);
-      resolve(null);
-    }, 10000); // 10 second timeout
-    
-    img.onload = () => {
-      clearTimeout(timeout);
-      console.log(`Successfully loaded ${description}`);
-      resolve(img);
-    };
-    
-    img.onerror = (error) => {
-      clearTimeout(timeout);
-      console.error(`Failed to load ${description} from:`, src, error);
-      resolve(null);
-    };
-    
-    img.src = src;
-  });
-};
 
 // Fixed infrastructure formatting function
 const formatInfrastructureForPdf = (infrastructure: any) => {
@@ -556,7 +538,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   let headerLogoFormat: 'PNG' | 'JPEG' = 'PNG';
   if (data.logoUrl) {
     console.log("Attempting to load festival logo:", data.logoUrl);
-    headerLogoImage = await loadImageSafely(data.logoUrl, 'festival logo');
+    headerLogoImage = await loadImageWithTimeout(data.logoUrl, 'festival logo');
     if (headerLogoImage) {
       headerLogoFormat = data.logoUrl.toLowerCase().includes('.png') ? 'PNG' : 'JPEG';
     }
@@ -564,15 +546,14 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
 
   if (!headerLogoImage) {
     console.log("Trying fallback logo");
-    headerLogoImage = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'fallback logo');
+    headerLogoImage = await loadImageWithTimeout(FALLBACK_BRAND_LOGO_PATH, 'fallback logo');
     if (headerLogoImage) {
       headerLogoFormat = 'PNG';
     }
   }
 
   const drawPageHeader = (): void => {
-    doc.setFillColor(125, 1, 1);
-    doc.rect(0, 0, pageWidth, 30, 'F');
+    drawFestivalHeaderBand(doc);
 
     if (headerLogoImage && headerLogoImage.width > 0 && headerLogoImage.height > 0) {
       const maxLogoWidth = 40;
@@ -590,11 +571,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       );
     }
 
-    doc.setFontSize(18);
-    doc.setTextColor(255, 255, 255);
-    doc.text(titleText, pageWidth / 2, 15, { align: 'center' });
-    doc.setFontSize(12);
-    doc.text(dateText, pageWidth / 2, 25, { align: 'center' });
+    drawFestivalHeaderText(doc, titleText, dateText);
   };
 
   drawPageHeader();
@@ -685,8 +662,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       valign: 'top',
     },
     headStyles: {
-      fillColor: [125, 1, 1],
-      textColor: [255, 255, 255],
+      ...FESTIVAL_TABLE_HEAD_STYLES,
       fontSize: 9,
       fontStyle: 'bold',
     },
@@ -805,7 +781,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
   if (data.includeGearConflicts) {
     const artistsWithConflicts = data.artists.filter(a => a.gearMismatches && a.gearMismatches.length > 0);
     if (artistsWithConflicts.length > 0) {
-      let currentY = (doc as any).lastAutoTable.finalY + 20;
+      let currentY = getLastAutoTableY(doc, 0) + 20;
       
       // Check if we need a new page for the summary
       if (currentY > pageHeight - 60) {
@@ -879,7 +855,7 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
       }
     } else if (data.equipmentNeeds) {
       // Add Equipment Needs section even if no conflicts
-      let currentY = (doc as any).lastAutoTable.finalY + 20;
+      let currentY = getLastAutoTableY(doc, 0) + 20;
       
       // Check if we need a new page for the equipment needs
       if (currentY > pageHeight - 60) {
@@ -892,38 +868,23 @@ export const exportArtistTablePDF = async (data: ArtistTablePdfData): Promise<Bl
     }
   }
 
-  const sectorImg =
-    (await loadImageSafely('/sector pro logo.png', 'Sector Pro logo')) ||
-    (await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'alternative Sector Pro logo'));
+  const sectorImg = await loadSectorProFooterLogo();
 
   const totalPages = doc.getNumberOfPages();
   for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
     doc.setPage(pageNumber);
     drawPageHeader();
 
-    if (sectorImg && sectorImg.width > 0 && sectorImg.height > 0) {
-      try {
-        const logoWidth = 20;
-        const logoHeight = logoWidth * (sectorImg.height / sectorImg.width);
-        doc.addImage(
-          sectorImg,
-          'PNG',
-          pageWidth / 2 - logoWidth / 2,
-          pageHeight - logoHeight - 5,
-          logoWidth,
-          logoHeight,
-        );
-      } catch (error) {
-        console.error('Error adding Sector Pro logo to PDF:', error);
-      }
-    }
-
-    doc.setFontSize(8);
-    doc.setTextColor(51, 51, 51);
-    doc.text(`Generado: ${createdDate}`, leftMargin, pageHeight - 10);
-    doc.text(`Pagina ${pageNumber} de ${totalPages}`, pageWidth - rightMargin, pageHeight - 10, { align: 'right' });
+    drawCenteredFooterLogo(doc, sectorImg, pageWidth, pageHeight, 5, 'Error adding Sector Pro logo to PDF:');
+    drawFooterMetaText(
+      doc,
+      pageWidth,
+      pageHeight,
+      `Generado: ${createdDate}`,
+      `Pagina ${pageNumber} de ${totalPages}`,
+    );
   }
-  
+
   console.log('Artist table PDF generation completed');
-  return doc.output('blob');
+  return pdfToBlob(doc);
 };
