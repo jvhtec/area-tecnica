@@ -1,78 +1,111 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
+import { useLocation } from 'react-router-dom'
 import { supabase } from '@/integrations/supabase/client'
 import { useQueryClient } from '@tanstack/react-query'
+import { UnifiedSubscriptionManager, type RealtimeChangePayload } from '@/lib/unified-subscription-manager'
 
 
 import { queryKeys } from "@/lib/react-query";
 export function useStaffingRealtime() {
   const qc = useQueryClient()
+  const location = useLocation()
+  const subscriptionManager = useMemo(
+    () => UnifiedSubscriptionManager.getInstance(qc),
+    [qc],
+  )
+  const ownerIdRef = useRef(`staffing-realtime-${Math.random().toString(36).slice(2)}`)
 
   useEffect(() => {
     console.log('🚀 Setting up staffing realtime subscriptions')
-    // Listen to both staffing_requests and staffing_events tables
-    const staffingRequestsChannel = supabase.channel('staffing-requests')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'staffing_requests'
-      }, (payload) => {
-        console.log('Staffing requests realtime update:', payload)
-        handleStaffingUpdate(payload)
-      })
-      .subscribe()
+    const ownerRoute = `${location.pathname}:${ownerIdRef.current}`
 
-    const staffingEventsChannel = supabase.channel('staffing-events')
-      .on('postgres_changes', {
+    // Listen to both staffing_requests and staffing_events tables
+    subscriptionManager.subscribeToTable(
+      'staffing_requests',
+      queryKeys.scope('staffing-realtime', 'requests'),
+      {
         event: '*',
         schema: 'public',
-        table: 'staffing_events'
-      }, (payload) => {
-        console.log('Staffing events realtime update:', payload)
-        handleStaffingUpdate(payload)
-      })
-      .subscribe()
+      },
+      'high',
+      {
+        ownerRoute,
+        invalidateOnPayload: false,
+        onPayload: (payload) => {
+          console.log('Staffing requests realtime update:', payload)
+          void handleStaffingUpdate(payload)
+        },
+      },
+    )
+
+    subscriptionManager.subscribeToTable(
+      'staffing_events',
+      queryKeys.scope('staffing-realtime', 'events'),
+      {
+        event: '*',
+        schema: 'public',
+      },
+      'high',
+      {
+        ownerRoute,
+        invalidateOnPayload: false,
+        onPayload: (payload) => {
+          console.log('Staffing events realtime update:', payload)
+          void handleStaffingUpdate(payload)
+        },
+      },
+    )
 
     // Also listen to activity_log for staffing.* events (secondary source of truth)
-    const activityChannel = supabase.channel('activity-log-staffing')
-      .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'activity_log'
-      }, (payload) => {
-        try {
-          const rec: any = payload.new || payload.old
-          const code = rec?.code || ''
-          if (typeof code === 'string' && code.startsWith('staffing.')) {
-            console.log('Activity staffing event:', code, rec)
-            // We don't know job/profile here, but invalidate broad keys
-            qc.invalidateQueries({ queryKey: queryKeys.scope('staffing') })
-            qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-by-date') })
-            qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') })
-            qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
+    subscriptionManager.subscribeToTable(
+      'activity_log',
+      queryKeys.scope('staffing-realtime', 'activity-log'),
+      {
+        event: '*',
+        schema: 'public',
+      },
+      'medium',
+      {
+        ownerRoute,
+        invalidateOnPayload: false,
+        onPayload: (payload) => {
+          try {
+            const rec = (payload.new || payload.old) as Record<string, unknown> | null
+            const code = rec?.code
+            if (typeof code === 'string' && code.startsWith('staffing.')) {
+              console.log('Activity staffing event:', code, rec)
+              // We don't know job/profile here, but invalidate broad keys
+              qc.invalidateQueries({ queryKey: queryKeys.scope('staffing') })
+              qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-by-date') })
+              qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') })
+              qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
+            }
+          } catch (e) {
+            console.warn('Activity staffing event handling error', e)
           }
-        } catch (e) {
-          console.warn('Activity staffing event handling error', e)
-        }
-      })
-      .subscribe()
+        },
+      },
+    )
 
-    async function handleStaffingUpdate(payload: any) {
+    async function handleStaffingUpdate(payload: RealtimeChangePayload) {
       console.log('🔄 Realtime update received:', {
         table: payload.table,
         eventType: payload.eventType,
         record: payload.new || payload.old
       })
 
-      const record = payload.new || payload.old
-      let jobId = null
-      let profileId = null
+      const record = (payload.new || payload.old) as Record<string, unknown> | null
+      let jobId: string | null = null
+      let profileId: string | null = null
 
       if (record && typeof record === 'object') {
         // Handle staffing_requests updates (have job_id and profile_id directly)
-        if ('job_id' in record && 'profile_id' in record) {
+        if (typeof record.job_id === 'string' && typeof record.profile_id === 'string') {
           jobId = record.job_id
           profileId = record.profile_id
         }
         // Handle staffing_events updates (need to fetch related request data)
-        else if ('staffing_request_id' in record) {
+        else if (typeof record.staffing_request_id === 'string') {
           try {
             const { data: requestData } = await supabase
               .from('staffing_requests')
@@ -110,9 +143,7 @@ export function useStaffingRealtime() {
     }
 
     return () => {
-      supabase.removeChannel(staffingRequestsChannel)
-      supabase.removeChannel(staffingEventsChannel)
-      supabase.removeChannel(activityChannel)
+      subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute)
     }
-  }, [qc])
+  }, [location.pathname, qc, subscriptionManager])
 }
