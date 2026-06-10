@@ -40,6 +40,12 @@ export type PowerTable = {
   isOverride?: boolean;
   overrideId?: string;
   defaultTableId?: string;
+  // snapshot of electrical settings at generation time, used when persisting
+  // and when re-loading saved tables for edition
+  snapshotSafetyMargin?: number;
+  snapshotPhaseMode?: PhaseMode;
+  snapshotVoltage?: number;
+  snapshotPowerFactor?: number;
 };
 
 export type PowerElectricalSettings = {
