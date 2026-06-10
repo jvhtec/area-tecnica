@@ -1,5 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   STAGE_PLOT_FOH,
@@ -14,6 +21,23 @@ import type { PowerPositionPreset } from "@/utils/powerPositions";
 import type { ConsumosLabels } from "./config";
 
 const UNPOSITIONED_ZONE = "unpositioned";
+const COLLAPSED_STORAGE_KEY = "sector-pro:consumos-stage-plot-collapsed";
+
+const readStoredCollapsed = () => {
+  try {
+    return window.localStorage.getItem(COLLAPSED_STORAGE_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
+
+const storeCollapsed = (collapsed: boolean) => {
+  try {
+    window.localStorage.setItem(COLLAPSED_STORAGE_KEY, String(collapsed));
+  } catch {
+    /* storage unavailable */
+  }
+};
 
 type DragGhost = { name: string; x: number; y: number };
 
@@ -41,7 +65,13 @@ export const PowerStagePlot: React.FC<{
   const dragInfoRef = useRef<{ id: string; from: string } | null>(null);
   const [ghost, setGhost] = useState<DragGhost | null>(null);
   const [hoverZone, setHoverZone] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(readStoredCollapsed);
   const isDragging = ghost !== null;
+
+  const handleCollapsedChange = (open: boolean) => {
+    setCollapsed(!open);
+    storeCollapsed(!open);
+  };
 
   useEffect(() => {
     if (!isDragging) return;
@@ -145,13 +175,32 @@ export const PowerStagePlot: React.FC<{
 
   return (
     <Card className="mb-6">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base">{labels.stagePlotTitle}</CardTitle>
-        {canDrag && (
-          <p className="text-xs text-muted-foreground">{labels.stagePlotDragHint}</p>
-        )}
-      </CardHeader>
-      <CardContent>
+      <Collapsible open={!collapsed} onOpenChange={handleCollapsedChange}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="text-base">{labels.stagePlotTitle}</CardTitle>
+            <CollapsibleTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                aria-label={labels.stagePlotTitle}
+              >
+                <ChevronDown
+                  className={cn(
+                    "h-4 w-4 transition-transform",
+                    !collapsed && "rotate-180",
+                  )}
+                />
+              </Button>
+            </CollapsibleTrigger>
+          </div>
+          {canDrag && !collapsed && (
+            <p className="text-xs text-muted-foreground">{labels.stagePlotDragHint}</p>
+          )}
+        </CardHeader>
+        <CollapsibleContent>
+          <CardContent>
         <div className="mx-auto max-w-3xl">
           <p className="mb-1 text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             {labels.stagePlotStage}
@@ -294,7 +343,9 @@ export const PowerStagePlot: React.FC<{
             {ghost.name}
           </div>
         )}
-      </CardContent>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 };
