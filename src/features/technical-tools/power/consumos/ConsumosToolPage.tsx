@@ -24,7 +24,7 @@ import type { PowerTable } from "@/features/technical-tools/power/types";
 import { FIXTURE_PF, type ConsumosDepartmentConfig, type FixtureType } from "./config";
 import { useConsumosTool } from "./useConsumosTool";
 import { CustomComponentDialog } from "./CustomComponentDialog";
-import { PowerStagePlot } from "./PowerStagePlot";
+import { PowerStagePlot } from "@/features/technical-tools/power/consumos/PowerStagePlot";
 import { GeneratedPowerTableCard } from "./GeneratedPowerTableCard";
 
 const PowerTableSummary: React.FC<{

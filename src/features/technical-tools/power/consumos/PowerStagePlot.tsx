@@ -19,7 +19,7 @@ import {
   type StagePlotTable,
 } from "@/utils/powerStagePlot";
 import type { PowerPositionPreset } from "@/utils/powerPositions";
-import type { ConsumosLabels } from "./config";
+import type { ConsumosLabels } from "@/features/technical-tools/power/consumos/config";
 
 const UNPOSITIONED_ZONE = "unpositioned";
 const COLLAPSED_STORAGE_KEY = "sector-pro:consumos-stage-plot-collapsed";
