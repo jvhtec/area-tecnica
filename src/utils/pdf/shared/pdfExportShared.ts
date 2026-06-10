@@ -3,6 +3,7 @@ import { SECTOR_PRO_RED, type PdfRgb } from '@/utils/pdf/exportHelpers';
 import { fetchJobLogo, fetchTourLogo } from '@/utils/pdf/logoUtils';
 
 export type { PdfRgb };
+export type PdfImageFormat = 'PNG' | 'JPEG';
 
 // ---------------------------------------------------------------------------
 // Shared corporate palette
@@ -130,6 +131,23 @@ export const loadSectorProFooterLogo = async (): Promise<HTMLImageElement | null
   (await loadImageWithTimeout(SECTOR_PRO_LOGO_PATH, 'Sector Pro logo')) ||
   (await loadImageWithTimeout(FALLBACK_BRAND_LOGO_PATH, 'alternative Sector Pro logo'));
 
+export const inferPdfImageFormat = (
+  source: string | HTMLImageElement | null | undefined,
+  fallback: PdfImageFormat = 'PNG',
+): PdfImageFormat => {
+  const src = (
+    typeof source === 'string' ? source : source?.currentSrc || source?.src || ''
+  ).toLowerCase();
+
+  if (src.startsWith('data:image/jpeg') || src.startsWith('data:image/jpg')) {
+    return 'JPEG';
+  }
+  if (src.startsWith('data:image/png')) return 'PNG';
+  if (/\.jpe?g(?:[?#]|$)/.test(src)) return 'JPEG';
+  if (/\.png(?:[?#]|$)/.test(src)) return 'PNG';
+  return fallback;
+};
+
 /**
  * Resolves the branding logo (tour logo first, then job/festival logo) for the
  * corporate header and loads it as an image element.
@@ -205,7 +223,7 @@ export const drawCorporateHeader = (
       const ratio = logo.width && logo.height ? logo.width / logo.height : 1;
       const logoHeight = 26;
       const logoWidth = logoHeight * ratio;
-      doc.addImage(logo, 'PNG', 16, 9, logoWidth, logoHeight);
+      doc.addImage(logo, inferPdfImageFormat(logo), 16, 9, logoWidth, logoHeight);
     } catch (error) {
       console.error('Error adding logo to PDF header:', error);
     }
@@ -253,7 +271,14 @@ export const drawCorporateFooter = (doc: jsPDF, logo: HTMLImageElement | null): 
         const logoHeight = 12;
         const logoWidth = logoHeight * ratio;
         const logoX = (pageWidth - logoWidth) / 2;
-        doc.addImage(logo, 'PNG', logoX, footerY - logoHeight - 3, logoWidth, logoHeight);
+        doc.addImage(
+          logo,
+          inferPdfImageFormat(logo),
+          logoX,
+          footerY - logoHeight - 3,
+          logoWidth,
+          logoHeight,
+        );
       } catch (error) {
         console.error('Error adding logo to PDF footer:', error);
       }

@@ -12,6 +12,18 @@ import {
   getVoltageForPhase,
 } from "@/features/technical-tools/power/powerCalculations";
 
+type PowerRequirementTableData = {
+  rows?: PowerTableRow[];
+  safetyMargin?: number;
+  phaseMode?: PhaseMode;
+  voltage?: number;
+  pf?: number;
+  generationTimestamp?: string;
+  stageNumber?: number;
+  stageName?: string;
+  [key: string]: unknown;
+};
+
 export type PowerRequirementTableRow = {
   id: string;
   job_id: string;
@@ -26,7 +38,7 @@ export type PowerRequirementTableRow = {
   position: string | null;
   custom_position: string | null;
   includes_hoist: boolean;
-  table_data: any;
+  table_data: PowerRequirementTableData | null;
   created_at: string;
 };
 
@@ -44,10 +56,8 @@ export const mapPowerRequirementRowToTable = (
   row: PowerRequirementTableRow,
   options: { fallbackSafetyMargin: number; perRowPf: boolean },
 ): PowerTable => {
-  const data = (row.table_data ?? {}) as Record<string, unknown>;
-  const rows: PowerTableRow[] = Array.isArray(data.rows)
-    ? (data.rows as PowerTableRow[])
-    : [];
+  const data = row.table_data ?? {};
+  const rows = Array.isArray(data.rows) ? data.rows : [];
 
   const safetyMargin =
     typeof data.safetyMargin === "number"
@@ -80,8 +90,8 @@ export const mapPowerRequirementRowToTable = (
         : row.created_at,
     name: row.table_name,
     rows,
-    stageNumber: row.stage_number ?? (data.stageNumber as number | undefined) ?? null,
-    stageName: row.stage_name ?? (data.stageName as string | undefined) ?? null,
+    stageNumber: row.stage_number ?? data.stageNumber ?? null,
+    stageName: row.stage_name ?? data.stageName ?? null,
     totalWatts,
     adjustedWatts,
     totalVa,

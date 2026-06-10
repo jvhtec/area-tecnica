@@ -13,6 +13,7 @@ import {
   drawFestivalHeaderBand,
   drawFestivalHeaderText,
   drawFooterMetaText,
+  inferPdfImageFormat,
   loadImageWithTimeout,
   loadSectorProFooterLogo,
 } from '@/utils/pdf/shared/pdfExportShared';
@@ -190,7 +191,14 @@ export const exportArtistPDF = async (data: ArtistPdfData, options: ArtistPdfOpt
     if (festivalImg) {
       try {
         console.log("Festival logo loaded, dimensions:", festivalImg.width, "x", festivalImg.height);
-        addLogoConstrainedToHeight(doc, festivalImg, 'JPEG', 5, 5, 18);
+        addLogoConstrainedToHeight(
+          doc,
+          festivalImg,
+          inferPdfImageFormat(data.logoUrl, 'JPEG'),
+          5,
+          5,
+          18,
+        );
         festivalLogoLoaded = true;
         console.log("Festival logo added successfully to PDF");
       } catch (error) {

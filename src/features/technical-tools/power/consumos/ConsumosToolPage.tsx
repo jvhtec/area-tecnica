@@ -23,11 +23,8 @@ import {
 import type { PowerTable } from "@/features/technical-tools/power/types";
 import { FIXTURE_PF, type ConsumosDepartmentConfig, type FixtureType } from "./config";
 import { useConsumosTool } from "./useConsumosTool";
-import { ComponentPicker } from "./ComponentPicker";
+import { CustomComponentDialog } from "./CustomComponentDialog";
 import { GeneratedPowerTableCard } from "./GeneratedPowerTableCard";
-
-const DEFAULT_PDU_SELECT_VALUE = "default";
-const CUSTOM_PDU_SELECT_VALUE = "Custom";
 
 const PowerTableSummary: React.FC<{
   table: PowerTable;
@@ -105,19 +102,15 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
     tableName,
     setTableName,
     currentRows,
+    components,
     addRow,
     removeRow,
     updateInput,
+    addComponentToRow,
     selectedPosition,
     setSelectedPosition,
     customPosition,
     setCustomPosition,
-    selectedPduType,
-    setSelectedPduType,
-    customPduType,
-    setCustomPduType,
-    includesHoist,
-    setIncludesHoist,
     editing,
     tables,
     activeTables,
@@ -564,49 +557,6 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>{labels.pduOverride}</Label>
-                    <Select value={selectedPduType} onValueChange={setSelectedPduType}>
-                      <SelectTrigger>
-                        <SelectValue placeholder={labels.pduOverridePlaceholder} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={DEFAULT_PDU_SELECT_VALUE}>
-                          {labels.pduOverridePlaceholder}
-                        </SelectItem>
-                        {pduOptions.map((type) => (
-                          <SelectItem key={type} value={type}>
-                            {type}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value={CUSTOM_PDU_SELECT_VALUE}>
-                          {labels.customPduOption}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {selectedPduType === CUSTOM_PDU_SELECT_VALUE && (
-                    <div className="space-y-2">
-                      <Label>{labels.customPdu}</Label>
-                      <Input
-                        value={customPduType}
-                        onChange={(event) => setCustomPduType(event.target.value)}
-                        placeholder={labels.customPduPlaceholder}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="hoistPower"
-                    checked={includesHoist}
-                    onCheckedChange={(checked) => setIncludesHoist(checked as boolean)}
-                  />
-                  <Label htmlFor="hoistPower">{labels.hoistCheckbox}</Label>
-                </div>
-
                 {/* Builder rows */}
                 <div className="border rounded-lg overflow-hidden">
                   <div className="overflow-x-auto">
@@ -662,16 +612,33 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                               </td>
                             )}
                             <td className="p-4">
-                              <ComponentPicker
-                                components={config.components}
-                                value={row.componentId}
-                                onSelect={(componentId) =>
-                                  updateInput(index, "componentId", componentId)
-                                }
-                                placeholder={labels.componentPlaceholder}
-                                searchPlaceholder={labels.componentSearchPlaceholder}
-                                emptyText={labels.componentEmpty}
-                              />
+                              <div className="flex min-w-[220px] items-center gap-2">
+                                <CustomComponentDialog
+                                  labels={labels}
+                                  showFixtureType={features.perRowPf}
+                                  onCreate={(input) => addComponentToRow(index, input)}
+                                />
+                                <Select
+                                  value={row.componentId || undefined}
+                                  onValueChange={(componentId) =>
+                                    updateInput(index, "componentId", componentId)
+                                  }
+                                >
+                                  <SelectTrigger className="min-w-0 flex-1">
+                                    <SelectValue placeholder={labels.componentPlaceholder} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {components.map((component) => (
+                                      <SelectItem
+                                        key={component.id}
+                                        value={component.id.toString()}
+                                      >
+                                        {component.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
                             </td>
                             <td className="p-4">
                               <Input

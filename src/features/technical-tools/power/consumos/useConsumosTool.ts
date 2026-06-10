@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useJobSelection } from "@/hooks/useJobSelection";
+import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useTourDefaultSets } from "@/hooks/useTourDefaultSets";
 import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
 import { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
@@ -51,6 +52,10 @@ import {
   mapPowerRequirementRowToTable,
   useJobPowerRequirementTables,
 } from "./useJobPowerRequirementTables";
+import {
+  type CustomPowerComponentInput,
+  useCustomPowerComponents,
+} from "./useCustomPowerComponents";
 
 const DEFAULT_PDU_SELECT_VALUE = "default";
 const CUSTOM_PDU_SELECT_VALUE = "Custom";
@@ -58,6 +63,45 @@ const CUSTOM_PDU_SELECT_VALUE = "Custom";
 type EditingTarget =
   | { kind: "table"; id: number | string }
   | { kind: "override"; id: string };
+
+type ConsumosJob = {
+  id: string;
+  title?: string;
+  start_time?: string;
+  end_time?: string;
+  tour_date_id?: string | null;
+  tour_date?: {
+    date?: string;
+    tour?: { name?: string } | null;
+    location?: { name?: string } | null;
+  } | null;
+  location?: { name?: string } | null;
+};
+
+type ReadOnlyPowerDefault = {
+  id: string;
+  table_type: string;
+  table_name: string;
+  total_value?: number;
+  table_data?: {
+    rows?: PowerTableRow[];
+    pf?: number;
+    safetyMargin?: number;
+  };
+  metadata?: {
+    pf?: number;
+    safetyMargin?: number;
+    current_per_phase?: number;
+    pdu_type?: string;
+    custom_pdu_type?: string;
+    position?: string;
+    custom_position?: string;
+    includes_hoist?: boolean;
+  };
+};
+
+const getErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : "unknown error";
 
 const getRecommendedFixturePf = (fixtureType?: string) =>
   FIXTURE_PF[(fixtureType as FixtureType) || DEFAULT_FIXTURE_TYPE]?.pf ??
@@ -78,10 +122,17 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { user } = useOptimizedAuth();
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
   const { department, features, labels } = config;
   const perRowPf = features.perRowPf;
+  const { customComponents, addCustomComponent } =
+    useCustomPowerComponents(department, user?.id);
+  const components = useMemo(
+    () => [...config.components, ...customComponents],
+    [config.components, customComponents],
+  );
 
   const jobIdFromUrl = searchParams.get("jobId");
   const tourIdParam = searchParams.get("tourId");
@@ -91,7 +142,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     Boolean(tourIdParam) && (mode === "tour-defaults" || mode === "defaults");
 
   const [selectedJobId, setSelectedJobId] = useState<string>("");
-  const [selectedJob, setSelectedJob] = useState<any>(null);
+  const [selectedJob, setSelectedJob] = useState<ConsumosJob | null>(null);
 
   // Override mode can be reached two ways: via tour management URLs
   // (tourId + tourDateId) or by opening a job that belongs to a tour date.
@@ -205,7 +256,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       if (!jobIdFromUrl) return;
       try {
         setSelectedJobId(jobIdFromUrl);
-        const found = (jobs || []).find((job: any) => job.id === jobIdFromUrl) || null;
+        const found = (jobs || []).find((job) => job.id === jobIdFromUrl) || null;
         if (found) {
           setSelectedJob(found);
           return;
@@ -293,7 +344,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     setCurrentRows((prev) => {
       const rows = [...prev];
       if (field === "componentId" && value) {
-        const component = config.components.find(
+        const component = components.find(
           (candidate) => candidate.id.toString() === value,
         );
         if (perRowPf) {
@@ -322,6 +373,28 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       } else {
         rows[index] = { ...rows[index], [field]: value };
       }
+      return rows;
+    });
+  };
+
+  const addComponentToRow = (
+    index: number,
+    input: CustomPowerComponentInput,
+  ) => {
+    const component = addCustomComponent(input);
+    setCurrentRows((previous) => {
+      const rows = [...previous];
+      rows[index] = {
+        ...rows[index],
+        componentId: component.id.toString(),
+        watts: component.watts.toString(),
+        ...(perRowPf
+          ? {
+              fixtureType: component.fixtureType || DEFAULT_FIXTURE_TYPE,
+              pf: getRecommendedFixturePf(component.fixtureType).toFixed(2),
+            }
+          : {}),
+      };
       return rows;
     });
   };
@@ -442,7 +515,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     let rawApparentPowerVa: number | undefined;
     if (perRowPf) {
       preparedRows = currentRows.map((row) => {
-        const component = config.components.find(
+        const component = components.find(
           (candidate) => candidate.id.toString() === row.componentId,
         );
         const fixtureType =
@@ -466,7 +539,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     }
 
     return createCalculatedPowerTable({
-      components: config.components,
+      components,
       currentTable: {
         rows: preparedRows,
         position: resolvedPosition,
@@ -590,14 +663,14 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
 
       setTables((prev) => [...prev, builtTable]);
       resetCurrentTable();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving consumos table:", error);
       toast({
         title: labels.toastError,
         description:
           editing?.kind === "override" || isOverrideMode
             ? labels.toastOverrideSaveError
-            : error?.message || "unknown error",
+            : getErrorMessage(error),
         variant: "destructive",
       });
     }
@@ -693,11 +766,11 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         ),
       );
       toast({ title: labels.toastSuccess, description: labels.toastDefaultSaved });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error saving tour default:", error);
       toast({
         title: labels.toastError,
-        description: labels.toastDefaultSaveError(error?.message || "unknown error"),
+        description: labels.toastDefaultSaveError(getErrorMessage(error)),
         variant: "destructive",
       });
     }
@@ -715,11 +788,11 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     let setId: string;
     try {
       setId = await getOrCreateDefaultSetId();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error getting/creating default set:", error);
       toast({
         title: labels.toastError,
-        description: labels.toastDefaultSaveError(error?.message || "unknown error"),
+        description: labels.toastDefaultSaveError(getErrorMessage(error)),
         variant: "destructive",
       });
       return;
@@ -881,9 +954,9 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   // Read-only defaults shown in URL override mode
   const readOnlyDefaultTables: PowerTable[] = useMemo(() => {
     if (!isUrlOverrideMode || !overrideData) return [];
-    return overrideData.defaults
-      .filter((table: any) => table.table_type === "power")
-      .map((table: any) => {
+    return (overrideData.defaults as ReadOnlyPowerDefault[])
+      .filter((table) => table.table_type === "power")
+      .map((table) => {
         const rows: PowerTableRow[] = table.table_data?.rows || [];
         const snapshot = {
           pf: table.metadata?.pf ?? table.table_data?.pf,
@@ -1175,9 +1248,11 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     tableName,
     setTableName,
     currentRows,
+    components,
     addRow,
     removeRow,
     updateInput,
+    addComponentToRow,
     selectedPosition,
     setSelectedPosition,
     customPosition,
