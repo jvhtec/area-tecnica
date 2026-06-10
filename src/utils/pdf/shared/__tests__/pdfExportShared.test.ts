@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inferPdfImageFormat } from "../pdfExportShared";
+import { inferPdfImageFormat } from "@/utils/pdf/shared/pdfExportShared";
 
 describe("inferPdfImageFormat", () => {
   it.each([
