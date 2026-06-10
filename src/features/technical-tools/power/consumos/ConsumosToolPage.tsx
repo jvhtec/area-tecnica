@@ -131,6 +131,8 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
     handleExportPDF,
     exportDisplayTables,
     exportTablesCount,
+    movablePlotTableIds,
+    moveTableToPosition,
   } = state;
 
   if (overrideLoading) {
@@ -213,9 +215,15 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
         </div>
       </div>
 
-      {/* Stage plot with the chosen PDU positions (renders only when at
-          least one table sits on a preset stage position) */}
-      <PowerStagePlot tables={exportDisplayTables} labels={labels} />
+      {/* Stage plot with the chosen PDU positions; tables can be dragged
+          between zones to reposition them */}
+      <PowerStagePlot
+        tables={exportDisplayTables}
+        labels={labels}
+        fohSchukoRequired={features.fohSchuko && fohSchukoRequired}
+        movableIds={movablePlotTableIds}
+        onMoveTable={moveTableToPosition}
+      />
 
       {/* 3-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

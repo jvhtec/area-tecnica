@@ -1237,6 +1237,53 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       : activeTables;
   const exportTablesCount = exportDisplayTables.length;
 
+  // Tables whose position may be changed from the stage plot: local tables,
+  // persisted overrides and persisted tour defaults (not the read-only
+  // defaults shown in URL override mode).
+  const movablePlotTableIds = useMemo(() => {
+    const ids = new Set<string>();
+    tables.forEach((table) => {
+      if (table.id !== undefined) ids.add(String(table.id));
+    });
+    overrideDisplayTables.forEach((table) => {
+      if (table.overrideId) ids.add(String(table.id));
+    });
+    tourDefaultDisplayTables.forEach((table) => {
+      if (table.defaultTableId) ids.add(String(table.id));
+    });
+    return ids;
+  }, [tables, overrideDisplayTables, tourDefaultDisplayTables]);
+
+  const moveTableToPosition = (plotTableId: string, position: string | null) => {
+    const patch: Partial<PowerTable> = {
+      position: position ?? undefined,
+      customPosition: undefined,
+    };
+
+    const localTable = tables.find((table) => String(table.id) === plotTableId);
+    if (localTable && localTable.id !== undefined) {
+      updateTableSettings(localTable.id, patch);
+      return;
+    }
+    const overrideTable = overrideDisplayTables.find(
+      (table) => String(table.id) === plotTableId,
+    );
+    if (overrideTable?.overrideId) {
+      void persistOverrideUpdate({ ...overrideTable, ...patch }, overrideTable.overrideId).catch(
+        (error) => {
+          console.error("Error moving override table:", error);
+        },
+      );
+      return;
+    }
+    const defaultTable = tourDefaultDisplayTables.find(
+      (table) => String(table.id) === plotTableId,
+    );
+    if (defaultTable?.defaultTableId) {
+      persistDefaultTableUpdate({ ...defaultTable, ...patch });
+    }
+  };
+
   return {
     config,
     labels,
@@ -1307,6 +1354,8 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     handleExportPDF,
     exportDisplayTables,
     exportTablesCount,
+    movablePlotTableIds,
+    moveTableToPosition,
   };
 };
 

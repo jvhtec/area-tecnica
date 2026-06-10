@@ -454,6 +454,7 @@ export const exportToPDF = async (
               pageWidth,
               pageHeight,
               footerSpace,
+              fohSchukoRequired,
             });
           }
         } else if ((type === 'weight' || type === 'rigging') && finalSummaryRows.length > 0) {

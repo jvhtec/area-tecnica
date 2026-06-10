@@ -194,6 +194,9 @@ const ENGLISH_LABELS: ConsumosLabels = {
   stagePlotStage: "Stage",
   stagePlotAudience: "Audience",
   stagePlotUnpositioned: "No position",
+  stagePlotFohSchuko: "16A schuko (female) required",
+  stagePlotHoist: "+ Hoist: CEE32A 3P+N+G",
+  stagePlotDragHint: "Drag tables to reposition them.",
   pfInfoTitle: "Recommended power factor by fixture type",
   pfInfoFootnote:
     "You can adjust the PF per item if the manufacturer specifies a different value.",
@@ -322,6 +325,9 @@ const SPANISH_LABELS: ConsumosLabels = {
   stagePlotStage: "Escenario",
   stagePlotAudience: "Público",
   stagePlotUnpositioned: "Sin posición",
+  stagePlotFohSchuko: "Se requiere schuko 16A hembra",
+  stagePlotHoist: "+ Motor: CEE32A 3P+N+G",
+  stagePlotDragHint: "Arrastra las tablas para cambiar su posición.",
   pfInfoTitle: "Power factor recomendado por tipo de fixture",
   pfInfoFootnote:
     "Puedes ajustar el PF por ítem si el fabricante especifica un valor distinto.",

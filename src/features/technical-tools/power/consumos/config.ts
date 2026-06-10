@@ -114,6 +114,9 @@ export type ConsumosLabels = {
   stagePlotStage: string;
   stagePlotAudience: string;
   stagePlotUnpositioned: string;
+  stagePlotFohSchuko: string;
+  stagePlotHoist: string;
+  stagePlotDragHint: string;
   pfInfoTitle: string;
   pfInfoFootnote: string;
   loadingOverrideData: string;

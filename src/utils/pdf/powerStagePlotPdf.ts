@@ -1,6 +1,8 @@
 import {
   STAGE_PLOT_FOH,
   STAGE_PLOT_GRID,
+  STAGE_PLOT_WING_LEFT,
+  STAGE_PLOT_WING_RIGHT,
   type PowerStagePlotData,
   type StagePlotEntry,
 } from "@/utils/powerStagePlot";
@@ -14,15 +16,21 @@ type PdfDoc = {
   setFillColor: (r: number, g: number, b: number) => void;
   setLineWidth: (width: number) => void;
   setLineDashPattern?: (pattern: number[], phase: number) => void;
+  setFont: (font: string | undefined, style?: string) => void;
   rect: (x: number, y: number, w: number, h: number, style?: string) => void;
   text: (text: string, x: number, y: number, options?: { align?: string }) => void;
   getTextWidth: (text: string) => number;
 };
 
 const ENTRY_HEIGHT = 8;
+const HOIST_LINE_HEIGHT = 3.4;
 const ZONE_HEADER_HEIGHT = 6;
 const MIN_CELL_HEIGHT = 16;
-const STAGE_WIDTH = 132;
+const STAGE_WIDTH = 126;
+const WING_WIDTH = 22;
+const WING_GAP = 1.5;
+const AUDIENCE_LABEL_HEIGHT = 6;
+const SCHUKO_NOTE_HEIGHT = 5;
 
 const fitText = (doc: PdfDoc, text: string, maxWidth: number) => {
   if (doc.getTextWidth(text) <= maxWidth) return text;
@@ -33,8 +41,14 @@ const fitText = (doc: PdfDoc, text: string, maxWidth: number) => {
   return `${trimmed}…`;
 };
 
+const entryHeight = (entry: StagePlotEntry) =>
+  ENTRY_HEIGHT + (entry.includesHoist ? HOIST_LINE_HEIGHT : 0);
+
 const zoneHeight = (entries: StagePlotEntry[]) =>
-  Math.max(MIN_CELL_HEIGHT, ZONE_HEADER_HEIGHT + entries.length * ENTRY_HEIGHT + 2);
+  Math.max(
+    MIN_CELL_HEIGHT,
+    ZONE_HEADER_HEIGHT + entries.reduce((sum, entry) => sum + entryHeight(entry), 0) + 2,
+  );
 
 const drawZoneEntries = (
   doc: PdfDoc,
@@ -43,8 +57,8 @@ const drawZoneEntries = (
   y: number,
   width: number,
 ) => {
-  entries.forEach((entry, index) => {
-    const entryY = y + ZONE_HEADER_HEIGHT + index * ENTRY_HEIGHT;
+  let entryY = y + ZONE_HEADER_HEIGHT;
+  entries.forEach((entry) => {
     doc.setFontSize(7);
     doc.setTextColor(125, 1, 1);
     doc.text(fitText(doc, entry.name, width - 6), x + width / 2, entryY + 3, {
@@ -56,29 +70,93 @@ const drawZoneEntries = (
         align: "center",
       });
     }
+    if (entry.includesHoist) {
+      doc.setFontSize(6);
+      doc.setTextColor(150, 100, 0);
+      doc.setFont(undefined, "italic");
+      doc.text(
+        fitText(doc, "+ Motor: CEE32A 3P+N+G", width - 4),
+        x + width / 2,
+        entryY + 6.2 + HOIST_LINE_HEIGHT,
+        { align: "center" },
+      );
+      doc.setFont(undefined, "normal");
+    }
+    entryY += entryHeight(entry);
   });
+};
+
+const drawZoneBox = (
+  doc: PdfDoc,
+  zone: string,
+  entries: StagePlotEntry[],
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+) => {
+  doc.setDrawColor(120, 120, 120);
+  if (entries.length === 0) {
+    doc.setFillColor(245, 245, 245);
+    doc.rect(x, y, width, height, "FD");
+  } else {
+    doc.rect(x, y, width, height, "S");
+  }
+  doc.setFontSize(6);
+  doc.setTextColor(140, 140, 140);
+  doc.text(zone, x + 1.5, y + 3.5);
+  drawZoneEntries(doc, entries, x, y, width);
 };
 
 const formatEntryList = (entries: StagePlotEntry[]) =>
   entries
-    .map((entry) => (entry.pduLabel ? `${entry.name} (${entry.pduLabel})` : entry.name))
+    .map((entry) => {
+      const base = entry.pduLabel ? `${entry.name} (${entry.pduLabel})` : entry.name;
+      return entry.includesHoist ? `${base} + Motor: CEE32A 3P+N+G` : base;
+    })
     .join(", ");
 
-export const estimatePowerStagePlotHeight = (plot: PowerStagePlotData) => {
-  const rowHeights = STAGE_PLOT_GRID.map((row) =>
-    Math.max(...row.map((zone) => zoneHeight(plot.zones[zone]))),
+const stageGridHeight = (plot: PowerStagePlotData) => {
+  const rowsHeight = STAGE_PLOT_GRID.reduce(
+    (sum, row) => sum + Math.max(...row.map((zone) => zoneHeight(plot.zones[zone]))),
+    0,
   );
-  const stageHeight = rowHeights.reduce((sum, height) => sum + height, 0);
-  const fohHeight = zoneHeight(plot.zones[STAGE_PLOT_FOH]);
+  return Math.max(
+    rowsHeight,
+    zoneHeight(plot.zones[STAGE_PLOT_WING_LEFT]),
+    zoneHeight(plot.zones[STAGE_PLOT_WING_RIGHT]),
+  );
+};
+
+const fohBoxHeight = (plot: PowerStagePlotData, fohSchukoRequired: boolean) =>
+  zoneHeight(plot.zones[STAGE_PLOT_FOH]) + (fohSchukoRequired ? SCHUKO_NOTE_HEIGHT : 0);
+
+export const estimatePowerStagePlotHeight = (
+  plot: PowerStagePlotData,
+  fohSchukoRequired = false,
+) => {
   const extraLines = plot.custom.length + (plot.unpositioned.length > 0 ? 1 : 0);
-  // title + stage label + grid + gap + FOH + audience label + extra lines
-  return 10 + 6 + stageHeight + 3 + fohHeight + 8 + extraLines * 6 + 4;
+  // title + stage label + grid + gap + audience label + FOH + audience label
+  // + extra lines
+  return (
+    10 +
+    6 +
+    stageGridHeight(plot) +
+    3 +
+    AUDIENCE_LABEL_HEIGHT +
+    fohBoxHeight(plot, fohSchukoRequired) +
+    AUDIENCE_LABEL_HEIGHT +
+    2 +
+    extraLines * 6 +
+    4
+  );
 };
 
 /**
- * Draws the stage plot (plan view, audience at the bottom) for a consumos
- * report and returns the new y cursor. Labels are Spanish to match the rest
- * of the summary page.
+ * Draws the stage plot (plan view, audience at the bottom, offstage wings
+ * flanking the grid, FOH inside the audience area) for a consumos report and
+ * returns the new y cursor. Labels are Spanish to match the rest of the
+ * summary page.
  */
 export const drawPowerStagePlot = (
   doc: PdfDoc,
@@ -88,12 +166,13 @@ export const drawPowerStagePlot = (
     pageWidth: number;
     pageHeight: number;
     footerSpace: number;
+    fohSchukoRequired?: boolean;
   },
 ): number => {
-  const { pageWidth, pageHeight, footerSpace } = options;
+  const { pageWidth, pageHeight, footerSpace, fohSchukoRequired = false } = options;
   let y = options.startY;
 
-  const totalHeight = estimatePowerStagePlotHeight(plot);
+  const totalHeight = estimatePowerStagePlotHeight(plot, fohSchukoRequired);
   if (y + totalHeight > pageHeight - footerSpace) {
     doc.addPage();
     y = 20;
@@ -104,7 +183,10 @@ export const drawPowerStagePlot = (
   doc.text("Distribución en Escenario", 14, y);
   y += 8;
 
-  const stageX = (pageWidth - STAGE_WIDTH) / 2;
+  const totalWidth = STAGE_WIDTH + 2 * (WING_WIDTH + WING_GAP);
+  const wingLeftX = (pageWidth - totalWidth) / 2;
+  const stageX = wingLeftX + WING_WIDTH + WING_GAP;
+  const wingRightX = stageX + STAGE_WIDTH + WING_GAP;
   const cellWidth = STAGE_WIDTH / 3;
 
   doc.setFontSize(8);
@@ -112,33 +194,61 @@ export const drawPowerStagePlot = (
   doc.text("ESCENARIO", pageWidth / 2, y, { align: "center" });
   y += 2;
 
+  const gridHeight = stageGridHeight(plot);
   doc.setLineWidth(0.4);
-  STAGE_PLOT_GRID.forEach((row) => {
-    const rowHeight = Math.max(...row.map((zone) => zoneHeight(plot.zones[zone])));
-    row.forEach((zone, columnIndex) => {
-      const entries = plot.zones[zone];
-      const x = stageX + columnIndex * cellWidth;
-      doc.setDrawColor(120, 120, 120);
-      if (entries.length === 0) {
-        doc.setFillColor(245, 245, 245);
-        doc.rect(x, y, cellWidth, rowHeight, "FD");
-      } else {
-        doc.rect(x, y, cellWidth, rowHeight, "S");
-      }
-      doc.setFontSize(6);
-      doc.setTextColor(140, 140, 140);
-      doc.text(zone, x + 1.5, y + 3.5);
-      drawZoneEntries(doc, entries, x, y, cellWidth);
-    });
-    y += rowHeight;
-  });
 
-  // FOH band in front of the stage
+  // Offstage wings (stage right drawn on the left, audience view)
+  drawZoneBox(
+    doc,
+    STAGE_PLOT_WING_LEFT,
+    plot.zones[STAGE_PLOT_WING_LEFT],
+    wingLeftX,
+    y,
+    WING_WIDTH,
+    gridHeight,
+  );
+  drawZoneBox(
+    doc,
+    STAGE_PLOT_WING_RIGHT,
+    plot.zones[STAGE_PLOT_WING_RIGHT],
+    wingRightX,
+    y,
+    WING_WIDTH,
+    gridHeight,
+  );
+
+  let rowY = y;
+  STAGE_PLOT_GRID.forEach((row, rowIndex) => {
+    const rowHeight =
+      rowIndex === STAGE_PLOT_GRID.length - 1
+        ? gridHeight - (rowY - y)
+        : Math.max(...row.map((zone) => zoneHeight(plot.zones[zone])));
+    row.forEach((zone, columnIndex) => {
+      drawZoneBox(
+        doc,
+        zone,
+        plot.zones[zone],
+        stageX + columnIndex * cellWidth,
+        rowY,
+        cellWidth,
+        rowHeight,
+      );
+    });
+    rowY += rowHeight;
+  });
+  y += gridHeight;
+
+  // Audience area with FOH inside: audience before and after the FOH box
   y += 3;
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text("PÚBLICO", pageWidth / 2, y + 4, { align: "center" });
+  y += AUDIENCE_LABEL_HEIGHT;
+
   const fohEntries = plot.zones[STAGE_PLOT_FOH];
   const fohWidth = (STAGE_WIDTH * 2) / 3;
   const fohX = (pageWidth - fohWidth) / 2;
-  const fohHeight = zoneHeight(fohEntries);
+  const fohHeight = fohBoxHeight(plot, fohSchukoRequired);
   doc.setDrawColor(120, 120, 120);
   try {
     doc.setLineDashPattern?.([1.5, 1.5], 0);
@@ -160,12 +270,24 @@ export const drawPowerStagePlot = (
   doc.setTextColor(140, 140, 140);
   doc.text(STAGE_PLOT_FOH, fohX + 1.5, y + 3.5);
   drawZoneEntries(doc, fohEntries, fohX, y, fohWidth);
+  if (fohSchukoRequired) {
+    doc.setFontSize(7);
+    doc.setTextColor(150, 100, 0);
+    doc.setFont(undefined, "italic");
+    doc.text(
+      fitText(doc, "Se requiere schuko 16A hembra", fohWidth - 4),
+      fohX + fohWidth / 2,
+      y + fohHeight - 2.5,
+      { align: "center" },
+    );
+    doc.setFont(undefined, "normal");
+  }
   y += fohHeight;
 
   doc.setFontSize(8);
   doc.setTextColor(120, 120, 120);
-  doc.text("PÚBLICO", pageWidth / 2, y + 5, { align: "center" });
-  y += 8;
+  doc.text("PÚBLICO", pageWidth / 2, y + 4, { align: "center" });
+  y += AUDIENCE_LABEL_HEIGHT + 2;
 
   doc.setFontSize(9);
   doc.setTextColor(60, 60, 60);
