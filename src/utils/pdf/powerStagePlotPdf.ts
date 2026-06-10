@@ -74,14 +74,14 @@ const drawZoneEntries = (
     if (entry.includesHoist) {
       doc.setFontSize(6);
       doc.setTextColor(150, 100, 0);
-      doc.setFont(undefined, "italic");
+      doc.setFont("helvetica", "italic");
       doc.text(
         fitText(doc, "+ Motor: CEE32A 3P+N+G", width - 4),
         x + width / 2,
         entryY + 6.2 + HOIST_LINE_HEIGHT,
         { align: "center" },
       );
-      doc.setFont(undefined, "normal");
+      doc.setFont("helvetica", "normal");
     }
     entryY += entryHeight(entry);
   });
@@ -298,14 +298,14 @@ export const drawPowerStagePlot = (
   if (fohSchukoRequired) {
     doc.setFontSize(7);
     doc.setTextColor(150, 100, 0);
-    doc.setFont(undefined, "italic");
+    doc.setFont("helvetica", "italic");
     doc.text(
       fitText(doc, "Se requiere schuko 16A hembra", fohWidth - 4),
       fohX + fohWidth / 2,
       y + fohHeight - 2.5,
       { align: "center" },
     );
-    doc.setFont(undefined, "normal");
+    doc.setFont("helvetica", "normal");
   }
   y += fohHeight;
 
