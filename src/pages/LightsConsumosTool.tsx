@@ -145,8 +145,8 @@ const lightComponentDatabase: LightComponent[] = [
   { id: 66, name: 'ANTARI HZ 500', watts: 480, fixtureType: 'smoke' },
   { id: 67, name: 'TURBINA SHOWTEC SF-250', watts: 1035, fixtureType: 'smoke' },
   { id: 68, name: 'BRITEQ HZFOG II', watts: 1750, fixtureType: 'smoke' },
-  { id: 70, name: 'GRAND MA3 FULL SIZE', watts: 450, fixtureType: 'consoles' }
-
+  { id: 70, name: 'GRAND MA3 FULL SIZE', watts: 450, fixtureType: 'consoles' },
+  { id: 71, name: 'ULTIMO HYBRID', watts: 550, fixtureType: 'discharge' }
 ];
 
 interface TableRow {
