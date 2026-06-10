@@ -155,7 +155,21 @@ describe("staffOptionValue", () => {
 });
 
 describe("syncTransportsWithLogistics", () => {
-  const sourced = (sourceId: string, extra: Record<string, unknown> = {}) => ({
+  interface TransportTest {
+    id: string;
+    transport_type: string;
+    source_logistics_event_id: string;
+    date_time: string;
+    license_plate?: string;
+    company?: string;
+    driver_name?: string;
+    driver_phone?: string;
+    has_return?: boolean;
+    is_hoja_relevant?: boolean;
+    logistics_categories?: unknown[];
+  }
+
+  const sourced = (sourceId: string, extra: Partial<TransportTest> = {}): TransportTest => ({
     id: `local-${sourceId}`,
     transport_type: "trailer",
     source_logistics_event_id: sourceId,
