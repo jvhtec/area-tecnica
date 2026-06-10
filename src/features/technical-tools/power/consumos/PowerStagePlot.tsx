@@ -9,10 +9,11 @@ import {
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
+  STAGE_PLOT_BACKSTAGE_ROW,
   STAGE_PLOT_FOH,
   STAGE_PLOT_GRID,
-  STAGE_PLOT_WING_LEFT,
-  STAGE_PLOT_WING_RIGHT,
+  STAGE_PLOT_WING_LEFT_COLUMN,
+  STAGE_PLOT_WING_RIGHT_COLUMN,
   buildPowerStagePlot,
   type StagePlotEntry,
   type StagePlotTable,
@@ -165,8 +166,6 @@ export const PowerStagePlot: React.FC<{
     );
 
   const fohEntries = plot.zones[STAGE_PLOT_FOH];
-  const wingLeftEntries = plot.zones[STAGE_PLOT_WING_LEFT];
-  const wingRightEntries = plot.zones[STAGE_PLOT_WING_RIGHT];
   const audienceLabel = (
     <p className="py-1 text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
       {labels.stagePlotAudience}
@@ -202,24 +201,58 @@ export const PowerStagePlot: React.FC<{
         <CollapsibleContent>
           <CardContent>
         <div className="mx-auto max-w-3xl">
+          {/* Backstage band behind the stage */}
+          <p className="mb-1 text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+            {labels.stagePlotBackstage}
+          </p>
+          <div className="mb-2 grid grid-cols-3 overflow-hidden rounded-lg border-2 border-foreground/20">
+            {STAGE_PLOT_BACKSTAGE_ROW.map((zone) => {
+              const entries = plot.zones[zone];
+              return (
+                <div
+                  key={zone}
+                  data-stage-zone={zone}
+                  className={zoneClasses(
+                    zone,
+                    entries.length > 0,
+                    "min-h-[48px] border border-foreground/10",
+                  )}
+                >
+                  <span className="absolute left-1.5 top-1 text-[10px] font-semibold text-muted-foreground">
+                    {zone}
+                  </span>
+                  {renderEntries(entries, zone)}
+                </div>
+              );
+            })}
+          </div>
+
           <p className="mb-1 text-center text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             {labels.stagePlotStage}
           </p>
 
-          {/* Offstage wings flanking the stage grid */}
+          {/* Offstage wings (split up/center/down) flanking the stage grid */}
           <div className="flex items-stretch gap-1">
-            <div
-              data-stage-zone={STAGE_PLOT_WING_LEFT}
-              className={zoneClasses(
-                STAGE_PLOT_WING_LEFT,
-                wingLeftEntries.length > 0,
-                "w-16 shrink-0 rounded-l-lg border-2 border-foreground/20 sm:w-20",
-              )}
-            >
-              <span className="absolute left-1.5 top-1 text-[10px] font-semibold text-muted-foreground">
-                {STAGE_PLOT_WING_LEFT}
-              </span>
-              {renderEntries(wingLeftEntries, STAGE_PLOT_WING_LEFT)}
+            <div className="flex w-16 shrink-0 flex-col overflow-hidden rounded-l-lg border-2 border-foreground/20 sm:w-20">
+              {STAGE_PLOT_WING_LEFT_COLUMN.map((zone) => {
+                const entries = plot.zones[zone];
+                return (
+                  <div
+                    key={zone}
+                    data-stage-zone={zone}
+                    className={zoneClasses(
+                      zone,
+                      entries.length > 0,
+                      "flex-1 border border-foreground/10",
+                    )}
+                  >
+                    <span className="absolute left-1.5 top-1 text-[10px] font-semibold text-muted-foreground">
+                      {zone}
+                    </span>
+                    {renderEntries(entries, zone)}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="grid flex-1 grid-cols-3 overflow-hidden rounded-lg border-2 border-foreground/30">
@@ -244,18 +277,26 @@ export const PowerStagePlot: React.FC<{
               })}
             </div>
 
-            <div
-              data-stage-zone={STAGE_PLOT_WING_RIGHT}
-              className={zoneClasses(
-                STAGE_PLOT_WING_RIGHT,
-                wingRightEntries.length > 0,
-                "w-16 shrink-0 rounded-r-lg border-2 border-foreground/20 sm:w-20",
-              )}
-            >
-              <span className="absolute left-1.5 top-1 text-[10px] font-semibold text-muted-foreground">
-                {STAGE_PLOT_WING_RIGHT}
-              </span>
-              {renderEntries(wingRightEntries, STAGE_PLOT_WING_RIGHT)}
+            <div className="flex w-16 shrink-0 flex-col overflow-hidden rounded-r-lg border-2 border-foreground/20 sm:w-20">
+              {STAGE_PLOT_WING_RIGHT_COLUMN.map((zone) => {
+                const entries = plot.zones[zone];
+                return (
+                  <div
+                    key={zone}
+                    data-stage-zone={zone}
+                    className={zoneClasses(
+                      zone,
+                      entries.length > 0,
+                      "flex-1 border border-foreground/10",
+                    )}
+                  >
+                    <span className="absolute left-1.5 top-1 text-[10px] font-semibold text-muted-foreground">
+                      {zone}
+                    </span>
+                    {renderEntries(entries, zone)}
+                  </div>
+                );
+              })}
             </div>
           </div>
 

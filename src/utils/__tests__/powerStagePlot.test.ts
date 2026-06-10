@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  STAGE_PLOT_BACKSTAGE_ROW,
   STAGE_PLOT_GRID,
-  STAGE_PLOT_WING_LEFT,
-  STAGE_PLOT_WING_RIGHT,
+  STAGE_PLOT_WING_LEFT_COLUMN,
+  STAGE_PLOT_WING_RIGHT_COLUMN,
   buildPowerStagePlot,
 } from "@/utils/powerStagePlot";
 import { estimatePowerStagePlotHeight } from "@/utils/pdf/powerStagePlotPdf";
@@ -60,14 +61,18 @@ describe("buildPowerStagePlot", () => {
   it("lays the grid out from the audience perspective (stage right on the left)", () => {
     expect(STAGE_PLOT_GRID[0]).toEqual(["USR", "USC", "USL"]);
     expect(STAGE_PLOT_GRID[2]).toEqual(["DSR", "DSC", "DSL"]);
-    expect(STAGE_PLOT_WING_LEFT).toBe("OSR");
-    expect(STAGE_PLOT_WING_RIGHT).toBe("OSL");
-    // every preset except FOH and the wings appears exactly once in the grid
-    const flattened = STAGE_PLOT_GRID.flat();
-    const gridPresets = POWER_POSITION_PRESETS.filter(
-      (preset) => preset !== "FOH" && preset !== "OSL" && preset !== "OSR",
-    );
-    expect([...flattened].sort()).toEqual([...gridPresets].sort());
+    expect(STAGE_PLOT_WING_LEFT_COLUMN).toEqual(["UOSR", "OSR", "DOSR"]);
+    expect(STAGE_PLOT_WING_RIGHT_COLUMN).toEqual(["UOSL", "OSL", "DOSL"]);
+    expect(STAGE_PLOT_BACKSTAGE_ROW).toEqual(["BSR", "BSC", "BSL"]);
+    // every preset appears exactly once across grid, wings, backstage and FOH
+    const allPlacements = [
+      ...STAGE_PLOT_GRID.flat(),
+      ...STAGE_PLOT_WING_LEFT_COLUMN,
+      ...STAGE_PLOT_WING_RIGHT_COLUMN,
+      ...STAGE_PLOT_BACKSTAGE_ROW,
+      "FOH",
+    ];
+    expect([...allPlacements].sort()).toEqual([...POWER_POSITION_PRESETS].sort());
   });
 
   it("estimates a plot height that grows with entries and the schuko note", () => {

@@ -59,4 +59,28 @@ describe("PowerTableControls", () => {
     expect(screen.getByPlaceholderText("Enter custom PDU type")).toHaveValue("");
     expect(screen.getByText("Custom PDU Type")).toBeInTheDocument();
   });
+
+  it("keeps the custom position input visible while the value is still empty", () => {
+    render(
+      <PowerTableControls
+        table={{ ...table, customPosition: "" }}
+        pduTypes={["CEE32A 3P+N+G"]}
+        onUpdateSettings={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("Enter custom position")).toHaveValue("");
+  });
+
+  it("shows the typed custom position", () => {
+    render(
+      <PowerTableControls
+        table={{ ...table, customPosition: "Torre PA" }}
+        pduTypes={["CEE32A 3P+N+G"]}
+        onUpdateSettings={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByPlaceholderText("Enter custom position")).toHaveValue("Torre PA");
+  });
 });

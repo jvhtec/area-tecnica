@@ -1,8 +1,9 @@
 import {
+  STAGE_PLOT_BACKSTAGE_ROW,
   STAGE_PLOT_FOH,
   STAGE_PLOT_GRID,
-  STAGE_PLOT_WING_LEFT,
-  STAGE_PLOT_WING_RIGHT,
+  STAGE_PLOT_WING_LEFT_COLUMN,
+  STAGE_PLOT_WING_RIGHT_COLUMN,
   type PowerStagePlotData,
   type StagePlotEntry,
 } from "@/utils/powerStagePlot";
@@ -116,17 +117,22 @@ const formatEntryList = (entries: StagePlotEntry[]) =>
     })
     .join(", ");
 
-const stageGridHeight = (plot: PowerStagePlotData) => {
-  const rowsHeight = STAGE_PLOT_GRID.reduce(
-    (sum, row) => sum + Math.max(...row.map((zone) => zoneHeight(plot.zones[zone]))),
-    0,
+// Wing cells align with the grid rows, so each row is as tall as its widest
+// occupant (grid cells or the wing cell beside them).
+const stageRowHeights = (plot: PowerStagePlotData) =>
+  STAGE_PLOT_GRID.map((row, rowIndex) =>
+    Math.max(
+      ...row.map((zone) => zoneHeight(plot.zones[zone])),
+      zoneHeight(plot.zones[STAGE_PLOT_WING_LEFT_COLUMN[rowIndex]]),
+      zoneHeight(plot.zones[STAGE_PLOT_WING_RIGHT_COLUMN[rowIndex]]),
+    ),
   );
-  return Math.max(
-    rowsHeight,
-    zoneHeight(plot.zones[STAGE_PLOT_WING_LEFT]),
-    zoneHeight(plot.zones[STAGE_PLOT_WING_RIGHT]),
-  );
-};
+
+const stageGridHeight = (plot: PowerStagePlotData) =>
+  stageRowHeights(plot).reduce((sum, height) => sum + height, 0);
+
+const backstageHeight = (plot: PowerStagePlotData) =>
+  Math.max(...STAGE_PLOT_BACKSTAGE_ROW.map((zone) => zoneHeight(plot.zones[zone])));
 
 const fohBoxHeight = (plot: PowerStagePlotData, fohSchukoRequired: boolean) =>
   zoneHeight(plot.zones[STAGE_PLOT_FOH]) + (fohSchukoRequired ? SCHUKO_NOTE_HEIGHT : 0);
@@ -136,10 +142,13 @@ export const estimatePowerStagePlotHeight = (
   fohSchukoRequired = false,
 ) => {
   const extraLines = plot.custom.length + (plot.unpositioned.length > 0 ? 1 : 0);
-  // title + stage label + grid + gap + audience label + FOH + audience label
-  // + extra lines
+  // title + backstage label/band + stage label + grid + gap + audience label
+  // + FOH + audience label + extra lines
   return (
     10 +
+    6 +
+    backstageHeight(plot) +
+    2 +
     6 +
     stageGridHeight(plot) +
     3 +
@@ -189,40 +198,56 @@ export const drawPowerStagePlot = (
   const wingRightX = stageX + STAGE_WIDTH + WING_GAP;
   const cellWidth = STAGE_WIDTH / 3;
 
-  doc.setFontSize(8);
-  doc.setTextColor(120, 120, 120);
-  doc.text("ESCENARIO", pageWidth / 2, y, { align: "center" });
-  y += 2;
-
-  const gridHeight = stageGridHeight(plot);
   doc.setLineWidth(0.4);
 
-  // Offstage wings (stage right drawn on the left, audience view)
-  drawZoneBox(
-    doc,
-    STAGE_PLOT_WING_LEFT,
-    plot.zones[STAGE_PLOT_WING_LEFT],
-    wingLeftX,
-    y,
-    WING_WIDTH,
-    gridHeight,
-  );
-  drawZoneBox(
-    doc,
-    STAGE_PLOT_WING_RIGHT,
-    plot.zones[STAGE_PLOT_WING_RIGHT],
-    wingRightX,
-    y,
-    WING_WIDTH,
-    gridHeight,
-  );
+  // Backstage band behind the stage
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text("BACKSTAGE", pageWidth / 2, y, { align: "center" });
+  y += 2;
+  const backstageBandHeight = backstageHeight(plot);
+  const backstageCellWidth = totalWidth / STAGE_PLOT_BACKSTAGE_ROW.length;
+  STAGE_PLOT_BACKSTAGE_ROW.forEach((zone, columnIndex) => {
+    drawZoneBox(
+      doc,
+      zone,
+      plot.zones[zone],
+      wingLeftX + columnIndex * backstageCellWidth,
+      y,
+      backstageCellWidth,
+      backstageBandHeight,
+    );
+  });
+  y += backstageBandHeight + 2;
 
+  doc.setFontSize(8);
+  doc.setTextColor(120, 120, 120);
+  doc.text("ESCENARIO", pageWidth / 2, y + 2, { align: "center" });
+  y += 4;
+
+  // Stage grid with offstage wings (split up/center/down) aligned per row
+  const rowHeights = stageRowHeights(plot);
   let rowY = y;
   STAGE_PLOT_GRID.forEach((row, rowIndex) => {
-    const rowHeight =
-      rowIndex === STAGE_PLOT_GRID.length - 1
-        ? gridHeight - (rowY - y)
-        : Math.max(...row.map((zone) => zoneHeight(plot.zones[zone])));
+    const rowHeight = rowHeights[rowIndex];
+    drawZoneBox(
+      doc,
+      STAGE_PLOT_WING_LEFT_COLUMN[rowIndex],
+      plot.zones[STAGE_PLOT_WING_LEFT_COLUMN[rowIndex]],
+      wingLeftX,
+      rowY,
+      WING_WIDTH,
+      rowHeight,
+    );
+    drawZoneBox(
+      doc,
+      STAGE_PLOT_WING_RIGHT_COLUMN[rowIndex],
+      plot.zones[STAGE_PLOT_WING_RIGHT_COLUMN[rowIndex]],
+      wingRightX,
+      rowY,
+      WING_WIDTH,
+      rowHeight,
+    );
     row.forEach((zone, columnIndex) => {
       drawZoneBox(
         doc,
@@ -236,7 +261,7 @@ export const drawPowerStagePlot = (
     });
     rowY += rowHeight;
   });
-  y += gridHeight;
+  y = rowY;
 
   // Audience area with FOH inside: audience before and after the FOH box
   y += 3;

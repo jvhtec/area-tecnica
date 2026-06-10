@@ -112,6 +112,7 @@ export type ConsumosLabels = {
   savedSetLoaded: (count: number) => string;
   stagePlotTitle: string;
   stagePlotStage: string;
+  stagePlotBackstage: string;
   stagePlotAudience: string;
   stagePlotUnpositioned: string;
   stagePlotFohSchuko: string;

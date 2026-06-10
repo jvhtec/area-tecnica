@@ -79,7 +79,12 @@ export const PowerTableControls = <Table extends PowerTable>({
       : customPduSelectValue
     : "default";
 
-  const positionSelectValue = getPowerPositionSelectValue(table.position, table.customPosition);
+  // An empty custom position means the user just picked "Custom" and hasn't
+  // typed yet — keep the select on Custom so the input stays visible.
+  const positionSelectValue =
+    table.customPosition !== undefined && table.customPosition !== null
+      ? CUSTOM_POWER_POSITION_VALUE
+      : getPowerPositionSelectValue(table.position, table.customPosition);
 
   return (
     <div className={`p-4 bg-muted/50 space-y-4 ${className}`.trim()}>

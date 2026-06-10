@@ -34,8 +34,9 @@ export type PowerStagePlotData = {
 
 /**
  * Stage zones laid out as seen from the audience (plan view, downstage at the
- * bottom): stage right appears on the left of the drawing. FOH is rendered as
- * a separate band within the audience, and the offstage wings flank the grid.
+ * bottom): stage right appears on the left of the drawing. The offstage wings
+ * flank the grid (split up/center/down), the backstage band sits behind the
+ * stage, and FOH is rendered inside the audience area.
  */
 export const STAGE_PLOT_GRID: PowerPositionPreset[][] = [
   ["USR", "USC", "USL"],
@@ -44,10 +45,24 @@ export const STAGE_PLOT_GRID: PowerPositionPreset[][] = [
 ];
 
 export const STAGE_PLOT_FOH: PowerPositionPreset = "FOH";
-/** Offstage wing drawn on the left of the plot (stage right, audience view). */
-export const STAGE_PLOT_WING_LEFT: PowerPositionPreset = "OSR";
-/** Offstage wing drawn on the right of the plot (stage left, audience view). */
-export const STAGE_PLOT_WING_RIGHT: PowerPositionPreset = "OSL";
+/** Offstage wing on the left of the drawing (stage right), top to bottom. */
+export const STAGE_PLOT_WING_LEFT_COLUMN: PowerPositionPreset[] = [
+  "UOSR",
+  "OSR",
+  "DOSR",
+];
+/** Offstage wing on the right of the drawing (stage left), top to bottom. */
+export const STAGE_PLOT_WING_RIGHT_COLUMN: PowerPositionPreset[] = [
+  "UOSL",
+  "OSL",
+  "DOSL",
+];
+/** Backstage band behind the stage, left to right as seen from the audience. */
+export const STAGE_PLOT_BACKSTAGE_ROW: PowerPositionPreset[] = [
+  "BSR",
+  "BSC",
+  "BSL",
+];
 
 const makeEmptyZones = (): PowerStagePlotData["zones"] =>
   POWER_POSITION_PRESETS.reduce(
