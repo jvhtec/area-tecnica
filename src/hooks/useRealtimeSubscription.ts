@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { UnifiedSubscriptionManager } from "@/lib/unified-subscription-manager";
@@ -22,7 +22,7 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
     [queryClient],
   );
   const ownerIdRef = useRef(`realtime-hook-${Math.random().toString(36).slice(2)}`);
-  const isSubscribedRef = useRef(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   const subscriptions = Array.isArray(options) ? options : [options];
   const serializedSubscriptions = useMemo(
@@ -59,15 +59,15 @@ export function useRealtimeSubscription(options: SubscriptionOptions | Subscript
       );
     });
 
-    isSubscribedRef.current = stableSubscriptions.length > 0;
+    setIsSubscribed(stableSubscriptions.length > 0);
 
     return () => {
       subscriptionManager.cleanupRouteDependentSubscriptions(ownerRoute);
-      isSubscribedRef.current = false;
+      setIsSubscribed(false);
     };
   }, [location.pathname, stableSubscriptions, subscriptionManager, queryClient]);
 
   return {
-    isSubscribed: isSubscribedRef.current,
+    isSubscribed,
   };
 }

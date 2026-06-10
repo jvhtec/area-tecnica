@@ -62,8 +62,6 @@ const staffingOrchestratorPolicyUtils = readFileSync(
   "utf-8",
 );
 
-const staffingOrchestratorModule = `${staffingOrchestratorFunction}\n${staffingOrchestratorPolicyUtils}`;
-
 describe("staffing recommendation consultation guards", () => {
   it("stores a structured role_code for role-specific staffing requests", () => {
     expect(migration).toContain("ADD COLUMN IF NOT EXISTS role_code text");
@@ -181,20 +179,22 @@ describe("smarter staffing recommendation migration", () => {
   });
 
   it("prioritizes confirmed assisted availability before auto mode contacts new candidates", () => {
-    expect(staffingOrchestratorModule).toContain("assisted_handoff_priority");
-    expect(staffingOrchestratorModule).toContain("normalizeCampaignPolicy");
-    expect(staffingOrchestratorModule).toContain("selected_job_profile");
-    expect(staffingOrchestratorModule).toContain("role_profiles");
-    expect(staffingOrchestratorModule).toContain("cost_scoring");
-    expect(staffingOrchestratorModule).toContain("waveWaitSeconds");
-    expect(staffingOrchestratorModule).toContain("confirmedAvailabilityRowsForJob");
-    expect(staffingOrchestratorModule).toContain("confirmedAvailabilityByRequestedRole");
-    expect(staffingOrchestratorModule).toContain(".order('created_at', { ascending: false })");
-    expect(staffingOrchestratorModule).toContain("const confirmedAvailabilityRows = matchingRequestedRole");
-    expect(staffingOrchestratorModule).toContain("offerRequestProfilesForJob");
-    expect(staffingOrchestratorModule).toContain("phase: 'offer'");
-    expect(staffingOrchestratorModule).toContain("require_no_conflicts: true");
-    expect(staffingOrchestratorModule).toContain("auto_actions");
+    expect(staffingOrchestratorFunction).toContain("normalizeCampaignPolicy,");
+    expect(staffingOrchestratorFunction).toContain('} from "./policyUtils.ts";');
+    expect(staffingOrchestratorFunction).toContain("const normalizedPolicy = normalizeCampaignPolicy(policy, job, rolesToCreate, normalizedMode)");
+    expect(staffingOrchestratorPolicyUtils).toContain("assisted_handoff_priority");
+    expect(staffingOrchestratorPolicyUtils).toContain("selected_job_profile");
+    expect(staffingOrchestratorPolicyUtils).toContain("role_profiles");
+    expect(staffingOrchestratorPolicyUtils).toContain("cost_scoring");
+    expect(staffingOrchestratorFunction).toContain("waveWaitSeconds");
+    expect(staffingOrchestratorFunction).toContain("confirmedAvailabilityRowsForJob");
+    expect(staffingOrchestratorFunction).toContain("confirmedAvailabilityByRequestedRole");
+    expect(staffingOrchestratorFunction).toContain(".order('created_at', { ascending: false })");
+    expect(staffingOrchestratorFunction).toContain("const confirmedAvailabilityRows = matchingRequestedRole");
+    expect(staffingOrchestratorFunction).toContain("offerRequestProfilesForJob");
+    expect(staffingOrchestratorFunction).toContain("phase: 'offer'");
+    expect(staffingOrchestratorFunction).toContain("require_no_conflicts: true");
+    expect(staffingOrchestratorFunction).toContain("auto_actions");
   });
 
   it("lets auto mode send availability waves from the same ranked candidate workflow", () => {

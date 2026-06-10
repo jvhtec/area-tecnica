@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryClient } from "@tanstack/react-query";
 
 type PostgresHandler = (payload: Record<string, unknown>) => void;
+type ChannelStatusHandler = (status: string) => void;
 
 const setupManager = async () => {
   vi.resetModules();
@@ -22,7 +23,7 @@ const setupManager = async () => {
     },
   }));
 
-  const { UnifiedSubscriptionManager } = await import("../unified-subscription-manager");
+  const { UnifiedSubscriptionManager } = await import("@/lib/unified-subscription-manager");
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -39,6 +40,7 @@ const createChannel = (name: string) => {
   const mockChannel = {
     name,
     postgresHandlers: [] as PostgresHandler[],
+    statusHandlers: [] as ChannelStatusHandler[],
     on: vi.fn(),
     subscribe: vi.fn(),
   };
@@ -53,7 +55,10 @@ const createChannel = (name: string) => {
   );
 
   mockChannel.subscribe.mockImplementation((callback?: (status: string) => void) => {
-    callback?.("SUBSCRIBED");
+    if (callback) {
+      mockChannel.statusHandlers.push(callback);
+      callback("SUBSCRIBED");
+    }
     return mockChannel;
   });
 
@@ -61,6 +66,7 @@ const createChannel = (name: string) => {
 };
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.clearAllMocks();
   vi.resetModules();
 });
@@ -157,5 +163,96 @@ describe("UnifiedSubscriptionManager", () => {
     });
 
     expect(handler).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves payload handlers and invalidation settings when channel retries resubscribe", async () => {
+    vi.useFakeTimers();
+    const { manager, queryClient, channels, removeChannel } = await setupManager();
+    const handler = vi.fn();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+
+    manager.subscribeToTable(
+      "staffing_requests",
+      ["staffing-realtime", "requests"],
+      undefined,
+      "high",
+      {
+        ownerRoute: "/matrix:staffing",
+        onPayload: handler,
+        invalidateOnPayload: false,
+      },
+    );
+
+    const firstStaffingChannel = channels.find((mockChannel) =>
+      mockChannel.name.startsWith("staffing_requests-"),
+    );
+    firstStaffingChannel?.statusHandlers[0]?.("CHANNEL_ERROR");
+
+    await vi.advanceTimersByTimeAsync(5000);
+
+    expect(removeChannel).toHaveBeenCalledWith(firstStaffingChannel);
+
+    const staffingChannels = channels.filter((mockChannel) =>
+      mockChannel.name.startsWith("staffing_requests-"),
+    );
+    const retriedChannel = staffingChannels[staffingChannels.length - 1];
+
+    retriedChannel.postgresHandlers[0]({
+      eventType: "UPDATE",
+      table: "staffing_requests",
+      new: { id: "req-1" },
+    });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).not.toHaveBeenCalled();
+
+    manager.cleanupRouteDependentSubscriptions("/matrix:staffing");
+
+    expect(removeChannel).toHaveBeenCalledWith(retriedChannel);
+  });
+
+  it("preserves payload handlers and invalidation settings when subscriptions are force refreshed", async () => {
+    const { manager, queryClient, channels, removeChannel } = await setupManager();
+    const handler = vi.fn();
+    const invalidateQueries = vi.spyOn(queryClient, "invalidateQueries");
+
+    manager.subscribeToTable(
+      "staffing_requests",
+      ["staffing-realtime", "requests"],
+      undefined,
+      "high",
+      {
+        ownerRoute: "/matrix:staffing",
+        onPayload: handler,
+        invalidateOnPayload: false,
+      },
+    );
+
+    const firstStaffingChannel = channels.find((mockChannel) =>
+      mockChannel.name.startsWith("staffing_requests-"),
+    );
+
+    manager.forceRefreshSubscriptions(["staffing_requests"]);
+    invalidateQueries.mockClear();
+
+    expect(removeChannel).toHaveBeenCalledWith(firstStaffingChannel);
+
+    const staffingChannels = channels.filter((mockChannel) =>
+      mockChannel.name.startsWith("staffing_requests-"),
+    );
+    const refreshedChannel = staffingChannels[staffingChannels.length - 1];
+
+    refreshedChannel.postgresHandlers[0]({
+      eventType: "UPDATE",
+      table: "staffing_requests",
+      new: { id: "req-1" },
+    });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(invalidateQueries).not.toHaveBeenCalled();
+
+    manager.cleanupRouteDependentSubscriptions("/matrix:staffing");
+
+    expect(removeChannel).toHaveBeenCalledWith(refreshedChannel);
   });
 });

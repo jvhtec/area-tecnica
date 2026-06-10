@@ -254,6 +254,46 @@ export class UnifiedSubscriptionManager {
       handler,
     }));
   }
+
+  private snapshotManagedSubscription(subscription: ManagedSubscription): PendingManagedSubscription {
+    return {
+      options: subscription.options,
+      ownerRoutes: Array.from(subscription.ownerRoutes),
+      payloadHandlers: this.getPayloadHandlerEntries(subscription),
+      invalidateOnPayload: subscription.invalidateOnPayload,
+    };
+  }
+
+  private replayPendingSubscription(pendingSubscription: PendingManagedSubscription) {
+    const { options, ownerRoutes, payloadHandlers, invalidateOnPayload } = pendingSubscription;
+    const subscription = this.subscribeToTable(
+      options.table,
+      options.queryKey,
+      options.filter,
+      options.priority,
+      { invalidateOnPayload },
+    );
+
+    ownerRoutes.forEach((ownerRoute) => {
+      this.registerRouteSubscription(ownerRoute, subscription.key);
+    });
+
+    payloadHandlers.forEach(({ ownerRoute, handler }) => {
+      this.subscribeToTable(
+        options.table,
+        options.queryKey,
+        options.filter,
+        options.priority,
+        {
+          ownerRoute,
+          onPayload: handler,
+          invalidateOnPayload,
+        },
+      );
+    });
+
+    return subscription;
+  }
   
   private updateSnapshot(partial: Partial<SubscriptionSnapshot>) {
     this.snapshot = { ...this.snapshot, ...partial };
@@ -402,12 +442,7 @@ export class UnifiedSubscriptionManager {
     
     // Copy all existing subscriptions to pending
     this.subscriptions.forEach((subscription, key) => {
-      this.pendingSubscriptions.set(key, {
-        options: subscription.options,
-        ownerRoutes: Array.from(subscription.ownerRoutes),
-        payloadHandlers: this.getPayloadHandlerEntries(subscription),
-        invalidateOnPayload: subscription.invalidateOnPayload,
-      });
+      this.pendingSubscriptions.set(key, this.snapshotManagedSubscription(subscription));
     });
     
     // Clean up existing subscriptions
@@ -415,33 +450,7 @@ export class UnifiedSubscriptionManager {
     
     // Resubscribe to all tables
     this.pendingSubscriptions.forEach((pendingSubscription, key) => {
-      const { options, ownerRoutes, payloadHandlers, invalidateOnPayload } = pendingSubscription;
-      const subscription = this.subscribeToTable(
-        options.table,
-        options.queryKey,
-        options.filter,
-        options.priority,
-        { invalidateOnPayload },
-      );
-
-      ownerRoutes.forEach((ownerRoute) => {
-        this.registerRouteSubscription(ownerRoute, subscription.key);
-      });
-
-      payloadHandlers.forEach(({ ownerRoute, handler }) => {
-        this.subscribeToTable(
-          options.table,
-          options.queryKey,
-          options.filter,
-          options.priority,
-          {
-            ownerRoute,
-            onPayload: handler,
-            invalidateOnPayload,
-          },
-        );
-      });
-
+      this.replayPendingSubscription(pendingSubscription);
       this.pendingSubscriptions.delete(key);
     });
     
@@ -616,14 +625,15 @@ export class UnifiedSubscriptionManager {
                 console.log(`Retrying subscription to ${table}`);
                 const sub = this.subscriptions.get(subscriptionKey);
                 if (sub) {
+                  const pendingSubscription = this.snapshotManagedSubscription(sub);
                   try {
                     sub.unsubscribe();
                   } catch (e) {
                     console.error('Error unsubscribing during retry:', e);
                   }
                   this.subscriptions.delete(subscriptionKey);
+                  this.replayPendingSubscription(pendingSubscription);
                 }
-                this.subscribeToTable(table, queryKey, filter, priority);
               }
             }, 5000); // Try again in 5 seconds
           }
@@ -860,14 +870,14 @@ export class UnifiedSubscriptionManager {
         const subscription = this.subscriptions.get(key);
         if (subscription) {
           try {
-            const { table, queryKey, filter, priority } = subscription.options;
+            const pendingSubscription = this.snapshotManagedSubscription(subscription);
             
             // Unsubscribe
             subscription.unsubscribe();
             this.subscriptions.delete(key);
             
             // Resubscribe
-            this.subscribeToTable(table, queryKey, filter, priority);
+            this.replayPendingSubscription(pendingSubscription);
             
             // Update activity timestamp to now
             this.tableLastActivity.set(key, Date.now());

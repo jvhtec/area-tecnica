@@ -57,6 +57,7 @@ type RoleProfilePolicy = {
 type StaffingJobLike = {
   job_type?: unknown;
   start_time?: unknown;
+  end_time?: unknown;
 };
 
 type StaffingRoleLike = {
@@ -182,13 +183,19 @@ export function normalizeProfileName(value: unknown): JobProfileName {
 
 export function inferJobProfile(job: StaffingJobLike | null | undefined, totalRequired: number): JobProfileName {
   const startsAt = job?.start_time ? new Date(String(job.start_time)) : null;
+  const endsAt = job?.end_time ? new Date(String(job.end_time)) : null;
   const startsWithinHours = startsAt && !Number.isNaN(startsAt.getTime())
     ? (startsAt.getTime() - Date.now()) / 36e5
     : null;
+  const spansMultipleDates = startsAt && endsAt
+    && !Number.isNaN(startsAt.getTime())
+    && !Number.isNaN(endsAt.getTime())
+    && endsAt.getTime() > startsAt.getTime()
+    && startsAt.toISOString().slice(0, 10) !== endsAt.toISOString().slice(0, 10);
   const type = String(job?.job_type || 'single').toLowerCase();
 
   if (startsWithinHours !== null && startsWithinHours <= 6) return 'emergency_fill';
-  if (type === 'tourdate' || type === 'ciclo') return 'multi_day_tour';
+  if (type === 'tourdate' || type === 'ciclo' || spansMultipleDates) return 'multi_day_tour';
   if (type === 'festival' || totalRequired >= 10) return 'high_risk_critical';
   return 'standard';
 }
@@ -280,8 +287,12 @@ export function normalizeCampaignPolicy(
       mode: basePolicy.waves?.mode || 'controlled_waves',
       size_mode: basePolicy.waves?.size_mode || 'required_plus_buffer',
       buffer: Number(basePolicy.waves?.buffer ?? timing.buffer),
-      max_waves: Number(basePolicy.waves?.max_waves || timing.maxWaves),
-      wait_minutes: Number(basePolicy.waves?.wait_minutes || timing.waveWait),
+      fixed_size:
+        basePolicy.waves?.fixed_size == null
+          ? undefined
+          : Math.max(1, Number(basePolicy.waves.fixed_size)),
+      max_waves: Number(basePolicy.waves?.max_waves ?? timing.maxWaves),
+      wait_minutes: Number(basePolicy.waves?.wait_minutes ?? timing.waveWait),
       auto_send_next_wave: basePolicy.waves?.auto_send_next_wave ?? mode === 'auto',
     },
     auto_close: {

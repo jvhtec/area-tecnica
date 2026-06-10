@@ -108,6 +108,46 @@ describe("staffing orchestrator policy utilities", () => {
     });
   });
 
+  it("infers overnight jobs as multi-day tours and preserves explicit wave controls", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-06-09T10:00:00.000Z"));
+
+    expect(inferJobProfile({
+      job_type: "single",
+      start_time: "2026-06-20T22:00:00.000Z",
+      end_time: "2026-06-21T02:00:00.000Z",
+    }, 2)).toBe("multi_day_tour");
+
+    const policy = normalizeCampaignPolicy(
+      {
+        waves: {
+          size_mode: "fixed",
+          fixed_size: 8,
+          max_waves: 0,
+          wait_minutes: 0,
+        },
+      },
+      {
+        job_type: "single",
+        start_time: "2026-06-20T22:00:00.000Z",
+        end_time: "2026-06-21T02:00:00.000Z",
+      },
+      [{ role_code: "LGT-AUX", quantity: 2 }],
+      "assisted",
+    );
+
+    expect(policy.profile).toMatchObject({
+      inferred_job_profile: "multi_day_tour",
+      selected_job_profile: "multi_day_tour",
+    });
+    expect(policy.waves).toMatchObject({
+      size_mode: "fixed",
+      fixed_size: 8,
+      max_waves: 0,
+      wait_minutes: 0,
+    });
+  });
+
   it("normalizes profile, role, department, and management authorization decisions", async () => {
     expect(normalizeProfileName("not-a-profile")).toBe("standard");
     expect(inferJobProfile({ job_type: "tourdate" }, 2)).toBe("multi_day_tour");
