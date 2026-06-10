@@ -1229,11 +1229,13 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     }
   };
 
-  const exportTablesCount = isTourDefaults
-    ? tourDefaultDisplayTables.length
+  // Same table set the PDF export uses; also feeds the stage plot in the UI
+  const exportDisplayTables = isTourDefaults
+    ? tourDefaultDisplayTables
     : isOverrideMode
-      ? readOnlyDefaultTables.length + overrideDisplayTables.length
-      : activeTables.length;
+      ? [...readOnlyDefaultTables, ...overrideDisplayTables]
+      : activeTables;
+  const exportTablesCount = exportDisplayTables.length;
 
   return {
     config,
@@ -1303,6 +1305,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     readOnlyDefaultTables,
     overrideDisplayTables,
     handleExportPDF,
+    exportDisplayTables,
     exportTablesCount,
   };
 };

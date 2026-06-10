@@ -24,6 +24,7 @@ import type { PowerTable } from "@/features/technical-tools/power/types";
 import { FIXTURE_PF, type ConsumosDepartmentConfig, type FixtureType } from "./config";
 import { useConsumosTool } from "./useConsumosTool";
 import { CustomComponentDialog } from "./CustomComponentDialog";
+import { PowerStagePlot } from "./PowerStagePlot";
 import { GeneratedPowerTableCard } from "./GeneratedPowerTableCard";
 
 const PowerTableSummary: React.FC<{
@@ -128,6 +129,7 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
     readOnlyDefaultTables,
     overrideDisplayTables,
     handleExportPDF,
+    exportDisplayTables,
     exportTablesCount,
   } = state;
 
@@ -210,6 +212,10 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
           )}
         </div>
       </div>
+
+      {/* Stage plot with the chosen PDU positions (renders only when at
+          least one table sits on a preset stage position) */}
+      <PowerStagePlot tables={exportDisplayTables} labels={labels} />
 
       {/* 3-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

@@ -1,5 +1,7 @@
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getResolvedPowerPosition } from '@/utils/powerPositions';
+import { buildPowerStagePlot } from '@/utils/powerStagePlot';
+import { drawPowerStagePlot } from '@/utils/pdf/powerStagePlotPdf';
 
 interface ExportTableRow {
   quantity?: string;
@@ -442,6 +444,17 @@ export const exportToPDF = async (
             }
             doc.text(`Corriente Total del Sistema: ${finalPowerSummary.totalSystemAmps.toFixed(2)} A`, 14, yPosition);
             yPosition += 7;
+          }
+
+          // Stage plot with PDU positions (theater conventions, audience at bottom)
+          const stagePlot = buildPowerStagePlot(tables);
+          if (stagePlot.hasPositionedEntries) {
+            yPosition = drawPowerStagePlot(doc, stagePlot, {
+              startY: yPosition + 6,
+              pageWidth,
+              pageHeight,
+              footerSpace,
+            });
           }
         } else if ((type === 'weight' || type === 'rigging') && finalSummaryRows.length > 0) {
           doc.setFontSize(16); doc.setTextColor(125, 1, 1);

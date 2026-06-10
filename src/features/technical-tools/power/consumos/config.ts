@@ -110,6 +110,10 @@ export type ConsumosLabels = {
   hoistNote: string;
   notAvailable: string;
   savedSetLoaded: (count: number) => string;
+  stagePlotTitle: string;
+  stagePlotStage: string;
+  stagePlotAudience: string;
+  stagePlotUnpositioned: string;
   pfInfoTitle: string;
   pfInfoFootnote: string;
   loadingOverrideData: string;

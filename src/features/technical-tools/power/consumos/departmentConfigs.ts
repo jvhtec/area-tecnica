@@ -190,6 +190,10 @@ const ENGLISH_LABELS: ConsumosLabels = {
   notAvailable: "N/A",
   savedSetLoaded: (count) =>
     `${count} saved table(s) loaded for this job. Edit them and re-export to update the saved set.`,
+  stagePlotTitle: "Stage layout (PDU positions)",
+  stagePlotStage: "Stage",
+  stagePlotAudience: "Audience",
+  stagePlotUnpositioned: "No position",
   pfInfoTitle: "Recommended power factor by fixture type",
   pfInfoFootnote:
     "You can adjust the PF per item if the manufacturer specifies a different value.",
@@ -314,6 +318,10 @@ const SPANISH_LABELS: ConsumosLabels = {
   notAvailable: "N/A",
   savedSetLoaded: (count) =>
     `Se cargaron ${count} tabla(s) guardadas para este trabajo. Edítalas y vuelve a exportar para actualizar el conjunto guardado.`,
+  stagePlotTitle: "Distribución en escenario (posiciones de PDU)",
+  stagePlotStage: "Escenario",
+  stagePlotAudience: "Público",
+  stagePlotUnpositioned: "Sin posición",
   pfInfoTitle: "Power factor recomendado por tipo de fixture",
   pfInfoFootnote:
     "Puedes ajustar el PF por ítem si el fabricante especifica un valor distinto.",
