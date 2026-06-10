@@ -56,6 +56,7 @@ import {
   type CustomPowerComponentInput,
   useCustomPowerComponents,
 } from "./useCustomPowerComponents";
+import { useConsumosComponents } from "./useConsumosComponents";
 
 const DEFAULT_PDU_SELECT_VALUE = "default";
 const CUSTOM_PDU_SELECT_VALUE = "Custom";
@@ -128,12 +129,21 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   const [searchParams] = useSearchParams();
   const { department, features, labels } = config;
   const perRowPf = features.perRowPf;
-  const { customComponents, addCustomComponent } =
+  // Catalog now lives in the consumos_components table; components stored in
+  // localStorage by the previous implementation are still merged in (read
+  // only) so nothing a user added locally disappears.
+  const { catalogComponents, createComponent } = useConsumosComponents(config);
+  const { customComponents: legacyLocalComponents } =
     useCustomPowerComponents(department, user?.id);
-  const components = useMemo(
-    () => [...config.components, ...customComponents],
-    [config.components, customComponents],
-  );
+  const components = useMemo(() => {
+    const catalogNames = new Set(
+      catalogComponents.map((component) => component.name.trim().toLowerCase()),
+    );
+    const legacyExtras = legacyLocalComponents.filter(
+      (component) => !catalogNames.has(component.name.trim().toLowerCase()),
+    );
+    return [...catalogComponents, ...legacyExtras];
+  }, [catalogComponents, legacyLocalComponents]);
 
   const jobIdFromUrl = searchParams.get("jobId");
   const tourIdParam = searchParams.get("tourId");
@@ -378,11 +388,23 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     });
   };
 
-  const addComponentToRow = (
+  const addComponentToRow = async (
     index: number,
     input: CustomPowerComponentInput,
   ) => {
-    const component = addCustomComponent(input);
+    let component;
+    try {
+      component = await createComponent(input);
+    } catch (error) {
+      console.error("Error adding consumos component:", error);
+      toast({
+        title: labels.toastError,
+        description: labels.toastComponentSaveError,
+        variant: "destructive",
+      });
+      return;
+    }
+    toast({ title: labels.toastSuccess, description: labels.toastComponentSaved });
     setCurrentRows((previous) => {
       const rows = [...previous];
       rows[index] = {

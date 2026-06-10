@@ -23,7 +23,11 @@ export const FIXTURE_PF: Record<FixtureType, { label: string; pf: number }> = {
 
 export const DEFAULT_FIXTURE_TYPE: FixtureType = "led";
 
-export type ConsumosComponent = PowerComponent & { fixtureType?: FixtureType };
+export type ConsumosComponent = PowerComponent & {
+  fixtureType?: FixtureType;
+  /** Optional per-component power factor override (per-row PF departments). */
+  defaultPf?: number;
+};
 
 export type ConsumosLabels = {
   title: string;
@@ -85,6 +89,8 @@ export type ConsumosLabels = {
   colPf: string;
   colTotalWatts: string;
   deleteRowAria: string;
+  toastComponentSaved: string;
+  toastComponentSaveError: string;
   addRow: string;
   generateTable: string;
   updateTable: string;
