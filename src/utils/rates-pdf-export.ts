@@ -7,12 +7,25 @@ import {
   shouldDisplayMultiplier,
 } from '@/lib/tourRateMath';
 import { formatCurrency } from '@/lib/utils';
-import { fetchJobLogo, fetchTourLogo, getCompanyLogo } from '@/utils/pdf/logoUtils';
+import { getCompanyLogo } from '@/utils/pdf/logoUtils';
 import { appendAutonomoLabel } from '@/utils/autonomo';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
 import { getInvoicingCompanyDetails } from '@/utils/invoicing-company-data';
 import { labelForJobExtraType } from '@/types/jobExtras';
-import type jsPDF from 'jspdf';
+import { getLastAutoTableY, pdfToBlob } from '@/utils/pdf/exportHelpers';
+import {
+  CORPORATE_RED,
+  TEXT_PRIMARY,
+  TEXT_MUTED,
+  SUMMARY_BACKGROUND,
+  CORPORATE_FOOTER_RESERVED,
+  buildPdfFilename,
+  corporateTableDefaults,
+  drawCorporateFooter,
+  drawCorporateHeader,
+  resolveHeaderLogo,
+  type CorporateHeaderOptions,
+} from '@/utils/pdf/shared/pdfExportShared';
 
 const NON_AUTONOMO_DEDUCTION_EUR = 30;
 // Fixed travel rate for house techs and assignable management users
@@ -97,152 +110,6 @@ export interface TimesheetLine {
   is_prep_day?: boolean;
   prep_day_hourly_rate_eur?: number;
 }
-
-const CORPORATE_RED: [number, number, number] = [125, 1, 1];
-const TEXT_PRIMARY: [number, number, number] = [31, 41, 55];
-const TEXT_MUTED: [number, number, number] = [100, 116, 139];
-const TABLE_STRIPE_COLOR: [number, number, number] = [248, 248, 248];
-const SUMMARY_BACKGROUND: [number, number, number] = [250, 250, 250];
-const HEADER_HEIGHT = 44;
-const HEADER_CONTENT_OFFSET = HEADER_HEIGHT + 18;
-// Reserve space at the bottom for footer so tables/text never collide with it
-const FOOTER_RESERVED = 38; // px, keep enough room for logo + page text
-const INVALID_FILENAME_CHARS_REGEX = /[<>:"/\\|?*]/g;
-
-const sanitizeFilenamePart = (value: string): string => {
-  return value
-    .replace(INVALID_FILENAME_CHARS_REGEX, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .replace(/[. ]+$/g, '');
-};
-
-const buildPdfFilename = (parts: Array<string | null | undefined>, fallback = 'Documento') => {
-  const safeParts = parts
-    .map((part) => sanitizeFilenamePart(part ?? ''))
-    .filter(Boolean);
-  const baseName = safeParts.join(' - ') || fallback;
-  return `${baseName}.pdf`;
-};
-
-const loadImageSafely = (src: string, description: string): Promise<HTMLImageElement | null> => {
-  return new Promise((resolve) => {
-    if (!src || typeof Image === 'undefined') {
-      resolve(null);
-      return;
-    }
-
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => {
-      console.warn(`Failed to load ${description} from`, src);
-      resolve(null);
-    };
-    img.src = src;
-  });
-};
-
-interface HeaderOptions {
-  title: string;
-  subtitle?: string;
-  metadata?: string;
-  logo?: HTMLImageElement | null;
-}
-
-const drawCorporateHeader = (doc: jsPDF, { title, subtitle, metadata, logo }: HeaderOptions) => {
-  const pageWidth = doc.internal.pageSize.getWidth();
-
-  doc.setFillColor(...CORPORATE_RED);
-  doc.rect(0, 0, pageWidth, HEADER_HEIGHT, 'F');
-
-  if (logo) {
-    try {
-      const ratio = logo.width && logo.height ? logo.width / logo.height : 1;
-      const logoHeight = 26;
-      const logoWidth = logoHeight * ratio;
-      doc.addImage(logo, 'PNG', 16, 9, logoWidth, logoHeight);
-    } catch (error) {
-      console.error('Error adding logo to PDF header:', error);
-    }
-  }
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(255, 255, 255);
-  doc.text(title, pageWidth / 2, 20, { align: 'center' });
-
-  if (subtitle) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(12);
-    doc.text(subtitle, pageWidth / 2, 31, { align: 'center' });
-  }
-
-  if (metadata) {
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.text(metadata, pageWidth - 18, HEADER_HEIGHT - 10, { align: 'right' });
-  }
-
-  doc.setTextColor(...TEXT_PRIMARY);
-
-  return HEADER_CONTENT_OFFSET;
-};
-
-const drawCorporateFooter = (doc: jsPDF, logo: HTMLImageElement | null) => {
-  const pageCount = doc.getNumberOfPages();
-
-  for (let pageNumber = 1; pageNumber <= pageCount; pageNumber++) {
-    doc.setPage(pageNumber);
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-
-    const footerY = pageHeight - 12;
-
-    if (logo) {
-      try {
-        const ratio = logo.width && logo.height ? logo.width / logo.height : 1;
-        const logoHeight = 12;
-        const logoWidth = logoHeight * ratio;
-        const logoX = (pageWidth - logoWidth) / 2;
-        doc.addImage(logo, 'PNG', logoX, footerY - logoHeight - 3, logoWidth, logoHeight);
-      } catch (error) {
-        console.error('Error adding logo to PDF footer:', error);
-      }
-    }
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(...TEXT_MUTED);
-
-    doc.text('Sector-Pro', 18, footerY);
-
-    const pageText = `Página ${pageNumber} de ${pageCount}`;
-    doc.text(pageText, pageWidth - 18, footerY, { align: 'right' });
-  }
-
-  doc.setTextColor(...TEXT_PRIMARY);
-};
-
-const resolveHeaderLogo = async ({
-  jobId,
-  tourId,
-}: {
-  jobId?: string;
-  tourId?: string | null;
-}): Promise<HTMLImageElement | null> => {
-  const [tourLogoUrl, jobLogoUrl] = await Promise.all([
-    tourId ? fetchTourLogo(tourId) : Promise.resolve(undefined),
-    jobId ? fetchJobLogo(jobId) : Promise.resolve(undefined),
-  ]);
-
-  const brandingUrl = tourLogoUrl || jobLogoUrl;
-  if (!brandingUrl) {
-    return null;
-  }
-
-  return loadImageSafely(brandingUrl, 'tour or job logo');
-};
 
 interface TechnicianNameInfo {
   name: string;
@@ -358,7 +225,7 @@ export async function generateRateQuotePDF(
     }),
     getCompanyLogo(),
   ]);
-  const headerOptions: HeaderOptions = {
+  const headerOptions: CorporateHeaderOptions = {
     title: 'Presupuesto de Tarifas',
     subtitle: jobDetails.title,
     metadata: `Generado: ${format(new Date(), 'PPP', { locale: es })}`,
@@ -481,10 +348,8 @@ export async function generateRateQuotePDF(
     startY: yPos,
     head: [['Técnico', 'Categoría', 'Base (calc.)', 'Mult.', 'Extras', 'Total']],
     body: tableData,
-    theme: 'grid',
-    headStyles: { fillColor: CORPORATE_RED, textColor: 255, fontStyle: 'bold' },
+    ...corporateTableDefaults(doc, headerOptions, contentTop),
     styles: { fontSize: 9, cellPadding: 3 },
-    alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR },
     columnStyles: {
       1: { cellWidth: 34 },
       2: { halign: 'right', cellWidth: 68 },
@@ -492,15 +357,9 @@ export async function generateRateQuotePDF(
       4: { halign: 'right' },
       5: { halign: 'right', fontStyle: 'bold' },
     },
-    margin: { left: 14, right: 14, top: contentTop, bottom: FOOTER_RESERVED },
-    didDrawPage: (data) => {
-      if (data.pageNumber > 1) {
-        drawCorporateHeader(doc, headerOptions);
-      }
-    },
   });
 
-  const finalY = ((doc as any).lastAutoTable?.finalY ?? yPos) + 10;
+  const finalY = getLastAutoTableY(doc, yPos) + 10;
   const pageWidth = doc.internal.pageSize.getWidth();
   const summaryWidth = pageWidth - 28;
 
@@ -625,8 +484,7 @@ export async function generateRateQuotePDF(
     format(new Date(), 'yyyy-MM-dd'),
   ]);
   if (options?.download === false) {
-    const blob = doc.output('blob') as Blob;
-    return blob;
+    return pdfToBlob(doc);
   }
   doc.save(filename);
 }
@@ -644,7 +502,7 @@ export async function generateTourRatesSummaryPDF(
     resolveHeaderLogo({ tourId }),
     getCompanyLogo(),
   ]);
-  const headerOptions: HeaderOptions = {
+  const headerOptions: CorporateHeaderOptions = {
     title: 'Resumen de Tarifas',
     subtitle: tourName,
     metadata: `Generado: ${format(new Date(), 'PPP', { locale: es })}`,
@@ -723,24 +581,16 @@ export async function generateTourRatesSummaryPDF(
     startY: yPos,
     head: [['Técnico', 'Fechas', 'LPOs', 'Total Gira']],
     body: summaryRows,
-    theme: 'grid',
-    headStyles: { fillColor: CORPORATE_RED, textColor: 255, fontStyle: 'bold' },
+    ...corporateTableDefaults(doc, headerOptions, contentTop),
     styles: { fontSize: 10, cellPadding: 3 },
-    alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR },
     columnStyles: {
       1: { halign: 'center' },
       2: { halign: 'left' },
       3: { halign: 'right', fontStyle: 'bold' },
     },
-    margin: { left: 14, right: 14, top: contentTop, bottom: FOOTER_RESERVED },
-    didDrawPage: (data) => {
-      if (data.pageNumber > 1) {
-        drawCorporateHeader(doc, headerOptions);
-      }
-    },
   });
 
-  const summaryFinalY = ((doc as any).lastAutoTable?.finalY ?? yPos) + 10;
+  const summaryFinalY = getLastAutoTableY(doc, yPos) + 10;
   const pageWidth = doc.internal.pageSize.getWidth();
   const boxWidth = pageWidth - 28;
   const tourGrandTotal = Array.from(techTotals.values()).reduce((sum, item) => sum + item.total, 0);
@@ -771,7 +621,7 @@ export async function generateTourRatesSummaryPDF(
   sortedJobs.forEach((item, index) => {
     if (!item.quotes.length) return;
 
-    if (breakdownY > pageHeight - (FOOTER_RESERVED + 60)) {
+    if (breakdownY > pageHeight - (CORPORATE_FOOTER_RESERVED + 60)) {
       doc.addPage();
       headerOffset = drawCorporateHeader(doc, headerOptions);
       doc.setFont('helvetica', 'bold');
@@ -853,24 +703,16 @@ export async function generateTourRatesSummaryPDF(
       startY: breakdownY,
       head: [['Técnico', 'Categoría', 'Base', 'Extras', 'Total']],
       body: jobTableRows,
-      theme: 'grid',
-      headStyles: { fillColor: CORPORATE_RED, textColor: 255, fontStyle: 'bold' },
+      ...corporateTableDefaults(doc, headerOptions, headerOffset),
       styles: { fontSize: 9, cellPadding: 3 },
-      alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR },
       columnStyles: {
         2: { halign: 'right' },
         3: { halign: 'right' },
         4: { halign: 'right', fontStyle: 'bold' },
       },
-      margin: { left: 14, right: 14, top: headerOffset, bottom: FOOTER_RESERVED },
-      didDrawPage: (data) => {
-        if (data.pageNumber > 1) {
-          drawCorporateHeader(doc, headerOptions);
-        }
-      },
     });
 
-    breakdownY = ((doc as any).lastAutoTable?.finalY ?? breakdownY) + 6;
+    breakdownY = getLastAutoTableY(doc, breakdownY) + 6;
 
     const { jobBaseTotal, jobExtrasTotal, jobGrandTotal } = item.quotes.reduce(
       (acc, quote) => {
@@ -884,7 +726,7 @@ export async function generateTourRatesSummaryPDF(
     );
 
     // If there isn't enough room for the totals line, continue on a new page
-    if (breakdownY > pageHeight - (FOOTER_RESERVED + 16)) {
+    if (breakdownY > pageHeight - (CORPORATE_FOOTER_RESERVED + 16)) {
       doc.addPage();
       headerOffset = drawCorporateHeader(doc, headerOptions);
       breakdownY = headerOffset + 8;
@@ -932,7 +774,7 @@ export async function generateJobPayoutPDF(
     }),
     getCompanyLogo(),
   ]);
-  const headerOptions: HeaderOptions = {
+  const headerOptions: CorporateHeaderOptions = {
     title: 'Informe de Pagos',
     subtitle: jobDetails.title,
     metadata: `Generado: ${format(new Date(), 'PPP', { locale: es })}`,
@@ -1101,25 +943,17 @@ export async function generateJobPayoutPDF(
     startY: yPos,
     head: [['Técnico', 'Partes', 'Extras', 'Gastos', 'Total']],
     body: tableData,
-    theme: 'grid',
-    headStyles: { fillColor: CORPORATE_RED, textColor: 255, fontStyle: 'bold' },
+    ...corporateTableDefaults(doc, headerOptions, contentTop),
     styles: { fontSize: 10, cellPadding: 3 },
-    alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR },
     columnStyles: {
       1: { halign: 'right' },
       2: { halign: 'right' },
       3: { halign: 'right' },
       4: { halign: 'right', fontStyle: 'bold' },
     },
-    margin: { left: 14, right: 14, top: contentTop, bottom: FOOTER_RESERVED },
-    didDrawPage: (data) => {
-      if (data.pageNumber > 1) {
-        drawCorporateHeader(doc, headerOptions);
-      }
-    },
   });
   
-  let disclaimerY = ((doc as any).lastAutoTable?.finalY ?? yPos) + 8;
+  let disclaimerY = getLastAutoTableY(doc, yPos) + 8;
   if (anyDeductionApplied) {
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
@@ -1175,7 +1009,7 @@ export async function generateJobPayoutPDF(
     (id) => (timesheetMap?.get(id) || []).length > 0
   );
   if (techIdsWithTimesheets.length > 0) {
-    if (currentY > pageHeight - (FOOTER_RESERVED + 60)) {
+    if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 60)) {
       doc.addPage();
       currentY = drawCorporateHeader(doc, headerOptions) + 2;
     }
@@ -1190,7 +1024,7 @@ export async function generateJobPayoutPDF(
       const lines = timesheetMap?.get(payout.technician_id) || [];
       if (!lines.length) continue;
 
-      if (currentY > pageHeight - (FOOTER_RESERVED + 40)) {
+      if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 40)) {
         doc.addPage();
         currentY = drawCorporateHeader(doc, headerOptions) + 2;
       }
@@ -1224,10 +1058,8 @@ export async function generateJobPayoutPDF(
         startY: currentY,
         head: [['Fecha', 'Horas', 'Base día', '+10–12', 'OT', 'Total Parte']],
         body: tableRows,
-        theme: 'grid',
-        headStyles: { fillColor: CORPORATE_RED, textColor: 255, fontStyle: 'bold' },
+        ...corporateTableDefaults(doc, headerOptions, contentTop),
         styles: { fontSize: 9, cellPadding: 3 },
-        alternateRowStyles: { fillColor: TABLE_STRIPE_COLOR },
         columnStyles: {
           1: { halign: 'center' },
           2: { halign: 'right' },
@@ -1235,20 +1067,14 @@ export async function generateJobPayoutPDF(
           4: { halign: 'right' },
           5: { halign: 'right', fontStyle: 'bold' },
         },
-        margin: { left: 14, right: 14, top: contentTop, bottom: FOOTER_RESERVED },
-        didDrawPage: (data) => {
-          if (data.pageNumber > 1) {
-            drawCorporateHeader(doc, headerOptions);
-          }
-        },
       });
 
-      currentY = ((doc as any).lastAutoTable?.finalY ?? currentY) + 8;
+      currentY = getLastAutoTableY(doc, currentY) + 8;
     }
   }
 
   if (payoutsWithExtras.length > 0) {
-    if (currentY > pageHeight - (FOOTER_RESERVED + 60)) {
+    if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 60)) {
       doc.addPage();
       currentY = drawCorporateHeader(doc, headerOptions) + 2;
     }
@@ -1260,7 +1086,7 @@ export async function generateJobPayoutPDF(
     currentY += 7;
 
     payoutsWithExtras.forEach((payout) => {
-      if (currentY > pageHeight - (FOOTER_RESERVED + 40)) {
+      if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 40)) {
         doc.addPage();
         currentY = drawCorporateHeader(doc, headerOptions) + 2;
       }
@@ -1283,7 +1109,7 @@ export async function generateJobPayoutPDF(
         doc.text(itemText, 18, currentY);
         currentY += 5;
 
-        if (currentY > pageHeight - (FOOTER_RESERVED + 20)) {
+        if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 20)) {
           doc.addPage();
           currentY = drawCorporateHeader(doc, headerOptions) + 2;
           doc.setFont('helvetica', 'normal');
@@ -1298,7 +1124,7 @@ export async function generateJobPayoutPDF(
 
   // Expense breakdown section
   if (payoutsWithExpenses.length > 0) {
-    if (currentY > pageHeight - (FOOTER_RESERVED + 60)) {
+    if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 60)) {
       doc.addPage();
       currentY = drawCorporateHeader(doc, headerOptions) + 2;
     }
@@ -1310,7 +1136,7 @@ export async function generateJobPayoutPDF(
     currentY += 7;
 
     payoutsWithExpenses.forEach((payout) => {
-      if (currentY > pageHeight - (FOOTER_RESERVED + 40)) {
+      if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 40)) {
         doc.addPage();
         currentY = drawCorporateHeader(doc, headerOptions) + 2;
       }
@@ -1344,7 +1170,7 @@ export async function generateJobPayoutPDF(
           doc.text(itemText, 18, currentY);
           currentY += 5;
 
-          if (currentY > pageHeight - (FOOTER_RESERVED + 20)) {
+          if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 20)) {
             doc.addPage();
             currentY = drawCorporateHeader(doc, headerOptions) + 2;
             doc.setFont('helvetica', 'normal');
@@ -1358,7 +1184,7 @@ export async function generateJobPayoutPDF(
     });
   }
 
-  if (currentY > pageHeight - (FOOTER_RESERVED + 40)) {
+  if (currentY > pageHeight - (CORPORATE_FOOTER_RESERVED + 40)) {
     doc.addPage();
     currentY = drawCorporateHeader(doc, headerOptions) + 4;
   }
@@ -1412,8 +1238,7 @@ export async function generateJobPayoutPDF(
     format(new Date(), 'yyyy-MM-dd'),
   ]);
   if (options?.download === false) {
-    const blob = doc.output('blob') as Blob;
-    return blob;
+    return pdfToBlob(doc);
   }
   doc.save(filename);
 }
