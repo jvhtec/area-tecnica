@@ -11,7 +11,6 @@ type ConsumosComponentRow = {
   name: string;
   watts: number | string;
   fixture_type: string | null;
-  weight_kg: number | string | null;
   legacy_code: number | null;
 };
 
@@ -32,7 +31,6 @@ const mapRowToComponent = (row: ConsumosComponentRow): ConsumosComponent => ({
   name: row.name,
   watts: Number(row.watts),
   fixtureType: (row.fixture_type as FixtureType) ?? undefined,
-  ...(row.weight_kg != null ? { weightKg: Number(row.weight_kg) } : {}),
 });
 
 /**
@@ -47,7 +45,7 @@ export const useConsumosComponents = (config: ConsumosDepartmentConfig) => {
     queryKey: consumosComponentsQueryKey(config.department),
     queryFn: async () => {
       const { data, error } = await componentsTable()
-        .select("id, name, watts, fixture_type, weight_kg, legacy_code")
+        .select("id, name, watts, fixture_type, legacy_code")
         .eq("department", config.department)
         .order("name", { ascending: true });
       if (error) throw error;
@@ -69,9 +67,8 @@ export const useConsumosComponents = (config: ConsumosDepartmentConfig) => {
           name: input.name.trim(),
           watts: input.watts,
           fixture_type: input.fixtureType ?? null,
-          weight_kg: input.weightKg ?? null,
         })
-        .select("id, name, watts, fixture_type, weight_kg, legacy_code")
+        .select("id, name, watts, fixture_type, legacy_code")
         .single();
       if (error) throw error;
       return mapRowToComponent(data as ConsumosComponentRow);

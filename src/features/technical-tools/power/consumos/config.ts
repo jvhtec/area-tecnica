@@ -25,8 +25,6 @@ export const DEFAULT_FIXTURE_TYPE: FixtureType = "led";
 
 export type ConsumosComponent = PowerComponent & {
   fixtureType?: FixtureType;
-  /** Optional per-component power factor override (per-row PF departments). */
-  defaultPf?: number;
 };
 
 export type ConsumosLabels = {
@@ -80,7 +78,6 @@ export type ConsumosLabels = {
   customComponentTitle: string;
   componentName: string;
   componentNamePlaceholder: string;
-  componentWeight: string;
   componentWatts: string;
   componentType: string;
   saveComponent: string;

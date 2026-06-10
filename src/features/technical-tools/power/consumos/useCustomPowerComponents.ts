@@ -10,7 +10,6 @@ import {
 export type CustomPowerComponentInput = {
   name: string;
   watts: number;
-  weightKg: number;
   fixtureType?: FixtureType;
 };
 
@@ -38,20 +37,17 @@ const sanitizeComponent = (
   const candidate = value as Record<string, unknown>;
   const name = typeof candidate.name === "string" ? candidate.name.trim() : "";
   const watts = Number(candidate.watts);
-  const weightKg = Number(candidate.weightKg);
   const id =
     typeof candidate.id === "string" || typeof candidate.id === "number"
       ? candidate.id
       : null;
 
   if (!id || !name || !Number.isFinite(watts) || watts <= 0) return null;
-  if (!Number.isFinite(weightKg) || weightKg < 0) return null;
 
   return {
     id,
     name,
     watts,
-    weightKg,
     ...(department === "lights"
       ? {
           fixtureType: isFixtureType(candidate.fixtureType)
@@ -132,7 +128,6 @@ export const useCustomPowerComponents = (
         id: createComponentId(department),
         name: input.name.trim(),
         watts: input.watts,
-        weightKg: input.weightKg,
         ...(department === "lights"
           ? { fixtureType: input.fixtureType || DEFAULT_FIXTURE_TYPE }
           : {}),

@@ -13,7 +13,6 @@ create table if not exists public.consumos_components (
   name text not null,
   watts numeric not null check (watts > 0),
   fixture_type text check (fixture_type in ('incandescent', 'discharge', 'led', 'led-pro', 'smoke', 'consoles')),
-  weight_kg numeric check (weight_kg >= 0),
   legacy_code integer,
   created_at timestamp with time zone not null default timezone('utc'::text, now()),
   updated_at timestamp with time zone not null default timezone('utc'::text, now()),
@@ -22,7 +21,6 @@ create table if not exists public.consumos_components (
 
 comment on table public.consumos_components is 'Component catalog for the Consumos (power calculator) tools, per department. Seeded from the previously hardcoded frontend databases; users can add new entries.';
 comment on column public.consumos_components.fixture_type is 'Lights only: fixture category used to recommend a power factor.';
-comment on column public.consumos_components.weight_kg is 'Optional unit weight, so the catalog can also serve the Pesos tools.';
 comment on column public.consumos_components.legacy_code is 'Numeric id the frontend used before the catalog moved to the database; kept so saved table rows keep resolving.';
 
 create unique index if not exists consumos_components_department_name_key
