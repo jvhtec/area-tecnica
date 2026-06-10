@@ -6,7 +6,6 @@ export type PowerComponent = {
   id: number | string;
   name: string;
   watts: number;
-  weightKg?: number;
 };
 
 export type PowerTableRow = {

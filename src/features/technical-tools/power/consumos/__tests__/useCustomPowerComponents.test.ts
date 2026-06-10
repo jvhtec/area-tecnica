@@ -24,7 +24,6 @@ describe("custom power component storage", () => {
       id: "custom:sound:1",
       name: "Amp rack",
       watts: 2400,
-      weightKg: 82.5,
     };
 
     writeCustomPowerComponents("sound", [soundComponent], storage, "user-1");
@@ -48,10 +47,12 @@ describe("custom power component storage", () => {
           id: "custom:lights:1",
           name: "  LED bar  ",
           watts: "300",
+          // weight was stored by the first localStorage implementation; it is
+          // ignored now that the catalog has no weight parameter
           weightKg: "12.5",
           fixtureType: "not-a-fixture",
         },
-        { id: "bad", name: "", watts: 0, weightKg: -1 },
+        { id: "bad", name: "", watts: 0 },
       ]),
     );
 
@@ -60,7 +61,6 @@ describe("custom power component storage", () => {
         id: "custom:lights:1",
         name: "LED bar",
         watts: 300,
-        weightKg: 12.5,
         fixtureType: "led",
       },
     ]);

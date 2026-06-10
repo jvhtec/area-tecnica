@@ -24,6 +24,7 @@ import type { PowerTable } from "@/features/technical-tools/power/types";
 import { FIXTURE_PF, type ConsumosDepartmentConfig, type FixtureType } from "./config";
 import { useConsumosTool } from "./useConsumosTool";
 import { CustomComponentDialog } from "./CustomComponentDialog";
+import { PowerStagePlot } from "@/features/technical-tools/power/consumos/PowerStagePlot";
 import { GeneratedPowerTableCard } from "./GeneratedPowerTableCard";
 
 const PowerTableSummary: React.FC<{
@@ -128,7 +129,10 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
     readOnlyDefaultTables,
     overrideDisplayTables,
     handleExportPDF,
+    exportDisplayTables,
     exportTablesCount,
+    movablePlotTableIds,
+    moveTableToPosition,
   } = state;
 
   if (overrideLoading) {
@@ -210,6 +214,16 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
           )}
         </div>
       </div>
+
+      {/* Stage plot with the chosen PDU positions; tables can be dragged
+          between zones to reposition them */}
+      <PowerStagePlot
+        tables={exportDisplayTables}
+        labels={labels}
+        fohSchukoRequired={features.fohSchuko && fohSchukoRequired}
+        movableIds={movablePlotTableIds}
+        onMoveTable={moveTableToPosition}
+      />
 
       {/* 3-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

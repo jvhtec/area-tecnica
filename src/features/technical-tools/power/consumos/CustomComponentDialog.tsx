@@ -45,25 +45,19 @@ export const CustomComponentDialog = ({
 }: CustomComponentDialogProps) => {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [weightKg, setWeightKg] = useState("");
   const [watts, setWatts] = useState("");
   const [fixtureType, setFixtureType] =
     useState<FixtureType>(DEFAULT_FIXTURE_TYPE);
 
   const reset = () => {
     setName("");
-    setWeightKg("");
     setWatts("");
     setFixtureType(DEFAULT_FIXTURE_TYPE);
   };
 
-  const parsedWeight = Number(weightKg);
   const parsedWatts = Number(watts);
   const canSubmit =
     name.trim().length > 0 &&
-    weightKg.trim().length > 0 &&
-    Number.isFinite(parsedWeight) &&
-    parsedWeight >= 0 &&
     watts.trim().length > 0 &&
     Number.isFinite(parsedWatts) &&
     parsedWatts > 0;
@@ -74,7 +68,6 @@ export const CustomComponentDialog = ({
 
     onCreate({
       name,
-      weightKg: parsedWeight,
       watts: parsedWatts,
       ...(showFixtureType ? { fixtureType } : {}),
     });
@@ -125,29 +118,16 @@ export const CustomComponentDialog = ({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="custom-component-weight">{labels.componentWeight}</Label>
-              <Input
-                id="custom-component-weight"
-                type="number"
-                min="0"
-                step="0.01"
-                value={weightKg}
-                onChange={(event) => setWeightKg(event.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="custom-component-watts">{labels.componentWatts}</Label>
-              <Input
-                id="custom-component-watts"
-                type="number"
-                min="1"
-                step="1"
-                value={watts}
-                onChange={(event) => setWatts(event.target.value)}
-              />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="custom-component-watts">{labels.componentWatts}</Label>
+            <Input
+              id="custom-component-watts"
+              type="number"
+              min="1"
+              step="1"
+              value={watts}
+              onChange={(event) => setWatts(event.target.value)}
+            />
           </div>
 
           {showFixtureType && (

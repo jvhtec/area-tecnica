@@ -23,7 +23,9 @@ export const FIXTURE_PF: Record<FixtureType, { label: string; pf: number }> = {
 
 export const DEFAULT_FIXTURE_TYPE: FixtureType = "led";
 
-export type ConsumosComponent = PowerComponent & { fixtureType?: FixtureType };
+export type ConsumosComponent = PowerComponent & {
+  fixtureType?: FixtureType;
+};
 
 export type ConsumosLabels = {
   title: string;
@@ -76,7 +78,6 @@ export type ConsumosLabels = {
   customComponentTitle: string;
   componentName: string;
   componentNamePlaceholder: string;
-  componentWeight: string;
   componentWatts: string;
   componentType: string;
   saveComponent: string;
@@ -85,6 +86,8 @@ export type ConsumosLabels = {
   colPf: string;
   colTotalWatts: string;
   deleteRowAria: string;
+  toastComponentSaved: string;
+  toastComponentSaveError: string;
   addRow: string;
   generateTable: string;
   updateTable: string;
@@ -107,6 +110,14 @@ export type ConsumosLabels = {
   hoistNote: string;
   notAvailable: string;
   savedSetLoaded: (count: number) => string;
+  stagePlotTitle: string;
+  stagePlotStage: string;
+  stagePlotBackstage: string;
+  stagePlotAudience: string;
+  stagePlotUnpositioned: string;
+  stagePlotFohSchuko: string;
+  stagePlotHoist: string;
+  stagePlotDragHint: string;
   pfInfoTitle: string;
   pfInfoFootnote: string;
   loadingOverrideData: string;

@@ -8,6 +8,15 @@ export const POWER_POSITION_PRESETS = [
   'DSL',
   'DSC',
   'DSR',
+  'UOSL',
+  'OSL',
+  'DOSL',
+  'UOSR',
+  'OSR',
+  'DOSR',
+  'BSL',
+  'BSC',
+  'BSR',
   'FOH',
 ] as const;
 
