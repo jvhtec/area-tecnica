@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { motion, AnimatePresence } from "framer-motion";
 import { Bed, Plus, Trash2, User, Hotel, MapPin, Building2 } from "lucide-react";
 import { Accommodation, RoomAssignment, EventData } from "@/types/hoja-de-ruta";
+import { staffOptionValue } from "@/utils/hoja-de-ruta/staffSync";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 import { HotelAutocomplete } from "@/components/maps/HotelAutocomplete";
 import { GoogleMap } from "@/components/maps/GoogleMap";
@@ -251,7 +252,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                                 <SelectContent>
                                   <SelectItem value="__none__">Sin asignar</SelectItem>
                                   {eventData.staff.map((staff, staffIndex) => (
-                                    <SelectItem key={staffIndex} value={staffIndex.toString()}>
+                                    <SelectItem key={staffIndex} value={staffOptionValue(staff, staffIndex)}>
                                       {staff.name} {staff.surname1}
                                     </SelectItem>
                                   ))}
@@ -272,7 +273,7 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
                                   <SelectContent>
                                     <SelectItem value="__none__">Sin asignar</SelectItem>
                                     {eventData.staff.map((staff, staffIndex) => (
-                                      <SelectItem key={staffIndex} value={staffIndex.toString()}>
+                                      <SelectItem key={staffIndex} value={staffOptionValue(staff, staffIndex)}>
                                         {staff.name} {staff.surname1}
                                       </SelectItem>
                                     ))}

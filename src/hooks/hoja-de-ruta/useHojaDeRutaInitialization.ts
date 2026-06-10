@@ -3,6 +3,10 @@ import { EventData } from '@/types/hoja-de-ruta';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPowerRequirementsText } from '@/utils/powerSummaryData';
+import {
+  mergeStaffWithAssignments,
+  remapAccommodationStaffReferences,
+} from '@/utils/hoja-de-ruta/staffSync';
 
 export const resolvePowerRequirementsForHojaInitialization = ({
   savedPowerRequirements,
@@ -21,6 +25,7 @@ export const useHojaDeRutaInitialization = (
   selectedJobId: string,
   hojaDeRuta: any,
   isLoadingHojaDeRuta: boolean,
+  isInitialized: boolean,
   setEventData: React.Dispatch<React.SetStateAction<EventData>>,
   setTravelArrangements: any,
   setAccommodations: any,
@@ -246,10 +251,12 @@ export const useHojaDeRutaInitialization = (
     }
   }, [toast, loadCurrentJobAssignments, fetchPowerRequirements, setEventData, setHasBasicJobData, setDataSource]);
 
-  // Initialize form with current job assignments, then merge with saved data if exists
+  // Initialize form with current job assignments, then merge with saved data if exists.
+  // Runs once per job selection: hojaDeRuta refetches (window focus, post-save
+  // invalidation) must not re-run this, or they would wipe unsaved edits.
   useEffect(() => {
-    if (!selectedJobId || isLoadingHojaDeRuta) return;
-    
+    if (!selectedJobId || isLoadingHojaDeRuta || isInitialized) return;
+
     console.log("🔄 INITIALIZATION: Initialization effect triggered for job:", selectedJobId);
     
     const initializeFormData = async () => {
@@ -287,77 +294,14 @@ export const useHojaDeRutaInitialization = (
         setDataSource('saved');
         
         const savedEventData = hojaDeRuta.eventData;
-        // Merge saved staff with current assignments, preserving saved DNI and manual entries
-        type StaffEntry = NonNullable<EventData['staff']>[number];
-        const mergeStaff = (
-          saved: StaffEntry[] = [],
-          assigned: StaffEntry[] = [],
-        ) => {
-          const norm = (s?: string) => (s || '').trim().toLowerCase();
-          const nameKey = (p: StaffEntry) => `${norm(p?.name)}|${norm(p?.surname1)}`;
-
-          const mergeTwo = (a: StaffEntry, s: StaffEntry): StaffEntry => ({
-            ...a,
-            ...s,
-            // Prefer saved DNI/position if present; otherwise take the assignment-derived values
-            dni: s.dni || a.dni || '',
-            position: s.position || a.position || '',
-            technician_id: s.technician_id || a.technician_id,
-            phone: s.phone || a.phone || '',
-            role: s.role || a.role,
-          });
-
-          // Start from saved order.
-          const result: StaffEntry[] = (saved || []).map((p) => ({ ...p }));
-          const usedAssigned = new Set<number>();
-
-          // PASS 1: match by technician_id (reliable)
-          const savedIndexByTechId = new Map<string, number>();
-          result.forEach((p, idx) => {
-            if (p?.technician_id) savedIndexByTechId.set(p.technician_id, idx);
-          });
-
-          assigned.forEach((a, aIdx) => {
-            const tid = a?.technician_id;
-            if (!tid) return;
-            const sIdx = savedIndexByTechId.get(tid);
-            if (sIdx == null) return;
-            result[sIdx] = mergeTwo(a, result[sIdx]);
-            usedAssigned.add(aIdx);
-          });
-
-          // PASS 2: match remaining legacy saved entries (no technician_id) by name|surname1
-          const legacySavedByName = new Map<string, number[]>();
-          result.forEach((p, idx) => {
-            if (p?.technician_id) return;
-            const k = nameKey(p);
-            if (!k || k === '|') return;
-            const arr = legacySavedByName.get(k) || [];
-            arr.push(idx);
-            legacySavedByName.set(k, arr);
-          });
-
-          assigned.forEach((a, aIdx) => {
-            if (usedAssigned.has(aIdx)) return;
-            const k = nameKey(a);
-            const arr = legacySavedByName.get(k);
-            if (!arr || arr.length === 0) return;
-            const sIdx = arr.shift()!;
-            result[sIdx] = mergeTwo(a, result[sIdx]);
-            usedAssigned.add(aIdx);
-            if (arr.length === 0) legacySavedByName.delete(k);
-          });
-
-          // Append any remaining assigned staff not present in saved data.
-          assigned.forEach((a, aIdx) => {
-            if (usedAssigned.has(aIdx)) return;
-            result.push({ ...a });
-          });
-
-          return result;
-        };
-
-        const mergedStaff = mergeStaff(savedEventData?.staff || [], staffFromAssignments || []);
+        // Merge saved staff with current assignments: keeps saved DNIs and
+        // manual entries, appends new assignments, and prunes entries whose
+        // assignment was removed so they disappear from the hoja.
+        const savedStaff = savedEventData?.staff || [];
+        const { staff: mergedStaff, savedIndexMap } = mergeStaffWithAssignments(
+          savedStaff,
+          staffFromAssignments || [],
+        );
         
         setEventData({
           eventName: savedEventData?.eventName || jobData.title || "",
@@ -406,14 +350,19 @@ export const useHojaDeRutaInitialization = (
         });
 
         // Set travel arrangements using transformed data
-        if (hojaDeRuta.travelArrangements && hojaDeRuta.travelArrangements.length > 0) {
-          setTravelArrangements(hojaDeRuta.travelArrangements);
-        }
+        setTravelArrangements(hojaDeRuta.travelArrangements || []);
 
-        // Set accommodations using transformed data  
-        if (hojaDeRuta.accommodations && hojaDeRuta.accommodations.length > 0) {
-          setAccommodations(hojaDeRuta.accommodations);
-        }
+        // Set accommodations, remapping room staff references against the
+        // merged staff list (room assignments stored array indexes, which go
+        // stale when staff entries are pruned or reordered)
+        setAccommodations(
+          remapAccommodationStaffReferences(
+            hojaDeRuta.accommodations || [],
+            savedStaff,
+            savedIndexMap,
+            mergedStaff,
+          ),
+        );
         
         toast({
           title: "✅ Datos cargados",
@@ -477,7 +426,7 @@ export const useHojaDeRutaInitialization = (
     };
 
     initializeFormData();
-  }, [selectedJobId, hojaDeRuta, isLoadingHojaDeRuta, loadCurrentJobAssignments, fetchPowerRequirements, toast, setEventData, setTravelArrangements, setAccommodations, setIsInitialized, setHasSavedData, setDataSource]);
+  }, [selectedJobId, hojaDeRuta, isLoadingHojaDeRuta, isInitialized, loadCurrentJobAssignments, fetchPowerRequirements, toast, setEventData, setTravelArrangements, setAccommodations, setIsInitialized, setHasSavedData, setDataSource]);
 
   return {
     autoPopulateBasicJobData,

@@ -120,6 +120,9 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
       if (error) throw error;
 
       if (!logisticsEvents || logisticsEvents.length === 0) {
+        // Still sync with the empty snapshot so transports imported from
+        // logistics events that were deleted disappear from the hoja.
+        onImportTransports([]);
         toast({
           title: "Sin datos",
           description: "No se encontraron eventos logísticos para este trabajo",
