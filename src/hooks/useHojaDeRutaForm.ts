@@ -6,6 +6,10 @@ import { useHojaDeRutaPersistence } from "./useHojaDeRutaPersistence";
 import { useHojaDeRutaState } from "./hoja-de-ruta/useHojaDeRutaState";
 import { useHojaDeRutaInitialization } from "./hoja-de-ruta/useHojaDeRutaInitialization";
 import { useHojaDeRutaSave } from "./hoja-de-ruta/useHojaDeRutaSave";
+import {
+  adjustAccommodationsForStaffRemoval,
+  syncTransportsWithLogistics,
+} from "@/utils/hoja-de-ruta/staffSync";
 
 export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type: string }[] = []) => {
   const { toast } = useToast();
@@ -38,6 +42,7 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
   const {
     hojaDeRuta,
     isLoading: isLoadingHojaDeRuta,
+    isFetching: isFetchingHojaDeRuta,
     fetchError,
     saveHojaDeRuta,
     isSaving,
@@ -77,7 +82,10 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
   const { autoPopulateBasicJobData } = useHojaDeRutaInitialization(
     selectedJobId,
     hojaDeRuta,
-    isLoadingHojaDeRuta,
+    // Wait for in-flight refetches so initialization never runs on stale
+    // cached data (it only runs once per job selection).
+    isLoadingHojaDeRuta || isFetchingHojaDeRuta,
+    isInitialized,
     setEventData,
     setTravelArrangements,
     setAccommodations,
@@ -211,6 +219,7 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
   }, [setEventData]);
 
   const removeStaffMember = useCallback((index: number) => {
+    const removedEntry = eventData.staff?.[index];
     setEventData(prev => {
       const next = (prev.staff || []).filter((_, i) => i !== index);
       return {
@@ -218,7 +227,10 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
         staff: next.length > 0 ? next : [{ name: '', surname1: '', surname2: '', position: '', dni: '' }],
       };
     });
-  }, [setEventData]);
+    // Keep room assignments consistent: clear references to the removed
+    // person and shift index-based references down.
+    setAccommodations(prev => adjustAccommodationsForStaffRemoval(prev, index, removedEntry));
+  }, [setEventData, setAccommodations, eventData.staff]);
 
   const updateTravelArrangement = useCallback((index: number, field: string, value: string | undefined) => {
     setTravelArrangements(prev => 
@@ -357,42 +369,12 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
       ...prev,
       logistics: {
         ...prev.logistics,
-        transport: (() => {
-          const current = Array.isArray(prev.logistics.transport) ? [...prev.logistics.transport] : [];
-
-          transports.forEach((incoming) => {
-            const sourceId = incoming.source_logistics_event_id || null;
-            if (sourceId) {
-              const existingIndex = current.findIndex(
-                (transport) => transport.source_logistics_event_id === sourceId
-              );
-
-              if (existingIndex >= 0) {
-                const existing = current[existingIndex];
-                const shouldSyncDateTime = !existing.date_time || !String(existing.date_time).trim();
-                current[existingIndex] = {
-                  ...existing,
-                  transport_type: incoming.transport_type,
-                  license_plate: incoming.license_plate,
-                  company: incoming.company,
-                  // Preserve any manually-edited Hoja de Ruta datetime; only sync if empty.
-                  date_time: shouldSyncDateTime ? incoming.date_time : existing.date_time,
-                  source_logistics_event_id: sourceId,
-                  is_hoja_relevant: incoming.is_hoja_relevant ?? true,
-                  logistics_categories: incoming.logistics_categories || [],
-                  driver_name: incoming.driver_name ?? existing.driver_name,
-                  driver_phone: incoming.driver_phone ?? existing.driver_phone,
-                  has_return: incoming.has_return ?? existing.has_return,
-                };
-                return;
-              }
-            }
-
-            current.push(incoming);
-          });
-
-          return current;
-        })()
+        // Full sync against the logistics snapshot: prunes transports whose
+        // logistics event was deleted, keeps manual edits and manual rows.
+        transport: syncTransportsWithLogistics(
+          Array.isArray(prev.logistics.transport) ? prev.logistics.transport : [],
+          transports
+        )
       }
     }));
   }, [setEventData]);

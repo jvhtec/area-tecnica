@@ -113,7 +113,7 @@ export const useHojaDeRutaPersistence = (
   const { onSuccess, onError, onSettled } = callbacks;
 
   // Fetch existing hoja de ruta data with new structure
-  const { data: hojaDeRuta, isLoading, error: fetchError } = useQuery({
+  const { data: hojaDeRuta, isLoading, isFetching, error: fetchError } = useQuery({
     queryKey: queryKeys.scope('hoja-de-ruta', jobId),
     queryFn: async () => {
       if (!jobId) return null;
@@ -748,6 +748,7 @@ export const useHojaDeRutaPersistence = (
   return {
     hojaDeRuta: hojaDeRuta || null,
     isLoading,
+    isFetching,
     fetchError,
     saveHojaDeRuta: saveHojaDeRuta.mutateAsync,
     isSaving: saveHojaDeRuta.isPending,

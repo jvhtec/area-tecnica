@@ -1,8 +1,12 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { EventData } from '@/types/hoja-de-ruta';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { formatPowerRequirementsText } from '@/utils/powerSummaryData';
+import {
+  mergeStaffWithAssignments,
+  remapAccommodationStaffReferences,
+} from '@/utils/hoja-de-ruta/staffSync';
 
 export const resolvePowerRequirementsForHojaInitialization = ({
   savedPowerRequirements,
@@ -21,6 +25,7 @@ export const useHojaDeRutaInitialization = (
   selectedJobId: string,
   hojaDeRuta: any,
   isLoadingHojaDeRuta: boolean,
+  isInitialized: boolean,
   setEventData: React.Dispatch<React.SetStateAction<EventData>>,
   setTravelArrangements: any,
   setAccommodations: any,
@@ -30,6 +35,8 @@ export const useHojaDeRutaInitialization = (
   setDataSource: React.Dispatch<React.SetStateAction<'none' | 'saved' | 'job' | 'mixed'>>
 ) => {
   const { toast } = useToast();
+  // Token of the initialization run currently in flight (see the effect below)
+  const initializingRunRef = useRef<{ jobId: string } | null>(null);
 
   const buildClientContacts = (jobData: { client_name?: string | null; client_phone?: string | null }) =>
     jobData.client_name ? [{
@@ -63,6 +70,66 @@ export const useHojaDeRutaInitialization = (
       merged.push({ name, role, phone });
     });
     return merged.length ? merged : [{ name: "", role: "", phone: "" }];
+  };
+
+  const formatJobEventDates = (jobData: { start_time?: string | null; end_time?: string | null }) => {
+    const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
+    const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
+
+    let eventDates = "";
+    if (startDate && endDate) {
+      eventDates = startDate.toDateString() === endDate.toDateString()
+        ? startDate.toLocaleDateString('es-ES')
+        : `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
+    }
+
+    return { startDate, endDate, eventDates };
+  };
+
+  // Builds the EventData used when there is no saved hoja for the job, shared
+  // by the initialization effect and autoPopulateBasicJobData.
+  const buildEventDataFromJob = ({
+    jobData,
+    staffFromAssignments,
+    tourContacts,
+    powerRequirementsText,
+  }: {
+    jobData: any;
+    staffFromAssignments: NonNullable<EventData['staff']>;
+    tourContacts: Array<{ name: string; role: string; phone: string }>;
+    powerRequirementsText: string;
+  }): EventData => {
+    const { startDate, eventDates } = formatJobEventDates(jobData);
+
+    return {
+      eventName: jobData.title || "",
+      eventDates,
+      venue: {
+        name: jobData.location?.name || "",
+        address: jobData.location?.formatted_address || "",
+        coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
+          ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
+          : undefined,
+      },
+      contacts: mergeContacts(
+        buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
+        tourContacts,
+      ),
+      logistics: {
+        transport: [],
+        loadingDetails: "",
+        unloadingDetails: "",
+        equipmentLogistics: "",
+      },
+      staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
+      schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
+      powerRequirements: powerRequirementsText || "",
+      auxiliaryNeeds: "",
+      auxiliaryStaffSetupQty: 0,
+      auxiliaryStaffDismantleQty: 0,
+      auxiliaryMachinery: [],
+      weather: undefined,
+    };
   };
 
   // Fetch power requirements for a job
@@ -170,49 +237,12 @@ export const useHojaDeRutaInitialization = (
 
       const { jobData, staffFromAssignments, tourContacts } = assignmentData;
 
-      // Prepare basic event data
-      const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
-      const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
-      
-      let eventDates = "";
-      if (startDate && endDate) {
-        if (startDate.toDateString() === endDate.toDateString()) {
-          eventDates = startDate.toLocaleDateString('es-ES');
-        } else {
-          eventDates = `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
-        }
-      }
-
-      const basicEventData: EventData = {
-        eventName: jobData.title || "",
-        eventDates,
-        venue: {
-          name: jobData.location?.name || "",
-          address: jobData.location?.formatted_address || "",
-          coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
-            ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
-            : undefined,
-        },
-        contacts: mergeContacts(
-          buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
-          tourContacts,
-        ),
-        logistics: {
-          transport: [],
-          loadingDetails: "",
-          unloadingDetails: "",
-          equipmentLogistics: "",
-        },
-        staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
-        schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
-        // Use fetched power requirements from database
-        powerRequirements: powerRequirementsText || "",
-        auxiliaryNeeds: "",
-        auxiliaryStaffSetupQty: 0,
-        auxiliaryStaffDismantleQty: 0,
-        auxiliaryMachinery: [],
-        weather: undefined,
-      };
+      const basicEventData = buildEventDataFromJob({
+        jobData,
+        staffFromAssignments,
+        tourContacts,
+        powerRequirementsText,
+      });
 
       console.log("✅ INITIALIZATION: Setting basic job data with assignments:", {
         eventName: basicEventData.eventName,
@@ -246,18 +276,36 @@ export const useHojaDeRutaInitialization = (
     }
   }, [toast, loadCurrentJobAssignments, fetchPowerRequirements, setEventData, setHasBasicJobData, setDataSource]);
 
-  // Initialize form with current job assignments, then merge with saved data if exists
+  // Initialize form with current job assignments, then merge with saved data if exists.
+  // Runs once per job selection: hojaDeRuta refetches (window focus, post-save
+  // invalidation) must not re-run this, or they would wipe unsaved edits.
   useEffect(() => {
-    if (!selectedJobId || isLoadingHojaDeRuta) return;
-    
+    if (!selectedJobId || isLoadingHojaDeRuta || isInitialized) return;
+    // The async initialization below sets isInitialized only when it finishes;
+    // block concurrent runs for the same job (e.g. a refetch landing
+    // mid-initialization).
+    if (initializingRunRef.current?.jobId === selectedJobId) return;
+    const runToken = { jobId: selectedJobId };
+    initializingRunRef.current = runToken;
+    // A newer run (job change) replaces the token; stale completions must not
+    // apply their results over the newer job's state.
+    const isCurrentRun = () => initializingRunRef.current === runToken;
+
     console.log("🔄 INITIALIZATION: Initialization effect triggered for job:", selectedJobId);
-    
+
     const initializeFormData = async () => {
       // Always load current job assignments and power requirements first
       const [assignmentData, powerRequirementsText] = await Promise.all([
         loadCurrentJobAssignments(selectedJobId),
         fetchPowerRequirements(selectedJobId)
       ]);
+
+      // Everything below is synchronous, so this single check after the only
+      // await guards every state mutation in this run.
+      if (!isCurrentRun()) {
+        console.log("⏭️ INITIALIZATION: Discarding stale initialization for job:", selectedJobId);
+        return;
+      }
 
       if (!assignmentData) {
         console.log("❌ INITIALIZATION: No assignment data available");
@@ -266,19 +314,7 @@ export const useHojaDeRutaInitialization = (
       }
 
       const { jobData, staffFromAssignments, tourContacts } = assignmentData;
-      
-      // Prepare basic event data from job
-      const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
-      const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
-      
-      let eventDates = "";
-      if (startDate && endDate) {
-        if (startDate.toDateString() === endDate.toDateString()) {
-          eventDates = startDate.toLocaleDateString('es-ES');
-        } else {
-          eventDates = `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
-        }
-      }
+      const { startDate, eventDates } = formatJobEventDates(jobData);
 
       // If we have saved data, merge current assignments with saved data
       if (hojaDeRuta) {
@@ -287,77 +323,14 @@ export const useHojaDeRutaInitialization = (
         setDataSource('saved');
         
         const savedEventData = hojaDeRuta.eventData;
-        // Merge saved staff with current assignments, preserving saved DNI and manual entries
-        type StaffEntry = NonNullable<EventData['staff']>[number];
-        const mergeStaff = (
-          saved: StaffEntry[] = [],
-          assigned: StaffEntry[] = [],
-        ) => {
-          const norm = (s?: string) => (s || '').trim().toLowerCase();
-          const nameKey = (p: StaffEntry) => `${norm(p?.name)}|${norm(p?.surname1)}`;
-
-          const mergeTwo = (a: StaffEntry, s: StaffEntry): StaffEntry => ({
-            ...a,
-            ...s,
-            // Prefer saved DNI/position if present; otherwise take the assignment-derived values
-            dni: s.dni || a.dni || '',
-            position: s.position || a.position || '',
-            technician_id: s.technician_id || a.technician_id,
-            phone: s.phone || a.phone || '',
-            role: s.role || a.role,
-          });
-
-          // Start from saved order.
-          const result: StaffEntry[] = (saved || []).map((p) => ({ ...p }));
-          const usedAssigned = new Set<number>();
-
-          // PASS 1: match by technician_id (reliable)
-          const savedIndexByTechId = new Map<string, number>();
-          result.forEach((p, idx) => {
-            if (p?.technician_id) savedIndexByTechId.set(p.technician_id, idx);
-          });
-
-          assigned.forEach((a, aIdx) => {
-            const tid = a?.technician_id;
-            if (!tid) return;
-            const sIdx = savedIndexByTechId.get(tid);
-            if (sIdx == null) return;
-            result[sIdx] = mergeTwo(a, result[sIdx]);
-            usedAssigned.add(aIdx);
-          });
-
-          // PASS 2: match remaining legacy saved entries (no technician_id) by name|surname1
-          const legacySavedByName = new Map<string, number[]>();
-          result.forEach((p, idx) => {
-            if (p?.technician_id) return;
-            const k = nameKey(p);
-            if (!k || k === '|') return;
-            const arr = legacySavedByName.get(k) || [];
-            arr.push(idx);
-            legacySavedByName.set(k, arr);
-          });
-
-          assigned.forEach((a, aIdx) => {
-            if (usedAssigned.has(aIdx)) return;
-            const k = nameKey(a);
-            const arr = legacySavedByName.get(k);
-            if (!arr || arr.length === 0) return;
-            const sIdx = arr.shift()!;
-            result[sIdx] = mergeTwo(a, result[sIdx]);
-            usedAssigned.add(aIdx);
-            if (arr.length === 0) legacySavedByName.delete(k);
-          });
-
-          // Append any remaining assigned staff not present in saved data.
-          assigned.forEach((a, aIdx) => {
-            if (usedAssigned.has(aIdx)) return;
-            result.push({ ...a });
-          });
-
-          return result;
-        };
-
-        const mergedStaff = mergeStaff(savedEventData?.staff || [], staffFromAssignments || []);
+        // Merge saved staff with current assignments: keeps saved DNIs and
+        // manual entries, appends new assignments, and prunes entries whose
+        // assignment was removed so they disappear from the hoja.
+        const savedStaff = savedEventData?.staff || [];
+        const { staff: mergedStaff, savedIndexMap } = mergeStaffWithAssignments(
+          savedStaff,
+          staffFromAssignments || [],
+        );
         
         setEventData({
           eventName: savedEventData?.eventName || jobData.title || "",
@@ -406,14 +379,19 @@ export const useHojaDeRutaInitialization = (
         });
 
         // Set travel arrangements using transformed data
-        if (hojaDeRuta.travelArrangements && hojaDeRuta.travelArrangements.length > 0) {
-          setTravelArrangements(hojaDeRuta.travelArrangements);
-        }
+        setTravelArrangements(hojaDeRuta.travelArrangements || []);
 
-        // Set accommodations using transformed data  
-        if (hojaDeRuta.accommodations && hojaDeRuta.accommodations.length > 0) {
-          setAccommodations(hojaDeRuta.accommodations);
-        }
+        // Set accommodations, remapping room staff references against the
+        // merged staff list (room assignments stored array indexes, which go
+        // stale when staff entries are pruned or reordered)
+        setAccommodations(
+          remapAccommodationStaffReferences(
+            hojaDeRuta.accommodations || [],
+            savedStaff,
+            savedIndexMap,
+            mergedStaff,
+          ),
+        );
         
         toast({
           title: "✅ Datos cargados",
@@ -424,39 +402,13 @@ export const useHojaDeRutaInitialization = (
         console.log("🆕 INITIALIZATION: No saved data, using current job data with assignments");
         setHasSavedData(false);
         setDataSource('job');
-        
-        const basicEventData: EventData = {
-          eventName: jobData.title || "",
-          eventDates,
-          venue: {
-            name: jobData.location?.name || "",
-            address: jobData.location?.formatted_address || "",
-            coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
-              ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
-              : undefined,
-          },
-          contacts: mergeContacts(
-            buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
-            tourContacts,
-          ),
-          logistics: {
-            transport: [],
-            loadingDetails: "",
-            unloadingDetails: "",
-            equipmentLogistics: "",
-          },
-          staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
-          schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
-          // Use fetched power requirements from database
-          powerRequirements: powerRequirementsText || "",
-          auxiliaryNeeds: "",
-          auxiliaryStaffSetupQty: 0,
-          auxiliaryStaffDismantleQty: 0,
-          auxiliaryMachinery: [],
-          weather: undefined,
-        };
 
-        setEventData(basicEventData);
+        setEventData(buildEventDataFromJob({
+          jobData,
+          staffFromAssignments,
+          tourContacts,
+          powerRequirementsText,
+        }));
         setTravelArrangements([]);
         setAccommodations([]);
 
@@ -476,8 +428,12 @@ export const useHojaDeRutaInitialization = (
       setIsInitialized(true);
     };
 
-    initializeFormData();
-  }, [selectedJobId, hojaDeRuta, isLoadingHojaDeRuta, loadCurrentJobAssignments, fetchPowerRequirements, toast, setEventData, setTravelArrangements, setAccommodations, setIsInitialized, setHasSavedData, setDataSource]);
+    initializeFormData().finally(() => {
+      if (isCurrentRun()) {
+        initializingRunRef.current = null;
+      }
+    });
+  }, [selectedJobId, hojaDeRuta, isLoadingHojaDeRuta, isInitialized, loadCurrentJobAssignments, fetchPowerRequirements, toast, setEventData, setTravelArrangements, setAccommodations, setIsInitialized, setHasSavedData, setDataSource]);
 
   return {
     autoPopulateBasicJobData,
