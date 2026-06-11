@@ -35,8 +35,8 @@ export const useHojaDeRutaInitialization = (
   setDataSource: React.Dispatch<React.SetStateAction<'none' | 'saved' | 'job' | 'mixed'>>
 ) => {
   const { toast } = useToast();
-  // Job id whose initialization is currently in flight (see the effect below)
-  const initializingJobRef = useRef<string | null>(null);
+  // Token of the initialization run currently in flight (see the effect below)
+  const initializingRunRef = useRef<{ jobId: string } | null>(null);
 
   const buildClientContacts = (jobData: { client_name?: string | null; client_phone?: string | null }) =>
     jobData.client_name ? [{
@@ -70,6 +70,66 @@ export const useHojaDeRutaInitialization = (
       merged.push({ name, role, phone });
     });
     return merged.length ? merged : [{ name: "", role: "", phone: "" }];
+  };
+
+  const formatJobEventDates = (jobData: { start_time?: string | null; end_time?: string | null }) => {
+    const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
+    const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
+
+    let eventDates = "";
+    if (startDate && endDate) {
+      eventDates = startDate.toDateString() === endDate.toDateString()
+        ? startDate.toLocaleDateString('es-ES')
+        : `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
+    }
+
+    return { startDate, endDate, eventDates };
+  };
+
+  // Builds the EventData used when there is no saved hoja for the job, shared
+  // by the initialization effect and autoPopulateBasicJobData.
+  const buildEventDataFromJob = ({
+    jobData,
+    staffFromAssignments,
+    tourContacts,
+    powerRequirementsText,
+  }: {
+    jobData: any;
+    staffFromAssignments: NonNullable<EventData['staff']>;
+    tourContacts: Array<{ name: string; role: string; phone: string }>;
+    powerRequirementsText: string;
+  }): EventData => {
+    const { startDate, eventDates } = formatJobEventDates(jobData);
+
+    return {
+      eventName: jobData.title || "",
+      eventDates,
+      venue: {
+        name: jobData.location?.name || "",
+        address: jobData.location?.formatted_address || "",
+        coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
+          ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
+          : undefined,
+      },
+      contacts: mergeContacts(
+        buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
+        tourContacts,
+      ),
+      logistics: {
+        transport: [],
+        loadingDetails: "",
+        unloadingDetails: "",
+        equipmentLogistics: "",
+      },
+      staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
+      schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
+      powerRequirements: powerRequirementsText || "",
+      auxiliaryNeeds: "",
+      auxiliaryStaffSetupQty: 0,
+      auxiliaryStaffDismantleQty: 0,
+      auxiliaryMachinery: [],
+      weather: undefined,
+    };
   };
 
   // Fetch power requirements for a job
@@ -177,49 +237,12 @@ export const useHojaDeRutaInitialization = (
 
       const { jobData, staffFromAssignments, tourContacts } = assignmentData;
 
-      // Prepare basic event data
-      const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
-      const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
-      
-      let eventDates = "";
-      if (startDate && endDate) {
-        if (startDate.toDateString() === endDate.toDateString()) {
-          eventDates = startDate.toLocaleDateString('es-ES');
-        } else {
-          eventDates = `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
-        }
-      }
-
-      const basicEventData: EventData = {
-        eventName: jobData.title || "",
-        eventDates,
-        venue: {
-          name: jobData.location?.name || "",
-          address: jobData.location?.formatted_address || "",
-          coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
-            ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
-            : undefined,
-        },
-        contacts: mergeContacts(
-          buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
-          tourContacts,
-        ),
-        logistics: {
-          transport: [],
-          loadingDetails: "",
-          unloadingDetails: "",
-          equipmentLogistics: "",
-        },
-        staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
-        schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
-        // Use fetched power requirements from database
-        powerRequirements: powerRequirementsText || "",
-        auxiliaryNeeds: "",
-        auxiliaryStaffSetupQty: 0,
-        auxiliaryStaffDismantleQty: 0,
-        auxiliaryMachinery: [],
-        weather: undefined,
-      };
+      const basicEventData = buildEventDataFromJob({
+        jobData,
+        staffFromAssignments,
+        tourContacts,
+        powerRequirementsText,
+      });
 
       console.log("✅ INITIALIZATION: Setting basic job data with assignments:", {
         eventName: basicEventData.eventName,
@@ -259,9 +282,14 @@ export const useHojaDeRutaInitialization = (
   useEffect(() => {
     if (!selectedJobId || isLoadingHojaDeRuta || isInitialized) return;
     // The async initialization below sets isInitialized only when it finishes;
-    // block concurrent runs (e.g. a refetch landing mid-initialization).
-    if (initializingJobRef.current === selectedJobId) return;
-    initializingJobRef.current = selectedJobId;
+    // block concurrent runs for the same job (e.g. a refetch landing
+    // mid-initialization).
+    if (initializingRunRef.current?.jobId === selectedJobId) return;
+    const runToken = { jobId: selectedJobId };
+    initializingRunRef.current = runToken;
+    // A newer run (job change) replaces the token; stale completions must not
+    // apply their results over the newer job's state.
+    const isCurrentRun = () => initializingRunRef.current === runToken;
 
     console.log("🔄 INITIALIZATION: Initialization effect triggered for job:", selectedJobId);
 
@@ -272,6 +300,13 @@ export const useHojaDeRutaInitialization = (
         fetchPowerRequirements(selectedJobId)
       ]);
 
+      // Everything below is synchronous, so this single check after the only
+      // await guards every state mutation in this run.
+      if (!isCurrentRun()) {
+        console.log("⏭️ INITIALIZATION: Discarding stale initialization for job:", selectedJobId);
+        return;
+      }
+
       if (!assignmentData) {
         console.log("❌ INITIALIZATION: No assignment data available");
         setIsInitialized(true);
@@ -279,19 +314,7 @@ export const useHojaDeRutaInitialization = (
       }
 
       const { jobData, staffFromAssignments, tourContacts } = assignmentData;
-      
-      // Prepare basic event data from job
-      const startDate = jobData.start_time ? new Date(jobData.start_time) : null;
-      const endDate = jobData.end_time ? new Date(jobData.end_time) : null;
-      
-      let eventDates = "";
-      if (startDate && endDate) {
-        if (startDate.toDateString() === endDate.toDateString()) {
-          eventDates = startDate.toLocaleDateString('es-ES');
-        } else {
-          eventDates = `${startDate.toLocaleDateString('es-ES')} - ${endDate.toLocaleDateString('es-ES')}`;
-        }
-      }
+      const { startDate, eventDates } = formatJobEventDates(jobData);
 
       // If we have saved data, merge current assignments with saved data
       if (hojaDeRuta) {
@@ -379,39 +402,13 @@ export const useHojaDeRutaInitialization = (
         console.log("🆕 INITIALIZATION: No saved data, using current job data with assignments");
         setHasSavedData(false);
         setDataSource('job');
-        
-        const basicEventData: EventData = {
-          eventName: jobData.title || "",
-          eventDates,
-          venue: {
-            name: jobData.location?.name || "",
-            address: jobData.location?.formatted_address || "",
-            coordinates: jobData.location?.latitude != null && jobData.location?.longitude != null
-              ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
-              : undefined,
-          },
-          contacts: mergeContacts(
-            buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
-            tourContacts,
-          ),
-          logistics: {
-            transport: [],
-            loadingDetails: "",
-            unloadingDetails: "",
-            equipmentLogistics: "",
-          },
-          staff: staffFromAssignments.length > 0 ? staffFromAssignments : [{ name: "", surname1: "", surname2: "", position: "", dni: "" }],
-          schedule: startDate ? `Load in: ${startDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}` : "",
-          // Use fetched power requirements from database
-          powerRequirements: powerRequirementsText || "",
-          auxiliaryNeeds: "",
-          auxiliaryStaffSetupQty: 0,
-          auxiliaryStaffDismantleQty: 0,
-          auxiliaryMachinery: [],
-          weather: undefined,
-        };
 
-        setEventData(basicEventData);
+        setEventData(buildEventDataFromJob({
+          jobData,
+          staffFromAssignments,
+          tourContacts,
+          powerRequirementsText,
+        }));
         setTravelArrangements([]);
         setAccommodations([]);
 
@@ -432,8 +429,8 @@ export const useHojaDeRutaInitialization = (
     };
 
     initializeFormData().finally(() => {
-      if (initializingJobRef.current === selectedJobId) {
-        initializingJobRef.current = null;
+      if (isCurrentRun()) {
+        initializingRunRef.current = null;
       }
     });
   }, [selectedJobId, hojaDeRuta, isLoadingHojaDeRuta, isInitialized, loadCurrentJobAssignments, fetchPowerRequirements, toast, setEventData, setTravelArrangements, setAccommodations, setIsInitialized, setHasSavedData, setDataSource]);
