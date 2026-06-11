@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { Transport } from "@/types/hoja-de-ruta";
 import {
   adjustAccommodationsForStaffRemoval,
   mergeStaffWithAssignments,
@@ -155,21 +156,7 @@ describe("staffOptionValue", () => {
 });
 
 describe("syncTransportsWithLogistics", () => {
-  interface TransportTest {
-    id: string;
-    transport_type: string;
-    source_logistics_event_id: string;
-    date_time: string;
-    license_plate?: string;
-    company?: string;
-    driver_name?: string;
-    driver_phone?: string;
-    has_return?: boolean;
-    is_hoja_relevant?: boolean;
-    logistics_categories?: unknown[];
-  }
-
-  const sourced = (sourceId: string, extra: Partial<TransportTest> = {}): TransportTest => ({
+  const sourced = (sourceId: string, extra: Partial<Transport> = {}): Transport => ({
     id: `local-${sourceId}`,
     transport_type: "trailer",
     source_logistics_event_id: sourceId,
@@ -178,7 +165,7 @@ describe("syncTransportsWithLogistics", () => {
   });
 
   it("prunes transports whose logistics event disappeared and keeps manual rows", () => {
-    const current = [
+    const current: Transport[] = [
       sourced("ev1"),
       sourced("ev2"),
       { id: "manual-1", transport_type: "furgoneta", date_time: "2026-06-10T08:00" },
@@ -190,7 +177,7 @@ describe("syncTransportsWithLogistics", () => {
   });
 
   it("clears all sourced transports when the snapshot is empty", () => {
-    const current = [sourced("ev1"), { id: "manual-1", transport_type: "4m" }];
+    const current: Transport[] = [sourced("ev1"), { id: "manual-1", transport_type: "4m" }];
     const next = syncTransportsWithLogistics(current, []);
     expect(next.map((t) => t.id)).toEqual(["manual-1"]);
   });
