@@ -19,6 +19,7 @@ import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService
 import { createAllFoldersForJob } from "@/utils/flex-folders";
 import { format } from "date-fns";
 import { createSafeFolderName, sanitizeFolderName } from "@/utils/folderNameSanitizer";
+import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 import type { JobDocument } from './JobCardDocuments';
 import { JobCardNewDetailsOnly } from "./job-card-new/JobCardNewDetailsOnly";
 import { JobCardNewView } from "./job-card-new/JobCardNewView";
@@ -677,8 +678,11 @@ function JobCardNewFull({
         body: { job_id: job.id as string, department, stage_number: 0 }
       });
       if (error) {
-        // Even on error, lock may have been recorded. We'll refetch lock and inform user.
-        toast({ title: 'Grupo solicitado', description: 'Se ha solicitado la creación del grupo. El botón quedará bloqueado.', });
+        toast({
+          title: 'Error al crear grupo',
+          description: await extractFunctionErrorMessage(error),
+          variant: 'destructive',
+        });
       } else {
         const result = data as CreateWhatsappGroupResult | null;
         const warnings = result?.warnings;
@@ -691,9 +695,12 @@ function JobCardNewFull({
       }
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
     } catch (err: any) {
-      // Still lock; refetch
       await Promise.all([refetchWaGroup(), refetchWaRequest()]);
-      toast({ title: 'Grupo solicitado', description: 'Se ha solicitado la creación del grupo. El botón quedará bloqueado.' });
+      toast({
+        title: 'Error al crear grupo',
+        description: err?.message || String(err),
+        variant: 'destructive',
+      });
     }
   };
 

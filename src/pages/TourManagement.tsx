@@ -45,6 +45,7 @@ import { exportTourPDF } from "@/lib/tourPdfExport";
 import { useToast } from "@/hooks/use-toast";
 import { useFlexUuid } from "@/hooks/useFlexUuid";
 import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
+import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 import createFolderIcon from "@/assets/icons/icon.png";
 import { TourDateFlexButton } from "@/components/tours/TourDateFlexButton";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -244,7 +245,7 @@ export const TourManagement = ({ tour, tourJobId }: TourManagementProps) => {
         body: { job_id: jobRow.id, department: waDepartment, stage_number: 0 }
       });
       if (fnErr) {
-        toast({ title: 'Error al crear grupo', description: fnErr.message, variant: 'destructive' });
+        toast({ title: 'Error al crear grupo', description: await extractFunctionErrorMessage(fnErr), variant: 'destructive' });
       } else {
         toast({ title: 'Solicitado', description: 'Se solicitó la creación del grupo de WhatsApp. Se finalizará en breve.' });
         setIsWaDialogOpen(false);
