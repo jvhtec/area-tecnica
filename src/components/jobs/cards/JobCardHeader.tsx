@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronUp, Clock, MapPin } from "lucide-react";
+import { ChevronDown, ChevronUp, Clock, MapPin, Package } from "lucide-react";
 import { Department } from "@/types/department";
 import { JobStatusSelector } from "@/components/jobs/JobStatusSelector";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -75,6 +75,13 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
             {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
             <h3 className={cn("font-medium break-words leading-tight", isMobile ? "text-base" : "text-lg")}>{job.title}</h3>
             {getBadgeForJobType(job.job_type)}
+            {job.tour_date?.is_tour_pack_only && (
+              <Badge className={cn("ml-2 gap-1 bg-blue-100 text-blue-700 hover:bg-blue-100", isMobile && "text-xs")}>
+                <Package className="h-3 w-3" />
+                <span className={cn(isMobile && "hidden")}>Tour Pack Only</span>
+                <span className={cn(!isMobile && "hidden")}>TP Only</span>
+              </Badge>
+            )}
             {job.invoicing_company && (
               <Badge variant="outline" className={cn("ml-2", isMobile && "text-xs")}>
                 {job.invoicing_company}
