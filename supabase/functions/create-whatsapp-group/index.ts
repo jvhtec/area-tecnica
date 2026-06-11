@@ -20,6 +20,88 @@ interface CreateRequest {
   stage_number?: number | string;
 }
 
+type WahaFallbackAttempt = {
+  id: string;
+  status?: number;
+  body?: string;
+  message?: string;
+};
+
+const MAX_LOG_BODY_LENGTH = 1200;
+
+function truncateForLog(value: string, maxLength = MAX_LOG_BODY_LENGTH) {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength)}...[truncated ${value.length - maxLength} chars]`;
+}
+
+function redactWahaParticipantId(id: string) {
+  return id.replace(/\d{7,15}(?=@c\.us)/g, (digits) => `***${digits.slice(-4)}`);
+}
+
+function sanitizeWahaResponseForLog(body: string) {
+  return truncateForLog(
+    body
+      .replace(/\d{7,15}(?=@c\.us)/g, (digits) => `***${digits.slice(-4)}`)
+      .replace(/\+\d{7,15}/g, (phone) => `***${phone.slice(-4)}`),
+  );
+}
+
+function wahaHostFromBase(base: string) {
+  try {
+    return new URL(base).host;
+  } catch {
+    return 'invalid-base-url';
+  }
+}
+
+function logWahaCreateFailure({
+  base,
+  department,
+  fallbackAttempts,
+  hasApiKey,
+  message,
+  participantCount,
+  requestId,
+  response,
+  session,
+  stageNumber,
+  status,
+  step,
+}: {
+  base: string;
+  department: Dept;
+  fallbackAttempts?: WahaFallbackAttempt[];
+  hasApiKey: boolean;
+  message?: string;
+  participantCount: number;
+  requestId: string;
+  response?: string;
+  session: string;
+  stageNumber: number;
+  status?: number;
+  step: string;
+}) {
+  console.error('create-whatsapp-group WAHA create-group failed', {
+    base_host: wahaHostFromBase(base),
+    department,
+    fallback_attempts: fallbackAttempts?.map((attempt) => ({
+      body: attempt.body ? sanitizeWahaResponseForLog(attempt.body) : undefined,
+      id: redactWahaParticipantId(attempt.id),
+      message: attempt.message,
+      status: attempt.status,
+    })),
+    has_api_key: hasApiKey,
+    message,
+    participant_count: participantCount,
+    request_id: requestId,
+    response: response ? sanitizeWahaResponseForLog(response) : undefined,
+    session,
+    stage_number: stageNumber,
+    status,
+    step,
+  });
+}
+
 function normalizePhone(raw: string, defaultCountry: string): { ok: true; value: string } | { ok: false; reason: string } {
   if (!raw) return { ok: false, reason: 'empty' };
   const trimmed = raw.trim();
@@ -43,6 +125,7 @@ function normalizePhone(raw: string, defaultCountry: string): { ok: true; value:
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
+  const requestId = crypto.randomUUID();
 
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -342,7 +425,14 @@ serve(async (req: Request) => {
       return b.replace(/\/+$/, '');
     };
     const base = normalizeBase(actor.waha_endpoint || 'https://waha.sector-pro.work');
-    const { data: cfg } = await supabaseAdmin.rpc('get_waha_config', { base_url: base });
+    const { data: cfg, error: cfgErr } = await supabaseAdmin.rpc('get_waha_config', { base_url: base });
+    if (cfgErr) {
+      console.warn('create-whatsapp-group WAHA config lookup failed', {
+        base_host: wahaHostFromBase(base),
+        message: cfgErr.message,
+        request_id: requestId,
+      });
+    }
     const apiKey = (cfg?.[0] as any)?.api_key || Deno.env.get('WAHA_API_KEY') || '';
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (apiKey) headers['X-API-Key'] = apiKey;
@@ -389,6 +479,15 @@ serve(async (req: Request) => {
       // Create the group per WAHA API: POST /api/{session}/groups { name, participants: [{id}] }
       const groupUrl = `${base}/api/${encodeURIComponent(session)}/groups`;
       let groupRes: Response;
+      console.info('create-whatsapp-group WAHA create-group request', {
+        base_host: wahaHostFromBase(base),
+        department,
+        has_api_key: Boolean(apiKey),
+        participant_count: creationGroupParticipants.length,
+        request_id: requestId,
+        session,
+        stage_number: effectiveStageNumber,
+      });
       try {
         groupRes = await fetch(groupUrl, {
           method: 'POST',
@@ -396,13 +495,25 @@ serve(async (req: Request) => {
           body: JSON.stringify({ name: subject, participants: creationGroupParticipants })
         });
       } catch (fe) {
-        return new Response(JSON.stringify({ error: 'WAHA request failed', step: 'create-group', url: groupUrl, message: (fe as Error)?.message || String(fe) }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        const message = (fe as Error)?.message || String(fe);
+        logWahaCreateFailure({
+          base,
+          hasApiKey: Boolean(apiKey),
+          message,
+          participantCount: creationGroupParticipants.length,
+          requestId,
+          session,
+          department,
+          stageNumber: effectiveStageNumber,
+          step: 'create-group-fetch',
+        });
+        return new Response(JSON.stringify({ error: 'WAHA request failed', request_id: requestId, step: 'create-group', url: groupUrl, message }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       if (!groupRes.ok) {
         const txt = await groupRes.text().catch(() => '');
         if (groupRes.status >= 500 && groupRes.status < 600 && creationGroupParticipants.length > 1) {
           // Fallback: try real assigned participants one by one when WAHA rejects bulk creation.
-          const fallbackErrors: Array<{ id: string; status?: number; body?: string; message?: string }> = [];
+          const fallbackErrors: WahaFallbackAttempt[] = [];
           for (const candidate of creationGroupParticipants) {
             const fallbackRes = await fetch(groupUrl, {
               method: 'POST',
@@ -429,10 +540,35 @@ serve(async (req: Request) => {
           }
 
           if (!usedFallback) {
-            return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: groupRes.status, url: groupUrl, response: txt, fallbackAttempts: fallbackErrors, firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            logWahaCreateFailure({
+              base,
+              fallbackAttempts: fallbackErrors,
+              hasApiKey: Boolean(apiKey),
+              participantCount: creationGroupParticipants.length,
+              requestId,
+              response: txt,
+              session,
+              department,
+              stageNumber: effectiveStageNumber,
+              status: groupRes.status,
+              step: 'create-group-response-with-fallbacks',
+            });
+            return new Response(JSON.stringify({ error: 'WAHA group creation failed', request_id: requestId, status: groupRes.status, url: groupUrl, response: txt, fallbackAttempts: fallbackErrors, firstAttempt: { status: groupRes.status, body: txt } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
         } else {
-          return new Response(JSON.stringify({ error: 'WAHA group creation failed', status: groupRes.status, url: groupUrl, response: txt }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          logWahaCreateFailure({
+            base,
+            hasApiKey: Boolean(apiKey),
+            participantCount: creationGroupParticipants.length,
+            requestId,
+            response: txt,
+            session,
+            department,
+            stageNumber: effectiveStageNumber,
+            status: groupRes.status,
+            step: 'create-group-response',
+          });
+          return new Response(JSON.stringify({ error: 'WAHA group creation failed', request_id: requestId, status: groupRes.status, url: groupUrl, response: txt }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }
       // Read body as text first to parse and also return on failure

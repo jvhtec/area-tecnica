@@ -76,7 +76,9 @@ describe("festival management selectors", () => {
     expect(normalizeFestivalWhatsappStage({ currentStage: 0, department: "sound", maxStages: 3 })).toBe(1);
     expect(normalizeFestivalWhatsappStage({ currentStage: 2, department: "video", maxStages: 3 })).toBe(2);
     expect(normalizeFestivalWhatsappStage({ currentStage: 2, department: "lights", maxStages: 3 })).toBe(0);
+    expect(normalizeFestivalWhatsappStage({ currentStage: 1, department: "sound", maxStages: 1 })).toBe(0);
     expect(requiresFestivalWhatsappStage(2, "sound")).toBe(true);
+    expect(requiresFestivalWhatsappStage(1, "sound")).toBe(false);
     expect(requiresFestivalWhatsappStage(2, "lights")).toBe(false);
     expect(buildFestivalWhatsappStageOptions([], 2)).toEqual([
       { number: 1, name: "Stage 1" },
