@@ -1,4 +1,9 @@
-import type { Accommodation, EventData, RoomAssignment } from "@/types/hoja-de-ruta";
+import type {
+  Accommodation,
+  EventData,
+  RoomAssignment,
+  Transport,
+} from "@/types/hoja-de-ruta";
 
 export type HojaStaffEntry = NonNullable<EventData["staff"]>[number];
 
@@ -109,11 +114,21 @@ export const staffOptionValue = (entry: HojaStaffEntry, index: number) =>
 
 const isIndexReference = (value: string) => /^\d+$/.test(value);
 
+const mapRoomStaffReferences = (
+  room: RoomAssignment,
+  mapReference: (value: string | undefined) => string,
+): RoomAssignment => ({
+  ...room,
+  staff_member1_id: mapReference(room.staff_member1_id),
+  staff_member2_id: mapReference(room.staff_member2_id),
+});
+
 const remapRoomReference = (
   value: string | undefined,
   savedStaff: HojaStaffEntry[],
   savedIndexMap: number[],
   mergedStaff: HojaStaffEntry[],
+  mergedTechnicianIds: Set<string>,
 ): string => {
   if (!value) return "";
 
@@ -121,13 +136,12 @@ const remapRoomReference = (
     const savedIndex = Number(value);
     if (savedIndex < 0 || savedIndex >= savedStaff.length) return "";
     const mergedIndex = savedIndexMap[savedIndex];
-    if (mergedIndex == null || mergedIndex < 0) return "";
-    return staffOptionValue(mergedStaff[mergedIndex], mergedIndex);
+    const target = mergedIndex != null && mergedIndex >= 0 ? mergedStaff[mergedIndex] : undefined;
+    return target ? staffOptionValue(target, mergedIndex) : "";
   }
 
   // technician_id reference: clear it when that technician was pruned
-  const stillPresent = mergedStaff.some((entry) => entry?.technician_id === value);
-  return stillPresent ? value : "";
+  return mergedTechnicianIds.has(value) ? value : "";
 };
 
 /**
@@ -141,25 +155,19 @@ export const remapAccommodationStaffReferences = (
   savedStaff: HojaStaffEntry[],
   savedIndexMap: number[],
   mergedStaff: HojaStaffEntry[],
-): Accommodation[] =>
-  accommodations.map((accommodation) => ({
+): Accommodation[] => {
+  const mergedTechnicianIds = new Set(
+    mergedStaff.map((entry) => entry?.technician_id).filter(Boolean) as string[],
+  );
+  return accommodations.map((accommodation) => ({
     ...accommodation,
-    rooms: (accommodation.rooms || []).map((room: RoomAssignment) => ({
-      ...room,
-      staff_member1_id: remapRoomReference(
-        room.staff_member1_id,
-        savedStaff,
-        savedIndexMap,
-        mergedStaff,
+    rooms: (accommodation.rooms || []).map((room) =>
+      mapRoomStaffReferences(room, (value) =>
+        remapRoomReference(value, savedStaff, savedIndexMap, mergedStaff, mergedTechnicianIds),
       ),
-      staff_member2_id: remapRoomReference(
-        room.staff_member2_id,
-        savedStaff,
-        savedIndexMap,
-        mergedStaff,
-      ),
-    })),
+    ),
   }));
+};
 
 const adjustReferenceForRemoval = (
   value: string | undefined,
@@ -188,19 +196,11 @@ export const adjustAccommodationsForStaffRemoval = (
 ): Accommodation[] =>
   accommodations.map((accommodation) => ({
     ...accommodation,
-    rooms: (accommodation.rooms || []).map((room: RoomAssignment) => ({
-      ...room,
-      staff_member1_id: adjustReferenceForRemoval(
-        room.staff_member1_id,
-        removedIndex,
-        removedEntry,
+    rooms: (accommodation.rooms || []).map((room) =>
+      mapRoomStaffReferences(room, (value) =>
+        adjustReferenceForRemoval(value, removedIndex, removedEntry),
       ),
-      staff_member2_id: adjustReferenceForRemoval(
-        room.staff_member2_id,
-        removedIndex,
-        removedEntry,
-      ),
-    })),
+    ),
   }));
 
 /**
@@ -209,16 +209,10 @@ export const adjustAccommodationsForStaffRemoval = (
  * longer hoja-relevant) are pruned, matched ones keep manual edits, and new
  * events are appended. Manually created transports are untouched.
  */
-export const syncTransportsWithLogistics = <
-  T extends {
-    source_logistics_event_id?: string;
-    date_time?: string;
-    [key: string]: unknown;
-  },
->(
-  current: T[],
-  incoming: T[],
-): T[] => {
+export const syncTransportsWithLogistics = (
+  current: Transport[],
+  incoming: Transport[],
+): Transport[] => {
   const incomingSourceIds = new Set(
     incoming
       .map((transport) => transport.source_logistics_event_id)
@@ -255,7 +249,7 @@ export const syncTransportsWithLogistics = <
           driver_name: incomingTransport.driver_name ?? existing.driver_name,
           driver_phone: incomingTransport.driver_phone ?? existing.driver_phone,
           has_return: incomingTransport.has_return ?? existing.has_return,
-        } as T;
+        };
         return;
       }
     }

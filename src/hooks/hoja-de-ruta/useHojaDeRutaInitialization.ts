@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { EventData } from '@/types/hoja-de-ruta';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -35,6 +35,8 @@ export const useHojaDeRutaInitialization = (
   setDataSource: React.Dispatch<React.SetStateAction<'none' | 'saved' | 'job' | 'mixed'>>
 ) => {
   const { toast } = useToast();
+  // Job id whose initialization is currently in flight (see the effect below)
+  const initializingJobRef = useRef<string | null>(null);
 
   const buildClientContacts = (jobData: { client_name?: string | null; client_phone?: string | null }) =>
     jobData.client_name ? [{
@@ -256,9 +258,13 @@ export const useHojaDeRutaInitialization = (
   // invalidation) must not re-run this, or they would wipe unsaved edits.
   useEffect(() => {
     if (!selectedJobId || isLoadingHojaDeRuta || isInitialized) return;
+    // The async initialization below sets isInitialized only when it finishes;
+    // block concurrent runs (e.g. a refetch landing mid-initialization).
+    if (initializingJobRef.current === selectedJobId) return;
+    initializingJobRef.current = selectedJobId;
 
     console.log("🔄 INITIALIZATION: Initialization effect triggered for job:", selectedJobId);
-    
+
     const initializeFormData = async () => {
       // Always load current job assignments and power requirements first
       const [assignmentData, powerRequirementsText] = await Promise.all([
@@ -425,7 +431,11 @@ export const useHojaDeRutaInitialization = (
       setIsInitialized(true);
     };
 
-    initializeFormData();
+    initializeFormData().finally(() => {
+      if (initializingJobRef.current === selectedJobId) {
+        initializingJobRef.current = null;
+      }
+    });
   }, [selectedJobId, hojaDeRuta, isLoadingHojaDeRuta, isInitialized, loadCurrentJobAssignments, fetchPowerRequirements, toast, setEventData, setTravelArrangements, setAccommodations, setIsInitialized, setHasSavedData, setDataSource]);
 
   return {
