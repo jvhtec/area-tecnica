@@ -131,6 +131,15 @@ export type WaSendResult = {
   sentCount: number;
   failed: Array<{ recipient_id: string; reason: string }>;
   job_id: string | null;
+  attachmentSentCount?: number;
+  /** How many attachments were delivered as a download link (WAHA Core fallback). */
+  attachmentLinkFallbackCount?: number;
+  attachmentFailed?: Array<{ recipient_id: string; reason: string }>;
+};
+
+export type WaProdHojaDeRutaDoc = {
+  id: string;
+  file_name: string | null;
 };
 
 export type TourdateSelectorInfo = {

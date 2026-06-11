@@ -120,6 +120,8 @@ export const createQueryKey = {
     prodAssignmentsByJob: (jobId: string) => [...createQueryKey.whatsapp.all, 'prod-assignments', jobId] as const,
     /** Timesheets (source of truth) used to derive worked dates for WhatsApp date grouping. */
     prodTimesheetsByJob: (jobId: string) => [...createQueryKey.whatsapp.all, 'prod-timesheets', jobId] as const,
+    /** Latest Hoja de Ruta PDF document available to attach to WhatsApp messages. */
+    prodHojaDeRutaDocByJob: (jobId: string) => [...createQueryKey.whatsapp.all, 'prod-hoja-de-ruta-doc', jobId] as const,
   },
   profiles: {
     all: ['profiles'] as const,
