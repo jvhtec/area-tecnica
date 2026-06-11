@@ -3,12 +3,25 @@ import { describe, expect, it } from "vitest";
 import {
   buildWahaGroupParticipants,
   collectFestivalStageRecipients,
+  normalizePhone,
   phoneToWahaJid,
 } from "../recipientUtils.ts";
 
 describe("WAHA participant helpers", () => {
   it("converts phone numbers to WAHA JIDs", () => {
     expect(phoneToWahaJid("+34 611 111 111")).toBe("34611111111@c.us");
+  });
+
+  it("normalizes Spanish shorthand and international WhatsApp numbers", () => {
+    expect(normalizePhone("611 111 111", "+34")).toEqual({ ok: true, value: "+34611111111" });
+    expect(normalizePhone("34611111111", "+34")).toEqual({ ok: true, value: "+34611111111" });
+    expect(normalizePhone("+351 912 345 678", "+34")).toEqual({ ok: true, value: "+351912345678" });
+    expect(normalizePhone("00351 912 345 678", "+34")).toEqual({ ok: true, value: "+351912345678" });
+    expect(normalizePhone("351912345678", "+34")).toEqual({ ok: true, value: "+351912345678" });
+  });
+
+  it("rejects ambiguous non-Spanish local numbers without a country code", () => {
+    expect(normalizePhone("912 345 678", "+34")).toEqual({ ok: false, reason: "missing_country_code" });
   });
 
   it("excludes the actor/session JID from WAHA group creation participants", () => {

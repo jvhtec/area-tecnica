@@ -23,6 +23,41 @@ export type FestivalStageRecipientResolution = {
   technicianIds: string[];
 };
 
+export function normalizePhone(raw: string, defaultCountry: string): { ok: true; value: string } | { ok: false; reason: string } {
+  if (!raw) return { ok: false, reason: 'empty' };
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: false, reason: 'empty' };
+
+  let digits = trimmed.replace(/[\s\-()]/g, '');
+  if (digits.startsWith('00')) digits = '+' + digits.slice(2);
+
+  if (digits.startsWith('+')) {
+    return /^\+\d{7,15}$/.test(digits)
+      ? { ok: true, value: digits }
+      : { ok: false, reason: 'invalid_format' };
+  }
+
+  if (/^[67]\d{8}$/.test(digits)) {
+    return { ok: true, value: '+34' + digits };
+  }
+
+  const defaultCountryDigits = defaultCountry.replace(/\D/g, '');
+  if (
+    defaultCountryDigits &&
+    digits.startsWith(defaultCountryDigits) &&
+    digits.length >= defaultCountryDigits.length + 7 &&
+    digits.length <= 15
+  ) {
+    return { ok: true, value: '+' + digits };
+  }
+
+  if (/^[1-9]\d{9,14}$/.test(digits)) {
+    return { ok: true, value: '+' + digits };
+  }
+
+  return { ok: false, reason: 'missing_country_code' };
+}
+
 const ROLE_PREFIX_BY_DEPARTMENT: Record<Dept, string> = {
   sound: 'SND-',
   lights: 'LGT-',

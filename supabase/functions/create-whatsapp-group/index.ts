@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import {
   buildWahaGroupParticipants,
+  normalizePhone,
   phoneToWahaJid,
   resolveFestivalStageTechnicianIds,
 } from "./recipientUtils.ts";
@@ -27,6 +28,23 @@ type WahaFallbackAttempt = {
   message?: string;
 };
 
+type WahaParticipantLogEntry = {
+  id: string;
+  label?: string;
+  source?: string;
+};
+
+type WahaContactDiagnostic = {
+  body?: string;
+  chatId?: string;
+  id: string;
+  label?: string;
+  numberExists?: boolean;
+  ok: boolean;
+  source?: string;
+  status?: number;
+};
+
 const MAX_LOG_BODY_LENGTH = 1200;
 
 function truncateForLog(value: string, maxLength = MAX_LOG_BODY_LENGTH) {
@@ -36,6 +54,10 @@ function truncateForLog(value: string, maxLength = MAX_LOG_BODY_LENGTH) {
 
 function redactWahaParticipantId(id: string) {
   return id.replace(/\d{7,15}(?=@c\.us)/g, (digits) => `***${digits.slice(-4)}`);
+}
+
+function redactWahaGroupId(id: string) {
+  return id.replace(/\d{7,15}(?=@g\.us)/g, (digits) => `***${digits.slice(-4)}`);
 }
 
 function sanitizeWahaResponseForLog(body: string) {
@@ -69,6 +91,10 @@ function shouldSkipCreateGroupFallback(body: string) {
   return errorText.includes('rate-overlimit') || errorText.includes('bad-request');
 }
 
+function isWahaBadRequest(body: string) {
+  return extractWahaErrorText(body).includes('bad-request');
+}
+
 function wahaHostFromBase(base: string) {
   try {
     return new URL(base).host;
@@ -79,11 +105,13 @@ function wahaHostFromBase(base: string) {
 
 function logWahaCreateFailure({
   base,
+  contactDiagnostics,
   department,
   fallbackAttempts,
   hasApiKey,
   message,
   participantCount,
+  participants,
   requestId,
   response,
   session,
@@ -92,11 +120,13 @@ function logWahaCreateFailure({
   step,
 }: {
   base: string;
+  contactDiagnostics?: WahaContactDiagnostic[];
   department: Dept;
   fallbackAttempts?: WahaFallbackAttempt[];
   hasApiKey: boolean;
   message?: string;
   participantCount: number;
+  participants?: WahaParticipantLogEntry[];
   requestId: string;
   response?: string;
   session: string;
@@ -106,6 +136,7 @@ function logWahaCreateFailure({
 }) {
   console.error('create-whatsapp-group WAHA create-group failed', {
     base_host: wahaHostFromBase(base),
+    contact_diagnostics: contactDiagnostics,
     department,
     fallback_attempts: fallbackAttempts?.map((attempt) => ({
       body: attempt.body ? sanitizeWahaResponseForLog(attempt.body) : undefined,
@@ -116,6 +147,7 @@ function logWahaCreateFailure({
     has_api_key: hasApiKey,
     message,
     participant_count: participantCount,
+    participants,
     request_id: requestId,
     response: response ? sanitizeWahaResponseForLog(response) : undefined,
     session,
@@ -125,24 +157,63 @@ function logWahaCreateFailure({
   });
 }
 
-function normalizePhone(raw: string, defaultCountry: string): { ok: true; value: string } | { ok: false; reason: string } {
-  if (!raw) return { ok: false, reason: 'empty' };
-  const trimmed = raw.trim();
-  if (!trimmed) return { ok: false, reason: 'empty' };
-  // Remove spaces, dashes, parentheses
-  let digits = trimmed.replace(/[\s\-()]/g, '');
-  if (digits.startsWith('00')) digits = '+' + digits.slice(2);
-  if (!digits.startsWith('+')) {
-    // Heuristic: if appears to be Spanish mobile (9 digits starting with 6/7), prefix +34
-    if (/^[67]\d{8}$/.test(digits)) {
-      digits = '+34' + digits;
-    } else {
-      const cc = defaultCountry.startsWith('+') ? defaultCountry : `+${defaultCountry}`;
-      digits = cc + digits;
+async function diagnoseWahaContacts({
+  base,
+  headers,
+  participantLogByJid,
+  participants,
+  session,
+}: {
+  base: string;
+  headers: Record<string, string>;
+  participantLogByJid: Map<string, WahaParticipantLogEntry>;
+  participants: Array<{ id: string }>;
+  session: string;
+}): Promise<WahaContactDiagnostic[]> {
+  const diagnostics: WahaContactDiagnostic[] = [];
+
+  for (const [index, participant] of participants.entries()) {
+    if (index > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+
+    const phone = participant.id.replace(/@c\.us$/, '');
+    const participantLog = participantLogByJid.get(participant.id);
+    const params = new URLSearchParams({ phone, session });
+    const checkUrl = `${base}/api/contacts/check-exists?${params.toString()}`;
+
+    try {
+      const res = await fetch(checkUrl, { method: 'GET', headers });
+      const body = await res.text().catch(() => '');
+      let parsed: { chatId?: string; numberExists?: boolean } = {};
+      try {
+        parsed = body ? JSON.parse(body) : {};
+      } catch {
+        parsed = {};
+      }
+
+      diagnostics.push({
+        body: res.ok ? undefined : sanitizeWahaResponseForLog(body),
+        chatId: parsed.chatId ? redactWahaParticipantId(parsed.chatId) : undefined,
+        id: participantLog?.id || redactWahaParticipantId(participant.id),
+        label: participantLog?.label,
+        numberExists: typeof parsed.numberExists === 'boolean' ? parsed.numberExists : undefined,
+        ok: res.ok,
+        source: participantLog?.source,
+        status: res.status,
+      });
+    } catch (err) {
+      diagnostics.push({
+        body: (err as Error)?.message || String(err),
+        id: participantLog?.id || redactWahaParticipantId(participant.id),
+        label: participantLog?.label,
+        ok: false,
+        source: participantLog?.source,
+      });
     }
   }
-  if (!/^\+\d{7,15}$/.test(digits)) return { ok: false, reason: 'invalid_format' };
-  return { ok: true, value: digits };
+
+  return diagnostics;
 }
 
 serve(async (req: Request) => {
@@ -285,6 +356,7 @@ serve(async (req: Request) => {
     const defaultCC = Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34';
     const crewParticipants: string[] = [];
     const supplementalParticipants: string[] = [];
+    const participantDetailsByPhone = new Map<string, { label: string; source: string }>();
     const missing: string[] = [];
     const invalid: string[] = [];
 
@@ -292,6 +364,7 @@ serve(async (req: Request) => {
       profile: { first_name?: string | null; last_name?: string | null; phone?: string | null } | null | undefined,
       fallbackName = 'Tecnico',
       target: string[] = crewParticipants,
+      source = 'crew',
     ) => {
       const fullName = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || fallbackName;
       const rawPhone = (profile?.phone || '').trim();
@@ -302,6 +375,9 @@ serve(async (req: Request) => {
       const norm = normalizePhone(rawPhone, defaultCC);
       if (norm.ok) {
         target.push(norm.value);
+        if (!participantDetailsByPhone.has(norm.value)) {
+          participantDetailsByPhone.set(norm.value, { label: fullName, source });
+        }
         return true;
       }
 
@@ -392,7 +468,12 @@ serve(async (req: Request) => {
     // Always include management user for the department (if phone exists and matches department)
     if (actor?.phone && actor?.department && actor.department === department) {
       const norm = normalizePhone(actor.phone, defaultCC);
-      if (norm.ok) supplementalParticipants.push(norm.value);
+      if (norm.ok) {
+        supplementalParticipants.push(norm.value);
+        if (!participantDetailsByPhone.has(norm.value)) {
+          participantDetailsByPhone.set(norm.value, { label: 'Requesting manager', source: 'actor' });
+        }
+      }
     }
 
     // Buddy system: Javier auto-adds Carlos, Carlos auto-adds Javier (department sound)
@@ -411,7 +492,12 @@ serve(async (req: Request) => {
             .maybeSingle();
           if (buddy?.phone) {
             const norm = normalizePhone(buddy.phone, defaultCC);
-            if (norm.ok) supplementalParticipants.push(norm.value);
+            if (norm.ok) {
+              supplementalParticipants.push(norm.value);
+              if (!participantDetailsByPhone.has(norm.value)) {
+                participantDetailsByPhone.set(norm.value, { label: 'Department buddy', source: 'buddy' });
+              }
+            }
           }
         } catch { /* ignore */ }
       }
@@ -486,6 +572,20 @@ serve(async (req: Request) => {
       actorJid: actorJidCandidate,
       participants: supplementalParticipantPhones,
     });
+    const participantLogByJid = new Map<string, WahaParticipantLogEntry>(
+      uniqueParticipants.map((phone) => {
+        const jid = phoneToWahaJid(phone);
+        const details = participantDetailsByPhone.get(phone);
+        return [jid, {
+          id: redactWahaParticipantId(jid),
+          label: details?.label,
+          source: details?.source,
+        }];
+      }),
+    );
+    const creationParticipantLogs = creationGroupParticipants.map((participant) =>
+      participantLogByJid.get(participant.id) || { id: redactWahaParticipantId(participant.id) }
+    );
 
     if (creationGroupParticipants.length === 0) {
       const message = effectiveStageNumber > 0
@@ -524,6 +624,7 @@ serve(async (req: Request) => {
           hasApiKey: Boolean(apiKey),
           message,
           participantCount: creationGroupParticipants.length,
+          participants: creationParticipantLogs,
           requestId,
           session,
           department,
@@ -534,11 +635,21 @@ serve(async (req: Request) => {
       }
       if (!groupRes.ok) {
         const txt = await groupRes.text().catch(() => '');
+        const shouldSkipFallback = shouldSkipCreateGroupFallback(txt);
+        const contactDiagnostics = isWahaBadRequest(txt)
+          ? await diagnoseWahaContacts({
+            base,
+            headers,
+            participantLogByJid,
+            participants: creationGroupParticipants,
+            session,
+          })
+          : undefined;
         if (
           groupRes.status >= 500 &&
           groupRes.status < 600 &&
           creationGroupParticipants.length > 1 &&
-          !shouldSkipCreateGroupFallback(txt)
+          !shouldSkipFallback
         ) {
           // Fallback: try real assigned participants one by one when WAHA rejects bulk creation.
           const fallbackErrors: WahaFallbackAttempt[] = [];
@@ -573,6 +684,7 @@ serve(async (req: Request) => {
               fallbackAttempts: fallbackErrors,
               hasApiKey: Boolean(apiKey),
               participantCount: creationGroupParticipants.length,
+              participants: creationParticipantLogs,
               requestId,
               response: txt,
               session,
@@ -586,8 +698,10 @@ serve(async (req: Request) => {
         } else {
           logWahaCreateFailure({
             base,
+            contactDiagnostics,
             hasApiKey: Boolean(apiKey),
             participantCount: creationGroupParticipants.length,
+            participants: creationParticipantLogs,
             requestId,
             response: txt,
             session,
