@@ -12,6 +12,7 @@ import {
   type JobCardJob,
   type JobAssignmentRow,
   type WaProdAssignment,
+  type WaProdHojaDeRutaDoc,
   type WaProdTimesheetRow,
   type WaSendResult,
 } from "@/components/jobs/cards/job-card-actions/types";
@@ -61,6 +62,7 @@ export const useProductionWhatsapp = ({
   const [waProdMessage, setWaProdMessage] = React.useState<string>("");
   const [waProdDirty, setWaProdDirty] = React.useState(false);
   const [waProdSending, setWaProdSending] = React.useState(false);
+  const [waProdAttachHojaDeRuta, setWaProdAttachHojaDeRuta] = React.useState(false);
 
   const { data: waProdAssignments = [], isLoading: waProdAssignmentsLoading } = useQuery({
     queryKey: createQueryKey.whatsapp.prodAssignmentsByJob(job.id),
@@ -108,6 +110,24 @@ export const useProductionWhatsapp = ({
 
       if (error) throw error;
       return (data as WaProdTimesheetRow[] | null) || [];
+    },
+    enabled: Boolean(waProdOpen && canSendProductionWhatsapp && job?.id),
+    staleTime: 30_000,
+  });
+
+  const { data: waProdHojaDeRutaDoc = null, isLoading: waProdHojaDeRutaLoading } = useQuery({
+    queryKey: createQueryKey.whatsapp.prodHojaDeRutaDocByJob(job.id),
+    queryFn: async (): Promise<WaProdHojaDeRutaDoc | null> => {
+      const { data, error } = await dataLayerClient.from("job_documents")
+        .select("id, file_name")
+        .eq("job_id", job.id)
+        .like("file_path", `hojas-de-ruta/${job.id}/%`)
+        .order("uploaded_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      return (data as WaProdHojaDeRutaDoc | null) || null;
     },
     enabled: Boolean(waProdOpen && canSendProductionWhatsapp && job?.id),
     staleTime: 30_000,
@@ -183,12 +203,15 @@ export const useProductionWhatsapp = ({
         return;
       }
 
+      const attachHojaDeRuta = waProdAttachHojaDeRuta && Boolean(waProdHojaDeRutaDoc);
+
       setWaProdSending(true);
       const { data, error } = await dataLayerClient.functions.invoke<WaSendResult>("send-job-whatsapp-message", {
         body: {
           job_id: job?.id,
           message: trimmed,
           recipient_ids: waProdRecipientIds,
+          attach_hoja_de_ruta: attachHojaDeRuta,
         },
       });
 
@@ -199,11 +222,17 @@ export const useProductionWhatsapp = ({
 
       const sent = data?.sentCount ?? null;
       const failed = data?.failed?.length ?? 0;
+      const descriptionParts = [
+        sent !== null ? `Enviados: ${sent}. Fallos: ${failed}.` : `Mensaje enviado. Fallos: ${failed}.`,
+      ];
+      if (attachHojaDeRuta) {
+        const attachmentSent = data?.attachmentSentCount ?? 0;
+        const attachmentFailed = data?.attachmentFailed?.length ?? 0;
+        descriptionParts.push(`Hoja de Ruta: ${attachmentSent} enviadas, ${attachmentFailed} fallos.`);
+      }
       toast({
         title: "Enviado",
-        description: sent !== null
-          ? `Enviados: ${sent}. Fallos: ${failed}.`
-          : `Mensaje enviado. Fallos: ${failed}.`,
+        description: descriptionParts.join(" "),
       });
       setWaProdOpen(false);
     } catch (error: unknown) {
@@ -212,7 +241,7 @@ export const useProductionWhatsapp = ({
     } finally {
       setWaProdSending(false);
     }
-  }, [job?.id, toast, waProdMessage, waProdRecipientIds]);
+  }, [job?.id, toast, waProdMessage, waProdRecipientIds, waProdAttachHojaDeRuta, waProdHojaDeRutaDoc]);
 
   React.useEffect(() => {
     if (!waProdOpen) return;
@@ -240,6 +269,7 @@ export const useProductionWhatsapp = ({
     setWaProdRecipientIds([]);
     setWaProdCallTime(suggested);
     setWaProdDirty(false);
+    setWaProdAttachHojaDeRuta(false);
     setWaProdMessage(buildProductionWhatsappTemplate(job, { groupKey: "all", callTime: suggested }));
     setWaProdOpen(true);
   }, [job]);
@@ -249,6 +279,7 @@ export const useProductionWhatsapp = ({
     if (!open) {
       setWaProdRecipientIds([]);
       setWaProdDirty(false);
+      setWaProdAttachHojaDeRuta(false);
     }
   }, []);
 
@@ -259,6 +290,7 @@ export const useProductionWhatsapp = ({
     handleProductionDialogOpenChange,
     handleWaProdSend,
     openProductionWhatsappDialog,
+    setWaProdAttachHojaDeRuta,
     setWaProdCallTime,
     setWaProdDateGroup,
     setWaProdDirty,
@@ -267,9 +299,12 @@ export const useProductionWhatsapp = ({
     setWaProdRecipientIds,
     waProdAssignments,
     waProdAssignmentsLoading,
+    waProdAttachHojaDeRuta,
     waProdCallTime,
     waProdDateGroup,
     waProdGroups,
+    waProdHojaDeRutaDoc,
+    waProdHojaDeRutaLoading,
     waProdMessage,
     waProdOpen,
     waProdRecipientIds,

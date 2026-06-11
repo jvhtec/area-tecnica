@@ -11,6 +11,8 @@ type SendRequest = {
   recipient_ids?: string[];
   /** Optional job ID for telemetry/debugging. */
   job_id?: string;
+  /** When true, send the latest Hoja de Ruta PDF as a follow-up message after the text. */
+  attach_hoja_de_ruta?: boolean;
 };
 
 /** Normalize a WAHA base URL (ensures protocol, strips trailing slashes). */
@@ -129,6 +131,41 @@ serve(async (req: Request) => {
       return jsonResponse({ error: "Bad Request", reason: "Too many recipients" }, { status: 400 });
     }
 
+    // Resolve the Hoja de Ruta attachment up-front so a missing document fails
+    // the request before any text message goes out.
+    const attachHojaDeRuta = Boolean(body.attach_hoja_de_ruta);
+    let attachment: { url: string; filename: string } | null = null;
+    if (attachHojaDeRuta) {
+      const { data: docRows, error: docErr } = await supabaseAdmin
+        .from("job_documents")
+        .select("file_name, file_path")
+        .eq("job_id", jobId)
+        .like("file_path", `hojas-de-ruta/${jobId}/%`)
+        .order("uploaded_at", { ascending: false })
+        .limit(1);
+
+      if (docErr) throw docErr;
+
+      const doc = docRows?.[0];
+      if (!doc?.file_path) {
+        return jsonResponse({ error: "Bad Request", reason: "hoja_de_ruta_not_found" }, { status: 400 });
+      }
+
+      const { data: signed, error: signErr } = await supabaseAdmin.storage
+        .from("job-documents")
+        .createSignedUrl(doc.file_path, 3600);
+
+      if (signErr || !signed?.signedUrl) {
+        console.error("Failed to sign Hoja de Ruta URL:", signErr);
+        return jsonResponse({ error: "Internal Server Error", reason: "hoja_de_ruta_sign_failed" }, { status: 500 });
+      }
+
+      attachment = {
+        url: signed.signedUrl,
+        filename: (doc.file_name || "Hoja de Ruta.pdf").toString(),
+      };
+    }
+
     // Security: restrict recipients to technicians assigned to this job.
     const { data: assignmentRows, error: asgErr } = await supabaseAdmin
       .from("job_assignments")
@@ -196,12 +233,69 @@ serve(async (req: Request) => {
       },
     ] as const;
 
+    const fileAttemptsFor = (chatId: string, file: { url: string; filename: string }) => [
+      {
+        url: `${base}/api/${encodeURIComponent(session)}/sendFile`,
+        body: { chatId, file: { url: file.url, filename: file.filename, mimetype: "application/pdf" } },
+      },
+      {
+        url: `${base}/api/sendFile`,
+        body: { chatId, file: { url: file.url, filename: file.filename, mimetype: "application/pdf" }, session },
+      },
+    ] as const;
+
     const timeoutMs = Number(Deno.env.get("WAHA_FETCH_TIMEOUT_MS") || 9000);
+
+    /** Try each WAHA endpoint variant in order; succeed on the first OK response. */
+    const runAttempts = async (
+      attempts: ReadonlyArray<{ url: string; body: unknown }>,
+    ): Promise<{ ok: true } | { ok: false; reason: string }> => {
+      let lastErr = "send_failed";
+      for (const attempt of attempts) {
+        try {
+          const res = await fetchWithTimeout(attempt.url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(attempt.body),
+          }, timeoutMs);
+
+          const contentType = res.headers.get("content-type") || "";
+          const payload = /application\/json/i.test(contentType)
+            ? await res.json().catch(() => null)
+            : await res.text().catch(() => null);
+
+          if (!res.ok) {
+            lastErr = `http_${res.status}`;
+            continue;
+          }
+
+          if (payload && typeof payload === "object") {
+            const obj = payload as Record<string, unknown>;
+            if (obj.success === false) {
+              lastErr = typeof obj.message === "string" ? obj.message : "waha_success_false";
+              continue;
+            }
+            if (typeof obj.error === "string") {
+              lastErr = obj.error;
+              continue;
+            }
+          }
+
+          return { ok: true } as const;
+        } catch (e) {
+          lastErr = e instanceof Error ? e.message : String(e);
+        }
+      }
+      return { ok: false, reason: lastErr } as const;
+    };
 
     // Concurrency note: Deno JS is single-threaded, so mutating `queue`/`sentCount` is safe
     // as long as we only do it between `await` points (which we do in this loop).
     const queue = [...sendTargets];
     const concurrency = Math.max(1, Math.min(4, Number(Deno.env.get("WAHA_SEND_CONCURRENCY") || 4)));
+
+    let attachmentSentCount = 0;
+    const attachmentFailed: Array<{ recipient_id: string; reason: string }> = [];
 
     const worker = async () => {
       while (queue.length) {
@@ -216,53 +310,34 @@ serve(async (req: Request) => {
         }
         const chatId = norm.value.replace(/^\+/, "").replace(/\D/g, "") + "@c.us";
 
-        let ok = false;
-        let lastErr = "send_failed";
-        for (const attempt of attemptsFor(chatId)) {
-          try {
-            const res = await fetchWithTimeout(attempt.url, {
-              method: "POST",
-              headers,
-              body: JSON.stringify(attempt.body),
-            }, timeoutMs);
-
-            const contentType = res.headers.get("content-type") || "";
-            const payload = /application\/json/i.test(contentType)
-              ? await res.json().catch(() => null)
-              : await res.text().catch(() => null);
-
-            if (!res.ok) {
-              lastErr = `http_${res.status}`;
-              continue;
-            }
-
-            if (payload && typeof payload === "object") {
-              const obj = payload as Record<string, unknown>;
-              if (obj.success === false) {
-                lastErr = typeof obj.message === "string" ? obj.message : "waha_success_false";
-                continue;
-              }
-              if (typeof obj.error === "string") {
-                lastErr = obj.error;
-                continue;
-              }
-            }
-
-            ok = true;
-            break;
-          } catch (e) {
-            lastErr = e instanceof Error ? e.message : String(e);
-          }
+        const textResult = await runAttempts(attemptsFor(chatId));
+        if (!textResult.ok) {
+          failed.push({ recipient_id: rid, reason: textResult.reason });
+          continue;
         }
+        sentCount += 1;
 
-        if (ok) sentCount += 1;
-        else failed.push({ recipient_id: rid, reason: lastErr });
+        // Follow-up: Hoja de Ruta PDF only after the text message succeeded.
+        if (attachment) {
+          const fileResult = await runAttempts(fileAttemptsFor(chatId, attachment));
+          if (fileResult.ok) attachmentSentCount += 1;
+          else attachmentFailed.push({ recipient_id: rid, reason: fileResult.reason });
+        }
       }
     };
 
     await Promise.all(Array.from({ length: concurrency }).map(() => worker()));
 
-    return jsonResponse({ success: true, sentCount, failed, job_id: jobId || null }, { status: 200 });
+    return jsonResponse(
+      {
+        success: true,
+        sentCount,
+        failed,
+        job_id: jobId || null,
+        ...(attachment ? { attachmentSentCount, attachmentFailed } : {}),
+      },
+      { status: 200 },
+    );
   } catch (err) {
     console.error("send-job-whatsapp-message error:", err);
     return jsonResponse({ error: "Internal Server Error" }, { status: 500 });

@@ -168,6 +168,30 @@ export const ProductionWhatsappDialog = ({ state }: ProductionWhatsappDialogProp
               className="min-h-[140px]"
             />
           </div>
+
+          <div className="flex items-start gap-2">
+            <Checkbox
+              id="wa-attach-hoja-de-ruta"
+              checked={state.waProdAttachHojaDeRuta}
+              onCheckedChange={(next) => state.setWaProdAttachHojaDeRuta(Boolean(next))}
+              disabled={state.waProdHojaDeRutaLoading || !state.waProdHojaDeRutaDoc}
+            />
+            <div className="space-y-1">
+              <Label
+                htmlFor="wa-attach-hoja-de-ruta"
+                className={cn("font-normal", !state.waProdHojaDeRutaLoading && !state.waProdHojaDeRutaDoc && "text-muted-foreground")}
+              >
+                Enviar Hoja de Ruta (PDF) como seguimiento
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {state.waProdHojaDeRutaLoading
+                  ? "Comprobando si hay Hoja de Ruta disponible…"
+                  : state.waProdHojaDeRutaDoc
+                    ? `Se enviará "${state.waProdHojaDeRutaDoc.file_name || "Hoja de Ruta.pdf"}" tras el mensaje de citación.`
+                    : "No hay Hoja de Ruta generada para este trabajo."}
+              </p>
+            </div>
+          </div>
         </div>
 
         <DialogFooter>
