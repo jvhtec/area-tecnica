@@ -15,6 +15,12 @@ const {
     setTextColor: vi.fn(),
     text: vi.fn(),
     setPage: vi.fn(),
+    // Used by the combined stage plot section
+    setDrawColor: vi.fn(),
+    setLineWidth: vi.fn(),
+    setLineDashPattern: vi.fn(),
+    setFont: vi.fn(),
+    getTextWidth: vi.fn(() => 20),
     addPage: vi.fn(function (this: any) {
       doc.internal.pages.push({});
       return this;
@@ -197,6 +203,79 @@ describe('technicalPowerSummaryPack', () => {
       expect.any(Number),
       expect.any(Number),
       expect.any(Object)
+    );
+  });
+
+  it('keeps stage-name-only rows in separate stage plot groups', async () => {
+    await generateTechnicalPowerSummaryPack({
+      jobTitle: 'Festival Test',
+      summary: {
+        departments: {
+          sound: {
+            department: 'sound',
+            rows: [
+              {
+                name: 'FoH',
+                stageNumber: null,
+                stageName: 'Main Stage',
+                pduLabel: '32A',
+                positionLabel: 'USL',
+                totalWatts: 1000,
+                currentPerPhase: 4,
+                totalVa: 1052,
+                notes: '',
+                source: 'job',
+              },
+              {
+                name: 'Monitors',
+                stageNumber: null,
+                stageName: 'Main-Stage',
+                pduLabel: '32A',
+                positionLabel: 'DSR',
+                totalWatts: 800,
+                currentPerPhase: 3,
+                totalVa: 842,
+                notes: '',
+                source: 'job',
+              },
+            ],
+            safetyMargin: null,
+            totalWatts: 1800,
+            totalAmps: 7,
+            totalKva: 1.89,
+          },
+          lights: {
+            department: 'lights',
+            rows: [],
+            safetyMargin: null,
+            totalWatts: 0,
+            totalAmps: 0,
+            totalKva: 0,
+          },
+          video: {
+            department: 'video',
+            rows: [],
+            safetyMargin: null,
+            totalWatts: 0,
+            totalAmps: 0,
+            totalKva: 0,
+          },
+        },
+        totalSystemWatts: 1800,
+        totalSystemAmps: 7,
+        totalSystemKva: 1.89,
+      },
+    });
+
+    expect(docMock.text).toHaveBeenCalledWith(
+      'Distribución en Escenario — Main Stage',
+      expect.any(Number),
+      expect.any(Number)
+    );
+    expect(docMock.text).toHaveBeenCalledWith(
+      'Distribución en Escenario — Main-Stage',
+      expect.any(Number),
+      expect.any(Number)
     );
   });
 });

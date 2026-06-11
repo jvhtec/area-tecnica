@@ -25,6 +25,8 @@ import { FIXTURE_PF, type ConsumosDepartmentConfig, type FixtureType } from "./c
 import { useConsumosTool } from "./useConsumosTool";
 import { CustomComponentDialog } from "./CustomComponentDialog";
 import { PowerStagePlot } from "@/features/technical-tools/power/consumos/PowerStagePlot";
+import { CopyToStageMenu } from "@/features/technical-tools/table-presets/CopyToStageMenu";
+import { QuickPresetsMenu } from "@/features/technical-tools/table-presets/QuickPresetsMenu";
 import { GeneratedPowerTableCard } from "./GeneratedPowerTableCard";
 
 const PowerTableSummary: React.FC<{
@@ -133,6 +135,13 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
     exportTablesCount,
     movablePlotTableIds,
     moveTableToPosition,
+    quickPresets,
+    isSavingPreset,
+    copyTableToStage,
+    copyActiveSetToStage,
+    saveActiveSetAsPreset,
+    applyQuickPreset,
+    removeQuickPreset,
   } = state;
 
   if (overrideLoading) {
@@ -168,6 +177,12 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
       showRowPf={features.perRowPf}
       showSaveDefault={isTourDefaults && !table.isDefault}
       isOverrideContext={isOverrideMode && !isTourDefaults}
+      copyStages={isNormalMode ? jobStages : undefined}
+      onCopyToStage={
+        isNormalMode
+          ? (stage) => copyTableToStage(table.id as number | string, stage)
+          : undefined
+      }
       onEdit={() => startEditingTable(table)}
       onRemove={() => removeTable(table.id as number | string)}
       onSaveDefault={() => saveTourDefault(table)}
@@ -206,12 +221,33 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
               )}
             </div>
           </div>
-          {exportTablesCount > 0 && (
-            <Button onClick={handleExportPDF} variant="outline" className="gap-2">
-              <FileText className="h-4 w-4" />
-              {isTourDefaults || isUrlOverrideMode ? labels.exportPdf : labels.exportUploadPdf}
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {isNormalMode && jobStages.length > 1 && activeTables.length > 0 && (
+              <CopyToStageMenu
+                label={labels.copySetToStage}
+                stages={jobStages}
+                excludeStageNumber={selectedStage?.number ?? null}
+                onCopy={copyActiveSetToStage}
+              />
+            )}
+            {isNormalMode && (
+              <QuickPresetsMenu
+                labels={labels.quickPresets}
+                presets={quickPresets}
+                canSaveCurrent={activeTables.length > 0}
+                isSaving={isSavingPreset}
+                onApply={applyQuickPreset}
+                onDelete={removeQuickPreset}
+                onSaveCurrent={saveActiveSetAsPreset}
+              />
+            )}
+            {exportTablesCount > 0 && (
+              <Button onClick={handleExportPDF} variant="outline" className="gap-2">
+                <FileText className="h-4 w-4" />
+                {isTourDefaults || isUrlOverrideMode ? labels.exportPdf : labels.exportUploadPdf}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

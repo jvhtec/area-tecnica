@@ -13,6 +13,8 @@ export type StagePlotTable = {
   pduType?: string;
   customPduType?: string;
   includesHoist?: boolean;
+  /** Owning department, used by combined plots to color-code entries. */
+  department?: string;
 };
 
 export type StagePlotEntry = {
@@ -22,6 +24,8 @@ export type StagePlotEntry = {
   pduLabel: string;
   /** Additional hoist/motor power (CEE32A 3P+N+G) required at this position. */
   includesHoist?: boolean;
+  /** Owning department, used by combined plots to color-code entries. */
+  department?: string;
 };
 
 export type PowerStagePlotData = {
@@ -86,6 +90,7 @@ export const buildPowerStagePlot = (
       name: table.name,
       pduLabel: table.customPduType || table.pduType || "",
       ...(table.includesHoist ? { includesHoist: true } : {}),
+      ...(table.department ? { department: table.department } : {}),
     };
     const resolved = getResolvedPowerPosition(table.position, table.customPosition);
 

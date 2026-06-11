@@ -58,6 +58,8 @@ export interface PesosToolViewProps {
   deleteOverride: (args: { id: string; table: string }) => void;
   saveAsDefaultSet: () => void;
   removeTable: (id: number) => void;
+  /** Extra header actions (stage copy / quick presets) rendered next to Export. */
+  headerExtras?: React.ReactNode;
 }
 
 export const PesosToolView: React.FC<PesosToolViewProps> = ({
@@ -105,6 +107,7 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
   deleteOverride,
   saveAsDefaultSet,
   removeTable,
+  headerExtras,
 }) => {
   return (
     <div className="w-full p-4 lg:p-6">
@@ -156,12 +159,15 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
               )}
             </div>
           </div>
-          {tables.length > 0 && !isDefaults && !isTourContext && !isTourDefaults && (
-            <Button onClick={handleExportPDF} variant="outline" className="gap-2">
-              <FileText className="w-4 h-4" />
-              Export & Upload PDF
-            </Button>
-          )}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {headerExtras}
+            {tables.length > 0 && !isDefaults && !isTourContext && !isTourDefaults && (
+              <Button onClick={handleExportPDF} variant="outline" className="gap-2">
+                <FileText className="w-4 h-4" />
+                Export & Upload PDF
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

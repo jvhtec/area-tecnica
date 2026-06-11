@@ -190,6 +190,28 @@ const ENGLISH_LABELS: ConsumosLabels = {
   notAvailable: "N/A",
   savedSetLoaded: (count) =>
     `${count} saved table(s) loaded for this job. Edit them and re-export to update the saved set.`,
+  copySetToStage: "Copy set to...",
+  copyTableToStage: "Copy to stage",
+  toastCopiedToStage: (count, stageName) =>
+    `${count} table(s) copied to ${stageName}.`,
+  quickPresets: {
+    button: "Presets",
+    heading: "Quick presets",
+    empty: "No presets saved for this department yet.",
+    tableCount: (count) => `${count} table(s)`,
+    apply: "Apply to current stage",
+    deleteAction: "Delete preset",
+    saveCurrentHeading: "Save current set as preset",
+    namePlaceholder: "Preset name",
+    saveAction: "Save preset",
+  },
+  toastPresetSaved: "Preset saved",
+  toastPresetSaveError:
+    "Failed to save the preset (is the name already in use?)",
+  toastPresetApplied: (count, presetName) =>
+    `${count} table(s) added from "${presetName}".`,
+  toastPresetDeleted: "Preset deleted",
+  toastPresetDeleteError: "Failed to delete the preset",
   stagePlotTitle: "Stage layout (PDU positions)",
   stagePlotStage: "Stage",
   stagePlotBackstage: "Backstage",
@@ -322,6 +344,28 @@ const SPANISH_LABELS: ConsumosLabels = {
   notAvailable: "N/A",
   savedSetLoaded: (count) =>
     `Se cargaron ${count} tabla(s) guardadas para este trabajo. Edítalas y vuelve a exportar para actualizar el conjunto guardado.`,
+  copySetToStage: "Copiar set a...",
+  copyTableToStage: "Copiar a stage",
+  toastCopiedToStage: (count, stageName) =>
+    `${count} tabla(s) copiadas a ${stageName}.`,
+  quickPresets: {
+    button: "Presets",
+    heading: "Presets rápidos",
+    empty: "Aún no hay presets guardados para este departamento.",
+    tableCount: (count) => `${count} tabla(s)`,
+    apply: "Aplicar al stage actual",
+    deleteAction: "Eliminar preset",
+    saveCurrentHeading: "Guardar set actual como preset",
+    namePlaceholder: "Nombre del preset",
+    saveAction: "Guardar preset",
+  },
+  toastPresetSaved: "Preset guardado",
+  toastPresetSaveError:
+    "No se pudo guardar el preset (¿el nombre ya existe?)",
+  toastPresetApplied: (count, presetName) =>
+    `${count} tabla(s) añadidas desde "${presetName}".`,
+  toastPresetDeleted: "Preset eliminado",
+  toastPresetDeleteError: "No se pudo eliminar el preset",
   stagePlotTitle: "Distribución en escenario (posiciones de PDU)",
   stagePlotStage: "Escenario",
   stagePlotBackstage: "Backstage",

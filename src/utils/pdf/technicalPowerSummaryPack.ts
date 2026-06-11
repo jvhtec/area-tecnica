@@ -9,8 +9,14 @@ import { normalizeTechnicalPowerDepartments } from '@/utils/technicalPowerTypes'
 import type {
   CombinedTechnicalPowerSummaryData,
   DepartmentPowerSummaryData,
+  DepartmentPowerSummaryRow,
   TechnicalPowerDepartment,
 } from '@/utils/technicalPowerTypes';
+import { buildPowerStagePlot, type StagePlotTable } from '@/utils/powerStagePlot';
+import {
+  drawPowerStagePlot,
+  type StagePlotRgb,
+} from '@/utils/pdf/powerStagePlotPdf';
 
 interface GenerateTechnicalPowerSummaryPackInput {
   jobTitle?: string | null;
@@ -27,6 +33,13 @@ const HEADER_HEIGHT = 40;
 const CONTENT_START_Y = 68;
 const FOOTER_SPACE = 28;
 const MADRID_TIMEZONE = 'Europe/Madrid';
+
+// Distinct color per department for the combined stage plot (legend on the PDF)
+const DEPARTMENT_PLOT_COLORS: Record<TechnicalPowerDepartment, StagePlotRgb> = {
+  sound: [37, 99, 235], // blue
+  lights: [217, 119, 6], // amber
+  video: [5, 150, 105], // green
+};
 
 const loadImage = (src?: string): Promise<HTMLImageElement | null> =>
   new Promise((resolve) => {
@@ -63,6 +76,18 @@ const formatDisplayDate = (value?: string | null, fallback = new Date()) =>
 const formatWatts = (value: number) => `${value.toFixed(2)} W`;
 const formatAmps = (value: number) => `${value.toFixed(2)} A`;
 const formatKva = (value: number) => `${value.toFixed(2)} kVA`;
+
+const buildStagePlotGroupKey = (
+  stageNumber?: number | null,
+  stageName?: string | null,
+) => {
+  if (stageNumber != null) return `stage-${stageNumber}`;
+
+  const normalizedName = stageName?.trim().toLowerCase();
+  if (!normalizedName) return 'general';
+
+  return `stage-name-${encodeURIComponent(normalizedName)}`;
+};
 
 const getPageWidth = (doc: any) =>
   doc.internal.pageSize.getWidth?.() ?? doc.internal.pageSize.width;
@@ -308,6 +333,67 @@ export const generateTechnicalPowerSummaryPack = async ({
         headerLogo,
       });
     },
+  });
+
+  // Combined stage plot(s): every department's tables on one drawing,
+  // color-coded by department, one plot per stage when the job uses stages.
+  const plotTables: Array<StagePlotTable & { stageKey: string; stageLabel: string }> =
+    departmentsToInclude.flatMap((department) =>
+      department.rows.map((row: DepartmentPowerSummaryRow) => ({
+        name: row.name,
+        position:
+          row.positionLabel && row.positionLabel !== 'N/A'
+            ? row.positionLabel
+            : undefined,
+        pduType: row.pduLabel && row.pduLabel !== 'N/A' ? row.pduLabel : '',
+        department: department.department,
+        stageKey: buildStagePlotGroupKey(row.stageNumber, row.stageName),
+        stageLabel:
+          row.stageName?.trim() ||
+          (row.stageNumber != null ? `Stage ${row.stageNumber}` : ''),
+      }))
+    );
+
+  const stageGroups = new Map<string, { label: string; tables: StagePlotTable[] }>();
+  plotTables.forEach((table) => {
+    const group = stageGroups.get(table.stageKey) || { label: table.stageLabel, tables: [] };
+    group.tables.push(table);
+    stageGroups.set(table.stageKey, group);
+  });
+
+  const legend = departmentsToInclude.map((department) => ({
+    label: getDepartmentLabel(department.department),
+    color: DEPARTMENT_PLOT_COLORS[department.department],
+  }));
+  const entryColorFor = (entry: { department?: string }) =>
+    DEPARTMENT_PLOT_COLORS[entry.department as TechnicalPowerDepartment] ??
+    CORPORATE_RED;
+
+  stageGroups.forEach((group) => {
+    const plot = buildPowerStagePlot(group.tables);
+    if (!plot.hasPositionedEntries) return;
+
+    doc.addPage();
+    drawCorporateHeader({
+      doc,
+      title: 'Resumen Tecnico de Potencia',
+      subtitleLines: [
+        jobTitle || 'Trabajo sin titulo',
+        group.label ? `Distribución en Escenario · ${group.label}` : 'Distribución en Escenario',
+      ],
+      headerLogo,
+    });
+    drawPowerStagePlot(doc, plot, {
+      startY: CONTENT_START_Y,
+      pageWidth: getPageWidth(doc),
+      pageHeight: getPageHeight(doc),
+      footerSpace: FOOTER_SPACE,
+      title: group.label
+        ? `Distribución en Escenario — ${group.label}`
+        : 'Distribución en Escenario',
+      entryColorFor,
+      legend,
+    });
   });
 
   departmentsToInclude.forEach((department) => {
