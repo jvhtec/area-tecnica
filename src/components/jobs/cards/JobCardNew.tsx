@@ -303,25 +303,47 @@ function JobCardNewFull({
   });
 
   const viewTourDocument = async (file: { file_path: string }) => {
-    const { data } = await dataLayerClient.storage
-      .from('tour-documents')
-      .createSignedUrl(file.file_path, 3600);
-    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+    try {
+      const { data, error } = await dataLayerClient.storage
+        .from('tour-documents')
+        .createSignedUrl(file.file_path, 3600);
+      if (error) throw error;
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+    } catch (error) {
+      console.error('Error viewing tour document:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo abrir el documento de la gira",
+        variant: "destructive"
+      });
+    }
   };
 
   const downloadTourDocument = async (file: { file_path: string; file_name: string }) => {
-    const { data } = await dataLayerClient.storage
-      .from('tour-documents')
-      .download(file.file_path);
-    if (!data) return;
-    const url = window.URL.createObjectURL(data);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.file_name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    let url: string | null = null;
+    try {
+      const { data, error } = await dataLayerClient.storage
+        .from('tour-documents')
+        .download(file.file_path);
+      if (error) throw error;
+      if (!data) return;
+      url = window.URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.file_name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (error) {
+      console.error('Error downloading tour document:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo descargar el documento de la gira",
+        variant: "destructive"
+      });
+    } finally {
+      if (url) window.URL.revokeObjectURL(url);
+    }
   };
 
   const viewRider = async (file: { file_path: string }) => {
