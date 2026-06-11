@@ -363,3 +363,9 @@
   .pb-safe-3 { padding-bottom: calc(var(--safe-area-bottom) + 0.75rem); }
   .pb-safe-4 { padding-bottom: calc(var(--safe-area-bottom) + 1rem); }
 }
+
+/* Sonner mobile viewport: sonner 1.x hardcodes a 16px mobile offset that
+   ignores the home indicator / notch on viewport-fit=cover devices */
+[data-sonner-toaster] {
+  --mobile-offset: max(16px, env(safe-area-inset-bottom)) !important;
+}
