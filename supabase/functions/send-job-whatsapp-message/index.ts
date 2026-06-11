@@ -151,9 +151,11 @@ serve(async (req: Request) => {
         return jsonResponse({ error: "Bad Request", reason: "hoja_de_ruta_not_found" }, { status: 400 });
       }
 
+      // 7 days: the link must stay alive in the chat, not just survive the send.
+      // (Used both by sendFile and by the WAHA Core text-link fallback.)
       const { data: signed, error: signErr } = await supabaseAdmin.storage
         .from("job-documents")
-        .createSignedUrl(doc.file_path, 3600);
+        .createSignedUrl(doc.file_path, 60 * 60 * 24 * 7);
 
       if (signErr || !signed?.signedUrl) {
         console.error("Failed to sign Hoja de Ruta URL:", signErr);
@@ -244,6 +246,22 @@ serve(async (req: Request) => {
       },
     ] as const;
 
+    // WAHA Core fallback: sending files is a Plus feature, so when sendFile is
+    // unavailable we deliver the PDF as a signed download link via plain text.
+    const linkAttemptsFor = (chatId: string, file: { url: string; filename: string }) => {
+      const text = `📄 Hoja de Ruta: ${file.filename}\n${file.url}\n(Enlace de descarga válido durante 7 días)`;
+      return [
+        {
+          url: `${base}/api/${encodeURIComponent(session)}/sendText`,
+          body: { chatId, text, linkPreview: false },
+        },
+        {
+          url: `${base}/api/sendText`,
+          body: { chatId, text, session, linkPreview: false },
+        },
+      ] as const;
+    };
+
     const timeoutMs = Number(Deno.env.get("WAHA_FETCH_TIMEOUT_MS") || 9000);
 
     /** Try each WAHA endpoint variant in order; succeed on the first OK response. */
@@ -295,6 +313,7 @@ serve(async (req: Request) => {
     const concurrency = Math.max(1, Math.min(4, Number(Deno.env.get("WAHA_SEND_CONCURRENCY") || 4)));
 
     let attachmentSentCount = 0;
+    let attachmentLinkFallbackCount = 0;
     const attachmentFailed: Array<{ recipient_id: string; reason: string }> = [];
 
     const worker = async () => {
@@ -318,10 +337,20 @@ serve(async (req: Request) => {
         sentCount += 1;
 
         // Follow-up: Hoja de Ruta PDF only after the text message succeeded.
+        // Native attachment first (WAHA Plus); download link as text otherwise.
         if (attachment) {
           const fileResult = await runAttempts(fileAttemptsFor(chatId, attachment));
-          if (fileResult.ok) attachmentSentCount += 1;
-          else attachmentFailed.push({ recipient_id: rid, reason: fileResult.reason });
+          if (fileResult.ok) {
+            attachmentSentCount += 1;
+          } else {
+            const linkResult = await runAttempts(linkAttemptsFor(chatId, attachment));
+            if (linkResult.ok) {
+              attachmentSentCount += 1;
+              attachmentLinkFallbackCount += 1;
+            } else {
+              attachmentFailed.push({ recipient_id: rid, reason: linkResult.reason });
+            }
+          }
         }
       }
     };
@@ -334,7 +363,7 @@ serve(async (req: Request) => {
         sentCount,
         failed,
         job_id: jobId || null,
-        ...(attachment ? { attachmentSentCount, attachmentFailed } : {}),
+        ...(attachment ? { attachmentSentCount, attachmentLinkFallbackCount, attachmentFailed } : {}),
       },
       { status: 200 },
     );

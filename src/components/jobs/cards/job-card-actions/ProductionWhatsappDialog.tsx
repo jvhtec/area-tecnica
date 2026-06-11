@@ -187,7 +187,7 @@ export const ProductionWhatsappDialog = ({ state }: ProductionWhatsappDialogProp
                 {state.waProdHojaDeRutaLoading
                   ? "Comprobando si hay Hoja de Ruta disponible…"
                   : state.waProdHojaDeRutaDoc
-                    ? `Se enviará "${state.waProdHojaDeRutaDoc.file_name || "Hoja de Ruta.pdf"}" tras el mensaje de citación.`
+                    ? `Se enviará "${state.waProdHojaDeRutaDoc.file_name || "Hoja de Ruta.pdf"}" tras el mensaje de citación (como PDF adjunto o enlace de descarga).`
                     : "No hay Hoja de Ruta generada para este trabajo."}
               </p>
             </div>
