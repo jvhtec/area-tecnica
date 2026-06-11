@@ -19,6 +19,18 @@ import {
   isSameTechnicalStage,
   useSelectedTechnicalStage,
 } from '@/features/technical-tools/stage/stageAllocation';
+import type { TechnicalStage } from '@/features/technical-tools/stage/stageUtils';
+import { CopyToStageMenu } from '@/features/technical-tools/table-presets/CopyToStageMenu';
+import { QuickPresetsMenu } from '@/features/technical-tools/table-presets/QuickPresetsMenu';
+import {
+  cloneTablesToStage,
+  remapClusterIds,
+  toPresetSnapshot,
+} from '@/features/technical-tools/table-presets/stageCopy';
+import {
+  useQuickPresets,
+  type QuickPreset,
+} from '@/features/technical-tools/table-presets/useQuickPresets';
 
 // Database for sound components.
 const soundComponentDatabase = [
@@ -213,6 +225,69 @@ const PesosTool: React.FC = () => {
   const activeTables = selectedStage
     ? tables.filter((table) => isSameTechnicalStage(table.stageNumber, selectedStage))
     : tables;
+
+  // --- Stage copy & quick presets (normal job mode only) ---
+  const isNormalJobMode =
+    !isTourContext && !isTourDefaults && !isTourDateContext && !isDefaults && !isJobOverrideMode;
+  const {
+    presets: quickPresets,
+    savePreset,
+    isSavingPreset,
+    deletePreset,
+  } = useQuickPresets<Table>('pesos', 'sound');
+
+  const copyActiveSetToStage = (stage: TechnicalStage) => {
+    if (activeTables.length === 0) return;
+    // Fresh cluster ids so mirrored pairs/cable picks don't group with the
+    // source tables; suffixes are recomputed per stage.
+    const clones = remapClusterIds(cloneTablesToStage(activeTables, stage));
+    setTables((prev) => assignSuffixes([...prev, ...clones]));
+    toast({
+      title: 'Success',
+      description: `${clones.length} table(s) copied to ${stage.name}.`,
+    });
+  };
+
+  const saveActiveSetAsPreset = async (name: string): Promise<boolean> => {
+    if (activeTables.length === 0) return false;
+    try {
+      await savePreset({ name, tables: activeTables.map(toPresetSnapshot) });
+      toast({ title: 'Success', description: 'Preset saved' });
+      return true;
+    } catch (error) {
+      console.error('Error saving quick preset:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to save the preset (is the name already in use?)',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
+  const applyQuickPreset = (preset: QuickPreset<Table>) => {
+    if (preset.tables.length === 0) return;
+    const clones = remapClusterIds(cloneTablesToStage(preset.tables, selectedStage ?? null));
+    setTables((prev) => assignSuffixes([...prev, ...clones]));
+    toast({
+      title: 'Success',
+      description: `${clones.length} table(s) added from "${preset.name}".`,
+    });
+  };
+
+  const removeQuickPreset = async (preset: QuickPreset<Table>) => {
+    try {
+      await deletePreset(preset.id);
+      toast({ title: 'Success', description: 'Preset deleted' });
+    } catch (error) {
+      console.error('Error deleting quick preset:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete the preset',
+        variant: 'destructive',
+      });
+    }
+  };
 
   // Preselect job from query param and fetch details if not in the list
   useEffect(() => {
@@ -881,6 +956,39 @@ const PesosTool: React.FC = () => {
       deleteOverride={deleteOverride}
       saveAsDefaultSet={saveAsDefaultSet}
       removeTable={removeTable}
+      headerExtras={
+        isNormalJobMode ? (
+          <>
+            {jobStages.length > 1 && activeTables.length > 0 && (
+              <CopyToStageMenu
+                label="Copy set to..."
+                stages={jobStages}
+                excludeStageNumber={selectedStage?.number ?? null}
+                onCopy={copyActiveSetToStage}
+              />
+            )}
+            <QuickPresetsMenu
+              labels={{
+                button: 'Presets',
+                heading: 'Quick presets',
+                empty: 'No presets saved for this department yet.',
+                tableCount: (count) => `${count} table(s)`,
+                apply: 'Apply to current stage',
+                deleteAction: 'Delete preset',
+                saveCurrentHeading: 'Save current set as preset',
+                namePlaceholder: 'Preset name',
+                saveAction: 'Save preset',
+              }}
+              presets={quickPresets}
+              canSaveCurrent={activeTables.length > 0}
+              isSaving={isSavingPreset}
+              onApply={applyQuickPreset}
+              onDelete={removeQuickPreset}
+              onSaveCurrent={saveActiveSetAsPreset}
+            />
+          </>
+        ) : undefined
+      }
     />
   );
 };

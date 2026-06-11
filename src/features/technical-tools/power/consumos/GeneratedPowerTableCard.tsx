@@ -2,6 +2,8 @@ import React from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Edit, Save } from "lucide-react";
+import { CopyToStageMenu } from "@/features/technical-tools/table-presets/CopyToStageMenu";
+import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
 import type { PhaseMode, PowerTable } from "@/features/technical-tools/power/types";
 import { PowerTableControls } from "@/features/technical-tools/power/PowerTableControls";
 import { getResolvedPowerPosition } from "@/utils/powerPositions";
@@ -30,6 +32,9 @@ export const GeneratedPowerTableCard: React.FC<{
   showRowPf: boolean;
   showSaveDefault?: boolean;
   isOverrideContext?: boolean;
+  /** Stages offered as copy targets; the table's own stage is excluded. */
+  copyStages?: TechnicalStage[];
+  onCopyToStage?: (stage: TechnicalStage) => void;
   onEdit?: () => void;
   onRemove: () => void;
   onSaveDefault?: () => void;
@@ -43,6 +48,8 @@ export const GeneratedPowerTableCard: React.FC<{
   showRowPf,
   showSaveDefault = false,
   isOverrideContext = false,
+  copyStages,
+  onCopyToStage,
   onEdit,
   onRemove,
   onSaveDefault,
@@ -70,6 +77,15 @@ export const GeneratedPowerTableCard: React.FC<{
           )}
         </div>
         <div className="flex items-center gap-2">
+          {onCopyToStage && copyStages && copyStages.length > 0 && (
+            <CopyToStageMenu
+              label={labels.copyTableToStage}
+              stages={copyStages}
+              excludeStageNumber={table.stageNumber}
+              iconOnly
+              onCopy={onCopyToStage}
+            />
+          )}
           {onEdit && (
             <Button variant="outline" size="sm" onClick={onEdit} className="gap-1">
               <Edit className="h-4 w-4" />

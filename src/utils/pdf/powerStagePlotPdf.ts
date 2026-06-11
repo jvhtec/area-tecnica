@@ -23,6 +23,13 @@ type PdfDoc = {
   getTextWidth: (text: string) => number;
 };
 
+export type StagePlotRgb = readonly [number, number, number];
+
+export type StagePlotLegendItem = { label: string; color: StagePlotRgb };
+
+const DEFAULT_ENTRY_COLOR: StagePlotRgb = [125, 1, 1];
+const LEGEND_HEIGHT = 7;
+
 const ENTRY_HEIGHT = 8;
 const HOIST_LINE_HEIGHT = 3.4;
 const ZONE_HEADER_HEIGHT = 6;
@@ -57,11 +64,13 @@ const drawZoneEntries = (
   x: number,
   y: number,
   width: number,
+  entryColorFor?: (entry: StagePlotEntry) => StagePlotRgb,
 ) => {
   let entryY = y + ZONE_HEADER_HEIGHT;
   entries.forEach((entry) => {
+    const [red, green, blue] = entryColorFor?.(entry) ?? DEFAULT_ENTRY_COLOR;
     doc.setFontSize(7);
-    doc.setTextColor(125, 1, 1);
+    doc.setTextColor(red, green, blue);
     doc.text(fitText(doc, entry.name, width - 6), x + width / 2, entryY + 3, {
       align: "center",
     });
@@ -95,6 +104,7 @@ const drawZoneBox = (
   y: number,
   width: number,
   height: number,
+  entryColorFor?: (entry: StagePlotEntry) => StagePlotRgb,
 ) => {
   doc.setDrawColor(120, 120, 120);
   if (entries.length === 0) {
@@ -106,7 +116,7 @@ const drawZoneBox = (
   doc.setFontSize(6);
   doc.setTextColor(140, 140, 140);
   doc.text(zone, x + 1.5, y + 3.5);
-  drawZoneEntries(doc, entries, x, y, width);
+  drawZoneEntries(doc, entries, x, y, width, entryColorFor);
 };
 
 const formatEntryList = (entries: StagePlotEntry[]) =>
@@ -140,12 +150,14 @@ const fohBoxHeight = (plot: PowerStagePlotData, fohSchukoRequired: boolean) =>
 export const estimatePowerStagePlotHeight = (
   plot: PowerStagePlotData,
   fohSchukoRequired = false,
+  hasLegend = false,
 ) => {
   const extraLines = plot.custom.length + (plot.unpositioned.length > 0 ? 1 : 0);
   // title + backstage label/band + stage label + grid + gap + audience label
   // + FOH + audience label + extra lines
   return (
     10 +
+    (hasLegend ? LEGEND_HEIGHT : 0) +
     6 +
     backstageHeight(plot) +
     2 +
@@ -176,12 +188,30 @@ export const drawPowerStagePlot = (
     pageHeight: number;
     footerSpace: number;
     fohSchukoRequired?: boolean;
+    /** Heading drawn above the plot; defaults to the Spanish section title. */
+    title?: string;
+    /** Per-entry color (combined plots color-code by department). */
+    entryColorFor?: (entry: StagePlotEntry) => StagePlotRgb;
+    /** Color legend drawn under the title when provided. */
+    legend?: StagePlotLegendItem[];
   },
 ): number => {
-  const { pageWidth, pageHeight, footerSpace, fohSchukoRequired = false } = options;
+  const {
+    pageWidth,
+    pageHeight,
+    footerSpace,
+    fohSchukoRequired = false,
+    title = "Distribución en Escenario",
+    entryColorFor,
+    legend,
+  } = options;
   let y = options.startY;
 
-  const totalHeight = estimatePowerStagePlotHeight(plot, fohSchukoRequired);
+  const totalHeight = estimatePowerStagePlotHeight(
+    plot,
+    fohSchukoRequired,
+    Boolean(legend?.length),
+  );
   if (y + totalHeight > pageHeight - footerSpace) {
     doc.addPage();
     y = 20;
@@ -189,8 +219,24 @@ export const drawPowerStagePlot = (
 
   doc.setFontSize(14);
   doc.setTextColor(125, 1, 1);
-  doc.text("Distribución en Escenario", 14, y);
+  doc.text(title, 14, y);
   y += 8;
+
+  // Color legend (one swatch + label per department)
+  if (legend && legend.length > 0) {
+    let legendX = 14;
+    doc.setFontSize(8);
+    legend.forEach(({ label, color }) => {
+      const [red, green, blue] = color;
+      doc.setFillColor(red, green, blue);
+      doc.setDrawColor(red, green, blue);
+      doc.rect(legendX, y - 2.8, 3.5, 3.5, "F");
+      doc.setTextColor(60, 60, 60);
+      doc.text(label, legendX + 5, y);
+      legendX += 5 + doc.getTextWidth(label) + 8;
+    });
+    y += LEGEND_HEIGHT;
+  }
 
   const totalWidth = STAGE_WIDTH + 2 * (WING_WIDTH + WING_GAP);
   const wingLeftX = (pageWidth - totalWidth) / 2;
@@ -216,6 +262,7 @@ export const drawPowerStagePlot = (
       y,
       backstageCellWidth,
       backstageBandHeight,
+      entryColorFor,
     );
   });
   y += backstageBandHeight + 2;
@@ -238,6 +285,7 @@ export const drawPowerStagePlot = (
       rowY,
       WING_WIDTH,
       rowHeight,
+      entryColorFor,
     );
     drawZoneBox(
       doc,
@@ -247,6 +295,7 @@ export const drawPowerStagePlot = (
       rowY,
       WING_WIDTH,
       rowHeight,
+      entryColorFor,
     );
     row.forEach((zone, columnIndex) => {
       drawZoneBox(
@@ -257,6 +306,7 @@ export const drawPowerStagePlot = (
         rowY,
         cellWidth,
         rowHeight,
+        entryColorFor,
       );
     });
     rowY += rowHeight;
@@ -294,7 +344,7 @@ export const drawPowerStagePlot = (
   doc.setFontSize(6);
   doc.setTextColor(140, 140, 140);
   doc.text(STAGE_PLOT_FOH, fohX + 1.5, y + 3.5);
-  drawZoneEntries(doc, fohEntries, fohX, y, fohWidth);
+  drawZoneEntries(doc, fohEntries, fohX, y, fohWidth, entryColorFor);
   if (fohSchukoRequired) {
     doc.setFontSize(7);
     doc.setTextColor(150, 100, 0);

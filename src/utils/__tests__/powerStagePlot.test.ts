@@ -49,6 +49,14 @@ describe("buildPowerStagePlot", () => {
     expect(plot.hasPositionedEntries).toBe(true);
   });
 
+  it("carries the department through to entries for combined color-coded plots", () => {
+    const plot = buildPowerStagePlot([
+      { name: "Dimmers", position: "USL", pduType: "CEE63A 3P+N+G", department: "lights" },
+    ]);
+
+    expect(plot.zones.USL[0].department).toBe("lights");
+  });
+
   it("reports no positioned entries when only custom/unpositioned tables exist", () => {
     const plot = buildPowerStagePlot([
       { name: "Delays", customPosition: "Torre PA" },

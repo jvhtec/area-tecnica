@@ -110,6 +110,15 @@ export type ConsumosLabels = {
   hoistNote: string;
   notAvailable: string;
   savedSetLoaded: (count: number) => string;
+  copySetToStage: string;
+  copyTableToStage: string;
+  toastCopiedToStage: (count: number, stageName: string) => string;
+  quickPresets: import("@/features/technical-tools/table-presets/QuickPresetsMenu").QuickPresetsLabels;
+  toastPresetSaved: string;
+  toastPresetSaveError: string;
+  toastPresetApplied: (count: number, presetName: string) => string;
+  toastPresetDeleted: string;
+  toastPresetDeleteError: string;
   stagePlotTitle: string;
   stagePlotStage: string;
   stagePlotBackstage: string;

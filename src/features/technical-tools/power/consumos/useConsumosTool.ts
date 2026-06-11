@@ -53,6 +53,16 @@ import {
   useJobPowerRequirementTables,
 } from "./useJobPowerRequirementTables";
 import {
+  cloneTableToStage,
+  cloneTablesToStage,
+  toPresetSnapshot,
+} from "@/features/technical-tools/table-presets/stageCopy";
+import {
+  useQuickPresets,
+  type QuickPreset,
+} from "@/features/technical-tools/table-presets/useQuickPresets";
+import type { TechnicalStage } from "@/features/technical-tools/stage/stageUtils";
+import {
   type CustomPowerComponentInput,
   useCustomPowerComponents,
 } from "./useCustomPowerComponents";
@@ -135,6 +145,12 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   const { catalogComponents, createComponent } = useConsumosComponents(config);
   const { customComponents: legacyLocalComponents } =
     useCustomPowerComponents(department, user?.id);
+  const {
+    presets: quickPresets,
+    savePreset,
+    isSavingPreset,
+    deletePreset,
+  } = useQuickPresets<PowerTable>("consumos", department);
   const components = useMemo(() => {
     const catalogNames = new Set(
       catalogComponents.map((component) => component.name.trim().toLowerCase()),
@@ -1229,6 +1245,72 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     }
   };
 
+  // --- Stage copy & quick presets ---
+
+  const copyTableToStage = (tableId: number | string, stage: TechnicalStage) => {
+    const source = tables.find((table) => table.id === tableId);
+    if (!source) return;
+    setTables((prev) => [...prev, cloneTableToStage(source, stage)]);
+    toast({
+      title: labels.toastSuccess,
+      description: labels.toastCopiedToStage(1, stage.name),
+    });
+  };
+
+  const copyActiveSetToStage = (stage: TechnicalStage) => {
+    if (activeTables.length === 0) return;
+    setTables((prev) => [...prev, ...cloneTablesToStage(activeTables, stage)]);
+    toast({
+      title: labels.toastSuccess,
+      description: labels.toastCopiedToStage(activeTables.length, stage.name),
+    });
+  };
+
+  const saveActiveSetAsPreset = async (name: string): Promise<boolean> => {
+    if (activeTables.length === 0) return false;
+    try {
+      await savePreset({ name, tables: activeTables.map(toPresetSnapshot) });
+      toast({ title: labels.toastSuccess, description: labels.toastPresetSaved });
+      return true;
+    } catch (error: any) {
+      console.error("Error saving quick preset:", error);
+      toast({
+        title: labels.toastError,
+        description: labels.toastPresetSaveError,
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const applyQuickPreset = (preset: QuickPreset<PowerTable>) => {
+    if (preset.tables.length === 0) return;
+    // Applied tables land on the current stage and behave like freshly
+    // generated ones (persisted on the next export).
+    setTables((prev) => [
+      ...prev,
+      ...cloneTablesToStage(preset.tables, selectedStage ?? null),
+    ]);
+    toast({
+      title: labels.toastSuccess,
+      description: labels.toastPresetApplied(preset.tables.length, preset.name),
+    });
+  };
+
+  const removeQuickPreset = async (preset: QuickPreset<PowerTable>) => {
+    try {
+      await deletePreset(preset.id);
+      toast({ title: labels.toastSuccess, description: labels.toastPresetDeleted });
+    } catch (error) {
+      console.error("Error deleting quick preset:", error);
+      toast({
+        title: labels.toastError,
+        description: labels.toastPresetDeleteError,
+        variant: "destructive",
+      });
+    }
+  };
+
   // Same table set the PDF export uses; also feeds the stage plot in the UI
   const exportDisplayTables = isTourDefaults
     ? tourDefaultDisplayTables
@@ -1356,6 +1438,13 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     exportTablesCount,
     movablePlotTableIds,
     moveTableToPosition,
+    quickPresets,
+    isSavingPreset,
+    copyTableToStage,
+    copyActiveSetToStage,
+    saveActiveSetAsPreset,
+    applyQuickPreset,
+    removeQuickPreset,
   };
 };
 

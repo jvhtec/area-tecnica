@@ -15,6 +15,12 @@ const {
     setTextColor: vi.fn(),
     text: vi.fn(),
     setPage: vi.fn(),
+    // Used by the combined stage plot section
+    setDrawColor: vi.fn(),
+    setLineWidth: vi.fn(),
+    setLineDashPattern: vi.fn(),
+    setFont: vi.fn(),
+    getTextWidth: vi.fn(() => 20),
     addPage: vi.fn(function (this: any) {
       doc.internal.pages.push({});
       return this;
