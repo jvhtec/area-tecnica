@@ -1,5 +1,6 @@
 import React from "react";
 import { createPortal } from "react-dom";
+import { format } from "date-fns";
 import { useReducedMotion } from "framer-motion";
 import { ChevronDown, ChevronRight, Download, Eye, FileText, Loader2, NotebookPen } from "lucide-react";
 
@@ -88,6 +89,12 @@ export interface JobCardNewViewProps {
   setRidersCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
   viewRider: (file: { file_path: string }) => void | Promise<void>;
   downloadRider: (file: { file_path: string; file_name: string }) => void | Promise<void>;
+
+  tourDocuments: Array<{ id: string; file_name: string; file_path: string; uploaded_at: string }>;
+  tourDocsCollapsed: boolean;
+  setTourDocsCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+  viewTourDocument: (file: { file_path: string }) => void | Promise<void>;
+  downloadTourDocument: (file: { file_path: string; file_name: string }) => void | Promise<void>;
 
   soundTasks: any;
   reqSummary: any;
@@ -202,6 +209,11 @@ export function JobCardNewView({
   setRidersCollapsed,
   viewRider,
   downloadRider,
+  tourDocuments,
+  tourDocsCollapsed,
+  setTourDocsCollapsed,
+  viewTourDocument,
+  downloadTourDocument,
   soundTasks,
   reqSummary,
   requiredVsAssigned,
@@ -531,6 +543,52 @@ export function JobCardNewView({
                           onDeleteDocument={(document) => handleDeleteDocument(document)}
                           showTitle={false}
                         />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {tourDocuments.length > 0 && (
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      className="w-full flex items-center justify-between text-left px-2 py-1 rounded hover:bg-accent/40"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTourDocsCollapsed((prev) => !prev);
+                      }}
+                    >
+                      <span className="text-sm font-medium">Tour Documents ({tourDocuments.length})</span>
+                      {tourDocsCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    </button>
+                    {!tourDocsCollapsed && (
+                      <div className="mt-1 space-y-2">
+                        {tourDocuments.map((file) => (
+                          <div
+                            key={file.id}
+                            className="flex items-center justify-between p-2 rounded-md bg-accent/20 hover:bg-accent/30 transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="flex flex-col">
+                              <span className="text-sm font-medium">{file.file_name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {format(new Date(file.uploaded_at), "MMM d, yyyy")}
+                              </span>
+                            </div>
+                            <div className="flex gap-2">
+                              <button className="p-1 hover:bg-accent rounded" title="View" onClick={() => viewTourDocument(file)}>
+                                <Eye className="h-4 w-4" />
+                              </button>
+                              <button
+                                className="p-1 hover:bg-accent rounded"
+                                title="Download"
+                                onClick={() => downloadTourDocument(file)}
+                              >
+                                <Download className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>

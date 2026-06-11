@@ -106,7 +106,8 @@ export const useOptimizedJobs = (
           date,
           start_date,
           end_date,
-          tour_date_type
+          tour_date_type,
+          is_tour_pack_only
         ),
         flex_folders(
           id,

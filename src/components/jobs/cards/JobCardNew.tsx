@@ -231,6 +231,7 @@ function JobCardNewFull({
   // Collapsible sections (collapsed by default)
   const [docsCollapsed, setDocsCollapsed] = useState(true);
   const [ridersCollapsed, setRidersCollapsed] = useState(true);
+  const [tourDocsCollapsed, setTourDocsCollapsed] = useState(true);
   const isFestivalLike = isFestivalLikeJobType(job?.job_type);
 
   // Track if we've already opened the modal from URL param to prevent race condition
@@ -251,10 +252,10 @@ function JobCardNewFull({
     onHojaDeRutaOpened?.();
   }, [openHojaDeRuta, isProjectManagementPage, onHojaDeRutaOpened]);
 
-  // Load artists then rider files (2-step RLS-friendly)
+  // Load artists then rider files (2-step RLS-friendly) for all job types except dry hire
   const { data: cardArtists = [] } = useQuery({
     queryKey: queryKeys.scope('jobcard-artists', job.id),
-    enabled: !!job?.id && isFestivalLike,
+    enabled: !!job?.id && job.job_type !== 'dryhire',
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('festival_artists')
         .select('id, name')
@@ -284,6 +285,44 @@ function JobCardNewFull({
       return (data || []) as Array<{ id: string; file_name: string; file_path: string; uploaded_at: string; artist_id: string }>;
     }
   });
+
+  // Load tour documents for jobs linked to a tour (e.g. tourdate jobs)
+  const cardTourId: string | null = job.tour_id || job.tour_date?.tour?.id || null;
+  const { data: tourDocuments = [] } = useQuery({
+    queryKey: queryKeys.scope('jobcard-tour-documents', job.id, cardTourId),
+    enabled: !!cardTourId && job.job_type !== 'dryhire',
+    queryFn: async () => {
+      const { data, error } = await dataLayerClient.from('tour_documents')
+        .select('id, file_name, file_path, uploaded_at')
+        .eq('tour_id', cardTourId)
+        .order('uploaded_at', { ascending: false });
+      if (error) throw error;
+      return (data || []) as Array<{ id: string; file_name: string; file_path: string; uploaded_at: string }>;
+    },
+    staleTime: 5 * 60_000,
+  });
+
+  const viewTourDocument = async (file: { file_path: string }) => {
+    const { data } = await dataLayerClient.storage
+      .from('tour-documents')
+      .createSignedUrl(file.file_path, 3600);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener');
+  };
+
+  const downloadTourDocument = async (file: { file_path: string; file_name: string }) => {
+    const { data } = await dataLayerClient.storage
+      .from('tour-documents')
+      .download(file.file_path);
+    if (!data) return;
+    const url = window.URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.file_name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
 
   const viewRider = async (file: { file_path: string }) => {
     const { data } = await dataLayerClient.storage
@@ -1277,6 +1316,11 @@ function JobCardNewFull({
       setRidersCollapsed={setRidersCollapsed}
       viewRider={viewRider}
       downloadRider={downloadRider}
+      tourDocuments={tourDocuments}
+      tourDocsCollapsed={tourDocsCollapsed}
+      setTourDocsCollapsed={setTourDocsCollapsed}
+      viewTourDocument={viewTourDocument}
+      downloadTourDocument={downloadTourDocument}
       soundTasks={soundTasks}
       reqSummary={reqSummary}
       requiredVsAssigned={requiredVsAssigned}
