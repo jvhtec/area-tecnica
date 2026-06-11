@@ -32,7 +32,7 @@ create policy "technical_tool_quick_presets_insert_authenticated"
 on public.technical_tool_quick_presets
 for insert
 to authenticated
-with check (true);
+with check (created_by = auth.uid());
 
 drop policy if exists "technical_tool_quick_presets_update_owner_management" on public.technical_tool_quick_presets;
 create policy "technical_tool_quick_presets_update_owner_management"

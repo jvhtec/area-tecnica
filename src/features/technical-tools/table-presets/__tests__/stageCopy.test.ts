@@ -69,7 +69,7 @@ describe("toPresetSnapshot", () => {
 
 describe("remapClusterIds", () => {
   it("regenerates cluster ids while preserving grouping", () => {
-    const tables = [
+    const tables: Array<{ name: string; rows: unknown[]; clusterId?: string }> = [
       { name: "A", rows: [], clusterId: "c1" },
       { name: "B", rows: [], clusterId: "c1" },
       { name: "C", rows: [], clusterId: "c2" },

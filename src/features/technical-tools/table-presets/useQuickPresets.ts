@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { queryKeys } from "@/lib/react-query";
 import type { TechnicalDepartment } from "@/features/technical-tools/power/types";
-import type { StageCopyableTable } from "./stageCopy";
+import type { StageCopyableTable } from "@/features/technical-tools/table-presets/stageCopy";
 
 export type QuickPresetTool = "consumos" | "pesos";
 
@@ -59,8 +59,12 @@ export const useQuickPresets = <T extends StageCopyableTable>(
 
   const saveMutation = useMutation({
     mutationFn: async ({ name, tables }: { name: string; tables: T[] }) => {
+      const trimmedName = name.trim();
+      if (!trimmedName) {
+        throw new Error("Preset name is required");
+      }
       const { data, error } = await presetsTable()
-        .insert({ tool, department, name: name.trim(), tables })
+        .insert({ tool, department, name: trimmedName, tables })
         .select("id, name")
         .single();
       if (error) throw error;

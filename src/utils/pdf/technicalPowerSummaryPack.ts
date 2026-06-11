@@ -77,6 +77,18 @@ const formatWatts = (value: number) => `${value.toFixed(2)} W`;
 const formatAmps = (value: number) => `${value.toFixed(2)} A`;
 const formatKva = (value: number) => `${value.toFixed(2)} kVA`;
 
+const buildStagePlotGroupKey = (
+  stageNumber?: number | null,
+  stageName?: string | null,
+) => {
+  if (stageNumber != null) return `stage-${stageNumber}`;
+
+  const normalizedName = stageName?.trim().toLowerCase();
+  if (!normalizedName) return 'general';
+
+  return `stage-name-${encodeURIComponent(normalizedName)}`;
+};
+
 const getPageWidth = (doc: any) =>
   doc.internal.pageSize.getWidth?.() ?? doc.internal.pageSize.width;
 
@@ -335,9 +347,9 @@ export const generateTechnicalPowerSummaryPack = async ({
             : undefined,
         pduType: row.pduLabel && row.pduLabel !== 'N/A' ? row.pduLabel : '',
         department: department.department,
-        stageKey: row.stageNumber != null ? `stage-${row.stageNumber}` : 'general',
+        stageKey: buildStagePlotGroupKey(row.stageNumber, row.stageName),
         stageLabel:
-          row.stageName ||
+          row.stageName?.trim() ||
           (row.stageNumber != null ? `Stage ${row.stageNumber}` : ''),
       }))
     );

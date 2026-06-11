@@ -1,10 +1,10 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Bookmark, Download, Save, Trash2 } from "lucide-react";
-import type { StageCopyableTable } from "./stageCopy";
-import type { QuickPreset } from "./useQuickPresets";
+import type { StageCopyableTable } from "@/features/technical-tools/table-presets/stageCopy";
+import type { QuickPreset } from "@/features/technical-tools/table-presets/useQuickPresets";
 
 export type QuickPresetsLabels = {
   button: string;
@@ -42,12 +42,23 @@ export const QuickPresetsMenu = <T extends StageCopyableTable>({
 }) => {
   const [open, setOpen] = useState(false);
   const [presetName, setPresetName] = useState("");
+  const [isSaveSubmitting, setIsSaveSubmitting] = useState(false);
+  const saveInFlightRef = useRef(false);
+  const isSaveDisabled = !presetName.trim() || isSaving || isSaveSubmitting;
 
   const handleSave = async () => {
+    if (isSaving || isSaveSubmitting || saveInFlightRef.current) return;
     const name = presetName.trim();
     if (!name) return;
-    const saved = await onSaveCurrent(name);
-    if (saved) setPresetName("");
+    saveInFlightRef.current = true;
+    setIsSaveSubmitting(true);
+    try {
+      const saved = await onSaveCurrent(name);
+      if (saved) setPresetName("");
+    } finally {
+      saveInFlightRef.current = false;
+      setIsSaveSubmitting(false);
+    }
   };
 
   return (
@@ -125,7 +136,7 @@ export const QuickPresetsMenu = <T extends StageCopyableTable>({
                   className="shrink-0"
                   aria-label={labels.saveAction}
                   title={labels.saveAction}
-                  disabled={!presetName.trim() || isSaving}
+                  disabled={isSaveDisabled}
                   onClick={() => void handleSave()}
                 >
                   <Save className="h-4 w-4" />
