@@ -46,6 +46,29 @@ function sanitizeWahaResponseForLog(body: string) {
   );
 }
 
+function extractWahaErrorText(body: string) {
+  try {
+    const parsed = JSON.parse(body) as {
+      exception?: { details?: unknown; message?: unknown };
+      message?: unknown;
+    };
+    const exceptionText = [parsed?.exception?.message, parsed?.exception?.details]
+      .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
+      .join(' ');
+    if (exceptionText) return exceptionText.toLowerCase();
+    if (typeof parsed?.message === 'string') return parsed.message.toLowerCase();
+  } catch {
+    // Fall back to a plain text search below.
+  }
+
+  return body.toLowerCase();
+}
+
+function shouldSkipCreateGroupFallback(body: string) {
+  const errorText = extractWahaErrorText(body);
+  return errorText.includes('rate-overlimit') || errorText.includes('bad-request');
+}
+
 function wahaHostFromBase(base: string) {
   try {
     return new URL(base).host;
@@ -511,7 +534,12 @@ serve(async (req: Request) => {
       }
       if (!groupRes.ok) {
         const txt = await groupRes.text().catch(() => '');
-        if (groupRes.status >= 500 && groupRes.status < 600 && creationGroupParticipants.length > 1) {
+        if (
+          groupRes.status >= 500 &&
+          groupRes.status < 600 &&
+          creationGroupParticipants.length > 1 &&
+          !shouldSkipCreateGroupFallback(txt)
+        ) {
           // Fallback: try real assigned participants one by one when WAHA rejects bulk creation.
           const fallbackErrors: WahaFallbackAttempt[] = [];
           for (const candidate of creationGroupParticipants) {
