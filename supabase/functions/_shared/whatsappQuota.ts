@@ -39,7 +39,8 @@ export interface WhatsappQuotaResult {
 
 export async function checkAndRecordWhatsappQuota(args: WhatsappQuotaArgs): Promise<WhatsappQuotaResult> {
   const { supabase, actorId, kind, jobId = null, dailyLimit } = args;
-  const unitsRequested = kind === "job_message" ? Math.max(0, args.recipientCount ?? 0) : 1;
+  const recipientCount = Math.max(0, args.recipientCount ?? 0);
+  const unitsRequested = kind === "job_message" ? recipientCount : 1;
 
   try {
     const { data, error } = await supabase.rpc("attempt_whatsapp_send", {
@@ -48,7 +49,7 @@ export async function checkAndRecordWhatsappQuota(args: WhatsappQuotaArgs): Prom
       _units: unitsRequested,
       _daily_limit: dailyLimit,
       _job_id: jobId,
-      _recipient_count: args.recipientCount ?? 0,
+      _recipient_count: recipientCount,
     });
 
     if (error) throw new Error(error.message || "quota RPC failed");
