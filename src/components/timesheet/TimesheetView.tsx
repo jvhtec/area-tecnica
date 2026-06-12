@@ -470,7 +470,7 @@ export const TimesheetView = ({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Clock className="h-6 w-6" />
@@ -479,7 +479,7 @@ export const TimesheetView = ({
           {jobTitle && <p className="text-muted-foreground">Trabajo: {jobTitle}</p>}
         </div>
         {isManagementUser && filteredTimesheets.length > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {showBulkActions && (
               <>
                 <Button
@@ -736,8 +736,8 @@ export const TimesheetView = ({
 
               return (
                 <div key={timesheet.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-3">
                       {isManagementUser && (
                         <input
                           type="checkbox"
@@ -765,7 +765,7 @@ export const TimesheetView = ({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {/* Edit button */}
                       {canEditTimesheet && (
                         <Button
