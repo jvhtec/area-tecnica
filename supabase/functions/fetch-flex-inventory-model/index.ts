@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { fetchWithRetry } from "../_shared/flexFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -113,7 +114,7 @@ serve(async (req: Request) => {
     const qs = new URLSearchParams();
     qs.set('_dc', String(Date.now()));
     const url = `https://sectorpro.flexrentalsolutions.com/f5/api/inventory-model/${encodeURIComponent(modelId)}?${qs.toString()}`;
-    const res = await fetch(url, { headers: { 'X-Auth-Token': flexAuthToken, 'apikey': flexAuthToken, 'X-Requested-With': 'XMLHttpRequest' } });
+    const res = await fetchWithRetry(url, { headers: { 'X-Auth-Token': flexAuthToken, 'apikey': flexAuthToken, 'X-Requested-With': 'XMLHttpRequest' } });
     if (!res.ok) {
       const text = await res.text();
       return new Response(JSON.stringify({ error: `Flex error ${res.status}`, details: text }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

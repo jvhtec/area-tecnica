@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { fetchWithRetry } from "../_shared/flexFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,7 +105,7 @@ serve(async (req: Request) => {
     // Fetch image from Flex API
     const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/image/${encodeURIComponent(imageId)}/${size}`;
 
-    const flexResponse = await fetch(flexUrl, {
+    const flexResponse = await fetchWithRetry(flexUrl, {
       headers: {
         "X-Auth-Token": flexAuthToken,
         "apikey": flexAuthToken,

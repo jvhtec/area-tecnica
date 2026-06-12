@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { fetchWithRetry } from "../_shared/flexFetch.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -67,14 +68,16 @@ async function createFlexFolder(payload: FlexFolderPayload, authToken: string): 
   console.log("Creating Flex folder with payload:", payload);
   
   try {
-    const response = await fetch(`${FLEX_API_BASE_URL}/element`, {
+    // Folder creation is not idempotent on the Flex side, so a timed-out
+    // attempt is never replayed (it may have landed); 5xx/429 are retried.
+    const response = await fetchWithRetry(`${FLEX_API_BASE_URL}/element`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${authToken}`,
       },
       body: JSON.stringify(payload)
-    });
+    }, { retryOnTimeout: false });
     
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
@@ -170,9 +173,13 @@ serve(async (req) => {
     const result = { success: true, data: tour }
 
     // Create root folders if requested
-    if (createRootFolders) {
+    if (createRootFolders && tour.flex_folders_created && tour.flex_main_folder_id) {
+      // Idempotency guard: a re-run (double click, client retry) must not
+      // create a duplicate folder tree in Flex.
+      console.log("Root folders already exist for tour, skipping creation:", tour.name)
+    } else if (createRootFolders) {
       console.log("Creating root folders for tour:", tour.name)
-      
+
       // Get selected departments for this tour
       const selectedDepartments = await getTourDepartments(supabase, tourId);
       console.log("Selected departments for root folder creation:", selectedDepartments);
@@ -262,9 +269,24 @@ serve(async (req) => {
       const selectedDepartments = await getTourDepartments(supabase, tourId);
       console.log("Selected departments for date folder creation:", selectedDepartments);
 
+      // Idempotency guard: skip dates that already have a Flex folder so a
+      // re-run only fills in the missing ones.
+      const { data: existingDateFolders } = await supabase
+        .from('flex_folders')
+        .select('tour_date_id')
+        .eq('folder_type', 'tour_date')
+        .in('tour_date_id', tourDates.map((td: any) => td.id))
+      const datesWithFolders = new Set(
+        (existingDateFolders || []).map((row: any) => row.tour_date_id).filter(Boolean)
+      )
+
       // Create folders for each tour date
       let createdDateCount = 0
       for (const tourDate of tourDates) {
+        if (datesWithFolders.has(tourDate.id)) {
+          console.log("Date folder already exists, skipping:", tourDate.date)
+          continue
+        }
         const dateStr = new Date(tourDate.date).toISOString().split('T')[0]
         const dateFolderName = `${dateStr} - ${tour.name}`
         

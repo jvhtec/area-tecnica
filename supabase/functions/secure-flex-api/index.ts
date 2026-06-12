@@ -1,6 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { fetchWithRetry } from "../_shared/flexFetch.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -76,7 +77,7 @@ serve(async (req) => {
     // Make secure API call to Flex
     const flexUrl = `${FLEX_API_BASE_URL}${endpoint}`
     
-    const response = await fetch(flexUrl, {
+    const response = await fetchWithRetry(flexUrl, {
       method,
       headers: {
         'Content-Type': 'application/json',
@@ -84,6 +85,10 @@ serve(async (req) => {
         'apikey': authToken,
       },
       body: payload ? JSON.stringify(payload) : undefined
+    }, {
+      // A timed-out mutation may have been applied by Flex; only GETs are
+      // safe to replay after a timeout.
+      retryOnTimeout: String(method).toUpperCase() === 'GET',
     });
 
     console.log('Flex API response status:', response.status);

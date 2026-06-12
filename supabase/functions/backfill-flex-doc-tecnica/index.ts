@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { fetchWithRetry } from "../_shared/flexFetch.ts";
 
 type Dept = "sound" | "lights" | "video" | "production" | "personnel" | "comercial" | "logistics" | "administrative";
 
@@ -35,7 +36,7 @@ const DEF_ID_DOCUMENTACION_TECNICA = "3787806c-af2d-11df-b8d5-00e08175e43e";
 
 async function fetchElementTree(elementId: string): Promise<any[]> {
   if (!FLEX_AUTH_TOKEN) throw new Error('Missing FLEX auth token');
-  const r = await fetch(`${FLEX_API_BASE_URL}/element/${encodeURIComponent(elementId)}/tree`, {
+  const r = await fetchWithRetry(`${FLEX_API_BASE_URL}/element/${encodeURIComponent(elementId)}/tree`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
