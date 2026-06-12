@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useSubscriptionContext } from '@/providers/SubscriptionProvider';
 import { formatDistanceToNow } from 'date-fns';
-import { getRealtimeConnectionStatus } from '@/lib/supabase-client';
+import { getRealtimeConnectionStatus } from '@/integrations/supabase/client';
 import { forceRefreshSubscriptions } from '@/lib/enhanced-supabase-client';
 
 /**

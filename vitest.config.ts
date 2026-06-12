@@ -57,6 +57,18 @@ export default defineConfig({
           lines: 85,
           statements: 85,
         },
+        "supabase/functions/_shared/flexFetch.ts": {
+          branches: 85,
+          functions: 100,
+          lines: 90,
+          statements: 90,
+        },
+        "supabase/functions/_shared/whatsappQuota.ts": {
+          branches: 75,
+          functions: 100,
+          lines: 85,
+          statements: 85,
+        },
       },
     },
   },

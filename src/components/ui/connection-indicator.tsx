@@ -4,7 +4,7 @@ import { Wifi, WifiOff, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
-import { getRealtimeConnectionStatus } from "@/lib/supabase-client";
+import { getRealtimeConnectionStatus } from "@/integrations/supabase/client";
 import { connectionRecovery } from "@/lib/connection-recovery-service";
 import { toast } from "sonner";
 

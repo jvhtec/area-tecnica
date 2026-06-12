@@ -10,7 +10,7 @@ const corsHeaders = {
   'Access-Control-Max-Age': '86400',
 }
 
-const FLEX_API_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/api';
+const FLEX_API_BASE_URL = Deno.env.get('FLEX_API_BASE_URL') || 'https://sectorpro.flexrentalsolutions.com/f5/api';
 
 serve(async (req) => {
   // Handle CORS preflight requests
