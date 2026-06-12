@@ -406,7 +406,14 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
   };
 
   const submitTimesheet = async (timesheetId: string) => {
-    const updated = await updateTimesheet(timesheetId, { status: 'submitted' });
+    // Clear rejection metadata so a resubmitted (previously rejected) part
+    // arrives clean for the next review round.
+    const updated = await updateTimesheet(timesheetId, {
+      status: 'submitted',
+      rejected_at: null,
+      rejected_by: null,
+      rejection_reason: null
+    });
 
     // Send push notification to management (fire-and-forget, non-blocking)
     if (updated?.job_id && updated?.technician_id) {
@@ -423,6 +430,36 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         // Non-blocking: log but don't fail the submission
         console.warn('Failed to send timesheet submission notification:', pushErr);
       }
+    }
+
+    return updated;
+  };
+
+  // Management action: send a timesheet back to draft (e.g. filled by
+  // mistake) so the technician can refill it. Keeps the entered hours —
+  // everything is editable again in draft — but invalidates the signature
+  // and clears approval/rejection metadata.
+  const resetTimesheet = async (timesheetId: string) => {
+    const updated = await updateTimesheet(
+      timesheetId,
+      {
+        status: 'draft',
+        approved_by_manager: false,
+        approved_by: null,
+        approved_at: null,
+        rejected_at: null,
+        rejected_by: null,
+        rejection_reason: null,
+        signature_data: null,
+        signed_at: null
+      },
+      true
+    );
+
+    if (updated) {
+      await fetchTimesheets();
+      toast.success('Parte restablecido a borrador');
+      invalidateApprovalContext();
     }
 
     return updated;
@@ -600,6 +637,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
     deleteTimesheet,
     deleteTimesheets,
     recalcTimesheet,
-    revertTimesheet
+    revertTimesheet,
+    resetTimesheet
   };
 };

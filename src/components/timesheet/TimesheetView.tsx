@@ -63,7 +63,7 @@ export const TimesheetView = ({
 }: TimesheetViewProps) => {
   // Ensure userRole is initialized before passing into hooks that depend on it
   const { user, userRole } = useOptimizedAuth();
-  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, revertTimesheet, refetch } = useTimesheets(jobId, { userRole });
+  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, revertTimesheet, resetTimesheet, refetch } = useTimesheets(jobId, { userRole });
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { toast } = useToast();
 
@@ -818,6 +818,36 @@ export const TimesheetView = ({
                         >
                           Revertir Aprobación
                         </Button>
+                      )}
+
+                      {/* Reset to draft - management action for timesheets filled by mistake */}
+                      {isManagementUser && timesheet.status !== 'draft' && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isBulkUpdating || isClosureLocked}
+                              className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                            >
+                              Restablecer
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Restablecer este parte a borrador?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                El parte volverá a estado borrador para que el técnico pueda rellenarlo de nuevo. Se conservan las horas introducidas, pero se invalida la firma y se eliminan la aprobación o el rechazo.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => resetTimesheet(timesheet.id)}>
+                                Restablecer
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
                       )}
 
                       {/* Delete button - only for management */}
