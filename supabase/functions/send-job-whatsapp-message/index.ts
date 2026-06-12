@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { checkAndRecordWhatsappQuota } from "../_shared/whatsappQuota.ts";
 
 /** Request payload for sending a WhatsApp message to multiple assigned users. */
 type SendRequest = {
@@ -187,6 +188,30 @@ serve(async (req: Request) => {
           disallowed_recipient_ids: disallowed,
         },
         { status: 403 },
+      );
+    }
+
+    // Per-actor daily quota (checked after validation so rejected requests
+    // don't consume it): limits the blast radius of a compromised
+    // admin/production account without affecting normal call-sheet volume.
+    const dailyRecipientLimit = Number(Deno.env.get("WA_DAILY_RECIPIENT_LIMIT") || 500);
+    const quota = await checkAndRecordWhatsappQuota({
+      supabase: supabaseAdmin,
+      actorId,
+      kind: "job_message",
+      recipientCount: dedupedRecipientIds.length,
+      jobId,
+      dailyLimit: dailyRecipientLimit,
+    });
+    if (!quota.allowed) {
+      return jsonResponse(
+        {
+          error: "Too Many Requests",
+          reason: "daily_whatsapp_recipient_quota_exceeded",
+          used_today: quota.usedToday,
+          daily_limit: quota.dailyLimit,
+        },
+        { status: 429 },
       );
     }
 

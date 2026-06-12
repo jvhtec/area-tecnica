@@ -39,7 +39,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { supabase } from "@/lib/supabase-client";
+import { supabase } from "@/integrations/supabase/client";
+import type { TablesUpdate } from "@/integrations/supabase/types";
 import { useToast } from "@/hooks/use-toast";
 import { ExternalLink, Trash2, Edit, CheckCircle, Eye } from "lucide-react";
 import { format } from "date-fns";
@@ -151,7 +152,9 @@ export function AdminPanel() {
         .eq("id", selectedBug.id)
         .single();
       if (error) throw error;
-      return data as BugReport;
+      // The generated row types console_logs/environment_info as Json;
+      // BugReport narrows them to their actual shapes.
+      return data as unknown as BugReport;
     },
     enabled: !!selectedBug?.id,
   });
@@ -191,7 +194,10 @@ export function AdminPanel() {
   // Update bug report
   const updateBugMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<BugReport> }) => {
-      const { error } = await supabase.from("bug_reports").update(updates).eq("id", id);
+      const { error } = await supabase
+        .from("bug_reports")
+        .update(updates as unknown as TablesUpdate<"bug_reports">)
+        .eq("id", id);
       if (error) throw error;
     },
     onMutate: async ({ id, updates }) => {

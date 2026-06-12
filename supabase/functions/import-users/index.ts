@@ -1,7 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { parse } from "https://deno.land/std@0.182.0/csv/parse.ts";
+import { parse } from "https://deno.land/std@0.224.0/csv/parse.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,9 +29,9 @@ serve(async (req) => {
 
   try {
     const formData = await req.formData();
-    const file = formData.get('file') as File;
-    
-    if (!file) {
+    const file = formData.get('file');
+
+    if (!(file instanceof File)) {
       throw new Error('No file provided');
     }
 

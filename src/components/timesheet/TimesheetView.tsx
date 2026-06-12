@@ -63,7 +63,7 @@ export const TimesheetView = ({
 }: TimesheetViewProps) => {
   // Ensure userRole is initialized before passing into hooks that depend on it
   const { user, userRole } = useOptimizedAuth();
-  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, revertTimesheet, refetch } = useTimesheets(jobId, { userRole });
+  const { timesheets, isLoading, createTimesheet, updateTimesheet, submitTimesheet, approveTimesheet, rejectTimesheet, signTimesheet, deleteTimesheet, deleteTimesheets, recalcTimesheet, revertTimesheet, resetTimesheet, refetch } = useTimesheets(jobId, { userRole });
   const { assignments } = useJobAssignmentsRealtime(jobId);
   const { toast } = useToast();
 
@@ -121,6 +121,9 @@ export const TimesheetView = ({
   });
   const [timesheetBeingRejected, setTimesheetBeingRejected] = useState<Timesheet | null>(null);
   const [rejectionNotes, setRejectionNotes] = useState("");
+  const [rejectResetHours, setRejectResetHours] = useState(false);
+  const [rejectSendEmail, setRejectSendEmail] = useState(true);
+  const [submitPromptTimesheetId, setSubmitPromptTimesheetId] = useState<string | null>(null);
   const [sendingReminder, setSendingReminder] = useState<string | null>(null);
 
   // Filter timesheets based on user role and props
@@ -240,6 +243,8 @@ export const TimesheetView = ({
   const openRejectDialog = (timesheet: Timesheet) => {
     setTimesheetBeingRejected(timesheet);
     setRejectionNotes(timesheet.rejection_reason ?? '');
+    setRejectResetHours(false);
+    setRejectSendEmail(true);
   };
 
   const closeRejectDialog = () => {
@@ -249,8 +254,22 @@ export const TimesheetView = ({
 
   const confirmRejectTimesheet = async () => {
     if (!timesheetBeingRejected) return;
-    await rejectTimesheet(timesheetBeingRejected.id, rejectionNotes.trim() || undefined);
+    await rejectTimesheet(timesheetBeingRejected.id, rejectionNotes.trim() || undefined, {
+      resetHours: rejectResetHours,
+      sendEmail: rejectSendEmail,
+    });
     closeRejectDialog();
+  };
+
+  // After a technician signs their own draft/rejected part, immediately offer
+  // to submit it — techs often sign and forget to hit send.
+  const handleSigned = async (timesheetId: string, signatureData: string) => {
+    const result = await signTimesheet(timesheetId, signatureData);
+    const signed = timesheets.find((t) => t.id === timesheetId);
+    if (result && signed && signed.technician_id === user?.id && (signed.status === 'draft' || signed.status === 'rejected')) {
+      setSubmitPromptTimesheetId(timesheetId);
+    }
+    return result;
   };
 
   const handleSendReminder = async (timesheetId: string) => {
@@ -451,7 +470,7 @@ export const TimesheetView = ({
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
             <Clock className="h-6 w-6" />
@@ -460,7 +479,7 @@ export const TimesheetView = ({
           {jobTitle && <p className="text-muted-foreground">Trabajo: {jobTitle}</p>}
         </div>
         {isManagementUser && filteredTimesheets.length > 0 && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {showBulkActions && (
               <>
                 <Button
@@ -717,8 +736,8 @@ export const TimesheetView = ({
 
               return (
                 <div key={timesheet.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-3">
                       {isManagementUser && (
                         <input
                           type="checkbox"
@@ -746,7 +765,7 @@ export const TimesheetView = ({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {/* Edit button */}
                       {canEditTimesheet && (
                         <Button
@@ -820,6 +839,36 @@ export const TimesheetView = ({
                         </Button>
                       )}
 
+                      {/* Reset to draft - management action for timesheets filled by mistake */}
+                      {isManagementUser && timesheet.status !== 'draft' && (
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={isBulkUpdating || isClosureLocked}
+                              className="border-orange-500 text-orange-600 hover:bg-orange-50"
+                            >
+                              Restablecer
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>¿Restablecer este parte a borrador?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                El parte volverá a estado borrador para que el técnico pueda rellenarlo de nuevo. Se conservan las horas introducidas, pero se invalida la firma y se eliminan la aprobación o el rechazo.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => resetTimesheet(timesheet.id)}>
+                                Restablecer
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      )}
+
                       {/* Delete button - only for management */}
                       {isManagementUser && (
                         <AlertDialog>
@@ -864,6 +913,18 @@ export const TimesheetView = ({
                         {timesheet.rejection_reason?.length
                           ? timesheet.rejection_reason
                           : 'Por favor revise las horas y vuelva a enviar para su aprobación.'}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {timesheet.status === 'draft' && timesheet.technician_id === user?.id && !isClosureLocked && (
+                    <Alert className="border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                      <AlertTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        Parte sin enviar
+                      </AlertTitle>
+                      <AlertDescription>
+                        Este parte está en borrador y todavía no se ha enviado. Cuando termines de rellenarlo y firmarlo, pulsa el botón verde «ENVIAR PARTE»: sin ese paso no podrá ser revisado ni aprobado.
                       </AlertDescription>
                     </Alert>
                   )}
@@ -1020,7 +1081,7 @@ export const TimesheetView = ({
                       timesheetId={timesheet.id}
                       currentSignature={timesheet.signature_data}
                       canSign={timesheet.technician_id === user?.id || isManagementUser}
-                      onSigned={signTimesheet}
+                      onSigned={handleSigned}
                     />
                   )}
                 </div>
@@ -1033,10 +1094,44 @@ export const TimesheetView = ({
       <TimesheetRejectDialog
         timesheet={timesheetBeingRejected}
         rejectionNotes={rejectionNotes}
+        resetHours={rejectResetHours}
+        sendEmail={rejectSendEmail}
         onRejectionNotesChange={setRejectionNotes}
+        onResetHoursChange={setRejectResetHours}
+        onSendEmailChange={setRejectSendEmail}
         onClose={closeRejectDialog}
         onConfirm={confirmRejectTimesheet}
       />
+
+      <AlertDialog
+        open={!!submitPromptTimesheetId}
+        onOpenChange={(open) => {
+          if (!open) setSubmitPromptTimesheetId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Parte firmado — ¿enviarlo ahora?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tu parte está firmado pero todavía NO se ha enviado. Hasta que no pulses «Enviar», el equipo de gestión no podrá revisarlo ni aprobarlo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSubmitPromptTimesheetId(null)}>
+              Todavía no
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-green-600 hover:bg-green-700"
+              onClick={() => {
+                if (submitPromptTimesheetId) submitTimesheet(submitPromptTimesheetId);
+                setSubmitPromptTimesheetId(null);
+              }}
+            >
+              ✓ Enviar parte ahora
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

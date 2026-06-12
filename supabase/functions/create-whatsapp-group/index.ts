@@ -7,6 +7,7 @@ import {
   resolveFestivalStageTechnicianIds,
 } from "./recipientUtils.ts";
 import type { Dept } from "./recipientUtils.ts";
+import { checkAndRecordWhatsappQuota } from "../_shared/whatsappQuota.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -511,6 +512,30 @@ serve(async (req: Request) => {
     const uniqueParticipants = Array.from(new Set([...crewParticipantPhones, ...supplementalParticipantPhones]));
     if (uniqueParticipants.length === 0) {
       return new Response(JSON.stringify({ error: 'No valid phone numbers found', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Per-actor daily quota on real group creations (duplicates and
+    // finalize-only runs are excluded): limits WAHA quota burn from a
+    // compromised admin/management account. Checked BEFORE the request lock
+    // below so a 429 doesn't leave the job/department permanently locked.
+    if (!finalizeOnly && !existingWaGroupId) {
+      const dailyGroupLimit = Number(Deno.env.get('WA_DAILY_GROUP_LIMIT') || 20);
+      const quota = await checkAndRecordWhatsappQuota({
+        supabase: supabaseAdmin,
+        actorId: actorId!,
+        kind: 'group_creation',
+        recipientCount: uniqueParticipants.length,
+        jobId: job_id,
+        dailyLimit: dailyGroupLimit,
+      });
+      if (!quota.allowed) {
+        return new Response(JSON.stringify({
+          error: 'Too Many Requests',
+          reason: 'daily_whatsapp_group_quota_exceeded',
+          used_today: quota.usedToday,
+          daily_limit: quota.dailyLimit,
+        }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     // Record request to lock further attempts only after recipient validation succeeds.

@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { addDays, getDaysInMonth } from "npm:date-fns@3.6.0";
 import { formatInTimeZone, fromZonedTime } from "npm:date-fns-tz@3.2.0";
 import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
+import { sendBrevoEmail } from "../_shared/brevo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -61,11 +62,38 @@ interface PayoutOverrideRow {
   override_amount_eur: number | null;
 }
 
+interface PayoutEmailResult {
+  technician_id: string;
+  sent: boolean;
+  error?: string;
+}
+
 interface JobPayoutRequestBody {
   job?: JobMetadata;
   technicians?: TechnicianPayload[];
   missing_emails?: string[];
   requested_at?: string;
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(items.length, Math.max(1, Math.floor(concurrency)));
+
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  };
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
 }
 
 function escapeHtml(str: string): string {
@@ -299,16 +327,17 @@ serve(async (req) => {
       );
     }
 
-    const results: Array<{ technician_id: string; sent: boolean; error?: string }> = [];
+    const job = body.job;
+    const technicians = body.technicians;
 
     // Preload payout overrides for this job (so email totals never depend on client-side enrichment)
-    const technicianIds = body.technicians.map((t) => t.technician_id).filter(Boolean);
+    const technicianIds = technicians.map((t) => t.technician_id).filter(Boolean);
     const overrideMap = new Map<string, number>();
     if (technicianIds.length > 0) {
       const { data: overrides, error: overrideError } = await supabaseAdmin
         .from("job_technician_payout_overrides")
         .select("technician_id, override_amount_eur")
-        .eq("job_id", body.job.id)
+        .eq("job_id", job.id)
         .in("technician_id", technicianIds);
 
       if (overrideError) {
@@ -328,18 +357,23 @@ serve(async (req) => {
     const todayEstimate = calculateEstimatedPayoutRange([new Date()]);
     const todayEstimateText = escapeHtml(`a partir del ${formatLongDate(todayEstimate.fromDate)}`);
 
-    for (const tech of body.technicians) {
+    const configuredConcurrency = Number(Deno.env.get('PAYOUT_EMAIL_CONCURRENCY') || 3);
+    const emailConcurrency = Number.isFinite(configuredConcurrency) && configuredConcurrency > 0
+      ? Math.min(5, Math.floor(configuredConcurrency))
+      : 3;
+    const results = await mapWithConcurrency<TechnicianPayload, PayoutEmailResult>(
+      technicians,
+      emailConcurrency,
+      async (tech) => {
       const trimmedEmail = (tech.email || '').trim();
       const pdfBase64 = (tech.pdf_base64 || '').trim();
 
       if (!trimmedEmail) {
-        results.push({ technician_id: tech.technician_id, sent: false, error: 'missing_email' });
-        continue;
+        return { technician_id: tech.technician_id, sent: false, error: 'missing_email' };
       }
       if (!pdfBase64) {
         console.error('[send-job-payout-email] Missing PDF for technician:', tech.technician_id);
-        results.push({ technician_id: tech.technician_id, sent: false, error: 'missing_pdf' });
-        continue;
+        return { technician_id: tech.technician_id, sent: false, error: 'missing_pdf' };
       }
       if (DEBUG) {
         console.log(`[send-job-payout-email][debug] PDF length for technician: ${tech.technician_id}`, {
@@ -347,8 +381,11 @@ serve(async (req) => {
         });
       }
 
-      const escapedJobTitle = escapeHtml(body.job.title || '');
-      const subject = `Resumen de pagos · ${body.job.title}`;
+      const normalizedJobTitle = (job.title || '').trim();
+      const escapedJobTitle = escapeHtml(normalizedJobTitle);
+      const subject = normalizedJobTitle
+        ? `Resumen de pagos · ${normalizedJobTitle}`
+        : 'Resumen de pagos';
 
       // Corporate-styled HTML, aligned with other emails
       const safeName = escapeHtml(tech.full_name || '');
@@ -356,7 +393,7 @@ serve(async (req) => {
       const prepServiceDates = parseWorkedDates(tech.prep_dates);
       const workedDatesText = formatWorkedDatesFromParsed(workedServiceDates);
       const prepDatesText = prepServiceDates.length > 0 ? formatWorkedDatesFromParsed(prepServiceDates) : '';
-      const fallbackJobDate = formatJobDate(body.job.start_time);
+      const fallbackJobDate = formatJobDate(job.start_time);
       const dateText =
         workedDatesText ||
         (fallbackJobDate === 'fecha desconocida' ? 'fecha desconocida' : `el ${fallbackJobDate}`);
@@ -371,7 +408,7 @@ serve(async (req) => {
       const deductionFormatted = formatCurrency(deductionAmount);
       const hasDeduction = deductionAmount > 0;
 
-      const jobFallbackServiceDate = body.job.start_time ? parseServiceDate(body.job.start_time) : null;
+      const jobFallbackServiceDate = job.start_time ? parseServiceDate(job.start_time) : null;
       const estimateSourceDates = workedServiceDates.length > 0
         ? workedServiceDates
         : (jobFallbackServiceDate ? [jobFallbackServiceDate] : []);
@@ -390,7 +427,7 @@ serve(async (req) => {
       const totalFromPayload = Number(tech.totals?.total_eur ?? 0);
       const effectiveTotal = overrideAmount != null ? overrideAmount - deductionAmount : totalFromPayload;
       const grand = formatCurrency(effectiveTotal);
-      const invoicingCompany = body.job.invoicing_company;
+      const invoicingCompany = job.invoicing_company;
 
       const companyDetails = getInvoicingCompanyDetails(invoicingCompany);
       if (DEBUG) {
@@ -514,7 +551,7 @@ serve(async (req) => {
         attachment: [
           {
             content: pdfBase64,
-            name: tech.filename || `pago_${body.job.id}_${tech.technician_id}.pdf`,
+            name: tech.filename || `pago_${job.id}_${tech.technician_id}.pdf`,
           },
         ],
       };
@@ -526,39 +563,32 @@ serve(async (req) => {
         console.log('[send-job-payout-email][debug] Sending email with attachment:', {
           to: '***',
           pdfLength: pdfBase64.length,
-          filename: tech.filename || `pago_${body.job.id}_${tech.technician_id}.pdf`,
+          filename: tech.filename || `pago_${job.id}_${tech.technician_id}.pdf`,
         });
       }
 
       try {
-        const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: {
-            'api-key': BREVO_KEY,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(emailPayload),
-        });
+        const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload, { timeoutMs: 10000 });
 
         if (!sendRes.ok) {
           const errText = await sendRes.text();
           console.error('[send-job-payout-email] Brevo error', sendRes.status, errText);
-          results.push({ technician_id: tech.technician_id, sent: false, error: errText || sendRes.statusText });
-        } else {
-          results.push({ technician_id: tech.technician_id, sent: true });
+          return { technician_id: tech.technician_id, sent: false, error: errText || sendRes.statusText };
         }
+        return { technician_id: tech.technician_id, sent: true };
       } catch (err) {
         console.error('[send-job-payout-email] Failed to send email', err);
-        results.push({ technician_id: tech.technician_id, sent: false, error: (err as Error).message });
+        return { technician_id: tech.technician_id, sent: false, error: (err as Error).message };
       }
-    }
+      },
+    );
 
     const success = results.every((r) => r.sent);
     return new Response(
       JSON.stringify({
         success,
         results,
-        job: body.job,
+        job,
         missing_emails: body.missing_emails || [],
         requested_at: body.requested_at || new Date().toISOString(),
       }),

@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.7.1'
+import { sendBrevoEmail } from '../_shared/brevo.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -92,8 +93,9 @@ serve(async (req) => {
 
     console.log('User authorized, role:', profile.role);
 
-    const { timesheetId } = await req.json();
-    console.log('Processing timesheet ID:', timesheetId);
+    const { timesheetId, kind = 'reminder', rejectionReason } = await req.json();
+    const isRejection = kind === 'rejection';
+    console.log('Processing timesheet ID:', timesheetId, 'kind:', kind);
 
     if (!timesheetId) {
       console.error('Missing timesheetId in request body');
@@ -110,8 +112,9 @@ serve(async (req) => {
       .eq('id', timesheetId)
       .single()
 
-    if (timesheetError || !timesheet) {
-      console.error('Timesheet not found:', timesheetError);
+    if (timesheetError || !timesheet || timesheet.is_active === false) {
+      // Voided timesheets (is_active = false) must not trigger reminders.
+      console.error('Timesheet not found or voided:', timesheetError);
       return new Response(JSON.stringify({ error: 'Timesheet not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -121,7 +124,7 @@ serve(async (req) => {
     // Fetch job details separately since there's no foreign key
     const { data: job, error: jobError } = await supabaseAdmin
       .from('jobs')
-      .select('id, title')
+      .select('id, title, client_name')
       .eq('id', timesheet.job_id)
       .single()
 
@@ -181,9 +184,54 @@ serve(async (req) => {
 
     const techName = technician.nickname || technician.first_name;
     const jobTitle = job?.title || 'trabajo desconocido';
-    const subject = `Recordatorio: Parte de horas pendiente - ${jobTitle}`;
+    const subject = isRejection
+      ? `Parte de horas rechazado - ${jobTitle}`
+      : `Recordatorio: Parte de horas pendiente - ${jobTitle}`;
 
     const timesheetUrl = `https://sector-pro.work/timesheets?jobId=${timesheet.job_id}`;
+
+    const escapeHtml = (value: string) => value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    const safeTechName = escapeHtml(techName || 'técnico');
+    const safeJobTitle = escapeHtml(jobTitle);
+    const safeClientName = job?.client_name ? escapeHtml(String(job.client_name)) : '';
+    const safeTechnicianEmail = escapeHtml(technician.email);
+
+    const statusLabel = timesheet.status === 'draft'
+      ? 'Borrador'
+      : timesheet.status === 'rejected'
+        ? 'Rechazado'
+        : timesheet.status === 'approved'
+          ? 'Aprobado'
+          : 'Enviado';
+
+    const mainBlock = isRejection
+      ? `<div style="background:#fef2f2;border-left:4px solid #ef4444;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
+                <div style="color:#7f1d1d;font-size:15px;line-height:1.6;font-weight:600;margin-bottom:8px;">
+                  Tu parte de horas ha sido rechazado
+                </div>
+                <div style="color:#7f1d1d;font-size:15px;line-height:1.6;">
+                  El parte de horas del trabajo <strong>${safeJobTitle}</strong> ha sido rechazado porque las horas indicadas no coinciden con los datos que tenemos registrados para ese trabajo. Es necesario que lo rellenes de nuevo y lo vuelvas a enviar para su aprobación.
+                </div>
+                ${rejectionReason ? `
+                <div style="color:#7f1d1d;font-size:14px;line-height:1.6;margin-top:12px;background:#ffffff;border:1px solid #fecaca;border-radius:4px;padding:12px;">
+                  <strong>Nota del gestor:</strong> ${escapeHtml(String(rejectionReason))}
+                </div>
+                ` : ''}
+              </div>`
+      : `<div style="background:#eef2ff;border-left:4px solid #6366f1;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
+                <div style="color:#374151;font-size:15px;line-height:1.6;">
+                  Te recordamos que tienes partes de horas pendientes de rellenar para el trabajo: <strong>${safeJobTitle}</strong>. Te rogamos completes los partes para su aprobación; una vez aprobados obtendrás un informe de los importes a facturar y la referencia que has de adjuntar a la factura.
+                </div>
+              </div>`;
+
+    const ctaLabel = isRejection
+      ? 'Rellenar de nuevo el parte de horas'
+      : 'Haz clic aquí para rellenar tu parte de horas ahora';
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="es">
@@ -223,7 +271,7 @@ serve(async (req) => {
           <tr>
             <td style="padding:24px;color:#111827;font-size:15px;line-height:1.6;">
               <div style="margin-bottom:16px;">
-                Hola ${techName},
+                Hola ${safeTechName},
               </div>
             </td>
           </tr>
@@ -231,12 +279,9 @@ serve(async (req) => {
           <!-- Main content -->
           <tr>
             <td style="padding:0 24px 24px 24px;">
-              <div style="background:#eef2ff;border-left:4px solid #6366f1;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
-                <div style="color:#374151;font-size:15px;line-height:1.6;">
-                  Te recordamos que tienes partes de horas pendientes de rellenar para el trabajo: <strong>${jobTitle}</strong>. Te rogamos completes los partes para su aprobación; una vez aprobados obtendrás un informe de los importes a facturar y la referencia que has de adjuntar a la factura.
-                </div>
-              </div>
+              ${mainBlock}
 
+              ${isRejection ? '' : `
               <!-- Important deadline warning -->
               <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
                 <div style="color:#92400e;font-size:14px;line-height:1.6;font-weight:600;margin-bottom:8px;">
@@ -249,6 +294,7 @@ serve(async (req) => {
                   <strong>Recomendación:</strong> Para evitar errores y asegurar que se registren correctamente todas tus horas trabajadas, te aconsejamos rellenar los partes inmediatamente después de finalizar cada trabajo.
                 </div>
               </div>
+              `}
 
               <!-- Job details -->
               <div style="margin-bottom:20px;">
@@ -260,13 +306,13 @@ serve(async (req) => {
                   </tr>
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
-                      <strong>Trabajo:</strong> ${jobTitle}
+                      <strong>Trabajo:</strong> ${safeJobTitle}
                     </td>
                   </tr>
                   ${job?.client_name ? `
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
-                      <strong>Cliente:</strong> ${job.client_name}
+                      <strong>Cliente:</strong> ${safeClientName}
                     </td>
                   </tr>
                   ` : ''}
@@ -282,7 +328,7 @@ serve(async (req) => {
                   </tr>
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;">
-                      <strong>Estado:</strong> ${timesheet.status === 'draft' ? 'Borrador' : 'Enviado'}
+                      <strong>Estado:</strong> ${statusLabel}
                     </td>
                   </tr>
                 </table>
@@ -292,7 +338,7 @@ serve(async (req) => {
               <div style="text-align:center;margin:24px 0;">
                 <a href="${timesheetUrl}"
                    style="display:inline-block;background:#6366f1;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:600;font-size:16px;box-shadow:0 2px 4px rgba(99,102,241,0.3);">
-                  Haz clic aquí para rellenar tu parte de horas ahora
+                  ${ctaLabel}
                 </a>
               </div>
 
@@ -302,7 +348,7 @@ serve(async (req) => {
                   <strong style="color:#374151;">Instrucciones de acceso:</strong><br/>
                   Si es la primera vez que accedes a la plataforma:
                   <ul style="margin:8px 0;padding-left:20px;">
-                    <li><strong>Usuario:</strong> ${technician.email}</li>
+                    <li><strong>Usuario:</strong> ${safeTechnicianEmail}</li>
                     <li><strong>Contraseña:</strong> pulsa "Olvidé mi contraseña" en la pantalla de acceso y recibirás un enlace para crearla.</li>
                   </ul>
                   Después podrás cambiarla cuando quieras desde tu perfil.
@@ -350,14 +396,7 @@ serve(async (req) => {
       htmlContent
     };
 
-    const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': BREVO_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(emailPayload),
-    });
+    const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload);
 
     if (!sendRes.ok) {
       const errorText = await sendRes.text();
@@ -374,13 +413,16 @@ serve(async (req) => {
     const brevoResponse = await sendRes.json();
     console.log('Email sent successfully:', brevoResponse.messageId);
 
-    // Stamp reminder_sent_at so the auto-reminder system knows a reminder was recently sent
-    const { error: updateError } = await supabaseAdmin
-      .from('timesheets')
-      .update({ reminder_sent_at: new Date().toISOString() })
-      .eq('id', timesheetId);
-    if (updateError) {
-      console.warn('Could not update reminder_sent_at:', updateError.message);
+    // Stamp reminder_sent_at so the auto-reminder system knows a reminder was
+    // recently sent. Rejection notices are not reminders — don't stamp those.
+    if (!isRejection) {
+      const { error: updateError } = await supabaseAdmin
+        .from('timesheets')
+        .update({ reminder_sent_at: new Date().toISOString() })
+        .eq('id', timesheetId);
+      if (updateError) {
+        console.warn('Could not update reminder_sent_at:', updateError.message);
+      }
     }
 
     return new Response(
@@ -396,8 +438,9 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error('Error sending timesheet reminder:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({ error: message }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

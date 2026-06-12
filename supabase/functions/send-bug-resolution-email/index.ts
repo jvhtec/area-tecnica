@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { wrapInCorporateTemplate, escapeHtml } from "../_shared/corporateEmailTemplate.ts";
+import { sendBrevoEmail } from "../_shared/brevo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -223,22 +224,9 @@ serve(async (req) => {
     const emailDomain = bugReport.reporter_email.split('@')[1] || 'unknown';
     console.log("[send-bug-resolution-email] Sending email to domain:", emailDomain);
 
-    // Add timeout for Brevo API call (10 seconds)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
     try {
-      const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: {
-          "api-key": BREVO_KEY,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emailPayload),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
+      // Timeout for Brevo API call (10 seconds)
+      const response = await sendBrevoEmail(BREVO_KEY, emailPayload, { timeoutMs: 10000 });
 
       if (!response.ok) {
         const errorMessage = await response.text();
@@ -270,7 +258,6 @@ serve(async (req) => {
         }
       );
     } catch (fetchError) {
-      clearTimeout(timeoutId);
       const errorId = `BRE-TIMEOUT-${Date.now()}-${Math.random().toString(36).substring(7)}`;
       console.error(`[send-bug-resolution-email] Fetch error ${errorId}:`, fetchError);
       return new Response(

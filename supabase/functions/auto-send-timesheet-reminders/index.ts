@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { sendBrevoEmail } from '../_shared/brevo.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -137,6 +138,7 @@ serve(async (req) => {
         .from('timesheets')
         .select('id, technician_id, job_id, date, status, reminder_sent_at, auto_reminder_count')
         .eq('status', 'draft')
+        .eq('is_active', true)
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1)
 
       if (tsError) {
@@ -465,11 +467,7 @@ serve(async (req) => {
         htmlContent,
       }
 
-      const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': BREVO_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify(emailPayload),
-      })
+      const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload)
 
       if (!sendRes.ok) {
         const errText = await sendRes.text()

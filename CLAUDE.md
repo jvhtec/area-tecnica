@@ -60,7 +60,7 @@ npm run build:staging     # Build for staging
 
 # Testing
 npm run test:run          # Single run (CI-friendly)
-npm run test:critical     # 30 critical workflow tests
+npm run test:critical     # Critical workflow test files (auth, assignments, timesheets, …)
 npm run test:coverage     # Coverage report
 npm run test:e2e          # Playwright smoke tests (Chromium)
 
@@ -402,7 +402,7 @@ Client-side security config in `src/lib/enhanced-security-config.ts`:
 ```bash
 npm test                # Vitest watch mode (interactive development)
 npm run test:run        # Vitest single run (CI-friendly)
-npm run test:critical   # 30 critical workflow tests (auth, assignments, timesheets, etc.)
+npm run test:critical   # Critical workflow tests (auth, assignments, timesheets, etc. — file list in package.json)
 npm run test:coverage   # Coverage report
 npm run test:e2e        # Playwright smoke tests (requires Chromium)
 ```
@@ -414,7 +414,7 @@ Defined in `.github/workflows/tests.yml`, triggered on PRs to `dev`/`main` or ma
 | Job | Timeout | What it does |
 |-----|---------|-------------|
 | `lint` | 20 min | ESLint on app code |
-| `test_critical` | 25 min | 30 critical test files (auth, assignments, timesheets) |
+| `test_critical` | 25 min | Critical test files (auth, assignments, timesheets) |
 | `test_run` | 25 min | Full Vitest suite |
 | `build` | 25 min | Vite production build + post-build scripts |
 | `e2e_smoke` | 30 min | Playwright Chromium smoke tests |
@@ -957,4 +957,5 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **CI requires Node 20** — GitHub Actions workflow uses Node 20; match locally for consistency
 - **Playwright needs Chromium** — `npm run test:e2e` requires Playwright browsers installed (`npx playwright install chromium`)
 - **100 SQL migrations exist** — the initial `00000000000000_production_schema.sql` is 10,500+ lines; new migrations use timestamp naming (`YYYYMMDDHHMMSS_description.sql`)
+- **Validate types with `npm run typecheck`, not bare `npx tsc --noEmit`** — CI gates on `tsc -p tsconfig.app.json`, which is stricter; a plain tsc run can pass while CI fails (e.g. typed-supabase-client casts)
 - **Don't manually edit archive/ or src/legacy/** — these are retained for reference only, no new runtime imports

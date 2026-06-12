@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendBrevoEmail } from "../_shared/brevo.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -202,7 +203,7 @@ serve(async (req) => {
     </html>`;
 
     const emailPayload = { sender: { email: BREVO_FROM }, to: [{ email: tech.email }], subject, htmlContent: html } as const;
-    const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', { method:'POST', headers: { 'api-key': BREVO_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(emailPayload) });
+    const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload);
     if (!sendRes.ok) {
       const t = await sendRes.text().catch(()=>'');
       return new Response(JSON.stringify({ error: 'Email delivery failed', details: { status: sendRes.status, message: t } }), { status: sendRes.status, headers: { 'Content-Type': 'application/json', ...corsHeaders } });

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { sendBrevoEmail } from "../_shared/brevo.ts";
 
 const corsHeaders: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -220,14 +221,7 @@ serve(async (req) => {
       emailPayload['bcc'] = [{ email: EXPENSE_NOTIFICATION_BCC }];
     }
 
-    const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': BREVO_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(emailPayload),
-    });
+    const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload);
 
     if (!sendRes.ok) {
       const errText = await sendRes.text();

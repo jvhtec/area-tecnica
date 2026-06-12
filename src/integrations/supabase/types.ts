@@ -851,6 +851,57 @@ export type Database = {
         }
         Relationships: []
       }
+      consumos_components: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department: Database["public"]["Enums"]["department"]
+          fixture_type: string | null
+          id: string
+          legacy_code: number | null
+          name: string
+          updated_at: string
+          watts: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department: Database["public"]["Enums"]["department"]
+          fixture_type?: string | null
+          id?: string
+          legacy_code?: number | null
+          name: string
+          updated_at?: string
+          watts: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department?: Database["public"]["Enums"]["department"]
+          fixture_type?: string | null
+          id?: string
+          legacy_code?: number | null
+          name?: string
+          updated_at?: string
+          watts?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "consumos_components_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "consumos_components_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       corporate_email_logs: {
         Row: {
           body_html: string | null
@@ -4333,7 +4384,7 @@ export type Database = {
           job_id: string
           override_amount_eur: number
           set_at: string
-          set_by: string
+          set_by: string | null
           technician_id: string
           updated_at: string
         }
@@ -4341,7 +4392,7 @@ export type Database = {
           job_id: string
           override_amount_eur: number
           set_at?: string
-          set_by: string
+          set_by?: string | null
           technician_id: string
           updated_at?: string
         }
@@ -4349,7 +4400,7 @@ export type Database = {
           job_id?: string
           override_amount_eur?: number
           set_at?: string
-          set_by?: string
+          set_by?: string | null
           technician_id?: string
           updated_at?: string
         }
@@ -6483,7 +6534,7 @@ export type Database = {
           rating_total: number
           ratings_count: number
           uploaded_at: string
-          uploaded_by: string
+          uploaded_by: string | null
           venue_id: string
         }
         Insert: {
@@ -6499,7 +6550,7 @@ export type Database = {
           rating_total?: number
           ratings_count?: number
           uploaded_at?: string
-          uploaded_by: string
+          uploaded_by?: string | null
           venue_id: string
         }
         Update: {
@@ -6515,7 +6566,7 @@ export type Database = {
           rating_total?: number
           ratings_count?: number
           uploaded_at?: string
-          uploaded_by?: string
+          uploaded_by?: string | null
           venue_id?: string
         }
         Relationships: [
@@ -6651,7 +6702,7 @@ export type Database = {
       staffing_campaigns: {
         Row: {
           created_at: string | null
-          created_by: string
+          created_by: string | null
           department: string
           id: string
           job_id: string
@@ -6667,7 +6718,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
-          created_by: string
+          created_by?: string | null
           department: string
           id?: string
           job_id: string
@@ -6683,7 +6734,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
-          created_by?: string
+          created_by?: string | null
           department?: string
           id?: string
           job_id?: string
@@ -7108,6 +7159,54 @@ export type Database = {
             columns: ["video_task_id"]
             isOneToOne: false
             referencedRelation: "video_job_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      technical_tool_quick_presets: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department: Database["public"]["Enums"]["department"]
+          id: string
+          name: string
+          tables: Json
+          tool: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department: Database["public"]["Enums"]["department"]
+          id?: string
+          name: string
+          tables: Json
+          tool: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department?: Database["public"]["Enums"]["department"]
+          id?: string
+          name?: string
+          tables?: Json
+          tool?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technical_tool_quick_presets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technical_tool_quick_presets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -8057,6 +8156,73 @@ export type Database = {
           },
         ]
       }
+      tour_guest_links: {
+        Row: {
+          access_level: string
+          allowed_sections: Json
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          label: string
+          revoked_at: string | null
+          token: string | null
+          token_hash: string
+          tour_id: string
+          updated_at: string
+        }
+        Insert: {
+          access_level?: string
+          allowed_sections?: Json
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          label?: string
+          revoked_at?: string | null
+          token?: string | null
+          token_hash: string
+          tour_id: string
+          updated_at?: string
+        }
+        Update: {
+          access_level?: string
+          allowed_sections?: Json
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          label?: string
+          revoked_at?: string | null
+          token?: string | null
+          token_hash?: string
+          tour_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tour_guest_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_guest_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_guest_links_tour_id_fkey"
+            columns: ["tour_id"]
+            isOneToOne: false
+            referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tour_logos: {
         Row: {
           content_type: string | null
@@ -8664,7 +8830,7 @@ export type Database = {
       transport_requests: {
         Row: {
           created_at: string
-          created_by: string
+          created_by: string | null
           department: string
           description: string | null
           fulfilled_by: string | null
@@ -8677,7 +8843,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          created_by: string
+          created_by?: string | null
           department: string
           description?: string | null
           fulfilled_by?: string | null
@@ -8690,7 +8856,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          created_by?: string
+          created_by?: string | null
           department?: string
           description?: string | null
           fulfilled_by?: string | null
@@ -9627,6 +9793,48 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_send_audit: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          id: string
+          job_id: string | null
+          kind: string
+          recipient_count: number
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          kind: string
+          recipient_count?: number
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          id?: string
+          job_id?: string | null
+          kind?: string
+          recipient_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_send_audit_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_send_audit_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "wallboard_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       current_stock_levels: {
@@ -10113,9 +10321,31 @@ export type Database = {
         }
       }
       assert_soundvision_access: { Args: never; Returns: boolean }
+      attempt_whatsapp_send: {
+        Args: {
+          _actor_id: string
+          _daily_limit: number
+          _job_id?: string
+          _kind: string
+          _recipient_count?: number
+          _units: number
+        }
+        Returns: {
+          allowed: boolean
+          used_today: number
+        }[]
+      }
       auto_complete_past_jobs: { Args: never; Returns: number }
       can_access_department_task: {
         Args: { task_assigned_department: string }
+        Returns: boolean
+      }
+      can_manage_role_skill_mapping: {
+        Args: { p_role_prefix: string; p_skill_name: string }
+        Returns: boolean
+      }
+      can_manage_skill_category: {
+        Args: { p_category: string }
         Returns: boolean
       }
       can_manage_users: { Args: never; Returns: boolean }
@@ -10180,8 +10410,36 @@ export type Database = {
         Args: { job_id: string }
         Returns: undefined
       }
+      create_tour_guest_link: {
+        Args: {
+          p_access_level?: string
+          p_allowed_sections?: Json
+          p_expires_at?: string
+          p_label?: string
+          p_tour_id: string
+        }
+        Returns: {
+          access_level: string
+          allowed_sections: Json
+          created_at: string
+          expires_at: string
+          id: string
+          label: string
+          revoked_at: string
+          token: string
+          tour_id: string
+        }[]
+      }
       current_user_department: { Args: never; Returns: string }
       current_user_role: { Args: never; Returns: string }
+      deactivate_unassigned_prep_day_timesheet: {
+        Args: { _date: string; _job_id: string; _technician_id: string }
+        Returns: number
+      }
+      department_for_role_prefix: {
+        Args: { p_role_prefix: string }
+        Returns: string
+      }
       distance_km: {
         Args: { lat1: number; lat2: number; lng1: number; lng2: number }
         Returns: number
@@ -10189,6 +10447,10 @@ export type Database = {
       dreamlit_auth_admin_executor: {
         Args: { command: string }
         Returns: undefined
+      }
+      ensure_prep_day_timesheets_for_job_date: {
+        Args: { _date: string; _job_id: string }
+        Returns: number
       }
       evaluate_daily_achievements: {
         Args: never
@@ -10474,6 +10736,7 @@ export type Database = {
         Args: { p_tour_date_id: string }
         Returns: Json
       }
+      get_tour_guest_payload: { Args: { p_token: string }; Returns: Json }
       get_user_job_ids: {
         Args: { user_uuid: string }
         Returns: {
@@ -10493,6 +10756,7 @@ export type Database = {
         Args: { event_type: string }
         Returns: undefined
       }
+      invoke_staffing_sweeper: { Args: never; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_admin_or_management: { Args: never; Returns: boolean }
       is_house_tech: { Args: { _profile_id: string }; Returns: boolean }
@@ -10614,10 +10878,6 @@ export type Database = {
         Args: { p_hoja_de_ruta_id: string; p_transport_rows: Json }
         Returns: undefined
       }
-      replace_job_required_roles: {
-        Args: { p_departments: string[]; p_job_id: string; p_rows: Json }
-        Returns: undefined
-      }
       replace_job_expense_receipt: {
         Args: {
           p_expense_id: string
@@ -10658,14 +10918,18 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      replace_job_required_roles: {
+        Args: { p_departments: string[]; p_job_id: string; p_rows: Json }
+        Returns: undefined
+      }
       replace_transport_request_with_items: {
         Args: {
           p_created_by: string
           p_department: string
           p_items: Json
           p_job_id: string
-          p_note: string | null
-          p_request_id: string | null
+          p_note: string
+          p_request_id: string
           p_status: string
         }
         Returns: string
@@ -10677,6 +10941,10 @@ export type Database = {
       resolve_visibility: {
         Args: { _actor_id: string; _code: string; _job_id: string }
         Returns: Database["public"]["Enums"]["activity_visibility"]
+      }
+      revoke_tour_guest_link: {
+        Args: { p_link_id: string }
+        Returns: undefined
       }
       rotate_my_calendar_ics_token: { Args: never; Returns: string }
       set_expense_permission: {
@@ -10716,6 +10984,11 @@ export type Database = {
         Args: { _amount_eur: number; _job_id: string; _technician_id: string }
         Returns: Json
       }
+      set_tour_guest_link_access: {
+        Args: { p_access_level: string; p_link_id: string }
+        Returns: undefined
+      }
+      staffing_role_prefix: { Args: { p_role_code: string }; Returns: string }
       submit_job_expense: {
         Args: {
           p_amount_original: number
@@ -10953,7 +11226,7 @@ export type Database = {
       room_type: "single" | "double"
       staffing_notification_scope: "all_departments" | "own_department"
       task_status: "not_started" | "in_progress" | "completed"
-      timesheet_status: "draft" | "submitted" | "approved"
+      timesheet_status: "draft" | "submitted" | "approved" | "rejected"
       tour_date_type:
         | "show"
         | "rehearsal"
@@ -11233,7 +11506,7 @@ export const Constants = {
       room_type: ["single", "double"],
       staffing_notification_scope: ["all_departments", "own_department"],
       task_status: ["not_started", "in_progress", "completed"],
-      timesheet_status: ["draft", "submitted", "approved"],
+      timesheet_status: ["draft", "submitted", "approved", "rejected"],
       tour_date_type: [
         "show",
         "rehearsal",

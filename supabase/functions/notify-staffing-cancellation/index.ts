@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendBrevoEmail } from "../_shared/brevo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -248,7 +249,7 @@ serve(async (req) => {
       </body>
       </html>`;
       const emailPayload = { sender: { email: BREVO_FROM }, to: [{ email: tech.email }], subject, htmlContent: html };
-      const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', { method: 'POST', headers: { 'api-key': BREVO_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify(emailPayload) });
+      const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload);
       await supabase.from('staffing_events').insert({ staffing_request_id: sr.id, event: 'email_cancel_notice_sent', meta: { phase, status: sendRes.status } });
       if (!sendRes.ok) {
         const err = await sendRes.text().catch(() => '');

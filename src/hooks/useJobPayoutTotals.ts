@@ -36,7 +36,8 @@ export function useJobPayoutTotals(
       let approvalsQuery = supabase
         .from('timesheets')
         .select('technician_id, approved_by_manager')
-        .eq('job_id', jobId);
+        .eq('job_id', jobId)
+        .eq('is_active', true);
 
       if (technicianId) {
         approvalsQuery = approvalsQuery.eq('technician_id', technicianId);

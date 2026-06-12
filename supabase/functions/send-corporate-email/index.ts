@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { wrapInCorporateTemplate } from "../_shared/corporateEmailTemplate.ts";
+import { sendBrevoEmail } from "../_shared/brevo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -681,14 +682,7 @@ serve(async (req) => {
 
       let batchResponse: Response | null = null;
       try {
-        batchResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
-          method: "POST",
-          headers: {
-            "api-key": BREVO_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(emailPayload),
-        });
+        batchResponse = await sendBrevoEmail(BREVO_KEY, emailPayload);
       } catch (error) {
         const errMsg = (error as Error).message || "Unknown error";
         console.error("[send-corporate-email] Brevo request error:", errMsg);

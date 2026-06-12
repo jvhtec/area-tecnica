@@ -209,9 +209,9 @@ export function TimesheetReminderSettings({ className }: { className?: string })
           {DEPARTMENTS.map(({ key, label }) => {
             const s = getDept(key);
             return (
-              <div key={key} className="flex items-center gap-4 py-2.5 first:pt-0 last:pb-0">
+              <div key={key} className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2.5 first:pt-0 last:pb-0">
                 {/* Department name */}
-                <span className="w-32 text-sm font-medium shrink-0">{label}</span>
+                <span className="w-24 sm:w-32 text-sm font-medium shrink-0">{label}</span>
 
                 {/* Toggle */}
                 <Switch
@@ -220,7 +220,7 @@ export function TimesheetReminderSettings({ className }: { className?: string })
                   onCheckedChange={(checked) => handleToggle(key, checked)}
                   disabled={mutation.isPending}
                 />
-                <label htmlFor={`toggle-${key}`} className="text-sm text-muted-foreground cursor-pointer w-20 shrink-0">
+                <label htmlFor={`toggle-${key}`} className="text-sm text-muted-foreground cursor-pointer shrink-0">
                   {s.auto_reminders_enabled ? "Activado" : "Desactivado"}
                 </label>
 

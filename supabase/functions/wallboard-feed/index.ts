@@ -446,7 +446,8 @@ serve(async (req) => {
         const { data: ts } = await sb
           .from("timesheets")
           .select("id, job_id, technician_id, status, date")
-          .in("job_id", jobIds);
+          .in("job_id", jobIds)
+          .eq("is_active", true);
         (ts ?? []).forEach((t) => {
           const arr = timesheetsByJob.get(t.job_id) ?? [];
           arr.push(t);
@@ -454,13 +455,15 @@ serve(async (req) => {
         });
       }
 
-      const computeStatus = (job: any, techId: string): "submitted" | "draft" | "missing" | "approved" => {
+      const computeStatus = (job: any, techId: string): "submitted" | "draft" | "missing" | "approved" | "rejected" => {
         const list = timesheetsByJob.get(job.id) ?? [];
         const ts = list.filter((t) => t.technician_id === techId);
         if (ts.length === 0) return "missing";
         const hasApproved = ts.some((t) => t.status === "approved");
         const hasSubmitted = ts.some((t) => t.status === "submitted");
+        const hasRejected = ts.some((t) => t.status === "rejected");
         const inPast = new Date(job.end_time) < new Date();
+        if (hasRejected) return "rejected";
         if (inPast && hasApproved) return "approved";
         if (hasSubmitted) return "submitted";
         return "draft";

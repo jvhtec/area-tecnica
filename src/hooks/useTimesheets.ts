@@ -56,6 +56,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         .from("timesheets")
         .select("*")
         .eq("job_id", jobId)
+        .eq("is_active", true)
         .order("date", { ascending: true })
         .order("created_at", { ascending: true });
 
@@ -210,7 +211,8 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       const { data: existingTimesheets } = await supabase
         .from("timesheets")
         .select("technician_id, date")
-        .eq("job_id", jobId);
+        .eq("job_id", jobId)
+        .eq("is_active", true);
 
       console.log("Existing timesheets:", existingTimesheets);
 
@@ -405,7 +407,14 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
   };
 
   const submitTimesheet = async (timesheetId: string) => {
-    const updated = await updateTimesheet(timesheetId, { status: 'submitted' });
+    // Clear rejection metadata so a resubmitted (previously rejected) part
+    // arrives clean for the next review round.
+    const updated = await updateTimesheet(timesheetId, {
+      status: 'submitted',
+      rejected_at: null,
+      rejected_by: null,
+      rejection_reason: null
+    });
 
     // Send push notification to management (fire-and-forget, non-blocking)
     if (updated?.job_id && updated?.technician_id) {
@@ -422,6 +431,36 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         // Non-blocking: log but don't fail the submission
         console.warn('Failed to send timesheet submission notification:', pushErr);
       }
+    }
+
+    return updated;
+  };
+
+  // Management action: send a timesheet back to draft (e.g. filled by
+  // mistake) so the technician can refill it. Keeps the entered hours —
+  // everything is editable again in draft — but invalidates the signature
+  // and clears approval/rejection metadata.
+  const resetTimesheet = async (timesheetId: string) => {
+    const updated = await updateTimesheet(
+      timesheetId,
+      {
+        status: 'draft',
+        approved_by_manager: false,
+        approved_by: null,
+        approved_at: null,
+        rejected_at: null,
+        rejected_by: null,
+        rejection_reason: null,
+        signature_data: null,
+        signed_at: null
+      },
+      true
+    );
+
+    if (updated) {
+      await fetchTimesheets();
+      toast.success('Parte restablecido a borrador');
+      invalidateApprovalContext();
     }
 
     return updated;
@@ -470,7 +509,11 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
     return updated;
   };
 
-  const rejectTimesheet = async (timesheetId: string, reason?: string) => {
+  const rejectTimesheet = async (
+    timesheetId: string,
+    reason?: string,
+    options?: { resetHours?: boolean; sendEmail?: boolean }
+  ) => {
     const currentUser = (await supabase.auth.getUser()).data.user;
     const updated = await updateTimesheet(
       timesheetId,
@@ -481,12 +524,39 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         approved_at: null,
         rejected_at: new Date().toISOString(),
         rejected_by: currentUser?.id,
-        rejection_reason: reason ?? null
+        rejection_reason: reason ?? null,
+        // A rejected part can be edited before resubmission, so its previous
+        // signature must never remain attached to corrected hours.
+        signature_data: null,
+        signed_at: null,
+        // Optionally wipe the entered hours so the tech refills from scratch
+        // (chk_valid_times requires start/end to be null together).
+        ...(options?.resetHours
+          ? {
+              start_time: null,
+              end_time: null,
+              break_minutes: 0,
+              overtime_hours: 0
+            }
+          : {})
       },
       true
     );
 
     if (updated) {
+      if (options?.sendEmail) {
+        try {
+          const { error: emailError } = await supabase.functions.invoke('send-timesheet-reminder', {
+            body: { timesheetId, kind: 'rejection', rejectionReason: reason || undefined }
+          });
+          if (emailError) throw emailError;
+          toast.success('Email de rechazo enviado al técnico');
+        } catch (emailErr) {
+          console.warn('Failed to send rejection email:', emailErr);
+          toast.error('El parte se rechazó, pero no se pudo enviar el email al técnico');
+        }
+      }
+
       await fetchTimesheets();
       toast.success('Timesheet rejected');
       invalidateApprovalContext();
@@ -599,6 +669,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
     deleteTimesheet,
     deleteTimesheets,
     recalcTimesheet,
-    revertTimesheet
+    revertTimesheet,
+    resetTimesheet
   };
 };

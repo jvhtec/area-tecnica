@@ -65,6 +65,56 @@ async function sha1(s: string) {
     .join("");
 }
 
+// Best-effort per-isolate rate limit. Calendar clients poll at most every
+// few minutes, so a generous hourly cap only affects scraping/enumeration.
+const configuredRateLimit = Number(Deno.env.get("ICS_RATE_LIMIT_PER_HOUR") || 120);
+const RATE_LIMIT_PER_HOUR = Number.isFinite(configuredRateLimit) && configuredRateLimit > 0
+  ? Math.floor(configuredRateLimit)
+  : 120;
+const MAX_RATE_BUCKETS = 10_000;
+const MAX_BUCKETS_SCANNED_PER_PRUNE = 250;
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function pruneExpiredBuckets(now: number): void {
+  let scanned = 0;
+  for (const [key, value] of rateBuckets) {
+    if (value.resetAt <= now) rateBuckets.delete(key);
+    scanned += 1;
+    if (scanned >= MAX_BUCKETS_SCANNED_PER_PRUNE) break;
+  }
+}
+
+function allowRequest(key: string): boolean {
+  const now = Date.now();
+  const bucket = rateBuckets.get(key);
+  if (!bucket || bucket.resetAt <= now) {
+    if (!bucket && rateBuckets.size >= MAX_RATE_BUCKETS) {
+      pruneExpiredBuckets(now);
+      if (rateBuckets.size >= MAX_RATE_BUCKETS) {
+        const oldestKey = rateBuckets.keys().next().value;
+        if (typeof oldestKey !== "string") return false;
+        rateBuckets.delete(oldestKey);
+      }
+    }
+    rateBuckets.set(key, { count: 1, resetAt: now + 3_600_000 });
+    return true;
+  }
+  bucket.count += 1;
+  return bucket.count <= RATE_LIMIT_PER_HOUR;
+}
+
+// Hash both sides before comparing so the string comparison can't leak
+// token prefixes through timing.
+async function tokensMatch(expected: string, provided: string): Promise<boolean> {
+  const [a, b] = await Promise.all([sha1(expected), sha1(provided)]);
+  let difference = a.length ^ b.length;
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    difference |= (a.charCodeAt(index) || 0) ^ (b.charCodeAt(index) || 0);
+  }
+  return difference === 0;
+}
+
 function replaceIsoDateKeepingTimeAndOffset(iso: string, ymd: string): string {
   // Expect iso like YYYY-MM-DDTHH:MM:SS[.sss][Z|±HH:MM]
   // Replace the YYYY-MM-DD prefix with provided ymd
@@ -106,6 +156,10 @@ serve(async (req) => {
     return new Response('Invalid parameters', { status: 400 });
   }
 
+  if (!allowRequest(tid!)) {
+    return new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': '3600' } });
+  }
+
   // Validate token against profiles
   const { data: profile, error: profErr } = await supabase
     .from('profiles')
@@ -113,7 +167,7 @@ serve(async (req) => {
     .eq('id', tid)
     .maybeSingle();
 
-  if (profErr || !profile || !profile.calendar_ics_token || profile.calendar_ics_token !== token) {
+  if (profErr || !profile || !profile.calendar_ics_token || !(await tokensMatch(profile.calendar_ics_token, token))) {
     return new Response('Forbidden', { status: 403 });
   }
 
