@@ -7,6 +7,7 @@ import {
   resolveFestivalStageTechnicianIds,
 } from "./recipientUtils.ts";
 import type { Dept } from "./recipientUtils.ts";
+import { checkAndRecordWhatsappQuota } from "../_shared/whatsappQuota.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -599,6 +600,27 @@ serve(async (req: Request) => {
     let wa_group_id = existingWaGroupId || '';
     let groupText = '';
     if (!finalizeOnly && !existingWaGroupId) {
+      // Per-actor daily quota on real group creations (duplicates and
+      // finalize-only runs never reach this branch): limits WAHA quota burn
+      // from a compromised admin/management account.
+      const dailyGroupLimit = Number(Deno.env.get('WA_DAILY_GROUP_LIMIT') || 20);
+      const quota = await checkAndRecordWhatsappQuota({
+        supabase: supabaseAdmin,
+        actorId: actorId!,
+        kind: 'group_creation',
+        recipientCount: creationGroupParticipants.length,
+        jobId: job_id,
+        dailyLimit: dailyGroupLimit,
+      });
+      if (!quota.allowed) {
+        return new Response(JSON.stringify({
+          error: 'Too Many Requests',
+          reason: 'daily_whatsapp_group_quota_exceeded',
+          used_today: quota.usedToday,
+          daily_limit: quota.dailyLimit,
+        }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       // Create the group per WAHA API: POST /api/{session}/groups { name, participants: [{id}] }
       const groupUrl = `${base}/api/${encodeURIComponent(session)}/groups`;
       let groupRes: Response;
