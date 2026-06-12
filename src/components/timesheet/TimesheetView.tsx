@@ -121,6 +121,9 @@ export const TimesheetView = ({
   });
   const [timesheetBeingRejected, setTimesheetBeingRejected] = useState<Timesheet | null>(null);
   const [rejectionNotes, setRejectionNotes] = useState("");
+  const [rejectResetHours, setRejectResetHours] = useState(false);
+  const [rejectSendEmail, setRejectSendEmail] = useState(true);
+  const [submitPromptTimesheetId, setSubmitPromptTimesheetId] = useState<string | null>(null);
   const [sendingReminder, setSendingReminder] = useState<string | null>(null);
 
   // Filter timesheets based on user role and props
@@ -240,6 +243,8 @@ export const TimesheetView = ({
   const openRejectDialog = (timesheet: Timesheet) => {
     setTimesheetBeingRejected(timesheet);
     setRejectionNotes(timesheet.rejection_reason ?? '');
+    setRejectResetHours(false);
+    setRejectSendEmail(true);
   };
 
   const closeRejectDialog = () => {
@@ -249,8 +254,22 @@ export const TimesheetView = ({
 
   const confirmRejectTimesheet = async () => {
     if (!timesheetBeingRejected) return;
-    await rejectTimesheet(timesheetBeingRejected.id, rejectionNotes.trim() || undefined);
+    await rejectTimesheet(timesheetBeingRejected.id, rejectionNotes.trim() || undefined, {
+      resetHours: rejectResetHours,
+      sendEmail: rejectSendEmail,
+    });
     closeRejectDialog();
+  };
+
+  // After a technician signs their own draft/rejected part, immediately offer
+  // to submit it — techs often sign and forget to hit send.
+  const handleSigned = async (timesheetId: string, signatureData: string) => {
+    const result = await signTimesheet(timesheetId, signatureData);
+    const signed = timesheets.find((t) => t.id === timesheetId);
+    if (signed && signed.technician_id === user?.id && (signed.status === 'draft' || signed.status === 'rejected')) {
+      setSubmitPromptTimesheetId(timesheetId);
+    }
+    return result;
   };
 
   const handleSendReminder = async (timesheetId: string) => {
@@ -898,6 +917,18 @@ export const TimesheetView = ({
                     </Alert>
                   )}
 
+                  {timesheet.status === 'draft' && timesheet.technician_id === user?.id && !isClosureLocked && (
+                    <Alert className="border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                      <AlertTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4" />
+                        Parte sin enviar
+                      </AlertTitle>
+                      <AlertDescription>
+                        Este parte está en borrador y todavía no se ha enviado. Cuando termines de rellenarlo y firmarlo, pulsa el botón verde «ENVIAR PARTE»: sin ese paso no podrá ser revisado ni aprobado.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   {editingTimesheet === timesheet.id ? (
                     <TimesheetEditForm
                       formData={formData}
@@ -1050,7 +1081,7 @@ export const TimesheetView = ({
                       timesheetId={timesheet.id}
                       currentSignature={timesheet.signature_data}
                       canSign={timesheet.technician_id === user?.id || isManagementUser}
-                      onSigned={signTimesheet}
+                      onSigned={handleSigned}
                     />
                   )}
                 </div>
@@ -1063,10 +1094,44 @@ export const TimesheetView = ({
       <TimesheetRejectDialog
         timesheet={timesheetBeingRejected}
         rejectionNotes={rejectionNotes}
+        resetHours={rejectResetHours}
+        sendEmail={rejectSendEmail}
         onRejectionNotesChange={setRejectionNotes}
+        onResetHoursChange={setRejectResetHours}
+        onSendEmailChange={setRejectSendEmail}
         onClose={closeRejectDialog}
         onConfirm={confirmRejectTimesheet}
       />
+
+      <AlertDialog
+        open={!!submitPromptTimesheetId}
+        onOpenChange={(open) => {
+          if (!open) setSubmitPromptTimesheetId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Parte firmado — ¿enviarlo ahora?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tu parte está firmado pero todavía NO se ha enviado. Hasta que no pulses «Enviar», el equipo de gestión no podrá revisarlo ni aprobarlo.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSubmitPromptTimesheetId(null)}>
+              Todavía no
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-green-600 hover:bg-green-700"
+              onClick={() => {
+                if (submitPromptTimesheetId) submitTimesheet(submitPromptTimesheetId);
+                setSubmitPromptTimesheetId(null);
+              }}
+            >
+              ✓ Enviar parte ahora
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

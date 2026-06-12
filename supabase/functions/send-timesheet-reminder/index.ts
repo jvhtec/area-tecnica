@@ -93,8 +93,9 @@ serve(async (req) => {
 
     console.log('User authorized, role:', profile.role);
 
-    const { timesheetId } = await req.json();
-    console.log('Processing timesheet ID:', timesheetId);
+    const { timesheetId, kind = 'reminder', rejectionReason } = await req.json();
+    const isRejection = kind === 'rejection';
+    console.log('Processing timesheet ID:', timesheetId, 'kind:', kind);
 
     if (!timesheetId) {
       console.error('Missing timesheetId in request body');
@@ -183,9 +184,50 @@ serve(async (req) => {
 
     const techName = technician.nickname || technician.first_name;
     const jobTitle = job?.title || 'trabajo desconocido';
-    const subject = `Recordatorio: Parte de horas pendiente - ${jobTitle}`;
+    const subject = isRejection
+      ? `Parte de horas rechazado - ${jobTitle}`
+      : `Recordatorio: Parte de horas pendiente - ${jobTitle}`;
 
     const timesheetUrl = `https://sector-pro.work/timesheets?jobId=${timesheet.job_id}`;
+
+    const escapeHtml = (value: string) => value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    const statusLabel = timesheet.status === 'draft'
+      ? 'Borrador'
+      : timesheet.status === 'rejected'
+        ? 'Rechazado'
+        : timesheet.status === 'approved'
+          ? 'Aprobado'
+          : 'Enviado';
+
+    const mainBlock = isRejection
+      ? `<div style="background:#fef2f2;border-left:4px solid #ef4444;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
+                <div style="color:#7f1d1d;font-size:15px;line-height:1.6;font-weight:600;margin-bottom:8px;">
+                  Tu parte de horas ha sido rechazado
+                </div>
+                <div style="color:#7f1d1d;font-size:15px;line-height:1.6;">
+                  El parte de horas del trabajo <strong>${escapeHtml(jobTitle)}</strong> ha sido rechazado porque las horas indicadas no coinciden con los datos que tenemos registrados para ese trabajo. Es necesario que lo rellenes de nuevo y lo vuelvas a enviar para su aprobación.
+                </div>
+                ${rejectionReason ? `
+                <div style="color:#7f1d1d;font-size:14px;line-height:1.6;margin-top:12px;background:#ffffff;border:1px solid #fecaca;border-radius:4px;padding:12px;">
+                  <strong>Nota del gestor:</strong> ${escapeHtml(String(rejectionReason))}
+                </div>
+                ` : ''}
+              </div>`
+      : `<div style="background:#eef2ff;border-left:4px solid #6366f1;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
+                <div style="color:#374151;font-size:15px;line-height:1.6;">
+                  Te recordamos que tienes partes de horas pendientes de rellenar para el trabajo: <strong>${escapeHtml(jobTitle)}</strong>. Te rogamos completes los partes para su aprobación; una vez aprobados obtendrás un informe de los importes a facturar y la referencia que has de adjuntar a la factura.
+                </div>
+              </div>`;
+
+    const ctaLabel = isRejection
+      ? 'Rellenar de nuevo el parte de horas'
+      : 'Haz clic aquí para rellenar tu parte de horas ahora';
 
     const htmlContent = `<!DOCTYPE html>
 <html lang="es">
@@ -233,12 +275,9 @@ serve(async (req) => {
           <!-- Main content -->
           <tr>
             <td style="padding:0 24px 24px 24px;">
-              <div style="background:#eef2ff;border-left:4px solid #6366f1;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
-                <div style="color:#374151;font-size:15px;line-height:1.6;">
-                  Te recordamos que tienes partes de horas pendientes de rellenar para el trabajo: <strong>${jobTitle}</strong>. Te rogamos completes los partes para su aprobación; una vez aprobados obtendrás un informe de los importes a facturar y la referencia que has de adjuntar a la factura.
-                </div>
-              </div>
+              ${mainBlock}
 
+              ${isRejection ? '' : `
               <!-- Important deadline warning -->
               <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
                 <div style="color:#92400e;font-size:14px;line-height:1.6;font-weight:600;margin-bottom:8px;">
@@ -251,6 +290,7 @@ serve(async (req) => {
                   <strong>Recomendación:</strong> Para evitar errores y asegurar que se registren correctamente todas tus horas trabajadas, te aconsejamos rellenar los partes inmediatamente después de finalizar cada trabajo.
                 </div>
               </div>
+              `}
 
               <!-- Job details -->
               <div style="margin-bottom:20px;">
@@ -284,7 +324,7 @@ serve(async (req) => {
                   </tr>
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;">
-                      <strong>Estado:</strong> ${timesheet.status === 'draft' ? 'Borrador' : 'Enviado'}
+                      <strong>Estado:</strong> ${statusLabel}
                     </td>
                   </tr>
                 </table>
@@ -294,7 +334,7 @@ serve(async (req) => {
               <div style="text-align:center;margin:24px 0;">
                 <a href="${timesheetUrl}"
                    style="display:inline-block;background:#6366f1;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:600;font-size:16px;box-shadow:0 2px 4px rgba(99,102,241,0.3);">
-                  Haz clic aquí para rellenar tu parte de horas ahora
+                  ${ctaLabel}
                 </a>
               </div>
 
@@ -369,13 +409,16 @@ serve(async (req) => {
     const brevoResponse = await sendRes.json();
     console.log('Email sent successfully:', brevoResponse.messageId);
 
-    // Stamp reminder_sent_at so the auto-reminder system knows a reminder was recently sent
-    const { error: updateError } = await supabaseAdmin
-      .from('timesheets')
-      .update({ reminder_sent_at: new Date().toISOString() })
-      .eq('id', timesheetId);
-    if (updateError) {
-      console.warn('Could not update reminder_sent_at:', updateError.message);
+    // Stamp reminder_sent_at so the auto-reminder system knows a reminder was
+    // recently sent. Rejection notices are not reminders — don't stamp those.
+    if (!isRejection) {
+      const { error: updateError } = await supabaseAdmin
+        .from('timesheets')
+        .update({ reminder_sent_at: new Date().toISOString() })
+        .eq('id', timesheetId);
+      if (updateError) {
+        console.warn('Could not update reminder_sent_at:', updateError.message);
+      }
     }
 
     return new Response(

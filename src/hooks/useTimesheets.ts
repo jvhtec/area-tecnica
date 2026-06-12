@@ -508,7 +508,11 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
     return updated;
   };
 
-  const rejectTimesheet = async (timesheetId: string, reason?: string) => {
+  const rejectTimesheet = async (
+    timesheetId: string,
+    reason?: string,
+    options?: { resetHours?: boolean; sendEmail?: boolean }
+  ) => {
     const currentUser = (await supabase.auth.getUser()).data.user;
     const updated = await updateTimesheet(
       timesheetId,
@@ -519,12 +523,37 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         approved_at: null,
         rejected_at: new Date().toISOString(),
         rejected_by: currentUser?.id,
-        rejection_reason: reason ?? null
+        rejection_reason: reason ?? null,
+        // Optionally wipe the entered hours so the tech refills from scratch
+        // (chk_valid_times requires start/end to be null together).
+        ...(options?.resetHours
+          ? {
+              start_time: null,
+              end_time: null,
+              break_minutes: 0,
+              overtime_hours: 0,
+              signature_data: null,
+              signed_at: null
+            }
+          : {})
       },
       true
     );
 
     if (updated) {
+      if (options?.sendEmail) {
+        try {
+          const { error: emailError } = await supabase.functions.invoke('send-timesheet-reminder', {
+            body: { timesheetId, kind: 'rejection', rejectionReason: reason || undefined }
+          });
+          if (emailError) throw emailError;
+          toast.success('Email de rechazo enviado al técnico');
+        } catch (emailErr) {
+          console.warn('Failed to send rejection email:', emailErr);
+          toast.error('El parte se rechazó, pero no se pudo enviar el email al técnico');
+        }
+      }
+
       await fetchTimesheets();
       toast.success('Timesheet rejected');
       invalidateApprovalContext();
