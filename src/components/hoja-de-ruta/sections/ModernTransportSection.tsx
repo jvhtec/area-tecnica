@@ -24,6 +24,7 @@ interface ModernTransportSectionProps {
   onRemoveTransport: (index: number) => void;
   onImportTransports: (transports: Transport[]) => void;
   jobId?: string;  // Add jobId prop to fetch logistics events
+  headerControls?: React.ReactNode;
 }
 
 export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
@@ -33,6 +34,7 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
   onRemoveTransport,
   onImportTransports,
   jobId,
+  headerControls,
 }) => {
   const { toast } = useToast();
   const [isImporting, setIsImporting] = useState(false);
@@ -186,7 +188,8 @@ export const ModernTransportSection: React.FC<ModernTransportSectionProps> = ({
             <Truck className="w-5 h-5 text-primary" />
             Transporte
           </CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {headerControls}
             {jobId && (
               <Button
                 onClick={handleImportFromLogistics}

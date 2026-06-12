@@ -17,6 +17,7 @@ type ScheduleBuilderProps = {
   title?: string;
   subtitle?: string;
   hideExport?: boolean;
+  headerControls?: React.ReactNode;
 };
 
 const defaultPresets: Array<Pick<ProgramRow, 'item' | 'dept' | 'notes'>> = [
@@ -40,6 +41,7 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
   title = 'Programa del Día',
   subtitle,
   hideExport = false,
+  headerControls,
 }) => {
   const [rows, setRows] = useState<ProgramRow[]>(value || []);
   const [snap, setSnap] = useState<5 | 10 | 15 | 20 | 30>(snapMinutes);
@@ -178,6 +180,7 @@ export const ScheduleBuilder: React.FC<ScheduleBuilderProps> = ({
         <CardTitle className="flex items-center justify-between">
           <span>Constructor de Programa</span>
           <div className="flex items-center gap-2">
+            {headerControls}
             <Label className="text-xs text-muted-foreground">Snap</Label>
             <select
               className="border rounded px-2 py-1 text-xs"

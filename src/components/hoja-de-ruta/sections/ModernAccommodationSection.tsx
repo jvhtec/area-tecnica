@@ -11,6 +11,8 @@ import { staffOptionValue } from "@/utils/hoja-de-ruta/staffSync";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 import { HotelAutocomplete } from "@/components/maps/HotelAutocomplete";
 import { GoogleMap } from "@/components/maps/GoogleMap";
+import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
+import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 
 interface ModernAccommodationSectionProps {
   accommodations: Accommodation[];
@@ -21,6 +23,8 @@ interface ModernAccommodationSectionProps {
   onRemoveAccommodation: (index: number) => void;
   onAddRoom: (accommodationIndex: number) => void;
   onRemoveRoom: (accommodationIndex: number, roomIndex: number) => void;
+  isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
+  onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
 export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProps> = ({
@@ -32,6 +36,8 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
   onRemoveAccommodation,
   onAddRoom,
   onRemoveRoom,
+  isPrintSectionExcluded,
+  onPrintSectionExcludedChange,
 }) => {
   const [expandedMaps, setExpandedMaps] = useState<Record<string, boolean>>({});
 
@@ -49,20 +55,27 @@ export const ModernAccommodationSection: React.FC<ModernAccommodationSectionProp
     >
       <Card className="border-2">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2">
               <Bed className="w-5 h-5 text-pink-600" />
               Alojamiento
             </CardTitle>
-            <Button
-              onClick={onAddAccommodation}
-              size="sm"
-              variant="outline"
-              className="gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Añadir Hotel
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <PrintSectionExclusionToggle
+                sectionId="accommodation"
+                isExcluded={isPrintSectionExcluded("accommodation")}
+                onExcludedChange={onPrintSectionExcludedChange}
+              />
+              <Button
+                onClick={onAddAccommodation}
+                size="sm"
+                variant="outline"
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Añadir Hotel
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

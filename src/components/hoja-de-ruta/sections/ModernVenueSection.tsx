@@ -11,6 +11,8 @@ import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { PlacesImageService } from "@/utils/hoja-de-ruta/pdf/services/places-image-service";
+import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
+import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 
 interface ModernVenueSectionProps {
   eventData: EventData;
@@ -22,6 +24,8 @@ interface ModernVenueSectionProps {
   onVenueMapUpload: (file: File) => void;
   handleVenueMapUrl: (url: string) => void;
   appendVenuePreviews: (dataUrls: string[]) => void;
+  isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
+  onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
 export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
@@ -34,6 +38,8 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
   onVenueMapUpload,
   handleVenueMapUrl,
   appendVenuePreviews,
+  isPrintSectionExcluded,
+  onPrintSectionExcludedChange,
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [staticMapUrl, setStaticMapUrl] = useState<string | null>(null);
@@ -229,70 +235,77 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
                 <MapPin className="w-5 h-5 text-emerald-600" />
                 Ubicación del Venue
               </div>
-              <Dialog>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Settings className="w-4 h-4" />
-                    Editar Ubicación
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Configurar Ubicación del Venue</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="venue-name">Nombre del Venue</Label>
-                      <PlaceAutocomplete
-                        value={eventData.venue.name || ''}
-                        onSelect={({ name, address, coordinates }) =>
-                          setEventData(prev => ({
-                            ...prev,
-                            venue: {
-                              ...prev.venue,
-                              name: name || prev.venue.name,
-                              address: address || prev.venue.address,
-                              coordinates: coordinates || prev.venue.coordinates,
-                            }
-                          }))
-                        }
-                        placeholder="Buscar venue o lugar..."
-                      />
-                    </div>
-                    <div>
-                      <Label>Dirección del Venue</Label>
-                      <AddressAutocomplete
-                        value={eventData.venue.address || ''}
-                        onChange={(address, coordinates) => {
-                          setEventData(prev => ({
-                            ...prev,
-                            venue: {
-                              ...prev.venue,
-                              address,
-                              coordinates
-                            }
-                          }));
-                        }}
-                        placeholder="Buscar dirección..."
-                      />
-                    </div>
-                    {(eventData.venue.address || eventData.venue.coordinates) && (
+              <div className="flex flex-wrap items-center justify-end gap-2">
+                <PrintSectionExclusionToggle
+                  sectionId="venue"
+                  isExcluded={isPrintSectionExcluded("venue")}
+                  onExcludedChange={onPrintSectionExcludedChange}
+                />
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Settings className="w-4 h-4" />
+                      Editar Ubicación
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                      <DialogTitle>Configurar Ubicación del Venue</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
                       <div>
-                        <Label>Vista Previa del Mapa</Label>
-                        <GoogleMap
-                          address={eventData.venue.address}
-                          coordinates={eventData.venue.coordinates}
-                          height="250px"
-                          interactive={true}
-                          showMarker={true}
-                          onLocationSelect={handleLocationUpdate}
-                          onStaticMapUrlChange={setStaticMapUrl}
+                        <Label htmlFor="venue-name">Nombre del Venue</Label>
+                        <PlaceAutocomplete
+                          value={eventData.venue.name || ''}
+                          onSelect={({ name, address, coordinates }) =>
+                            setEventData(prev => ({
+                              ...prev,
+                              venue: {
+                                ...prev.venue,
+                                name: name || prev.venue.name,
+                                address: address || prev.venue.address,
+                                coordinates: coordinates || prev.venue.coordinates,
+                              }
+                            }))
+                          }
+                          placeholder="Buscar venue o lugar..."
                         />
                       </div>
-                    )}
-                  </div>
-                </DialogContent>
-              </Dialog>
+                      <div>
+                        <Label>Dirección del Venue</Label>
+                        <AddressAutocomplete
+                          value={eventData.venue.address || ''}
+                          onChange={(address, coordinates) => {
+                            setEventData(prev => ({
+                              ...prev,
+                              venue: {
+                                ...prev.venue,
+                                address,
+                                coordinates
+                              }
+                            }));
+                          }}
+                          placeholder="Buscar dirección..."
+                        />
+                      </div>
+                      {(eventData.venue.address || eventData.venue.coordinates) && (
+                        <div>
+                          <Label>Vista Previa del Mapa</Label>
+                          <GoogleMap
+                            address={eventData.venue.address}
+                            coordinates={eventData.venue.coordinates}
+                            height="250px"
+                            interactive={true}
+                            showMarker={true}
+                            onLocationSelect={handleLocationUpdate}
+                            onStaticMapUrlChange={setStaticMapUrl}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>

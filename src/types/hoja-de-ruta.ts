@@ -1,4 +1,5 @@
 import type { LogisticsHojaCategory } from "@/constants/logisticsHojaCategories";
+import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf/section-options";
 
 // Core interfaces - most comprehensive version first
 export interface WeatherData {
@@ -161,6 +162,7 @@ export interface EventData {
   weather?: WeatherData[];
   restaurants?: Restaurant[];
   selectedRestaurants?: string[];
+  printExcludedSections?: HojaDeRutaPrintSectionId[];
   metadata?: HojaDeRutaMetadata;
 }
 

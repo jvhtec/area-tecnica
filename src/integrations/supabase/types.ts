@@ -2648,6 +2648,7 @@ export type Database = {
           local_contacts: Json | null
           logistics_info: Json | null
           power_requirements: string | null
+          print_excluded_sections: Json
           program_schedule_json: Json | null
           restaurants_info: Json | null
           schedule: string | null
@@ -2683,6 +2684,7 @@ export type Database = {
           local_contacts?: Json | null
           logistics_info?: Json | null
           power_requirements?: string | null
+          print_excluded_sections?: Json
           program_schedule_json?: Json | null
           restaurants_info?: Json | null
           schedule?: string | null
@@ -2718,6 +2720,7 @@ export type Database = {
           local_contacts?: Json | null
           logistics_info?: Json | null
           power_requirements?: string | null
+          print_excluded_sections?: Json
           program_schedule_json?: Json | null
           restaurants_info?: Json | null
           schedule?: string | null

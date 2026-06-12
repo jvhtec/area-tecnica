@@ -12,6 +12,7 @@ type MultiDayScheduleBuilderProps = {
   onChange: (days: ProgramDay[]) => void;
   dayTitle?: string; // e.g., "Programa"
   subtitle?: string;
+  scheduleHeaderControls?: React.ReactNode;
 };
 
 export const MultiDayScheduleBuilder: React.FC<MultiDayScheduleBuilderProps> = ({
@@ -19,6 +20,7 @@ export const MultiDayScheduleBuilder: React.FC<MultiDayScheduleBuilderProps> = (
   onChange,
   dayTitle = 'Programa',
   subtitle,
+  scheduleHeaderControls,
 }) => {
   const initialDays = useMemo<ProgramDay[]>(() => {
     if (Array.isArray(value) && value.length > 0) return value;
@@ -140,6 +142,7 @@ export const MultiDayScheduleBuilder: React.FC<MultiDayScheduleBuilderProps> = (
           snapMinutes={15}
           title={`${dayTitle} — ${activeDay?.label || `Día ${active + 1}`}${activeDay?.date ? ` (${activeDay.date})` : ''}`}
           hideExport
+          headerControls={scheduleHeaderControls}
         />
       </CardContent>
     </Card>
@@ -147,4 +150,3 @@ export const MultiDayScheduleBuilder: React.FC<MultiDayScheduleBuilderProps> = (
 };
 
 export default MultiDayScheduleBuilder;
-

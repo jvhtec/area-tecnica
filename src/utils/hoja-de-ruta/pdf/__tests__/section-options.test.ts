@@ -6,6 +6,8 @@ import {
   getHojaDeRutaPdfSelectionLabel,
   HOJA_DE_RUTA_PDF_SECTIONS,
   isHojaDeRutaPdfSectionId,
+  normalizeHojaDeRutaPdfSections,
+  normalizeHojaDeRutaPrintSections,
 } from "@/utils/hoja-de-ruta/pdf/section-options";
 
 describe("hoja de ruta PDF section options", () => {
@@ -37,5 +39,26 @@ describe("hoja de ruta PDF section options", () => {
   it("guards section ids", () => {
     expect(isHojaDeRutaPdfSectionId("event")).toBe(true);
     expect(isHojaDeRutaPdfSectionId("not-a-section")).toBe(false);
+  });
+
+  it("normalizes persisted section lists", () => {
+    expect(normalizeHojaDeRutaPdfSections(["event", "venue", "event", "bad", 1])).toEqual([
+      "event",
+      "venue",
+    ]);
+    expect(normalizeHojaDeRutaPdfSections("event")).toEqual([]);
+  });
+
+  it("normalizes persisted print subsection lists", () => {
+    expect(normalizeHojaDeRutaPrintSections(["power", "program", "power", "bad", 1])).toEqual([
+      "power",
+      "program",
+    ]);
+    expect(normalizeHojaDeRutaPrintSections(["schedule"])).toEqual([
+      "program",
+      "schedule-notes",
+      "power",
+    ]);
+    expect(normalizeHojaDeRutaPrintSections("power")).toEqual([]);
   });
 });

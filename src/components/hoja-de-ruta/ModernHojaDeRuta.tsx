@@ -76,6 +76,8 @@ import {
   getHojaDeRutaPdfSectionLabel,
   type GeneratedHojaDeRutaPdf,
   type HojaDeRutaPdfSectionId,
+  type HojaDeRutaPrintSectionId,
+  normalizeHojaDeRutaPrintSections,
 } from "@/utils/hoja-de-ruta/pdf";
 import type { EventData, HojaDeRutaMetadata } from "@/types/hoja-de-ruta";
 import type { LucideIcon } from "lucide-react";
@@ -255,6 +257,28 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     }
   };
 
+  const buildFullDocumentPdfOptions = () => {
+    const excludedSections = normalizeHojaDeRutaPrintSections(eventData.printExcludedSections);
+    return excludedSections.length > 0 ? { excludedSections } : undefined;
+  };
+
+  const handlePrintExclusionChange = (
+    sectionId: HojaDeRutaPrintSectionId,
+    isExcluded: boolean
+  ) => {
+    setEventData((prev) => {
+      const currentSections = normalizeHojaDeRutaPrintSections(prev.printExcludedSections);
+      const nextSections = isExcluded
+        ? Array.from(new Set([...currentSections, sectionId]))
+        : currentSections.filter((id) => id !== sectionId);
+
+      return {
+        ...prev,
+        printExcludedSections: nextSections,
+      };
+    });
+  };
+
   const openGeneratedPdfPreview = (generatedPdf: GeneratedHojaDeRutaPdf) => {
     setPdfPreview({
       url: URL.createObjectURL(generatedPdf.blob),
@@ -313,7 +337,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
         jobDetails?.title || "",
         jobDetails?.start_time || undefined,
         toast,
-        accommodations
+        accommodations,
+        buildFullDocumentPdfOptions()
       );
 
       // PDF generation and download is handled within the generatePDF function
@@ -399,7 +424,7 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
         jobDetails?.start_time || undefined,
         undefined,
         accommodations,
-        sectionId ? { sections: [sectionId] } : undefined
+        sectionId ? { sections: [sectionId] } : buildFullDocumentPdfOptions()
       );
 
       openGeneratedPdfPreview(generatedPdf);
@@ -616,6 +641,11 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
     ...section,
     label: getHojaDeRutaPdfSectionLabel(section.id),
   }));
+
+  const excludedPrintSections = normalizeHojaDeRutaPrintSections(eventData.printExcludedSections);
+  const excludedPrintSectionSet = new Set<HojaDeRutaPrintSectionId>(excludedPrintSections);
+  const isPrintSectionExcluded = (sectionId: HojaDeRutaPrintSectionId) =>
+    excludedPrintSectionSet.has(sectionId);
 
   if (isLoadingHojaDeRuta) {
     return (
@@ -867,6 +897,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                         jobDetails={null}
                         onAutoPopulate={handleLoadJobData}
                         hideJobSelection={!!jobId}
+                        isPrintSectionExcluded={isPrintSectionExcluded}
+                        onPrintSectionExcludedChange={handlePrintExclusionChange}
                       />
                     </TabsContent>
 
@@ -886,6 +918,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                         }}
                         handleVenueMapUrl={handleVenueMapUrl}
                         appendVenuePreviews={appendVenuePreviews}
+                        isPrintSectionExcluded={isPrintSectionExcluded}
+                        onPrintSectionExcludedChange={handlePrintExclusionChange}
                       />
                     </TabsContent>
 
@@ -893,6 +927,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                       <ModernWeatherSection
                         eventData={eventData}
                         setEventData={setEventData}
+                        isPrintSectionExcluded={isPrintSectionExcluded}
+                        onPrintSectionExcludedChange={handlePrintExclusionChange}
                       />
                     </TabsContent>
 
@@ -902,6 +938,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                         onContactChange={handleContactChange}
                         onAddContact={addContact}
                         onRemoveContact={removeContact}
+                        isPrintSectionExcluded={isPrintSectionExcluded}
+                        onPrintSectionExcludedChange={handlePrintExclusionChange}
                       />
                     </TabsContent>
 
@@ -911,6 +949,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                         onStaffChange={handleStaffChange}
                         onAddStaff={addStaffMember}
                         onRemoveStaff={removeStaffMember}
+                        isPrintSectionExcluded={isPrintSectionExcluded}
+                        onPrintSectionExcludedChange={handlePrintExclusionChange}
                       />
                     </TabsContent>
 
@@ -920,6 +960,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                         onUpdate={updateTravelArrangement}
                         onAdd={addTravelArrangement}
                         onRemove={removeTravelArrangement}
+                        isPrintSectionExcluded={isPrintSectionExcluded}
+                        onPrintSectionExcludedChange={handlePrintExclusionChange}
                       />
                     </TabsContent>
 
@@ -939,6 +981,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                          onRemoveAccommodation={removeAccommodation}
                          onAddRoom={addRoom}
                          onRemoveRoom={removeRoom}
+                         isPrintSectionExcluded={isPrintSectionExcluded}
+                         onPrintSectionExcludedChange={handlePrintExclusionChange}
                        />
                     </TabsContent>
 
@@ -951,6 +995,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                          onRemoveTransport={removeTransport}
                          onImportTransports={importTransports}
                          jobId={jobId || selectedJobId}
+                         isPrintSectionExcluded={isPrintSectionExcluded}
+                         onPrintSectionExcludedChange={handlePrintExclusionChange}
                        />
                      </TabsContent>
 
@@ -958,6 +1004,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                       <ModernScheduleSection
                         eventData={eventData}
                         setEventData={setEventData}
+                        isPrintSectionExcluded={isPrintSectionExcluded}
+                        onPrintSectionExcludedChange={handlePrintExclusionChange}
                       />
                     </TabsContent>
 
@@ -966,6 +1014,8 @@ export const ModernHojaDeRuta = ({ jobId }: ModernHojaDeRutaProps) => {
                         eventData={eventData}
                         onUpdateEventData={setEventData}
                         accommodations={accommodations}
+                        isPrintSectionExcluded={isPrintSectionExcluded}
+                        onPrintSectionExcludedChange={handlePrintExclusionChange}
                       />
                     </TabsContent>
                   </motion.div>

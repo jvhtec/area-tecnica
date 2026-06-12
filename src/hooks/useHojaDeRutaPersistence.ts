@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { isAuxiliaryMachineryType } from "@/constants/hojaDeRutaAuxiliaryNeeds";
+import { normalizeHojaDeRutaPrintSections } from "@/utils/hoja-de-ruta/pdf/section-options";
 
 
 
@@ -264,7 +265,8 @@ export const useHojaDeRutaPersistence = (
         auxiliaryStaffSetupQty: toSafeNonNegativeInt(mainData.aux_staff_setup_qty),
         auxiliaryStaffDismantleQty: toSafeNonNegativeInt(mainData.aux_staff_dismantle_qty),
         auxiliaryMachinery: normalizeAuxiliaryMachinery(mainData.aux_machinery_requirements),
-        weather: (Array.isArray(mainData.weather_data) ? mainData.weather_data : []) as unknown as WeatherData[]
+        weather: (Array.isArray(mainData.weather_data) ? mainData.weather_data : []) as unknown as WeatherData[],
+        printExcludedSections: normalizeHojaDeRutaPrintSections(mainData.print_excluded_sections),
       };
 
       // Transform accommodations data
@@ -356,6 +358,7 @@ export const useHojaDeRutaPersistence = (
         aux_staff_dismantle_qty: auxiliaryStaffDismantleQty,
         aux_machinery_requirements: auxiliaryMachinery as unknown as Json,
         weather_data: eventData.weather as unknown as Json || null,
+        print_excluded_sections: normalizeHojaDeRutaPrintSections(eventData.printExcludedSections) as unknown as Json,
         updated_at: now,
         last_modified: now,
         last_modified_by: userId
