@@ -455,15 +455,17 @@ serve(async (req) => {
         });
       }
 
-      const computeStatus = (job: any, techId: string): "submitted" | "draft" | "missing" | "approved" => {
+      const computeStatus = (job: any, techId: string): "submitted" | "draft" | "missing" | "approved" | "rejected" => {
         const list = timesheetsByJob.get(job.id) ?? [];
         const ts = list.filter((t) => t.technician_id === techId);
         if (ts.length === 0) return "missing";
         const hasApproved = ts.some((t) => t.status === "approved");
         const hasSubmitted = ts.some((t) => t.status === "submitted");
+        const hasRejected = ts.some((t) => t.status === "rejected");
         const inPast = new Date(job.end_time) < new Date();
         if (inPast && hasApproved) return "approved";
         if (hasSubmitted) return "submitted";
+        if (hasRejected) return "rejected";
         return "draft";
       };
 

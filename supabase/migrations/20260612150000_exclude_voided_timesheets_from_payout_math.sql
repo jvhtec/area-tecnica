@@ -67,22 +67,35 @@ create or replace view public.v_job_tech_payout_2025_base with (security_invoker
 drop materialized view if exists public.v_job_staffing_summary;
 
 create materialized view public.v_job_staffing_summary as
- select j.id as job_id,
-    j.title,
-    j.job_type,
-    count(ja.*) filter (where (ja.status is not null)) as assigned_count,
+with assignment_rollup as (
+  select
+    ja.job_id,
+    count(*) filter (where ja.status is not null) as assigned_count
+  from public.job_assignments ja
+  group by ja.job_id
+), timesheet_rollup as (
+  select
+    t.job_id,
     count(distinct t.technician_id) as worked_count,
-    coalesce(sum(t.amount_eur), (0)::numeric) as total_cost_eur,
-    coalesce(sum(
-        case
-            when (t.status = 'approved'::public.timesheet_status) then t.amount_eur
-            else (0)::numeric
-        end), (0)::numeric) as approved_cost_eur
-   from ((public.jobs j
-     left join public.job_assignments ja on ((ja.job_id = j.id)))
-     left join public.timesheets t on (((t.job_id = j.id) and (t.is_schedule_only is not true) and coalesce(t.is_active, true))))
-  group by j.id
-  with no data;
+    coalesce(sum(t.amount_eur), 0::numeric) as total_cost_eur,
+    coalesce(sum(t.amount_eur) filter (where t.status = 'approved'::public.timesheet_status), 0::numeric) as approved_cost_eur
+  from public.timesheets t
+  where t.is_schedule_only is not true
+    and coalesce(t.is_active, true)
+  group by t.job_id
+)
+select
+  j.id as job_id,
+  j.title,
+  j.job_type,
+  coalesce(ar.assigned_count, 0::bigint) as assigned_count,
+  coalesce(tr.worked_count, 0::bigint) as worked_count,
+  coalesce(tr.total_cost_eur, 0::numeric) as total_cost_eur,
+  coalesce(tr.approved_cost_eur, 0::numeric) as approved_cost_eur
+from public.jobs j
+left join assignment_rollup ar on ar.job_id = j.id
+left join timesheet_rollup tr on tr.job_id = j.id
+with no data;
 
 alter table public.v_job_staffing_summary owner to postgres;
 

@@ -140,6 +140,19 @@ describe("fetchWithRetry", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it("does not retry network errors when ambiguous retries are disabled", async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new TypeError("connection reset"));
+
+    await expect(
+      fetchWithRetry("https://flex.example/element", { method: "POST" }, {
+        retryOnTimeout: false,
+        fetchImpl,
+        sleep: noSleep,
+      }),
+    ).rejects.toThrow("connection reset");
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("retries timeouts when retryOnTimeout is enabled", async () => {
     let calls = 0;
     const fetchImpl = vi.fn((_url: string, init?: RequestInit) => {

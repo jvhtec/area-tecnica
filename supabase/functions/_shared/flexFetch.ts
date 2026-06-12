@@ -77,7 +77,10 @@ export async function fetchWithRetry(
       const timedOut = controller.signal.aborted;
       lastError = timedOut ? new FlexFetchTimeoutError(url, timeoutMs) : error;
 
-      if ((timedOut && !retryOnTimeout) || attempt === attempts) {
+      // Fetch rejections can happen after the request reached the origin
+      // (for example, a connection reset while reading the response). Treat
+      // every thrown error as ambiguous for non-idempotent callers.
+      if (!retryOnTimeout || attempt === attempts) {
         throw lastError;
       }
     } finally {

@@ -37,3 +37,24 @@ create or replace function public.validate_timesheet_status_transition() returns
       RETURN NEW;
     END;
     $$;
+
+-- The wallboard consumes this view as a text status. Without an explicit
+-- rejected branch, rejected parts fall through to "missing"; voided parts
+-- must also stay out of the aggregate.
+create or replace view public.wallboard_timesheet_status
+with (security_invoker = 'true', security_barrier = 'true') as
+select
+  t.job_id,
+  t.technician_id,
+  case
+    when bool_or(t.status = 'approved'::public.timesheet_status) then 'approved'::text
+    when bool_or(t.status = 'submitted'::public.timesheet_status) then 'submitted'::text
+    -- Compare through text because a newly-added enum value cannot be cast
+    -- explicitly until the ALTER TYPE transaction commits.
+    when bool_or(t.status::text = 'rejected') then 'rejected'::text
+    when bool_or(t.status = 'draft'::public.timesheet_status) then 'draft'::text
+    else 'missing'::text
+  end as status
+from public.timesheets t
+where t.is_active = true
+group by t.job_id, t.technician_id;

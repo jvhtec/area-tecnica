@@ -124,7 +124,7 @@ serve(async (req) => {
     // Fetch job details separately since there's no foreign key
     const { data: job, error: jobError } = await supabaseAdmin
       .from('jobs')
-      .select('id, title')
+      .select('id, title, client_name')
       .eq('id', timesheet.job_id)
       .single()
 
@@ -196,6 +196,10 @@ serve(async (req) => {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+    const safeTechName = escapeHtml(techName || 'técnico');
+    const safeJobTitle = escapeHtml(jobTitle);
+    const safeClientName = job?.client_name ? escapeHtml(String(job.client_name)) : '';
+    const safeTechnicianEmail = escapeHtml(technician.email);
 
     const statusLabel = timesheet.status === 'draft'
       ? 'Borrador'
@@ -211,7 +215,7 @@ serve(async (req) => {
                   Tu parte de horas ha sido rechazado
                 </div>
                 <div style="color:#7f1d1d;font-size:15px;line-height:1.6;">
-                  El parte de horas del trabajo <strong>${escapeHtml(jobTitle)}</strong> ha sido rechazado porque las horas indicadas no coinciden con los datos que tenemos registrados para ese trabajo. Es necesario que lo rellenes de nuevo y lo vuelvas a enviar para su aprobación.
+                  El parte de horas del trabajo <strong>${safeJobTitle}</strong> ha sido rechazado porque las horas indicadas no coinciden con los datos que tenemos registrados para ese trabajo. Es necesario que lo rellenes de nuevo y lo vuelvas a enviar para su aprobación.
                 </div>
                 ${rejectionReason ? `
                 <div style="color:#7f1d1d;font-size:14px;line-height:1.6;margin-top:12px;background:#ffffff;border:1px solid #fecaca;border-radius:4px;padding:12px;">
@@ -221,7 +225,7 @@ serve(async (req) => {
               </div>`
       : `<div style="background:#eef2ff;border-left:4px solid #6366f1;padding:16px 20px;margin-bottom:20px;border-radius:4px;">
                 <div style="color:#374151;font-size:15px;line-height:1.6;">
-                  Te recordamos que tienes partes de horas pendientes de rellenar para el trabajo: <strong>${escapeHtml(jobTitle)}</strong>. Te rogamos completes los partes para su aprobación; una vez aprobados obtendrás un informe de los importes a facturar y la referencia que has de adjuntar a la factura.
+                  Te recordamos que tienes partes de horas pendientes de rellenar para el trabajo: <strong>${safeJobTitle}</strong>. Te rogamos completes los partes para su aprobación; una vez aprobados obtendrás un informe de los importes a facturar y la referencia que has de adjuntar a la factura.
                 </div>
               </div>`;
 
@@ -267,7 +271,7 @@ serve(async (req) => {
           <tr>
             <td style="padding:24px;color:#111827;font-size:15px;line-height:1.6;">
               <div style="margin-bottom:16px;">
-                Hola ${techName},
+                Hola ${safeTechName},
               </div>
             </td>
           </tr>
@@ -302,13 +306,13 @@ serve(async (req) => {
                   </tr>
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
-                      <strong>Trabajo:</strong> ${jobTitle}
+                      <strong>Trabajo:</strong> ${safeJobTitle}
                     </td>
                   </tr>
                   ${job?.client_name ? `
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
-                      <strong>Cliente:</strong> ${job.client_name}
+                      <strong>Cliente:</strong> ${safeClientName}
                     </td>
                   </tr>
                   ` : ''}
@@ -344,7 +348,7 @@ serve(async (req) => {
                   <strong style="color:#374151;">Instrucciones de acceso:</strong><br/>
                   Si es la primera vez que accedes a la plataforma:
                   <ul style="margin:8px 0;padding-left:20px;">
-                    <li><strong>Usuario:</strong> ${technician.email}</li>
+                    <li><strong>Usuario:</strong> ${safeTechnicianEmail}</li>
                     <li><strong>Contraseña:</strong> pulsa "Olvidé mi contraseña" en la pantalla de acceso y recibirás un enlace para crearla.</li>
                   </ul>
                   Después podrás cambiarla cuando quieras desde tu perfil.
@@ -434,8 +438,9 @@ serve(async (req) => {
     )
   } catch (error) {
     console.error('Error sending timesheet reminder:', error);
+    const message = error instanceof Error ? error.message : 'Internal server error';
     return new Response(
-      JSON.stringify({ error: error.message || 'Internal server error' }),
+      JSON.stringify({ error: message }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

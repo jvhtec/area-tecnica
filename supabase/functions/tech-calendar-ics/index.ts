@@ -67,17 +67,30 @@ async function sha1(s: string) {
 
 // Best-effort per-isolate rate limit. Calendar clients poll at most every
 // few minutes, so a generous hourly cap only affects scraping/enumeration.
-const RATE_LIMIT_PER_HOUR = Math.max(1, Number(Deno.env.get("ICS_RATE_LIMIT_PER_HOUR") || 120));
+const configuredRateLimit = Number(Deno.env.get("ICS_RATE_LIMIT_PER_HOUR") || 120);
+const RATE_LIMIT_PER_HOUR = Number.isFinite(configuredRateLimit) && configuredRateLimit > 0
+  ? Math.floor(configuredRateLimit)
+  : 120;
+const MAX_RATE_BUCKETS = 10_000;
+const MAX_BUCKETS_SCANNED_PER_PRUNE = 250;
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+
+function pruneExpiredBuckets(now: number): void {
+  let scanned = 0;
+  for (const [key, value] of rateBuckets) {
+    if (value.resetAt <= now) rateBuckets.delete(key);
+    scanned += 1;
+    if (scanned >= MAX_BUCKETS_SCANNED_PER_PRUNE) break;
+  }
+}
 
 function allowRequest(key: string): boolean {
   const now = Date.now();
   const bucket = rateBuckets.get(key);
   if (!bucket || bucket.resetAt <= now) {
-    if (rateBuckets.size > 10_000) {
-      for (const [k, v] of rateBuckets) {
-        if (v.resetAt <= now) rateBuckets.delete(k);
-      }
+    if (!bucket && rateBuckets.size >= MAX_RATE_BUCKETS) {
+      pruneExpiredBuckets(now);
+      if (rateBuckets.size >= MAX_RATE_BUCKETS) return false;
     }
     rateBuckets.set(key, { count: 1, resetAt: now + 3_600_000 });
     return true;
@@ -90,7 +103,12 @@ function allowRequest(key: string): boolean {
 // token prefixes through timing.
 async function tokensMatch(expected: string, provided: string): Promise<boolean> {
   const [a, b] = await Promise.all([sha1(expected), sha1(provided)]);
-  return a === b;
+  let difference = a.length ^ b.length;
+  const length = Math.max(a.length, b.length);
+  for (let index = 0; index < length; index += 1) {
+    difference |= (a.charCodeAt(index) || 0) ^ (b.charCodeAt(index) || 0);
+  }
+  return difference === 0;
 }
 
 function replaceIsoDateKeepingTimeAndOffset(iso: string, ymd: string): string {

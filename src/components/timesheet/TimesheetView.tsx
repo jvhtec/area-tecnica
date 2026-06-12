@@ -266,7 +266,7 @@ export const TimesheetView = ({
   const handleSigned = async (timesheetId: string, signatureData: string) => {
     const result = await signTimesheet(timesheetId, signatureData);
     const signed = timesheets.find((t) => t.id === timesheetId);
-    if (signed && signed.technician_id === user?.id && (signed.status === 'draft' || signed.status === 'rejected')) {
+    if (result && signed && signed.technician_id === user?.id && (signed.status === 'draft' || signed.status === 'rejected')) {
       setSubmitPromptTimesheetId(timesheetId);
     }
     return result;

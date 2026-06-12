@@ -211,7 +211,8 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
       const { data: existingTimesheets } = await supabase
         .from("timesheets")
         .select("technician_id, date")
-        .eq("job_id", jobId);
+        .eq("job_id", jobId)
+        .eq("is_active", true);
 
       console.log("Existing timesheets:", existingTimesheets);
 
@@ -524,6 +525,10 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         rejected_at: new Date().toISOString(),
         rejected_by: currentUser?.id,
         rejection_reason: reason ?? null,
+        // A rejected part can be edited before resubmission, so its previous
+        // signature must never remain attached to corrected hours.
+        signature_data: null,
+        signed_at: null,
         // Optionally wipe the entered hours so the tech refills from scratch
         // (chk_valid_times requires start/end to be null together).
         ...(options?.resetHours
@@ -531,9 +536,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
               start_time: null,
               end_time: null,
               break_minutes: 0,
-              overtime_hours: 0,
-              signature_data: null,
-              signed_at: null
+              overtime_hours: 0
             }
           : {})
       },

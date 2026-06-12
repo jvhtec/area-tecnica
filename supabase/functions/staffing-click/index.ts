@@ -30,7 +30,7 @@ serve(async (req) => {
       rid,
       action,
       exp: exp?.substring(0, 20),
-      t: t ? `${t.substring(0, 8)}…` : t,
+      hasToken: Boolean(t),
       channel: c,
       urlStyle,
     });
