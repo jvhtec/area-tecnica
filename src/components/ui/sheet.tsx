@@ -47,6 +47,26 @@ const sheetVariants = cva(
   }
 )
 
+// Safe-area insets are applied as inline styles so consumer className
+// utilities (p-*, pb-*, ...) cannot silently strip them. Consumers that
+// handle insets themselves (e.g. p-0 with a safe-padded inner element)
+// opt out explicitly via the style prop.
+const sheetSafeAreaInsets: Record<
+  "top" | "bottom" | "left" | "right",
+  React.CSSProperties
+> = {
+  top: { paddingTop: "max(1.5rem, env(safe-area-inset-top))" },
+  bottom: { paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" },
+  left: {
+    paddingTop: "max(1.5rem, env(safe-area-inset-top))",
+    paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
+  },
+  right: {
+    paddingTop: "max(1.5rem, env(safe-area-inset-top))",
+    paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
+  },
+}
+
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
   VariantProps<typeof sheetVariants> { }
@@ -54,12 +74,13 @@ interface SheetContentProps
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
+>(({ side = "right", className, style, children, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <SheetPrimitive.Content
       ref={ref}
       className={cn(sheetVariants({ side }), className)}
+      style={{ ...sheetSafeAreaInsets[side ?? "right"], ...style }}
       {...props}
     >
       {children}
