@@ -381,8 +381,11 @@ serve(async (req) => {
         });
       }
 
-      const escapedJobTitle = escapeHtml(job.title || '');
-      const subject = `Resumen de pagos · ${job.title}`;
+      const normalizedJobTitle = (job.title || '').trim();
+      const escapedJobTitle = escapeHtml(normalizedJobTitle);
+      const subject = normalizedJobTitle
+        ? `Resumen de pagos · ${normalizedJobTitle}`
+        : 'Resumen de pagos';
 
       // Corporate-styled HTML, aligned with other emails
       const safeName = escapeHtml(tech.full_name || '');

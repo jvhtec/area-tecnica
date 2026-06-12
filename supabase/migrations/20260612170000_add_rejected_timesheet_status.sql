@@ -47,11 +47,11 @@ select
   t.job_id,
   t.technician_id,
   case
-    when bool_or(t.status = 'approved'::public.timesheet_status) then 'approved'::text
-    when bool_or(t.status = 'submitted'::public.timesheet_status) then 'submitted'::text
     -- Compare through text because a newly-added enum value cannot be cast
     -- explicitly until the ALTER TYPE transaction commits.
     when bool_or(t.status::text = 'rejected') then 'rejected'::text
+    when bool_or(t.status = 'approved'::public.timesheet_status) then 'approved'::text
+    when bool_or(t.status = 'submitted'::public.timesheet_status) then 'submitted'::text
     when bool_or(t.status = 'draft'::public.timesheet_status) then 'draft'::text
     else 'missing'::text
   end as status

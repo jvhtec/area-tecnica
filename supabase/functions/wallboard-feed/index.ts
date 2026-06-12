@@ -463,9 +463,9 @@ serve(async (req) => {
         const hasSubmitted = ts.some((t) => t.status === "submitted");
         const hasRejected = ts.some((t) => t.status === "rejected");
         const inPast = new Date(job.end_time) < new Date();
+        if (hasRejected) return "rejected";
         if (inPast && hasApproved) return "approved";
         if (hasSubmitted) return "submitted";
-        if (hasRejected) return "rejected";
         return "draft";
       };
 

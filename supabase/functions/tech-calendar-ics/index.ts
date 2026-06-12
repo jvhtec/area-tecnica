@@ -90,7 +90,11 @@ function allowRequest(key: string): boolean {
   if (!bucket || bucket.resetAt <= now) {
     if (!bucket && rateBuckets.size >= MAX_RATE_BUCKETS) {
       pruneExpiredBuckets(now);
-      if (rateBuckets.size >= MAX_RATE_BUCKETS) return false;
+      if (rateBuckets.size >= MAX_RATE_BUCKETS) {
+        const oldestKey = rateBuckets.keys().next().value;
+        if (typeof oldestKey !== "string") return false;
+        rateBuckets.delete(oldestKey);
+      }
     }
     rateBuckets.set(key, { count: 1, resetAt: now + 3_600_000 });
     return true;
