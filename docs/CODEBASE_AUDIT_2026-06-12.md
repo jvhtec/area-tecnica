@@ -141,3 +141,30 @@ Two high-severity items from last time are **still open** — `staffing-click` l
 12. Finish the last 9 legacy supabase-client imports; delete `src/legacy/`.
 13. Migrate the 9 remaining send-* functions to the shared email template.
 14. Break up `TourOpsManagementHub.tsx` (2,116 LOC) and `JobCardNew.tsx` (1,421 LOC); continue phased `any` reduction.
+
+---
+
+## 7. Remediation addendum (same day, commits `dbc32d3`…`1b92507`)
+
+Fixed on this branch immediately after the audit:
+
+| Item | Status | Commit |
+|---|---|---|
+| H6 — staffing-click token logging | ✅ Fixed: no headers/raw URL logged; token preview 8 chars | `dbc32d3` |
+| Missing `created_by` FK indexes (2 new tables) | ✅ Fixed: `20260612130000` migration | `dbc32d3` |
+| CI npm cache (7 jobs) | ✅ Fixed: `actions/cache` on `~/.npm` keyed on package.json | `dbc32d3` |
+| CLAUDE.md "30 critical tests" drift | ✅ Fixed | `dbc32d3` |
+| H3 — apply-flex-status always 200 | ✅ Fixed: 200/207/502/503/500; callers recover the body via `extractFunctionErrorMessage` | `f6db5e6` |
+| H9 — Flex timeout/retry + folder idempotency | ✅ Fixed: shared `_shared/flexFetch.ts` (tested, 8 tests) wired into 6 functions; `create-flex-folders` skips existing root/date folders | `b18c28f` |
+| NEW-1/2 — WhatsApp rate limiting | ✅ Fixed: `whatsapp_send_audit` ledger + per-actor daily quotas (500 recipients, 20 groups; env-tunable), tested helper | `7d71e45` |
+| Supabase client split-brain (7 stragglers) | ✅ Fixed: all on canonical import | `8ddd27e` |
+| `src/legacy/` (1,327 LOC unreferenced) | ✅ Deleted | `8ddd27e` |
+| `secure-flex-api` hardcoded base URL; `import-users` std 0.182 pin | ✅ Fixed | `8ddd27e` |
+| PayoutEmailPreview hand-rolled escaping | ✅ Fixed: DOMPurify sanitize before render | `4e74990` |
+| A11y clickable divs (3 genuine of 5 flagged) | ✅ Fixed: real buttons / role+tabIndex+keydown (other 2 are delegation wrappers over real buttons — fine) | `4e74990` |
+| tech-calendar-ics abuse | ✅ Fixed: per-token rate limit (120/h) + hash-then-compare token check. Token TTL **not** added — calendar feed URLs are long-lived by design; rotation is a product decision | `29e0e25` |
+| timesheets `is_active` leak into payroll | ✅ Fixed: migration `20260612150000` patches `v_job_tech_payout_2025_base`, `v_job_staffing_summary`, `get_job_total_amounts()`, `get_timesheet_amounts_visible()`; 3 app queries + 3 edge functions filtered. Verified voiding never resets `status`, so the leak was real | `36f0679` |
+| Email duplication (send mechanics) | ✅ Fixed: `_shared/brevo.ts` (15s timeout) used by all 13 Brevo functions; HTML templates intentionally untouched | `1b92507` |
+| Coverage thresholds | 🟡 Extended to the new shared helpers; a global floor is impractical until coverage rises | `8ddd27e` |
+
+**Still open (the honest path to A+ everywhere):** staffing-orchestrator `index.ts` tests (H8 remainder), 34 direct `.channel()` calls (H7), CORS wildcard (accepted-risk — all endpoints auth/token-gated; restricting needs the production origin list incl. Capacitor origins), shared HTML email template adoption (needs visual review), catalog-table INSERT-for-all-authenticated (designed collaborative feature — restrict or accept explicitly), god components, phased `any` reduction, toast consolidation, ICS token rotation (product decision).
