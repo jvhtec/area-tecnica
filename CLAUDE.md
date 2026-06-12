@@ -957,4 +957,5 @@ _Add rules here as they are discovered. Each rule should reference a specific mi
 - **CI requires Node 20** — GitHub Actions workflow uses Node 20; match locally for consistency
 - **Playwright needs Chromium** — `npm run test:e2e` requires Playwright browsers installed (`npx playwright install chromium`)
 - **100 SQL migrations exist** — the initial `00000000000000_production_schema.sql` is 10,500+ lines; new migrations use timestamp naming (`YYYYMMDDHHMMSS_description.sql`)
+- **Validate types with `npm run typecheck`, not bare `npx tsc --noEmit`** — CI gates on `tsc -p tsconfig.app.json`, which is stricter; a plain tsc run can pass while CI fails (e.g. typed-supabase-client casts)
 - **Don't manually edit archive/ or src/legacy/** — these are retained for reference only, no new runtime imports
