@@ -242,7 +242,7 @@ export const TechnicianIncidentReportDialog = ({
       </div>
 
       {isOpen && (
-        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${t.modalOverlay} p-2 sm:p-4 animate-in fade-in duration-200 overflow-y-auto`}>
+        <div className={`fixed inset-0 z-[70] flex items-center justify-center ${t.modalOverlay} p-2 sm:p-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:pt-[max(1rem,env(safe-area-inset-top))] sm:pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200 overflow-y-auto`}>
           <div className={`w-full max-w-2xl max-h-[90dvh] my-auto ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${t.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col`}>
 
             {/* Header */}
@@ -441,7 +441,7 @@ export const TechnicianIncidentReportDialog = ({
 
       {/* Signature Dialog */}
       {isSignatureDialogOpen && (
-        <div className={`fixed inset-0 z-[80] flex items-center justify-center ${t.modalOverlay} p-4 animate-in fade-in duration-200`}>
+        <div className={`fixed inset-0 z-[80] flex items-center justify-center ${t.modalOverlay} p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
           <div className={`w-full max-w-md ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${t.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}>
             <div className={`p-4 border-b ${t.divider} flex justify-between items-center`}>
               <h3 className={`font-bold ${t.textMain}`}>Firma Digital</h3>

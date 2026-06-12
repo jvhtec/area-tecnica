@@ -397,8 +397,8 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
     };
 
     return (
-        <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
-            <div className={`w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] h-[90vh] ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden overflow-x-hidden animate-in zoom-in-95 duration-200`}>
+        <div className={`fixed inset-0 z-50 flex items-center justify-center ${theme.modalOverlay} p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
+            <div className={`w-[98vw] sm:w-[96vw] max-w-[1200px] xl:max-w-[1400px] h-[90dvh] max-h-full ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl flex flex-col overflow-hidden overflow-x-hidden animate-in zoom-in-95 duration-200`}>
 
                 {/* Header */}
                 <div className={`p-4 border-b ${theme.divider} flex justify-between items-center shrink-0`}>

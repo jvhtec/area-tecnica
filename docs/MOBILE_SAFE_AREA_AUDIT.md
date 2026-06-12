@@ -32,7 +32,7 @@ Not affected (auto-positioned floating elements, no fixed edges): `popover.tsx`,
 
 ## Tier 2 — Custom full-screen modals bypassing the convention
 
-These hand-rolled `fixed inset-0` overlays should use the technician-modal pattern but don't:
+These hand-rolled `fixed inset-0` overlays bypassed the technician-modal pattern. **Status: all items in this tier are fixed on this branch** — full-screen views pad their root with `env()` insets, centered modal overlays use the technician pattern, and `MobileArtistList`'s bottom sheet was resolved by the Phase 1 `SheetContent` fix.
 
 | File | Line | Surface |
 |---|---|---|
@@ -90,7 +90,7 @@ Plus point inconsistencies:
 
 **Phase 1 — primitives (✅ done on this branch).** Per-side inset handling added to `sheet.tsx`, `drawer.tsx`, the `toast.tsx` viewport, and the sonner toaster; dialog/alert-dialog max-heights are inset-aware; `sidebar/sidebar-components.tsx` reconciled with `sidebar.tsx`. Note: `SheetContent` applies insets as inline styles so consumer `className` padding utilities cannot silently strip them; consumers that handle insets themselves (e.g. full-bleed layouts with a safe-padded inner element) opt out explicitly via the `style` prop.
 
-**Phase 2 — custom full-screen modals.** Apply the technician-modal pattern to the eight Tier 2 surfaces. Consider extracting a shared `FullScreenOverlay` wrapper or a `safe-overlay` utility class so the pattern can't drift again.
+**Phase 2 — custom full-screen modals (✅ done on this branch).** The technician-modal pattern applied to all Tier 2 surfaces; `ArtistManagementDialog` also moved from `100vh` to `dvh`, and `EnhancedJobDetailsModal`'s inner panel from `h-[90vh]` to `h-[90dvh] max-h-full`. A shared `FullScreenOverlay` wrapper remains a good future refactor so the pattern can't drift again.
 
 **Phase 3 — fixed elements + viewport heights.** Tier 3 floats get `calc(... + env(safe-area-inset-bottom/top))` offsets; Tier 4 pages move from `h-screen`/`100vh` to `h-dvh`/`min-h-screen` with inset terms.
 

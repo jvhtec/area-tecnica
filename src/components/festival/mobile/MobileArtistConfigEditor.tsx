@@ -618,7 +618,7 @@ export const MobileArtistConfigEditor = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background flex flex-col animate-in slide-in-from-right duration-200">
+    <div className="fixed inset-0 z-50 bg-background flex flex-col pt-[max(0px,env(safe-area-inset-top))] pb-[max(0px,env(safe-area-inset-bottom))] animate-in slide-in-from-right duration-200">
       {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b shrink-0">
         <button
