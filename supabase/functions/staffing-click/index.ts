@@ -17,28 +17,20 @@ function b64uToU8(b64u: string) {
 }
 
 serve(async (req) => {
-  // 🔍 EARLY REQUEST LOGGING - Log all incoming requests for debugging
-  console.log('📥 INCOMING REQUEST:', {
-    method: req.method,
-    url: req.url,
-    headers: Object.fromEntries(req.headers.entries())
-  });
+  // Do not log headers or the raw URL: the auth token travels in the
+  // Authorization header, the `t` query param, or a path segment.
+  console.log('📥 INCOMING REQUEST:', { method: req.method });
 
   try {
     const url = new URL(req.url);
     const parsedRequest = parseStaffingClickRequest(url);
-    console.log('🔗 PARSED URL:', {
-      pathname: url.pathname,
-      searchParams: Object.fromEntries(url.searchParams.entries()),
-      parsedRequest,
-    });
     const { rid, action, exp, token: t, channelHint: c, urlStyle } = parsedRequest;
-    
+
     console.log('✅ STEP 1: Parameters parsed', {
       rid,
       action,
       exp: exp?.substring(0, 20),
-      t: t?.substring(0, 20),
+      t: t ? `${t.substring(0, 8)}…` : t,
       channel: c,
       urlStyle,
     });

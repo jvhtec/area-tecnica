@@ -22,6 +22,16 @@ jobs:
         with:
           node-version: 20
 
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          # No lockfile in this repo (intentional — see CLAUDE.md), so key on
+          # package.json instead of a lockfile hash.
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
@@ -41,6 +51,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          # No lockfile in this repo (intentional — see CLAUDE.md), so key on
+          # package.json instead of a lockfile hash.
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
@@ -62,6 +82,16 @@ jobs:
         with:
           node-version: 20
 
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          # No lockfile in this repo (intentional — see CLAUDE.md), so key on
+          # package.json instead of a lockfile hash.
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
@@ -81,6 +111,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          # No lockfile in this repo (intentional — see CLAUDE.md), so key on
+          # package.json instead of a lockfile hash.
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
@@ -102,6 +142,16 @@ jobs:
         with:
           node-version: 20
 
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          # No lockfile in this repo (intentional — see CLAUDE.md), so key on
+          # package.json instead of a lockfile hash.
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
+
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
@@ -121,6 +171,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          # No lockfile in this repo (intentional — see CLAUDE.md), so key on
+          # package.json instead of a lockfile hash.
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
@@ -144,6 +204,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Cache npm downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          # No lockfile in this repo (intentional — see CLAUDE.md), so key on
+          # package.json instead of a lockfile hash.
+          key: npm-${{ runner.os }}-${{ hashFiles('package.json') }}
+          restore-keys: |
+            npm-${{ runner.os }}-
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
