@@ -52,15 +52,26 @@ create or replace view public.v_job_tech_payout_2025_base with (security_invoker
             when public.needs_vehicle_disclaimer(b.technician_id) then 'Se requiere vehículo propio'::text
             else null::text
         end as vehicle_disclaimer_text
-   from ((base b
-     left join ( select timesheets.job_id,
-            timesheets.technician_id,
-            sum(timesheets.amount_eur) filter (where (timesheets.status = 'approved'::public.timesheet_status)) as timesheets_total_eur
-           from public.timesheets
-          where coalesce(timesheets.is_active, true)
-          group by timesheets.job_id, timesheets.technician_id) tt on (((tt.job_id = b.job_id) and (tt.technician_id = b.technician_id))))
-     left join lateral ( select coalesce(public.extras_total_for_job_tech(b.job_id, b.technician_id), jsonb_build_object('total_eur', 0, 'items', '[]'::jsonb)) as extras_payload) ex on (true))
-     left join expense_rollup er on (((er.job_id = b.job_id) and (er.technician_id = b.technician_id))));
+   from base b
+   left join (
+     select
+       timesheets.job_id,
+       timesheets.technician_id,
+       sum(timesheets.amount_eur) filter (
+         where timesheets.status = 'approved'::public.timesheet_status
+       ) as timesheets_total_eur
+     from public.timesheets
+     where coalesce(timesheets.is_active, true)
+     group by timesheets.job_id, timesheets.technician_id
+   ) tt on tt.job_id = b.job_id and tt.technician_id = b.technician_id
+   left join lateral (
+     select coalesce(
+       public.extras_total_for_job_tech(b.job_id, b.technician_id),
+       jsonb_build_object('total_eur', 0, 'items', '[]'::jsonb)
+     ) as extras_payload
+   ) ex on true
+   left join expense_rollup er
+     on er.job_id = b.job_id and er.technician_id = b.technician_id;
 
 -- 2. v_job_staffing_summary (materialized) -----------------------------------
 
