@@ -16,7 +16,12 @@ export interface FlexFetchOptions {
   timeoutMs?: number;
   /** Base backoff delay; grows exponentially (1x, 2x, 4x…). Default 1000. */
   backoffMs?: number;
-  /** Retry when an attempt times out. Default true (set false for non-idempotent requests). */
+  /**
+   * Retry attempts whose outcome is ambiguous — timeouts and 502/504 gateway
+   * responses, where the origin may have already processed the request.
+   * Default true; set false for non-idempotent requests. (To disable retries
+   * entirely, pass `attempts: 1`.)
+   */
   retryOnTimeout?: boolean;
   /** Injectable for tests. */
   fetchImpl?: typeof fetch;
@@ -25,6 +30,9 @@ export interface FlexFetchOptions {
 }
 
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+// Gateway statuses where the origin may have already processed the request —
+// replaying them has the same duplicate-side-effect risk as replaying a timeout.
+const AMBIGUOUS_STATUSES = new Set([502, 504]);
 
 export class FlexFetchTimeoutError extends Error {
   constructor(url: string, timeoutMs: number) {
@@ -56,7 +64,9 @@ export async function fetchWithRetry(
     try {
       const response = await fetchImpl(url, { ...init, signal: controller.signal });
 
-      if (!RETRYABLE_STATUSES.has(response.status) || attempt === attempts) {
+      const retryable = RETRYABLE_STATUSES.has(response.status) &&
+        (retryOnTimeout || !AMBIGUOUS_STATUSES.has(response.status));
+      if (!retryable || attempt === attempts) {
         return response;
       }
 

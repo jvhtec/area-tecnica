@@ -270,12 +270,14 @@ serve(async (req) => {
       console.log("Selected departments for date folder creation:", selectedDepartments);
 
       // Idempotency guard: skip dates that already have a Flex folder so a
-      // re-run only fills in the missing ones.
-      const { data: existingDateFolders } = await supabase
+      // re-run only fills in the missing ones. A failed read must abort —
+      // treating it as "no folders" would recreate the whole tree in Flex.
+      const { data: existingDateFolders, error: existingDateFoldersError } = await supabase
         .from('flex_folders')
         .select('tour_date_id')
         .eq('folder_type', 'tour_date')
         .in('tour_date_id', tourDates.map((td: any) => td.id))
+      if (existingDateFoldersError) throw existingDateFoldersError
       const datesWithFolders = new Set(
         (existingDateFolders || []).map((row: any) => row.tour_date_id).filter(Boolean)
       )

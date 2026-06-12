@@ -92,6 +92,36 @@ describe("fetchWithRetry", () => {
     expect(delays).toEqual([100, 200]);
   });
 
+  it("does not retry ambiguous gateway statuses when retryOnTimeout is false", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(504))
+      .mockResolvedValueOnce(jsonResponse(200));
+
+    const res = await fetchWithRetry("https://flex.example/element", { method: "POST" }, {
+      retryOnTimeout: false,
+      fetchImpl,
+      sleep: noSleep,
+    });
+
+    expect(res.status).toBe(504);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("still retries unambiguous 5xx when retryOnTimeout is false", async () => {
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(503))
+      .mockResolvedValueOnce(jsonResponse(200));
+
+    const res = await fetchWithRetry("https://flex.example/element", { method: "POST" }, {
+      retryOnTimeout: false,
+      fetchImpl,
+      sleep: noSleep,
+    });
+
+    expect(res.status).toBe(200);
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
   it("throws FlexFetchTimeoutError without retrying when retryOnTimeout is false", async () => {
     const fetchImpl = vi.fn((_url: string, init?: RequestInit) =>
       new Promise<Response>((_resolve, reject) => {

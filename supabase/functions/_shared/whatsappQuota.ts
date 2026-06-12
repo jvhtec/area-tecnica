@@ -1,25 +1,22 @@
 /**
  * Per-actor daily quota + audit ledger for outbound WhatsApp operations,
- * backed by the whatsapp_send_audit table (written with the service role).
+ * backed by the attempt_whatsapp_send RPC (whatsapp_send_audit table). The
+ * RPC takes a per-actor advisory lock and does the count + ledger insert in
+ * one transaction, so concurrent bursts cannot overshoot the quota.
  *
  * Quotas are defense-in-depth against a compromised admin/management
- * account burning WAHA capacity, so a failed ledger READ fails open (the
- * send proceeds, with a warning) rather than blocking production traffic.
+ * account burning WAHA capacity, so an RPC infrastructure failure (e.g.
+ * migration not yet applied) fails open — the send proceeds, with a
+ * warning — rather than blocking production traffic.
  */
 
-type QueryResult = { data: Array<{ recipient_count: number | null }> | null; error: { message?: string } | null };
+type RpcRow = { allowed: boolean; used_today: number };
 
 export interface WhatsappQuotaClient {
-  from(table: string): {
-    select(columns: string): {
-      eq(column: string, value: string): {
-        eq(column: string, value: string): {
-          gte(column: string, value: string): PromiseLike<QueryResult>;
-        };
-      };
-    };
-    insert(row: Record<string, unknown>): PromiseLike<{ error: { message?: string } | null }>;
-  };
+  rpc(
+    fn: string,
+    args: Record<string, unknown>,
+  ): PromiseLike<{ data: RpcRow[] | RpcRow | null; error: { message?: string } | null }>;
 }
 
 export type WhatsappQuotaKind = "job_message" | "group_creation";
@@ -32,7 +29,6 @@ export interface WhatsappQuotaArgs {
   recipientCount?: number;
   jobId?: string | null;
   dailyLimit: number;
-  now?: Date;
 }
 
 export interface WhatsappQuotaResult {
@@ -41,50 +37,33 @@ export interface WhatsappQuotaResult {
   dailyLimit: number;
 }
 
-const WINDOW_MS = 24 * 60 * 60 * 1000;
-
 export async function checkAndRecordWhatsappQuota(args: WhatsappQuotaArgs): Promise<WhatsappQuotaResult> {
   const { supabase, actorId, kind, jobId = null, dailyLimit } = args;
-  const now = args.now ?? new Date();
   const unitsRequested = kind === "job_message" ? Math.max(0, args.recipientCount ?? 0) : 1;
-  const windowStart = new Date(now.getTime() - WINDOW_MS).toISOString();
-
-  let usedToday = 0;
-  try {
-    const { data, error } = await supabase
-      .from("whatsapp_send_audit")
-      .select("recipient_count")
-      .eq("actor_id", actorId)
-      .eq("kind", kind)
-      .gte("created_at", windowStart);
-
-    if (error) throw new Error(error.message || "quota lookup failed");
-
-    usedToday = kind === "job_message"
-      ? (data ?? []).reduce((sum, row) => sum + (row.recipient_count ?? 0), 0)
-      : (data ?? []).length;
-  } catch (err) {
-    console.warn("whatsapp quota lookup failed, allowing send:", err instanceof Error ? err.message : String(err));
-    usedToday = 0;
-  }
-
-  if (usedToday + unitsRequested > dailyLimit) {
-    return { allowed: false, usedToday, dailyLimit };
-  }
 
   try {
-    const { error: insertError } = await supabase.from("whatsapp_send_audit").insert({
-      actor_id: actorId,
-      kind,
-      job_id: jobId,
-      recipient_count: kind === "job_message" ? unitsRequested : args.recipientCount ?? 0,
+    const { data, error } = await supabase.rpc("attempt_whatsapp_send", {
+      _actor_id: actorId,
+      _kind: kind,
+      _units: unitsRequested,
+      _daily_limit: dailyLimit,
+      _job_id: jobId,
+      _recipient_count: args.recipientCount ?? 0,
     });
-    if (insertError) {
-      console.warn("whatsapp quota ledger insert failed:", insertError.message);
-    }
-  } catch (err) {
-    console.warn("whatsapp quota ledger insert failed:", err instanceof Error ? err.message : String(err));
-  }
 
-  return { allowed: true, usedToday, dailyLimit };
+    if (error) throw new Error(error.message || "quota RPC failed");
+
+    const row = Array.isArray(data) ? data[0] : data;
+    if (!row || typeof row.allowed !== "boolean") {
+      throw new Error("quota RPC returned no row");
+    }
+
+    return { allowed: row.allowed, usedToday: row.used_today ?? 0, dailyLimit };
+  } catch (err) {
+    console.warn(
+      "whatsapp quota check failed, allowing send:",
+      err instanceof Error ? err.message : String(err),
+    );
+    return { allowed: true, usedToday: 0, dailyLimit };
+  }
 }

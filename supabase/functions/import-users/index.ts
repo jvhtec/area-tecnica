@@ -29,9 +29,9 @@ serve(async (req) => {
 
   try {
     const formData = await req.formData();
-    const file = formData.get('file') as File;
-    
-    if (!file) {
+    const file = formData.get('file');
+
+    if (!(file instanceof File)) {
       throw new Error('No file provided');
     }
 

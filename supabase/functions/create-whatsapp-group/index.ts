@@ -514,6 +514,30 @@ serve(async (req: Request) => {
       return new Response(JSON.stringify({ error: 'No valid phone numbers found', warnings: { missing, invalid } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // Per-actor daily quota on real group creations (duplicates and
+    // finalize-only runs are excluded): limits WAHA quota burn from a
+    // compromised admin/management account. Checked BEFORE the request lock
+    // below so a 429 doesn't leave the job/department permanently locked.
+    if (!finalizeOnly && !existingWaGroupId) {
+      const dailyGroupLimit = Number(Deno.env.get('WA_DAILY_GROUP_LIMIT') || 20);
+      const quota = await checkAndRecordWhatsappQuota({
+        supabase: supabaseAdmin,
+        actorId: actorId!,
+        kind: 'group_creation',
+        recipientCount: uniqueParticipants.length,
+        jobId: job_id,
+        dailyLimit: dailyGroupLimit,
+      });
+      if (!quota.allowed) {
+        return new Response(JSON.stringify({
+          error: 'Too Many Requests',
+          reason: 'daily_whatsapp_group_quota_exceeded',
+          used_today: quota.usedToday,
+          daily_limit: quota.dailyLimit,
+        }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
     // Record request to lock further attempts only after recipient validation succeeds.
     if (!priorReq && !existingWaGroupId) {
       const { error: lockErr } = await supabaseAdmin
@@ -600,27 +624,6 @@ serve(async (req: Request) => {
     let wa_group_id = existingWaGroupId || '';
     let groupText = '';
     if (!finalizeOnly && !existingWaGroupId) {
-      // Per-actor daily quota on real group creations (duplicates and
-      // finalize-only runs never reach this branch): limits WAHA quota burn
-      // from a compromised admin/management account.
-      const dailyGroupLimit = Number(Deno.env.get('WA_DAILY_GROUP_LIMIT') || 20);
-      const quota = await checkAndRecordWhatsappQuota({
-        supabase: supabaseAdmin,
-        actorId: actorId!,
-        kind: 'group_creation',
-        recipientCount: creationGroupParticipants.length,
-        jobId: job_id,
-        dailyLimit: dailyGroupLimit,
-      });
-      if (!quota.allowed) {
-        return new Response(JSON.stringify({
-          error: 'Too Many Requests',
-          reason: 'daily_whatsapp_group_quota_exceeded',
-          used_today: quota.usedToday,
-          daily_limit: quota.dailyLimit,
-        }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      }
-
       // Create the group per WAHA API: POST /api/{session}/groups { name, participants: [{id}] }
       const groupUrl = `${base}/api/${encodeURIComponent(session)}/groups`;
       let groupRes: Response;
