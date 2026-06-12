@@ -591,7 +591,7 @@ export const ProfileView = ({ theme, isDark, user, userProfile, toggleTheme }: P
 
             {/* Password Change Modal */}
             {showPasswordModal && (
-                <div className={`fixed inset-0 z-[70] flex items-center justify-center ${theme.modalOverlay} p-4 animate-in fade-in duration-200`}>
+                <div className={`fixed inset-0 z-[70] flex items-center justify-center ${theme.modalOverlay} p-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
                     <div className={`w-full max-w-md ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}>
                         {/* Header */}
                         <div className={`p-4 border-b ${theme.divider} flex justify-between items-center`}>

@@ -138,7 +138,7 @@ export const TimesheetSidebar = ({ isOpen, onClose }: TimesheetSidebarProps) => 
       />
 
       {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-96 bg-background border-l border-border shadow-lg overflow-hidden flex flex-col">
+      <div className="fixed right-0 top-0 h-full w-96 bg-background border-l border-border shadow-lg overflow-hidden flex flex-col pt-[max(0px,env(safe-area-inset-top))] pb-[max(0px,env(safe-area-inset-bottom))] pr-[max(0px,env(safe-area-inset-right))]">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">

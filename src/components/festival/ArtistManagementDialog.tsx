@@ -67,7 +67,7 @@ export const ArtistManagementDialog = ({
   // Desktop: standard dialog
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="flex h-[100vh] max-h-[100vh] md:max-h-[100vh] w-[100vw] max-w-[100vw] flex-col gap-0 overflow-hidden rounded-none sm:rounded-none p-0">
+      <DialogContent className="flex h-dvh max-h-dvh md:max-h-dvh w-[100vw] max-w-[100vw] flex-col gap-0 overflow-hidden rounded-none sm:rounded-none p-0 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
         <DialogHeader className="border-b px-4 py-3 sm:px-6">
           <DialogTitle>
             {artist ? "Editar Artista" : "Agregar Artista"}
