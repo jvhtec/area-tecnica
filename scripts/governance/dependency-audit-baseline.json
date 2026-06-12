@@ -1,10 +1,9 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-04T17:55:33.566Z",
+  "generatedAt": "2026-06-12T21:28:10.080Z",
   "note": "Current npm audit advisories are grandfathered. CI fails on new advisory IDs or increased severity counts.",
   "advisoryIds": [
     "1098574",
-    "1102341",
     "1112659",
     "1113300",
     "1113375",
@@ -14,17 +13,23 @@
     "1114200",
     "1114302",
     "1114680",
-    "1116229",
     "1116451",
     "1119441",
-    "1120011"
+    "1120679"
+  ],
+  "exceptions": [
+    {
+      "advisoryId": "1120679",
+      "package": "esbuild",
+      "rationale": "The vulnerable Deno module path is not used; this repository consumes esbuild through Node and Vite 6. The patched esbuild 0.28 line breaks Vite 6 target transforms, so remove this exception during the planned Vite major migration."
+    }
   ],
   "vulnerabilityCounts": {
     "info": 0,
     "low": 0,
-    "moderate": 8,
-    "high": 6,
-    "critical": 2
+    "moderate": 5,
+    "high": 12,
+    "critical": 0
   },
-  "total": 16
+  "total": 17
 }
