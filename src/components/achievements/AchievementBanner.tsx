@@ -21,7 +21,7 @@ export function AchievementBanner() {
   };
 
   return (
-    <div className="fixed inset-x-0 top-0 z-[100] flex justify-center px-4 pt-4 pointer-events-none">
+    <div className="fixed inset-x-0 top-0 z-[100] flex justify-center px-4 pt-[calc(1rem+env(safe-area-inset-top))] pointer-events-none">
       <div className="pointer-events-auto w-full max-w-md animate-in slide-in-from-top-4 fade-in duration-500">
         <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-card shadow-lg">
           {/* Dismiss */}

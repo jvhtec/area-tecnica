@@ -30,7 +30,7 @@ const SoundVisionFiles = () => {
 
   if (isLoading) {
     return (
-      <div className="w-full h-[calc(100vh-6rem)] flex items-center justify-center bg-background text-foreground">
+      <div className="w-full h-[calc(100dvh-6rem)] flex items-center justify-center bg-background text-foreground">
         <div className="flex items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
           <span className="text-muted-foreground">Cargando...</span>
@@ -99,7 +99,7 @@ const SoundVisionFiles = () => {
   };
 
   return (
-    <div className="w-full h-[calc(100vh-4rem)] p-0 m-0 overflow-hidden relative">
+    <div className="w-full h-[calc(100dvh-4rem-env(safe-area-inset-top))] p-0 m-0 overflow-hidden relative">
       <SoundVisionInteractiveMap
         theme={mapTheme}
         isDark={isDark}

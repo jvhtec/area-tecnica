@@ -621,7 +621,7 @@ export default function JobAssignmentMatrix() {
         : `${outstandingJobsCount} trabajo${outstandingJobsCount === 1 ? '' : 's'} pendiente${outstandingJobsCount === 1 ? '' : 's'}`;
 
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="h-dvh flex flex-col bg-background">
       <MatrixPageControls
         selectedDepartment={selectedDepartment}
         defaultDepartment={defaultDepartment}

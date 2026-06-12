@@ -32,7 +32,7 @@ const SysCalc = () => {
       </div>
 
       {/* Calculator iframe */}
-      <div className="w-full h-[calc(100vh-73px)] relative">
+      <div className="w-full h-[calc(100dvh-73px)] relative">
         <iframe
           key={iframeKey}
           src={sysCalcUrl}
@@ -83,7 +83,7 @@ const SysCalc = () => {
 
       {/* Mobile helper text */}
       {isMobile && (
-        <div className="fixed bottom-4 left-4 right-4 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-xs text-blue-400">
+        <div className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom)+1rem)] left-4 right-4 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-xs text-blue-400">
           <p className="font-medium">💡 Tip: Rotate your device to landscape for better viewing</p>
         </div>
       )}

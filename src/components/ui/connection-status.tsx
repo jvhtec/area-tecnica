@@ -120,7 +120,7 @@ export function ConnectionStatus({
   }
   
   return (
-    <div className={`fixed bottom-4 right-4 z-50 max-w-md transition-all duration-300 ease-in-out ${className || ''}`}>
+    <div className={`fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-50 max-w-md transition-all duration-300 ease-in-out ${className || ''}`}>
       {isVisible && (
         <Card className={`shadow-lg ${
           connectionStatus === 'connecting' ? 'bg-blue-50' :

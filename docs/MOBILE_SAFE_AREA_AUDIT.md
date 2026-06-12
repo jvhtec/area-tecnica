@@ -47,6 +47,8 @@ These hand-rolled `fixed inset-0` overlays bypassed the technician-modal pattern
 
 ## Tier 3 — Fixed/floating elements missing insets
 
+**Status: fixed on this branch**, except `DashboardMobileHub` — on re-verification its `pb-24` is internal spacing inside Layout's already nav-padded main (`pb-[calc(4.5rem+env(...))]`), not a clipping bug, so it was left as is. The MobileAvailabilityView FAB and SysCalc's mobile tip (same bug class, found during the fix) are now offset above the mobile nav (`calc(4.5rem + env(safe-area-inset-bottom) + gap)`).
+
 | File | Line | Issue |
 |---|---|---|
 | `src/components/ui/connection-status.tsx` | 123 | `fixed bottom-4 right-4` — hidden behind home indicator. |
@@ -56,7 +58,7 @@ These hand-rolled `fixed inset-0` overlays bypassed the technician-modal pattern
 
 ## Tier 4 — Page-level viewport-height bugs
 
-`h-screen`/`100vh` on iOS includes area under browser chrome and ignores insets; the codebase standard elsewhere is `min-h-screen` or `h-svh` (see `sidebar.tsx`).
+`h-screen`/`100vh` on iOS includes area under browser chrome and ignores insets; the codebase standard elsewhere is `min-h-screen` or `h-svh` (see `sidebar.tsx`). **Status: fixed on this branch** — `h-screen` roots moved to `h-dvh`, `100vh` calcs to `100dvh` (the SoundVision map page additionally subtracts `env(safe-area-inset-top)` since Layout's header grows with the inset), and the Auth page gained inset-aware vertical padding on both variants.
 
 | File | Line | Issue |
 |---|---|---|
@@ -92,7 +94,7 @@ Plus point inconsistencies:
 
 **Phase 2 — custom full-screen modals (✅ done on this branch).** The technician-modal pattern applied to all Tier 2 surfaces; `ArtistManagementDialog` also moved from `100vh` to `dvh`, and `EnhancedJobDetailsModal`'s inner panel from `h-[90vh]` to `h-[90dvh] max-h-full`. A shared `FullScreenOverlay` wrapper remains a good future refactor so the pattern can't drift again.
 
-**Phase 3 — fixed elements + viewport heights.** Tier 3 floats get `calc(... + env(safe-area-inset-bottom/top))` offsets; Tier 4 pages move from `h-screen`/`100vh` to `h-dvh`/`min-h-screen` with inset terms.
+**Phase 3 — fixed elements + viewport heights (✅ done on this branch).** Tier 3 floats got `calc(... + env(safe-area-inset-bottom/top))` offsets; Tier 4 pages moved from `h-screen`/`100vh` to `h-dvh`/`100dvh` with inset terms where Layout chrome height varies; Auth page padded for both insets.
 
 **Phase 4 — standardization.**
 - Introduce a shared `--mobile-nav-height: 4.5rem` CSS var and replace all four hard-coded nav-height assumptions.
