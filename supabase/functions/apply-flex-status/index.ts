@@ -214,7 +214,7 @@ serve(async (req) => {
       } catch {}
     }
     if (!flexAuthToken) {
-      return new Response(JSON.stringify({ success: false, error: 'Flex authentication token missing' }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+      return new Response(JSON.stringify({ success: false, error: 'Flex authentication token missing' }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
     }
 
     const { ok: success, response: responseJson, errorMessage } = await callFlexWorkflowAction({
@@ -354,12 +354,13 @@ serve(async (req) => {
       }
     }
 
-    // Always return 200 so clients can parse structured result
-    return new Response(JSON.stringify({ success, response: responseJson, error: success ? null : errorMessage, cascade: cascadeResult }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    // 200 = synced, 207 = master synced but some children failed, 502 = Flex rejected the update.
+    // Clients recover the structured body from FunctionsHttpError via extractFunctionErrorMessage.
+    const httpStatus = success ? ((cascadeResult?.failed ?? 0) > 0 ? 207 : 200) : 502;
+    return new Response(JSON.stringify({ success, response: responseJson, error: success ? null : errorMessage, cascade: cascadeResult }), { status: httpStatus, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
 
   } catch (error: any) {
     console.error('apply-flex-status error:', error);
-    // Return structured error with 200 to avoid opaque 5xx on client
-    return new Response(JSON.stringify({ success: false, error: 'Internal server error', details: error?.message || String(error) }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
+    return new Response(JSON.stringify({ success: false, error: 'Internal server error', details: error?.message || String(error) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
   }
 });

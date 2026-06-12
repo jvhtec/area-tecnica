@@ -9,6 +9,7 @@ import {
 import { ChevronDown } from "lucide-react";
 import { JobStatusBadge } from "./JobStatusBadge";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -120,6 +121,7 @@ export const JobStatusSelector = ({
 	                || (syncRes as any)?.response?.exceptionMessage
 	                || (syncRes as any)?.response?.primaryMessage
 	                || (syncRes as any)?.response?.message
+	                || (syncErr ? await extractFunctionErrorMessage(syncErr, '') : undefined)
 	                || undefined;
 
 	              console.warn('Flex status sync failed', syncErr || syncRes);

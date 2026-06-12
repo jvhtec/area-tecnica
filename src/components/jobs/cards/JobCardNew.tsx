@@ -831,6 +831,7 @@ function JobCardNewFull({
 	          || result?.response?.exceptionMessage
 	          || result?.response?.primaryMessage
 	          || result?.response?.message
+	          || (error ? await extractFunctionErrorMessage(error, '') : undefined)
 	          || undefined;
 	        toast({ title: 'Flex sync failed', description: msg || 'See logs for details.', variant: 'destructive' });
 	      } else {
