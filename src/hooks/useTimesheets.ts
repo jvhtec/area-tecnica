@@ -56,6 +56,7 @@ export const useTimesheets = (jobId: string, opts?: { userRole?: string | null }
         .from("timesheets")
         .select("*")
         .eq("job_id", jobId)
+        .eq("is_active", true)
         .order("date", { ascending: true })
         .order("created_at", { ascending: true });
 

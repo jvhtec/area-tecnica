@@ -446,7 +446,8 @@ serve(async (req) => {
         const { data: ts } = await sb
           .from("timesheets")
           .select("id, job_id, technician_id, status, date")
-          .in("job_id", jobIds);
+          .in("job_id", jobIds)
+          .eq("is_active", true);
         (ts ?? []).forEach((t) => {
           const arr = timesheetsByJob.get(t.job_id) ?? [];
           arr.push(t);

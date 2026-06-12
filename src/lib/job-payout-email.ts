@@ -86,7 +86,8 @@ async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<a
     .from('timesheets')
     .select('technician_id, job_id, date, amount_breakdown, approved_by_manager')
     .eq('job_id', jobId)
-    .eq('approved_by_manager', true);
+    .eq('approved_by_manager', true)
+    .eq('is_active', true);
   if (error) throw error;
   if (data && data.length) return data as any[];
   const { data: rpcData, error: rpcError } = await client.rpc('get_timesheet_amounts_visible');

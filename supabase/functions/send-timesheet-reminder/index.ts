@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.7.1'
+import { sendBrevoEmail } from '../_shared/brevo.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -110,8 +111,9 @@ serve(async (req) => {
       .eq('id', timesheetId)
       .single()
 
-    if (timesheetError || !timesheet) {
-      console.error('Timesheet not found:', timesheetError);
+    if (timesheetError || !timesheet || timesheet.is_active === false) {
+      // Voided timesheets (is_active = false) must not trigger reminders.
+      console.error('Timesheet not found or voided:', timesheetError);
       return new Response(JSON.stringify({ error: 'Timesheet not found' }), {
         status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -350,14 +352,7 @@ serve(async (req) => {
       htmlContent
     };
 
-    const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': BREVO_KEY,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(emailPayload),
-    });
+    const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload);
 
     if (!sendRes.ok) {
       const errorText = await sendRes.text();
