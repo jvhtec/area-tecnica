@@ -28,21 +28,17 @@ const SheetOverlay = React.forwardRef<
 ))
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
-// Edge-touching sides carry safe-area inset padding. Consumers overriding
-// padding on those edges (e.g. pb-* on side="bottom", p-0 full-bleed layouts)
-// take responsibility for the inset themselves — keep an env(safe-area-inset-*)
-// term or pad an inner element instead.
 const sheetVariants = cva(
   "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
   {
     variants: {
       side: {
-        top: "inset-x-0 top-0 border-b pt-[max(1.5rem,env(safe-area-inset-top))] data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
+        top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
         bottom:
-          "inset-x-0 bottom-0 border-t pb-[max(1.5rem,env(safe-area-inset-bottom))] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
+          "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+        left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
         right:
-          "inset-y-0 right-0 h-full w-3/4  border-l pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))] data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
+          "inset-y-0 right-0 h-full w-3/4  border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
       },
     },
     defaultVariants: {
@@ -51,6 +47,26 @@ const sheetVariants = cva(
   }
 )
 
+// Safe-area insets are applied as inline styles so consumer className
+// utilities (p-*, pb-*, ...) cannot silently strip them. Consumers that
+// handle insets themselves (e.g. p-0 with a safe-padded inner element)
+// opt out explicitly via the style prop.
+const sheetSafeAreaInsets: Record<
+  "top" | "bottom" | "left" | "right",
+  React.CSSProperties
+> = {
+  top: { paddingTop: "max(1.5rem, env(safe-area-inset-top))" },
+  bottom: { paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))" },
+  left: {
+    paddingTop: "max(1.5rem, env(safe-area-inset-top))",
+    paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
+  },
+  right: {
+    paddingTop: "max(1.5rem, env(safe-area-inset-top))",
+    paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
+  },
+}
+
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
   VariantProps<typeof sheetVariants> { }
@@ -58,12 +74,13 @@ interface SheetContentProps
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
+>(({ side = "right", className, style, children, ...props }, ref) => (
   <SheetPortal>
     <SheetOverlay />
     <SheetPrimitive.Content
       ref={ref}
       className={cn(sheetVariants({ side }), className)}
+      style={{ ...sheetSafeAreaInsets[side ?? "right"], ...style }}
       {...props}
     >
       {children}

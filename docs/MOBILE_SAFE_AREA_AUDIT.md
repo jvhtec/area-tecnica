@@ -88,7 +88,7 @@ Plus point inconsistencies:
 
 ## Recommended fix plan
 
-**Phase 1 — primitives (✅ done on this branch).** Per-side inset handling added to `sheet.tsx`, `drawer.tsx`, the `toast.tsx` viewport, and the sonner toaster; dialog/alert-dialog max-heights are inset-aware; `sidebar/sidebar-components.tsx` reconciled with `sidebar.tsx`. Note: consumers that override edge padding on `SheetContent` (e.g. `pb-*`, `p-0`) take over inset responsibility — keep an `env(safe-area-inset-*)` term or pad an inner element.
+**Phase 1 — primitives (✅ done on this branch).** Per-side inset handling added to `sheet.tsx`, `drawer.tsx`, the `toast.tsx` viewport, and the sonner toaster; dialog/alert-dialog max-heights are inset-aware; `sidebar/sidebar-components.tsx` reconciled with `sidebar.tsx`. Note: `SheetContent` applies insets as inline styles so consumer `className` padding utilities cannot silently strip them; consumers that handle insets themselves (e.g. full-bleed layouts with a safe-padded inner element) opt out explicitly via the `style` prop.
 
 **Phase 2 — custom full-screen modals.** Apply the technician-modal pattern to the eight Tier 2 surfaces. Consider extracting a shared `FullScreenOverlay` wrapper or a `safe-overlay` utility class so the pattern can't drift again.
 

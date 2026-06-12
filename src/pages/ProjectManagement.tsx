@@ -556,7 +556,8 @@ const ProjectManagement = () => {
                 </SheetTrigger>
                 <SheetContent
                   side="bottom"
-                  className="h-auto max-h-[85dvh] overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-5"
+                  className="h-auto max-h-[85dvh] overflow-y-auto px-4 pt-5"
+                  style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
                 >
                   <SheetHeader className="mb-4">
                     <SheetTitle>Filtros</SheetTitle>

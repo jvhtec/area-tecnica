@@ -53,7 +53,8 @@ export const MobileActionTray = ({
       <SheetTrigger asChild>{renderTrigger(open)}</SheetTrigger>
       <SheetContent
         side="bottom"
-        className="flex h-[75vh] flex-col overflow-hidden rounded-t-3xl border-none bg-background px-0 pb-0 shadow-2xl [&>[data-radix-dialog-close]]:hidden"
+        className="flex h-[75vh] flex-col overflow-hidden rounded-t-3xl border-none bg-background px-0 shadow-2xl [&>[data-radix-dialog-close]]:hidden"
+        style={{ paddingBottom: 0 }}
       >
         <div className="mt-1 flex justify-center">
           <span className="mb-2 h-1.5 w-16 rounded-full bg-muted" aria-hidden="true" />
