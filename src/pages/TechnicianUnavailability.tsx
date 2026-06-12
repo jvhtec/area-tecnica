@@ -298,7 +298,7 @@ export default function TechnicianUnavailability() {
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetContent
             side="bottom"
-            className="flex h-[94vh] flex-col overflow-hidden rounded-t-2xl bg-background px-6 pb-6 pt-10"
+            className="flex h-[94vh] flex-col overflow-hidden rounded-t-2xl bg-background px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-10"
           >
             <SheetHeader className="space-y-1 text-left">
               <SheetTitle>Añadir bloqueo de disponibilidad</SheetTitle>

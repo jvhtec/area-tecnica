@@ -18,16 +18,15 @@ The inconsistencies come from surfaces that predate or bypass this convention.
 
 ## Tier 1 — Base shadcn/ui primitives (systemic, highest leverage)
 
-These are non-compliant at the primitive level, so **every consumer inherits the bug**. Fixing these resolves dozens of screens at once.
+These were non-compliant at the primitive level, so **every consumer inherited the bug**. **Status: all items in this tier are fixed on this branch** — fixing them resolved dozens of screens at once.
 
-| File | Line | Issue |
+| File | Line | Original issue (now fixed) |
 |---|---|---|
-| `src/components/ui/sheet.tsx` | 38 | `side="bottom"` variant is `inset-x-0 bottom-0` with no `pb-safe` — content sits under the home indicator. Top/left/right variants likewise have no inset handling. |
-| `src/components/ui/drawer.tsx` | 44 | `DrawerContent` (vaul bottom sheet) is `fixed inset-x-0 bottom-0` with no bottom inset padding. |
-| `src/components/ui/toast.tsx` | 17 | `ToastViewport` is `fixed top-0 ... p-4` on mobile — toasts render under the notch/Dynamic Island. Desktop `sm:bottom-0` lacks bottom inset. |
-| `src/components/ui/dialog.tsx` | 15-53 | Centered `DialogContent` has no safe-area-aware max-height/padding; tall dialogs (`max-h-screen`, `h-[90vh]` consumers) can extend into insets. |
-| `src/components/ui/alert-dialog.tsx` | 13-43 | Same pattern as dialog.tsx. |
-| `src/components/ui/sidebar/sidebar-components.tsx` | 53, 68, 99 | Diverges from `src/components/ui/sidebar.tsx` (which is fully compliant at lines 207/363/382/416): header/footer have no inset padding, content has `pt-safe` but no `pb-safe`. Duplicate implementation drifting. |
+| `src/components/ui/sheet.tsx` | 38 | `side="bottom"` variant was `inset-x-0 bottom-0` with no `pb-safe` — content sat under the home indicator. Top/left/right variants likewise had no inset handling. Each edge-touching side now carries `max(1.5rem, env(...))` padding. |
+| `src/components/ui/drawer.tsx` | 44 | `DrawerContent` (vaul bottom sheet) was `fixed inset-x-0 bottom-0` with no bottom inset padding. Now has `pb-[max(0px,env(safe-area-inset-bottom))]`. |
+| `src/components/ui/toast.tsx` | 17 | `ToastViewport` was `fixed top-0 ... p-4` on mobile — toasts rendered under the notch/Dynamic Island; desktop `sm:bottom-0` lacked bottom inset. Both edges now inset-aware; the sonner toaster also gained safe-area `offset`/`mobileOffset`. |
+| `src/components/ui/dialog.tsx` + `alert-dialog.tsx` | — | `DialogContent`/`AlertDialogContent` capped height at plain `90vh` (or not at all), letting tall dialogs extend into the insets. Both now cap at `calc(90dvh − env(top) − env(bottom))` with `overflow-y-auto`, keeping content scrollable and clear of notch and home indicator. |
+| `src/components/ui/sidebar/sidebar-components.tsx` | 53, 68, 99 | Diverged from `src/components/ui/sidebar.tsx` (fully compliant): header/footer had no inset padding, content had `pt-safe` but no `pb-safe`. Now reconciled with `sidebar.tsx`. |
 
 Not affected (auto-positioned floating elements, no fixed edges): `popover.tsx`, `dropdown-menu.tsx`, `select.tsx`.
 
@@ -89,7 +88,7 @@ Plus point inconsistencies:
 
 ## Recommended fix plan
 
-**Phase 1 — primitives (one PR, biggest win).** Add inset handling to `sheet.tsx` (per-side: `pb` for bottom, `pt` for top, `py` for left/right), `drawer.tsx`, `toast.tsx` viewport, and dialog/alert-dialog max-height (`max-h-[calc(100dvh-2rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))]`-style). Reconcile `sidebar/sidebar-components.tsx` with `sidebar.tsx`.
+**Phase 1 — primitives (✅ done on this branch).** Per-side inset handling added to `sheet.tsx`, `drawer.tsx`, the `toast.tsx` viewport, and the sonner toaster; dialog/alert-dialog max-heights are inset-aware; `sidebar/sidebar-components.tsx` reconciled with `sidebar.tsx`. Note: consumers that override edge padding on `SheetContent` (e.g. `pb-*`, `p-0`) take over inset responsibility — keep an `env(safe-area-inset-*)` term or pad an inner element.
 
 **Phase 2 — custom full-screen modals.** Apply the technician-modal pattern to the eight Tier 2 surfaces. Consider extracting a shared `FullScreenOverlay` wrapper or a `safe-overlay` utility class so the pattern can't drift again.
 
