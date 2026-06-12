@@ -96,6 +96,10 @@
     --safe-area-bottom: env(safe-area-inset-bottom);
     --safe-area-left: env(safe-area-inset-left);
     --safe-area-right: env(safe-area-inset-right);
+    /* Height of the fixed MobileNavBar (content + base padding, excluding
+       its safe-area inset). Anything offset above the nav must use
+       calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) [+ gap]) */
+    --mobile-nav-height: 4.5rem;
     /* Mobile typography scale */
     --text-xs: clamp(0.75rem, 0.68rem + 0.3vw, 0.8rem);
     --text-sm: clamp(0.875rem, 0.82rem + 0.35vw, 0.95rem);

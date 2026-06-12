@@ -512,7 +512,7 @@ const Layout = () => {
               suppressChrome || mobileFullscreenRoutes
                 ? "pb-6"
                 : isMobile
-                  ? "pb-[calc(4.5rem+env(safe-area-inset-bottom))]"
+                  ? "pb-[calc(var(--mobile-nav-height)+env(safe-area-inset-bottom))]"
                   : "pb-10",
             )}
           >
