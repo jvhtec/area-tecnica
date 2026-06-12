@@ -95,8 +95,12 @@ export class ContentSections {
     return this.scheduleSection.addScheduleSection(eventData, yPosition);
   }
 
-  addLogisticsSection(eventData: EventData, yPosition: number): number {
-    return this.logisticsSection.addLogisticsSection(eventData, yPosition);
+  addLogisticsSection(
+    eventData: EventData,
+    yPosition: number,
+    options?: { includeTransport?: boolean; includeDetails?: boolean }
+  ): number {
+    return this.logisticsSection.addLogisticsSection(eventData, yPosition, options);
   }
 
   addDeliveryCertificateSection(
@@ -123,8 +127,12 @@ export class ContentSections {
     return this.auxNeedsSection.addAuxNeedsSection(eventData, yPosition);
   }
 
-  addProgramSection(eventData: EventData, yPosition: number): number {
-    return this.programSection.addProgramSection(eventData, yPosition);
+  addProgramSection(
+    eventData: EventData,
+    yPosition: number,
+    options?: { includeStructured?: boolean; includeScheduleText?: boolean }
+  ): number {
+    return this.programSection.addProgramSection(eventData, yPosition, options);
   }
 
   async addRestaurantsSection(eventData: EventData, yPosition: number): Promise<number> {
@@ -186,15 +194,23 @@ export class ContentSections {
   }
 
   hasLogisticsData(eventData: EventData): boolean {
+    return this.hasLogisticsTransportData(eventData) || this.hasLogisticsDetailsData(eventData);
+  }
+
+  hasLogisticsTransportData(eventData: EventData): boolean {
     if (!eventData.logistics) return false;
 
-    const { transport = [], loadingDetails, unloadingDetails, equipmentLogistics } = eventData.logistics;
-    const hasTransportEntries = Array.isArray(transport) && transport.some(item => DataValidators.hasData(item));
-    const hasDetails = DataValidators.hasData(loadingDetails) ||
+    const { transport = [] } = eventData.logistics;
+    return Array.isArray(transport) && transport.some(item => DataValidators.hasData(item));
+  }
+
+  hasLogisticsDetailsData(eventData: EventData): boolean {
+    if (!eventData.logistics) return false;
+
+    const { loadingDetails, unloadingDetails, equipmentLogistics } = eventData.logistics;
+    return DataValidators.hasData(loadingDetails) ||
       DataValidators.hasData(unloadingDetails) ||
       DataValidators.hasData(equipmentLogistics);
-
-    return hasTransportEntries || hasDetails;
   }
 
   hasDeliveryCertificateData(eventData: EventData): boolean {
@@ -218,10 +234,18 @@ export class ContentSections {
   }
 
   hasProgramData(eventData: EventData): boolean {
+    return this.hasStructuredProgramData(eventData) || this.hasScheduleTextData(eventData);
+  }
+
+  hasStructuredProgramData(eventData: EventData): boolean {
     const hasStructured = Array.isArray(eventData.programSchedule) && eventData.programSchedule.length > 0;
-    const hasMulti = Array.isArray((eventData as any).programScheduleDays) && (eventData as any).programScheduleDays.some((d: any) => Array.isArray(d.rows) && d.rows.length > 0);
-    const hasLegacy = !!(eventData.schedule && eventData.schedule.trim().length > 0);
-    return hasMulti || hasStructured || hasLegacy;
+    const hasMulti = Array.isArray((eventData as any).programScheduleDays) &&
+      (eventData as any).programScheduleDays.some((d: any) => Array.isArray(d.rows) && d.rows.length > 0);
+    return hasMulti || hasStructured;
+  }
+
+  hasScheduleTextData(eventData: EventData): boolean {
+    return !!(eventData.schedule && eventData.schedule.trim().length > 0);
   }
 
   hasRestaurantsData(eventData: EventData): boolean {

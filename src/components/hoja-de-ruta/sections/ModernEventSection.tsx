@@ -10,6 +10,8 @@ import { Calendar, Plus, Sparkles, Trash2, Zap, Building2 } from "lucide-react";
 import type { AuxiliaryMachineryType, EventData } from "@/types/hoja-de-ruta";
 import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { AUXILIARY_MACHINERY_OPTIONS } from "@/constants/hojaDeRutaAuxiliaryNeeds";
+import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
+import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 
 interface ModernEventSectionProps {
   eventData: EventData;
@@ -21,6 +23,8 @@ interface ModernEventSectionProps {
   jobDetails: any;
   onAutoPopulate: () => void;
   hideJobSelection?: boolean;
+  isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
+  onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
 export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
@@ -33,6 +37,8 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
   jobDetails,
   onAutoPopulate,
   hideJobSelection = false,
+  isPrintSectionExcluded,
+  onPrintSectionExcludedChange,
 }) => {
   const handleVenueSelect = (place: any) => {
     setEventData(prev => ({
@@ -196,10 +202,17 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
       >
         <Card className="border-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-600" />
-              Información del Evento
-            </CardTitle>
+            <div className="flex items-start justify-between gap-3">
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-purple-600" />
+                Información del Evento
+              </CardTitle>
+              <PrintSectionExclusionToggle
+                sectionId="event-details"
+                isExcluded={isPrintSectionExcluded("event-details")}
+                onExcludedChange={onPrintSectionExcludedChange}
+              />
+            </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-2 gap-6">
@@ -261,7 +274,14 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
             </div>
 
             <div className="space-y-4">
-              <Label className="text-sm font-medium">Necesidades Auxiliares</Label>
+              <div className="flex items-start justify-between gap-3">
+                <Label className="text-sm font-medium">Necesidades Auxiliares</Label>
+                <PrintSectionExclusionToggle
+                  sectionId="aux-needs"
+                  isExcluded={isPrintSectionExcluded("aux-needs")}
+                  onExcludedChange={onPrintSectionExcludedChange}
+                />
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">

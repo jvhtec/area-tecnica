@@ -9,12 +9,16 @@ import { Users, Plus, Trash2, User, IdCard, Briefcase } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
 import { ProfileAutocomplete } from "../components/ProfileAutocomplete";
 import { dataLayerClient } from "@/services/dataLayerClient";
+import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
+import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 interface ModernStaffSectionProps {
   eventData: EventData;
   onStaffChange: (index: number, field: string, value: string) => void;
   onAddStaff: () => void;
   onRemoveStaff: (index: number) => void;
   onProfileSelect?: (index: number, profileData: any) => void;
+  isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
+  onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
 export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
@@ -23,6 +27,8 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
   onAddStaff,
   onRemoveStaff,
   onProfileSelect,
+  isPrintSectionExcluded,
+  onPrintSectionExcludedChange,
 }) => {
   const handleProfileSelect = async (index: number, profile: any) => {
     console.debug('[ModernStaffSection] Profile selected', { index, profile });
@@ -66,20 +72,27 @@ export const ModernStaffSection: React.FC<ModernStaffSectionProps> = ({
     >
       <Card className="border-2">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5 text-orange-600" />
               Personal del Evento
             </CardTitle>
-            <Button
-              onClick={onAddStaff}
-              size="sm"
-              variant="outline"
-              className="gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Añadir Personal
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <PrintSectionExclusionToggle
+                sectionId="staff"
+                isExcluded={isPrintSectionExcluded("staff")}
+                onExcludedChange={onPrintSectionExcludedChange}
+              />
+              <Button
+                onClick={onAddStaff}
+                size="sm"
+                variant="outline"
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Añadir Personal
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

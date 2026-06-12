@@ -6,12 +6,16 @@ import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Phone, Plus, Trash2, User, Briefcase } from "lucide-react";
 import { EventData } from "@/types/hoja-de-ruta";
+import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
+import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 
 interface ModernContactsSectionProps {
   eventData: EventData;
   onContactChange: (index: number, field: string, value: string) => void;
   onAddContact: () => void;
   onRemoveContact: (index: number) => void;
+  isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
+  onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
 export const ModernContactsSection: React.FC<ModernContactsSectionProps> = ({
@@ -19,6 +23,8 @@ export const ModernContactsSection: React.FC<ModernContactsSectionProps> = ({
   onContactChange,
   onAddContact,
   onRemoveContact,
+  isPrintSectionExcluded,
+  onPrintSectionExcludedChange,
 }) => {
   return (
     <motion.div
@@ -27,20 +33,27 @@ export const ModernContactsSection: React.FC<ModernContactsSectionProps> = ({
     >
       <Card className="border-2">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2">
               <Phone className="w-5 h-5 text-purple-600" />
               Contactos del Evento
             </CardTitle>
-            <Button
-              onClick={onAddContact}
-              size="sm"
-              variant="outline"
-              className="gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Añadir Contacto
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <PrintSectionExclusionToggle
+                sectionId="contacts"
+                isExcluded={isPrintSectionExcluded("contacts")}
+                onExcludedChange={onPrintSectionExcludedChange}
+              />
+              <Button
+                onClick={onAddContact}
+                size="sm"
+                variant="outline"
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Añadir Contacto
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

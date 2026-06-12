@@ -8,6 +8,7 @@ import type {
   ImagePreviews
 } from '@/types/hoja-de-ruta';
 import type { HojaDeRutaPdfSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
+import type { HojaDeRutaPrintSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
 
 export type {
   EventData,
@@ -49,6 +50,7 @@ export interface PDFGenerationOptions {
   includeLogisticsTransport?: boolean;
   dedupeTransportAcrossSections?: boolean;
   sections?: HojaDeRutaPdfSectionId[];
+  excludedSections?: HojaDeRutaPrintSectionId[];
 }
 
 export interface DriverCertificatePDFGenerationOptions {

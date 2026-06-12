@@ -19,6 +19,8 @@ import {
 import { PlacesRestaurantService } from '@/utils/hoja-de-ruta/services/places-restaurant-service';
 import type { Restaurant, EventData, Accommodation } from '@/types/hoja-de-ruta';
 import { useToast } from '@/hooks/use-toast';
+import { PrintSectionExclusionToggle } from '../components/PrintSectionExclusionToggle';
+import type { HojaDeRutaPrintSectionId } from '@/utils/hoja-de-ruta/pdf';
 import {
   Select,
   SelectContent,
@@ -31,9 +33,17 @@ interface ModernRestaurantSectionProps {
   eventData: EventData;
   onUpdateEventData: (data: EventData) => void;
   accommodations?: Accommodation[];
+  isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
+  onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
-export function ModernRestaurantSection({ eventData, onUpdateEventData, accommodations = [] }: ModernRestaurantSectionProps) {
+export function ModernRestaurantSection({
+  eventData,
+  onUpdateEventData,
+  accommodations = [],
+  isPrintSectionExcluded,
+  onPrintSectionExcludedChange,
+}: ModernRestaurantSectionProps) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchRadius, setSearchRadius] = useState('2000');
@@ -180,9 +190,16 @@ export function ModernRestaurantSection({ eventData, onUpdateEventData, accommod
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 mb-4">
-        <UtensilsCrossed className="h-5 w-5 text-primary" />
-        <h2 className="text-xl font-semibold">Recomendaciones de Restaurantes</h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <UtensilsCrossed className="h-5 w-5 text-primary" />
+          <h2 className="text-xl font-semibold">Recomendaciones de Restaurantes</h2>
+        </div>
+        <PrintSectionExclusionToggle
+          sectionId="restaurants"
+          isExcluded={isPrintSectionExcluded("restaurants")}
+          onExcludedChange={onPrintSectionExcludedChange}
+        />
       </div>
 
       {/* Search Controls */}

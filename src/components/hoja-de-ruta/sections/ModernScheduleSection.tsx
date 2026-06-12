@@ -8,15 +8,21 @@ import { EventData } from "@/types/hoja-de-ruta";
 import { ScheduleBuilder } from "@/components/schedule/ScheduleBuilder";
 import { MultiDayScheduleBuilder } from "@/components/schedule/MultiDayScheduleBuilder";
 import { useMemo } from "react";
+import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
+import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 
 interface ModernScheduleSectionProps {
   eventData: EventData;
   setEventData: React.Dispatch<React.SetStateAction<EventData>>;
+  isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
+  onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
 export const ModernScheduleSection: React.FC<ModernScheduleSectionProps> = ({
   eventData,
   setEventData,
+  isPrintSectionExcluded,
+  onPrintSectionExcludedChange,
 }) => {
   const programRows = useMemo(() => eventData.programSchedule ?? [], [eventData.programSchedule]);
   const programDays = useMemo(() => eventData.programScheduleDays ?? [], [eventData.programScheduleDays]);
@@ -33,15 +39,29 @@ export const ModernScheduleSection: React.FC<ModernScheduleSectionProps> = ({
         onChange={(days) => setEventData(prev => ({ ...prev, programScheduleDays: days, programSchedule: days?.[0]?.rows || [] }))}
         dayTitle="Programa"
         subtitle={eventData.eventName ? `${eventData.eventName}${eventData.eventDates ? ' • ' + eventData.eventDates : ''}` : undefined}
+        scheduleHeaderControls={
+          <PrintSectionExclusionToggle
+            sectionId="program"
+            isExcluded={isPrintSectionExcluded("program")}
+            onExcludedChange={onPrintSectionExcludedChange}
+          />
+        }
       />
 
       {/* Legacy free-text (keep for now) */}
       <Card className="border-2">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-red-600" />
-            Programa (Texto Libre)
-          </CardTitle>
+          <div className="flex items-start justify-between gap-3">
+            <CardTitle className="flex items-center gap-2">
+              <Activity className="w-5 h-5 text-red-600" />
+              Programa (Texto Libre)
+            </CardTitle>
+            <PrintSectionExclusionToggle
+              sectionId="schedule-notes"
+              isExcluded={isPrintSectionExcluded("schedule-notes")}
+              onExcludedChange={onPrintSectionExcludedChange}
+            />
+          </div>
         </CardHeader>
         <CardContent>
           <Textarea
@@ -56,10 +76,17 @@ export const ModernScheduleSection: React.FC<ModernScheduleSectionProps> = ({
       {/* Power Requirements Card */}
       <Card className="border-2">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-yellow-600" />
-            Requisitos de Energía
-          </CardTitle>
+          <div className="flex items-start justify-between gap-3">
+            <CardTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-yellow-600" />
+              Requisitos de Energía
+            </CardTitle>
+            <PrintSectionExclusionToggle
+              sectionId="power"
+              isExcluded={isPrintSectionExcluded("power")}
+              onExcludedChange={onPrintSectionExcludedChange}
+            />
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-3">

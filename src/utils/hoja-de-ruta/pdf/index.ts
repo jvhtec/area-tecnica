@@ -2,7 +2,10 @@ export { PDFEngine } from '@/utils/hoja-de-ruta/pdf/pdf-engine';
 export {
   getHojaDeRutaPdfSectionLabel,
   getHojaDeRutaPdfSelectionLabel,
-  HOJA_DE_RUTA_PDF_SECTIONS
+  HOJA_DE_RUTA_PDF_SECTIONS,
+  HOJA_DE_RUTA_PRINT_SECTIONS,
+  getHojaDeRutaPrintSectionLabel,
+  normalizeHojaDeRutaPrintSections,
 } from '@/utils/hoja-de-ruta/pdf/section-options';
 export type {
   DriverCertificatePDFGenerationOptions,
@@ -10,6 +13,7 @@ export type {
   PDFGenerationOptions,
 } from '@/utils/hoja-de-ruta/pdf/core/pdf-types';
 export type { HojaDeRutaPdfSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
+export type { HojaDeRutaPrintSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
 import { PDFEngine } from '@/utils/hoja-de-ruta/pdf/pdf-engine';
 import { DriverCertificatePDFEngine } from '@/utils/hoja-de-ruta/pdf/driver-certificate-pdf-engine';
 import type {
@@ -29,7 +33,7 @@ const createPDFEngine = (
   jobDate?: string,
   toast?: PDFGenerationOptions['toast'],
   accommodations?: PDFGenerationOptions['accommodations'],
-  pdfOptions?: Pick<PDFGenerationOptions, 'sections'>
+  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections'>
 ) => new PDFEngine({
   eventData,
   travelArrangements,
@@ -57,7 +61,7 @@ export const generatePDF = async (
   jobDate?: string,
   toast?: PDFGenerationOptions['toast'],
   accommodations?: PDFGenerationOptions['accommodations'],
-  pdfOptions?: Pick<PDFGenerationOptions, 'sections'>
+  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections'>
 ): Promise<void> => {
   const engine = createPDFEngine(
     eventData,
@@ -87,7 +91,7 @@ export const generatePDFPreview = async (
   jobDate?: string,
   toast?: PDFGenerationOptions['toast'],
   accommodations?: PDFGenerationOptions['accommodations'],
-  pdfOptions?: Pick<PDFGenerationOptions, 'sections'>
+  pdfOptions?: Pick<PDFGenerationOptions, 'sections' | 'excludedSections'>
 ): Promise<GeneratedHojaDeRutaPdf> => {
   const engine = createPDFEngine(
     eventData,

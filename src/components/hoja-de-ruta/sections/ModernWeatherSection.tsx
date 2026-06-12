@@ -6,15 +6,21 @@ import { motion } from "framer-motion";
 import { CloudSun, RefreshCw, AlertTriangle, Loader2 } from "lucide-react";
 import { getWeatherForJob, formatWeatherDisplay } from "@/utils/weather/weatherApi";
 import { EventData, WeatherData } from "@/types/hoja-de-ruta";
+import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
+import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 
 interface ModernWeatherSectionProps {
   eventData: EventData;
   setEventData: React.Dispatch<React.SetStateAction<EventData>>;
+  isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
+  onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
 export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
   eventData,
   setEventData,
+  isPrintSectionExcluded,
+  onPrintSectionExcludedChange,
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +95,12 @@ export const ModernWeatherSection: React.FC<ModernWeatherSectionProps> = ({
               <CloudSun className="w-5 h-5" />
               Previsión Meteorológica
             </CardTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <PrintSectionExclusionToggle
+                sectionId="weather"
+                isExcluded={isPrintSectionExcluded("weather")}
+                onExcludedChange={onPrintSectionExcludedChange}
+              />
               {lastFetch && (
                 <Badge variant="outline" className="text-xs">
                   Actualizado: {lastFetch.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}

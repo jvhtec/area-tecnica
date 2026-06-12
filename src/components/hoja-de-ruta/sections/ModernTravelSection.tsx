@@ -10,12 +10,16 @@ import { Car, Plus, Trash2, Plane, Bus, Train, MapPin, Clock, User, Phone, Hash 
 import { TravelArrangement } from "@/types/hoja-de-ruta";
 import { AddressAutocomplete } from "@/components/maps/AddressAutocomplete";
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
+import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
+import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 
 interface ModernTravelSectionProps {
   travelArrangements: TravelArrangement[];
   onUpdate: (index: number, field: keyof TravelArrangement, value: string | undefined) => void;
   onAdd: () => void;
   onRemove: (index: number) => void;
+  isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
+  onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
 export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
@@ -23,6 +27,8 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
   onUpdate,
   onAdd,
   onRemove,
+  isPrintSectionExcluded,
+  onPrintSectionExcludedChange,
 }) => {
   const getTransportIcon = (type: string) => {
     switch (type) {
@@ -89,20 +95,27 @@ export const ModernTravelSection: React.FC<ModernTravelSectionProps> = ({
     >
       <Card className="border-2">
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <CardTitle className="flex items-center gap-2">
               <Car className="w-5 h-5 text-cyan-600" />
               Transporte y Viajes
             </CardTitle>
-            <Button
-              onClick={onAdd}
-              size="sm"
-              variant="outline"
-              className="gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Añadir Viaje
-            </Button>
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <PrintSectionExclusionToggle
+                sectionId="travel"
+                isExcluded={isPrintSectionExcluded("travel")}
+                onExcludedChange={onPrintSectionExcludedChange}
+              />
+              <Button
+                onClick={onAdd}
+                size="sm"
+                variant="outline"
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Añadir Viaje
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

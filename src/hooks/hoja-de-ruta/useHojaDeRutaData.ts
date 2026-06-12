@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { EventData, TravelArrangement, Accommodation, Restaurant } from '@/types/hoja-de-ruta';
 import type { Json } from '@/integrations/supabase/types';
+import { normalizeHojaDeRutaPrintSections } from '@/utils/hoja-de-ruta/pdf/section-options';
 
 /**
  * Normalizes a datetime value to a valid UTC ISO string for database storage.
@@ -118,6 +119,7 @@ export const useHojaDeRutaData = () => {
         aux_machinery_requirements: Array.isArray(eventData.auxiliaryMachinery)
           ? eventData.auxiliaryMachinery.filter(item => item.quantity > 0) as unknown as Json
           : [] as unknown as Json,
+        print_excluded_sections: normalizeHojaDeRutaPrintSections(eventData.printExcludedSections) as unknown as Json,
         status: 'draft',
         last_modified: new Date().toISOString()
       };

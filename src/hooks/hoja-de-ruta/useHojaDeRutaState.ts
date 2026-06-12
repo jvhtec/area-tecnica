@@ -19,6 +19,7 @@ const initialEventData: EventData = {
   auxiliaryStaffSetupQty: 0,
   auxiliaryStaffDismantleQty: 0,
   auxiliaryMachinery: [],
+  printExcludedSections: [],
 };
 
 export const useHojaDeRutaState = () => {
@@ -52,6 +53,7 @@ export const useHojaDeRutaState = () => {
                      (eventData.auxiliaryStaffSetupQty ?? 0) > 0 ||
                      (eventData.auxiliaryStaffDismantleQty ?? 0) > 0 ||
                      (eventData.auxiliaryMachinery?.some(item => (item.quantity ?? 0) > 0) ?? false) ||
+                     (eventData.printExcludedSections?.length ?? 0) > 0 ||
                      eventData.contacts.some(c => c.name) ||
                      eventData.staff.some(s => s.name) || 
                      travelArrangements.length > 0 ||

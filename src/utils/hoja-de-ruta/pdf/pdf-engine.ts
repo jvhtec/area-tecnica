@@ -9,8 +9,12 @@ import { FooterService } from './services/footer-service';
 import {
   getHojaDeRutaPdfSectionFilenameLabel,
   getHojaDeRutaPdfSelectionLabel,
+  normalizeHojaDeRutaPrintSections,
 } from '@/utils/hoja-de-ruta/pdf/section-options';
-import type { HojaDeRutaPdfSectionId } from '@/utils/hoja-de-ruta/pdf/section-options';
+import type {
+  HojaDeRutaPdfSectionId,
+  HojaDeRutaPrintSectionId,
+} from '@/utils/hoja-de-ruta/pdf/section-options';
 
 export class PDFEngine {
   private pdfDoc: PDFDocument;
@@ -19,6 +23,7 @@ export class PDFEngine {
   private logoData?: string;
   private hasCoverPage = true;
   private renderedSectionCount = 0;
+  private excludedSections = new Set<HojaDeRutaPrintSectionId>();
 
   constructor(private options: PDFGenerationOptions) {
     this.pdfDoc = new PDFDocument();
@@ -62,12 +67,15 @@ export class PDFEngine {
       selectedJobId,
       jobTitle,
     } = this.options;
-    const selectedSections = this.options.sections?.length ? this.options.sections : undefined;
-    const sectionSelection = selectedSections ? new Set(selectedSections) : undefined;
-    const selectedSectionLabel = selectedSections
-      ? getHojaDeRutaPdfSelectionLabel(selectedSections) ?? "Secciones seleccionadas"
+    this.excludedSections = new Set(normalizeHojaDeRutaPrintSections(this.options.excludedSections));
+
+    const requestedSections = this.options.sections?.length ? this.options.sections : undefined;
+    const selectedSections = requestedSections;
+    const sectionSelection = requestedSections ? new Set(selectedSections) : undefined;
+    const selectedSectionLabel = requestedSections
+      ? getHojaDeRutaPdfSelectionLabel(requestedSections) ?? "Secciones seleccionadas"
       : undefined;
-    this.hasCoverPage = !sectionSelection;
+    this.hasCoverPage = !requestedSections;
     this.renderedSectionCount = 0;
 
     // Load logo first (used on cover and in page header)
@@ -115,7 +123,7 @@ export class PDFEngine {
     if (sectionSelection) {
       await this.generateSelectedSections(sectionSelection);
       if (this.renderedSectionCount === 0) {
-        this.addEmptySectionPage(selectedSections);
+        this.addEmptySectionPage(requestedSections);
       }
     } else {
       await this.generateFullDocument();
@@ -132,14 +140,23 @@ export class PDFEngine {
 
   private async generateFullDocument(): Promise<void> {
     // Each major section starts on a new page as per requirements.
-    if (this.contentSections.hasEventDetailsData(this.options.eventData) || this.contentSections.hasVenueData(this.options.eventData)) {
-      let currentY = this.addSectionHeader("Detalles y Venue");
+    const includeEvent = !this.isPrintSectionExcluded("event-details") && this.contentSections.hasEventDetailsData(this.options.eventData);
+    const includeVenue = !this.isPrintSectionExcluded("venue") && this.contentSections.hasVenueData(this.options.eventData);
 
-      if (this.contentSections.hasEventDetailsData(this.options.eventData)) {
+    if (includeEvent || includeVenue) {
+      let currentY = this.addSectionHeader(
+        includeEvent && includeVenue
+          ? "Detalles y Venue"
+          : includeEvent
+            ? "Detalles del Evento"
+            : "Venue"
+      );
+
+      if (includeEvent) {
         currentY = this.contentSections.addEventDetailsSection(this.options.eventData, currentY);
       }
 
-      if (this.contentSections.hasVenueData(this.options.eventData)) {
+      if (includeVenue) {
         await this.contentSections.addVenueSection(
           this.options.eventData,
           this.options.venueMapPreview,
@@ -151,12 +168,12 @@ export class PDFEngine {
 
     await this.addWeatherSectionIfAvailable();
 
-    if (this.contentSections.hasContactsData(this.options.eventData)) {
+    if (!this.isPrintSectionExcluded("contacts") && this.contentSections.hasContactsData(this.options.eventData)) {
       const currentY = this.addSectionHeader("Contactos");
       this.contentSections.addContactsSection(this.options.eventData, currentY);
     }
 
-    if (this.contentSections.hasStaffData(this.options.eventData)) {
+    if (!this.isPrintSectionExcluded("staff") && this.contentSections.hasStaffData(this.options.eventData)) {
       const currentY = this.addSectionHeader("Personal");
       this.contentSections.addStaffSection(this.options.eventData, currentY);
     }
@@ -166,7 +183,7 @@ export class PDFEngine {
     const includeTravelArrangements = this.options.includeTravelArrangements ?? true;
     const includeLogisticsTransport = this.options.includeLogisticsTransport ?? true;
 
-    if (includeTravelArrangements && this.contentSections.hasTravelData(this.options.travelArrangements)) {
+    if (!this.isPrintSectionExcluded("travel") && includeTravelArrangements && this.contentSections.hasTravelData(this.options.travelArrangements)) {
       const currentY = this.addSectionHeader("Viajes");
       await this.contentSections.addTravelSection(
         this.options.travelArrangements,
@@ -175,7 +192,7 @@ export class PDFEngine {
       );
     }
 
-    if (this.contentSections.hasAccommodationData(this.options.accommodations)) {
+    if (!this.isPrintSectionExcluded("accommodation") && this.contentSections.hasAccommodationData(this.options.accommodations)) {
       const currentY = this.addSectionHeader("Alojamientos");
       await this.contentSections.addAccommodationSection(
         this.options.accommodations || [],
@@ -185,7 +202,7 @@ export class PDFEngine {
       );
     }
 
-    if (includeAggregatedRooming && this.contentSections.hasRoomingData(this.options.accommodations)) {
+    if (!this.isPrintSectionExcluded("accommodation") && includeAggregatedRooming && this.contentSections.hasRoomingData(this.options.accommodations)) {
       const currentY = this.addSectionHeader("Rooming");
       this.contentSections.addRoomingSection(
         this.options.accommodations || [],
@@ -194,27 +211,54 @@ export class PDFEngine {
       );
     }
 
-    if (includeLogisticsTransport && this.contentSections.hasLogisticsData(this.options.eventData)) {
-      const currentY = this.addSectionHeader("Transportes");
-      this.contentSections.addLogisticsSection(this.options.eventData, currentY);
+    const includeLogisticsTransportSection =
+      !this.isPrintSectionExcluded("logistics-transport") &&
+      includeLogisticsTransport &&
+      this.contentSections.hasLogisticsTransportData(this.options.eventData);
+    const includeLogisticsDetailsSection =
+      !this.isPrintSectionExcluded("logistics-details") &&
+      this.contentSections.hasLogisticsDetailsData(this.options.eventData);
+
+    if (includeLogisticsTransportSection || includeLogisticsDetailsSection) {
+      const currentY = this.addSectionHeader(
+        includeLogisticsTransportSection && includeLogisticsDetailsSection
+          ? "Logística"
+          : includeLogisticsTransportSection
+            ? "Transportes"
+            : "Logística del Evento"
+      );
+      this.contentSections.addLogisticsSection(this.options.eventData, currentY, {
+        includeTransport: includeLogisticsTransportSection,
+        includeDetails: includeLogisticsDetailsSection,
+      });
     }
 
-    if (this.contentSections.hasPowerData(this.options.eventData)) {
+    if (!this.isPrintSectionExcluded("power") && this.contentSections.hasPowerData(this.options.eventData)) {
       const currentY = this.addSectionHeader("Requerimientos eléctricos");
       this.contentSections.addPowerSection(this.options.eventData, currentY);
     }
 
-    if (this.contentSections.hasAuxNeedsData(this.options.eventData)) {
+    if (!this.isPrintSectionExcluded("aux-needs") && this.contentSections.hasAuxNeedsData(this.options.eventData)) {
       const currentY = this.addSectionHeader("Necesidades auxiliares");
       this.contentSections.addAuxNeedsSection(this.options.eventData, currentY);
     }
 
-    if (this.contentSections.hasProgramData(this.options.eventData)) {
+    const includeStructuredProgram =
+      !this.isPrintSectionExcluded("program") &&
+      this.contentSections.hasStructuredProgramData(this.options.eventData);
+    const includeScheduleText =
+      !this.isPrintSectionExcluded("schedule-notes") &&
+      this.contentSections.hasScheduleTextData(this.options.eventData);
+
+    if (includeStructuredProgram || includeScheduleText) {
       const currentY = this.addSectionHeader("Programa");
-      this.contentSections.addProgramSection(this.options.eventData, currentY);
+      this.contentSections.addProgramSection(this.options.eventData, currentY, {
+        includeStructured: includeStructuredProgram,
+        includeScheduleText,
+      });
     }
 
-    if (this.contentSections.hasRestaurantsData(this.options.eventData)) {
+    if (!this.isPrintSectionExcluded("restaurants") && this.contentSections.hasRestaurantsData(this.options.eventData)) {
       const currentY = this.addSectionHeader("Restaurantes");
       await this.contentSections.addRestaurantsSection(this.options.eventData, currentY);
     }
@@ -299,6 +343,10 @@ export class PDFEngine {
   }
 
   private async addWeatherSectionIfAvailable(): Promise<void> {
+    if (this.isPrintSectionExcluded("weather")) {
+      return;
+    }
+
     if (this.contentSections.hasWeatherData(this.options.eventData)) {
       const currentY = this.addSectionHeader("Clima");
       this.contentSections.addWeatherSection(this.options.eventData, currentY);
@@ -345,6 +393,10 @@ export class PDFEngine {
     return this.contentSections.hasVenueData(this.options.eventData) ||
       Boolean(this.options.venueMapPreview) ||
       Boolean(this.options.imagePreviews?.venue?.length);
+  }
+
+  private isPrintSectionExcluded(sectionId: HojaDeRutaPrintSectionId): boolean {
+    return this.excludedSections.has(sectionId);
   }
 
   private createGeneratedPDF(): GeneratedHojaDeRutaPdf {

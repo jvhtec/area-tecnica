@@ -6,6 +6,8 @@ import { motion } from "framer-motion";
 import { Building2, Package, ArrowDown, ArrowUp } from "lucide-react";
 import { EventData, Transport } from "@/types/hoja-de-ruta";
 import { ModernTransportSection } from "./ModernTransportSection";
+import { PrintSectionExclusionToggle } from "../components/PrintSectionExclusionToggle";
+import type { HojaDeRutaPrintSectionId } from "@/utils/hoja-de-ruta/pdf";
 
 interface ModernLogisticsSectionProps {
   eventData: EventData;
@@ -15,6 +17,8 @@ interface ModernLogisticsSectionProps {
   onRemoveTransport: (index: number) => void;
   onImportTransports: (transports: Transport[]) => void;
   jobId?: string;  // Add jobId prop
+  isPrintSectionExcluded: (sectionId: HojaDeRutaPrintSectionId) => boolean;
+  onPrintSectionExcludedChange: (sectionId: HojaDeRutaPrintSectionId, isExcluded: boolean) => void;
 }
 
 export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
@@ -25,6 +29,8 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
   onRemoveTransport,
   onImportTransports,
   jobId,
+  isPrintSectionExcluded,
+  onPrintSectionExcludedChange,
 }) => {
   return (
     <motion.div
@@ -39,13 +45,27 @@ export const ModernLogisticsSection: React.FC<ModernLogisticsSectionProps> = ({
         onRemoveTransport={onRemoveTransport}
         onImportTransports={onImportTransports}
         jobId={jobId}
+        headerControls={
+          <PrintSectionExclusionToggle
+            sectionId="logistics-transport"
+            isExcluded={isPrintSectionExcluded("logistics-transport")}
+            onExcludedChange={onPrintSectionExcludedChange}
+          />
+        }
       />
       <Card className="border">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-primary" />
-            Logística del Evento
-          </CardTitle>
+          <div className="flex items-start justify-between gap-3">
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-primary" />
+              Logística del Evento
+            </CardTitle>
+            <PrintSectionExclusionToggle
+              sectionId="logistics-details"
+              isExcluded={isPrintSectionExcluded("logistics-details")}
+              onExcludedChange={onPrintSectionExcludedChange}
+            />
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -129,6 +129,7 @@ export const useHojaDeRutaInitialization = (
       auxiliaryStaffDismantleQty: 0,
       auxiliaryMachinery: [],
       weather: undefined,
+      printExcludedSections: [],
     };
   };
 
@@ -376,6 +377,7 @@ export const useHojaDeRutaInitialization = (
           // Restaurants
           restaurants: savedEventData?.restaurants || undefined,
           selectedRestaurants: savedEventData?.selectedRestaurants || undefined,
+          printExcludedSections: savedEventData?.printExcludedSections || [],
         });
 
         // Set travel arrangements using transformed data

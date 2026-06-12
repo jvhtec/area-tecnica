@@ -7,15 +7,21 @@ import { formatLogisticsHojaCategories } from "@/constants/logisticsHojaCategori
 export class LogisticsSection {
   constructor(private pdfDoc: PDFDocument) {}
 
-  addLogisticsSection(eventData: EventData, yPosition: number): number {
+  addLogisticsSection(
+    eventData: EventData,
+    yPosition: number,
+    options: { includeTransport?: boolean; includeDetails?: boolean } = {}
+  ): number {
     const logistics = eventData.logistics;
     if (!logistics) return yPosition;
     const lineHeight = 6;
+    const includeTransport = options.includeTransport ?? true;
+    const includeDetails = options.includeDetails ?? true;
 
     yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
 
     // Transportes section with complete field set
-    if (logistics.transport && logistics.transport.length > 0) {
+    if (includeTransport && logistics.transport && logistics.transport.length > 0) {
       // Start table immediately; section header is already printed by the page header
 
       const transportData = logistics.transport.map(transport => [
@@ -54,7 +60,7 @@ export class LogisticsSection {
     }
 
     // Loading details
-    if (DataValidators.hasData(logistics.loadingDetails)) {
+    if (includeDetails && DataValidators.hasData(logistics.loadingDetails)) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
       
       this.pdfDoc.setText(12, [125, 1, 1]);
@@ -72,7 +78,7 @@ export class LogisticsSection {
     }
 
     // Unloading details
-    if (DataValidators.hasData(logistics.unloadingDetails)) {
+    if (includeDetails && DataValidators.hasData(logistics.unloadingDetails)) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
       
       this.pdfDoc.setText(12, [125, 1, 1]);
@@ -90,7 +96,7 @@ export class LogisticsSection {
     }
 
     // Equipment logistics
-    if (DataValidators.hasData(logistics.equipmentLogistics)) {
+    if (includeDetails && DataValidators.hasData(logistics.equipmentLogistics)) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 30);
       
       this.pdfDoc.setText(12, [125, 1, 1]);

@@ -167,6 +167,7 @@ export const useHojaDeRutaForm = (venueImages: { image_path: string; image_type:
                      (eventData.auxiliaryStaffSetupQty ?? 0) > 0 ||
                      (eventData.auxiliaryStaffDismantleQty ?? 0) > 0 ||
                      (eventData.auxiliaryMachinery?.some(item => (item.quantity ?? 0) > 0) ?? false) ||
+                     (eventData.printExcludedSections?.length ?? 0) > 0 ||
                      eventData.contacts?.some(c => c.name) ||
                      eventData.staff?.some(s => s.name) || 
                      travelArrangements.length > 0 ||
