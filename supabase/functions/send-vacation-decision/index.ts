@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 import { format as formatDate } from "https://esm.sh/date-fns@3.6.0";
+import { sendBrevoEmail } from "../_shared/brevo.ts";
 // Deno std@0.224.0 base64 module no longer exports `encode`.
 // Implement a small Uint8Array -> Base64 helper using btoa for reliability in Edge Runtime.
 function u8ToBase64(u8: Uint8Array): string {
@@ -469,14 +470,7 @@ serve(async (req) => {
           payload.bcc = bccList;
         }
 
-        const sendRes = await fetch("https://api.brevo.com/v3/smtp/email", {
-          method: "POST",
-          headers: {
-            "api-key": BREVO_KEY,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        });
+        const sendRes = await sendBrevoEmail(BREVO_KEY, payload);
 
         if (!sendRes.ok) {
           const msg = await sendRes.text();

@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { addDays, getDaysInMonth } from "npm:date-fns@3.6.0";
 import { formatInTimeZone, fromZonedTime } from "npm:date-fns-tz@3.2.0";
 import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
+import { sendBrevoEmail } from "../_shared/brevo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -531,14 +532,7 @@ serve(async (req) => {
       }
 
       try {
-        const sendRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-          method: 'POST',
-          headers: {
-            'api-key': BREVO_KEY,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(emailPayload),
-        });
+        const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload);
 
         if (!sendRes.ok) {
           const errText = await sendRes.text();

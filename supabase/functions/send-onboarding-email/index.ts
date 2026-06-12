@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from 'npm:@supabase/supabase-js@2.48.1';
+import { sendBrevoEmail } from '../_shared/brevo.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -442,21 +443,14 @@ serve(async (req) => {
 
     // Images are referenced by public URLs so no inline attachments are needed.
 
-    const brevoRes = await fetch('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': BREVO_KEY,
-        'Content-Type': 'application/json',
+    const brevoRes = await sendBrevoEmail(BREVO_KEY, {
+      sender: {
+        email: BREVO_FROM,
+        name: 'Sistema de Gestión',
       },
-      body: JSON.stringify({
-        sender: {
-          email: BREVO_FROM,
-          name: 'Sistema de Gestión',
-        },
-        to: [{ email: normalizedEmail, name: `${firstName ?? ''} ${lastName ?? ''}`.trim() || undefined }],
-        subject: 'Bienvenido a Área Técnica',
-        htmlContent,
-      }),
+      to: [{ email: normalizedEmail, name: `${firstName ?? ''} ${lastName ?? ''}`.trim() || undefined }],
+      subject: 'Bienvenido a Área Técnica',
+      htmlContent,
     });
 
     if (!brevoRes.ok) {

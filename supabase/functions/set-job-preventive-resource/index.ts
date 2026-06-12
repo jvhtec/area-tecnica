@@ -3,6 +3,7 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
 import { escapeHtml, wrapInCorporateTemplate } from "../_shared/corporateEmailTemplate.ts";
+import { sendBrevoEmail } from "../_shared/brevo.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -126,18 +127,11 @@ async function sendPreventiveResourceEmail(params: {
     bodyHtml,
   });
 
-  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-    method: "POST",
-    headers: {
-      "api-key": BREVO_KEY,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      sender: { email: FROM_EMAIL, name: FROM_NAME },
-      to: [{ email, name: technicianName }],
-      subject,
-      htmlContent,
-    }),
+  const response = await sendBrevoEmail(BREVO_KEY, {
+    sender: { email: FROM_EMAIL, name: FROM_NAME },
+    to: [{ email, name: technicianName }],
+    subject,
+    htmlContent,
   });
 
   if (!response.ok) {

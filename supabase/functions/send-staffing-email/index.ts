@@ -6,6 +6,7 @@ import {
   buildWhatsAppStaffingMessage,
   normalizeStaffingConfirmBase,
 } from "./messageUtils.ts";
+import { sendBrevoEmail } from "../_shared/brevo.ts";
 
 // Inlined from roles.ts for dashboard deployment compatibility
 const CODE_TO_LABEL: Record<string, string> = {
@@ -1554,7 +1555,7 @@ serve(async (req) => {
           htmlContent: html
         };
         console.log('📤 EMAIL PAYLOAD:', { sender: emailPayload.sender, to: [{ email: '***@***.***' }], subject: emailPayload.subject });
-        const sendRes = await fetch("https://api.brevo.com/v3/smtp/email", { method: "POST", headers: { "api-key": BREVO_KEY, "Content-Type": "application/json" }, body: JSON.stringify(emailPayload) });
+        const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload);
         console.log('📤 BREVO RESPONSE:', { status: sendRes.status, statusText: sendRes.statusText, ok: sendRes.ok });
         await supabase.from("staffing_events").insert({
           staffing_request_id: insertedId,
