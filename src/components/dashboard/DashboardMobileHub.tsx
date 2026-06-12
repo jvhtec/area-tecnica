@@ -375,14 +375,14 @@ export const DashboardMobileHub: React.FC<DashboardMobileHubProps> = ({
             >
               <ChevronLeft size={20} />
             </button>
-            <div className="text-center cursor-pointer" onClick={handleToday}>
+            <button type="button" className="text-center cursor-pointer" onClick={handleToday}>
               <div className={cn("text-lg font-bold", themeTokens.textMain)}>
                 {isToday(selectedDate) ? "Today" : format(selectedDate, "MMM d")}
               </div>
               <div className={cn("text-xs", themeTokens.textMuted)}>
                 {format(selectedDate, "EEE")}
               </div>
-            </div>
+            </button>
             <button
               onClick={handleNextDay}
               className={cn("p-1 rounded", themeTokens.hover, themeTokens.textMain)}

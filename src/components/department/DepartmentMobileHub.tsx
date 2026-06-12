@@ -301,6 +301,14 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
           <Card
             className={cn("p-4 rounded-xl border flex items-center justify-between cursor-pointer", t.card, t.hover)}
             onClick={onStaffClick}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onStaffClick?.();
+              }
+            }}
           >
             <div>
               <div className={cn("text-xs font-bold uppercase tracking-wider mb-1", t.textMuted)}>
@@ -413,14 +421,14 @@ export const DepartmentMobileHub: React.FC<DepartmentMobileHubProps> = ({
             >
               <ChevronLeft size={20} />
             </button>
-            <div className="text-center cursor-pointer" onClick={handleToday}>
+            <button type="button" className="text-center cursor-pointer" onClick={handleToday}>
               <div className={cn("text-lg font-bold", t.textMain)}>
                 {isToday(selectedDate) ? "Today" : format(selectedDate, "MMM d")}
               </div>
               <div className={cn("text-xs", t.textMuted)}>
                 {format(selectedDate, "EEE")}
               </div>
-            </div>
+            </button>
             <button
               onClick={handleNextDay}
               className={cn("p-1 rounded hover:bg-white/10", t.textMain)}

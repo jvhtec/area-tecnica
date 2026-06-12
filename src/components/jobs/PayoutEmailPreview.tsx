@@ -1,4 +1,5 @@
 import React from 'react';
+import DOMPurify from 'dompurify';
 import { useQuery } from '@tanstack/react-query';
 import { createQueryKey } from '@/lib/optimized-react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -380,7 +381,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
               </TabsList>
 
               <TabsContent value="email" className="flex-1 overflow-auto border rounded-md p-4">
-                <div dangerouslySetInnerHTML={{ __html: getEmailHTML() }} />
+                <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(getEmailHTML()) }} />
               </TabsContent>
 
               <TabsContent value="data" className="flex-1 overflow-auto">
