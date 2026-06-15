@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import type { EventData } from '../../core/pdf-types';
-import { PDFDocument } from '../../core/pdf-document';
-import { ProgramSection } from '../program';
+import type { EventData } from '@/utils/hoja-de-ruta/pdf/core/pdf-types';
+import { PDFDocument } from '@/utils/hoja-de-ruta/pdf/core/pdf-document';
+import { ProgramSection } from '@/utils/hoja-de-ruta/pdf/sections/program';
 
 const LONG_NOTE =
   'Mantener despejada la zona de carga durante toda la prueba y confirmar por intercom antes de mover cualquier equipo del escenario.';
