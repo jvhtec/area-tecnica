@@ -2,6 +2,13 @@ import { PDFDocument } from '../core/pdf-document';
 import { EventData } from '../core/pdf-types';
 import { DataValidators } from '../utils/validators';
 
+const PROGRAM_TABLE_COLUMN_STYLES = {
+  0: { cellWidth: 24 },
+  1: { cellWidth: 40 },
+  2: { cellWidth: 45 },
+  3: { cellWidth: 61 },
+};
+
 export class ProgramSection {
   constructor(private pdfDoc: PDFDocument) {}
 
@@ -40,13 +47,8 @@ export class ProgramSection {
             headStyles: { fillColor: [240, 240, 240], textColor: [51, 51, 51] },
             theme: 'grid',
             margin: { left: 20, right: 20 },
-            columnStyles: {
-              0: { cellWidth: 24 },
-              1: { cellWidth: 40 },
-              2: { cellWidth: 45 },
-              3: { cellWidth: 'auto' },
-            },
-            tableWidth: 'wrap',
+            columnStyles: PROGRAM_TABLE_COLUMN_STYLES,
+            tableWidth: 'auto',
           });
           yPosition = this.pdfDoc.getLastAutoTableY() + 12;
         } else {
@@ -75,13 +77,8 @@ export class ProgramSection {
         headStyles: { fillColor: [240, 240, 240], textColor: [51, 51, 51] },
         theme: 'grid',
         margin: { left: 20, right: 20 },
-        columnStyles: {
-          0: { cellWidth: 24 }, // time
-          1: { cellWidth: 40 }, // item
-          2: { cellWidth: 45 }, // dept
-          3: { cellWidth: 'auto' }, // notes
-        },
-        tableWidth: 'wrap',
+        columnStyles: PROGRAM_TABLE_COLUMN_STYLES,
+        tableWidth: 'auto',
       });
       yPosition = this.pdfDoc.getLastAutoTableY() + 12;
       renderedStructured = true;
