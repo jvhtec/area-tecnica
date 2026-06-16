@@ -27,6 +27,10 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
 
+vi.mock("@/lib/supabase", () => ({
+  supabase: mockSupabase,
+}));
+
 vi.mock("@/services/dataLayerClient", () => ({
   dataLayerClient: mockSupabase,
 }));
@@ -157,7 +161,7 @@ describe("TourDateManagementDialog", () => {
       />,
     );
 
-    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getAllByRole("combobox")[0]);
     await user.click(screen.getByRole("option", { name: /ensayo/i }));
     await user.type(screen.getByLabelText(/^location$/i), "Madrid Arena");
     await user.type(screen.getByLabelText(/start date/i), "2026-04-10");
@@ -178,6 +182,147 @@ describe("TourDateManagementDialog", () => {
       { job_id: "job-1", date: "2026-04-11", type: "rehearsal" },
       { job_id: "job-1", date: "2026-04-12", type: "rehearsal" },
     ]);
+  });
+
+  it("stores S package intent when creating a date with the Tour Pack shortcut and no default sets", async () => {
+    const user = userEvent.setup();
+    const tourDateBuilder = createMockQueryBuilder({
+      data: {
+        id: "tour-date-1",
+        date: "2026-04-10",
+        start_date: "2026-04-10",
+        end_date: "2026-04-10",
+        tour_date_type: "show",
+        rehearsal_days: 1,
+        is_tour_pack_only: true,
+        sound_package_size: "s",
+        lights_package_size: "s",
+        video_package_size: "s",
+        sound_default_set_id: null,
+        lights_default_set_id: null,
+        video_default_set_id: null,
+        location: { id: "location-1", name: "Bilbao Arena" },
+      },
+      error: null,
+    });
+    const tourBuilder = createMockQueryBuilder({
+      data: {
+        name: "World Tour",
+        color: "#123456",
+        tour_dates: [{ jobs: [{ job_departments: [{ department: "sound" }] }] }],
+      },
+      error: null,
+    });
+    const jobsBuilder = createMockQueryBuilder({ data: { id: "job-1" }, error: null });
+    const jobDepartmentsBuilder = createMockQueryBuilder({ data: null, error: null });
+    const jobDateTypesBuilder = createMockQueryBuilder({ data: null, error: null });
+
+    queueTableBuilders({
+      tour_default_sets: [createMockQueryBuilder({ data: [], error: null })],
+      tour_dates: [tourDateBuilder],
+      tours: [tourBuilder],
+      jobs: [jobsBuilder],
+      job_departments: [jobDepartmentsBuilder],
+      job_date_types: [jobDateTypesBuilder],
+    });
+
+    renderWithProviders(
+      <TourDateManagementDialog
+        open
+        onOpenChange={vi.fn()}
+        tourId="tour-1"
+        tourDates={[]}
+      />,
+    );
+
+    await user.type(screen.getByLabelText(/^location$/i), "Bilbao Arena");
+    await user.type(screen.getByLabelText(/^date$/i), "2026-04-10");
+    await user.click(screen.getByLabelText(/tour pack \/ s package/i));
+    await user.click(screen.getByRole("button", { name: /añadir/i }));
+
+    await waitFor(() => {
+      expect(tourDateBuilder.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          is_tour_pack_only: true,
+          sound_package_size: "s",
+          lights_package_size: "s",
+          video_package_size: "s",
+          sound_default_set_id: null,
+          lights_default_set_id: null,
+          video_default_set_id: null,
+        }),
+      );
+    });
+  });
+
+  it("pins unique matching S default sets when creating a Tour Pack date", async () => {
+    const user = userEvent.setup();
+    const tourDateBuilder = createMockQueryBuilder({
+      data: {
+        id: "tour-date-1",
+        date: "2026-04-10",
+        start_date: "2026-04-10",
+        end_date: "2026-04-10",
+        tour_date_type: "show",
+        rehearsal_days: 1,
+        is_tour_pack_only: true,
+        location: { id: "location-1", name: "Bilbao Arena" },
+      },
+      error: null,
+    });
+    const tourBuilder = createMockQueryBuilder({
+      data: {
+        name: "World Tour",
+        color: "#123456",
+        tour_dates: [{ jobs: [{ job_departments: [{ department: "sound" }] }] }],
+      },
+      error: null,
+    });
+    const jobsBuilder = createMockQueryBuilder({ data: { id: "job-1" }, error: null });
+    const jobDepartmentsBuilder = createMockQueryBuilder({ data: null, error: null });
+    const jobDateTypesBuilder = createMockQueryBuilder({ data: null, error: null });
+
+    queueTableBuilders({
+      tour_default_sets: [
+        createMockQueryBuilder({
+          data: [
+            { id: "sound-s", tour_id: "tour-1", department: "sound", name: "Sound S", package_size: "s" },
+            { id: "lights-s", tour_id: "tour-1", department: "lights", name: "Lights S", package_size: "s" },
+            { id: "video-s", tour_id: "tour-1", department: "video", name: "Video S", package_size: "s" },
+          ],
+          error: null,
+        }),
+      ],
+      tour_dates: [tourDateBuilder],
+      tours: [tourBuilder],
+      jobs: [jobsBuilder],
+      job_departments: [jobDepartmentsBuilder],
+      job_date_types: [jobDateTypesBuilder],
+    });
+
+    renderWithProviders(
+      <TourDateManagementDialog
+        open
+        onOpenChange={vi.fn()}
+        tourId="tour-1"
+        tourDates={[]}
+      />,
+    );
+
+    await user.type(screen.getByLabelText(/^location$/i), "Bilbao Arena");
+    await user.type(screen.getByLabelText(/^date$/i), "2026-04-10");
+    await user.click(screen.getByLabelText(/tour pack \/ s package/i));
+    await user.click(screen.getByRole("button", { name: /añadir/i }));
+
+    await waitFor(() => {
+      expect(tourDateBuilder.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          sound_default_set_id: "sound-s",
+          lights_default_set_id: "lights-s",
+          video_default_set_id: "video-s",
+        }),
+      );
+    });
   });
 
   it("keeps rehearsal toggles as the pricing source of truth when editing a rehearsal date back to show", async () => {

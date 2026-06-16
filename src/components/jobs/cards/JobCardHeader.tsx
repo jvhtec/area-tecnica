@@ -11,6 +11,11 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useJobDistance } from "@/hooks/useJobDistance";
 import { getDateTypeMeta } from "@/constants/dateTypes";
 import { canEditJobs } from "@/utils/permissions";
+import {
+  getDepartmentPackageSize,
+  getPackageBadgeLabel,
+  isPackageDepartment,
+} from "@/utils/tourPackages";
 
 interface JobCardHeaderProps {
   job: any;
@@ -37,6 +42,10 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
 }) => {
   const isMobile = useIsMobile();
   const distance = useJobDistance(job);
+  const packageDepartment = isPackageDepartment(department) ? department : null;
+  const packageSize = packageDepartment
+    ? getDepartmentPackageSize(job.tour_date, packageDepartment)
+    : null;
 
   const getDateTypeIcon = (jobId: string, date: Date, dateTypes: Record<string, any>) => {
     const key = `${jobId}-${format(date, "yyyy-MM-dd")}`;
@@ -75,11 +84,14 @@ export const JobCardHeader: React.FC<JobCardHeaderProps> = ({
             {getDateTypeIcon(job.id, new Date(job.start_time), dateTypes)}
             <h3 className={cn("font-medium break-words leading-tight", isMobile ? "text-base" : "text-lg")}>{job.title}</h3>
             {getBadgeForJobType(job.job_type)}
-            {job.tour_date?.is_tour_pack_only && (
+            {packageDepartment && packageSize && (
               <Badge className={cn("ml-2 gap-1 bg-blue-100 text-blue-700 hover:bg-blue-100", isMobile && "text-xs")}>
                 <Package className="h-3 w-3" />
-                <span className={cn(isMobile && "hidden")}>Tour Pack Only</span>
-                <span className={cn(!isMobile && "hidden")}>TP Only</span>
+                {getPackageBadgeLabel({
+                  department: packageDepartment,
+                  packageSize,
+                  mobile: isMobile,
+                })}
               </Badge>
             )}
             {job.invoicing_company && (

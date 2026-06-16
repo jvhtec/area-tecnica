@@ -50,6 +50,13 @@ export const TourChips = ({ onTourClick, readOnly = false }: TourChipsProps) => 
           tour_dates (
             id,
             date,
+            is_tour_pack_only,
+            sound_package_size,
+            lights_package_size,
+            video_package_size,
+            sound_default_set_id,
+            lights_default_set_id,
+            video_default_set_id,
             location:locations (name)
           )
         `)

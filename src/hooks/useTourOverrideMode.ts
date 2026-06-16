@@ -2,6 +2,14 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import {
+  getPackageResolutionMessage,
+  isPackageDepartment,
+  resolveDefaultSetForTourDate,
+  type ResolveDefaultSetResult,
+  type TourDefaultSetLike,
+  type TourPackageDateLike,
+} from '@/utils/tourPackages';
 
 interface TourOverrideData {
   tourId: string;
@@ -11,6 +19,7 @@ interface TourOverrideData {
   locationName: string;
   defaults: any[];
   overrides: any[];
+  defaultSetResolution?: ResolveDefaultSetResult<TourDefaultSetLike>;
 }
 
 export const useTourOverrideMode = (
@@ -43,6 +52,14 @@ export const useTourOverrideMode = (
           .from('tour_dates')
           .select(`
             date,
+            tour_id,
+            is_tour_pack_only,
+            sound_package_size,
+            lights_package_size,
+            video_package_size,
+            sound_default_set_id,
+            lights_default_set_id,
+            video_default_set_id,
             locations (name)
           `)
           .eq('id', tourDateId)
@@ -50,17 +67,43 @@ export const useTourOverrideMode = (
 
         if (tourDateError) throw tourDateError;
 
-        // Fetch defaults for this tour and department
-        const { data: defaultTables, error: defaultsError } = await supabase
-          .from('tour_default_tables')
-          .select(`
-            *,
-            tour_default_sets!inner(tour_id, department)
-          `)
-          .eq('tour_default_sets.tour_id', tourId)
-          .eq('tour_default_sets.department', department);
+        let defaultTables: any[] = [];
+        let defaultSetResolution: ResolveDefaultSetResult<TourDefaultSetLike> | undefined;
 
-        if (defaultsError) throw defaultsError;
+        if (isPackageDepartment(department)) {
+          const { data: defaultSets, error: setsError } = await supabase
+            .from('tour_default_sets')
+            .select('*')
+            .eq('tour_id', tourId)
+            .eq('department', department);
+
+          if (setsError) throw setsError;
+
+          defaultSetResolution = resolveDefaultSetForTourDate({
+            tourDate: tourDateData as TourPackageDateLike,
+            department,
+            defaultSets: (defaultSets || []) as TourDefaultSetLike[],
+          });
+
+          if (defaultSetResolution.status === 'resolved') {
+            const { data, error: defaultsError } = await supabase
+              .from('tour_default_tables')
+              .select('*')
+              .eq('set_id', defaultSetResolution.set.id);
+
+            if (defaultsError) throw defaultsError;
+            defaultTables = data || [];
+          } else {
+            const message = getPackageResolutionMessage(defaultSetResolution);
+            if (message) {
+              toast({
+                title: 'Tour defaults need attention',
+                description: message,
+                variant: 'destructive',
+              });
+            }
+          }
+        }
 
         // Fetch existing overrides for this tour date and department
         const powerOverridesPromise = supabase
@@ -86,11 +129,12 @@ export const useTourOverrideMode = (
           tourName: tourData.name,
           tourDate: tourDateData.date,
           locationName: (tourDateData.locations as any)?.name || 'Unknown Location',
-          defaults: defaultTables || [],
+          defaults: defaultTables,
           overrides: [
             ...(powerOverrides.data || []),
             ...(weightOverrides.data || [])
-          ]
+          ],
+          defaultSetResolution,
         });
       } catch (error) {
         console.error('Error loading override data:', error);

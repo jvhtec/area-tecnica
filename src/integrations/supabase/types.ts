@@ -7978,11 +7978,17 @@ export type Database = {
           flex_folders_created: boolean | null
           id: string
           is_tour_pack_only: boolean | null
+          lights_default_set_id: string | null
+          lights_package_size: "xl" | "l" | "m" | "s" | null
           location_id: string | null
           rehearsal_days: number | null
+          sound_default_set_id: string | null
+          sound_package_size: "xl" | "l" | "m" | "s" | null
           start_date: string
           tour_date_type: Database["public"]["Enums"]["tour_date_type"] | null
           tour_id: string | null
+          video_default_set_id: string | null
+          video_package_size: "xl" | "l" | "m" | "s" | null
         }
         Insert: {
           created_at?: string
@@ -7991,11 +7997,17 @@ export type Database = {
           flex_folders_created?: boolean | null
           id?: string
           is_tour_pack_only?: boolean | null
+          lights_default_set_id?: string | null
+          lights_package_size?: "xl" | "l" | "m" | "s" | null
           location_id?: string | null
           rehearsal_days?: number | null
+          sound_default_set_id?: string | null
+          sound_package_size?: "xl" | "l" | "m" | "s" | null
           start_date: string
           tour_date_type?: Database["public"]["Enums"]["tour_date_type"] | null
           tour_id?: string | null
+          video_default_set_id?: string | null
+          video_package_size?: "xl" | "l" | "m" | "s" | null
         }
         Update: {
           created_at?: string
@@ -8004,13 +8016,26 @@ export type Database = {
           flex_folders_created?: boolean | null
           id?: string
           is_tour_pack_only?: boolean | null
+          lights_default_set_id?: string | null
+          lights_package_size?: "xl" | "l" | "m" | "s" | null
           location_id?: string | null
           rehearsal_days?: number | null
+          sound_default_set_id?: string | null
+          sound_package_size?: "xl" | "l" | "m" | "s" | null
           start_date?: string
           tour_date_type?: Database["public"]["Enums"]["tour_date_type"] | null
           tour_id?: string | null
+          video_default_set_id?: string | null
+          video_package_size?: "xl" | "l" | "m" | "s" | null
         }
         Relationships: [
+          {
+            foreignKeyName: "tour_dates_lights_default_set_id_fkey"
+            columns: ["lights_default_set_id"]
+            isOneToOne: false
+            referencedRelation: "tour_default_sets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "tour_dates_location_id_fkey"
             columns: ["location_id"]
@@ -8019,10 +8044,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "tour_dates_sound_default_set_id_fkey"
+            columns: ["sound_default_set_id"]
+            isOneToOne: false
+            referencedRelation: "tour_default_sets"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "tour_dates_tour_id_fkey"
             columns: ["tour_id"]
             isOneToOne: false
             referencedRelation: "tours"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tour_dates_video_default_set_id_fkey"
+            columns: ["video_default_set_id"]
+            isOneToOne: false
+            referencedRelation: "tour_default_sets"
             referencedColumns: ["id"]
           },
         ]
@@ -8034,6 +8073,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          package_size: "xl" | "l" | "m" | "s" | null
           tour_id: string
           updated_at: string
         }
@@ -8043,6 +8083,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          package_size?: "xl" | "l" | "m" | "s" | null
           tour_id: string
           updated_at?: string
         }
@@ -8052,6 +8093,7 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          package_size?: "xl" | "l" | "m" | "s" | null
           tour_id?: string
           updated_at?: string
         }

@@ -753,6 +753,73 @@ describe('powerSummaryData', () => {
     expect(summary.totalSystemWatts).toBe(4300);
   });
 
+  it('uses only the resolved package default set for tourdate summaries', async () => {
+    const supabase = createMockSupabase({
+      tour_dates: [
+        {
+          id: 'tour-date-1',
+          tour_id: 'tour-1',
+          sound_package_size: 'xl',
+          is_tour_pack_only: false,
+          sound_default_set_id: null,
+          lights_default_set_id: null,
+          video_default_set_id: null,
+        },
+      ],
+      tour_date_power_overrides: [],
+      tour_power_defaults: [],
+      tour_default_sets: [
+        {
+          id: 'set-sound-xl',
+          tour_id: 'tour-1',
+          department: 'sound',
+          package_size: 'xl',
+        },
+        {
+          id: 'set-sound-s',
+          tour_id: 'tour-1',
+          department: 'sound',
+          package_size: 's',
+        },
+      ],
+      tour_default_tables: [
+        {
+          id: 'default-sound-xl',
+          set_id: 'set-sound-xl',
+          table_name: 'XL FoH',
+          table_type: 'power',
+          total_value: 3000,
+          metadata: { current_per_phase: 12, pdu_type: '63A', pf: 0.95 },
+          table_data: { rows: [{ quantity: '1' }] },
+          created_at: '2026-04-07T08:00:00.000Z',
+        },
+        {
+          id: 'default-sound-s',
+          set_id: 'set-sound-s',
+          table_name: 'S FoH',
+          table_type: 'power',
+          total_value: 1000,
+          metadata: { current_per_phase: 4, pdu_type: '32A', pf: 0.95 },
+          table_data: { rows: [{ quantity: '1' }] },
+          created_at: '2026-04-07T08:00:00.000Z',
+        },
+      ],
+    });
+
+    const summary = await loadTechnicalPowerSummaryData({
+      job: {
+        id: 'job-tour',
+        job_type: 'tourdate',
+        tour_id: 'tour-1',
+        tour_date_id: 'tour-date-1',
+      },
+      supabase,
+    });
+
+    expect(summary.departments.sound.rows.map((row) => row.name)).toEqual(['XL FoH']);
+    expect(summary.departments.sound.totalWatts).toBe(3000);
+  });
+
   it('treats legacy tour defaults with a null department as sound defaults', async () => {
     const supabase = createMockSupabase({
       tour_date_power_overrides: [],

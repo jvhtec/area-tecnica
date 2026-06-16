@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useJobSelection } from "@/hooks/useJobSelection";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
-import { useTourDefaultSets } from "@/hooks/useTourDefaultSets";
+import { useTourDefaultSets, type TourDefaultTable } from "@/hooks/useTourDefaultSets";
 import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
 import { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
 import { useTourOverrideMode } from "@/hooks/useTourOverrideMode";
+import type { TourPackageSize } from "@/utils/tourPackages";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { queryKeys } from "@/lib/react-query";
 import { exportToPDF } from "@/utils/pdfExport";
@@ -73,6 +74,7 @@ const CUSTOM_PDU_SELECT_VALUE = "Custom";
 
 type EditingTarget =
   | { kind: "table"; id: number | string }
+  | { kind: "default"; id: string }
   | { kind: "override"; id: string };
 
 type ConsumosJob = {
@@ -202,11 +204,85 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     createSet,
     createTable: createTourDefaultTable,
     updateTable: updateTourDefaultTable,
+    deleteTable: deleteTourDefaultTable,
+    copyTablesToSet: copyTourDefaultTablesToSet,
   } = useTourDefaultSets(tourIdParam || "", department);
 
   const { powerDefaults: legacyTourDefaults = [] } = useTourPowerDefaults(
     features.legacyTourDefaultsFallback ? tourIdParam || "" : "",
   );
+
+  const [selectedDefaultSetId, setSelectedDefaultSetId] = useState<string>("");
+  const [selectedDefaultPackageSize, setSelectedDefaultPackageSize] = useState<TourPackageSize | "unassigned">("unassigned");
+  const [newDefaultSetName, setNewDefaultSetName] = useState("");
+  const [isCreatingDefaultSet, setIsCreatingDefaultSet] = useState(false);
+  const [copySourceSetId, setCopySourceSetIdInternal] = useState<string>("");
+  const [selectedCopyTableIds, setSelectedCopyTableIds] = useState<string[]>([]);
+  const selectedDefaultSet =
+    defaultSets.find((set) => set.id === selectedDefaultSetId) || null;
+  const selectedCopySourceSet =
+    defaultSets.find((set) => set.id === copySourceSetId) || null;
+
+  const setCopySourceSetId = useCallback((setId: string) => {
+    setCopySourceSetIdInternal(setId);
+    setSelectedCopyTableIds([]);
+  }, []);
+
+  const selectDefaultSetId = useCallback(
+    (setId: string) => {
+      if (!setId && selectedDefaultSetId) {
+        setCopySourceSetIdInternal((current) => current || selectedDefaultSetId);
+      }
+      setIsCreatingDefaultSet(!setId);
+      setSelectedDefaultSetId(setId);
+      const set = defaultSets.find((candidate) => candidate.id === setId);
+      if (set) {
+        setSelectedDefaultPackageSize(set.package_size || "unassigned");
+      }
+    },
+    [defaultSets, selectedDefaultSetId],
+  );
+
+  useEffect(() => {
+    if (
+      !isTourDefaults ||
+      selectedDefaultSetId ||
+      isCreatingDefaultSet ||
+      defaultSets.length !== 1
+    ) {
+      return;
+    }
+    selectDefaultSetId(defaultSets[0].id);
+  }, [
+    defaultSets,
+    isCreatingDefaultSet,
+    isTourDefaults,
+    selectedDefaultSetId,
+    selectDefaultSetId,
+  ]);
+
+  useEffect(() => {
+    if (!isTourDefaults || copySourceSetId || defaultSets.length === 0) return;
+    setCopySourceSetIdInternal(selectedDefaultSetId || defaultSets[0].id);
+  }, [copySourceSetId, defaultSets, isTourDefaults, selectedDefaultSetId]);
+
+  useEffect(() => {
+    if (!copySourceSetId) {
+      setSelectedCopyTableIds([]);
+      return;
+    }
+    const availableIds = new Set(
+      defaultTables
+        .filter(
+          (table) =>
+            table.set_id === copySourceSetId && table.table_type === "power",
+        )
+        .map((table) => table.id),
+    );
+    setSelectedCopyTableIds((previous) =>
+      previous.filter((tableId) => availableIds.has(tableId)),
+    );
+  }, [copySourceSetId, defaultTables]);
 
   const { data: tourName = "" } = useQuery({
     queryKey: queryKeys.scope("tour", tourIdParam, "name"),
@@ -449,9 +525,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     setEditing(null);
   };
 
-  // Load an existing table (saved set, local, default or override) into the builder
-  const startEditingTable = (table: PowerTable) => {
-    if (table.id === undefined) return;
+  const loadPowerTableIntoBuilder = (table: PowerTable) => {
     setTableName(table.name);
     setCurrentRows(
       table.rows.length > 0
@@ -481,7 +555,19 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       setCustomPduType("");
     }
     setIncludesHoist(Boolean(table.includesHoist));
+  };
+
+  // Load an existing local table into the builder.
+  const startEditingTable = (table: PowerTable) => {
+    if (table.id === undefined) return;
+    loadPowerTableIntoBuilder(table);
     setEditing({ kind: "table", id: table.id });
+  };
+
+  const startEditingDefaultTable = (table: PowerTable) => {
+    if (!table.defaultTableId) return;
+    loadPowerTableIntoBuilder(table);
+    setEditing({ kind: "default", id: table.defaultTableId });
   };
 
   const startEditingOverride = (override: {
@@ -619,12 +705,13 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     });
   };
 
-  const persistDefaultTableUpdate = (table: PowerTable) => {
+  const persistDefaultTableUpdate = async (table: PowerTable) => {
     if (!table.defaultTableId) return;
     const settings = getTableSnapshotSettings(table);
-    updateTourDefaultTable({
+    await updateTourDefaultTable({
       tableId: table.defaultTableId,
       updates: {
+        table_name: table.name,
         table_data: buildPowerTableData(table, settings),
         total_value: table.totalWatts || 0,
         metadata: buildPowerTableMetadata(table, settings),
@@ -652,6 +739,19 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         return;
       }
 
+      if (editing?.kind === "default") {
+        const updatedDefaultTable: PowerTable = {
+          ...builtTable,
+          id: `new-default-${editing.id}`,
+          isDefault: true,
+          defaultTableId: editing.id,
+        };
+        await persistDefaultTableUpdate(updatedDefaultTable);
+        toast({ title: labels.toastSuccess, description: labels.toastDefaultSaved });
+        resetCurrentTable();
+        return;
+      }
+
       if (editing?.kind === "table") {
         const original = tables.find((table) => table.id === editing.id);
         if (original) {
@@ -671,7 +771,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
             prev.map((table) => (table.id === editing.id ? merged : table)),
           );
           if (isTourDefaults && merged.defaultTableId) {
-            persistDefaultTableUpdate(merged);
+            await persistDefaultTableUpdate(merged);
           } else if (isOverrideMode && merged.overrideId) {
             await persistOverrideUpdate(merged, merged.overrideId);
             toast({ title: labels.toastSuccess, description: labels.toastOverrideUpdated });
@@ -741,7 +841,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     );
 
     if (isTourDefaults && updatedTable.defaultTableId) {
-      persistDefaultTableUpdate(updatedTable);
+      void persistDefaultTableUpdate(updatedTable);
     } else if (isOverrideMode && updatedTable.overrideId) {
       void persistOverrideUpdate(updatedTable, updatedTable.overrideId).catch((error) => {
         console.error("Error saving override table settings:", error);
@@ -751,23 +851,32 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
 
   // Tour defaults persistence
   const pendingSetIdRef = useRef<Promise<string> | null>(null);
-  const resolvedSetIdRef = useRef<string | null>(null);
 
   const getOrCreateDefaultSetId = async (): Promise<string> => {
-    if (defaultSets.length > 0) {
-      resolvedSetIdRef.current = defaultSets[0].id;
-      return defaultSets[0].id;
+    if (selectedDefaultSetId) {
+      return selectedDefaultSetId;
     }
-    if (resolvedSetIdRef.current) return resolvedSetIdRef.current;
     if (pendingSetIdRef.current) return pendingSetIdRef.current;
+
+    const trimmedSetName = newDefaultSetName.trim();
+    if (!trimmedSetName) {
+      throw new Error("Select an existing default set or enter a name to create one.");
+    }
+
     const creation = createSet({
       tour_id: tourIdParam!,
-      name: config.defaultsSetName(tourName || tourIdParam || ""),
+      name: trimmedSetName,
       department,
       description: config.defaultsSetDescription,
+      package_size:
+        selectedDefaultPackageSize === "unassigned"
+          ? null
+          : selectedDefaultPackageSize,
     })
       .then((set) => {
-        resolvedSetIdRef.current = set.id;
+        setSelectedDefaultSetId(set.id);
+        setIsCreatingDefaultSet(false);
+        setNewDefaultSetName("");
         pendingSetIdRef.current = null;
         return set.id;
       })
@@ -777,6 +886,19 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       });
     pendingSetIdRef.current = creation;
     return creation;
+  };
+
+  const createEmptyDefaultSet = async () => {
+    try {
+      await getOrCreateDefaultSetId();
+    } catch (error: unknown) {
+      console.error("Error creating default set:", error);
+      toast({
+        title: labels.toastError,
+        description: labels.toastDefaultSaveError(getErrorMessage(error)),
+        variant: "destructive",
+      });
+    }
   };
 
   const saveTourDefault = async (table: PowerTable) => {
@@ -884,6 +1006,22 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     }
   };
 
+  const handleDeleteDefaultTable = async (defaultTableId: string) => {
+    try {
+      await deleteTourDefaultTable(defaultTableId);
+      if (editing?.kind === "default" && editing.id === defaultTableId) {
+        resetCurrentTable();
+      }
+    } catch (error) {
+      console.error("Error deleting default table:", error);
+      toast({
+        title: labels.toastError,
+        description: labels.toastDefaultsFailed([defaultTableId]),
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDeleteOverride = async (overrideId: string) => {
     try {
       await deleteOverride({ id: overrideId, table: "power" });
@@ -924,41 +1062,120 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     return { adjustedWatts, totalVa };
   };
 
+  const mapTourDefaultTableToPowerTable = (
+    table: TourDefaultTable,
+  ): PowerTable => {
+    const rows: PowerTableRow[] = table.table_data?.rows || [];
+    const snapshot = {
+      pf: table.metadata?.pf ?? table.table_data?.pf,
+      safetyMargin: table.metadata?.safetyMargin ?? table.table_data?.safetyMargin,
+    };
+    const { adjustedWatts, totalVa } = computeDisplayTotals(
+      table.total_value || 0,
+      rows,
+      snapshot,
+    );
+    return {
+      id: `new-default-${table.id}`,
+      name: table.table_name,
+      rows,
+      totalWatts: table.total_value,
+      adjustedWatts,
+      totalVa,
+      currentPerPhase: table.metadata?.current_per_phase || 0,
+      pduType: table.metadata?.pdu_type || "",
+      customPduType: table.metadata?.custom_pdu_type || undefined,
+      position: table.metadata?.position || undefined,
+      customPosition: table.metadata?.custom_position || undefined,
+      includesHoist: table.metadata?.includes_hoist || false,
+      snapshotSafetyMargin: table.metadata?.safetyMargin ?? table.table_data?.safetyMargin,
+      snapshotPhaseMode: table.metadata?.phaseMode ?? table.table_data?.phaseMode,
+      snapshotVoltage: table.metadata?.voltage ?? table.table_data?.voltage,
+      snapshotPowerFactor: table.metadata?.pf ?? table.table_data?.pf,
+      isDefault: true,
+      defaultTableId: table.id,
+    } as PowerTable;
+  };
+
+  const copySourceTables = (defaultTables || [])
+    .filter(
+      (table) =>
+        table.set_id === copySourceSetId && table.table_type === "power",
+    )
+    .map(mapTourDefaultTableToPowerTable);
+
+  const copySourceTableIds = copySourceTables
+    .map((table) => table.defaultTableId)
+    .filter((tableId): tableId is string => Boolean(tableId));
+  const selectedCopyTableCount = selectedCopyTableIds.filter((tableId) =>
+    copySourceTableIds.includes(tableId),
+  ).length;
+  const allCopySourceTablesSelected =
+    copySourceTableIds.length > 0 &&
+    selectedCopyTableCount === copySourceTableIds.length;
+
+  const toggleCopyTableSelection = (tableId: string, checked: boolean) => {
+    setSelectedCopyTableIds((previous) => {
+      if (checked) return Array.from(new Set([...previous, tableId]));
+      return previous.filter((selectedId) => selectedId !== tableId);
+    });
+  };
+
+  const toggleAllCopySourceTables = (checked: boolean) => {
+    setSelectedCopyTableIds(checked ? copySourceTableIds : []);
+  };
+
+  const copySelectedDefaultTables = async () => {
+    const selectedIds = selectedCopyTableIds.filter((tableId) =>
+      copySourceTableIds.includes(tableId),
+    );
+    if (selectedIds.length === 0) {
+      toast({
+        title: labels.toastError,
+        description: "Selecciona al menos una tabla para copiar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const targetSetId = selectedDefaultSetId || (await getOrCreateDefaultSetId());
+      await copyTourDefaultTablesToSet({
+        tableIds: selectedIds,
+        targetSetId,
+      });
+      setSelectedCopyTableIds([]);
+      setSelectedDefaultSetId(targetSetId);
+      setIsCreatingDefaultSet(false);
+    } catch (error: unknown) {
+      console.error("Error copying default tables:", error);
+      toast({
+        title: labels.toastError,
+        description: getErrorMessage(error),
+        variant: "destructive",
+      });
+    }
+  };
+
   // Tour defaults for display (new system with legacy fallback)
   const tourDefaultDisplayTables: PowerTable[] = useMemo(() => {
+    const canDisplayNewSystemTables =
+      Boolean(selectedDefaultSetId) || defaultSets.length <= 1;
     const newSystemTables = (defaultTables || [])
-      .filter((table) => table.table_type === "power")
-      .map((table) => {
-        const rows: PowerTableRow[] = table.table_data?.rows || [];
-        const snapshot = {
-          pf: table.metadata?.pf ?? table.table_data?.pf,
-          safetyMargin: table.metadata?.safetyMargin ?? table.table_data?.safetyMargin,
-        };
-        const { adjustedWatts, totalVa } = computeDisplayTotals(
-          table.total_value || 0,
-          rows,
-          snapshot,
-        );
-        return {
-          id: `new-default-${table.id}`,
-          name: table.table_name,
-          rows,
-          totalWatts: table.total_value,
-          adjustedWatts,
-          totalVa,
-          currentPerPhase: table.metadata?.current_per_phase || 0,
-          pduType: table.metadata?.pdu_type || "",
-          customPduType: table.metadata?.custom_pdu_type || undefined,
-          position: table.metadata?.position || undefined,
-          customPosition: table.metadata?.custom_position || undefined,
-          includesHoist: table.metadata?.includes_hoist || false,
-          isDefault: true,
-          defaultTableId: table.id,
-        } as PowerTable;
-      });
+      .filter(
+        (table) =>
+          canDisplayNewSystemTables &&
+          table.table_type === "power" &&
+          (!selectedDefaultSetId || table.set_id === selectedDefaultSetId),
+      )
+      .map(mapTourDefaultTableToPowerTable);
 
     if (newSystemTables.length > 0 || !features.legacyTourDefaultsFallback) {
       return newSystemTables;
+    }
+
+    if (defaultSets.length > 0) {
+      return [];
     }
 
     return legacyTourDefaults.map((legacyDefault) => {
@@ -988,7 +1205,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       } as PowerTable;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultTables, legacyTourDefaults, features.legacyTourDefaultsFallback, safetyMargin, pf]);
+  }, [defaultSets.length, defaultTables, selectedDefaultSetId, legacyTourDefaults, features.legacyTourDefaultsFallback, safetyMargin, pf]);
 
   // Read-only defaults shown in URL override mode
   const readOnlyDefaultTables: PowerTable[] = useMemo(() => {
@@ -1362,7 +1579,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       (table) => String(table.id) === plotTableId,
     );
     if (defaultTable?.defaultTableId) {
-      persistDefaultTableUpdate({ ...defaultTable, ...patch });
+      void persistDefaultTableUpdate({ ...defaultTable, ...patch });
     }
   };
 
@@ -1382,6 +1599,26 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     overrideLoading,
     overrideData,
     isCreatingOverride,
+    defaultSets,
+    selectedDefaultSet,
+    selectedDefaultSetId,
+    setSelectedDefaultSetId: selectDefaultSetId,
+    isCreatingDefaultSet,
+    selectedDefaultPackageSize,
+    setSelectedDefaultPackageSize,
+    newDefaultSetName,
+    setNewDefaultSetName,
+    createEmptyDefaultSet,
+    copySourceSetId,
+    setCopySourceSetId,
+    selectedCopySourceSet,
+    copySourceTables,
+    selectedCopyTableIds,
+    selectedCopyTableCount,
+    allCopySourceTablesSelected,
+    toggleCopyTableSelection,
+    toggleAllCopySourceTables,
+    copySelectedDefaultTables,
     tourName,
     tourInfo: getTourInfo(),
     selectedStage,
@@ -1426,9 +1663,11 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     removeTable,
     updateTableSettings,
     startEditingTable,
+    startEditingDefaultTable,
     startEditingOverride,
     saveTourDefault,
     saveDefaultTables,
+    handleDeleteDefaultTable,
     handleDeleteOverride,
     tourDefaultDisplayTables,
     readOnlyDefaultTables,

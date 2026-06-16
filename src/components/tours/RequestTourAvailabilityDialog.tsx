@@ -9,7 +9,15 @@ import { buildTourSchedulePdfBlob } from '@/lib/tourPdfExport';
 import { uploadTourPdfWithRecord } from '@/utils/tourDocumentsUpload';
 import { isDepartmentManagementRole, isTechnicianRole } from '@/utils/permissions';
 
-type TourDateLite = { id: string; date: string; location?: { name?: string | null } | null; is_tour_pack_only?: boolean | null };
+type TourDateLite = {
+  id: string;
+  date: string;
+  location?: { name?: string | null } | null;
+  is_tour_pack_only?: boolean | null;
+  sound_package_size?: 'xl' | 'l' | 'm' | 's' | null;
+  lights_package_size?: 'xl' | 'l' | 'm' | 's' | null;
+  video_package_size?: 'xl' | 'l' | 'm' | 's' | null;
+};
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -48,7 +56,7 @@ export const RequestTourAvailabilityDialog: React.FC<Props> = ({ open, onOpenCha
       try {
         if (tourDates && tourDates.length) { setDates(tourDates); return; }
         const { data, error } = await dataLayerClient.from('tour_dates')
-          .select('id, date, is_tour_pack_only, location:locations(name)')
+          .select('id, date, is_tour_pack_only, sound_package_size, lights_package_size, video_package_size, location:locations(name)')
           .eq('tour_id', tourId)
           .order('date', { ascending: true });
         if (error) throw error;

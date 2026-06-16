@@ -18,6 +18,7 @@ export const useJobs = () => {
     // Documents and tour dates change less frequently; keep lower priority
     { table: 'job_documents', queryKey: queryKeys.scope('jobs'), priority: 'low' },
     { table: 'tour_dates', queryKey: queryKeys.scope('jobs'), priority: 'low' },
+    { table: 'tour_default_sets', queryKey: queryKeys.scope('jobs'), priority: 'low' },
     { table: 'tours', queryKey: queryKeys.scope('jobs'), priority: 'low' },
   ]);
 
@@ -81,6 +82,13 @@ export const useJobs = () => {
                 end_date,
                 tour_date_type,
                 is_tour_pack_only,
+                tour_id,
+                sound_package_size,
+                lights_package_size,
+                video_package_size,
+                sound_default_set_id,
+                lights_default_set_id,
+                video_default_set_id,
                 tour: tours(
                   id,
                   name,

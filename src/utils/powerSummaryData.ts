@@ -15,6 +15,12 @@ import {
   type TechnicalPowerDepartment,
   normalizeTechnicalPowerDepartments,
 } from '@/utils/technicalPowerTypes';
+import {
+  getDepartmentPackageSize,
+  isPackageDepartment,
+  resolveDefaultSetForTourDate,
+  type TourPackageDateLike,
+} from '@/utils/tourPackages';
 
 type TypedSupabaseClient = SupabaseClient<Database>;
 type PowerRequirementTableRow = Database['public']['Tables']['power_requirement_tables']['Row'];
@@ -376,17 +382,30 @@ const loadTourdateReferenceData = async ({
 }) => {
   let resolvedTourId = tourId || null;
 
+  const { data: tourDateRows, error: tourDateError } = await supabase
+    .from('tour_dates')
+    .select(`
+      id,
+      tour_id,
+      is_tour_pack_only,
+      sound_package_size,
+      lights_package_size,
+      video_package_size,
+      sound_default_set_id,
+      lights_default_set_id,
+      video_default_set_id
+    `)
+    .eq('id', tourDateId);
+
+  if (tourDateError) throw tourDateError;
+
+  const tourDate =
+    (tourDateRows?.[0] as TourPackageDateLike | undefined) ||
+    (resolvedTourId ? ({ tour_id: resolvedTourId } satisfies TourPackageDateLike) : null);
+
   if (!resolvedTourId) {
-    const { data: tourDateRows, error: tourDateError } = await supabase
-      .from('tour_dates')
-      .select('tour_id')
-      .eq('id', tourDateId);
-
-    if (tourDateError) throw tourDateError;
-
     resolvedTourId =
-      (tourDateRows?.[0] as Pick<TourDateRow, 'tour_id'> | undefined)?.tour_id ||
-      null;
+      (tourDate as Pick<TourDateRow, 'tour_id'> | null | undefined)?.tour_id || null;
   }
 
   const [
@@ -435,6 +454,7 @@ const loadTourdateReferenceData = async ({
     legacyDefaults: legacyDefaultsResponse.data || [],
     defaultSets: defaultSetsResponse.data || [],
     defaultTables: defaultTablesResponse.data || [],
+    tourDate,
   };
 };
 
@@ -446,7 +466,7 @@ const loadTourdatePowerData = async ({
   supabase: TypedSupabaseClient;
 }) => {
   const [
-    { overrides, legacyDefaults, defaultSets, defaultTables },
+    { overrides, legacyDefaults, defaultSets, defaultTables, tourDate },
     jobSpecificDepartments,
   ] = await Promise.all([
     loadTourdateReferenceData({
@@ -463,13 +483,19 @@ const loadTourdatePowerData = async ({
         (row) => row.department === department
       ) as TourDatePowerOverrideRow[];
 
-      const departmentSetIds = defaultSets
-        .filter((set) => set.department === department)
-        .map((set) => set.id);
+      const resolvedDefaultSet =
+        tourDate && isPackageDepartment(department)
+          ? resolveDefaultSetForTourDate({
+              tourDate,
+              department,
+              defaultSets,
+            })
+          : null;
 
-      const departmentDefaultTables = defaultTables.filter((table) =>
-        departmentSetIds.includes(table.set_id)
-      ) as TourDefaultTableRow[];
+      const departmentDefaultTables =
+        resolvedDefaultSet?.status === 'resolved'
+          ? (defaultTables.filter((table) => table.set_id === resolvedDefaultSet.set.id) as TourDefaultTableRow[])
+          : [];
 
       const departmentLegacyDefaults = legacyDefaults.filter(
         (row) => isMatchingLegacyPowerDefaultDepartment(department, row.department)
@@ -496,10 +522,21 @@ const loadTourdatePowerData = async ({
         return [department, jobSpecificSummary];
       }
 
+      const hasPackageIntent =
+        tourDate && isPackageDepartment(department)
+          ? Boolean(getDepartmentPackageSize(tourDate, department))
+          : false;
+      const canUseLegacyDefaults =
+        departmentDefaultTables.length === 0 &&
+        !hasPackageIntent &&
+        (!resolvedDefaultSet ||
+          resolvedDefaultSet.status === 'missing' ||
+          resolvedDefaultSet.status === 'resolved');
+
       const normalized = buildNormalizedTourPowerTables({
         department,
         defaultTables: departmentDefaultTables,
-        legacyDefaults: departmentLegacyDefaults,
+        legacyDefaults: canUseLegacyDefaults ? departmentLegacyDefaults : [],
       });
 
       return [

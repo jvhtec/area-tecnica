@@ -96,8 +96,17 @@ export const TourManagementDialog = ({
   const handleBulkTourPackUpdate = async (tourPackOnly: boolean) => {
     setIsUpdatingTourPack(true);
     try {
+      const packageUpdates = {
+        sound_package_size: tourPackOnly ? ('s' as const) : null,
+        lights_package_size: tourPackOnly ? ('s' as const) : null,
+        video_package_size: tourPackOnly ? ('s' as const) : null,
+        sound_default_set_id: null as string | null,
+        lights_default_set_id: null as string | null,
+        video_default_set_id: null as string | null,
+      };
+
       const { error } = await dataLayerClient.from("tour_dates")
-        .update({ is_tour_pack_only: tourPackOnly })
+        .update({ is_tour_pack_only: tourPackOnly, ...packageUpdates })
         .eq("tour_id", tour.id);
 
       if (error) throw error;
@@ -252,7 +261,7 @@ export const TourManagementDialog = ({
                     <Package className="h-4 w-4 text-blue-600" />
                     <div>
                       <p className="text-sm font-medium">Modo Tour Pack Masivo</p>
-                      <p className="text-xs text-muted-foreground">Establecer todas las fechas de esta gira a Solo Tour Pack</p>
+                      <p className="text-xs text-muted-foreground">Establecer todas las fechas de esta gira como paquete S</p>
                     </div>
                   </div>
                   <div className="flex gap-2">

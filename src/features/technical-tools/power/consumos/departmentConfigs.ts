@@ -104,15 +104,15 @@ const lightComponentDatabase: ConsumosComponent[] = [
 
 const ENGLISH_LABELS: ConsumosLabels = {
   title: "Power Calculator",
-  tourDefaultsBadge: "Tour Defaults Mode",
-  tourDefaultsNoticeTitle: "Tour Defaults Mode Active",
+  tourDefaultsBadge: "Modo Valores por Defecto",
+  tourDefaultsNoticeTitle: "Modo Conjunto por Defecto de Gira Activo",
   tourDefaultsNoticeBody:
-    "Any tables you create will be saved as global defaults for this tour. These defaults will apply to all tour dates unless specifically overridden.",
-  creatingDefaultsFor: "Creating defaults for:",
-  overrideBadge: "Override Mode",
-  overrideNoticeTitle: "Override Mode Active",
+    "Las tablas que crees se guardarán en el conjunto/paquete por defecto seleccionado. Las fechas de gira solo usarán ese conjunto cuando su paquete o pin explícito lo resuelva; las anulaciones por fecha siguen teniendo prioridad.",
+  creatingDefaultsFor: "Creando valores por defecto para:",
+  overrideBadge: "Modo Anulación",
+  overrideNoticeTitle: "Modo Anulación Activo",
   overrideNoticeBody:
-    "This job is part of a tour. Any tables you create will be saved as overrides for the specific tour date.",
+    "Este trabajo forma parte de una gira. Las tablas que crees se guardarán como anulaciones para la fecha de gira específica.",
   existingDefaultsHeading: "Existing Tour Defaults",
   readOnlyDefaultsHeading: "Tour Defaults (Read-Only)",
   existingOverridesHeading: "Existing Overrides",
@@ -259,9 +259,9 @@ const ENGLISH_LABELS: ConsumosLabels = {
 const SPANISH_LABELS: ConsumosLabels = {
   title: "Calculadora de Potencia",
   tourDefaultsBadge: "Modo Valores por Defecto",
-  tourDefaultsNoticeTitle: "Modo Valores por Defecto de Gira Activo",
+  tourDefaultsNoticeTitle: "Modo Conjunto por Defecto de Gira Activo",
   tourDefaultsNoticeBody:
-    "Las tablas que crees aquí se guardarán como valores por defecto para todas las fechas de la gira, salvo que se anulen específicamente.",
+    "Las tablas que crees se guardarán en el conjunto/paquete por defecto seleccionado. Las fechas de gira solo usarán ese conjunto cuando su paquete o pin explícito lo resuelva; las anulaciones por fecha siguen teniendo prioridad.",
   creatingDefaultsFor: "Creando valores por defecto para:",
   overrideBadge: "Modo Anulación",
   overrideNoticeTitle: "Modo Anulación Activo",

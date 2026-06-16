@@ -21,9 +21,9 @@ import {
   Edit,
   Package,
   Clock,
+  AlertTriangle,
 } from "lucide-react";
 import { TourDateFormFields } from "./TourDateFormFields";
-import { TourDateListItem } from "./TourDateListItem";
 import { useLocationManagement, LocationDetails } from "@/hooks/useLocationManagement";
 import { useTourDateRealtime } from "@/hooks/useTourDateRealtime";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,6 +43,19 @@ import {
   isSingleDayDateType,
   TOUR_DATE_TYPE_OPTIONS,
 } from "@/constants/dateTypes";
+import { useTourDefaultSets } from "@/hooks/useTourDefaultSets";
+import {
+  DEPARTMENT_PACKAGE_LABELS,
+  PACKAGE_DEPARTMENTS,
+  TOUR_PACKAGE_LABELS,
+  TOUR_PACKAGE_SIZES,
+  getDepartmentDefaultSetId,
+  getDepartmentPackageSize,
+  getPackageBadgeLabel,
+  resolveDefaultSetForTourDate,
+  type PackageDepartment,
+  type TourPackageSize,
+} from "@/utils/tourPackages";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -68,6 +81,12 @@ interface TourDateObject {
   start_date?: string;
   end_date?: string;
   is_tour_pack_only?: boolean;
+  sound_package_size?: TourPackageSize | null;
+  lights_package_size?: TourPackageSize | null;
+  video_package_size?: TourPackageSize | null;
+  sound_default_set_id?: string | null;
+  lights_default_set_id?: string | null;
+  video_default_set_id?: string | null;
 }
 
 interface TourDateManagementDialogProps {
@@ -86,6 +105,24 @@ const buildTourDateJobTitle = (tourName: string, location: string, tourDateType:
   return `${tourName} - ${getDateTypeMeta(tourDateType)?.labelEs || tourDateType} (${safeLocation})`;
 };
 
+type PackageSelectionState = Record<PackageDepartment, TourPackageSize | null>;
+type DefaultSetSelectionState = Record<PackageDepartment, string | null>;
+
+const emptyPackageSelection = (): PackageSelectionState => ({
+  sound: null,
+  lights: null,
+  video: null,
+});
+
+const emptyDefaultSetSelection = (): DefaultSetSelectionState => ({
+  sound: null,
+  lights: null,
+  video: null,
+});
+
+const packageSelectValue = (value: TourPackageSize | null) => value ?? "unassigned";
+const defaultSetSelectValue = (value: string | null) => value ?? "auto";
+
 export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> = ({
   open,
   onOpenChange,
@@ -96,6 +133,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { getOrCreateLocation, getOrCreateLocationWithDetails } = useLocationManagement();
+  const { defaultSets } = useTourDefaultSets(tourId || "");
 
   // Add real-time subscriptions
   const tourDateIds = React.useMemo(() => tourDates.map(d => d.id), [tourDates]);
@@ -115,6 +153,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const [editStartDate, setEditStartDate] = useState<string>("");
   const [editEndDate, setEditEndDate] = useState<string>("");
   const [editTourPackOnly, setEditTourPackOnly] = useState<boolean>(false);
+  const [editPackageSizes, setEditPackageSizes] = useState<PackageSelectionState>(emptyPackageSelection);
+  const [editDefaultSetIds, setEditDefaultSetIds] = useState<DefaultSetSelectionState>(emptyDefaultSetSelection);
   const [isDeletingDate, setIsDeletingDate] = useState<string | null>(null);
 
   // New date form state
@@ -124,6 +164,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
   const [newStartDate, setNewStartDate] = useState<string>("");
   const [newEndDate, setNewEndDate] = useState<string>("");
   const [newTourPackOnly, setNewTourPackOnly] = useState<boolean>(false);
+  const [newPackageSizes, setNewPackageSizes] = useState<PackageSelectionState>(emptyPackageSelection);
+  const [newDefaultSetIds, setNewDefaultSetIds] = useState<DefaultSetSelectionState>(emptyDefaultSetSelection);
   const [editLocationDetails, setEditLocationDetails] = useState<LocationDetails | null>(null);
 
   const { data: foldersExistenceMap } = useQuery({
@@ -145,12 +187,165 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     enabled: tourDates.length > 0,
   });
 
+  const getUniqueDefaultSetId = (
+    department: PackageDepartment,
+    packageSize: TourPackageSize | null
+  ) => {
+    if (!packageSize) return null;
+    const matches = defaultSets.filter(
+      (set) => set.department === department && set.package_size === packageSize
+    );
+    return matches.length === 1 ? matches[0].id : null;
+  };
+
+  const buildPackageUpdatePayload = (
+    packageSizes: PackageSelectionState,
+    defaultSetIds: DefaultSetSelectionState
+  ) => ({
+    sound_package_size: packageSizes.sound,
+    lights_package_size: packageSizes.lights,
+    video_package_size: packageSizes.video,
+    sound_default_set_id:
+      defaultSetIds.sound || getUniqueDefaultSetId("sound", packageSizes.sound),
+    lights_default_set_id:
+      defaultSetIds.lights || getUniqueDefaultSetId("lights", packageSizes.lights),
+    video_default_set_id:
+      defaultSetIds.video || getUniqueDefaultSetId("video", packageSizes.video),
+  });
+
+  const applyTourPackShortcut = (
+    checked: boolean,
+    setTourPackOnly: (value: boolean) => void,
+    setPackageSizes: React.Dispatch<React.SetStateAction<PackageSelectionState>>,
+    setDefaultSetIds: React.Dispatch<React.SetStateAction<DefaultSetSelectionState>>
+  ) => {
+    setTourPackOnly(checked);
+    setPackageSizes(checked ? { sound: "s", lights: "s", video: "s" } : emptyPackageSelection());
+    setDefaultSetIds(emptyDefaultSetSelection());
+  };
+
+  const updatePackageSize = (
+    department: PackageDepartment,
+    value: string,
+    setPackageSizes: React.Dispatch<React.SetStateAction<PackageSelectionState>>,
+    setDefaultSetIds: React.Dispatch<React.SetStateAction<DefaultSetSelectionState>>
+  ) => {
+    const packageSize = value === "unassigned" ? null : (value as TourPackageSize);
+    setPackageSizes((prev) => ({ ...prev, [department]: packageSize }));
+    setDefaultSetIds((prev) => ({
+      ...prev,
+      [department]: prev[department] && packageSize ? prev[department] : null,
+    }));
+  };
+
+  const renderPackageControls = ({
+    packageSizes,
+    setPackageSizes,
+    defaultSetIds,
+    setDefaultSetIds,
+  }: {
+    packageSizes: PackageSelectionState;
+    setPackageSizes: React.Dispatch<React.SetStateAction<PackageSelectionState>>;
+    defaultSetIds: DefaultSetSelectionState;
+    setDefaultSetIds: React.Dispatch<React.SetStateAction<DefaultSetSelectionState>>;
+  }) => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {PACKAGE_DEPARTMENTS.map((department) => {
+        const packageSize = packageSizes[department];
+        const selectableSets = defaultSets.filter(
+          (set) =>
+            set.department === department &&
+            (!packageSize || !set.package_size || set.package_size === packageSize)
+        );
+
+        return (
+          <div key={department} className="space-y-2 rounded-md border p-3">
+            <Label htmlFor={`${department}-package-size`} className="text-xs md:text-sm">
+              {DEPARTMENT_PACKAGE_LABELS[department]}
+            </Label>
+            <Select
+              value={packageSelectValue(packageSize)}
+              onValueChange={(value) =>
+                updatePackageSize(department, value, setPackageSizes, setDefaultSetIds)
+              }
+            >
+              <SelectTrigger id={`${department}-package-size`}>
+                <SelectValue placeholder="Package size" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {TOUR_PACKAGE_SIZES.map((size) => (
+                  <SelectItem key={size} value={size}>
+                    {TOUR_PACKAGE_LABELS[size]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={defaultSetSelectValue(defaultSetIds[department])}
+              onValueChange={(value) =>
+                setDefaultSetIds((prev) => ({
+                  ...prev,
+                  [department]: value === "auto" ? null : value,
+                }))
+              }
+            >
+              <SelectTrigger aria-label={`${DEPARTMENT_PACKAGE_LABELS[department]} default set`}>
+                <SelectValue placeholder="Default set" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">Auto / no pin</SelectItem>
+                {selectableSets.map((set) => (
+                  <SelectItem key={set.id} value={set.id}>
+                    {set.name}
+                    {set.package_size ? ` (${TOUR_PACKAGE_LABELS[set.package_size]})` : " (Unassigned)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  const renderPackageBadges = (dateObj: TourDateObject) => {
+    const badges = PACKAGE_DEPARTMENTS.map((department) => {
+      const packageSize = getDepartmentPackageSize(dateObj, department);
+      if (!packageSize) return null;
+
+      const resolution = resolveDefaultSetForTourDate({
+        tourDate: dateObj,
+        department,
+        defaultSets,
+      });
+      const needsAttention = resolution.status !== "resolved";
+
+      return (
+        <div
+          key={department}
+          className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs"
+        >
+          <Package className="h-3 w-3" />
+          <span>{getPackageBadgeLabel({ department, packageSize })}</span>
+          {needsAttention && <AlertTriangle className="h-3 w-3 text-amber-600" />}
+        </div>
+      );
+    }).filter(Boolean);
+
+    return badges.length > 0 ? (
+      <div className="flex flex-wrap items-center gap-1">{badges}</div>
+    ) : null;
+  };
+
   const handleAddDate = async (
     location: string,
     tourDateType: DateType = "show",
     startDate: string,
     endDate: string,
-    isTourPackOnly: boolean = false
+    isTourPackOnly: boolean = false,
+    packageSizes: PackageSelectionState = emptyPackageSelection(),
+    defaultSetIds: DefaultSetSelectionState = emptyDefaultSetSelection()
   ) => {
     try {
       if (!tourId) {
@@ -179,6 +374,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           rehearsal_days: rehearsalDays,
           location_id: locationId,
           is_tour_pack_only: isTourPackOnly,
+          ...buildPackageUpdatePayload(packageSizes, defaultSetIds),
         })
         .select(`
           id,
@@ -188,6 +384,12 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           tour_date_type,
           rehearsal_days,
           is_tour_pack_only,
+          sound_package_size,
+          lights_package_size,
+          video_package_size,
+          sound_default_set_id,
+          lights_default_set_id,
+          video_default_set_id,
           location:locations (
             id,
             name
@@ -302,7 +504,9 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     tourDateType: DateType,
     startDate: string,
     endDate: string,
-    isTourPackOnly: boolean
+    isTourPackOnly: boolean,
+    packageSizes: PackageSelectionState,
+    defaultSetIds: DefaultSetSelectionState
   ) => {
     try {
       if (!tourId) {
@@ -338,12 +542,19 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
           rehearsal_days: rehearsalDays,
           location_id: locationId,
           is_tour_pack_only: isTourPackOnly,
+          ...buildPackageUpdatePayload(packageSizes, defaultSetIds),
         })
         .eq("id", dateId)
         .select(`
           id,
           date,
           is_tour_pack_only,
+          sound_package_size,
+          lights_package_size,
+          video_package_size,
+          sound_default_set_id,
+          lights_default_set_id,
+          video_default_set_id,
           location:locations (
             id,
             name
@@ -711,6 +922,16 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     setEditLocationValue(dateObj.location?.name || "");
     setEditTourDateType(dateObj.tour_date_type || 'show');
     setEditTourPackOnly(dateObj.is_tour_pack_only || false);
+    setEditPackageSizes({
+      sound: getDepartmentPackageSize(dateObj, "sound"),
+      lights: getDepartmentPackageSize(dateObj, "lights"),
+      video: getDepartmentPackageSize(dateObj, "video"),
+    });
+    setEditDefaultSetIds({
+      sound: getDepartmentDefaultSetId(dateObj, "sound"),
+      lights: getDepartmentDefaultSetId(dateObj, "lights"),
+      video: getDepartmentDefaultSetId(dateObj, "video"),
+    });
 
     if (dateObj.location) {
       setEditLocationDetails({
@@ -734,6 +955,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     setEditStartDate("");
     setEditEndDate("");
     setEditTourPackOnly(false);
+    setEditPackageSizes(emptyPackageSelection());
+    setEditDefaultSetIds(emptyDefaultSetSelection());
     setEditLocationDetails(null);
   };
 
@@ -744,7 +967,9 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       editTourDateType,
       editStartDate,
       editEndDate,
-      editTourPackOnly
+      editTourPackOnly,
+      editPackageSizes,
+      editDefaultSetIds
     );
     cancelEditing();
   };
@@ -855,12 +1080,25 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                             <Checkbox
                               id="tour-pack-only-edit"
                               checked={editTourPackOnly}
-                              onCheckedChange={(checked) => setEditTourPackOnly(checked as boolean)}
+                              onCheckedChange={(checked) =>
+                                applyTourPackShortcut(
+                                  checked as boolean,
+                                  setEditTourPackOnly,
+                                  setEditPackageSizes,
+                                  setEditDefaultSetIds
+                                )
+                              }
                             />
                             <Label htmlFor="tour-pack-only-edit" className="text-xs md:text-sm">
-                              Tour Pack Only (skip PA pullsheet)
+                              Tour Pack / S package
                             </Label>
                           </div>
+                          {renderPackageControls({
+                            packageSizes: editPackageSizes,
+                            setPackageSizes: setEditPackageSizes,
+                            defaultSetIds: editDefaultSetIds,
+                            setDefaultSetIds: setEditDefaultSetIds,
+                          })}
                           <div className="flex flex-col-reverse sm:flex-row gap-2">
                             <Button variant="outline" onClick={cancelEditing} className="w-full sm:w-auto">
                               Cancel
@@ -876,13 +1114,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                             <div className="flex flex-wrap items-center gap-2 text-xs md:text-sm">
                               <Calendar className="h-4 w-4 flex-shrink-0" />
                               <span>{format(new Date(dateObj.date), "MMM d, yyyy")}</span>
-                              {dateObj.is_tour_pack_only && (
-                                <div className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">
-                                  <Package className="h-3 w-3" />
-                                  <span className="hidden sm:inline">Tour Pack Only</span>
-                                  <span className="sm:hidden">TP Only</span>
-                                </div>
-                              )}
+                              {renderPackageBadges(dateObj)}
                             </div>
                             {dateObj.location?.name && (
                               <div className="flex items-center gap-2 text-xs md:text-sm text-muted-foreground">
@@ -951,12 +1183,25 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                     <Checkbox
                       id="tour-pack-only"
                       checked={newTourPackOnly}
-                      onCheckedChange={(checked) => setNewTourPackOnly(checked as boolean)}
+                      onCheckedChange={(checked) =>
+                        applyTourPackShortcut(
+                          checked as boolean,
+                          setNewTourPackOnly,
+                          setNewPackageSizes,
+                          setNewDefaultSetIds
+                        )
+                      }
                     />
                     <Label htmlFor="tour-pack-only" className="text-xs md:text-sm">
-                      Tour Pack Only (skip PA pullsheet)
+                      Tour Pack / S package
                     </Label>
                   </div>
+                  {renderPackageControls({
+                    packageSizes: newPackageSizes,
+                    setPackageSizes: setNewPackageSizes,
+                    defaultSetIds: newDefaultSetIds,
+                    setDefaultSetIds: setNewDefaultSetIds,
+                  })}
                   <Button
                     onClick={() => {
                       if (!newStartDate || !newLocation) {
@@ -972,7 +1217,9 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                         newTourDateType,
                         newStartDate,
                         newEndDate || newStartDate,
-                        newTourPackOnly
+                        newTourPackOnly,
+                        newPackageSizes,
+                        newDefaultSetIds
                       );
                       // Reset form
                       setNewLocation("");
@@ -981,6 +1228,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
                       setNewStartDate("");
                       setNewEndDate("");
                       setNewTourPackOnly(false);
+                      setNewPackageSizes(emptyPackageSelection());
+                      setNewDefaultSetIds(emptyDefaultSetSelection());
                     }}
                     className="w-full touch-manipulation"
                   >
