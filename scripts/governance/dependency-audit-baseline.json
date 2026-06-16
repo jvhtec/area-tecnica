@@ -15,13 +15,19 @@
     "1114680",
     "1116451",
     "1119441",
-    "1120679"
+    "1120679",
+    "1120782"
   ],
   "exceptions": [
     {
       "advisoryId": "1120679",
       "package": "esbuild",
       "rationale": "The vulnerable Deno module path is not used; this repository consumes esbuild through Node and Vite 6. The patched esbuild 0.28 line breaks Vite 6 target transforms, so remove this exception during the planned Vite major migration."
+    },
+    {
+      "advisoryId": "1120782",
+      "package": "tar",
+      "rationale": "This is pulled through @capacitor/assets 3.0.5 -> @capacitor/cli 5.x. @capacitor/assets is already at its latest release and npm audit reports no fixAvailable path for that nested CLI; remove this exception when @capacitor/assets publishes a compatible release that no longer depends on the vulnerable tar range."
     }
   ],
   "vulnerabilityCounts": {
