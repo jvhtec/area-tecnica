@@ -8,6 +8,12 @@ import {
   resolveSuggestedCallTime,
 } from "@/components/jobs/cards/job-card-actions/jobActionFormatters";
 import {
+  pickLatestJobHojaDeRutaDocument,
+  pickLatestLinkedJobHojaDeRutaDocument,
+  pickLatestTourHojaDeRutaDocument,
+  type HojaDeRutaAttachmentRow,
+} from "@/components/jobs/cards/job-card-actions/hojaDeRutaAttachment";
+import {
   MADRID_TIME_ZONE,
   type JobCardJob,
   type JobAssignmentRow,
@@ -22,6 +28,7 @@ import { createQueryKey } from "@/lib/optimized-react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Department } from "@/types/department";
 import { isManagementRole } from "@/utils/permissions";
+import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 
 export type ProductionWhatsappState = ReturnType<typeof useProductionWhatsapp>;
 
@@ -116,18 +123,66 @@ export const useProductionWhatsapp = ({
   });
 
   const { data: waProdHojaDeRutaDoc = null, isLoading: waProdHojaDeRutaLoading } = useQuery({
-    queryKey: createQueryKey.whatsapp.prodHojaDeRutaDocByJob(job.id),
+    queryKey: [
+      ...createQueryKey.whatsapp.prodHojaDeRutaDocByJob(job.id),
+      job.tour_date_id ?? null,
+      job.tour_id ?? job.tour?.id ?? null,
+    ],
     queryFn: async (): Promise<WaProdHojaDeRutaDoc | null> => {
-      const { data, error } = await dataLayerClient.from("job_documents")
-        .select("id, file_name")
-        .eq("job_id", job.id)
-        .like("file_path", `hojas-de-ruta/${job.id}/%`)
-        .order("uploaded_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      const findJobHojaDocument = async (jobId: string): Promise<WaProdHojaDeRutaDoc | null> => {
+        const { data, error } = await dataLayerClient.from("job_documents")
+          .select("id, job_id, file_name, file_path, file_type, uploaded_at")
+          .eq("job_id", jobId)
+          .order("uploaded_at", { ascending: false })
+          .limit(25);
 
-      if (error) throw error;
-      return (data as WaProdHojaDeRutaDoc | null) || null;
+        if (error) throw error;
+        return pickLatestJobHojaDeRutaDocument(data as HojaDeRutaAttachmentRow[] | null, jobId);
+      };
+
+      const directJobDoc = await findJobHojaDocument(job.id);
+      if (directJobDoc) return directJobDoc;
+
+      if (job.tour_date_id) {
+        const { data: hojaRows, error: hojaError } = await dataLayerClient.from("hoja_de_ruta")
+          .select("job_id")
+          .eq("tour_date_id", job.tour_date_id)
+          .order("created_at", { ascending: false });
+
+        if (hojaError) throw hojaError;
+
+        const linkedJobIds = Array.from(new Set(
+          ((hojaRows as Array<{ job_id: string | null }> | null) || [])
+            .map((row) => row.job_id)
+            .filter((id): id is string => Boolean(id && id !== job.id))
+        ));
+
+        if (linkedJobIds.length > 0) {
+          const { data: linkedDocs, error: linkedDocsError } = await dataLayerClient.from("job_documents")
+            .select("id, job_id, file_name, file_path, file_type, uploaded_at")
+            .in("job_id", linkedJobIds)
+            .order("uploaded_at", { ascending: false });
+
+          if (linkedDocsError) throw linkedDocsError;
+          const linkedJobDoc = pickLatestLinkedJobHojaDeRutaDocument(
+            linkedDocs as HojaDeRutaAttachmentRow[] | null,
+            linkedJobIds
+          );
+          if (linkedJobDoc) return linkedJobDoc;
+        }
+      }
+
+      const tourId = job.tour_id || job.tour?.id || null;
+      if (!tourId) return null;
+
+      const { data: tourDocs, error: tourDocsError } = await dataLayerClient.from("tour_documents")
+        .select("id, file_name, file_path, file_type, uploaded_at")
+        .eq("tour_id", tourId)
+        .order("uploaded_at", { ascending: false })
+        .limit(25);
+
+      if (tourDocsError) throw tourDocsError;
+      return pickLatestTourHojaDeRutaDocument(tourDocs as HojaDeRutaAttachmentRow[] | null);
     },
     enabled: Boolean(waProdOpen && canSendProductionWhatsapp && job?.id),
     staleTime: 30_000,
@@ -216,7 +271,7 @@ export const useProductionWhatsapp = ({
       });
 
       if (error) {
-        toast({ title: "Error al enviar", description: error.message, variant: "destructive" });
+        toast({ title: "Error al enviar", description: await extractFunctionErrorMessage(error), variant: "destructive" });
         return;
       }
 
@@ -236,7 +291,8 @@ export const useProductionWhatsapp = ({
       });
       setWaProdOpen(false);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      const fallback = error instanceof Error ? error.message : String(error);
+      const message = await extractFunctionErrorMessage(error, fallback);
       toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setWaProdSending(false);

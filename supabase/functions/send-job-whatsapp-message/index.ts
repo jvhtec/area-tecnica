@@ -69,9 +69,240 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
+type SupabaseAdminClient = ReturnType<typeof createClient>;
+
+type HojaDocumentRow = {
+  id?: string;
+  job_id?: string | null;
+  file_name?: string | null;
+  file_path?: string | null;
+  file_type?: string | null;
+  uploaded_at?: string | null;
+};
+
+type HojaAttachment = {
+  source: "job_documents" | "tour_documents";
+  bucket: "job-documents" | "job_documents" | "tour-documents";
+  path: string;
+  filename: string;
+};
+
+const DEPT_PREFIXES = new Set(["sound", "lights", "video", "production", "logistics", "administrative"]);
+
+const normalizeObjectPath = (value: string | null | undefined) => (value || "").replace(/^\/+/, "");
+
+const normalizeText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const hasHojaDeRutaText = (doc: HojaDocumentRow) => {
+  const text = normalizeText(`${doc.file_name || ""} ${doc.file_path || ""}`);
+  return text.includes("hoja") && (text.includes("ruta") || text.includes("route"));
+};
+
+const isPdfDocument = (doc: HojaDocumentRow) => {
+  const mimeType = (doc.file_type || "").split(";")[0].trim().toLowerCase();
+  if (mimeType === "application/pdf") return true;
+
+  return [doc.file_name, doc.file_path].some((value) =>
+    /\.pdf$/i.test(normalizeObjectPath(value))
+  );
+};
+
+const uploadedAtMs = (doc: HojaDocumentRow) => {
+  const value = doc.uploaded_at ? Date.parse(doc.uploaded_at) : NaN;
+  return Number.isFinite(value) ? value : 0;
+};
+
+const byNewestUpload = (a: HojaDocumentRow, b: HojaDocumentRow) =>
+  uploadedAtMs(b) - uploadedAtMs(a);
+
+function resolveJobDocumentBucket(filePath: string): "job-documents" | "job_documents" {
+  const first = normalizeObjectPath(filePath).split("/")[0] || "";
+  return DEPT_PREFIXES.has(first) ? "job_documents" : "job-documents";
+}
+
+function isJobHojaDeRutaDocument(doc: HojaDocumentRow, jobId: string): boolean {
+  const path = normalizeObjectPath(doc.file_path);
+  if (!path) return false;
+  if (!isPdfDocument(doc)) return false;
+  if (path.startsWith(`hojas-de-ruta/${jobId}/`)) return true;
+  if (path.startsWith("hojas-de-ruta/") && hasHojaDeRutaText(doc)) return true;
+  if (path.startsWith(`${jobId}/`) && hasHojaDeRutaText(doc)) return true;
+  return hasHojaDeRutaText(doc);
+}
+
+function isTourHojaDeRutaDocument(doc: HojaDocumentRow): boolean {
+  const path = normalizeObjectPath(doc.file_path);
+  if (!path) return false;
+  if (!isPdfDocument(doc)) return false;
+  if (path.startsWith("hojas-de-ruta/")) return true;
+  return hasHojaDeRutaText(doc);
+}
+
+function toHojaAttachment(
+  source: HojaAttachment["source"],
+  doc: HojaDocumentRow,
+  bucket: HojaAttachment["bucket"],
+): HojaAttachment | null {
+  const path = normalizeObjectPath(doc.file_path);
+  if (!path) return null;
+  return {
+    source,
+    bucket,
+    path,
+    filename: (doc.file_name || "Hoja de Ruta.pdf").toString(),
+  };
+}
+
+async function findLatestJobHojaAttachment(
+  supabaseAdmin: SupabaseAdminClient,
+  jobId: string,
+): Promise<HojaAttachment | null> {
+  const { data, error } = await supabaseAdmin
+    .from("job_documents")
+    .select("id, file_name, file_path, file_type, uploaded_at")
+    .eq("job_id", jobId)
+    .order("uploaded_at", { ascending: false })
+    .limit(25);
+
+  if (error) throw error;
+
+  const doc = ((data || []) as HojaDocumentRow[])
+    .filter((row) => isJobHojaDeRutaDocument(row, jobId))
+    .sort(byNewestUpload)[0];
+  if (!doc?.file_path) return null;
+  return toHojaAttachment("job_documents", doc, resolveJobDocumentBucket(doc.file_path));
+}
+
+async function findLatestLinkedJobHojaAttachment(
+  supabaseAdmin: SupabaseAdminClient,
+  linkedJobIds: string[],
+): Promise<HojaAttachment | null> {
+  if (linkedJobIds.length === 0) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from("job_documents")
+    .select("id, job_id, file_name, file_path, file_type, uploaded_at")
+    .in("job_id", linkedJobIds)
+    .order("uploaded_at", { ascending: false });
+
+  if (error) throw error;
+
+  const linkedJobIdSet = new Set(linkedJobIds);
+  const doc = ((data || []) as HojaDocumentRow[])
+    .filter((row) => {
+      const rowJobId = row.job_id || null;
+      return Boolean(rowJobId && linkedJobIdSet.has(rowJobId) && isJobHojaDeRutaDocument(row, rowJobId));
+    })
+    .sort(byNewestUpload)[0];
+
+  if (!doc?.file_path) return null;
+  return toHojaAttachment("job_documents", doc, resolveJobDocumentBucket(doc.file_path));
+}
+
+async function findLinkedHojaJobIdsForTourDate(
+  supabaseAdmin: SupabaseAdminClient,
+  tourDateId: string,
+  currentJobId: string,
+): Promise<string[]> {
+  const { data, error } = await supabaseAdmin
+    .from("hoja_de_ruta")
+    .select("job_id")
+    .eq("tour_date_id", tourDateId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return Array.from(new Set(
+    ((data || []) as Array<{ job_id?: string | null }>)
+      .map((row) => row.job_id)
+      .filter((id): id is string => Boolean(id && id !== currentJobId))
+  ));
+}
+
+async function resolveTourIdFromTourDate(
+  supabaseAdmin: SupabaseAdminClient,
+  tourDateId: string | null,
+): Promise<string | null> {
+  if (!tourDateId) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from("tour_dates")
+    .select("tour_id")
+    .eq("id", tourDateId)
+    .maybeSingle();
+
+  if (error) throw error;
+  const tourId = (data as { tour_id?: string | null } | null)?.tour_id;
+  return typeof tourId === "string" && tourId ? tourId : null;
+}
+
+async function findLatestTourHojaAttachment(
+  supabaseAdmin: SupabaseAdminClient,
+  tourId: string,
+): Promise<HojaAttachment | null> {
+  const { data, error } = await supabaseAdmin
+    .from("tour_documents")
+    .select("id, file_name, file_path, file_type, uploaded_at")
+    .eq("tour_id", tourId)
+    .order("uploaded_at", { ascending: false })
+    .limit(25);
+
+  if (error) throw error;
+
+  const doc = ((data || []) as HojaDocumentRow[])
+    .filter(isTourHojaDeRutaDocument)
+    .sort(byNewestUpload)[0];
+  return doc ? toHojaAttachment("tour_documents", doc, "tour-documents") : null;
+}
+
+async function resolveHojaAttachment(
+  supabaseAdmin: SupabaseAdminClient,
+  jobId: string,
+): Promise<HojaAttachment | null> {
+  const directJobDoc = await findLatestJobHojaAttachment(supabaseAdmin, jobId);
+  if (directJobDoc) return directJobDoc;
+
+  const { data: jobRow, error: jobErr } = await supabaseAdmin
+    .from("jobs")
+    .select("id, tour_id, tour_date_id")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+
+  const jobContext = (jobRow || {}) as { tour_id?: string | null; tour_date_id?: string | null };
+  const tourDateId = typeof jobContext.tour_date_id === "string" ? jobContext.tour_date_id : null;
+
+  if (tourDateId) {
+    const linkedJobIds = await findLinkedHojaJobIdsForTourDate(supabaseAdmin, tourDateId, jobId);
+    const linkedJobDoc = await findLatestLinkedJobHojaAttachment(supabaseAdmin, linkedJobIds);
+    if (linkedJobDoc) return linkedJobDoc;
+  }
+
+  const tourId = typeof jobContext.tour_id === "string" && jobContext.tour_id
+    ? jobContext.tour_id
+    : await resolveTourIdFromTourDate(supabaseAdmin, tourDateId);
+
+  return tourId ? findLatestTourHojaAttachment(supabaseAdmin, tourId) : null;
+}
+
+function logRejection(
+  reason: string,
+  details: Record<string, unknown> = {},
+) {
+  console.warn("send-job-whatsapp-message rejected", { reason, ...details });
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") return jsonResponse({ error: "Method Not Allowed" }, { status: 405 });
+  if (req.method !== "POST") {
+    logRejection("method_not_allowed", { method: req.method });
+    return jsonResponse({ error: "Method Not Allowed" }, { status: 405 });
+  }
 
   try {
     const supabaseAdmin = createClient(
@@ -80,9 +311,11 @@ serve(async (req: Request) => {
     );
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      logRejection("missing_authorization_header");
       return jsonResponse({ error: "Unauthorized", reason: "Missing Authorization header" }, { status: 401 });
     }
     if (!authHeader.startsWith("Bearer ")) {
+      logRejection("invalid_auth_scheme");
       return jsonResponse({ error: "Unauthorized", reason: "Invalid auth scheme" }, { status: 401 });
     }
 
@@ -90,6 +323,7 @@ serve(async (req: Request) => {
     const { data: userData } = await supabaseAdmin.auth.getUser(token);
     const actorId = userData?.user?.id || null;
     if (!actorId) {
+      logRejection("invalid_actor");
       return jsonResponse({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -101,12 +335,15 @@ serve(async (req: Request) => {
 
     const role = (actorProfile?.role || "").toLowerCase();
     const dept = normalizeDept(actorProfile?.department || null);
+    const wahaEndpoint = (actorProfile?.waha_endpoint || "").trim();
 
     if (!(role === "admin" || dept === "production")) {
+      logRejection("forbidden_actor", { actorId, role, department: actorProfile?.department || null });
       return jsonResponse({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (!actorProfile?.waha_endpoint) {
+    if (!wahaEndpoint) {
+      logRejection("missing_waha_endpoint", { actorId, role, department: actorProfile?.department || null });
       return jsonResponse({ error: "Forbidden", reason: "User not authorized for WhatsApp operations" }, { status: 403 });
     }
 
@@ -117,18 +354,22 @@ serve(async (req: Request) => {
     const jobId = (body.job_id || "").toString().trim();
 
     if (!message) {
+      logRejection("empty_message", { actorId, jobId: jobId || null });
       return jsonResponse({ error: "Bad Request", reason: "Empty message" }, { status: 400 });
     }
 
     if (!jobId) {
+      logRejection("missing_job_id", { actorId });
       return jsonResponse({ error: "Bad Request", reason: "Missing job_id" }, { status: 400 });
     }
 
     if (dedupedRecipientIds.length === 0) {
+      logRejection("no_recipients", { actorId, jobId });
       return jsonResponse({ error: "Bad Request", reason: "No recipients" }, { status: 400 });
     }
 
     if (dedupedRecipientIds.length > 80) {
+      logRejection("too_many_recipients", { actorId, jobId, recipientCount: dedupedRecipientIds.length });
       return jsonResponse({ error: "Bad Request", reason: "Too many recipients" }, { status: 400 });
     }
 
@@ -137,26 +378,17 @@ serve(async (req: Request) => {
     const attachHojaDeRuta = Boolean(body.attach_hoja_de_ruta);
     let attachment: { url: string; filename: string } | null = null;
     if (attachHojaDeRuta) {
-      const { data: docRows, error: docErr } = await supabaseAdmin
-        .from("job_documents")
-        .select("file_name, file_path")
-        .eq("job_id", jobId)
-        .like("file_path", `hojas-de-ruta/${jobId}/%`)
-        .order("uploaded_at", { ascending: false })
-        .limit(1);
-
-      if (docErr) throw docErr;
-
-      const doc = docRows?.[0];
-      if (!doc?.file_path) {
+      const doc = await resolveHojaAttachment(supabaseAdmin, jobId);
+      if (!doc) {
+        logRejection("hoja_de_ruta_not_found", { actorId, jobId });
         return jsonResponse({ error: "Bad Request", reason: "hoja_de_ruta_not_found" }, { status: 400 });
       }
 
       // 7 days: the link must stay alive in the chat, not just survive the send.
       // (Used both by sendFile and by the WAHA Core text-link fallback.)
       const { data: signed, error: signErr } = await supabaseAdmin.storage
-        .from("job-documents")
-        .createSignedUrl(doc.file_path, 60 * 60 * 24 * 7);
+        .from(doc.bucket)
+        .createSignedUrl(doc.path, 60 * 60 * 24 * 7);
 
       if (signErr || !signed?.signedUrl) {
         console.error("Failed to sign Hoja de Ruta URL:", signErr);
@@ -165,7 +397,7 @@ serve(async (req: Request) => {
 
       attachment = {
         url: signed.signedUrl,
-        filename: (doc.file_name || "Hoja de Ruta.pdf").toString(),
+        filename: doc.filename,
       };
     }
 
@@ -181,6 +413,7 @@ serve(async (req: Request) => {
     const allowedIds = new Set((assignmentRows || []).map((r) => r.technician_id as string));
     const disallowed = dedupedRecipientIds.filter((id) => !allowedIds.has(id));
     if (disallowed.length > 0) {
+      logRejection("disallowed_recipients", { actorId, jobId, disallowedCount: disallowed.length });
       return jsonResponse(
         {
           error: "Forbidden",
@@ -204,6 +437,13 @@ serve(async (req: Request) => {
       dailyLimit: dailyRecipientLimit,
     });
     if (!quota.allowed) {
+      logRejection("daily_quota_exceeded", {
+        actorId,
+        jobId,
+        recipientCount: dedupedRecipientIds.length,
+        usedToday: quota.usedToday,
+        dailyLimit: quota.dailyLimit,
+      });
       return jsonResponse(
         {
           error: "Too Many Requests",
@@ -238,7 +478,7 @@ serve(async (req: Request) => {
 
     type WahaConfigRow = { session?: string; api_key?: string };
 
-    const base = normalizeBase(actorProfile.waha_endpoint);
+    const base = normalizeBase(wahaEndpoint);
     const { data: cfg, error: cfgErr } = await supabaseAdmin.rpc("get_waha_config", { base_url: base });
     if (cfgErr) console.warn("get_waha_config RPC failed, falling back to env vars:", cfgErr.message);
     const row = (cfg as WahaConfigRow[] | null)?.[0];
