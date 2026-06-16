@@ -115,17 +115,98 @@ serve(async (req) => {
       const defaultCC = Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34';
       const headersWA: Record<string,string> = { 'Content-Type':'application/json' };
       if (apiKey) headersWA['X-API-Key'] = apiKey;
-      function normalizePhone(raw: string, cc: string): string | null {
-        let d = (raw||'').trim().replace(/[\s\-()]/g,'');
-        if (!d) return null; if (d.startsWith('00')) d = '+'+d.slice(2); if (!d.startsWith('+')) d = (cc.startsWith('+')?cc:'+'+cc)+d; if (!/^\+\d{7,15}$/.test(d)) return null; return d; }
-      const jid = (normalizePhone(tech.phone, defaultCC) || '').replace(/^\+/, '').replace(/\D/g,'') + '@c.us';
-      const sendUrl = `${base}/api/sendText`;
-      const resp = await fetch(sendUrl, { method:'POST', headers: headersWA, body: JSON.stringify({ chatId: jid, text, session, linkPreview: false }) });
-      if (resp.ok) {
-        return new Response(JSON.stringify({ success: true, channel: 'whatsapp' }), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+
+      /** Normalize phone to E.164 + Spain shortcut (like send-job-whatsapp-message). */
+      function normalizePhone(raw: string, cc: string): { ok: true; value: string } | { ok: false; reason: string } {
+        if (!raw) return { ok: false, reason: 'empty' };
+        const trimmed = raw.trim();
+        if (!trimmed) return { ok: false, reason: 'empty' };
+        let digits = trimmed.replace(/[\s\-()]/g, '');
+        if (digits.startsWith('00')) digits = '+' + digits.slice(2);
+        if (!digits.startsWith('+')) {
+          const dc = cc.startsWith('+') ? cc : `+${cc}`;
+          // Spain shortcut: 9-digit mobile numbers starting with 6/7
+          if (/^[67]\d{8}$/.test(digits)) digits = '+34' + digits;
+          else digits = dc + digits;
+        }
+        if (!/^\+\d{7,15}$/.test(digits)) return { ok: false, reason: 'invalid_format' };
+        return { ok: true, value: digits };
       }
-      const errTxt = await resp.text().catch(()=>'');
-      return new Response(JSON.stringify({ error: 'WhatsApp delivery failed', details: { status: resp.status, body: errTxt } }), { status: resp.status, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
+
+      const norm = normalizePhone(tech.phone, defaultCC);
+      if (!norm.ok) {
+        return new Response(JSON.stringify({ error: 'Invalid phone number', details: { phone: tech.phone, reason: norm.reason } }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const chatId = norm.value.replace(/^\+/, '').replace(/\D/g, '') + '@c.us';
+
+      /** Fetch helper with hard timeout. */
+      const fetchWithTimeout = async (url: string, init: RequestInit, ms: number) => {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(new DOMException('timeout','AbortError')), ms);
+        try { return await fetch(url, { ...init, signal: controller.signal }); }
+        finally { clearTimeout(id); }
+      };
+
+      /** Interpret WAHA JSON response body to detect errors. */
+      const interpretWahaResponse = (payload: unknown): { ok: boolean; reason?: string } => {
+        if (!payload || typeof payload !== 'object') return { ok: true };
+        const obj = payload as Record<string, unknown>;
+        if (obj.success === false) return { ok: false, reason: typeof obj.message === 'string' ? obj.message : 'waha_success_false' };
+        if (typeof obj.error === 'string' && obj.error) return { ok: false, reason: obj.error };
+        if (Array.isArray(obj.errors) && obj.errors.length) return { ok: false, reason: obj.errors.map((e: unknown) => String(e)).join(', ') };
+        if (typeof obj.status === 'string') {
+          const lowered = obj.status.toLowerCase();
+          if (['error', 'fail', 'failed'].includes(lowered)) {
+            return { ok: false, reason: typeof obj.message === 'string' ? obj.message : obj.status };
+          }
+          if (['success', 'ok'].includes(lowered)) return { ok: true };
+        }
+        if (obj.success === true) return { ok: true };
+        if ('result' in obj && obj.result !== undefined) return { ok: true };
+        if ('data' in obj && obj.data !== undefined) return { ok: true };
+        if ('id' in obj || 'messageId' in obj) return { ok: true };
+        return { ok: true };
+      };
+
+      const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
+
+      // Try both WAHA URL formats (path-based session, then body-based session)
+      const attempts = [
+        { url: `${base}/api/${encodeURIComponent(session)}/sendText`, body: { chatId, text, linkPreview: false } },
+        { url: `${base}/api/sendText`, body: { chatId, text, session, linkPreview: false } },
+      ] as const;
+
+      let waSendOk = false;
+      let waLastErr = 'send_failed';
+      for (const attempt of attempts) {
+        try {
+          const res = await fetchWithTimeout(attempt.url, { method: 'POST', headers: headersWA, body: JSON.stringify(attempt.body) }, timeoutMs);
+          const contentType = res.headers.get('content-type') || '';
+          const payload = /application\/json/i.test(contentType) ? await res.json().catch(() => null) : null;
+
+          if (!res.ok) {
+            waLastErr = `http_${res.status}`;
+            continue;
+          }
+
+          const interpretation = interpretWahaResponse(payload);
+          if (!interpretation.ok) {
+            waLastErr = interpretation.reason || 'waha_reported_error';
+            continue;
+          }
+
+          waSendOk = true;
+          break;
+        } catch (e) {
+          waLastErr = e instanceof Error ? e.message : String(e);
+        }
+      }
+
+      if (!waSendOk) {
+        return new Response(JSON.stringify({ error: 'WhatsApp delivery failed', details: { reason: waLastErr } }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      return new Response(JSON.stringify({ success: true, channel: 'whatsapp' }), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
     }
 
     // Email channel
