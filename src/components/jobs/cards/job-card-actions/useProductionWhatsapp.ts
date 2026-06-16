@@ -27,6 +27,7 @@ import { createQueryKey } from "@/lib/optimized-react-query";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { Department } from "@/types/department";
 import { isManagementRole } from "@/utils/permissions";
+import { extractFunctionErrorMessage } from "@/utils/supabaseFunctionError";
 
 export type ProductionWhatsappState = ReturnType<typeof useProductionWhatsapp>;
 
@@ -261,7 +262,7 @@ export const useProductionWhatsapp = ({
       });
 
       if (error) {
-        toast({ title: "Error al enviar", description: error.message, variant: "destructive" });
+        toast({ title: "Error al enviar", description: await extractFunctionErrorMessage(error), variant: "destructive" });
         return;
       }
 
@@ -281,7 +282,8 @@ export const useProductionWhatsapp = ({
       });
       setWaProdOpen(false);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error);
+      const fallback = error instanceof Error ? error.message : String(error);
+      const message = await extractFunctionErrorMessage(error, fallback);
       toast({ title: "Error", description: message, variant: "destructive" });
     } finally {
       setWaProdSending(false);

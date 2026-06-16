@@ -250,9 +250,19 @@ async function resolveHojaAttachment(
   return tourId ? findLatestTourHojaAttachment(supabaseAdmin, tourId) : null;
 }
 
+function logRejection(
+  reason: string,
+  details: Record<string, unknown> = {},
+) {
+  console.warn("send-job-whatsapp-message rejected", { reason, ...details });
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") return jsonResponse({ error: "Method Not Allowed" }, { status: 405 });
+  if (req.method !== "POST") {
+    logRejection("method_not_allowed", { method: req.method });
+    return jsonResponse({ error: "Method Not Allowed" }, { status: 405 });
+  }
 
   try {
     const supabaseAdmin = createClient(
@@ -261,9 +271,11 @@ serve(async (req: Request) => {
     );
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
+      logRejection("missing_authorization_header");
       return jsonResponse({ error: "Unauthorized", reason: "Missing Authorization header" }, { status: 401 });
     }
     if (!authHeader.startsWith("Bearer ")) {
+      logRejection("invalid_auth_scheme");
       return jsonResponse({ error: "Unauthorized", reason: "Invalid auth scheme" }, { status: 401 });
     }
 
@@ -271,6 +283,7 @@ serve(async (req: Request) => {
     const { data: userData } = await supabaseAdmin.auth.getUser(token);
     const actorId = userData?.user?.id || null;
     if (!actorId) {
+      logRejection("invalid_actor");
       return jsonResponse({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -284,10 +297,12 @@ serve(async (req: Request) => {
     const dept = normalizeDept(actorProfile?.department || null);
 
     if (!(role === "admin" || dept === "production")) {
+      logRejection("forbidden_actor", { actorId, role, department: actorProfile?.department || null });
       return jsonResponse({ error: "Forbidden" }, { status: 403 });
     }
 
     if (!actorProfile?.waha_endpoint) {
+      logRejection("missing_waha_endpoint", { actorId, role, department: actorProfile?.department || null });
       return jsonResponse({ error: "Forbidden", reason: "User not authorized for WhatsApp operations" }, { status: 403 });
     }
 
@@ -298,18 +313,22 @@ serve(async (req: Request) => {
     const jobId = (body.job_id || "").toString().trim();
 
     if (!message) {
+      logRejection("empty_message", { actorId, jobId: jobId || null });
       return jsonResponse({ error: "Bad Request", reason: "Empty message" }, { status: 400 });
     }
 
     if (!jobId) {
+      logRejection("missing_job_id", { actorId });
       return jsonResponse({ error: "Bad Request", reason: "Missing job_id" }, { status: 400 });
     }
 
     if (dedupedRecipientIds.length === 0) {
+      logRejection("no_recipients", { actorId, jobId });
       return jsonResponse({ error: "Bad Request", reason: "No recipients" }, { status: 400 });
     }
 
     if (dedupedRecipientIds.length > 80) {
+      logRejection("too_many_recipients", { actorId, jobId, recipientCount: dedupedRecipientIds.length });
       return jsonResponse({ error: "Bad Request", reason: "Too many recipients" }, { status: 400 });
     }
 
@@ -320,6 +339,7 @@ serve(async (req: Request) => {
     if (attachHojaDeRuta) {
       const doc = await resolveHojaAttachment(supabaseAdmin, jobId);
       if (!doc) {
+        logRejection("hoja_de_ruta_not_found", { actorId, jobId });
         return jsonResponse({ error: "Bad Request", reason: "hoja_de_ruta_not_found" }, { status: 400 });
       }
 
@@ -352,6 +372,7 @@ serve(async (req: Request) => {
     const allowedIds = new Set((assignmentRows || []).map((r) => r.technician_id as string));
     const disallowed = dedupedRecipientIds.filter((id) => !allowedIds.has(id));
     if (disallowed.length > 0) {
+      logRejection("disallowed_recipients", { actorId, jobId, disallowedCount: disallowed.length });
       return jsonResponse(
         {
           error: "Forbidden",
@@ -375,6 +396,13 @@ serve(async (req: Request) => {
       dailyLimit: dailyRecipientLimit,
     });
     if (!quota.allowed) {
+      logRejection("daily_quota_exceeded", {
+        actorId,
+        jobId,
+        recipientCount: dedupedRecipientIds.length,
+        usedToday: quota.usedToday,
+        dailyLimit: quota.dailyLimit,
+      });
       return jsonResponse(
         {
           error: "Too Many Requests",
