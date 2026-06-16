@@ -3,8 +3,12 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Weight, Calculator, Trash2, Download, Calendar } from "lucide-react";
+import { FileText, Weight, Calculator, Trash2, Download, Calendar, Copy, AlertTriangle } from "lucide-react";
 import { exportToPDF } from "@/utils/pdfExport";
 import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -16,6 +20,19 @@ import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tou
 import { getDepartmentLabel } from "@/types/department";
 import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
 import { getResolvedPowerPosition } from "@/utils/powerPositions";
+import {
+  DEPARTMENT_PACKAGE_LABELS,
+  TOUR_PACKAGE_LABELS,
+  TOUR_PACKAGE_SIZES,
+  getDepartmentPackageSize,
+  getPackageBadgeLabel,
+  getPackageResolutionMessage,
+  getPackageSetLabel,
+  isPackageDepartment,
+  resolveDefaultSetForTourDate,
+  type PackageDepartment,
+  type TourPackageSize,
+} from "@/utils/tourPackages";
 
 interface TourDefaultsManagerProps {
   open: boolean;
@@ -35,6 +52,14 @@ type TourPowerDefaultRow =
 interface TourDateWithLocation {
   id: string;
   date: string;
+  tour_id?: string | null;
+  is_tour_pack_only?: boolean | null;
+  sound_package_size?: TourPackageSize | null;
+  lights_package_size?: TourPackageSize | null;
+  video_package_size?: TourPackageSize | null;
+  sound_default_set_id?: string | null;
+  lights_default_set_id?: string | null;
+  video_default_set_id?: string | null;
   locations?: { name: string | null } | Array<{ name: string | null }> | null;
 }
 
@@ -112,29 +137,33 @@ const getPdfTypeLabel = (type: 'power' | 'weight') =>
 const getDefaultsPdfTitle = (
   tourName: string,
   department: string,
-  type: 'power' | 'weight'
-) => `${tourName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)} predeterminados`;
+  type: 'power' | 'weight',
+  packageLabel?: string
+) => `${tourName} - ${packageLabel || getDepartmentLabel(department)} ${getPdfTypeLabel(type)} predeterminados`;
 
 const getDefaultsPdfFilename = (
   tourName: string,
   department: string,
-  type: 'power' | 'weight'
-) => `${tourName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)} predeterminados.pdf`;
+  type: 'power' | 'weight',
+  packageLabel?: string
+) => `${tourName} - ${packageLabel || getDepartmentLabel(department)} ${getPdfTypeLabel(type)} predeterminados.pdf`;
 
 const getTourDatePdfTitle = (
   tourName: string,
   locationName: string,
   department: string,
-  type: 'power' | 'weight'
-) => `${tourName} - ${locationName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)}`;
+  type: 'power' | 'weight',
+  packageLabel?: string
+) => `${tourName} - ${locationName} - ${packageLabel || getDepartmentLabel(department)} ${getPdfTypeLabel(type)}`;
 
 const getTourDatePdfFilename = (
   tourName: string,
   dateStr: string,
   locationName: string,
   department: string,
-  type: 'power' | 'weight'
-) => `${tourName} - ${dateStr} - ${locationName} - ${getDepartmentLabel(department)} ${getPdfTypeLabel(type)}.pdf`;
+  type: 'power' | 'weight',
+  packageLabel?: string
+) => `${tourName} - ${dateStr} - ${locationName} - ${packageLabel || getDepartmentLabel(department)} ${getPdfTypeLabel(type)}.pdf`;
 
 // Legacy types for backward compatibility
 interface TourPowerDefault {
@@ -172,14 +201,23 @@ export const TourDefaultsManager = ({
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('sound');
   const [tourDates, setTourDates] = useState<TourDateWithLocation[]>([]);
+  const [newSetName, setNewSetName] = useState('');
+  const [newSetDescription, setNewSetDescription] = useState('');
+  const [newSetPackageSize, setNewSetPackageSize] = useState<TourPackageSize | null>(null);
 
   // Use the new tour default sets hook
   const {
     defaultSets,
     defaultTables,
     isLoading: defaultSetsLoading,
+    createSet,
+    updateSet,
+    duplicateSet,
     deleteSet,
     deleteTable,
+    isCreatingSet,
+    isUpdatingSet,
+    isDuplicatingSet,
     isDeletingSet,
     isDeletingTable
   } = useTourDefaultSets(tour?.id || '');
@@ -206,6 +244,14 @@ export const TourDefaultsManager = ({
         .select(`
           id,
           date,
+          tour_id,
+          is_tour_pack_only,
+          sound_package_size,
+          lights_package_size,
+          video_package_size,
+          sound_default_set_id,
+          lights_default_set_id,
+          video_default_set_id,
           locations (
             name
           )
@@ -313,6 +359,123 @@ export const TourDefaultsManager = ({
     }
   };
 
+  const handleCreateSet = async (department: string) => {
+    if (!tour?.id || !isPackageDepartment(department)) return;
+    const trimmedName = newSetName.trim();
+    if (!trimmedName) {
+      toast({
+        title: 'Nombre requerido',
+        description: 'Introduce un nombre para el conjunto.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      await createSet({
+        tour_id: tour.id,
+        name: trimmedName,
+        description: newSetDescription.trim() || null,
+        department,
+        package_size: newSetPackageSize,
+      });
+      setNewSetName('');
+      setNewSetDescription('');
+      setNewSetPackageSize(null);
+    } catch (error) {
+      console.error('Error creating set:', error);
+    }
+  };
+
+  const handleDuplicateSet = async (setId: string) => {
+    const sourceSet = defaultSets.find((set) => set.id === setId);
+    if (!sourceSet) return;
+
+    try {
+      await duplicateSet({
+        setId,
+        name: `${sourceSet.name} Copy`,
+        description: sourceSet.description,
+        package_size: sourceSet.package_size,
+      });
+    } catch (error) {
+      console.error('Error duplicating set:', error);
+    }
+  };
+
+  const updateSetPackageSize = async (setId: string, value: string) => {
+    await updateSet({
+      setId,
+      updates: {
+        package_size: value === 'unassigned' ? null : (value as TourPackageSize),
+      },
+    });
+  };
+
+  const getDuplicatePackageWarnings = (department: string) => {
+    if (!isPackageDepartment(department)) return [];
+    return TOUR_PACKAGE_SIZES.flatMap((packageSize) => {
+      const matches = defaultSets.filter(
+        (set) => set.department === department && set.package_size === packageSize
+      );
+      if (matches.length <= 1) return [];
+      return [{
+        packageSize,
+        message: `Multiple ${DEPARTMENT_PACKAGE_LABELS[department]} ${TOUR_PACKAGE_LABELS[packageSize]} default sets exist. Date/package auto-resolution will be ambiguous unless a specific set is selected.`,
+      }];
+    });
+  };
+
+  const renderSetMetadata = (set: typeof defaultSets[number]) => {
+    const packageSize = set.package_size || null;
+    return (
+      <div className="space-y-2 min-w-[220px]">
+        <Input
+          defaultValue={set.name}
+          aria-label={`${set.name} set name`}
+          onBlur={(event) => {
+            const nextName = event.target.value.trim();
+            if (nextName && nextName !== set.name) {
+              void updateSet({ setId: set.id, updates: { name: nextName } });
+            }
+          }}
+        />
+        <Input
+          defaultValue={set.description || ''}
+          aria-label={`${set.name} set description`}
+          placeholder="Description"
+          onBlur={(event) => {
+            const nextDescription = event.target.value.trim() || null;
+            if (nextDescription !== (set.description || null)) {
+              void updateSet({ setId: set.id, updates: { description: nextDescription } });
+            }
+          }}
+        />
+        <Select
+          value={packageSize || 'unassigned'}
+          onValueChange={(value) => void updateSetPackageSize(set.id, value)}
+        >
+          <SelectTrigger aria-label={`${set.name} package size`}>
+            <SelectValue placeholder="Package size" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="unassigned">Unassigned</SelectItem>
+            {TOUR_PACKAGE_SIZES.map((size) => (
+              <SelectItem key={size} value={size}>
+                {TOUR_PACKAGE_LABELS[size]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {isPackageDepartment(set.department) && packageSize && (
+          <Badge variant="outline">
+            {getPackageBadgeLabel({ department: set.department, packageSize })}
+          </Badge>
+        )}
+      </div>
+    );
+  };
+
   // Helper function to get table name based on format
   const getTableName = (table: CombinedDefaultType): string => {
     if (isNewFormatTable(table)) {
@@ -367,9 +530,38 @@ export const TourDefaultsManager = ({
     return undefined;
   };
 
-  const handleBulkPDFExport = async (department: string, type: 'power' | 'weight') => {
+  const handleBulkPDFExport = async (
+    department: string,
+    type: 'power' | 'weight',
+    options?: { setId?: string; packageLabel?: string }
+  ) => {
     try {
-      const relevantDefaults = getDepartmentDefaults(department, type);
+      const departmentSets = defaultSets.filter((set) => set.department === department);
+      let relevantDefaults: CombinedDefaultType[];
+      let packageLabel = options?.packageLabel;
+
+      if (options?.setId) {
+        relevantDefaults = defaultTables.filter(
+          (table) => table.set_id === options.setId && table.table_type === type
+        );
+      } else if (departmentSets.length === 1) {
+        const set = departmentSets[0];
+        packageLabel = isPackageDepartment(department)
+          ? getPackageSetLabel(department, set.package_size || null, set)
+          : set.name;
+        relevantDefaults = defaultTables.filter(
+          (table) => table.set_id === set.id && table.table_type === type
+        );
+      } else if (departmentSets.length > 1) {
+        toast({
+          title: 'Seleccione un paquete',
+          description: `Hay varios conjuntos de ${getDepartmentLabel(department)}. Exporta desde un conjunto específico para no mezclar paquetes.`,
+          variant: 'destructive',
+        });
+        return;
+      } else {
+        relevantDefaults = getDepartmentDefaults(department, type);
+      }
 
       if (relevantDefaults.length === 0) {
         toast({
@@ -404,7 +596,7 @@ export const TourDefaultsManager = ({
         };
 
         const pdfBlob = await exportToPDF(
-          getDefaultsPdfTitle(tour.name, department, type),
+          getDefaultsPdfTitle(tour.name, department, type, packageLabel),
           tables,
           type,
           tour.name,
@@ -415,7 +607,7 @@ export const TourDefaultsManager = ({
           logoUrl
         );
 
-        const fileName = getDefaultsPdfFilename(tour.name, department, type);
+        const fileName = getDefaultsPdfFilename(tour.name, department, type, packageLabel);
         const url = window.URL.createObjectURL(pdfBlob);
         const a = document.createElement('a');
         a.href = url;
@@ -508,7 +700,7 @@ export const TourDefaultsManager = ({
       })();
 
       const pdfBlob = await exportToPDF(
-        getDefaultsPdfTitle(tour.name, department, type),
+        getDefaultsPdfTitle(tour.name, department, type, packageLabel),
         tables,
         type,
         tour.name,
@@ -519,7 +711,7 @@ export const TourDefaultsManager = ({
         logoUrl
       );
 
-      const fileName = getDefaultsPdfFilename(tour.name, department, type);
+      const fileName = getDefaultsPdfFilename(tour.name, department, type, packageLabel);
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
       a.href = url;
@@ -590,8 +782,39 @@ export const TourDefaultsManager = ({
     type: 'power' | 'weight',
     logoUrl?: string
   ): Promise<boolean> => {
-    // Get defaults for this department and type
-    const defaultsData = getDepartmentDefaults(department, type);
+    let defaultsData: CombinedDefaultType[] = [];
+    let packageLabel: string | undefined;
+
+    if (isPackageDepartment(department)) {
+      const resolution = resolveDefaultSetForTourDate({
+        tourDate,
+        department,
+        defaultSets,
+      });
+
+      if (resolution.status === 'resolved') {
+        defaultsData = defaultTables.filter(
+          (table) => table.set_id === resolution.set.id && table.table_type === type
+        );
+        packageLabel = getPackageSetLabel(department, resolution.packageSize, resolution.set);
+      } else if (
+        resolution.status === 'missing' &&
+        !getDepartmentPackageSize(tourDate, department) &&
+        defaultSets.filter((set) => set.department === department).length === 0
+      ) {
+        defaultsData = getDepartmentDefaults(department, type);
+      } else {
+        const message = getPackageResolutionMessage(resolution);
+        toast({
+          title: 'No se puede exportar el paquete',
+          description: message || 'Selecciona un conjunto de valores por defecto válido para esta fecha.',
+          variant: 'destructive',
+        });
+        return false;
+      }
+    } else {
+      defaultsData = getDepartmentDefaults(department, type);
+    }
 
     // Check for any overrides for this tour date
     const overrideTable = type === 'power' ? 'tour_date_power_overrides' : 'tour_date_weight_overrides';
@@ -632,7 +855,7 @@ export const TourDefaultsManager = ({
       const dateStr = tourDate.date;
 
       const pdfBlob = await exportToPDF(
-        getTourDatePdfTitle(tour.name, locationName, department, type),
+        getTourDatePdfTitle(tour.name, locationName, department, type, packageLabel),
         tables,
         type,
         `${tour.name} - ${locationName}`,
@@ -648,7 +871,8 @@ export const TourDefaultsManager = ({
         dateStr,
         locationName,
         department,
-        type
+        type,
+        packageLabel
       );
       const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement('a');
@@ -753,7 +977,7 @@ export const TourDefaultsManager = ({
     const dateStr = tourDate.date; // Pass ISO string directly for proper parsing
 
     const pdfBlob = await exportToPDF(
-      getTourDatePdfTitle(tour.name, locationName, department, type),
+      getTourDatePdfTitle(tour.name, locationName, department, type, packageLabel),
       combinedTables,
       type,
       `${tour.name} - ${locationName}`, // Include location in jobName for header
@@ -769,7 +993,8 @@ export const TourDefaultsManager = ({
       dateStr,
       locationName,
       department,
-      type
+      type,
+      packageLabel
     );
     const url = window.URL.createObjectURL(pdfBlob);
     const a = document.createElement('a');
@@ -785,18 +1010,81 @@ export const TourDefaultsManager = ({
   const renderDepartmentDefaults = (department: string) => {
     const powerTables = getDepartmentDefaults(department, 'power');
     const weightTables = getDepartmentDefaults(department, 'weight');
+    const duplicateWarnings = getDuplicatePackageWarnings(department);
 
     // Group new format tables by sets
     const departmentSets = defaultSets.filter(set => set.department === department);
-    const powerSets = departmentSets.filter(set => 
-      defaultTables.some(table => table.set_id === set.id && table.table_type === 'power')
-    );
-    const weightSets = departmentSets.filter(set => 
-      defaultTables.some(table => table.set_id === set.id && table.table_type === 'weight')
-    );
+    const powerSets = departmentSets;
+    const weightSets = departmentSets;
 
     return (
       <div className="space-y-6">
+        {isPackageDepartment(department) && (
+          <div className="border rounded-lg p-4 space-y-3">
+            <h4 className="font-semibold">Crear conjunto de paquete</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="space-y-2 md:col-span-1">
+                <Label htmlFor={`${department}-new-set-name`}>Nombre</Label>
+                <Input
+                  id={`${department}-new-set-name`}
+                  value={newSetName}
+                  onChange={(event) => setNewSetName(event.target.value)}
+                  placeholder={`${DEPARTMENT_PACKAGE_LABELS[department]} package`}
+                />
+              </div>
+              <div className="space-y-2 md:col-span-1">
+                <Label htmlFor={`${department}-new-set-description`}>Descripción</Label>
+                <Input
+                  id={`${department}-new-set-description`}
+                  value={newSetDescription}
+                  onChange={(event) => setNewSetDescription(event.target.value)}
+                  placeholder="Optional"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Package size</Label>
+                <Select
+                  value={newSetPackageSize || 'unassigned'}
+                  onValueChange={(value) =>
+                    setNewSetPackageSize(value === 'unassigned' ? null : (value as TourPackageSize))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Package size" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {TOUR_PACKAGE_SIZES.map((size) => (
+                      <SelectItem key={size} value={size}>
+                        {TOUR_PACKAGE_LABELS[size]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-end">
+                <Button
+                  onClick={() => handleCreateSet(department)}
+                  disabled={isCreatingSet}
+                  className="w-full"
+                >
+                  Crear conjunto
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {duplicateWarnings.map((warning) => (
+          <div
+            key={warning.packageSize}
+            className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+          >
+            <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+            <span>{warning.message}</span>
+          </div>
+        ))}
+
         {/* Power Defaults */}
         <div>
           <div className="flex items-center justify-between mb-4">
@@ -835,21 +1123,43 @@ export const TourDefaultsManager = ({
             return (
               <div key={set.id} className="mb-6 border rounded-lg p-4 bg-gray-50">
                 <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h5 className="font-medium text-lg">{set.name}</h5>
-                    {set.description && (
-                      <p className="text-sm text-muted-foreground">{set.description}</p>
-                    )}
+                  {renderSetMetadata(set)}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        handleBulkPDFExport(department, 'power', {
+                          setId: set.id,
+                          packageLabel: isPackageDepartment(department)
+                            ? getPackageSetLabel(department, set.package_size || null, set)
+                            : set.name,
+                        })
+                      }
+                      disabled={setTables.length === 0}
+                    >
+                      <FileText className="h-4 w-4 mr-1" />
+                      PDF
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDuplicateSet(set.id)}
+                      disabled={isDuplicatingSet}
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      Duplicar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteSet(set.id)}
+                      disabled={isDeletingSet || isUpdatingSet}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteSet(set.id)}
-                    disabled={isDeletingSet}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -965,21 +1275,43 @@ export const TourDefaultsManager = ({
             return (
               <div key={set.id} className="mb-6 border rounded-lg p-4 bg-gray-50">
                 <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h5 className="font-medium text-lg">{set.name}</h5>
-                    {set.description && (
-                      <p className="text-sm text-muted-foreground">{set.description}</p>
-                    )}
+                  {renderSetMetadata(set)}
+                  <div className="flex flex-wrap justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        handleBulkPDFExport(department, 'weight', {
+                          setId: set.id,
+                          packageLabel: isPackageDepartment(department)
+                            ? getPackageSetLabel(department, set.package_size || null, set)
+                            : set.name,
+                        })
+                      }
+                      disabled={setTables.length === 0}
+                    >
+                      <FileText className="h-4 w-4 mr-1" />
+                      PDF
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDuplicateSet(set.id)}
+                      disabled={isDuplicatingSet}
+                    >
+                      <Copy className="h-4 w-4 mr-1" />
+                      Duplicar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteSet(set.id)}
+                      disabled={isDeletingSet || isUpdatingSet}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteSet(set.id)}
-                    disabled={isDeletingSet}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1069,6 +1401,25 @@ export const TourDefaultsManager = ({
                     <p className="text-sm text-muted-foreground">
                       {getTourDateLocationName(tourDate)}
                     </p>
+                    <div className="flex flex-wrap gap-1 mt-2">
+                      {(['sound', 'lights', 'video'] as PackageDepartment[]).map((department) => {
+                        const packageSize = getDepartmentPackageSize(tourDate, department);
+                        if (!packageSize) return null;
+                        const resolution = resolveDefaultSetForTourDate({
+                          tourDate,
+                          department,
+                          defaultSets,
+                        });
+                        return (
+                          <Badge key={department} variant="outline" className="gap-1">
+                            {getPackageBadgeLabel({ department, packageSize })}
+                            {resolution.status !== 'resolved' && (
+                              <AlertTriangle className="h-3 w-3 text-amber-600" />
+                            )}
+                          </Badge>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
                 

@@ -5,12 +5,15 @@ import { useToast } from "@/hooks/use-toast";
 
 
 import { queryKeys } from "@/lib/react-query";
+import type { TourPackageSize } from "@/utils/tourPackages";
+
 export interface TourDefaultSet {
   id: string;
   tour_id: string;
   name: string;
-  description?: string;
+  description?: string | null;
   department: 'sound' | 'lights' | 'video';
+  package_size?: TourPackageSize | null;
   created_at: string;
   updated_at: string;
 }
@@ -47,7 +50,7 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
 
       const { data, error } = await query;
       if (error) throw error;
-      return data as TourDefaultSet[];
+      return (data || []) as TourDefaultSet[];
     },
     enabled: !!tourId,
   });
@@ -67,7 +70,7 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
         .order("created_at", { ascending: true });
 
       if (error) throw error;
-      return data as TourDefaultTable[];
+      return (data || []) as TourDefaultTable[];
     },
     enabled: defaultSets.length > 0,
   });
@@ -95,6 +98,37 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
       toast({
         title: "Error",
         description: error.message || "Failed to create default set",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Update default set metadata
+  const updateSetMutation = useMutation({
+    mutationFn: async ({ setId, updates }: { setId: string, updates: Partial<Pick<TourDefaultSet, "name" | "description" | "package_size">> }) => {
+      const { data, error } = await supabase
+        .from("tour_default_sets")
+        .update(updates)
+        .eq("id", setId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as TourDefaultSet;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-default-sets", tourId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+      toast({
+        title: "Success",
+        description: "Default set updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update default set",
         variant: "destructive",
       });
     },
@@ -185,6 +219,75 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
     },
   });
 
+  // Duplicate default set and all child tables
+  const duplicateSetMutation = useMutation({
+    mutationFn: async ({
+      setId,
+      name,
+      description,
+      package_size,
+    }: {
+      setId: string;
+      name?: string;
+      description?: string | null;
+      package_size?: TourPackageSize | null;
+    }) => {
+      const sourceSet = defaultSets.find((set) => set.id === setId);
+      if (!sourceSet) {
+        throw new Error("Source default set not found");
+      }
+
+      const { data: newSet, error: setError } = await supabase
+        .from("tour_default_sets")
+        .insert({
+          tour_id: sourceSet.tour_id,
+          name: name || `${sourceSet.name} Copy`,
+          description: description ?? sourceSet.description ?? null,
+          department: sourceSet.department,
+          package_size: package_size ?? sourceSet.package_size ?? null,
+        })
+        .select()
+        .single();
+
+      if (setError) throw setError;
+
+      const sourceTables = defaultTables.filter((table) => table.set_id === setId);
+      if (sourceTables.length > 0) {
+        const { error: tablesError } = await supabase
+          .from("tour_default_tables")
+          .insert(
+            sourceTables.map((table) => ({
+              set_id: newSet.id,
+              table_name: table.table_name,
+              table_data: table.table_data,
+              table_type: table.table_type,
+              total_value: table.total_value,
+              metadata: table.metadata,
+            }))
+          );
+
+        if (tablesError) throw tablesError;
+      }
+
+      return newSet as TourDefaultSet;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-default-sets", tourId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-default-tables", tourId) });
+      toast({
+        title: "Success",
+        description: "Default set duplicated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to duplicate default set",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete default table
   const deleteTableMutation = useMutation({
     mutationFn: async (tableId: string) => {
@@ -217,14 +320,18 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
     defaultTables,
     isLoading: setsLoading || tablesLoading,
     createSet: createSetMutation.mutateAsync,
+    updateSet: updateSetMutation.mutateAsync,
     createTable: createTableMutation.mutateAsync,
     updateTable: updateTableMutation.mutateAsync,
     deleteSet: deleteSetMutation.mutateAsync,
     deleteTable: deleteTableMutation.mutateAsync,
+    duplicateSet: duplicateSetMutation.mutateAsync,
     isCreatingSet: createSetMutation.isPending,
+    isUpdatingSet: updateSetMutation.isPending,
     isCreatingTable: createTableMutation.isPending,
     isUpdatingTable: updateTableMutation.isPending,
     isDeletingSet: deleteSetMutation.isPending,
     isDeletingTable: deleteTableMutation.isPending,
+    isDuplicatingSet: duplicateSetMutation.isPending,
   };
 };

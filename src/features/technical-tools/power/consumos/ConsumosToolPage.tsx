@@ -28,6 +28,11 @@ import { PowerStagePlot } from "@/features/technical-tools/power/consumos/PowerS
 import { CopyToStageMenu } from "@/features/technical-tools/table-presets/CopyToStageMenu";
 import { QuickPresetsMenu } from "@/features/technical-tools/table-presets/QuickPresetsMenu";
 import { GeneratedPowerTableCard } from "./GeneratedPowerTableCard";
+import {
+  TOUR_PACKAGE_LABELS,
+  TOUR_PACKAGE_SIZES,
+  type TourPackageSize,
+} from "@/utils/tourPackages";
 
 const PowerTableSummary: React.FC<{
   table: PowerTable;
@@ -85,6 +90,13 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
     overrideLoading,
     overrideData,
     isCreatingOverride,
+    defaultSets,
+    selectedDefaultSetId,
+    setSelectedDefaultSetId,
+    selectedDefaultPackageSize,
+    setSelectedDefaultPackageSize,
+    newDefaultSetName,
+    setNewDefaultSetName,
     tourName,
     tourInfo,
     selectedStage,
@@ -319,6 +331,66 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                       onCheckedChange={(checked) => setFohSchukoRequired(!!checked)}
                     />
                     <Label htmlFor="foh-schuko">{labels.fohSchuko}</Label>
+                  </div>
+                )}
+
+                {isTourDefaults && (
+                  <div className="space-y-3 rounded-lg border p-4">
+                    <h3 className="text-sm font-semibold">Default set</h3>
+                    <div className="space-y-2">
+                      <Label>Existing set</Label>
+                      <Select
+                        value={selectedDefaultSetId || "new"}
+                        onValueChange={(value) => setSelectedDefaultSetId(value === "new" ? "" : value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select default set" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="new">Create new set</SelectItem>
+                          {defaultSets.map((set) => (
+                            <SelectItem key={set.id} value={set.id}>
+                              {set.name}
+                              {set.package_size ? ` (${TOUR_PACKAGE_LABELS[set.package_size]})` : " (Unassigned)"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {!selectedDefaultSetId && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="newDefaultSetName">New set name</Label>
+                          <Input
+                            id="newDefaultSetName"
+                            value={newDefaultSetName}
+                            onChange={(event) => setNewDefaultSetName(event.target.value)}
+                            placeholder={`${tourName || "Tour"} ${labels.defaultBadge}`}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Package size</Label>
+                          <Select
+                            value={selectedDefaultPackageSize}
+                            onValueChange={(value) =>
+                              setSelectedDefaultPackageSize(value as TourPackageSize | "unassigned")
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Package size" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              {TOUR_PACKAGE_SIZES.map((size) => (
+                                <SelectItem key={size} value={size}>
+                                  {TOUR_PACKAGE_LABELS[size]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -22,6 +22,7 @@ import {
 import type { TechnicalStage } from '@/features/technical-tools/stage/stageUtils';
 import { CopyToStageMenu } from '@/features/technical-tools/table-presets/CopyToStageMenu';
 import { QuickPresetsMenu } from '@/features/technical-tools/table-presets/QuickPresetsMenu';
+import type { TourPackageSize } from '@/utils/tourPackages';
 import {
   cloneTablesToStage,
   remapClusterIds,
@@ -212,6 +213,17 @@ const PesosTool: React.FC = () => {
     isLoading: defaultsLoading
   } = useTourDefaultSets(tourId || '', 'sound');
 
+  const [selectedDefaultSetId, setSelectedDefaultSetId] = useState<string>('');
+  const [selectedDefaultPackageSize, setSelectedDefaultPackageSize] = useState<TourPackageSize | 'unassigned'>('unassigned');
+  const [newDefaultSetName, setNewDefaultSetName] = useState('');
+
+  useEffect(() => {
+    if (!isTourDefaults && !isDefaults) return;
+    if (selectedDefaultSetId || defaultSets.length !== 1) return;
+    setSelectedDefaultSetId(defaultSets[0].id);
+    setSelectedDefaultPackageSize(defaultSets[0].package_size || 'unassigned');
+  }, [defaultSets, isDefaults, isTourDefaults, selectedDefaultSetId]);
+
   const {
     weightOverrides,
     createWeightOverride,
@@ -316,21 +328,25 @@ const PesosTool: React.FC = () => {
 
   // Helper function to get or create the set ID for sound department
   const getOrCreateSoundSetId = async (): Promise<string> => {
-    // Check if a sound set already exists
-    const existingSoundSet = defaultSets.find(set => set.department === 'sound');
-
-    if (existingSoundSet) {
-      return existingSoundSet.id;
+    if (selectedDefaultSetId) {
+      return selectedDefaultSetId;
     }
 
-    // Create a new sound set
+    const trimmedName = (newDefaultSetName || currentSetName).trim();
+    if (!trimmedName) {
+      throw new Error('Select an existing default set or enter a name to create one.');
+    }
+
     const newSet = await createSet({
       tour_id: tourId!,
-      name: `${tourName} Sound Defaults`,
+      name: trimmedName,
       department: 'sound',
-      description: 'Sound department weight defaults'
+      description: 'Sound department weight defaults',
+      package_size: selectedDefaultPackageSize === 'unassigned' ? null : selectedDefaultPackageSize
     });
 
+    setSelectedDefaultSetId(newSet.id);
+    setNewDefaultSetName('');
     return newSet.id;
   };
 
@@ -419,7 +435,7 @@ const PesosTool: React.FC = () => {
     if (isDefaults && defaultTables.length > 0) {
       // Group tables by set and convert to our local format
       const convertedTables = defaultTables
-        .filter(dt => dt.table_type === 'weight')
+        .filter(dt => dt.table_type === 'weight' && (!selectedDefaultSetId || dt.set_id === selectedDefaultSetId))
         .map((dt, index) => ({
           name: dt.table_name,
           rows: (dt.table_data?.rows || [{
@@ -441,7 +457,7 @@ const PesosTool: React.FC = () => {
         }));
       setTables(assignSuffixes(convertedTables));
     }
-  }, [isDefaults, defaultTables]);
+  }, [isDefaults, defaultTables, selectedDefaultSetId]);
 
   // Load tour date overrides when in tour date context
   useEffect(() => {
@@ -532,7 +548,8 @@ const PesosTool: React.FC = () => {
         tour_id: tourId,
         name: currentSetName,
         description: `Weight calculation set with ${tables.length} tables`,
-        department: 'sound'
+        department: 'sound',
+        package_size: selectedDefaultPackageSize === 'unassigned' ? null : selectedDefaultPackageSize
       });
 
       // Save each table as a default table
@@ -951,6 +968,12 @@ const PesosTool: React.FC = () => {
       resetCurrentTable={resetCurrentTable}
       defaultSets={defaultSets}
       defaultTables={defaultTables}
+      selectedDefaultSetId={selectedDefaultSetId}
+      setSelectedDefaultSetId={setSelectedDefaultSetId}
+      selectedDefaultPackageSize={selectedDefaultPackageSize}
+      setSelectedDefaultPackageSize={setSelectedDefaultPackageSize}
+      newDefaultSetName={newDefaultSetName}
+      setNewDefaultSetName={setNewDefaultSetName}
       deleteSet={deleteSet}
       weightOverrides={weightOverrides}
       deleteOverride={deleteOverride}

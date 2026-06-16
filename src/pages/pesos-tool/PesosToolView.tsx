@@ -12,6 +12,11 @@ import {
   TechnicalStageSelector,
   type TechnicalStage,
 } from "@/features/technical-tools/stage/stageAllocation";
+import {
+  TOUR_PACKAGE_LABELS,
+  TOUR_PACKAGE_SIZES,
+  type TourPackageSize,
+} from "@/utils/tourPackages";
 
 export interface PesosToolViewProps {
   handleBackNavigation: () => void;
@@ -53,6 +58,12 @@ export interface PesosToolViewProps {
   resetCurrentTable: () => void;
   defaultSets: any[];
   defaultTables: any[];
+  selectedDefaultSetId: string;
+  setSelectedDefaultSetId: (value: string) => void;
+  selectedDefaultPackageSize: TourPackageSize | "unassigned";
+  setSelectedDefaultPackageSize: (value: TourPackageSize | "unassigned") => void;
+  newDefaultSetName: string;
+  setNewDefaultSetName: (value: string) => void;
   deleteSet: (id: string) => void;
   weightOverrides: any[];
   deleteOverride: (args: { id: string; table: string }) => void;
@@ -102,6 +113,12 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
   resetCurrentTable,
   defaultSets,
   defaultTables,
+  selectedDefaultSetId,
+  setSelectedDefaultSetId,
+  selectedDefaultPackageSize,
+  setSelectedDefaultPackageSize,
+  newDefaultSetName,
+  setNewDefaultSetName,
   deleteSet,
   weightOverrides,
   deleteOverride,
@@ -228,6 +245,66 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                       onChange={(e) => setCurrentSetName(e.target.value)}
                       placeholder="Enter set name (e.g., 'Main Stage Rigging')"
                     />
+                  </div>
+                )}
+
+                {(isDefaults || isTourDefaults) && (
+                  <div className="space-y-3 rounded-lg border p-4">
+                    <h3 className="text-sm font-semibold">Sound default set</h3>
+                    <div className="space-y-2">
+                      <Label>Existing set</Label>
+                      <Select
+                        value={selectedDefaultSetId || "new"}
+                        onValueChange={(value) => setSelectedDefaultSetId(value === "new" ? "" : value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select default set" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="new">Create new set</SelectItem>
+                          {defaultSets.map((set) => (
+                            <SelectItem key={set.id} value={set.id}>
+                              {set.name}
+                              {set.package_size ? ` (${TOUR_PACKAGE_LABELS[set.package_size as TourPackageSize]})` : " (Unassigned)"}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {!selectedDefaultSetId && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="newWeightDefaultSetName">New set name</Label>
+                          <Input
+                            id="newWeightDefaultSetName"
+                            value={newDefaultSetName}
+                            onChange={(event) => setNewDefaultSetName(event.target.value)}
+                            placeholder="Sound S weights"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Package size</Label>
+                          <Select
+                            value={selectedDefaultPackageSize}
+                            onValueChange={(value) =>
+                              setSelectedDefaultPackageSize(value as TourPackageSize | "unassigned")
+                            }
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Package size" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              {TOUR_PACKAGE_SIZES.map((size) => (
+                                <SelectItem key={size} value={size}>
+                                  {TOUR_PACKAGE_LABELS[size]}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 

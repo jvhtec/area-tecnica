@@ -4,6 +4,12 @@ import { fetchTourLogo } from '@/utils/pdf/logoUtils';
 import { buildReadableFilename } from '@/utils/fileName';
 import { MADRID_TIMEZONE } from '@/utils/timezoneUtils';
 import {
+  PACKAGE_DEPARTMENTS,
+  getDepartmentPackageSize,
+  getPackageBadgeLabel,
+  type TourPackageSize,
+} from '@/utils/tourPackages';
+import {
   createPdfExportDocument,
   drawCorporatePdfHeader,
   getLastAutoTableY,
@@ -18,6 +24,9 @@ import {
 interface TourScheduleDate {
   date: string;
   is_tour_pack_only?: boolean | null;
+  sound_package_size?: TourPackageSize | null;
+  lights_package_size?: TourPackageSize | null;
+  video_package_size?: TourPackageSize | null;
   location?: {
     name?: string | null;
   } | null;
@@ -39,7 +48,13 @@ const tableRowsForTour = (tour: TourScheduleExport) =>
     format(parseISO(date.date), 'dd/MM/yyyy'),
     format(parseISO(date.date), 'EEEE'),
     date.location?.name || 'TBC',
-    date.is_tour_pack_only ? 'Tour Pack Only' : 'Full Setup',
+    PACKAGE_DEPARTMENTS
+      .map((department) => {
+        const packageSize = getDepartmentPackageSize(date, department);
+        return packageSize ? getPackageBadgeLabel({ department, packageSize }) : null;
+      })
+      .filter(Boolean)
+      .join(' · ') || 'Unassigned',
   ]);
 
 const drawTourScheduleHeader = async (

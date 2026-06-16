@@ -8,6 +8,7 @@ import { useTourDefaultSets } from "@/hooks/useTourDefaultSets";
 import { useTourPowerDefaults } from "@/hooks/useTourPowerDefaults";
 import { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
 import { useTourOverrideMode } from "@/hooks/useTourOverrideMode";
+import type { TourPackageSize } from "@/utils/tourPackages";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { queryKeys } from "@/lib/react-query";
 import { exportToPDF } from "@/utils/pdfExport";
@@ -207,6 +208,16 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   const { powerDefaults: legacyTourDefaults = [] } = useTourPowerDefaults(
     features.legacyTourDefaultsFallback ? tourIdParam || "" : "",
   );
+
+  const [selectedDefaultSetId, setSelectedDefaultSetId] = useState<string>("");
+  const [selectedDefaultPackageSize, setSelectedDefaultPackageSize] = useState<TourPackageSize | "unassigned">("unassigned");
+  const [newDefaultSetName, setNewDefaultSetName] = useState("");
+
+  useEffect(() => {
+    if (!isTourDefaults || selectedDefaultSetId || defaultSets.length !== 1) return;
+    setSelectedDefaultSetId(defaultSets[0].id);
+    setSelectedDefaultPackageSize(defaultSets[0].package_size || "unassigned");
+  }, [defaultSets, isTourDefaults, selectedDefaultSetId]);
 
   const { data: tourName = "" } = useQuery({
     queryKey: queryKeys.scope("tour", tourIdParam, "name"),
@@ -754,20 +765,32 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   const resolvedSetIdRef = useRef<string | null>(null);
 
   const getOrCreateDefaultSetId = async (): Promise<string> => {
-    if (defaultSets.length > 0) {
-      resolvedSetIdRef.current = defaultSets[0].id;
-      return defaultSets[0].id;
+    if (selectedDefaultSetId) {
+      resolvedSetIdRef.current = selectedDefaultSetId;
+      return selectedDefaultSetId;
     }
     if (resolvedSetIdRef.current) return resolvedSetIdRef.current;
     if (pendingSetIdRef.current) return pendingSetIdRef.current;
+
+    const trimmedSetName = newDefaultSetName.trim();
+    if (!trimmedSetName) {
+      throw new Error("Select an existing default set or enter a name to create one.");
+    }
+
     const creation = createSet({
       tour_id: tourIdParam!,
-      name: config.defaultsSetName(tourName || tourIdParam || ""),
+      name: trimmedSetName,
       department,
       description: config.defaultsSetDescription,
+      package_size:
+        selectedDefaultPackageSize === "unassigned"
+          ? null
+          : selectedDefaultPackageSize,
     })
       .then((set) => {
         resolvedSetIdRef.current = set.id;
+        setSelectedDefaultSetId(set.id);
+        setNewDefaultSetName("");
         pendingSetIdRef.current = null;
         return set.id;
       })
@@ -927,7 +950,11 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   // Tour defaults for display (new system with legacy fallback)
   const tourDefaultDisplayTables: PowerTable[] = useMemo(() => {
     const newSystemTables = (defaultTables || [])
-      .filter((table) => table.table_type === "power")
+      .filter(
+        (table) =>
+          table.table_type === "power" &&
+          (!selectedDefaultSetId || table.set_id === selectedDefaultSetId),
+      )
       .map((table) => {
         const rows: PowerTableRow[] = table.table_data?.rows || [];
         const snapshot = {
@@ -988,7 +1015,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       } as PowerTable;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultTables, legacyTourDefaults, features.legacyTourDefaultsFallback, safetyMargin, pf]);
+  }, [defaultTables, selectedDefaultSetId, legacyTourDefaults, features.legacyTourDefaultsFallback, safetyMargin, pf]);
 
   // Read-only defaults shown in URL override mode
   const readOnlyDefaultTables: PowerTable[] = useMemo(() => {
@@ -1382,6 +1409,13 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     overrideLoading,
     overrideData,
     isCreatingOverride,
+    defaultSets,
+    selectedDefaultSetId,
+    setSelectedDefaultSetId,
+    selectedDefaultPackageSize,
+    setSelectedDefaultPackageSize,
+    newDefaultSetName,
+    setNewDefaultSetName,
     tourName,
     tourInfo: getTourInfo(),
     selectedStage,
