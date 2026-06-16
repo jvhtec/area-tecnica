@@ -4,6 +4,7 @@ import {
   isJobHojaDeRutaDocument,
   isTourHojaDeRutaDocument,
   pickLatestJobHojaDeRutaDocument,
+  pickLatestLinkedJobHojaDeRutaDocument,
   pickLatestTourHojaDeRutaDocument,
 } from "@/components/jobs/cards/job-card-actions/hojaDeRutaAttachment";
 
@@ -41,21 +42,62 @@ describe("hojaDeRutaAttachment", () => {
     }, "job-1")).toBe(false);
   });
 
-  it("picks the first matching job document from an upload-descending list", () => {
+  it("does not attach files with unsafe PDF-looking names", () => {
+    expect(isJobHojaDeRutaDocument({
+      id: "doc-1",
+      file_name: "Hoja de Ruta.pdf.exe",
+      file_path: "job-1/Hoja de Ruta.pdf.exe",
+      file_type: "application/x-msdownload",
+    }, "job-1")).toBe(false);
+  });
+
+  it("accepts the PDF MIME type even when the filename has no extension", () => {
+    expect(isJobHojaDeRutaDocument({
+      id: "doc-1",
+      file_name: "Hoja de Ruta - Show",
+      file_path: "hojas-de-ruta/job-1/Hoja de Ruta - Show",
+      file_type: "application/pdf; charset=binary",
+    }, "job-1")).toBe(true);
+  });
+
+  it("picks the latest matching job document by upload time", () => {
     const selected = pickLatestJobHojaDeRutaDocument([
       {
-        id: "calc",
-        file_name: "Resumen Potencia.pdf",
-        file_path: "calculators/pesos/job-1/Resumen Potencia.pdf",
+        id: "old-hoja",
+        file_name: "Hoja de Ruta - Old.pdf",
+        file_path: "hojas-de-ruta/job-1/Hoja de Ruta - Old.pdf",
+        uploaded_at: "2026-06-16T10:00:00Z",
       },
       {
-        id: "hoja",
-        file_name: "Hoja de Ruta - Show.pdf",
-        file_path: "hojas-de-ruta/job-1/Hoja de Ruta - Show.pdf",
+        id: "new-hoja",
+        file_name: "Hoja de Ruta - New.pdf",
+        file_path: "hojas-de-ruta/job-1/Hoja de Ruta - New.pdf",
+        uploaded_at: "2026-06-16T12:00:00Z",
       },
     ], "job-1");
 
-    expect(selected).toMatchObject({ id: "hoja", source: "job_documents" });
+    expect(selected).toMatchObject({ id: "new-hoja", source: "job_documents" });
+  });
+
+  it("picks the latest linked job Hoja de Ruta across all candidate jobs", () => {
+    const selected = pickLatestLinkedJobHojaDeRutaDocument([
+      {
+        id: "job-2-hoja",
+        job_id: "job-2",
+        file_name: "Hoja de Ruta - Linked 2.pdf",
+        file_path: "hojas-de-ruta/job-2/Hoja de Ruta - Linked 2.pdf",
+        uploaded_at: "2026-06-16T10:00:00Z",
+      },
+      {
+        id: "job-3-hoja",
+        job_id: "job-3",
+        file_name: "Hoja de Ruta - Linked 3.pdf",
+        file_path: "hojas-de-ruta/job-3/Hoja de Ruta - Linked 3.pdf",
+        uploaded_at: "2026-06-16T12:00:00Z",
+      },
+    ], ["job-2", "job-3"]);
+
+    expect(selected).toMatchObject({ id: "job-3-hoja", source: "job_documents" });
   });
 
   it("matches tour-document Hoja de Ruta records without matching generic schedules", () => {

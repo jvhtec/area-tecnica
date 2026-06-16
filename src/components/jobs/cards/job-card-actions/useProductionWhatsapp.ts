@@ -9,6 +9,7 @@ import {
 } from "@/components/jobs/cards/job-card-actions/jobActionFormatters";
 import {
   pickLatestJobHojaDeRutaDocument,
+  pickLatestLinkedJobHojaDeRutaDocument,
   pickLatestTourHojaDeRutaDocument,
   type HojaDeRutaAttachmentRow,
 } from "@/components/jobs/cards/job-card-actions/hojaDeRutaAttachment";
@@ -130,7 +131,7 @@ export const useProductionWhatsapp = ({
     queryFn: async (): Promise<WaProdHojaDeRutaDoc | null> => {
       const findJobHojaDocument = async (jobId: string): Promise<WaProdHojaDeRutaDoc | null> => {
         const { data, error } = await dataLayerClient.from("job_documents")
-          .select("id, file_name, file_path, file_type, uploaded_at")
+          .select("id, job_id, file_name, file_path, file_type, uploaded_at")
           .eq("job_id", jobId)
           .order("uploaded_at", { ascending: false })
           .limit(25);
@@ -146,8 +147,7 @@ export const useProductionWhatsapp = ({
         const { data: hojaRows, error: hojaError } = await dataLayerClient.from("hoja_de_ruta")
           .select("job_id")
           .eq("tour_date_id", job.tour_date_id)
-          .order("created_at", { ascending: false })
-          .limit(10);
+          .order("created_at", { ascending: false });
 
         if (hojaError) throw hojaError;
 
@@ -157,8 +157,17 @@ export const useProductionWhatsapp = ({
             .filter((id): id is string => Boolean(id && id !== job.id))
         ));
 
-        for (const linkedJobId of linkedJobIds) {
-          const linkedJobDoc = await findJobHojaDocument(linkedJobId);
+        if (linkedJobIds.length > 0) {
+          const { data: linkedDocs, error: linkedDocsError } = await dataLayerClient.from("job_documents")
+            .select("id, job_id, file_name, file_path, file_type, uploaded_at")
+            .in("job_id", linkedJobIds)
+            .order("uploaded_at", { ascending: false });
+
+          if (linkedDocsError) throw linkedDocsError;
+          const linkedJobDoc = pickLatestLinkedJobHojaDeRutaDocument(
+            linkedDocs as HojaDeRutaAttachmentRow[] | null,
+            linkedJobIds
+          );
           if (linkedJobDoc) return linkedJobDoc;
         }
       }

@@ -73,6 +73,7 @@ type SupabaseAdminClient = ReturnType<typeof createClient>;
 
 type HojaDocumentRow = {
   id?: string;
+  job_id?: string | null;
   file_name?: string | null;
   file_path?: string | null;
   file_type?: string | null;
@@ -102,9 +103,21 @@ const hasHojaDeRutaText = (doc: HojaDocumentRow) => {
 };
 
 const isPdfDocument = (doc: HojaDocumentRow) => {
-  const text = normalizeText(`${doc.file_type || ""} ${doc.file_name || ""} ${doc.file_path || ""}`);
-  return text.includes("pdf");
+  const mimeType = (doc.file_type || "").split(";")[0].trim().toLowerCase();
+  if (mimeType === "application/pdf") return true;
+
+  return [doc.file_name, doc.file_path].some((value) =>
+    /\.pdf$/i.test(normalizeObjectPath(value))
+  );
 };
+
+const uploadedAtMs = (doc: HojaDocumentRow) => {
+  const value = doc.uploaded_at ? Date.parse(doc.uploaded_at) : NaN;
+  return Number.isFinite(value) ? value : 0;
+};
+
+const byNewestUpload = (a: HojaDocumentRow, b: HojaDocumentRow) =>
+  uploadedAtMs(b) - uploadedAtMs(a);
 
 function resolveJobDocumentBucket(filePath: string): "job-documents" | "job_documents" {
   const first = normalizeObjectPath(filePath).split("/")[0] || "";
@@ -157,7 +170,35 @@ async function findLatestJobHojaAttachment(
 
   if (error) throw error;
 
-  const doc = ((data || []) as HojaDocumentRow[]).find((row) => isJobHojaDeRutaDocument(row, jobId));
+  const doc = ((data || []) as HojaDocumentRow[])
+    .filter((row) => isJobHojaDeRutaDocument(row, jobId))
+    .sort(byNewestUpload)[0];
+  if (!doc?.file_path) return null;
+  return toHojaAttachment("job_documents", doc, resolveJobDocumentBucket(doc.file_path));
+}
+
+async function findLatestLinkedJobHojaAttachment(
+  supabaseAdmin: SupabaseAdminClient,
+  linkedJobIds: string[],
+): Promise<HojaAttachment | null> {
+  if (linkedJobIds.length === 0) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from("job_documents")
+    .select("id, job_id, file_name, file_path, file_type, uploaded_at")
+    .in("job_id", linkedJobIds)
+    .order("uploaded_at", { ascending: false });
+
+  if (error) throw error;
+
+  const linkedJobIdSet = new Set(linkedJobIds);
+  const doc = ((data || []) as HojaDocumentRow[])
+    .filter((row) => {
+      const rowJobId = row.job_id || null;
+      return Boolean(rowJobId && linkedJobIdSet.has(rowJobId) && isJobHojaDeRutaDocument(row, rowJobId));
+    })
+    .sort(byNewestUpload)[0];
+
   if (!doc?.file_path) return null;
   return toHojaAttachment("job_documents", doc, resolveJobDocumentBucket(doc.file_path));
 }
@@ -171,8 +212,7 @@ async function findLinkedHojaJobIdsForTourDate(
     .from("hoja_de_ruta")
     .select("job_id")
     .eq("tour_date_id", tourDateId)
-    .order("created_at", { ascending: false })
-    .limit(10);
+    .order("created_at", { ascending: false });
 
   if (error) throw error;
 
@@ -213,7 +253,9 @@ async function findLatestTourHojaAttachment(
 
   if (error) throw error;
 
-  const doc = ((data || []) as HojaDocumentRow[]).find(isTourHojaDeRutaDocument);
+  const doc = ((data || []) as HojaDocumentRow[])
+    .filter(isTourHojaDeRutaDocument)
+    .sort(byNewestUpload)[0];
   return doc ? toHojaAttachment("tour_documents", doc, "tour-documents") : null;
 }
 
@@ -237,10 +279,8 @@ async function resolveHojaAttachment(
 
   if (tourDateId) {
     const linkedJobIds = await findLinkedHojaJobIdsForTourDate(supabaseAdmin, tourDateId, jobId);
-    for (const linkedJobId of linkedJobIds) {
-      const linkedJobDoc = await findLatestJobHojaAttachment(supabaseAdmin, linkedJobId);
-      if (linkedJobDoc) return linkedJobDoc;
-    }
+    const linkedJobDoc = await findLatestLinkedJobHojaAttachment(supabaseAdmin, linkedJobIds);
+    if (linkedJobDoc) return linkedJobDoc;
   }
 
   const tourId = typeof jobContext.tour_id === "string" && jobContext.tour_id
@@ -295,13 +335,14 @@ serve(async (req: Request) => {
 
     const role = (actorProfile?.role || "").toLowerCase();
     const dept = normalizeDept(actorProfile?.department || null);
+    const wahaEndpoint = (actorProfile?.waha_endpoint || "").trim();
 
     if (!(role === "admin" || dept === "production")) {
       logRejection("forbidden_actor", { actorId, role, department: actorProfile?.department || null });
       return jsonResponse({ error: "Forbidden" }, { status: 403 });
     }
 
-    if (!actorProfile?.waha_endpoint) {
+    if (!wahaEndpoint) {
       logRejection("missing_waha_endpoint", { actorId, role, department: actorProfile?.department || null });
       return jsonResponse({ error: "Forbidden", reason: "User not authorized for WhatsApp operations" }, { status: 403 });
     }
@@ -437,7 +478,7 @@ serve(async (req: Request) => {
 
     type WahaConfigRow = { session?: string; api_key?: string };
 
-    const base = normalizeBase(actorProfile.waha_endpoint);
+    const base = normalizeBase(wahaEndpoint);
     const { data: cfg, error: cfgErr } = await supabaseAdmin.rpc("get_waha_config", { base_url: base });
     if (cfgErr) console.warn("get_waha_config RPC failed, falling back to env vars:", cfgErr.message);
     const row = (cfg as WahaConfigRow[] | null)?.[0];

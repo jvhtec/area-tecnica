@@ -12,6 +12,19 @@ interface UploadPdfToJobOptions {
   kind?: HojaPdfDocumentKind;
 }
 
+export const sanitizeHojaPdfFileName = (fileName: string): string => {
+  const sanitized = fileName
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/_/g, ' ')
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+\./g, '.')
+    .trim();
+
+  return sanitized || 'Hoja de Ruta.pdf';
+};
+
 export const uploadPdfToJob = async (
   jobId: string,
   pdfBlob: Blob,
@@ -23,12 +36,7 @@ export const uploadPdfToJob = async (
     const folderBase = HOJA_PDF_FOLDER_BY_KIND[kind];
 
     // Sanitize filename for storage while preserving human-readable spaces.
-    const sanitizedFileName = fileName
-      .replace(/_/g, ' ')
-      .replace(/[<>:"/\\|?*\x00-\x1F]/g, ' ') // illegal file/path chars
-      .replace(/\s+/g, ' ')
-      .replace(/\s+\./g, '.')
-      .trim();
+    const sanitizedFileName = sanitizeHojaPdfFileName(fileName);
 
     const folderPath = `${folderBase}/${jobId}`;
     const filePath = `${folderPath}/${sanitizedFileName}`;
@@ -74,7 +82,8 @@ export const uploadPdfToJob = async (
       .from("job-documents")
       .upload(filePath, pdfBlob, {
         cacheControl: '3600',
-        upsert: false
+        upsert: false,
+        contentType: 'application/pdf',
       });
 
     console.log('Upload result:', { uploadData, uploadError });
