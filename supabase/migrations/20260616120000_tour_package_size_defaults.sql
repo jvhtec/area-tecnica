@@ -206,7 +206,7 @@ SET
 WHERE is_tour_pack_only IS TRUE;
 
 WITH unique_s_sets AS (
-  SELECT tour_id, department, min(id) AS default_set_id, count(*) AS match_count
+  SELECT tour_id, department, min(id::text)::uuid AS default_set_id, count(*) AS match_count
   FROM public.tour_default_sets
   WHERE package_size = 's'
     AND department = ANY (ARRAY['sound'::text, 'lights'::text, 'video'::text])
@@ -222,7 +222,7 @@ WHERE td.is_tour_pack_only IS TRUE
   AND unique_s_sets.department = 'sound';
 
 WITH unique_s_sets AS (
-  SELECT tour_id, department, min(id) AS default_set_id, count(*) AS match_count
+  SELECT tour_id, department, min(id::text)::uuid AS default_set_id, count(*) AS match_count
   FROM public.tour_default_sets
   WHERE package_size = 's'
     AND department = ANY (ARRAY['sound'::text, 'lights'::text, 'video'::text])
@@ -238,7 +238,7 @@ WHERE td.is_tour_pack_only IS TRUE
   AND unique_s_sets.department = 'lights';
 
 WITH unique_s_sets AS (
-  SELECT tour_id, department, min(id) AS default_set_id, count(*) AS match_count
+  SELECT tour_id, department, min(id::text)::uuid AS default_set_id, count(*) AS match_count
   FROM public.tour_default_sets
   WHERE package_size = 's'
     AND department = ANY (ARRAY['sound'::text, 'lights'::text, 'video'::text])
