@@ -246,6 +246,17 @@ serve(async (req: Request) => {
                 lastErr = obj.error;
                 continue;
               }
+              if (Array.isArray(obj.errors) && obj.errors.length) {
+                lastErr = obj.errors.map((e: unknown) => String(e)).join(", ");
+                continue;
+              }
+              if (typeof obj.status === "string") {
+                const lowered = obj.status.toLowerCase();
+                if (["error", "fail", "failed"].includes(lowered)) {
+                  lastErr = typeof obj.message === "string" ? obj.message : obj.status;
+                  continue;
+                }
+              }
             }
 
             ok = true;
