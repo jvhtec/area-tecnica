@@ -141,10 +141,10 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
               {isTourDefaults && (
                 <div className="flex items-center justify-center gap-2 mt-2">
                   <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    Tour Defaults Mode
+                    Modo Valores por Defecto
                   </Badge>
                   <p className="text-sm text-muted-foreground">
-                    Creating defaults for: <span className="font-medium">{tourName}</span>
+                    Creando valores por defecto para: <span className="font-medium">{tourName}</span>
                   </p>
                 </div>
               )}
@@ -200,11 +200,11 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
-                      <p className="text-sm font-medium text-blue-900">Job Override Mode Active</p>
+                      <p className="text-sm font-medium text-blue-900">Modo Anulación de Trabajo Activo</p>
                     </div>
                     <p className="text-sm text-blue-700 mt-1">
-                      This job is part of a tour. Any tables you create will be saved as overrides for the specific tour
-                      date.
+                      Este trabajo forma parte de una gira. Las tablas que crees se guardarán como anulaciones para la
+                      fecha de gira específica.
                     </p>
                   </div>
                 )}
@@ -214,11 +214,12 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                   <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 bg-green-500 rounded-full"></div>
-                      <p className="text-sm font-medium text-green-900">Tour Defaults Mode Active</p>
+                      <p className="text-sm font-medium text-green-900">Modo Conjunto por Defecto de Gira Activo</p>
                     </div>
                     <p className="text-sm text-green-700 mt-1">
-                      Any tables you create will be saved as global defaults for this tour. These defaults will apply to
-                      all tour dates unless specifically overridden.
+                      Las tablas que crees se guardarán en el conjunto/paquete de Sonido seleccionado. Las fechas de gira
+                      solo usarán ese conjunto cuando su paquete de Sonido o pin explícito lo resuelva; las anulaciones
+                      por fecha siguen teniendo prioridad.
                     </p>
                   </div>
                 )}
@@ -228,10 +229,10 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <div className="flex items-center gap-2">
                       <div className="h-2 w-2 bg-blue-500 rounded-full"></div>
-                      <p className="text-sm font-medium text-blue-900">Override Mode Active</p>
+                      <p className="text-sm font-medium text-blue-900">Modo Anulación Activo</p>
                     </div>
                     <p className="text-sm text-blue-700 mt-1">
-                      Any tables you create will be saved as overrides for this specific tour date.
+                      Las tablas que crees se guardarán como anulaciones para esta fecha de gira específica.
                     </p>
                   </div>
                 )}
@@ -250,22 +251,22 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
 
                 {(isDefaults || isTourDefaults) && (
                   <div className="space-y-3 rounded-lg border p-4">
-                    <h3 className="text-sm font-semibold">Sound default set</h3>
+                    <h3 className="text-sm font-semibold">Conjunto por defecto de Sonido</h3>
                     <div className="space-y-2">
-                      <Label>Existing set</Label>
+                      <Label>Conjunto existente</Label>
                       <Select
                         value={selectedDefaultSetId || "new"}
                         onValueChange={(value) => setSelectedDefaultSetId(value === "new" ? "" : value)}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select default set" />
+                          <SelectValue placeholder="Selecciona un conjunto" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="new">Create new set</SelectItem>
+                          <SelectItem value="new">Crear conjunto</SelectItem>
                           {defaultSets.map((set) => (
                             <SelectItem key={set.id} value={set.id}>
                               {set.name}
-                              {set.package_size ? ` (${TOUR_PACKAGE_LABELS[set.package_size as TourPackageSize]})` : " (Unassigned)"}
+                              {set.package_size ? ` (${TOUR_PACKAGE_LABELS[set.package_size as TourPackageSize]})` : " (Sin asignar)"}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -274,16 +275,16 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                     {!selectedDefaultSetId && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-2">
-                          <Label htmlFor="newWeightDefaultSetName">New set name</Label>
+                          <Label htmlFor="newWeightDefaultSetName">Nombre del nuevo conjunto</Label>
                           <Input
                             id="newWeightDefaultSetName"
                             value={newDefaultSetName}
                             onChange={(event) => setNewDefaultSetName(event.target.value)}
-                            placeholder="Sound S weights"
+                            placeholder="Pesos Sonido S"
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Package size</Label>
+                          <Label>Tamaño de paquete</Label>
                           <Select
                             value={selectedDefaultPackageSize}
                             onValueChange={(value) =>
@@ -291,10 +292,10 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Package size" />
+                              <SelectValue placeholder="Tamaño de paquete" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              <SelectItem value="unassigned">Sin asignar</SelectItem>
                               {TOUR_PACKAGE_SIZES.map((size) => (
                                 <SelectItem key={size} value={size}>
                                   {TOUR_PACKAGE_LABELS[size]}

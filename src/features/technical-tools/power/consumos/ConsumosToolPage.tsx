@@ -336,22 +336,22 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
 
                 {isTourDefaults && (
                   <div className="space-y-3 rounded-lg border p-4">
-                    <h3 className="text-sm font-semibold">Default set</h3>
+                    <h3 className="text-sm font-semibold">Conjunto por defecto</h3>
                     <div className="space-y-2">
-                      <Label>Existing set</Label>
+                      <Label>Conjunto existente</Label>
                       <Select
                         value={selectedDefaultSetId || "new"}
                         onValueChange={(value) => setSelectedDefaultSetId(value === "new" ? "" : value)}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select default set" />
+                          <SelectValue placeholder="Selecciona un conjunto" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="new">Create new set</SelectItem>
+                          <SelectItem value="new">Crear conjunto</SelectItem>
                           {defaultSets.map((set) => (
                             <SelectItem key={set.id} value={set.id}>
                               {set.name}
-                              {set.package_size ? ` (${TOUR_PACKAGE_LABELS[set.package_size]})` : " (Unassigned)"}
+                              {set.package_size ? ` (${TOUR_PACKAGE_LABELS[set.package_size]})` : " (Sin asignar)"}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -360,7 +360,7 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                     {!selectedDefaultSetId && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div className="space-y-2">
-                          <Label htmlFor="newDefaultSetName">New set name</Label>
+                          <Label htmlFor="newDefaultSetName">Nombre del nuevo conjunto</Label>
                           <Input
                             id="newDefaultSetName"
                             value={newDefaultSetName}
@@ -369,7 +369,7 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label>Package size</Label>
+                          <Label>Tamaño de paquete</Label>
                           <Select
                             value={selectedDefaultPackageSize}
                             onValueChange={(value) =>
@@ -377,10 +377,10 @@ export const ConsumosToolPage: React.FC<{ config: ConsumosDepartmentConfig }> = 
                             }
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Package size" />
+                              <SelectValue placeholder="Tamaño de paquete" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="unassigned">Unassigned</SelectItem>
+                              <SelectItem value="unassigned">Sin asignar</SelectItem>
                               {TOUR_PACKAGE_SIZES.map((size) => (
                                 <SelectItem key={size} value={size}>
                                   {TOUR_PACKAGE_LABELS[size]}
