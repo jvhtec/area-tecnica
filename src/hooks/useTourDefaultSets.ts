@@ -288,6 +288,56 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
     },
   });
 
+  // Copy selected child tables into an existing set
+  const copyTablesToSetMutation = useMutation({
+    mutationFn: async ({
+      tableIds,
+      targetSetId,
+    }: {
+      tableIds: string[];
+      targetSetId: string;
+    }) => {
+      const sourceTables = defaultTables.filter((table) => tableIds.includes(table.id));
+      if (sourceTables.length === 0) {
+        throw new Error("No default tables selected");
+      }
+
+      const { data, error } = await supabase
+        .from("tour_default_tables")
+        .insert(
+          sourceTables.map((table) => ({
+            set_id: targetSetId,
+            table_name:
+              table.set_id === targetSetId
+                ? `${table.table_name} Copy`
+                : table.table_name,
+            table_data: table.table_data,
+            table_type: table.table_type,
+            total_value: table.total_value,
+            metadata: table.metadata,
+          })),
+        )
+        .select();
+
+      if (error) throw error;
+      return data as TourDefaultTable[];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-default-tables", tourId) });
+      toast({
+        title: "Success",
+        description: "Default table(s) copied successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to copy default tables",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete default table
   const deleteTableMutation = useMutation({
     mutationFn: async (tableId: string) => {
@@ -326,6 +376,7 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
     deleteSet: deleteSetMutation.mutateAsync,
     deleteTable: deleteTableMutation.mutateAsync,
     duplicateSet: duplicateSetMutation.mutateAsync,
+    copyTablesToSet: copyTablesToSetMutation.mutateAsync,
     isCreatingSet: createSetMutation.isPending,
     isUpdatingSet: updateSetMutation.isPending,
     isCreatingTable: createTableMutation.isPending,
@@ -333,5 +384,6 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
     isDeletingSet: deleteSetMutation.isPending,
     isDeletingTable: deleteTableMutation.isPending,
     isDuplicatingSet: duplicateSetMutation.isPending,
+    isCopyingTables: copyTablesToSetMutation.isPending,
   };
 };
