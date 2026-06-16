@@ -140,6 +140,8 @@ export type WaSendResult = {
 export type WaProdHojaDeRutaDoc = {
   id: string;
   file_name: string | null;
+  file_path?: string | null;
+  source?: "job_documents" | "tour_documents";
 };
 
 export type TourdateSelectorInfo = {

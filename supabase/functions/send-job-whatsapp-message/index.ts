@@ -69,6 +69,187 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: numbe
   }
 }
 
+type SupabaseAdminClient = ReturnType<typeof createClient>;
+
+type HojaDocumentRow = {
+  id?: string;
+  file_name?: string | null;
+  file_path?: string | null;
+  file_type?: string | null;
+  uploaded_at?: string | null;
+};
+
+type HojaAttachment = {
+  source: "job_documents" | "tour_documents";
+  bucket: "job-documents" | "job_documents" | "tour-documents";
+  path: string;
+  filename: string;
+};
+
+const DEPT_PREFIXES = new Set(["sound", "lights", "video", "production", "logistics", "administrative"]);
+
+const normalizeObjectPath = (value: string | null | undefined) => (value || "").replace(/^\/+/, "");
+
+const normalizeText = (value: string) =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+
+const hasHojaDeRutaText = (doc: HojaDocumentRow) => {
+  const text = normalizeText(`${doc.file_name || ""} ${doc.file_path || ""}`);
+  return text.includes("hoja") && (text.includes("ruta") || text.includes("route"));
+};
+
+const isPdfDocument = (doc: HojaDocumentRow) => {
+  const text = normalizeText(`${doc.file_type || ""} ${doc.file_name || ""} ${doc.file_path || ""}`);
+  return text.includes("pdf");
+};
+
+function resolveJobDocumentBucket(filePath: string): "job-documents" | "job_documents" {
+  const first = normalizeObjectPath(filePath).split("/")[0] || "";
+  return DEPT_PREFIXES.has(first) ? "job_documents" : "job-documents";
+}
+
+function isJobHojaDeRutaDocument(doc: HojaDocumentRow, jobId: string): boolean {
+  const path = normalizeObjectPath(doc.file_path);
+  if (!path) return false;
+  if (!isPdfDocument(doc)) return false;
+  if (path.startsWith(`hojas-de-ruta/${jobId}/`)) return true;
+  if (path.startsWith("hojas-de-ruta/") && hasHojaDeRutaText(doc)) return true;
+  if (path.startsWith(`${jobId}/`) && hasHojaDeRutaText(doc)) return true;
+  return hasHojaDeRutaText(doc);
+}
+
+function isTourHojaDeRutaDocument(doc: HojaDocumentRow): boolean {
+  const path = normalizeObjectPath(doc.file_path);
+  if (!path) return false;
+  if (!isPdfDocument(doc)) return false;
+  if (path.startsWith("hojas-de-ruta/")) return true;
+  return hasHojaDeRutaText(doc);
+}
+
+function toHojaAttachment(
+  source: HojaAttachment["source"],
+  doc: HojaDocumentRow,
+  bucket: HojaAttachment["bucket"],
+): HojaAttachment | null {
+  const path = normalizeObjectPath(doc.file_path);
+  if (!path) return null;
+  return {
+    source,
+    bucket,
+    path,
+    filename: (doc.file_name || "Hoja de Ruta.pdf").toString(),
+  };
+}
+
+async function findLatestJobHojaAttachment(
+  supabaseAdmin: SupabaseAdminClient,
+  jobId: string,
+): Promise<HojaAttachment | null> {
+  const { data, error } = await supabaseAdmin
+    .from("job_documents")
+    .select("id, file_name, file_path, file_type, uploaded_at")
+    .eq("job_id", jobId)
+    .order("uploaded_at", { ascending: false })
+    .limit(25);
+
+  if (error) throw error;
+
+  const doc = ((data || []) as HojaDocumentRow[]).find((row) => isJobHojaDeRutaDocument(row, jobId));
+  if (!doc?.file_path) return null;
+  return toHojaAttachment("job_documents", doc, resolveJobDocumentBucket(doc.file_path));
+}
+
+async function findLinkedHojaJobIdsForTourDate(
+  supabaseAdmin: SupabaseAdminClient,
+  tourDateId: string,
+  currentJobId: string,
+): Promise<string[]> {
+  const { data, error } = await supabaseAdmin
+    .from("hoja_de_ruta")
+    .select("job_id")
+    .eq("tour_date_id", tourDateId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) throw error;
+
+  return Array.from(new Set(
+    ((data || []) as Array<{ job_id?: string | null }>)
+      .map((row) => row.job_id)
+      .filter((id): id is string => Boolean(id && id !== currentJobId))
+  ));
+}
+
+async function resolveTourIdFromTourDate(
+  supabaseAdmin: SupabaseAdminClient,
+  tourDateId: string | null,
+): Promise<string | null> {
+  if (!tourDateId) return null;
+
+  const { data, error } = await supabaseAdmin
+    .from("tour_dates")
+    .select("tour_id")
+    .eq("id", tourDateId)
+    .maybeSingle();
+
+  if (error) throw error;
+  const tourId = (data as { tour_id?: string | null } | null)?.tour_id;
+  return typeof tourId === "string" && tourId ? tourId : null;
+}
+
+async function findLatestTourHojaAttachment(
+  supabaseAdmin: SupabaseAdminClient,
+  tourId: string,
+): Promise<HojaAttachment | null> {
+  const { data, error } = await supabaseAdmin
+    .from("tour_documents")
+    .select("id, file_name, file_path, file_type, uploaded_at")
+    .eq("tour_id", tourId)
+    .order("uploaded_at", { ascending: false })
+    .limit(25);
+
+  if (error) throw error;
+
+  const doc = ((data || []) as HojaDocumentRow[]).find(isTourHojaDeRutaDocument);
+  return doc ? toHojaAttachment("tour_documents", doc, "tour-documents") : null;
+}
+
+async function resolveHojaAttachment(
+  supabaseAdmin: SupabaseAdminClient,
+  jobId: string,
+): Promise<HojaAttachment | null> {
+  const directJobDoc = await findLatestJobHojaAttachment(supabaseAdmin, jobId);
+  if (directJobDoc) return directJobDoc;
+
+  const { data: jobRow, error: jobErr } = await supabaseAdmin
+    .from("jobs")
+    .select("id, tour_id, tour_date_id")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+
+  const jobContext = (jobRow || {}) as { tour_id?: string | null; tour_date_id?: string | null };
+  const tourDateId = typeof jobContext.tour_date_id === "string" ? jobContext.tour_date_id : null;
+
+  if (tourDateId) {
+    const linkedJobIds = await findLinkedHojaJobIdsForTourDate(supabaseAdmin, tourDateId, jobId);
+    for (const linkedJobId of linkedJobIds) {
+      const linkedJobDoc = await findLatestJobHojaAttachment(supabaseAdmin, linkedJobId);
+      if (linkedJobDoc) return linkedJobDoc;
+    }
+  }
+
+  const tourId = typeof jobContext.tour_id === "string" && jobContext.tour_id
+    ? jobContext.tour_id
+    : await resolveTourIdFromTourDate(supabaseAdmin, tourDateId);
+
+  return tourId ? findLatestTourHojaAttachment(supabaseAdmin, tourId) : null;
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method Not Allowed" }, { status: 405 });
@@ -137,26 +318,16 @@ serve(async (req: Request) => {
     const attachHojaDeRuta = Boolean(body.attach_hoja_de_ruta);
     let attachment: { url: string; filename: string } | null = null;
     if (attachHojaDeRuta) {
-      const { data: docRows, error: docErr } = await supabaseAdmin
-        .from("job_documents")
-        .select("file_name, file_path")
-        .eq("job_id", jobId)
-        .like("file_path", `hojas-de-ruta/${jobId}/%`)
-        .order("uploaded_at", { ascending: false })
-        .limit(1);
-
-      if (docErr) throw docErr;
-
-      const doc = docRows?.[0];
-      if (!doc?.file_path) {
+      const doc = await resolveHojaAttachment(supabaseAdmin, jobId);
+      if (!doc) {
         return jsonResponse({ error: "Bad Request", reason: "hoja_de_ruta_not_found" }, { status: 400 });
       }
 
       // 7 days: the link must stay alive in the chat, not just survive the send.
       // (Used both by sendFile and by the WAHA Core text-link fallback.)
       const { data: signed, error: signErr } = await supabaseAdmin.storage
-        .from("job-documents")
-        .createSignedUrl(doc.file_path, 60 * 60 * 24 * 7);
+        .from(doc.bucket)
+        .createSignedUrl(doc.path, 60 * 60 * 24 * 7);
 
       if (signErr || !signed?.signedUrl) {
         console.error("Failed to sign Hoja de Ruta URL:", signErr);
@@ -165,7 +336,7 @@ serve(async (req: Request) => {
 
       attachment = {
         url: signed.signedUrl,
-        filename: (doc.file_name || "Hoja de Ruta.pdf").toString(),
+        filename: doc.filename,
       };
     }
 
