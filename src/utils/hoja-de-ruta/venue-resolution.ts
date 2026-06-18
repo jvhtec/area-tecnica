@@ -21,13 +21,26 @@ const normalizeAddressForComparison = (value: string): string =>
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .trim();
 
+const parseCoordinate = (value: unknown): number | undefined => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== "string") return undefined;
+
+  const normalized = value.trim();
+  if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(normalized)) {
+    return undefined;
+  }
+
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
 export const normalizeVenueCoordinates = (
   value: VenueCoordinatesInput | null | undefined
 ): { lat: number; lng: number } | undefined => {
-  const lat = typeof value?.lat === "number" ? value.lat : Number.parseFloat(String(value?.lat ?? ""));
-  const lng = typeof value?.lng === "number" ? value.lng : Number.parseFloat(String(value?.lng ?? ""));
+  const lat = parseCoordinate(value?.lat);
+  const lng = parseCoordinate(value?.lng);
 
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  if (lat === undefined || lng === undefined) return undefined;
   if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return undefined;
 
   return { lat, lng };

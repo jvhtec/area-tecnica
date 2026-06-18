@@ -1,47 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { fromMock } = vi.hoisted(() => ({
-  fromMock: vi.fn(),
-}));
+import {
+  createMockQueryBuilder,
+  mockSupabase,
+  resetMockSupabase,
+  type MockSupabaseResult,
+} from "@/test/mockSupabase";
 
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: {
-    from: fromMock,
-  },
+  supabase: mockSupabase,
 }));
 
 import { loadHojaDeRutaPdfData } from "@/utils/hoja-de-ruta/load-hoja-de-ruta-pdf-data";
 
-type QueryResult = {
-  data: unknown;
-  error: unknown;
-};
-
-const createQuery = (result: QueryResult) => {
-  const query: {
-    select: ReturnType<typeof vi.fn>;
-    eq: ReturnType<typeof vi.fn>;
-    maybeSingle: ReturnType<typeof vi.fn>;
-    then: Promise<QueryResult>["then"];
-  } = {
-    select: vi.fn(),
-    eq: vi.fn(),
-    maybeSingle: vi.fn(),
-    then: Promise.resolve(result).then.bind(Promise.resolve(result)),
-  };
-
-  query.select.mockReturnValue(query);
-  query.eq.mockReturnValue(query);
-  query.maybeSingle.mockResolvedValue(result);
-
-  return query;
-};
-
 describe("loadHojaDeRutaPdfData", () => {
   beforeEach(() => {
-    fromMock.mockReset();
+    resetMockSupabase();
 
-    const results: Record<string, QueryResult> = {
+    const results: Record<string, MockSupabaseResult> = {
       hoja_de_ruta: {
         data: {
           id: "hoja-1",
@@ -73,7 +49,13 @@ describe("loadHojaDeRutaPdfData", () => {
       },
     };
 
-    fromMock.mockImplementation((table: string) => createQuery(results[table]));
+    mockSupabase.from.mockImplementation((table: string) => {
+      const result = results[table];
+      if (!result) {
+        throw new Error(`Unexpected mocked table: ${table}`);
+      }
+      return createMockQueryBuilder(result);
+    });
   });
 
   it("keeps the saved Hoja venue when a department can also read the job catalog location", async () => {

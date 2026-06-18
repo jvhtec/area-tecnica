@@ -72,4 +72,11 @@ describe("normalizeVenueCoordinates", () => {
     });
     expect(normalizeVenueCoordinates({ lat: 120, lng: -3.4776 })).toBeUndefined();
   });
+
+  it("rejects partially numeric coordinate strings", () => {
+    expect(normalizeVenueCoordinates({
+      lat: "40.4552abc",
+      lng: "-3.4776",
+    })).toBeUndefined();
+  });
 });
