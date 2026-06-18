@@ -265,7 +265,14 @@ export const ModernEventSection: React.FC<ModernEventSectionProps> = ({
                   value={eventData.venue.address}
                   onChange={(e) => setEventData(prev => ({
                     ...prev,
-                    venue: { ...prev.venue, address: e.target.value }
+                    // Free-text edits invalidate coordinates selected for the
+                    // previous address. The map/QR will geocode the new text
+                    // until the user selects a precise place again.
+                    venue: {
+                      ...prev.venue,
+                      address: e.target.value,
+                      coordinates: undefined,
+                    }
                   }))}
                   placeholder="Ej. Calle Mayor 123, Madrid"
                   className="border-2 focus:border-purple-300"
