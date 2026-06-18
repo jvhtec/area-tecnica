@@ -619,7 +619,9 @@ export const generateAndMergeFestivalPDFs = async (
             jobTitle: jobTitle || 'Festival',
             logoUrl,
             venue: {
-              address: resolvedVenue.address || jobData.description || undefined,
+              address:
+                resolvedVenue.address ||
+                (!resolvedVenue.coordinates ? jobData.description || undefined : undefined),
               coordinates: resolvedVenue.coordinates,
             },
             jobDates

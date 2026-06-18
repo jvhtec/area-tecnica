@@ -136,7 +136,8 @@ export class DriverCertificatePDFEngine {
   private async addVenueSection(eventData: EventData, yPosition: number, venueMapPreview: string | null): Promise<number> {
     const venueName = (eventData.venue?.name || '').trim();
     const venueAddress = (eventData.venue?.address || '').trim();
-    const hasVenueData = Boolean(venueName || venueAddress || venueMapPreview);
+    const venueDestinationUrl = MapService.generateVenueDestinationUrl(eventData.venue);
+    const hasVenueData = Boolean(venueName || venueDestinationUrl || venueMapPreview);
     if (!hasVenueData) return yPosition;
 
     yPosition = this.addSectionTitle('Recinto', yPosition);
