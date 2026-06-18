@@ -17,6 +17,10 @@ import { generateWeatherPDF, WeatherPdfData } from './weatherPdfGenerator';
 import { ensurePublicArtistFormLinks } from '../publicArtistFormLinks';
 import { buildReadableFilename } from '@/utils/fileName';
 import {
+  normalizeVenueCoordinates,
+  resolveHojaVenue,
+} from '@/utils/hoja-de-ruta/venue-resolution';
+import {
   attachShiftAssignmentsAndProfiles,
   buildArtistTableArtists,
   buildInfrastructureArtists,
@@ -538,16 +542,68 @@ export const generateAndMergeFestivalPDFs = async (
       console.log("Starting weather PDF generation");
       
       try {
-        // Fetch job details to get location info
-        const { data: jobData, error: jobError } = await supabase
-          .from("jobs")
-          .select("*")
-          .eq("id", jobId)
-          .single();
+        const [
+          { data: jobData, error: jobError },
+          { data: hojaVenue, error: hojaVenueError },
+        ] = await Promise.all([
+          supabase
+            .from("jobs")
+            .select("start_time, end_time, location_id, description")
+            .eq("id", jobId)
+            .single(),
+          supabase
+            .from("hoja_de_ruta")
+            .select("venue_name, venue_address, venue_latitude, venue_longitude")
+            .eq("job_id", jobId)
+            .maybeSingle(),
+        ]);
         
         if (jobError) {
           console.error("Error fetching job data for weather:", jobError);
         } else {
+          if (hojaVenueError) {
+            console.warn("Unable to load saved Hoja venue for festival weather PDF:", hojaVenueError);
+          }
+
+          let catalogLocation:
+            | {
+                name?: string | null;
+                formatted_address?: string | null;
+                latitude?: number | null;
+                longitude?: number | null;
+              }
+            | null = null;
+
+          if (jobData.location_id) {
+            const { data, error } = await supabase
+              .from("locations")
+              .select("name, formatted_address, latitude, longitude")
+              .eq("id", jobData.location_id)
+              .maybeSingle();
+
+            if (error) {
+              console.warn("Unable to load catalog location for festival weather PDF:", error);
+            } else {
+              catalogLocation = data;
+            }
+          }
+
+          const resolvedVenue = resolveHojaVenue({
+            name: hojaVenue?.venue_name,
+            address: hojaVenue?.venue_address,
+            coordinates: {
+              lat: hojaVenue?.venue_latitude,
+              lng: hojaVenue?.venue_longitude,
+            },
+          }, {
+            name: catalogLocation?.name,
+            address: catalogLocation?.formatted_address || catalogLocation?.name,
+            coordinates: normalizeVenueCoordinates({
+              lat: catalogLocation?.latitude,
+              lng: catalogLocation?.longitude,
+            }),
+          });
+
           // Get job dates
           const startDate = new Date(jobData.start_time);
           const endDate = new Date(jobData.end_time);
@@ -563,7 +619,10 @@ export const generateAndMergeFestivalPDFs = async (
             jobTitle: jobTitle || 'Festival',
             logoUrl,
             venue: {
-              address: jobData.description // Using description as venue address fallback
+              address:
+                resolvedVenue.address ||
+                (!resolvedVenue.coordinates ? jobData.description || undefined : undefined),
+              coordinates: resolvedVenue.coordinates,
             },
             jobDates
           };

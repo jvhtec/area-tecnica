@@ -14,6 +14,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { isAuxiliaryMachineryType } from "@/constants/hojaDeRutaAuxiliaryNeeds";
 import { normalizeHojaDeRutaPrintSections } from "@/utils/hoja-de-ruta/pdf/section-options";
+import {
+  normalizeVenueCoordinates,
+  resolveHojaVenue,
+} from "@/utils/hoja-de-ruta/venue-resolution";
 
 
 
@@ -183,7 +187,8 @@ export const useHojaDeRutaPersistence = (
 
       console.log("🔄 FETCH: Transforming data to frontend format");
 
-      // Attempt to get venue from the job's location as the primary source
+      // Load the job location only as a fallback. The saved Hoja venue may be
+      // intentionally corrected or more precise than the catalog location.
       let venueFromJob: { name?: string; address?: string; coordinates?: { lat: number; lng: number } } | null = null;
       try {
         const { data: jobRec, error: jobErr } = await supabase
@@ -202,9 +207,10 @@ export const useHojaDeRutaPersistence = (
             venueFromJob = {
               name: loc.name || undefined,
               address: (loc.formatted_address || loc.name) || undefined,
-              coordinates: (typeof loc.latitude === 'number' && typeof loc.longitude === 'number')
-                ? { lat: loc.latitude, lng: loc.longitude }
-                : undefined,
+              coordinates: normalizeVenueCoordinates({
+                lat: loc.latitude,
+                lng: loc.longitude,
+              }),
             };
           }
         }
@@ -216,14 +222,14 @@ export const useHojaDeRutaPersistence = (
       const eventData: EventData = {
         eventName: mainData.event_name || '',
         eventDates: mainData.event_dates || '',
-        venue: venueFromJob || {
+        venue: resolveHojaVenue({
           name: mainData.venue_name || '',
           address: mainData.venue_address || '',
           coordinates: mainData.venue_latitude != null && mainData.venue_longitude != null ? {
             lat: Number(mainData.venue_latitude),
             lng: Number(mainData.venue_longitude)
           } : undefined
-        },
+        }, venueFromJob),
         contacts: contacts?.length ? contacts.map(c => ({
           name: c.name,
           role: c.role || '',

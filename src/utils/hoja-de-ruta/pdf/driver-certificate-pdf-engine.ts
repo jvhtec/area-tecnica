@@ -136,7 +136,8 @@ export class DriverCertificatePDFEngine {
   private async addVenueSection(eventData: EventData, yPosition: number, venueMapPreview: string | null): Promise<number> {
     const venueName = (eventData.venue?.name || '').trim();
     const venueAddress = (eventData.venue?.address || '').trim();
-    const hasVenueData = Boolean(venueName || venueAddress || venueMapPreview);
+    const venueDestinationUrl = MapService.generateVenueDestinationUrl(eventData.venue);
+    const hasVenueData = Boolean(venueName || venueDestinationUrl || venueMapPreview);
     if (!hasVenueData) return yPosition;
 
     yPosition = this.addSectionTitle('Recinto', yPosition);
@@ -158,7 +159,7 @@ export class DriverCertificatePDFEngine {
 
     const mapWidth = this.pdfDoc.dimensions.width - 40;
     const mapHeight = 65;
-    const mapDataUrl = await this.resolveVenueMapDataUrl(venueAddress, venueMapPreview, mapWidth, mapHeight);
+    const mapDataUrl = await this.resolveVenueMapDataUrl(eventData.venue, venueMapPreview, mapWidth, mapHeight);
 
     if (mapDataUrl) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 75);
@@ -567,20 +568,21 @@ export class DriverCertificatePDFEngine {
   }
 
   private async resolveVenueMapDataUrl(
-    venueAddress: string,
+    venue: EventData['venue'],
     venueMapPreview: string | null,
     mapWidth: number,
     mapHeight: number
   ): Promise<string | null> {
-    if (venueAddress) {
+    const destinationUrl = MapService.generateVenueDestinationUrl(venue);
+    if (destinationUrl) {
       try {
-        const mapDataUrl = await MapService.getMapImageForAddress(venueAddress, mapWidth, mapHeight);
+        const mapDataUrl = await MapService.getMapImageForVenue(venue, mapWidth, mapHeight);
         if (mapDataUrl) return mapDataUrl;
       } catch (error) {
         console.warn('Unable to fetch venue map for driver certificate:', error);
       }
     }
 
-    return venueMapPreview || null;
+    return destinationUrl ? null : venueMapPreview || null;
   }
 }

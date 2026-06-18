@@ -1,4 +1,6 @@
 import { supabase } from '@/lib/supabase';
+import type { EventData } from '@/types/hoja-de-ruta';
+import { normalizeVenueCoordinates } from '@/utils/hoja-de-ruta/venue-resolution';
 
 export class MapService {
   private static geocodeCache: Map<string, { lat: number; lng: number }> = new Map();
@@ -104,6 +106,31 @@ export class MapService {
     const baseUrl = 'https://www.google.com/maps/dir/';
     const params = `?api=1&destination=${encodeURIComponent(destination)}`;
     return `${baseUrl}${params}`;
+  }
+
+  static generateVenueDestinationUrl(venue: EventData['venue']): string | null {
+    const coordinates = normalizeVenueCoordinates(venue?.coordinates);
+    if (coordinates) {
+      return this.generateDestinationUrl(`${coordinates.lat},${coordinates.lng}`);
+    }
+
+    const address = venue?.address?.trim();
+    return address ? this.generateDestinationUrl(address) : null;
+  }
+
+  static async getMapImageForVenue(
+    venue: EventData['venue'],
+    width: number,
+    height: number,
+    zoom: number = 14
+  ): Promise<string | null> {
+    const coordinates = normalizeVenueCoordinates(venue?.coordinates);
+    if (coordinates) {
+      return this.getStaticMapDataUrl(coordinates.lat, coordinates.lng, width, height, zoom);
+    }
+
+    const address = venue?.address?.trim();
+    return address ? this.getMapImageForAddress(address, width, height, zoom) : null;
   }
 
   /**

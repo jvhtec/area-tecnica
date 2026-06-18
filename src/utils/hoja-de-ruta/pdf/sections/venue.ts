@@ -89,8 +89,10 @@ export class VenueSection {
       yPosition += imgHeight + 10;
     }
 
-    // Add map and QR (generate map via geocoding; fall back to passed preview)
-    if (eventData.venue?.address) {
+    // Prefer exact saved coordinates. Address geocoding is only a fallback,
+    // preventing ambiguous text from pointing the PDF at another venue.
+    const destinationUrl = MapService.generateVenueDestinationUrl(eventData.venue);
+    if (destinationUrl || venueMapPreview) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 120);
 
       const leftMargin = 20;
@@ -101,20 +103,27 @@ export class VenueSection {
       const { width: pageWidth } = this.pdfDoc.dimensions;
       const availableWidth = pageWidth - leftMargin - rightMargin;
       const desiredMapWidth = 100;
-      const sideBySide = availableWidth >= (desiredMapWidth + gap + qrSize);
-      const mapW = sideBySide ? desiredMapWidth : availableWidth;
+      const includeQr = Boolean(destinationUrl);
+      const sideBySide = includeQr && availableWidth >= (desiredMapWidth + gap + qrSize);
+      const mapW = includeQr && sideBySide ? desiredMapWidth : availableWidth;
       const mapX = leftMargin;
       const mapY = yPosition;
       const qrX = sideBySide ? Math.min(leftMargin + mapW + gap, pageWidth - rightMargin - qrSize) : leftMargin;
       const qrY = sideBySide ? yPosition : (yPosition + mapHeight + 10);
 
       let mapDataUrl: string | null = null;
-      try {
-        mapDataUrl = await MapService.getMapImageForAddress(eventData.venue.address, mapW, mapHeight);
-      } catch (e) {
-        console.warn('Venue map fetch failed, will fallback to preview:', e);
+      if (destinationUrl) {
+        try {
+          mapDataUrl = await MapService.getMapImageForVenue(eventData.venue, mapW, mapHeight);
+        } catch (e) {
+          console.warn('Venue map fetch failed:', e);
+        }
       }
-      if (!mapDataUrl && venueMapPreview) {
+
+      // A preview has no stored address/coordinate provenance. Only use it
+      // when there is no venue locator to verify, never as a fallback for a
+      // different saved address.
+      if (!destinationUrl && venueMapPreview) {
         mapDataUrl = venueMapPreview;
       }
 
@@ -138,21 +147,24 @@ export class VenueSection {
       }
 
       // Add QR code for directions (destination-only so device uses current location)
-      try {
-        const destUrl = MapService.generateDestinationUrl(eventData.venue.address);
-        const qrData = await QRService.generateQRCode(destUrl);
-        this.pdfDoc.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize);
-        
-        // Make QR code clickable
-        this.pdfDoc.addLink(destUrl, qrX, qrY, qrSize, qrSize);
-        
-        this.pdfDoc.setText(8, [51, 51, 51]);
-        this.pdfDoc.addText('Escanea para direcciones', qrX, qrY + qrSize + 6);
-      } catch (error) {
-        console.error('Error generating venue QR:', error);
+      if (destinationUrl) {
+        try {
+          const qrData = await QRService.generateQRCode(destinationUrl);
+          this.pdfDoc.addImage(qrData, 'PNG', qrX, qrY, qrSize, qrSize);
+
+          // Make QR code clickable
+          this.pdfDoc.addLink(destinationUrl, qrX, qrY, qrSize, qrSize);
+
+          this.pdfDoc.setText(8, [51, 51, 51]);
+          this.pdfDoc.addText('Escanea para direcciones', qrX, qrY + qrSize + 6);
+        } catch (error) {
+          console.error('Error generating venue QR:', error);
+        }
       }
 
-      const blockBottom = sideBySide ? Math.max(mapY + mapHeight, qrY + qrSize) : (qrY + qrSize);
+      const blockBottom = includeQr
+        ? (sideBySide ? Math.max(mapY + mapHeight, qrY + qrSize) : qrY + qrSize)
+        : mapY + mapHeight;
       yPosition = blockBottom + 15;
     }
 

@@ -4,6 +4,10 @@ import {
   buildFestivalStageOptions,
   buildJobDates,
 } from "@/features/festival-management/selectors";
+import {
+  normalizeVenueCoordinates,
+  resolveHojaVenue,
+} from "@/utils/hoja-de-ruta/venue-resolution";
 import type {
   ArtistRiderFile,
   FestivalDocumentsData,
@@ -21,59 +25,69 @@ type LocationRow = {
 };
 
 type HojaVenueRow = {
+  venue_name?: string | null;
   venue_address?: string | null;
   venue_latitude?: number | null;
   venue_longitude?: number | null;
 };
 
-const mapLocationVenueData = (location: LocationRow | null | undefined): FestivalVenueData => ({
-  address: (location?.formatted_address || location?.name || undefined) as string | undefined,
-  coordinates:
-    typeof location?.latitude === "number" && typeof location?.longitude === "number"
-      ? { lat: location.latitude, lng: location.longitude }
-      : undefined,
-});
+export const resolveFestivalVenueData = (
+  hojaData: HojaVenueRow | null | undefined,
+  location: LocationRow | null | undefined
+): FestivalVenueData => {
+  const venue = resolveHojaVenue({
+    name: hojaData?.venue_name,
+    address: hojaData?.venue_address,
+    coordinates: {
+      lat: hojaData?.venue_latitude,
+      lng: hojaData?.venue_longitude,
+    },
+  }, {
+    name: location?.name,
+    address: location?.formatted_address || location?.name,
+    coordinates: normalizeVenueCoordinates({
+      lat: location?.latitude,
+      lng: location?.longitude,
+    }),
+  });
 
-const mapHojaVenueData = (hojaData: HojaVenueRow | null | undefined): FestivalVenueData => ({
-  address: hojaData?.venue_address || undefined,
-  coordinates:
-    typeof hojaData?.venue_latitude === "number" && typeof hojaData?.venue_longitude === "number"
-      ? { lat: hojaData.venue_latitude, lng: hojaData.venue_longitude }
-      : undefined,
-});
+  return {
+    address: venue.address || undefined,
+    coordinates: venue.coordinates,
+  };
+};
 
-const fetchHojaVenueData = async (jobId: string): Promise<FestivalVenueData> => {
+const fetchHojaVenueData = async (jobId: string): Promise<HojaVenueRow | null> => {
   const { data, error } = await supabase
     .from("hoja_de_ruta")
-    .select("venue_address, venue_latitude, venue_longitude")
+    .select("venue_name, venue_address, venue_latitude, venue_longitude")
     .eq("job_id", jobId)
     .maybeSingle();
 
   if (error || !data) {
-    return {};
+    return null;
   }
 
-  return mapHojaVenueData(data);
+  return data;
 };
 
 const fetchVenueData = async (jobId: string, job: FestivalJob): Promise<FestivalVenueData> => {
-  if (!job.location_id) {
-    console.log("Job has no location_id; attempting hoja_de_ruta fallback");
-    return fetchHojaVenueData(jobId);
+  const [hojaData, locationResult] = await Promise.all([
+    fetchHojaVenueData(jobId),
+    job.location_id
+      ? supabase
+          .from("locations")
+          .select("name, formatted_address, latitude, longitude")
+          .eq("id", job.location_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  if (locationResult.error) {
+    console.warn("Unable to load catalog location for festival venue; using saved Hoja venue:", locationResult.error);
   }
 
-  const { data: location, error } = await supabase
-    .from("locations")
-    .select("name, formatted_address, latitude, longitude")
-    .eq("id", job.location_id)
-    .single();
-
-  if (!error && location) {
-    return mapLocationVenueData(location);
-  }
-
-  console.log("No location found for job; falling back to hoja_de_ruta if available");
-  return fetchHojaVenueData(jobId);
+  return resolveFestivalVenueData(hojaData, locationResult.error ? null : locationResult.data);
 };
 
 const fetchJobDates = async (jobId: string, job: FestivalJob) => {

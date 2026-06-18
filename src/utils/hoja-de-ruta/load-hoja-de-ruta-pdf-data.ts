@@ -2,6 +2,10 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 import { supabase } from '@/integrations/supabase/client';
 import type { EventData, Transport } from '@/types/hoja-de-ruta';
+import {
+  normalizeVenueCoordinates,
+  resolveHojaVenue,
+} from '@/utils/hoja-de-ruta/venue-resolution';
 
 const MADRID_TIMEZONE = 'Europe/Madrid';
 
@@ -25,15 +29,6 @@ const normalizeTransportType = (value: string | null | undefined): Transport['tr
   }
 
   return 'furgoneta';
-};
-
-const toCoordinate = (value: unknown): number | undefined => {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number.parseFloat(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return undefined;
 };
 
 export interface HojaDeRutaPdfData {
@@ -71,7 +66,9 @@ export const loadHojaDeRutaPdfData = async (jobId: string): Promise<HojaDeRutaPd
   if (contactsError) throw contactsError;
   if (transportError) throw transportError;
   if (imagesError) throw imagesError;
-  if (jobError) throw jobError;
+  if (jobError) {
+    console.warn('Unable to load job location for Hoja de Transportes; using saved Hoja venue:', jobError);
+  }
 
   let venueFromJob:
     | {
@@ -81,34 +78,37 @@ export const loadHojaDeRutaPdfData = async (jobId: string): Promise<HojaDeRutaPd
       }
     | undefined;
 
-  if (jobRow?.location_id) {
+  if (!jobError && jobRow?.location_id) {
     const { data: locationData, error: locationError } = await supabase
       .from('locations')
       .select('name,formatted_address,latitude,longitude')
       .eq('id', jobRow.location_id)
       .maybeSingle();
 
-    if (locationError) throw locationError;
+    if (locationError) {
+      console.warn('Unable to load catalog location for Hoja de Transportes; using saved Hoja venue:', locationError);
+    }
 
-    if (locationData) {
-      const lat = toCoordinate(locationData.latitude);
-      const lng = toCoordinate(locationData.longitude);
-
+    if (!locationError && locationData) {
       venueFromJob = {
         name: locationData.name || undefined,
         address: locationData.formatted_address || locationData.name || undefined,
-        coordinates: lat !== undefined && lng !== undefined ? { lat, lng } : undefined,
+        coordinates: normalizeVenueCoordinates({
+          lat: locationData.latitude,
+          lng: locationData.longitude,
+        }),
       };
     }
   }
 
-  const venueLat = toCoordinate(mainData.venue_latitude);
-  const venueLng = toCoordinate(mainData.venue_longitude);
-  const mappedVenue = venueFromJob || {
+  const mappedVenue = resolveHojaVenue({
     name: mainData.venue_name || '',
     address: mainData.venue_address || '',
-    coordinates: venueLat !== undefined && venueLng !== undefined ? { lat: venueLat, lng: venueLng } : undefined,
-  };
+    coordinates: {
+      lat: mainData.venue_latitude,
+      lng: mainData.venue_longitude,
+    },
+  }, venueFromJob);
 
   const mappedContacts = (contacts || []).map((contact) => ({
     name: contact.name || '',

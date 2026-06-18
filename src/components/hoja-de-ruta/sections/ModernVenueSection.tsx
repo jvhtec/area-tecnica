@@ -264,7 +264,9 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
                                 ...prev.venue,
                                 name: name || prev.venue.name,
                                 address: address || prev.venue.address,
-                                coordinates: coordinates || prev.venue.coordinates,
+                                // Never retain coordinates from a previous
+                                // place after selecting a different venue.
+                                coordinates,
                               }
                             }))
                           }
