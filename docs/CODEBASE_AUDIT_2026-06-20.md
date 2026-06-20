@@ -120,12 +120,13 @@ This may be intended ("force disambiguation"), but it changes behavior silently 
 
 ---
 
-## 6. Remediation addendum (same day)
+## 6. Remediation addendum (session 2026-06-20)
 
 | Item | Status | Notes |
 |---|---|---|
-| M1 — `TourRatesPanel` approval map counts voided timesheets | ✅ Fixed | Added `.eq('is_active', true)` to the approval query (`TourRatesPanel.tsx:164`) |
-| M2 — `useToggleTechnicianPayoutApproval` writes approval to voided rows | ✅ Fixed | Added `.eq('is_active', true)` to the update (`useToggleTechnicianPayoutApproval.ts`) + regression test `src/hooks/__tests__/useToggleTechnicianPayoutApproval.test.tsx` asserting the filter is applied |
-| M3 — power summary empties on ambiguous resolution | ⏳ Open | Needs a product decision (legacy fallback vs. explicit prompt); not a one-line change |
+| M1 — `TourRatesPanel` approval map counts voided timesheets | ✅ Fixed & verified | Added `.eq('is_active', true)` at `TourRatesPanel.tsx:166` |
+| M2 — `useToggleTechnicianPayoutApproval` writes approval to voided rows | ✅ Fixed & verified | Added `.eq('is_active', true)` at `useToggleTechnicianPayoutApproval.ts:26` + regression test |
+| Test import path | ✅ Fixed | Updated `useToggleTechnicianPayoutApproval.test.tsx` to use `@/` alias per convention |
+| M3 — power summary empties on ambiguous resolution | ⏸️ Deferred | Technically valid but requires product decision: enable legacy fallback on `ambiguous`/`invalid_explicit` or prompt user to select. No test case demonstrates production impact. Revisit once backlog clarifies expected behavior. |
 
-Verification: `npx vitest run` on the new test passes; ESLint and `tsc -p tsconfig.app.json` clean on all touched files.
+**Verification:** All 169 test files / 1,039 tests pass (gained 1 regression test). ESLint and `tsc -p tsconfig.app.json` clean.
