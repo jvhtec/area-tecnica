@@ -10,7 +10,7 @@ vi.mock("@/integrations/supabase/client", () => ({
   supabase: mockSupabase,
 }));
 
-import { useToggleTechnicianPayoutApproval } from "../useToggleTechnicianPayoutApproval";
+import { useToggleTechnicianPayoutApproval } from "@/hooks/useToggleTechnicianPayoutApproval";
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
