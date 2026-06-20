@@ -117,3 +117,15 @@ This may be intended ("force disambiguation"), but it changes behavior silently 
 **Backlog (unchanged)**
 5. Lint rule banning new direct `.channel(` calls; finish migration to the unified subscription manager.
 6. Break up the 1,000+ LOC tour components; continue phased `any` reduction; consolidate toast systems.
+
+---
+
+## 6. Remediation addendum (same day)
+
+| Item | Status | Notes |
+|---|---|---|
+| M1 — `TourRatesPanel` approval map counts voided timesheets | ✅ Fixed | Added `.eq('is_active', true)` to the approval query (`TourRatesPanel.tsx:164`) |
+| M2 — `useToggleTechnicianPayoutApproval` writes approval to voided rows | ✅ Fixed | Added `.eq('is_active', true)` to the update (`useToggleTechnicianPayoutApproval.ts`) + regression test `src/hooks/__tests__/useToggleTechnicianPayoutApproval.test.tsx` asserting the filter is applied |
+| M3 — power summary empties on ambiguous resolution | ⏳ Open | Needs a product decision (legacy fallback vs. explicit prompt); not a one-line change |
+
+Verification: `npx vitest run` on the new test passes; ESLint and `tsc -p tsconfig.app.json` clean on all touched files.
