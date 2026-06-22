@@ -61,37 +61,41 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
     }
   }, [staticMapUrl, handleVenueMapUrl]);
 
-  // DISABLED: Auto-fetch venue photos from Google Places to avoid API costs (€15/month)
-  // Users should manually upload venue photos instead to keep costs at €0
-  // useEffect(() => {
-  //   const name = eventData.venue?.name?.trim();
-  //   const address = eventData.venue?.address?.trim();
-  //   const query = name || address;
-  //   if (!query) return;
-  //   // Only fetch if we have room for suggestions
-  //   if ((imagePreviews.venue?.length || 0) >= 2) return;
-  //   const key = `${query.toLowerCase()}`;
-  //   if (fetchedQueriesRef.current.has(key)) return;
+  // Auto-suggest a venue photo from Wikimedia (free, no API costs). Users can
+  // still upload their own; suggestions only fill in when there's room.
+  useEffect(() => {
+    const name = eventData.venue?.name?.trim();
+    const address = eventData.venue?.address?.trim();
+    const query = name || address;
+    if (!query) return;
+    // Only fetch if we have room for suggestions
+    if ((imagePreviews.venue?.length || 0) >= 2) return;
+    const key = query.toLowerCase();
+    if (fetchedQueriesRef.current.has(key)) return;
 
-  //   let cancelled = false;
-  //   (async () => {
-  //     try {
-  //       console.log('📸 Fetching venue suggestion photos for:', query);
-  //       const photos = await PlacesImageService.getPhotosForQuery(query, 1, 500, 300);
-  //       if (!cancelled && photos && photos.length) {
-  //         appendVenuePreviews(photos);
-  //         fetchedQueriesRef.current.add(key);
-  //         console.log(`📸 Added ${photos.length} suggested photo(s) for venue`);
-  //       }
-  //     } catch (e) {
-  //       console.warn('Failed to fetch venue suggestion photos:', e);
-  //     }
-  //   })();
+    let cancelled = false;
+    (async () => {
+      try {
+        const photos = await PlacesImageService.getPhotosForQuery(
+          query,
+          1,
+          500,
+          300,
+          eventData.venue?.coordinates,
+        );
+        if (!cancelled && photos && photos.length) {
+          appendVenuePreviews(photos);
+          fetchedQueriesRef.current.add(key);
+        }
+      } catch (e) {
+        console.warn('Failed to fetch venue suggestion photos:', e);
+      }
+    })();
 
-  //   return () => {
-  //     cancelled = true;
-  //   };
-  // }, [eventData.venue?.name, eventData.venue?.address, imagePreviews.venue, appendVenuePreviews]);
+    return () => {
+      cancelled = true;
+    };
+  }, [eventData.venue?.name, eventData.venue?.address, eventData.venue?.coordinates, imagePreviews.venue, appendVenuePreviews]);
 
   const handleLocationUpdate = (coordinates: { lat: number; lng: number }, address: string) => {
     setEventData(prev => ({

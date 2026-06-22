@@ -34,18 +34,34 @@ edge function and is safe to expose to the browser (URL-restricted by design).
 
 ### Phase 2 — Kept on Google, but optimized
 
-Mapbox has no ratings / price level / phone / website / photos, so these stay on
+Mapbox has no ratings / price level / phone / website, so **restaurants** stay on
 Google but are now cheap:
 
-- **Restaurant search/details** (`place-restaurants`) and **venue photos**
-  (`place-photos`) now persist responses in a new `place_api_cache` table
-  (migration `20260622120000_place_api_cache.sql`). Each venue is fetched at most
-  once per cache window (restaurants: 30 days, photos: 180 days).
+- **Restaurant search/details** (`place-restaurants`) now persists responses in a
+  new `place_api_cache` table (migration `20260622120000_place_api_cache.sql`).
+  Each venue is searched at most once per cache window (30 days).
 - `place-restaurants` now geocodes the venue address with **Mapbox** (via
   `_shared/mapboxGeocode.ts`) instead of paid Google Geocoding.
 - The browser fallbacks that called Google directly were removed from
-  `PlacesRestaurantService` and `PlacesImageService` — these features now go
-  exclusively through the edge functions.
+  `PlacesRestaurantService` — restaurants now go exclusively through the edge
+  function.
+
+### Venue/accommodation photos — now free via Wikimedia
+
+The photo feature was previously **disabled everywhere** (commented out) because
+it used the paid Google Places Photo Media API. It is now **re-enabled and free**:
+
+- `place-photos` fetches images from **Wikimedia** — Wikipedia article lead images
+  matching the venue/hotel name, plus a Wikimedia **Commons geosearch** fallback
+  around the coordinates when available. No API key, no billing.
+- Results are cached persistently (180 days) and returned as base64 data URLs so
+  they embed directly into PDFs.
+- Re-enabled call sites: PDF `venue.ts` and `accommodation.ts` auto-fetch, and the
+  live `ModernVenueSection` photo suggestion. Manual uploads still take priority;
+  Wikimedia only fills in when there's room.
+- Coverage note: Wikimedia has photos for most notable venues/arenas/theaters and
+  many hotels, but not every small business. When nothing is found, the section
+  simply falls back to manual upload (unchanged UX).
 
 ### Phase 3 — Hardening (Google key never leaves the server)
 
