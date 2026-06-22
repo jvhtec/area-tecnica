@@ -146,9 +146,6 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
                           )}
                           <h3 className="font-semibold">{group.name}</h3>
                         </div>
-                        {group.client && (
-                          <p className="text-sm text-muted-foreground mt-1">{group.client}</p>
-                        )}
                       </div>
                       <Badge variant="secondary">
                         {group.tasks.length} {group.tasks.length === 1 ? 'tarea' : 'tareas'}

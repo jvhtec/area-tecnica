@@ -124,7 +124,7 @@ serve(async (req) => {
     // Fetch job details separately since there's no foreign key
     const { data: job, error: jobError } = await supabaseAdmin
       .from('jobs')
-      .select('id, title, client_name')
+      .select('id, title')
       .eq('id', timesheet.job_id)
       .single()
 
@@ -198,7 +198,6 @@ serve(async (req) => {
       .replace(/'/g, '&#39;');
     const safeTechName = escapeHtml(techName || 'técnico');
     const safeJobTitle = escapeHtml(jobTitle);
-    const safeClientName = job?.client_name ? escapeHtml(String(job.client_name)) : '';
     const safeTechnicianEmail = escapeHtml(technician.email);
 
     const statusLabel = timesheet.status === 'draft'
@@ -309,13 +308,6 @@ serve(async (req) => {
                       <strong>Trabajo:</strong> ${safeJobTitle}
                     </td>
                   </tr>
-                  ${job?.client_name ? `
-                  <tr>
-                    <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
-                      <strong>Cliente:</strong> ${safeClientName}
-                    </td>
-                  </tr>
-                  ` : ''}
                   <tr>
                     <td style="padding:12px 16px;font-size:14px;color:#374151;border-bottom:1px solid #e5e7eb;">
                       <strong>Fecha:</strong> ${new Date(timesheet.date).toLocaleDateString('es-ES', {

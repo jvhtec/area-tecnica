@@ -13,7 +13,6 @@ export interface FlatPendingTask {
   // Context from parent group
   jobOrTourName: string;
   jobOrTourType: 'job' | 'tour' | 'global';
-  client?: string;
 }
 
 /**
@@ -34,7 +33,6 @@ export function useFlatPendingTasks(userId: string | null, userRole: string | nu
           ...task,
           jobOrTourName: group.name,
           jobOrTourType: group.type,
-          client: group.client,
         });
       });
     });

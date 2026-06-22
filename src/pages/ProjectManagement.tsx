@@ -165,7 +165,7 @@ const ProjectManagement = () => {
       : (selectedJobTypes.length === 0 ||
         selectedJobTypes.map(t => t.toLowerCase()).includes(String(job.job_type || '').toLowerCase()));
     const matchesStatus = selectedJobStatuses.length === 0 || selectedJobStatuses.includes(job.status);
-    const searchableValues = [job.title, job.client, job.location?.name, job.location?.formatted_address]
+    const searchableValues = [job.title, job.location?.name, job.location?.formatted_address]
       .filter(Boolean)
       .map((value: string) => normalizeSearchText(value));
     const matchesSearch =

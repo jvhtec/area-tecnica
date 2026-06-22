@@ -55,15 +55,6 @@ export const useJobIntegration = (jobId: string) => {
       }
     }
 
-    const contacts = [];
-    if (jobDetails.client_name) {
-      contacts.push({
-        name: jobDetails.client_name,
-        role: "Cliente",
-        phone: jobDetails.client_phone || ""
-      });
-    }
-
     const staff = jobDetails.job_assignments?.map((assignment: any) => ({
       name: assignment.profiles?.first_name || "",
       surname1: assignment.profiles?.last_name || "",
@@ -78,7 +69,7 @@ export const useJobIntegration = (jobId: string) => {
         name: jobDetails.venue || "",
         address: jobDetails.location || ""
       },
-      contacts: contacts.length > 0 ? contacts : [{ name: "", role: "", phone: "" }],
+      contacts: [{ name: "", role: "", phone: "" }],
       staff: staff.length > 0 ? staff : [{ name: "", surname1: "", surname2: "", position: "" }],
       logistics: {
         transport: [],

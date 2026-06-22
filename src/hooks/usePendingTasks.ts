@@ -20,7 +20,6 @@ export interface PendingTask {
   created_at: string;
   updated_at: string;
   job_name: string | null;
-  client: string | null;
   tour_name: string | null;
   assignee_first_name: string | null;
   assignee_last_name: string | null;
@@ -31,7 +30,6 @@ export interface GroupedPendingTask {
   id: string;
   type: 'job' | 'tour' | 'global';
   name: string;
-  client?: string;
   tasks: Array<{
     id: string;
     department: 'sound' | 'lights' | 'video' | 'production' | 'administrative';
@@ -124,7 +122,6 @@ export function usePendingTasks(userId: string | null, userRole: string | null, 
             id: groupId,
             type,
             name,
-            client: isGlobal ? undefined : (task.client || undefined),
             tasks: [],
           });
         }
