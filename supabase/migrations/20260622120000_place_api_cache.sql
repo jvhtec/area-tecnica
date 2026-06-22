@@ -21,6 +21,12 @@ create index if not exists idx_place_api_cache_expires_at
 
 alter table public.place_api_cache enable row level security;
 
+-- The place-photos / place-restaurants edge functions access this table with the
+-- service role (which bypasses RLS). Grant explicitly rather than relying on
+-- default privileges (satisfies the Data API grant guard). No grants are issued
+-- to anon/authenticated, and RLS has no policies, so they have no access.
+grant select, insert, update, delete on table public.place_api_cache to service_role;
+
 comment on table public.place_api_cache is
   'Server-side cache for Google Places API responses (place-photos, place-restaurants edge functions). Service-role access only.';
 
