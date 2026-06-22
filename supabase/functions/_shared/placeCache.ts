@@ -49,13 +49,16 @@ export async function setCachedPayload(
       ? new Date(Date.now() + ttlSeconds * 1000).toISOString()
       : null;
 
-    await supabase.from("place_api_cache").upsert({
+    const { error } = await supabase.from("place_api_cache").upsert({
       cache_key: cacheKey,
       kind,
       payload,
       created_at: new Date().toISOString(),
       expires_at,
     });
+    if (error) {
+      console.warn("place cache write failed:", error);
+    }
   } catch (err) {
     console.warn("place cache write failed:", err);
   }

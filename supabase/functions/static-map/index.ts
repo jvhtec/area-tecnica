@@ -4,6 +4,7 @@
 // address. Backed by the Mapbox Static Images API (no Google billing).
 
 import { mapboxGeocode } from '../_shared/mapboxGeocode.ts'
+import { arrayBufferToBase64 } from '../_shared/base64.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -27,7 +28,9 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const token = Deno.env.get('MAPBOX_PUBLIC_TOKEN');
+    // Prefer an unrestricted server token: the public token is URL-restricted
+    // for browser use and would be rejected for server-side (no-Referer) calls.
+    const token = Deno.env.get('MAPBOX_SERVER_TOKEN') ?? Deno.env.get('MAPBOX_PUBLIC_TOKEN');
     if (!token) {
       return new Response(JSON.stringify({ error: 'Mapbox token not available' }), {
         status: 500,
@@ -74,10 +77,11 @@ Deno.serve(async (req) => {
     const overlay = `pin-s+ff0000(${centerLng},${centerLat})`;
     const url = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/${centerLng},${centerLat},${zoom}/${w}x${h}@2x?access_token=${token}`;
 
-    const mapRes = await fetch(url);
+    const mapRes = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!mapRes.ok) {
       const txt = await mapRes.text().catch(()=>'');
-      return new Response(JSON.stringify({ error: 'Static map fetch failed', status: mapRes.status, details: txt }), {
+      console.error('static-map: Mapbox fetch failed', mapRes.status, txt);
+      return new Response(JSON.stringify({ error: 'Static map fetch failed', status: mapRes.status }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -85,7 +89,7 @@ Deno.serve(async (req) => {
 
     const blob = await mapRes.blob();
     const arrayBuffer = await blob.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const base64 = arrayBufferToBase64(arrayBuffer);
     const dataUrl = `data:${blob.type};base64,${base64}`;
 
     return new Response(JSON.stringify({ dataUrl }), {
@@ -93,7 +97,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: 'Internal server error', details: err?.message || String(err) }), {
+    console.error('static-map: internal error', err?.message || String(err));
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

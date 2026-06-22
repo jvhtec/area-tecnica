@@ -81,6 +81,14 @@ it used the paid Google Places Photo Media API. It is now **re-enabled and free*
    npx supabase functions deploy place-photos place-restaurants static-map get-google-maps-key
    ```
 3. **Confirm secrets** (already set, verify): `MAPBOX_PUBLIC_TOKEN`, `GOOGLE_MAPS_API_KEY`.
+   - **Recommended:** set `MAPBOX_SERVER_TOKEN` to an *unrestricted* Mapbox token.
+     The `place-restaurants` and `static-map` edge functions geocode/render
+     server-side (no browser Referer), so a URL-restricted public token can be
+     rejected. They use `MAPBOX_SERVER_TOKEN` when present and fall back to
+     `MAPBOX_PUBLIC_TOKEN` otherwise.
+     ```bash
+     npx supabase secrets set MAPBOX_SERVER_TOKEN=sk.************
+     ```
 4. Deploy the frontend as usual (Cloudflare Pages).
 
 ## Expected outcome

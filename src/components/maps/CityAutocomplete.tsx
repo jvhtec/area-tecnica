@@ -30,8 +30,8 @@ interface PredictionItem {
 export const CityAutocomplete: React.FC<CityAutocompleteProps> = ({
   value,
   onChange,
-  placeholder = "Enter city name",
-  label = "City",
+  placeholder = "Introduce el nombre de la ciudad",
+  label = "Ciudad",
   className,
   id = "city-autocomplete",
   required = false,

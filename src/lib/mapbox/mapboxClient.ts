@@ -101,14 +101,14 @@ export async function getStaticMapUrlForLocation(opts: {
   if (!token) return null;
 
   let { lat, lng } = opts;
-  if ((typeof lat !== 'number' || typeof lng !== 'number') && opts.address) {
+  if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && opts.address) {
     const geocoded = await geocodeForward(opts.address, token);
     if (!geocoded) return null;
     lat = geocoded.lat;
     lng = geocoded.lng;
   }
 
-  if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
 
   return buildStaticMapUrl(token, {
     lat,

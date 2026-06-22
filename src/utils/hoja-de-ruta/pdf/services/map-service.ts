@@ -35,15 +35,16 @@ export class MapService {
     height: number = 320,
     zoom: number = 14
   ): Promise<string | null> {
-    const token = await getMapboxToken();
-    if (!token) return null;
     // Oversample for crisper rendering in PDFs (Mapbox @2x retina tiles)
     const w = Math.min(Math.max(Math.floor(width * 2), 1), 1280);
     const h = Math.min(Math.max(Math.floor(height * 2), 1), 1280);
-    const url = buildStaticMapUrl(token, { lat, lng, width: w, height: h, zoom });
     const cacheKey = `${lat.toFixed(6)},${lng.toFixed(6)}:${w}x${h}:mapbox:${zoom}`;
     const cached = this.mapCache.get(cacheKey);
     if (cached) return cached;
+
+    const token = await getMapboxToken();
+    if (!token) return null;
+    const url = buildStaticMapUrl(token, { lat, lng, width: w, height: h, zoom });
     try {
       const res = await fetch(url);
       if (!res.ok) return null;

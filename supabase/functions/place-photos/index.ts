@@ -12,6 +12,10 @@
 
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { getCachedPayload, setCachedPayload } from '../_shared/placeCache.ts'
+import { arrayBufferToBase64 } from '../_shared/base64.ts'
+
+// Abort upstream requests that hang so one slow source can't hold the function open.
+const FETCH_TIMEOUT_MS = 8000
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -59,6 +63,7 @@ async function wikipediaImageUrls(
       })
       const res = await fetch(`https://${lang}.wikipedia.org/w/api.php?${params.toString()}`, {
         headers: { 'User-Agent': WIKIMEDIA_USER_AGENT, Accept: 'application/json' },
+        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       })
       if (!res.ok) continue
       const data = await res.json()
@@ -95,6 +100,7 @@ async function commonsGeosearchUrls(
     })
     const res = await fetch(`https://commons.wikimedia.org/w/api.php?${params.toString()}`, {
       headers: { 'User-Agent': WIKIMEDIA_USER_AGENT, Accept: 'application/json' },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     })
     if (!res.ok) return []
     const data = await res.json()
@@ -115,11 +121,14 @@ async function commonsGeosearchUrls(
 
 async function toDataUrl(url: string): Promise<string | null> {
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': WIKIMEDIA_USER_AGENT } })
+    const res = await fetch(url, {
+      headers: { 'User-Agent': WIKIMEDIA_USER_AGENT },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
     if (!res.ok) return null
     const blob = await res.blob()
     const arrayBuffer = await blob.arrayBuffer()
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+    const base64 = arrayBufferToBase64(arrayBuffer)
     const type = blob.type || 'image/jpeg'
     return `data:${type};base64,${base64}`
   } catch (err) {
@@ -134,10 +143,16 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('place-photos: missing Supabase server configuration')
+      return new Response(
+        JSON.stringify({ error: 'Server configuration missing', photos: [] }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    const supabase = createClient(supabaseUrl, serviceRoleKey)
 
     const { query, lat, lng, maxPhotos = 2, maxWidthPx = 500 }: PhotoRequest = await req.json()
 

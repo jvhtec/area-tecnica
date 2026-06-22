@@ -42,8 +42,8 @@ const getErrorMessage = (error: unknown) => {
 export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   value,
   onChange,
-  placeholder = 'Enter venue address',
-  label = 'Address',
+  placeholder = 'Introduce la dirección del recinto',
+  label = 'Dirección',
   className,
   id,
 }) => {

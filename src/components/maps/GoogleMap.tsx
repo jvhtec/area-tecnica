@@ -105,7 +105,6 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
           center: [center.lng, center.lat],
           zoom: 15,
           interactive,
-          attributionControl: false,
         });
         mapInstanceRef.current = map;
 
@@ -205,7 +204,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
           <div className="absolute inset-0 flex items-center justify-center bg-background/80">
             <div className="flex items-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span className="text-sm">Loading map...</span>
+              <span className="text-sm">Cargando mapa...</span>
             </div>
           </div>
         )}

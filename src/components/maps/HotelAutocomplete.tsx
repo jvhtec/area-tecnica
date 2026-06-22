@@ -79,7 +79,9 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   };
 
   const searchHotels = async (query: string) => {
-    if (!query || query.length < 2 || !token) {
+    const key = token || (await getMapboxToken());
+    if (key && !token) setToken(key);
+    if (!query || query.length < 2 || !key) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -94,7 +96,7 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
     setIsLoading(true);
 
     try {
-      const suggestionsResult = await searchBoxSuggest(query, token, ensureSessionToken(), {
+      const suggestionsResult = await searchBoxSuggest(query, key, ensureSessionToken(), {
         language: 'es',
         types: 'poi',
         poiCategory: 'hotel,motel,hostel,lodging,bed_and_breakfast',

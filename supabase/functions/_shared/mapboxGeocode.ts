@@ -18,6 +18,7 @@ export async function mapboxGeocode(
 
     const res = await fetch(
       `https://api.mapbox.com/search/geocode/v6/forward?${params.toString()}`,
+      { signal: AbortSignal.timeout(8000) },
     );
     if (!res.ok) return null;
 

@@ -31,10 +31,15 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('place-restaurants: missing Supabase server configuration');
+      return new Response(JSON.stringify({ error: 'Server configuration missing' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
     const body = await req.json();
     const { location, radius = 2000, maxResults = 20, placeId, details = false } = body || {};
@@ -105,8 +110,10 @@ Deno.serve(async (req) => {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      // Geocode the address with Mapbox (avoids a paid Google Geocoding call)
-      const mapboxToken = Deno.env.get('MAPBOX_PUBLIC_TOKEN');
+      // Geocode the address with Mapbox (avoids a paid Google Geocoding call).
+      // Prefer an unrestricted server token: the public token is URL-restricted
+      // for browser use and would be rejected for server-side (no-Referer) calls.
+      const mapboxToken = Deno.env.get('MAPBOX_SERVER_TOKEN') ?? Deno.env.get('MAPBOX_PUBLIC_TOKEN');
       if (!mapboxToken) {
         return new Response(JSON.stringify({ error: 'Mapbox token not configured for geocoding' }), {
           status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
