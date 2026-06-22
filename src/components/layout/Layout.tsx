@@ -583,7 +583,6 @@ const Layout = () => {
             task={unacknowledgedTasks[currentTaskIndex]}
             jobOrTourName={unacknowledgedTasks[currentTaskIndex]?.jobOrTourName || ''}
             jobOrTourType={unacknowledgedTasks[currentTaskIndex]?.jobOrTourType || 'job'}
-            client={unacknowledgedTasks[currentTaskIndex]?.client}
             onDismiss={handleSingleTaskDismiss}
             onViewAll={handleViewAllTasks}
             totalPendingCount={unacknowledgedTasks.length}

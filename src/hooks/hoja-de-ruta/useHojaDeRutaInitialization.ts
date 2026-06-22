@@ -38,13 +38,6 @@ export const useHojaDeRutaInitialization = (
   // Token of the initialization run currently in flight (see the effect below)
   const initializingRunRef = useRef<{ jobId: string } | null>(null);
 
-  const buildClientContacts = (jobData: { client_name?: string | null; client_phone?: string | null }) =>
-    jobData.client_name ? [{
-      name: jobData.client_name,
-      role: "Cliente",
-      phone: jobData.client_phone || ""
-    }] : [{ name: "", role: "", phone: "" }];
-
   const normalizeTourContacts = (value: unknown) => {
     if (!Array.isArray(value)) return [];
     return value
@@ -111,10 +104,7 @@ export const useHojaDeRutaInitialization = (
           ? { lat: jobData.location.latitude, lng: jobData.location.longitude }
           : undefined,
       },
-      contacts: mergeContacts(
-        buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
-        tourContacts,
-      ),
+      contacts: mergeContacts(tourContacts),
       logistics: {
         transport: [],
         loadingDetails: "",
@@ -347,10 +337,7 @@ export const useHojaDeRutaInitialization = (
           },
           contacts: savedEventData?.contacts?.length > 0
             ? mergeContacts(savedEventData.contacts, tourContacts)
-            : mergeContacts(
-                buildClientContacts(jobData as { client_name?: string | null; client_phone?: string | null }),
-                tourContacts,
-              ),
+            : mergeContacts(tourContacts),
           logistics: savedEventData?.logistics || {
             transport: [],
             loadingDetails: "",

@@ -33,7 +33,6 @@ interface SingleTaskPopupProps {
   task: Task | null;
   jobOrTourName: string;
   jobOrTourType: 'job' | 'tour' | 'global';
-  client?: string;
   onDismiss: () => void;
   onViewAll: () => void;
   totalPendingCount: number;
@@ -64,7 +63,6 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
   task,
   jobOrTourName,
   jobOrTourType,
-  client,
   onDismiss,
   onViewAll,
   totalPendingCount,
@@ -110,9 +108,6 @@ export const SingleTaskPopup: React.FC<SingleTaskPopupProps> = ({
               )}
               <h3 className="font-semibold">{jobOrTourName}</h3>
             </div>
-            {client && (
-              <p className="text-sm text-muted-foreground mt-1">{client}</p>
-            )}
           </div>
 
           {/* Task Details */}
