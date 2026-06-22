@@ -11,6 +11,7 @@ import type {
   JobDocumentEntry,
 } from "@/features/festival-management/types";
 import { supabase } from "@/integrations/supabase/client";
+import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
 import type { CreateFoldersOptions } from "@/utils/flex-folders";
 import { createAllFoldersForJob, openFlexElement } from "@/utils/flex-folders";
 import { resolveJobDocLocation } from "@/utils/jobDocuments";
@@ -85,27 +86,14 @@ export const loadStaticMapPreviewUrl = async (venueData: FestivalVenueData) => {
     return null;
   }
 
-  const { data, error } = await supabase.functions.invoke("get-google-maps-key");
-  if (error || !data?.apiKey) {
-    console.warn("Failed to load Google Maps API key");
-    return null;
-  }
-
-  const apiKey = data.apiKey as string;
-  const zoom = 13;
-  const width = 400;
-  const height = 200;
-  const scale = 2;
-  const center = venueData.coordinates
-    ? `${venueData.coordinates.lat},${venueData.coordinates.lng}`
-    : encodeURIComponent(venueData.address || "");
-  const markers = venueData.coordinates
-    ? `&markers=color:red|label:V|${venueData.coordinates.lat},${venueData.coordinates.lng}`
-    : venueData.address
-      ? `&markers=color:red|label:V|${encodeURIComponent(venueData.address)}`
-      : "";
-
-  return `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=${zoom}&size=${width}x${height}&scale=${scale}${markers}&key=${encodeURIComponent(apiKey)}`;
+  return getStaticMapUrlForLocation({
+    lat: venueData.coordinates?.lat,
+    lng: venueData.coordinates?.lng,
+    address: venueData.address || undefined,
+    width: 400,
+    height: 200,
+    zoom: 13,
+  });
 };
 
 export const ensureNoExistingFlexFolders = async (jobId: string) => {

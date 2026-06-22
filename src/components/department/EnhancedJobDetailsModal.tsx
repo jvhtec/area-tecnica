@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { dataLayerClient } from '@/services/dataLayerClient';
+import { getStaticMapUrlForLocation } from '@/lib/mapbox/mapboxClient';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -267,26 +268,7 @@ export const EnhancedJobDetailsModal = ({ theme, isDark, job, onClose, userRole,
 
                 setIsMapLoading(true);
 
-                const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
-                if (error || !data?.apiKey) {
-                    setMapPreviewUrl(null);
-                    setIsMapLoading(false);
-                    return;
-                }
-                const apiKey = data.apiKey as string;
-
-                const zoom = 15;
-                const width = 600;
-                const height = 300;
-                const scale = 2;
-                const center = Number.isFinite(lat) && Number.isFinite(lng)
-                    ? `${lat},${lng}`
-                    : encodeURIComponent(address);
-                const markers = Number.isFinite(lat) && Number.isFinite(lng)
-                    ? `&markers=color:red|label:A|${lat},${lng}`
-                    : (address ? `&markers=color:red|label:A|${encodeURIComponent(address)}` : '');
-                const url = `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=${zoom}&size=${width}x${height}&scale=${scale}${markers}&key=${encodeURIComponent(apiKey)}`;
-
+                const url = await getStaticMapUrlForLocation({ lat, lng, address, width: 600, height: 300, zoom: 15 });
                 setMapPreviewUrl(url);
             } catch (e: unknown) {
                 const message = e instanceof Error ? e.message : String(e);

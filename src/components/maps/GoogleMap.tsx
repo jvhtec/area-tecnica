@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Loader2, MapPin } from 'lucide-react';
-import { dataLayerClient } from "@/services/dataLayerClient";
+import {
+  buildStaticMapUrl,
+  geocodeForward,
+  geocodeReverse,
+  getMapboxToken,
+} from '@/lib/mapbox/mapboxClient';
+
 interface GoogleMapProps {
   address?: string;
   coordinates?: { lat: number; lng: number };
@@ -12,8 +18,13 @@ interface GoogleMapProps {
   onStaticMapUrlChange?: (url: string) => void;
 }
 
-// Remove conflicting global type declaration - using typed definitions from src/types/google-maps.d.ts
+const DEFAULT_CENTER = { lat: 40.4168, lng: -3.7038 }; // Madrid
 
+/**
+ * Interactive map backed by Mapbox GL JS. The component name is kept as
+ * `GoogleMap` for backwards compatibility with existing imports, but it no
+ * longer uses any Google Maps APIs (no billing).
+ */
 export const GoogleMap: React.FC<GoogleMapProps> = ({
   address,
   coordinates,
@@ -26,185 +37,152 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const markerRef = useRef<any>(null);
+  const mapboxglRef = useRef<any>(null);
+  const tokenRef = useRef<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState<string | null>(null);
 
-  // Fetch Google Maps API key
-  useEffect(() => {
-    const fetchApiKey = async () => {
-      try {
-        const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
-        
-        if (error) {
-          console.error('Failed to fetch Google Maps API key:', error);
-          setError('Failed to load Google Maps API key');
-          return;
-        }
-        
-        if (data?.apiKey) {
-          setApiKey(data.apiKey);
-        } else {
-          setError('Google Maps API key not found');
-        }
-      } catch (err) {
-        setError('Failed to fetch Google Maps API key');
-        console.error('Error fetching API key:', err);
-      }
-    };
+  // Keep latest callbacks/props for use inside map event handlers
+  const onLocationSelectRef = useRef(onLocationSelect);
+  onLocationSelectRef.current = onLocationSelect;
+  const onStaticMapUrlChangeRef = useRef(onStaticMapUrlChange);
+  onStaticMapUrlChangeRef.current = onStaticMapUrlChange;
 
-    fetchApiKey();
-  }, []);
-
-  // Load Google Maps script
-  useEffect(() => {
-    if (!apiKey) return;
-
-    const loadGoogleMaps = () => {
-      if (window.google) {
-        initializeMap();
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places,geometry`;
-      script.async = true;
-      script.defer = true;
-      
-      (window as any).initGoogleMaps = initializeMap;
-      script.onload = initializeMap;
-      script.onerror = () => setError('Failed to load Google Maps');
-      
-      document.head.appendChild(script);
-    };
-
-    loadGoogleMaps();
-  }, [apiKey]);
-
-  useEffect(() => {
-    if (mapInstanceRef.current) {
-      initializeMap();
+  const resolveCenter = async (token: string): Promise<{ lat: number; lng: number }> => {
+    if (coordinates) return coordinates;
+    if (address) {
+      const geocoded = await geocodeForward(address, token);
+      if (geocoded) return { lat: geocoded.lat, lng: geocoded.lng };
     }
-  }, [address, coordinates]);
+    return DEFAULT_CENTER;
+  };
 
-  const initializeMap = async () => {
-    if (!mapRef.current || !window.google) return;
-
-    try {
-      setIsLoading(true);
-
-      let center = { lat: 40.4168, lng: -3.7038 }; // Default to Madrid
-      
-      // If we have coordinates, use them
-      if (coordinates) {
-        center = coordinates;
-      } else if (address) {
-        // Geocode the address
-        const geocoder = new window.google.maps.Geocoder();
-        try {
-          const result = await new Promise<any>((resolve, reject) => {
-            geocoder.geocode({ address }, (results: any[], status: string) => {
-              if (status === 'OK' && results[0]) {
-                resolve(results[0]);
-              } else {
-                reject(new Error(`Geocoding failed: ${status}`));
-              }
-            });
-          });
-          
-          center = {
-            lat: result.geometry.location.lat(),
-            lng: result.geometry.location.lng(),
-          };
-        } catch (geocodeError) {
-          console.warn('Geocoding failed, using default location');
-        }
-      }
-
-      // Generate static map URL
-      if (onStaticMapUrlChange && apiKey) {
-        const staticMapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${center.lat},${center.lng}&zoom=15&size=600x300&maptype=roadmap&markers=color:red%7C${center.lat},${center.lng}&key=${apiKey}`;
-        onStaticMapUrlChange(staticMapUrl);
-      }
-
-      const mapOptions = {
-        center,
-        zoom: 15,
-        mapTypeId: window.google.maps.MapTypeId.ROADMAP,
-        disableDefaultUI: !interactive,
-        zoomControl: interactive,
-        scrollwheel: interactive,
-        draggable: interactive,
-        mapTypeControl: false,
-        streetViewControl: false,
-        fullscreenControl: false,
-      };
-
-      mapInstanceRef.current = new window.google.maps.Map(mapRef.current, mapOptions);
-
-      // Add marker if requested
-      if (showMarker) {
-        markerRef.current = new window.google.maps.Marker({
-          position: center,
-          map: mapInstanceRef.current,
-          draggable: interactive && !!onLocationSelect,
-          title: address || 'Venue Location',
-        });
-
-        // Handle marker drag
-        if (interactive && onLocationSelect) {
-          markerRef.current.addListener('dragend', () => {
-            const position = markerRef.current.getPosition();
-            const coords = {
-              lat: position.lat(),
-              lng: position.lng(),
-            };
-            
-            // Reverse geocode to get address
-            const geocoder = new window.google.maps.Geocoder();
-            geocoder.geocode({ location: coords }, (results: any[], status: string) => {
-              if (status === 'OK' && results[0]) {
-                onLocationSelect(coords, results[0].formatted_address);
-              } else {
-                onLocationSelect(coords, `${coords.lat}, ${coords.lng}`);
-              }
-            });
-          });
-        }
-      }
-
-      // Handle map clicks for location selection
-      if (interactive && onLocationSelect) {
-        mapInstanceRef.current.addListener('click', (event: any) => {
-          const coords = {
-            lat: event.latLng.lat(),
-            lng: event.latLng.lng(),
-          };
-
-          // Update marker position
-          if (markerRef.current) {
-            markerRef.current.setPosition(coords);
-          }
-
-          // Reverse geocode to get address
-          const geocoder = new window.google.maps.Geocoder();
-          geocoder.geocode({ location: coords }, (results: any[], status: string) => {
-            if (status === 'OK' && results[0]) {
-              onLocationSelect(coords, results[0].formatted_address);
-            } else {
-              onLocationSelect(coords, `${coords.lat}, ${coords.lng}`);
-            }
-          });
-        });
-      }
-
-      setIsLoading(false);
-    } catch (err) {
-      setError('Failed to initialize map');
-      setIsLoading(false);
-      console.error('Map initialization error:', err);
+  const emitStaticMapUrl = (center: { lat: number; lng: number }) => {
+    if (onStaticMapUrlChangeRef.current && tokenRef.current) {
+      onStaticMapUrlChangeRef.current(
+        buildStaticMapUrl(tokenRef.current, { ...center, width: 600, height: 300, zoom: 15 }),
+      );
     }
   };
+
+  const handlePositionChange = async (center: { lat: number; lng: number }) => {
+    if (!onLocationSelectRef.current) return;
+    const token = tokenRef.current;
+    const resolvedAddress = token ? await geocodeReverse(center.lng, center.lat, token) : null;
+    onLocationSelectRef.current(center, resolvedAddress || `${center.lat}, ${center.lng}`);
+  };
+
+  // Initialize map once
+  useEffect(() => {
+    let isMounted = true;
+
+    const initMap = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const token = await getMapboxToken();
+        if (!token) {
+          if (isMounted) setError('Failed to load map token');
+          return;
+        }
+        tokenRef.current = token;
+
+        const [{ default: mapboxgl }] = await Promise.all([
+          import('mapbox-gl'),
+          import('mapbox-gl/dist/mapbox-gl.css'),
+        ]);
+        if (!isMounted || !mapRef.current) return;
+        mapboxglRef.current = mapboxgl;
+        mapboxgl.accessToken = token;
+
+        const center = await resolveCenter(token);
+        if (!isMounted || !mapRef.current) return;
+
+        const map = new mapboxgl.Map({
+          container: mapRef.current,
+          style: 'mapbox://styles/mapbox/streets-v12',
+          center: [center.lng, center.lat],
+          zoom: 15,
+          interactive,
+          attributionControl: false,
+        });
+        mapInstanceRef.current = map;
+
+        if (interactive) {
+          map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+        }
+
+        emitStaticMapUrl(center);
+
+        if (showMarker) {
+          const draggable = interactive && !!onLocationSelect;
+          const marker = new mapboxgl.Marker({ color: '#ef4444', draggable })
+            .setLngLat([center.lng, center.lat])
+            .addTo(map);
+          markerRef.current = marker;
+
+          if (draggable) {
+            marker.on('dragend', () => {
+              const lngLat = marker.getLngLat();
+              void handlePositionChange({ lat: lngLat.lat, lng: lngLat.lng });
+            });
+          }
+        }
+
+        if (interactive && onLocationSelect) {
+          map.on('click', (event: any) => {
+            const coords = { lat: event.lngLat.lat, lng: event.lngLat.lng };
+            markerRef.current?.setLngLat([coords.lng, coords.lat]);
+            void handlePositionChange(coords);
+          });
+        }
+
+        map.on('load', () => {
+          if (isMounted) setIsLoading(false);
+          map.resize();
+        });
+      } catch (err) {
+        console.error('Map initialization error:', err);
+        if (isMounted) {
+          setError('Failed to initialize map');
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void initMap();
+
+    return () => {
+      isMounted = false;
+      markerRef.current?.remove();
+      markerRef.current = null;
+      mapInstanceRef.current?.remove();
+      mapInstanceRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Recenter when address/coordinates change
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const token = tokenRef.current;
+    if (!map || !token) return;
+
+    let isCancelled = false;
+    (async () => {
+      const center = await resolveCenter(token);
+      if (isCancelled || !mapInstanceRef.current) return;
+      map.setCenter([center.lng, center.lat]);
+      markerRef.current?.setLngLat([center.lng, center.lat]);
+      emitStaticMapUrl(center);
+    })();
+
+    return () => {
+      isCancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, coordinates?.lat, coordinates?.lng]);
 
   if (error) {
     return (

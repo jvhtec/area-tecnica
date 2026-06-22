@@ -5,7 +5,13 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
-import { dataLayerClient } from '@/services/dataLayerClient';
+import {
+  createSessionToken,
+  getMapboxToken,
+  searchBoxRetrieve,
+  searchBoxSuggest,
+} from '@/lib/mapbox/mapboxClient';
+
 interface AddressAutocompleteProps {
   value: string;
   onChange: (address: string, coordinates?: { lat: number; lng: number }) => void;
@@ -21,18 +27,6 @@ interface PredictionItem {
   formatted_address: string;
 }
 
-const ADDRESS_PRIMARY_TYPES = ['geocode', 'street_address', 'route', 'premise', 'subpremise'] as const;
-let cachedGoogleMapsApiKey: string | null = null;
-let googleMapsKeyPromise: Promise<string | null> | null = null;
-
-const createSessionToken = () => {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  return Math.random().toString(36).slice(2, 14);
-};
-
 const getErrorMessage = (error: unknown) => {
   if (error instanceof Error && error.message) {
     return error.message;
@@ -44,44 +38,6 @@ const getErrorMessage = (error: unknown) => {
 
   return 'Unknown error';
 };
-
-const getGoogleMapsKeyMemoized = async (): Promise<string | null> => {
-  if (cachedGoogleMapsApiKey) {
-    return cachedGoogleMapsApiKey;
-  }
-
-  if (googleMapsKeyPromise) {
-    return googleMapsKeyPromise;
-  }
-
-  googleMapsKeyPromise = (async () => {
-    const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
-
-    if (error) {
-      throw error;
-    }
-
-    const key = data?.apiKey as string | undefined;
-    if (!key) {
-      throw new Error('Google Maps API key not configured');
-    }
-
-    cachedGoogleMapsApiKey = key;
-    return key;
-  })();
-
-  try {
-    return await googleMapsKeyPromise;
-  } finally {
-    googleMapsKeyPromise = null;
-  }
-};
-
-const getPredictionText = (placePrediction: any, fallback: string) =>
-  placePrediction?.structuredFormat?.mainText?.text || placePrediction?.text?.text || fallback;
-
-const getPredictionAddress = (placePrediction: any, fallback: string) =>
-  placePrediction?.structuredFormat?.secondaryText?.text || placePrediction?.text?.text || fallback;
 
 export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   value,
@@ -97,7 +53,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   const [suggestions, setSuggestions] = useState<PredictionItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<number | undefined>(undefined);
   const cacheRef = useRef<Record<string, PredictionItem[]>>({});
@@ -110,20 +66,20 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     setInputValue(value || '');
   }, [value]);
 
-  const fetchApiKey = async (): Promise<string | null> => {
-    if (apiKey) {
-      return apiKey;
+  const fetchToken = async (): Promise<string | null> => {
+    if (token) {
+      return token;
     }
 
     try {
-      const key = await getGoogleMapsKeyMemoized();
-      if (key) {
-        setApiKey((currentKey) => currentKey ?? key);
+      const fetched = await getMapboxToken();
+      if (fetched) {
+        setToken((current) => current ?? fetched);
+        return fetched;
       }
-
-      return key;
+      notifyAutocompleteUnavailable(new Error('Mapbox token not configured'));
     } catch (err) {
-      console.error('Error fetching API key:', err);
+      console.error('Error fetching Mapbox token:', err);
       notifyAutocompleteUnavailable(err);
     }
 
@@ -200,7 +156,7 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     setIsLoading(true);
 
     try {
-      const key = apiKey || (await fetchApiKey());
+      const key = token || (await fetchToken());
       if (requestId !== latestSearchRequestIdRef.current || controller.signal.aborted) {
         return;
       }
@@ -211,64 +167,21 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
         return;
       }
 
-      const requestBody = {
-        input: trimmedQuery,
-        languageCode: 'es',
-        sessionToken: ensureSessionToken(),
-        includedPrimaryTypes: [...ADDRESS_PRIMARY_TYPES],
-      };
-
-      let autocompleteResponse = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
-        },
-        body: JSON.stringify(requestBody),
+      const suggestionsResult = await searchBoxSuggest(trimmedQuery, key, ensureSessionToken(), {
+        language: 'es',
+        types: 'address,street,place,locality,neighborhood,postcode',
         signal: controller.signal,
       });
 
-      if (!autocompleteResponse.ok) {
-        const errorText = await autocompleteResponse.text().catch(() => '');
-        console.warn('AddressAutocomplete: filtered autocomplete failed, retrying without type filters:', autocompleteResponse.status, errorText);
-        if (requestId !== latestSearchRequestIdRef.current || controller.signal.aborted) {
-          return;
-        }
-
-        autocompleteResponse = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': key,
-            'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
-          },
-          body: JSON.stringify({
-            input: trimmedQuery,
-            languageCode: 'es',
-            sessionToken: ensureSessionToken(),
-          }),
-          signal: controller.signal,
-        });
-      }
-
-      if (!autocompleteResponse.ok) {
-        const errorText = await autocompleteResponse.text().catch(() => '');
-        throw new Error(`Autocomplete API error: ${autocompleteResponse.status} ${errorText}`);
-      }
-
-      const data = await autocompleteResponse.json();
       if (requestId !== latestSearchRequestIdRef.current || controller.signal.aborted) {
         return;
       }
 
-      const results: PredictionItem[] = (data.suggestions || [])
-        .filter((suggestion: any) => suggestion.placePrediction)
-        .map((suggestion: any) => ({
-          place_id: suggestion.placePrediction.placeId,
-          name: getPredictionText(suggestion.placePrediction, trimmedQuery),
-          formatted_address: getPredictionAddress(suggestion.placePrediction, trimmedQuery),
-        }));
+      const results: PredictionItem[] = suggestionsResult.map((suggestion) => ({
+        place_id: suggestion.mapboxId,
+        name: suggestion.name || trimmedQuery,
+        formatted_address: suggestion.fullAddress || suggestion.name || trimmedQuery,
+      }));
 
       cacheRef.current[trimmedQuery] = results;
       setSuggestions(results);
@@ -294,11 +207,11 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
   };
 
   const getAddressDetails = async (
-    placeId: string,
+    mapboxId: string,
     fallbackName: string,
-    fallbackAddress?: string
+    fallbackAddress?: string,
   ) => {
-    const key = apiKey || (await fetchApiKey());
+    const key = token || (await fetchToken());
 
     if (!key) {
       const address = fallbackAddress || fallbackName;
@@ -310,30 +223,10 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
     }
 
     try {
-      const requestUrl = new URL(`https://places.googleapis.com/v1/places/${placeId}`);
-      requestUrl.searchParams.set('sessionToken', ensureSessionToken());
+      const place = await searchBoxRetrieve(mapboxId, key, ensureSessionToken());
+      const address = place?.address || fallbackAddress || place?.name || fallbackName;
 
-      const response = await fetch(requestUrl.toString(), {
-        headers: {
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'id,formattedAddress,location,displayName',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Place Details API error: ${response.status}`);
-      }
-
-      const place = await response.json();
-      const coordinates = place.location
-        ? {
-            lat: place.location.latitude,
-            lng: place.location.longitude,
-          }
-        : undefined;
-      const address = place.formattedAddress || fallbackAddress || place.displayName?.text || fallbackName;
-
-      onChange(address, coordinates);
+      onChange(address, place?.coordinates);
       setInputValue(address);
       setShowSuggestions(false);
     } catch (error) {
@@ -394,8 +287,8 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
             }
           }}
           onFocus={() => {
-            if (!apiKey) {
-              void fetchApiKey();
+            if (!token) {
+              void fetchToken();
             }
 
             if (suggestions.length > 0) {

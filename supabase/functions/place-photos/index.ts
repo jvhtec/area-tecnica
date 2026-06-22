@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { getCachedPayload, setCachedPayload } from '../_shared/placeCache.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,6 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 }
+
+// Photos for a given venue rarely change, so cache aggressively (180 days).
+const PHOTO_CACHE_TTL_SECONDS = 180 * 24 * 60 * 60
 
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
@@ -19,32 +23,32 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get Google Maps API key from secrets
-    const { data: secretData, error: secretError } = await supabase.functions.invoke('get-secret', {
-      body: { secretName: 'GOOGLE_MAPS_API_KEY' },
-    });
-
-    if (secretError || !secretData?.GOOGLE_MAPS_API_KEY) {
-      console.error('Failed to get Google Maps API key:', secretError);
+    const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY')
+    if (!apiKey) {
+      console.error('Google Maps API key not configured')
       return new Response(
-        JSON.stringify({ error: 'Google Maps API key not configured' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        JSON.stringify({ error: 'Google Maps API key not configured', photos: [] }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const apiKey = secretData.GOOGLE_MAPS_API_KEY;
     const { query, maxPhotos = 2, maxWidthPx = 400, maxHeightPx = 300 } = await req.json();
 
     if (!query) {
       return new Response(
         JSON.stringify({ error: 'Query parameter is required' }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const cacheKey = `photos::${String(query).trim().toLowerCase()}::${maxPhotos}::${maxWidthPx}x${maxHeightPx}`;
+
+    // Serve from persistent cache when available
+    const cached = await getCachedPayload<{ photos: string[] }>(supabase, cacheKey);
+    if (cached?.photos) {
+      return new Response(
+        JSON.stringify({ photos: cached.photos, cached: true }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -58,9 +62,9 @@ Deno.serve(async (req) => {
         'X-Goog-Api-Key': apiKey,
         'X-Goog-FieldMask': 'places.id,places.displayName,places.photos'
       },
-      body: JSON.stringify({ 
-        textQuery: query, 
-        maxResultCount: 1 
+      body: JSON.stringify({
+        textQuery: query,
+        maxResultCount: 1
       })
     });
 
@@ -68,10 +72,7 @@ Deno.serve(async (req) => {
       console.error('🗺️ place-photos: Places search failed:', searchResponse.status, searchResponse.statusText);
       return new Response(
         JSON.stringify({ photos: [] }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -81,12 +82,11 @@ Deno.serve(async (req) => {
 
     if (!photos.length) {
       console.log('🗺️ place-photos: No photos found for query:', query);
+      // Cache the empty result so we don't repeatedly hit Google for venues without photos
+      await setCachedPayload(supabase, cacheKey, 'photos', { photos: [] }, PHOTO_CACHE_TTL_SECONDS);
       return new Response(
         JSON.stringify({ photos: [] }),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -109,7 +109,7 @@ Deno.serve(async (req) => {
         const arrayBuffer = await blob.arrayBuffer();
         const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
         const dataUrl = `data:${blob.type};base64,${base64}`;
-        
+
         return dataUrl;
       } catch (error) {
         console.error('🗺️ place-photos: Error fetching photo:', error);
@@ -118,26 +118,22 @@ Deno.serve(async (req) => {
     });
 
     const results = await Promise.all(photoPromises);
-    const validPhotos = results.filter(photo => photo !== null);
+    const validPhotos = results.filter(photo => photo !== null) as string[];
 
     console.log(`🗺️ place-photos: Successfully fetched ${validPhotos.length} photos for query: ${query}`);
 
+    await setCachedPayload(supabase, cacheKey, 'photos', { photos: validPhotos }, PHOTO_CACHE_TTL_SECONDS);
+
     return new Response(
       JSON.stringify({ photos: validPhotos }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('🗺️ place-photos: Unexpected error:', error);
     return new Response(
       JSON.stringify({ error: 'Internal server error', photos: [] }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });

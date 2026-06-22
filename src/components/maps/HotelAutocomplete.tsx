@@ -2,10 +2,14 @@ import React, { useState, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Building, Star } from "lucide-react";
+import { MapPin, Building } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { dataLayerClient } from "@/services/dataLayerClient";
-// Remove conflicting global type declaration - using typed definitions from src/types/google-maps.d.ts
+import {
+  createSessionToken,
+  getMapboxToken,
+  searchBoxRetrieve,
+  searchBoxSuggest,
+} from "@/lib/mapbox/mapboxClient";
 
 interface HotelAutocompleteProps {
   value: string;
@@ -22,8 +26,6 @@ interface HotelPrediction {
   place_id: string;
   name: string;
   formatted_address: string;
-  rating?: number;
-  types: string[];
 }
 
 export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
@@ -39,46 +41,20 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   const [suggestions, setSuggestions] = useState<HotelPrediction[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState<string | null>(null);
-  const [isApiLoaded, setIsApiLoaded] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const inputRef = useRef<HTMLDivElement>(null);
   const timeoutRef = useRef<NodeJS.Timeout>();
   const searchCache = useRef<Record<string, HotelPrediction[]>>({});
+  const sessionTokenRef = useRef<string | null>(null);
 
-  // Fetch Google Maps API key
+  // Fetch Mapbox token
   useEffect(() => {
-    const fetchApiKey = async () => {
-      try {
-        const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
-        
-        if (error) {
-          console.error('Failed to fetch Google Maps API key:', error);
-          return;
-        }
-        
-        console.log('API key response:', data);
-        
-        if (data?.apiKey) {
-          setApiKey(data.apiKey);
-          console.log('Google Maps API key loaded for hotel autocomplete');
-        } else {
-          console.error('No Google Maps API key found in response:', data);
-        }
-      } catch (err) {
-        console.error('Error fetching API key:', err);
-      }
+    const fetchToken = async () => {
+      const fetched = await getMapboxToken();
+      if (fetched) setToken(fetched);
     };
-
-    fetchApiKey();
+    void fetchToken();
   }, []);
-
-  // Load Google Maps script is not needed for new Places API
-  useEffect(() => {
-    if (apiKey) {
-      setIsApiLoaded(true);
-      console.log('Google Places API (New) ready for hotel autocomplete');
-    }
-  }, [apiKey]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -91,8 +67,19 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const ensureSessionToken = () => {
+    if (!sessionTokenRef.current) {
+      sessionTokenRef.current = createSessionToken();
+    }
+    return sessionTokenRef.current;
+  };
+
+  const resetSessionToken = () => {
+    sessionTokenRef.current = null;
+  };
+
   const searchHotels = async (query: string) => {
-    if (!query || query.length < 2 || !isApiLoaded || !apiKey) {
+    if (!query || query.length < 2 || !token) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
@@ -107,108 +94,21 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
     setIsLoading(true);
 
     try {
-      // First, try the more specific Text Search
-      let searchResponse = await fetch('https://places.googleapis.com/v1/places:searchText', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.types'
-        },
-        body: JSON.stringify({
-          textQuery: query,
-          includedType: "lodging",
-          maxResultCount: 5
-        })
+      const suggestionsResult = await searchBoxSuggest(query, token, ensureSessionToken(), {
+        language: 'es',
+        types: 'poi',
+        poiCategory: 'hotel,motel,hostel,lodging,bed_and_breakfast',
       });
 
-      if (!searchResponse.ok) {
-        // Retry without includedType to avoid 400s from strict filters
-        const errTxt = await searchResponse.text().catch(() => '');
-        console.warn('Text Search error, retrying without includedType:', searchResponse.status, errTxt);
-        searchResponse = await fetch('https://places.googleapis.com/v1/places:searchText', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': apiKey,
-            'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.types'
-          },
-          body: JSON.stringify({
-            textQuery: query,
-            maxResultCount: 5
-          })
-        });
-      }
+      const hotelPredictions: HotelPrediction[] = suggestionsResult.map((suggestion) => ({
+        place_id: suggestion.mapboxId,
+        name: suggestion.name || suggestion.fullAddress,
+        formatted_address: suggestion.fullAddress || '',
+      }));
 
-      if (searchResponse.ok) {
-        const data = await searchResponse.json();
-        if (data.places && data.places.length > 0) {
-          const hotelPredictions = data.places.map((place: any) => ({
-            place_id: place.id,
-            name: place.displayName?.text || place.formattedAddress,
-            formatted_address: place.formattedAddress,
-            rating: place.rating,
-            types: place.types || ['lodging'],
-            location: place.location
-          }));
-          setSuggestions(hotelPredictions);
-          setShowSuggestions(true);
-          searchCache.current[query] = hotelPredictions;
-          return;
-        }
-      }
-
-      // If Text Search fails or returns no results, fallback to Autocomplete
-      console.log('Fallback to autocomplete for:', query);
-      let autocompleteResponse = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat'
-        },
-        body: JSON.stringify({
-          input: query,
-          includedPrimaryTypes: ['lodging'],
-        })
-      });
-
-      if (!autocompleteResponse.ok) {
-        const txt = await autocompleteResponse.text().catch(() => '');
-        console.warn('Autocomplete API error with lodging filter, retrying without filter:', autocompleteResponse.status, txt);
-        // Retry without includedPrimaryTypes if API rejects the filter
-        autocompleteResponse = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': apiKey,
-            'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat'
-          },
-          body: JSON.stringify({
-            input: query
-          })
-        });
-      }
-
-      if (autocompleteResponse.ok) {
-        const data = await autocompleteResponse.json();
-        if (data.suggestions) {
-          const hotelPredictions = data.suggestions
-            .filter((s: any) => s.placePrediction)
-            .map((s: any) => ({
-              place_id: s.placePrediction.placeId,
-              name: s.placePrediction.structuredFormat?.mainText?.text || s.placePrediction.text?.text,
-              formatted_address: s.placePrediction.structuredFormat?.secondaryText?.text || '',
-              types: ['lodging']
-            }));
-          setSuggestions(hotelPredictions);
-          setShowSuggestions(hotelPredictions.length > 0);
-          searchCache.current[query] = hotelPredictions;
-        }
-      } else {
-        const txt = await autocompleteResponse.text().catch(() => '');
-        throw new Error(`Autocomplete API error: ${autocompleteResponse.status} ${txt}`);
-      }
+      setSuggestions(hotelPredictions);
+      setShowSuggestions(hotelPredictions.length > 0);
+      searchCache.current[query] = hotelPredictions;
     } catch (error) {
       console.error('Error searching hotels:', error);
       setSuggestions([]);
@@ -230,40 +130,29 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
     // Debounce search
     timeoutRef.current = setTimeout(() => {
       searchHotels(newValue);
-    }, 500); // Increased debounce time
+    }, 500);
   };
 
-  const getPlaceDetails = async (placeId: string, hotelName: string, fallbackAddress?: string) => {
-    if (!isApiLoaded || !apiKey) {
-      console.error('Google Places API (New) not ready');
+  const getPlaceDetails = async (mapboxId: string, hotelName: string, fallbackAddress?: string) => {
+    if (!token) {
       onChange(hotelName, fallbackAddress);
+      resetSessionToken();
       return;
     }
 
     try {
-      const response = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
-        method: 'GET',
-        headers: {
-          'X-Goog-Api-Key': apiKey,
-          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location'
-        }
-      });
-
-      if (!response.ok) throw new Error(`Place Details API error: ${response.status}`);
-
-      const place = await response.json();
-      const coordinates = place.location ? { lat: place.location.latitude, lng: place.location.longitude } : undefined;
-      
+      const place = await searchBoxRetrieve(mapboxId, token, ensureSessionToken());
       onChange(
-        place.displayName?.text || hotelName,
-        place.formattedAddress || fallbackAddress,
-        coordinates
+        place?.name || hotelName,
+        place?.address || fallbackAddress,
+        place?.coordinates,
       );
     } catch (error) {
       console.error('Error getting place details, using fallback:', error);
       onChange(hotelName, fallbackAddress);
     } finally {
       setShowSuggestions(false);
+      resetSessionToken();
     }
   };
 
@@ -310,7 +199,7 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
       {showSuggestions && suggestions.length > 0 && (
         <Card className="absolute z-50 w-full mt-1 shadow-lg border-2">
           <div className="max-h-60 overflow-y-auto">
-            {suggestions.map((hotel, index) => (
+            {suggestions.map((hotel) => (
               <Button
                 key={hotel.place_id}
                 variant="ghost"
@@ -322,11 +211,6 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate">
                       {hotel.name}
-                      {hotel.rating && (
-                        <span className="ml-2 text-yellow-500">
-                          ⭐ {hotel.rating.toFixed(1)}
-                        </span>
-                      )}
                     </div>
                     <div className="text-xs text-gray-500 truncate flex items-center gap-1">
                       <MapPin className="w-3 h-3" />
