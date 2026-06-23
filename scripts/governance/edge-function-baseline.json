@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-04T17:55:51.218Z",
+  "generatedAt": "2026-06-23T21:57:59.589Z",
   "note": "Existing manual Edge Functions are grandfathered. New functions must use createHttpHandler or add an explicit reviewed exemption.",
   "manualFunctions": [
     {
@@ -159,16 +159,6 @@
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
-      "functionName": "send-expense-notification",
-      "path": "supabase/functions/send-expense-notification/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "send-job-payout-email",
-      "path": "supabase/functions/send-job-payout-email/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
       "functionName": "send-job-whatsapp-message",
       "path": "supabase/functions/send-job-whatsapp-message/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
@@ -181,11 +171,6 @@
     {
       "functionName": "send-password-reset",
       "path": "supabase/functions/send-password-reset/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "send-payout-override-notification",
-      "path": "supabase/functions/send-payout-override-notification/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
@@ -256,11 +241,6 @@
     {
       "functionName": "sync-flex-crew-for-job",
       "path": "supabase/functions/sync-flex-crew-for-job/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "system-health",
-      "path": "supabase/functions/system-health/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
