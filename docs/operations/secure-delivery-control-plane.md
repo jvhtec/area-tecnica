@@ -15,7 +15,7 @@ Required pull request controls:
 - Strict required status checks.
 - No force-pushes or branch deletion.
 
-High-risk changes require two independent approvals before merge. GitHub branch rules can enforce the first approval and CODEOWNER review; the second high-risk approval is enforced through the PR checklist and release review process.
+High-risk changes require two independent approvals before merge. GitHub branch rules can enforce the first approval and CODEOWNER review. The second high-risk approval is a manual release-control gate: the release lead or merger must verify a distinct second approval or a PR comment containing `High-risk second approval: approved`, tick the PR checklist item, and leave the approval evidence in the PR timeline for audit.
 
 High-risk path classes:
 
@@ -65,6 +65,10 @@ npm install --legacy-peer-deps
 
 only when intentionally updating the dependency graph, then commit both `package.json` and `package-lock.json`.
 
+Intentional changes to either `package.json` or `package-lock.json` are high-risk dependency graph changes. They require the CODEOWNER review and second high-risk approval described above, even when the lockfile is the only changed dependency artifact.
+
+The repository `.npmrc` sets `legacy-peer-deps=true`, so the explicit `--legacy-peer-deps` flag is redundant for local npm commands but remains in documented commands to make the compatibility requirement visible in CI, release notes, and agent workflows.
+
 Do not migrate package managers or remove `--legacy-peer-deps` without an approved dependency migration plan.
 
 ## GitHub security settings
@@ -105,7 +109,7 @@ New RLS-sensitive migrations should add or update pgTAP tests in the same PR.
 
 Cloudflare Pages serves production headers from `public/_headers`.
 
-The CSP starts in `Content-Security-Policy-Report-Only` mode. Before switching CSP to enforcement:
+The CSP starts in `Content-Security-Policy-Report-Only` mode and reports to the unauthenticated `csp-report` Supabase Edge Function, which normalizes reports into `security_audit_log` without storing raw payloads or URL query strings. Before switching CSP to enforcement:
 
 1. Confirm report-only violations for critical routes.
 2. Add required source allowlists deliberately.

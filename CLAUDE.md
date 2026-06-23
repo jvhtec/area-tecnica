@@ -92,6 +92,7 @@ npm install --legacy-peer-deps
 
 - Required due to peer dependency conflicts (vite 6, date-fns 3, vitest)
 - `package-lock.json` is committed and must stay in sync with `package.json`
+- `.npmrc` sets `legacy-peer-deps=true`, so the explicit flag is redundant locally but kept in documented commands for clarity.
 
 ### Dependency Constraints
 - **date-fns**: Must stay at ^3.6.0 (react-day-picker compatibility)
