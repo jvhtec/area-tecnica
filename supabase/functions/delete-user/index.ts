@@ -8,16 +8,15 @@ import {
   jsonResponse,
   readBoundedJsonObject,
   redactSensitiveValues,
-  requireBearerToken,
   requireEnvValues,
 } from "../_shared/http.ts";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 
 type DeleteUserBody = Record<string, unknown> & {
   userId?: unknown;
 };
 
 const MAX_DELETE_USER_BODY_BYTES = 8 * 1024;
-const ADMIN_ROLES = new Set(["admin", "management"]);
 
 const normalizeRequiredText = (value: unknown) => {
   if (typeof value !== "string") {
@@ -49,37 +48,14 @@ serve(createHttpHandler(async (req) => {
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-  const token = requireBearerToken(req);
-  const { data: { user: requestingUser }, error: userError } = await supabaseAdmin.auth.getUser(token);
-  if (userError || !requestingUser) {
-    throw new HttpError(401, "Unauthorized", { code: "invalid_authorization" });
-  }
-
-  const { data: requesterProfile, error: profileErr } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", requestingUser.id)
-    .maybeSingle();
-
-  if (profileErr) {
-    throw new HttpError(500, "Authorization lookup failed", {
-      code: "authorization_lookup_failed",
-      exposeDetails: false,
-    });
-  }
-
-  const requesterRole = typeof requesterProfile?.role === "string"
-    ? requesterProfile.role.toLowerCase()
-    : "";
-
-  if (!ADMIN_ROLES.has(requesterRole)) {
-    throw new HttpError(403, "Unauthorized - admin or management role required", {
-      code: "insufficient_role",
-    });
-  }
+  const caller = await requireAdminOrManagement(supabaseAdmin, req, {
+    missingMessage: "Unauthorized",
+    invalidMessage: "Unauthorized",
+    forbiddenMessage: "Unauthorized - admin or management role required",
+  });
 
   // Guard against self-deletion (would orphan the requester's own session/audit trail).
-  if (userId === requestingUser.id) {
+  if (userId === caller.userId) {
     throw new HttpError(400, "You cannot delete your own account", {
       code: "self_delete_blocked",
     });
@@ -91,7 +67,7 @@ serve(createHttpHandler(async (req) => {
     throw new HttpError(404, "User not found", { code: "user_not_found" });
   }
 
-  console.log("Deleting user:", redactSensitiveValues({ correlationId, userId, requestedBy: requestingUser.id }));
+  console.log("Deleting user:", redactSensitiveValues({ correlationId, userId, requestedBy: caller.userId }));
 
   // Deleting from auth.users cascades to profiles and, via the normalized
   // ON DELETE rules, to all dependent records.
@@ -109,6 +85,7 @@ serve(createHttpHandler(async (req) => {
 }, {
   allowedMethods: ["POST"],
   internalErrorMessage: "Unexpected error",
+  errorHeaders: (req) => correlationHeaders(getCorrelationId(req)),
   onError: (error, req) => {
     console.error("delete-user error:", redactSensitiveValues({
       correlationId: getCorrelationId(req),

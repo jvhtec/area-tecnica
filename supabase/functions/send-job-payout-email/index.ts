@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 import { addDays, getDaysInMonth } from "npm:date-fns@3.6.0";
 import { formatInTimeZone, fromZonedTime } from "npm:date-fns-tz@3.2.0";
 
@@ -11,9 +11,9 @@ import {
   jsonResponse,
   readBoundedJsonObject,
   redactSensitiveValues,
-  requireBearerToken,
   requireEnvValues,
 } from "../_shared/http.ts";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 
@@ -21,7 +21,6 @@ const INVOICE_SUBMISSION_EMAIL = "administracion@sector-pro.com";
 const MADRID_TIMEZONE = "Europe/Madrid";
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_PAYOUT_EMAIL_BODY_BYTES = 25 * 1024 * 1024;
-const ADMIN_ROLES = new Set(["admin", "management"]);
 
 interface JobMetadata {
   id: string;
@@ -68,49 +67,6 @@ interface JobPayoutRequestBody extends Record<string, unknown> {
   technicians?: TechnicianPayload[];
   missing_emails?: string[];
   requested_at?: string;
-}
-
-async function requireAdminOrManagement(
-  supabaseAdmin: SupabaseClient,
-  req: Request,
-): Promise<{ userId: string; role: string }> {
-  const token = requireBearerToken(req, {
-    message: "Missing or malformed authorization header",
-    code: "missing_authorization",
-  });
-
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-  if (authError || !user) {
-    console.error("[send-job-payout-email] Token verification failed:", authError?.message);
-    throw new HttpError(401, "Invalid or expired token", { code: "invalid_authorization" });
-  }
-
-  const { data: callerProfile, error: profileError } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error("[send-job-payout-email] Profile lookup failed:", profileError.message);
-    throw new HttpError(500, "Authorization lookup failed", {
-      code: "authorization_lookup_failed",
-      exposeDetails: false,
-    });
-  }
-
-  const role = typeof callerProfile?.role === "string"
-    ? callerProfile.role.toLowerCase()
-    : "";
-
-  if (!ADMIN_ROLES.has(role)) {
-    console.warn("[send-job-payout-email] Forbidden: user", user.id, "role:", role || "<missing>");
-    throw new HttpError(403, "Forbidden: insufficient permissions", {
-      code: "insufficient_role",
-    });
-  }
-
-  return { userId: user.id, role };
 }
 
 async function mapWithConcurrency<T, R>(
@@ -281,7 +237,9 @@ serve(createHttpHandler(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const caller = await requireAdminOrManagement(supabaseAdmin, req);
+  const caller = await requireAdminOrManagement(supabaseAdmin, req, {
+    logContext: "send-job-payout-email",
+  });
   const body = await readBoundedJsonObject<JobPayoutRequestBody>(req, {
     maxBytes: MAX_PAYOUT_EMAIL_BODY_BYTES,
   });

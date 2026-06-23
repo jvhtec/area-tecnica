@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 import {
   correlationHeaders,
@@ -9,12 +9,11 @@ import {
   jsonResponse,
   readBoundedJsonObject,
   redactSensitiveValues,
-  requireBearerToken,
   requireEnvValues,
 } from "../_shared/http.ts";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 
 const MAX_PAYOUT_OVERRIDE_BODY_BYTES = 16 * 1024;
-const ADMIN_ROLES = new Set(["admin", "management"]);
 
 /**
  * Escapes HTML special characters to prevent XSS injection in email templates.
@@ -44,53 +43,6 @@ interface PayoutOverrideNotificationRequest extends Record<string, unknown> {
   calculatedTotal: number;
 }
 
-async function requireAdminOrManagement(
-  supabase: SupabaseClient,
-  req: Request,
-): Promise<{ userId: string; role: string; authorizationHeader: string }> {
-  const token = requireBearerToken(req, {
-    message: "Missing or malformed authorization header",
-    code: "missing_authorization",
-  });
-
-  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !user) {
-    console.error("[send-payout-override-notification] Token verification failed:", authError?.message);
-    throw new HttpError(401, "Invalid or expired token", { code: "invalid_authorization" });
-  }
-
-  const { data: callerProfile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error("[send-payout-override-notification] Profile lookup failed:", profileError.message);
-    throw new HttpError(500, "Authorization lookup failed", {
-      code: "authorization_lookup_failed",
-      exposeDetails: false,
-    });
-  }
-
-  const role = typeof callerProfile?.role === "string"
-    ? callerProfile.role.toLowerCase()
-    : "";
-
-  if (!ADMIN_ROLES.has(role)) {
-    console.warn("[send-payout-override-notification] Forbidden: user", user.id, "role:", role || "<missing>");
-    throw new HttpError(403, "Forbidden: insufficient permissions", {
-      code: "insufficient_role",
-    });
-  }
-
-  return {
-    userId: user.id,
-    role,
-    authorizationHeader: `Bearer ${token}`,
-  };
-}
-
 serve(createHttpHandler(async (req) => {
   const correlationId = getCorrelationId(req);
   const responseHeaders = correlationHeaders(correlationId);
@@ -108,7 +60,9 @@ serve(createHttpHandler(async (req) => {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const caller = await requireAdminOrManagement(supabase, req);
+  const caller = await requireAdminOrManagement(supabase, req, {
+    logContext: "send-payout-override-notification",
+  });
 
   // Parse request body
   const payload = await readBoundedJsonObject<PayoutOverrideNotificationRequest>(req, {

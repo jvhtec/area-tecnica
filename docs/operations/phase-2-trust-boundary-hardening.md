@@ -89,6 +89,19 @@ priority-function migration:
 
 These are covered by unit tests in `supabase/functions/_shared/http.test.ts`.
 
+`supabase/functions/_shared/auth.ts` centralizes authenticated role checks for
+privileged Edge Functions:
+
+- `requireAuthenticatedRole` verifies the bearer token, resolves
+  `profiles.role`, enforces an allowlist, and returns a normalized caller
+  context plus the original authorization header for safe nested function calls.
+- `requireAdminOrManagement` is the default admin/management guard used by the
+  hardened user-admin, diagnostics, and payout notification handlers.
+- Callers can preserve endpoint-specific error messages and run denial hooks
+  such as `system-health` security audit logging without copying auth logic.
+
+This helper is covered by unit tests in `supabase/functions/_shared/auth.test.ts`.
+
 ### 5. Database authorization regression tests
 
 `supabase/tests/database/phase2_trust_boundary.sql` (pgTAP, run by the required
@@ -119,7 +132,9 @@ These are covered by unit tests in `supabase/functions/_shared/http.test.ts`.
   notification functions (`send-expense-notification`, `send-job-payout-email`,
   `send-payout-override-notification`) were migrated on 2026-06-23 as the next
   follow-up slice, including explicit service-role/privileged-role guards and
-  bounded payload parsing.
+  bounded payload parsing. The duplicated admin/management caller checks across
+  the hardened user-admin, diagnostics, and payout handlers now route through
+  the shared auth helper.
 - Add durable, storage-backed rate limiting for public-token endpoints.
 - Continue ratcheting the `anon`/`PUBLIC` grant baseline downward (trigger
   functions can be revoked from `anon` without behavioral impact).
