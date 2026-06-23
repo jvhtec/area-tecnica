@@ -1,8 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
-import { FLEX_API_BASE_URL } from '@/lib/api-config';
+import { flexApiFetch } from '@/lib/flex-api-client';
 import type { PresetSubsystem } from '@/types/equipment';
-
-let cachedFlexToken: string | null = null;
 
 // Material de sonido is a root-only grouping in Flex and intentionally omitted here.
 export const FLEX_CATEGORY_MAP = new Map<string, string>([
@@ -30,42 +28,19 @@ const SUBSYSTEM_TO_FLEX_CATEGORY: Record<PresetSubsystem, string> = {
   amplification: 'pa_amp',
 };
 
-async function getFlexAuthToken(): Promise<string> {
-  if (cachedFlexToken) return cachedFlexToken;
-
-  const { data, error } = await supabase.functions.invoke('get-secret', {
-    body: { secretName: 'X_AUTH_TOKEN' },
-  });
-
-  if (error) {
-    throw new Error(error.message || 'Failed to resolve Flex auth token');
-  }
-
-  const token = (data as { X_AUTH_TOKEN?: string } | null)?.X_AUTH_TOKEN;
-  if (!token) {
-    throw new Error('Flex auth token response missing X_AUTH_TOKEN');
-  }
-
-  cachedFlexToken = token;
-  return token;
-}
-
 async function addResourceLineItem(options: {
   documentId: string;
   resourceId: string;
   quantity: number;
   parentLineItemId?: string;
   nextSiblingId?: string;
-  token: string;
 }): Promise<{ success: boolean; error?: string; lineItemId?: string }> {
-  const { documentId, resourceId, quantity, parentLineItemId = '', nextSiblingId = '', token } = options;
-  const baseUrl = `${FLEX_API_BASE_URL}/line-item/${encodeURIComponent(documentId)}/add-resource/${encodeURIComponent(resourceId)}`;
+  const { documentId, resourceId, quantity, parentLineItemId = '', nextSiblingId = '' } = options;
+  const endpoint = `/line-item/${encodeURIComponent(documentId)}/add-resource/${encodeURIComponent(resourceId)}`;
 
   const headers = {
     accept: '*/*',
     'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-    'X-Auth-Token': token,
-    'apikey': token,
   };
 
   const form = new URLSearchParams({
@@ -77,7 +52,7 @@ async function addResourceLineItem(options: {
   });
 
   try {
-    const res = await fetch(baseUrl, {
+    const res = await flexApiFetch(endpoint, {
       method: 'POST',
       headers,
       body: form.toString(),
@@ -178,20 +153,6 @@ export async function pushEquipmentToPullsheet(
     failed: [],
   };
 
-  // Get auth token
-  let token: string;
-  try {
-    token = await getFlexAuthToken();
-  } catch (err) {
-    const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-    console.error('[FlexPullsheets] Failed to get auth token:', errorMessage);
-    // Mark all items as failed
-    equipment.forEach(item => {
-      result.failed.push({ name: item.name, error: 'Authentication failed' });
-    });
-    return result;
-  }
-
   const normalizedItems = normalizeEquipmentItems(equipment);
 
   console.log('[FlexPullsheets] Using category headers:', Array.from(FLEX_CATEGORY_MAP.entries()));
@@ -221,7 +182,6 @@ export async function pushEquipmentToPullsheet(
         documentId: pullsheetElementId,
         resourceId: categoryResourceId,
         quantity: 1,
-        token,
       });
 
       if (categoryResponse.success && categoryResponse.lineItemId) {
@@ -241,7 +201,6 @@ export async function pushEquipmentToPullsheet(
         resourceId: item.resourceId,
         quantity: item.quantity,
         parentLineItemId: parentLineItemId,
-        token,
       });
 
       if (response.success) {
@@ -342,27 +301,17 @@ export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPul
       return dbPullsheets;
     }
 
-    // Fetch Flex tree with timeout
-    const token = await getFlexAuthToken();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
     let treeData;
     try {
-      const response = await fetch(
-        `${FLEX_API_BASE_URL}/element/${mainFolder.element_id}/tree`,
+      const response = await flexApiFetch(
+        `/element/${encodeURIComponent(mainFolder.element_id)}/tree`,
         {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
-            'X-Auth-Token': token,
-            'apikey': token,
           },
-          signal: controller.signal,
         }
       );
-
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         console.warn('[FlexPullsheets] Failed to fetch Flex tree, returning DB results only');
@@ -371,13 +320,12 @@ export async function getJobPullsheetsWithFlexApi(jobId: string): Promise<JobPul
 
       // Parse JSON inside try-catch to handle parsing errors
       try {
-        treeData = await response.json();
+        treeData = await response.json<FlexTreeNode | FlexTreeNode[]>();
       } catch (jsonError) {
         console.warn('[FlexPullsheets] Failed to parse Flex tree JSON, returning DB results only:', jsonError);
         return dbPullsheets;
       }
     } catch (fetchError) {
-      clearTimeout(timeoutId);
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
         console.warn('[FlexPullsheets] Flex API request timed out, returning DB results only');
       } else {

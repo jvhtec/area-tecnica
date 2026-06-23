@@ -30,23 +30,8 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    // Auth token
-    let flexAuthToken = Deno.env.get("X_AUTH_TOKEN") || "";
-    if (!flexAuthToken) {
-      try {
-        const res = await fetch(new URL(req.url).origin + "/functions/v1/get-secret", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ key: "X_AUTH_TOKEN" })
-        });
-        if (res.ok) {
-          const j = await res.json();
-          flexAuthToken = (j as any)?.X_AUTH_TOKEN || flexAuthToken;
-        }
-      } catch (_) {
-        // ignore
-      }
-    }
+    const flexAuthToken =
+      Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
 
     if (!flexAuthToken) {
       return new Response(JSON.stringify({ error: "X_AUTH_TOKEN not configured" }), {

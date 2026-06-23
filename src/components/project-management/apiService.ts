@@ -1,4 +1,4 @@
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { flexApiFetch } from "@/lib/flex-api-client";
 export interface CreateLaborPORequest {
   name: string;
   plannedStartDate: string;
@@ -98,32 +98,12 @@ interface ProjectHeaderResponse {
   customerPO: FlexField<string>;
 }
 
-let cachedToken: string | null = null;
-
-const getAuthToken = async () => {
-  if (cachedToken) return cachedToken;
-  
-  const { data: { X_AUTH_TOKEN }, error } = await dataLayerClient.functions.invoke('get-secret', {
-      body: { secretName: 'X_AUTH_TOKEN' }
-    });
-    
-  if (error) {
-    throw new Error('Failed to get auth token');
-  }
-  
-  cachedToken = X_AUTH_TOKEN;
-  return X_AUTH_TOKEN;
-};
-
 export const getProjectDetails = async (searchText: string): Promise<ProjectDetails[]> => {
-  const token = await getAuthToken();
-  const url = `https://sectorpro.flexrentalsolutions.com/f5/api/element/search?searchText=${searchText}`;
+  const url = `/element/search?searchText=${encodeURIComponent(searchText)}`;
   
-  const response = await fetch(url, {
+  const response = await flexApiFetch(url, {
     headers: {
       'Content-Type': 'application/json',
-      'X-Auth-Token': token,
-      'apikey': token,
     },
   });
 
@@ -135,15 +115,11 @@ export const getProjectDetails = async (searchText: string): Promise<ProjectDeta
 };
 
 export const getProjectHeader = async (projectId: string): Promise<ProjectHeader> => {
-  const token = await getAuthToken();
-  const timestamp = new Date().getTime();
-  const url = `https://sectorpro.flexrentalsolutions.com/f5/api/element/${projectId}/key-info/?_dc=1737066549442`;
+  const url = `/element/${encodeURIComponent(projectId)}/key-info/`;
   
-  const response = await fetch(url, {
+  const response = await flexApiFetch(url, {
     headers: {
       'Content-Type': 'application/json',
-      'X-Auth-Token': token,
-      'apikey': token,
     },
   });
 
@@ -151,7 +127,7 @@ export const getProjectHeader = async (projectId: string): Promise<ProjectHeader
     throw new Error(`Failed to fetch project header: ${response.statusText}`);
   }
 
-  const data: ProjectHeaderResponse = await response.json();
+  const data = await response.json<ProjectHeaderResponse>();
   
   return {
     documentName: data.documentName.data || '',
@@ -164,16 +140,13 @@ export const getProjectHeader = async (projectId: string): Promise<ProjectHeader
 };
 
 export const createLaborPO = async (data: CreateLaborPORequest): Promise<CreateLaborPOResponse> => {
-  const token = await getAuthToken();
-  const url = 'https://sectorpro.flexrentalsolutions.com/f5/api/element';
+  const url = '/element';
 
-  const response = await fetch(url, {
+  const response = await flexApiFetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       accept: '*/*',
-      'X-Auth-Token': token,
-      'apikey': token,
     },
     body: JSON.stringify({
       definitionId: 'labor-po-definition-id',
@@ -194,7 +167,7 @@ export const createLaborPO = async (data: CreateLaborPORequest): Promise<CreateL
     throw new Error(`Failed to create Labor PO: ${response.statusText}`);
   }
 
-  const responseData = await response.json();
+  const responseData = await response.json<CreateLaborPOResponse>();
   return {
     id: responseData.id,
     name: responseData.name,
@@ -204,15 +177,17 @@ export const createLaborPO = async (data: CreateLaborPORequest): Promise<CreateL
 export const addResourceLineItem = async (
   data: AddResourceLineItemRequest
 ): Promise<AddResourceLineItemResponse> => {
-  const token = await getAuthToken();
-  const url = `https://sectorpro.flexrentalsolutions.com/f5/api/financial-document-line-item/${data.documentId}/add-resource/${data.resourceId}?resourceParentId=${data.resourceParentId}&managedResourceLineItemType=${data.managedResourceLineItemType}&quantity=${data.quantity}`;
+  const query = new URLSearchParams({
+    resourceParentId: data.resourceParentId,
+    managedResourceLineItemType: data.managedResourceLineItemType,
+    quantity: String(data.quantity),
+  });
+  const url = `/financial-document-line-item/${encodeURIComponent(data.documentId)}/add-resource/${encodeURIComponent(data.resourceId)}?${query}`;
 
-  const response = await fetch(url, {
+  const response = await flexApiFetch(url, {
     method: 'POST',
     headers: {
       accept: '*/*',
-      'X-Auth-Token': token,
-      'apikey': token,
     },
   });
 
@@ -220,14 +195,13 @@ export const addResourceLineItem = async (
     throw new Error(`Failed to add resource line item: ${response.statusText}`);
   }
 
-  return response.json();
+  return response.json<AddResourceLineItemResponse>();
 };
 
 export const updateLineItemDates = async (
   data: UpdateLineItemDatesRequest
 ): Promise<UpdateLineItemDatesResponse> => {
-  const token = await getAuthToken();
-  const url = `https://sectorpro.flexrentalsolutions.com/f5/api/financial-document-line-item/${data.documentId}/bulk-update`;
+  const url = `/financial-document-line-item/${encodeURIComponent(data.documentId)}/bulk-update`;
 
   const payload = {
     bulkData: [
@@ -239,13 +213,11 @@ export const updateLineItemDates = async (
     ],
   };
 
-  const response = await fetch(url, {
+  const response = await flexApiFetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       accept: '*/*',
-      'X-Auth-Token': token,
-      'apikey': token,
     },
     body: JSON.stringify(payload),
   });
@@ -269,16 +241,13 @@ export interface ElementTreeNode {
 }
 
 export const getElementTree = async (elementId: string): Promise<ElementTreeNode[]> => {
-  const token = await getAuthToken();
-  const url = `https://sectorpro.flexrentalsolutions.com/f5/api/element/${elementId}/tree`;
+  const url = `/element/${encodeURIComponent(elementId)}/tree`;
 
   console.log(`Fetching element tree for element ID: ${elementId}`);
 
-  const response = await fetch(url, {
+  const response = await flexApiFetch(url, {
     headers: {
       'Content-Type': 'application/json',
-      'X-Auth-Token': token,
-      'apikey': token,
     },
   });
 
@@ -288,7 +257,7 @@ export const getElementTree = async (elementId: string): Promise<ElementTreeNode
     throw new Error(errorMessage);
   }
 
-  const data = await response.json();
+  const data = await response.json<ElementTreeNode[] | unknown>();
   console.log(`Successfully fetched element tree for element ID: ${elementId}`, data);
 
   return Array.isArray(data) ? data : [];

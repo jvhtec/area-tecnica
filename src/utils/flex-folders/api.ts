@@ -1,37 +1,11 @@
-import { supabase } from "@/integrations/supabase/client";
+import { flexApiFetch } from "@/lib/flex-api-client";
 import { FlexFolderPayload, FlexFolderResponse } from "./types";
-import { getFlexApiBaseUrl } from "./config";
 
 /**
  * Error response from Flex API
  */
 interface FlexApiError {
   exceptionMessage?: string;
-}
-
-let cachedFlexToken: string | null = null;
-
-/**
- * Gets the Flex authentication token from Supabase secrets
- */
-async function getFlexAuthToken(): Promise<string> {
-  if (cachedFlexToken) return cachedFlexToken;
-
-  const { data, error } = await supabase.functions.invoke('get-secret', {
-    body: { secretName: 'X_AUTH_TOKEN' },
-  });
-
-  if (error) {
-    throw new Error(error.message || 'Failed to resolve Flex auth token');
-  }
-
-  const token = (data as { X_AUTH_TOKEN?: string } | null)?.X_AUTH_TOKEN;
-  if (!token) {
-    throw new Error('Flex auth token response missing X_AUTH_TOKEN');
-  }
-
-  cachedFlexToken = token;
-  return token;
 }
 
 /**
@@ -42,40 +16,30 @@ async function getFlexAuthToken(): Promise<string> {
 export async function createFlexFolder(payload: FlexFolderPayload): Promise<FlexFolderResponse> {
   console.log("Creating Flex folder with payload:", payload);
   
-  const token = await getFlexAuthToken();
-  const apiBaseUrl = getFlexApiBaseUrl();
-
-  const response = await fetch(`${apiBaseUrl}/element`, {
+  const response = await flexApiFetch("/element", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Auth-Token": token,
-      "apikey": token,
     },
     body: JSON.stringify(payload)
   });
 
   if (!response.ok) {
-    const errorData = await response.json();
+    const errorData = await response
+      .json<FlexApiError>()
+      .catch((): FlexApiError => ({}));
     console.error("Flex folder creation error:", errorData);
     throw new Error(errorData.exceptionMessage || "Failed to create folder in Flex");
   }
 
-  const data = await response.json();
+  const data = await response.json<FlexFolderResponse>();
   console.log("Created Flex folder:", data);
   return data;
 }
 
 export async function deleteFlexFolder(elementId: string): Promise<void> {
-  const token = await getFlexAuthToken();
-  const apiBaseUrl = getFlexApiBaseUrl();
-
-  const response = await fetch(`${apiBaseUrl}/element/${encodeURIComponent(elementId)}`, {
+  const response = await flexApiFetch(`/element/${encodeURIComponent(elementId)}`, {
     method: "DELETE",
-    headers: {
-      "X-Auth-Token": token,
-      "apikey": token,
-    },
   });
 
   if (!response.ok) {
@@ -101,16 +65,12 @@ export async function updateFlexElementHeader(
   fieldType: string,
   value: string
 ): Promise<void> {
-  const token = await getFlexAuthToken();
-  const apiBaseUrl = getFlexApiBaseUrl();
-
-  const response = await fetch(
-    `${apiBaseUrl}/element/${encodeURIComponent(elementId)}/header-update`,
+  const response = await flexApiFetch(
+    `/element/${encodeURIComponent(elementId)}/header-update`,
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Auth-Token": token,
         "X-Api-Client": "flex5-desktop",
         "X-Requested-With": "XMLHttpRequest",
       },

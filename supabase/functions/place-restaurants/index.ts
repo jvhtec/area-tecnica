@@ -20,6 +20,9 @@ const RESTAURANT_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
 const DEFAULT_RADIUS_METERS = 2000;
 const MAX_RADIUS_METERS = 10000;
 const DEFAULT_MAX_RESULTS = 20;
+const USER_DAILY_PAID_API_LIMIT = 100;
+const GLOBAL_DAILY_PAID_API_LIMIT = 1000;
+const GLOBAL_QUOTA_ACTOR_ID = '00000000-0000-0000-0000-000000000000';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object';
@@ -48,6 +51,27 @@ function normalizePositiveInteger(value: unknown, fallback: number, max: number)
   return Math.min(Math.floor(value), max);
 }
 
+async function consumePaidApiQuota(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+): Promise<boolean> {
+  const { data: allowed, error: quotaError } = await supabase.rpc(
+    'consume_external_api_dual_quota',
+    {
+      p_user_actor_id: userId,
+      p_user_service: 'google_places',
+      p_user_daily_limit: USER_DAILY_PAID_API_LIMIT,
+      p_global_actor_id: GLOBAL_QUOTA_ACTOR_ID,
+      p_global_service: 'google_places_global',
+      p_global_daily_limit: GLOBAL_DAILY_PAID_API_LIMIT,
+    },
+  );
+  if (quotaError) {
+    console.error('place-restaurants: quota check failed', quotaError);
+  }
+  return !quotaError && allowed === true;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -70,6 +94,20 @@ Deno.serve(async (req) => {
       });
     }
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Authentication required' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.slice('Bearer '.length),
+    );
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Invalid authentication' }), {
+        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     let body: Record<string, unknown>;
     try {
@@ -115,6 +153,12 @@ Deno.serve(async (req) => {
       if (cachedDetails?.restaurant) {
         return new Response(JSON.stringify({ restaurant: cachedDetails.restaurant, cached: true }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      if (!(await consumePaidApiQuota(supabase, user.id))) {
+        return new Response(JSON.stringify({ error: 'Daily Places API quota exceeded' }), {
+          status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
 
@@ -183,6 +227,12 @@ Deno.serve(async (req) => {
     if (cachedSearch?.restaurants) {
       return new Response(JSON.stringify({ restaurants: cachedSearch.restaurants, cached: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!(await consumePaidApiQuota(supabase, user.id))) {
+      return new Response(JSON.stringify({ error: 'Daily Places API quota exceeded' }), {
+        status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 

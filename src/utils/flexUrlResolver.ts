@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabase';
-import { FLEX_API_BASE_URL } from '@/lib/api-config';
+import { flexApiFetch as proxyFlexApiFetch } from '@/lib/flex-api-client';
 import { FLEX_FOLDER_IDS } from './flex-folders/constants';
 
 export const FLEX_UI_BASE_URL = 'https://sectorpro.flexrentalsolutions.com/f5/ui/?desktop';
@@ -122,9 +121,6 @@ interface SchemaResolution {
   reason?: string;
 }
 
-let cachedFlexToken: string | null = null;
-let pendingTokenPromise: Promise<string> | null = null;
-
 function coerceString(value: unknown): string | undefined {
   if (typeof value === 'string') {
     const trimmed = value.trim();
@@ -162,68 +158,7 @@ function pickPrimaryElementId(node: FlexTreeNode): string | null {
   return null;
 }
 
-async function getFlexAuthToken(): Promise<string> {
-  if (cachedFlexToken) {
-    return cachedFlexToken;
-  }
-
-  if (pendingTokenPromise) {
-    return pendingTokenPromise;
-  }
-
-  pendingTokenPromise = (async () => {
-    console.log('[flexUrlResolver] Fetching Flex auth token');
-    const { data, error } = await supabase.functions.invoke('get-secret', {
-      body: { secretName: 'X_AUTH_TOKEN' },
-    });
-
-    if (error) {
-      pendingTokenPromise = null;
-      throw new Error(error.message || 'Failed to resolve Flex auth token');
-    }
-
-    const token = (data as { X_AUTH_TOKEN?: string } | null)?.X_AUTH_TOKEN;
-    if (!token) {
-      pendingTokenPromise = null;
-      throw new Error('Flex auth token response missing X_AUTH_TOKEN');
-    }
-
-    cachedFlexToken = token;
-    pendingTokenPromise = null;
-    return token;
-  })();
-
-  try {
-    return await pendingTokenPromise;
-  } catch (error) {
-    cachedFlexToken = null;
-    throw error;
-  }
-}
-
-async function flexApiFetch(path: string, init: RequestInit = {}): Promise<Response> {
-  const token = await getFlexAuthToken();
-  const headers = new Headers(init.headers || {});
-
-  if (!headers.has('X-Auth-Token')) {
-    headers.set('X-Auth-Token', token);
-  }
-  if (!headers.has('apikey')) {
-    headers.set('apikey', token);
-  }
-  if (!headers.has('Accept')) {
-    headers.set('Accept', 'application/json');
-  }
-
-  const url = path.startsWith('http')
-    ? path
-    : `${FLEX_API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
-
-  return fetch(url, {
-    ...init,
-    headers,
-  });
-}
+const flexApiFetch = proxyFlexApiFetch;
 
 function extractFlexField(value: unknown): string | undefined {
   if (!value || typeof value === 'string') {
@@ -530,6 +465,6 @@ export async function resolveFlexUrl(
 }
 
 export function __resetFlexAuthCacheForTests(): void {
-  cachedFlexToken = null;
-  pendingTokenPromise = null;
+  // Retained as a no-op for backward-compatible test helpers. Credentials are
+  // no longer cached in the browser.
 }

@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { flexApiFetch } from "@/lib/flex-api-client";
 
 /**
  * Types for Flex element tree structure
@@ -27,31 +27,6 @@ export interface FlatElementNode {
   depth: number;
 }
 
-let cachedFlexToken: string | null = null;
-
-/**
- * Gets the Flex authentication token from Supabase secrets
- */
-async function getFlexAuthToken(): Promise<string> {
-  if (cachedFlexToken) return cachedFlexToken;
-
-  const { data, error } = await supabase.functions.invoke('get-secret', {
-    body: { secretName: 'X_AUTH_TOKEN' },
-  });
-
-  if (error) {
-    throw new Error(error.message || 'Failed to resolve Flex auth token');
-  }
-
-  const token = (data as { X_AUTH_TOKEN?: string } | null)?.X_AUTH_TOKEN;
-  if (!token) {
-    throw new Error('Flex auth token response missing X_AUTH_TOKEN');
-  }
-
-  cachedFlexToken = token;
-  return token;
-}
-
 /**
  * Fetches the element tree from Flex API starting from a given main element
  * @param mainElementId The root element ID to fetch the tree from
@@ -61,29 +36,27 @@ export async function getElementTree(
   mainElementId: string
 ): Promise<FlexElementNode[]> {
   try {
-    const token = await getFlexAuthToken();
-
-    const response = await fetch(
-      `https://sectorpro.flexrentalsolutions.com/f5/api/element/${mainElementId}/tree`,
+    const response = await flexApiFetch(
+      `/element/${encodeURIComponent(mainElementId)}/tree`,
       {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "X-Auth-Token": token,
-          "apikey": token,
         },
       }
     );
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      const errorData: { exceptionMessage?: string } = await response
+        .json<{ exceptionMessage?: string }>()
+        .catch(() => ({}));
       console.error("Flex element tree fetch error:", errorData);
       throw new Error(
         errorData.exceptionMessage || "Failed to fetch element tree from Flex"
       );
     }
 
-    const data = await response.json();
+    const data = await response.json<unknown>();
     console.log("Fetched Flex element tree:", data);
 
     // Transform API response to our format

@@ -4,15 +4,10 @@ import {
   persistSecurityAuditLog,
 } from "../_shared/securityAudit.ts";
 
-const ALLOWED_SECRET_NAMES = ["X_AUTH_TOKEN", "OPENAI_API_KEY", "GOOGLE_MAPS_API_KEY"];
-const MANAGEMENT_ROLES = new Set(["admin", "management"]);
 const SECRET_RESOURCE_PREFIX = "secret:";
 const MAX_AUDIT_RESOURCE_LENGTH = 255;
-const MAX_AUDIT_SECRET_NAME_LENGTH = MAX_AUDIT_RESOURCE_LENGTH - SECRET_RESOURCE_PREFIX.length;
-
-interface ProfileRecord {
-  role: string | null;
-}
+const MAX_AUDIT_SECRET_NAME_LENGTH =
+  MAX_AUDIT_RESOURCE_LENGTH - SECRET_RESOURCE_PREFIX.length;
 
 interface GetSecretDeps {
   supabase: {
@@ -22,41 +17,36 @@ interface GetSecretDeps {
       ) => Promise<{ data: { user: { id: string } | null }; error: unknown }>;
     };
     from: (table: string) => {
-      select: (columns: string) => {
-        eq: (column: string, value: string) => {
-          single: () => Promise<{ data: ProfileRecord | null; error: unknown }>;
-        };
-      };
       insert: (payload: Record<string, unknown>) => Promise<{ error: unknown }>;
     };
   };
-  getEnv: (name: string) => string | undefined;
 }
 
-async function auditSecretAccess(
+async function auditBlockedSecretAccess(
   req: Request,
   deps: GetSecretDeps,
   details: {
     userId?: string | null;
     secretName?: string | null;
-    success: boolean;
     outcome: string;
-    role?: string | null;
   },
 ): Promise<void> {
-  const normalizedSecretName = (details.secretName ?? "unknown").slice(0, MAX_AUDIT_SECRET_NAME_LENGTH);
+  const normalizedSecretName = (details.secretName ?? "unknown").slice(
+    0,
+    MAX_AUDIT_SECRET_NAME_LENGTH,
+  );
 
   await persistSecurityAuditLog(req, deps.supabase, {
     user_id: details.userId ?? null,
-    action: "secret_access",
+    action: "secret_access_blocked",
     resource: `${SECRET_RESOURCE_PREFIX}${normalizedSecretName}`,
-    severity: details.success ? "low" : "high",
+    severity: "high",
     metadata: {
-      success: details.success,
+      success: false,
       outcome: details.outcome,
-      role: details.role ?? null,
       secret_name: details.secretName ?? null,
-      secret_name_truncated: normalizedSecretName !== (details.secretName ?? "unknown"),
+      secret_name_truncated:
+        normalizedSecretName !== (details.secretName ?? "unknown"),
     },
   });
 }
@@ -66,23 +56,21 @@ export async function handleGetSecretRequest(
   deps: GetSecretDeps,
 ): Promise<Response> {
   const body = await req.json().catch(() => null);
-  const secretName = typeof body?.secretName === "string" ? body.secretName.trim() : "";
+  const secretName =
+    typeof body?.secretName === "string" ? body.secretName.trim() : "";
 
   if (!secretName) {
-    await auditSecretAccess(req, deps, {
+    await auditBlockedSecretAccess(req, deps, {
       secretName: null,
-      success: false,
       outcome: "invalid_request",
     });
     return jsonResponse({ error: "secretName is required" }, { status: 400 });
   }
 
   const accessToken = extractBearerToken(req);
-
   if (!accessToken) {
-    await auditSecretAccess(req, deps, {
+    await auditBlockedSecretAccess(req, deps, {
       secretName,
-      success: false,
       outcome: "missing_authorization",
     });
     return jsonResponse({ error: "Authorization header required" }, { status: 401 });
@@ -94,79 +82,24 @@ export async function handleGetSecretRequest(
   } = await deps.supabase.auth.getUser(accessToken);
 
   if (authError || !user) {
-    await auditSecretAccess(req, deps, {
+    await auditBlockedSecretAccess(req, deps, {
       secretName,
-      success: false,
       outcome: "invalid_authentication",
     });
     return jsonResponse({ error: "Invalid authentication" }, { status: 401 });
   }
 
-  const profileQuery = deps.supabase.from("profiles").select("role");
-  const { data: profile, error: profileError } = await profileQuery.eq("id", user.id).single();
-
-  if (profileError) {
-    await auditSecretAccess(req, deps, {
-      userId: user.id,
-      secretName,
-      success: false,
-      outcome: "db_error",
-    });
-    return jsonResponse({ error: "Failed to load user profile" }, { status: 500 });
-  }
-
-  if (!profile) {
-    await auditSecretAccess(req, deps, {
-      userId: user.id,
-      secretName,
-      success: false,
-      outcome: "profile_not_found",
-    });
-    return jsonResponse({ error: "User profile not found" }, { status: 403 });
-  }
-
-  if (!MANAGEMENT_ROLES.has(profile.role ?? "")) {
-    await auditSecretAccess(req, deps, {
-      userId: user.id,
-      secretName,
-      success: false,
-      outcome: "insufficient_permissions",
-      role: profile.role,
-    });
-    return jsonResponse({ error: "Insufficient permissions" }, { status: 403 });
-  }
-
-  if (!ALLOWED_SECRET_NAMES.includes(secretName)) {
-    await auditSecretAccess(req, deps, {
-      userId: user.id,
-      secretName,
-      success: false,
-      outcome: "secret_not_allowed",
-      role: profile.role,
-    });
-    return jsonResponse({ error: `Secret ${secretName} not allowed` }, { status: 403 });
-  }
-
-  const secretValue = deps.getEnv(secretName);
-
-  if (!secretValue) {
-    await auditSecretAccess(req, deps, {
-      userId: user.id,
-      secretName,
-      success: false,
-      outcome: "secret_not_configured",
-      role: profile.role,
-    });
-    return jsonResponse({ error: `Secret ${secretName} not found` }, { status: 404 });
-  }
-
-  await auditSecretAccess(req, deps, {
+  await auditBlockedSecretAccess(req, deps, {
     userId: user.id,
     secretName,
-    success: true,
-    outcome: "allowed",
-    role: profile.role,
+    outcome: "direct_secret_delivery_disabled",
   });
 
-  return jsonResponse({ [secretName]: secretValue }, { status: 200 });
+  return jsonResponse(
+    {
+      error:
+        "Direct secret delivery is disabled. Use an approved server-side operation.",
+    },
+    { status: 410 },
+  );
 }

@@ -160,6 +160,22 @@ Deno.serve(async (req) => {
       )
     }
     const supabase = createClient(supabaseUrl, serviceRoleKey)
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Authentication required', photos: [] }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
+    const { data: { user }, error: authError } = await supabase.auth.getUser(
+      authHeader.slice('Bearer '.length),
+    )
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authentication', photos: [] }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
 
     let body: Partial<PhotoRequest>
     try {
