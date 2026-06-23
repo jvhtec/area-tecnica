@@ -288,18 +288,19 @@ DROP POLICY IF EXISTS "p_storage_job_documents_oscar_task_delete" ON storage.obj
 CREATE POLICY "p_storage_job_documents_oscar_task_delete" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'job_documents' AND public.current_user_role() = 'oscar' AND name ~ '^(sound|lights|video|production|administrative)/[^/]+/task-[^/]+/.+');
 
 DO $$
+DECLARE
+  task_table text;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'production_job_tasks'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.production_job_tasks (id, job_id, tour_id, task_type, assigned_to, status, progress, due_at, priority, created_at, updated_at);
-  END IF;
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'administrative_job_tasks'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime ADD TABLE public.administrative_job_tasks (id, job_id, tour_id, task_type, assigned_to, status, progress, due_at, priority, created_at, updated_at);
-  END IF;
+  FOREACH task_table IN ARRAY ARRAY[
+    'production_job_tasks',
+    'administrative_job_tasks'
+  ] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = task_table
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', task_table);
+    END IF;
+  END LOOP;
 END
-$$;;
+$$;

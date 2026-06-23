@@ -1,74 +1,27 @@
 -- Enable realtime replication for task tables used by pending task subscriptions.
 -- Without these publication entries, postgres_changes listeners never receive updates.
+--
+-- Publish full task rows. These tables use REPLICA IDENTITY FULL and later
+-- migrations delete duplicate rows; column-list publications that omit replica
+-- identity columns cause PostgreSQL to reject those DELETE statements.
 DO $$
+DECLARE
+  task_table text;
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime'
-      AND schemaname = 'public'
-      AND tablename = 'sound_job_tasks'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime
-      ADD TABLE public.sound_job_tasks (
-        id,
-        job_id,
-        tour_id,
-        task_type,
-        assigned_to,
-        status,
-        progress,
-        due_at,
-        priority,
-        created_at,
-        updated_at
-      );
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime'
-      AND schemaname = 'public'
-      AND tablename = 'lights_job_tasks'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime
-      ADD TABLE public.lights_job_tasks (
-        id,
-        job_id,
-        tour_id,
-        task_type,
-        assigned_to,
-        status,
-        progress,
-        due_at,
-        priority,
-        created_at,
-        updated_at
-      );
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1
-    FROM pg_publication_tables
-    WHERE pubname = 'supabase_realtime'
-      AND schemaname = 'public'
-      AND tablename = 'video_job_tasks'
-  ) THEN
-    ALTER PUBLICATION supabase_realtime
-      ADD TABLE public.video_job_tasks (
-        id,
-        job_id,
-        tour_id,
-        task_type,
-        assigned_to,
-        status,
-        progress,
-        due_at,
-        priority,
-        created_at,
-        updated_at
-      );
-  END IF;
+  FOREACH task_table IN ARRAY ARRAY[
+    'sound_job_tasks',
+    'lights_job_tasks',
+    'video_job_tasks'
+  ] LOOP
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_publication_tables
+      WHERE pubname = 'supabase_realtime'
+        AND schemaname = 'public'
+        AND tablename = task_table
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', task_table);
+    END IF;
+  END LOOP;
 END
 $$;
