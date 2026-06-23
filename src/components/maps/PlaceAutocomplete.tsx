@@ -4,7 +4,13 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, MapPin } from 'lucide-react';
-import { dataLayerClient } from '@/services/dataLayerClient';
+import {
+  createSessionToken,
+  getMapboxToken,
+  searchBoxRetrieve,
+  searchBoxSuggest,
+} from '@/lib/mapbox/mapboxClient';
+
 interface PlaceAutocompleteResult {
   name: string;
   address: string;
@@ -41,36 +47,27 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   const [suggestions, setSuggestions] = useState<PredictionItem[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<number | undefined>(undefined);
   const cacheRef = useRef<Record<string, PredictionItem[]>>({});
+  const sessionTokenRef = useRef<string | null>(null);
 
   // Keep local input in sync with external value
   useEffect(() => {
     setInputValue(value || '');
   }, [value]);
 
-  // Fetch Google Maps API key securely (with retry support)
-  const fetchApiKey = async (): Promise<string | null> => {
-    try {
-      const { data, error } = await dataLayerClient.functions.invoke('get-google-maps-key');
-      if (error) {
-        console.error('Failed to fetch Google Maps API key:', error);
-        return null;
-      }
-      if (data?.apiKey) {
-        setApiKey(data.apiKey);
-        return data.apiKey as string;
-      }
-    } catch (err) {
-      console.error('Error fetching API key:', err);
-    }
-    return null;
+  const fetchToken = async (): Promise<string | null> => {
+    if (token) return token;
+    const fetched = await getMapboxToken();
+    if (fetched) setToken(fetched);
+    return fetched;
   };
 
   useEffect(() => {
-    fetchApiKey();
+    void fetchToken();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -83,20 +80,29 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const ensureSessionToken = () => {
+    if (!sessionTokenRef.current) {
+      sessionTokenRef.current = createSessionToken();
+    }
+    return sessionTokenRef.current;
+  };
+
+  const resetSessionToken = () => {
+    sessionTokenRef.current = null;
+    // Mapbox requires the retrieve call to reuse the suggest session token, so
+    // drop cached suggestions tied to the old session.
+    cacheRef.current = {};
+  };
+
   const searchPlaces = async (query: string) => {
-    // Ensure API key is available (retry on demand)
-    const key = apiKey || (await fetchApiKey());
+    const key = token || (await fetchToken());
     if (!key || !query || query.length < 2) {
-      console.log('PlacesAutocomplete: Search conditions not met:', { hasApiKey: !!key, query, queryLength: query?.length || 0 });
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
-    console.log('PlacesAutocomplete: Searching for:', query);
-
     if (cacheRef.current[query]) {
-      console.log('PlacesAutocomplete: Using cached results for:', query);
       setSuggestions(cacheRef.current[query]);
       setShowSuggestions(true);
       return;
@@ -104,79 +110,22 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
 
     setIsLoading(true);
     onBusyChange?.(true);
-    console.log('PlacesAutocomplete: Starting API search...');
 
     try {
-      // Try Places Text Search first (good for establishments)
-      console.log('PlacesAutocomplete: Trying text search...');
-      const textSearchRes = await fetch('https://places.googleapis.com/v1/places:searchText', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location,places.types',
-        },
-        body: JSON.stringify({
-          textQuery: query,
-          maxResultCount: 6,
-        }),
+      const suggestionsResult = await searchBoxSuggest(query, key, ensureSessionToken(), {
+        language: 'es',
+        types: 'poi,address,place,street',
       });
 
-      console.log('PlacesAutocomplete: Text search response status:', textSearchRes.status);
+      const results: PredictionItem[] = suggestionsResult.map((suggestion) => ({
+        place_id: suggestion.mapboxId,
+        name: suggestion.name || suggestion.fullAddress,
+        formatted_address: suggestion.fullAddress || '',
+      }));
 
-      if (textSearchRes.ok) {
-        const data = await textSearchRes.json();
-        console.log('PlacesAutocomplete: Text search data:', data);
-        if (data.places && data.places.length > 0) {
-          const results: PredictionItem[] = data.places.map((p: any) => ({
-            place_id: p.id,
-            name: p.displayName?.text || p.formattedAddress,
-            formatted_address: p.formattedAddress || '',
-          }));
-          console.log('PlacesAutocomplete: Text search results:', results);
-          cacheRef.current[query] = results;
-          setSuggestions(results);
-          setShowSuggestions(true);
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      // Fallback to Autocomplete API for broader matches (establishments + addresses)
-      console.log('PlacesAutocomplete: Trying autocomplete...');
-      const acRes = await fetch('https://places.googleapis.com/v1/places:autocomplete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'suggestions.placePrediction.placeId,suggestions.placePrediction.text,suggestions.placePrediction.structuredFormat',
-        },
-          body: JSON.stringify({
-            input: query,
-          }),
-      });
-
-      console.log('PlacesAutocomplete: Autocomplete response status:', acRes.status);
-
-      if (acRes.ok) {
-        const data = await acRes.json();
-        console.log('PlacesAutocomplete: Autocomplete data:', data);
-        const results: PredictionItem[] = (data.suggestions || [])
-          .filter((s: any) => s.placePrediction)
-          .map((s: any) => ({
-            place_id: s.placePrediction.placeId,
-            name: s.placePrediction.structuredFormat?.mainText?.text || s.placePrediction.text?.text,
-            formatted_address: s.placePrediction.structuredFormat?.secondaryText?.text || '',
-          }));
-        console.log('PlacesAutocomplete: Autocomplete results:', results);
-        cacheRef.current[query] = results;
-        setSuggestions(results);
-        setShowSuggestions(results.length > 0);
-      } else {
-        console.error('Places Autocomplete API error:', acRes.status);
-        setSuggestions([]);
-        setShowSuggestions(false);
-      }
+      cacheRef.current[query] = results;
+      setSuggestions(results);
+      setShowSuggestions(results.length > 0);
     } catch (e) {
       console.error('Error searching places:', e);
       setSuggestions([]);
@@ -187,62 +136,42 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
     }
   };
 
-  const getPlaceDetails = async (placeId: string, fallbackName: string, fallbackAddress?: string) => {
-    console.log('PlacesAutocomplete: Getting place details for:', { placeId, fallbackName, fallbackAddress });
-    
-    const key = apiKey || (await fetchApiKey());
+  const getPlaceDetails = async (mapboxId: string, fallbackName: string, fallbackAddress?: string) => {
+    const key = token || (await fetchToken());
     if (!key) {
-      console.log('PlacesAutocomplete: No API key after retry, using fallback data');
-      onSelect({ name: fallbackName, address: fallbackAddress || '', place_id: placeId });
+      onSelect({ name: fallbackName, address: fallbackAddress || '', place_id: mapboxId });
+      resetSessionToken();
       return;
     }
-    
+
     try {
       onBusyChange?.(true);
-      const res = await fetch(`https://places.googleapis.com/v1/places/${placeId}`, {
-        headers: {
-          'X-Goog-Api-Key': key,
-          'X-Goog-FieldMask': 'id,displayName,formattedAddress,location',
-        },
-      });
-      
-      console.log('PlacesAutocomplete: Place details response status:', res.status);
-      
-      if (!res.ok) throw new Error(`Place Details API error: ${res.status}`);
-      
-      const place = await res.json();
-      console.log('PlacesAutocomplete: Place details data:', place);
-      
-      const coordinates = place.location
-        ? { lat: place.location.latitude, lng: place.location.longitude }
-        : undefined;
-        
+      const place = await searchBoxRetrieve(mapboxId, key, ensureSessionToken());
+
       const result: PlaceAutocompleteResult = {
-        name: place.displayName?.text || fallbackName,
-        address: place.formattedAddress || fallbackAddress || '',
-        coordinates,
-        place_id: placeId,
+        name: place?.name || fallbackName,
+        address: place?.address || fallbackAddress || '',
+        coordinates: place?.coordinates,
+        place_id: mapboxId,
       };
-      
-      console.log('PlacesAutocomplete: Calling onSelect with:', result);
+
       onSelect(result);
       setInputValue(result.name);
       setShowSuggestions(false);
     } catch (err) {
       console.error('Error fetching place details:', err);
-      const fallbackResult = { name: fallbackName, address: fallbackAddress || '', place_id: placeId };
-      console.log('PlacesAutocomplete: Using fallback result:', fallbackResult);
+      const fallbackResult = { name: fallbackName, address: fallbackAddress || '', place_id: mapboxId };
       onSelect(fallbackResult);
       setInputValue(fallbackName);
       setShowSuggestions(false);
     } finally {
       onBusyChange?.(false);
+      resetSessionToken();
     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const v = e.target.value;
-    console.log('PlacesAutocomplete: Input changed:', v);
     setInputValue(v);
     onInputChange?.(v);
     // Debounce
@@ -251,7 +180,6 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
   };
 
   const handleSelect = (item: PredictionItem) => {
-    console.log('PlacesAutocomplete: Item selected:', item);
     getPlaceDetails(item.place_id, item.name, item.formatted_address);
   };
 
@@ -272,7 +200,7 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
               e.stopPropagation();
             }
           }}
-          onFocus={() => { if (!apiKey) { fetchApiKey(); } if (suggestions.length > 0) setShowSuggestions(true); }}
+          onFocus={() => { if (!token) { void fetchToken(); } if (suggestions.length > 0) setShowSuggestions(true); }}
         />
         <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <div className="absolute right-3 top-1/2 -translate-y-1/2">

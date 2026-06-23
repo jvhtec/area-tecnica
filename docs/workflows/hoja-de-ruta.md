@@ -79,7 +79,7 @@ Generates a 10-sheet workbook via ExcelJS: Evento, Recinto, Contactos, Personal,
 ## Key Technical Details
 
 - **Timezone**: All datetimes stored as UTC, displayed in Europe/Madrid
-- **Images**: Supports direct upload + URL-based loading with CORS handling + Google Places photos
+- **Images**: Supports direct upload, URL-based loading with CORS handling, and Wikimedia-backed photo suggestions
 - **Atomic updates**: Uses `replace_hoja_de_ruta_all` RPC for consistent multi-table saves
 - **Templates**: Save current form as reusable template (event_type categories: corporate, festival, tour, conference, wedding, other)
 - **Dirty state**: Tracks unsaved changes, warns before navigation
@@ -87,6 +87,8 @@ Generates a 10-sheet workbook via ExcelJS: Evento, Recinto, Contactos, Personal,
 ## Integration Points
 
 - **Job Management**: Auto-populates from job data (location, assignments, dates)
-- **Google Places API**: Restaurant search, place photos, venue coordinates
+- **Mapbox**: Autocomplete, geocoding, maps, and venue coordinates
+- **Google Places API**: Restaurant search/details only, via cached edge function
+- **Wikimedia**: Venue/accommodation photo suggestions, via cached edge function
 - **Weather API**: Forecast data for event dates
 - **Technician Profiles**: Links staff to profiles via technician_id

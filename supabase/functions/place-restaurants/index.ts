@@ -1,4 +1,13 @@
 // Edge Function: place-restaurants
+//
+// Restaurant search/details stay on Google Places (Mapbox lacks ratings, price
+// level, phone, website). To keep paid usage near zero we: (1) geocode the venue
+// address with Mapbox instead of Google, and (2) cache results persistently so
+// each venue is searched at most once per cache window.
+
+import { createClient } from 'npm:@supabase/supabase-js@2'
+import { getCachedPayload, setCachedPayload } from '../_shared/placeCache.ts'
+import { mapboxGeocode } from '../_shared/mapboxGeocode.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,6 +15,38 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
+
+const RESTAURANT_CACHE_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+const DEFAULT_RADIUS_METERS = 2000;
+const MAX_RADIUS_METERS = 10000;
+const DEFAULT_MAX_RESULTS = 20;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object';
+}
+
+function normalizeCoordinates(lat: unknown, lng: unknown): { lat: number; lng: number } | undefined {
+  if (
+    typeof lat === 'number' &&
+    typeof lng === 'number' &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  ) {
+    return { lat, lng };
+  }
+  return undefined;
+}
+
+function normalizePositiveInteger(value: unknown, fallback: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return fallback;
+  }
+  return Math.min(Math.floor(value), max);
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,19 +61,37 @@ Deno.serve(async (req) => {
   }
 
   try {
-    console.log('Place restaurants function called with method:', req.method);
-    const body = await req.json();
-    console.log('Request body:', JSON.stringify(body, null, 2));
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('place-restaurants: missing Supabase server configuration');
+      return new Response(JSON.stringify({ error: 'Server configuration missing' }), {
+        status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
 
-    const { location, radius = 2000, maxResults = 20, placeId, details = false } = body || {};
+    let body: Record<string, unknown>;
+    try {
+      const parsedBody: unknown = await req.json();
+      body = isRecord(parsedBody) ? parsedBody : {};
+    } catch {
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    const { location, placeId } = body;
+    const details = body.details === true;
+    const locationQuery = typeof location === 'string' ? location.trim() : '';
+    const radiusMeters = normalizePositiveInteger(body?.radius, DEFAULT_RADIUS_METERS, MAX_RADIUS_METERS);
+    const resultLimit = normalizePositiveInteger(body?.maxResults, DEFAULT_MAX_RESULTS, DEFAULT_MAX_RESULTS);
+    const requestCoordinates = isRecord(body.coordinates) ? body.coordinates : null;
 
     // Accept coordinates from body if provided
     const coords =
-      body?.coordinates && typeof body.coordinates.lat === 'number' && typeof body.coordinates.lng === 'number'
-        ? { lat: body.coordinates.lat, lng: body.coordinates.lng }
-        : (typeof body?.latitude === 'number' && typeof body?.longitude === 'number'
-            ? { lat: body.latitude, lng: body.longitude }
-            : undefined);
+      (requestCoordinates
+        ? normalizeCoordinates(requestCoordinates.lat, requestCoordinates.lng)
+        : undefined) ?? normalizeCoordinates(body?.latitude, body?.longitude);
 
     const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
     if (!apiKey) {
@@ -43,8 +102,23 @@ Deno.serve(async (req) => {
     }
 
     // Place details by ID
-    if (details && placeId) {
-      const detailsUrl = `https://places.googleapis.com/v1/places/${placeId}`;
+    if (details) {
+      const normalizedPlaceId = typeof placeId === 'string' ? placeId.trim() : '';
+      if (!normalizedPlaceId) {
+        return new Response(JSON.stringify({ error: 'placeId is required for details lookup' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const detailsCacheKey = `restaurant-details::${normalizedPlaceId}`;
+      const cachedDetails = await getCachedPayload<{ restaurant: unknown }>(supabase, detailsCacheKey);
+      if (cachedDetails?.restaurant) {
+        return new Response(JSON.stringify({ restaurant: cachedDetails.restaurant, cached: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      const detailsUrl = `https://places.googleapis.com/v1/places/${encodeURIComponent(normalizedPlaceId)}`;
       const detailsResponse = await fetch(detailsUrl, {
         method: 'GET',
         headers: {
@@ -65,6 +139,7 @@ Deno.serve(async (req) => {
         }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
       }
       const detailsData = await detailsResponse.json();
+      await setCachedPayload(supabase, detailsCacheKey, 'restaurant-details', { restaurant: detailsData }, RESTAURANT_CACHE_TTL_SECONDS);
       return new Response(JSON.stringify({ restaurant: detailsData }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -77,24 +152,38 @@ Deno.serve(async (req) => {
     if (coords) {
       lat = coords.lat;
       lng = coords.lng;
-      console.log('Using provided coordinates:', { lat, lng });
     } else {
-      if (!location) {
+      if (!locationQuery) {
         return new Response(JSON.stringify({ error: 'Location or coordinates are required' }), {
           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(location)}&key=${apiKey}`;
-      const geocodeResponse = await fetch(geocodeUrl);
-      const geocodeData = await geocodeResponse.json();
-      console.log('Geocode status:', geocodeData?.status);
-      if (!geocodeData.results || geocodeData.results.length === 0) {
+      // Geocode the address with Mapbox (avoids a paid Google Geocoding call).
+      // Require an unrestricted server token: the browser public token is
+      // URL-restricted and can be rejected for server-side (no-Referer) calls.
+      const mapboxToken = Deno.env.get('MAPBOX_SERVER_TOKEN');
+      if (!mapboxToken) {
+        return new Response(JSON.stringify({ error: 'Mapbox server token not configured for geocoding' }), {
+          status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+      const geocoded = await mapboxGeocode(locationQuery, mapboxToken);
+      if (!geocoded) {
         return new Response(JSON.stringify({ error: 'Location not found' }), {
           status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
       }
-      lat = geocodeData.results[0].geometry.location.lat;
-      lng = geocodeData.results[0].geometry.location.lng;
+      lat = geocoded.lat;
+      lng = geocoded.lng;
+    }
+
+    // Serve restaurant search results from the persistent cache when possible
+    const searchCacheKey = `restaurants::${lat!.toFixed(5)},${lng!.toFixed(5)}::${radiusMeters}::${resultLimit}`;
+    const cachedSearch = await getCachedPayload<{ restaurants: unknown[] }>(supabase, searchCacheKey);
+    if (cachedSearch?.restaurants) {
+      return new Response(JSON.stringify({ restaurants: cachedSearch.restaurants, cached: true }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Nearby search (Places API v1)
@@ -108,12 +197,12 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         includedPrimaryTypes: ['restaurant'],
-        maxResultCount: Math.min(maxResults, 20),
+        maxResultCount: resultLimit,
         rankPreference: 'DISTANCE',
         locationRestriction: {
           circle: {
             center: { latitude: lat, longitude: lng },
-            radius: radius
+            radius: radiusMeters
           }
         },
         languageCode: 'es',
@@ -159,6 +248,7 @@ Deno.serve(async (req) => {
     });
 
     restaurants.sort((a: any, b: any) => a.distance - b.distance);
+    await setCachedPayload(supabase, searchCacheKey, 'restaurants', { restaurants }, RESTAURANT_CACHE_TTL_SECONDS);
     return new Response(JSON.stringify({ restaurants }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

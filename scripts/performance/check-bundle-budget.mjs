@@ -59,7 +59,11 @@ function assetKind(file) {
 }
 
 function chunkFamily(fileName) {
-  return fileName.replace(/-[A-Za-z0-9_]{6,}(?=\.[^.]+$)/, "");
+  // Rollup content hashes are 8-char base64url and can contain "-" or "_",
+  // which otherwise collide with the "-" name separator and break family
+  // grouping (e.g. "pdf-libs-C-EJni8q.js" must reduce to "pdf-libs.js", not
+  // "pdf-libs-C.js"). Strip exactly the trailing 8-char hash segment.
+  return fileName.replace(/-[A-Za-z0-9_-]{8}(?=\.[^.]+$)/, "");
 }
 
 function collectBundleMetrics() {

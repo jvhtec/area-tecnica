@@ -6,7 +6,7 @@ import { MapPin, Truck } from "lucide-react";
 import { TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { dataLayerClient } from "@/services/dataLayerClient";
+import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
 import { useJobDistance } from "@/hooks/useJobDistance";
 
 interface JobDetailsLocationTabProps {
@@ -16,8 +16,7 @@ interface JobDetailsLocationTabProps {
 }
 
 export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ open, jobDetails, isJobLoading }) => {
-  // Static map preview via Google Static Maps (key fetched via Edge Function secret)
-  const [googleStaticKey, setGoogleStaticKey] = useState<string | null>(null);
+  // Static map preview via Mapbox Static Images API (public token, no Google billing)
   const [mapPreviewUrl, setMapPreviewUrl] = useState<string | null>(null);
   const [isMapLoading, setIsMapLoading] = useState<boolean>(false);
 
@@ -49,32 +48,7 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
 
         setIsMapLoading(true);
 
-        // Ensure we have an API key (fetch from secrets if needed)
-        let apiKey = googleStaticKey;
-        if (!apiKey) {
-          const { data, error } = await dataLayerClient.functions.invoke("get-google-maps-key");
-          if (error || !data?.apiKey) {
-            setMapPreviewUrl(null);
-            setIsMapLoading(false);
-            return;
-          }
-          apiKey = data.apiKey as string;
-          setGoogleStaticKey(apiKey);
-        }
-
-        const zoom = 15;
-        const width = 600;
-        const height = 300;
-        const scale = 2;
-        const center = Number.isFinite(lat) && Number.isFinite(lng) ? `${lat},${lng}` : encodeURIComponent(address);
-        const markers =
-          Number.isFinite(lat) && Number.isFinite(lng)
-            ? `&markers=color:red|label:A|${lat},${lng}`
-            : address
-              ? `&markers=color:red|label:A|${encodeURIComponent(address)}`
-              : "";
-        const url = `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=${zoom}&size=${width}x${height}&scale=${scale}${markers}&key=${encodeURIComponent(apiKey)}`;
-
+        const url = await getStaticMapUrlForLocation({ lat, lng, address, width: 600, height: 300, zoom: 15 });
         setMapPreviewUrl(url);
       } catch (e: any) {
         console.warn("Failed to load static map preview:", e?.message || e);
@@ -84,7 +58,7 @@ export const JobDetailsLocationTab: React.FC<JobDetailsLocationTabProps> = ({ op
       }
     };
     loadStaticMap();
-  }, [open, jobDetails, googleStaticKey]);
+  }, [open, jobDetails]);
 
   const openGoogleMaps = () => {
     if (jobDetails?.locations) {

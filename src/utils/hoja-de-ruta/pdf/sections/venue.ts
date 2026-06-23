@@ -4,6 +4,7 @@ import { DataValidators } from '../utils/validators';
 import { MapService } from '../services/map-service';
 import { PlacesImageService } from '../services/places-image-service';
 import { QRService } from '../services/qr-service';
+import { normalizeVenueCoordinates } from '@/utils/hoja-de-ruta/venue-resolution';
 
 export class VenueSection {
   constructor(private pdfDoc: PDFDocument) {}
@@ -45,16 +46,16 @@ export class VenueSection {
       yPosition = this.pdfDoc.getLastAutoTableY() + 15;
     }
 
-    // Add venue images: ONLY use manually uploaded previews (no auto-fetch to avoid €15/month API costs)
+    // Add venue images: prefer manually uploaded previews; otherwise auto-fetch
+    // from Wikimedia (free, no API costs).
     let imagesToRender: string[] = [];
     if (venueImagePreviews && venueImagePreviews.length > 0) {
       imagesToRender = venueImagePreviews.slice(0, 2);
+    } else if (eventData.venue?.name || eventData.venue?.address) {
+      const q = eventData.venue?.name || eventData.venue?.address || '';
+      const coords = normalizeVenueCoordinates(eventData.venue?.coordinates);
+      imagesToRender = await PlacesImageService.getPhotosForQuery(q, 2, 500, 300, coords);
     }
-    // DISABLED: Auto-fetch from Google Places API to keep costs at €0
-    // else if (eventData.venue?.name || eventData.venue?.address) {
-    //   const q = eventData.venue?.name || eventData.venue?.address || '';
-    //   imagesToRender = await PlacesImageService.getPhotosForQuery(q, 1, 500, 300);
-    // }
 
     if (imagesToRender.length > 0) {
       yPosition = this.pdfDoc.checkPageBreak(yPosition, 90);

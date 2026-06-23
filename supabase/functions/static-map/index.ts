@@ -1,4 +1,10 @@
 // Edge Function: static-map
+//
+// Returns a static map image (as a data URL) for the given coordinates or
+// address. Backed by the Mapbox Static Images API (no Google billing).
+
+import { mapboxGeocode } from '../_shared/mapboxGeocode.ts'
+import { arrayBufferToBase64 } from '../_shared/base64.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,6 +12,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Max-Age': '86400',
 };
+
+const MAX_DIM = 1280;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -20,15 +28,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const apiKey = Deno.env.get('GOOGLE_MAPS_API_KEY');
-    if (!apiKey) {
-      return new Response(JSON.stringify({ error: 'API key not available' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
     const {
       lat,
       lng,
@@ -36,26 +36,46 @@ Deno.serve(async (req) => {
       width = 600,
       height = 300,
       zoom = 15,
-      scale = 2,
     } = body || {};
 
-    let centerLat: number | undefined = typeof lat === 'number' ? lat : undefined;
-    let centerLng: number | undefined = typeof lng === 'number' ? lng : undefined;
+    const isFiniteNumber = (value: unknown): value is number =>
+      typeof value === 'number' && Number.isFinite(value);
 
-    if ((centerLat === undefined || centerLng === undefined) && address) {
-      const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
-      const geocodeRes = await fetch(geocodeUrl);
-      if (!geocodeRes.ok) {
-        return new Response(JSON.stringify({ error: 'Geocoding failed' }), {
-          status: 502,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      const geocodeData = await geocodeRes.json();
-      const location = geocodeData?.results?.[0]?.geometry?.location;
-      if (location) {
-        centerLat = location.lat;
-        centerLng = location.lng;
+    let centerLat: number | undefined = isFiniteNumber(lat) && lat >= -90 && lat <= 90 ? lat : undefined;
+    let centerLng: number | undefined = isFiniteNumber(lng) && lng >= -180 && lng <= 180 ? lng : undefined;
+    const queryAddress = typeof address === 'string' ? address.trim() : '';
+
+    if ((centerLat === undefined || centerLng === undefined) && !queryAddress) {
+      return new Response(JSON.stringify({ error: 'Latitude/Longitude or address is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (
+      !isFiniteNumber(width) ||
+      !isFiniteNumber(height) ||
+      !isFiniteNumber(zoom)
+    ) {
+      return new Response(JSON.stringify({ error: 'Invalid static map parameters' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const token = Deno.env.get('MAPBOX_SERVER_TOKEN');
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Mapbox server token not available' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if ((centerLat === undefined || centerLng === undefined) && queryAddress) {
+      const geocoded = await mapboxGeocode(queryAddress, token);
+      if (geocoded) {
+        centerLat = geocoded.lat;
+        centerLng = geocoded.lng;
       } else {
         return new Response(JSON.stringify({ error: 'Address not found' }), {
           status: 404,
@@ -71,17 +91,17 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Clamp dimensions to Static Maps API limits; use <= 640px per dimension
-    const w = Math.min(Math.max(Math.floor(width), 1), 640);
-    const h = Math.min(Math.max(Math.floor(height), 1), 640);
-    const s = Math.min(Math.max(Math.floor(scale), 1), 2);
+    const w = Math.min(Math.max(Math.floor(width), 1), MAX_DIM);
+    const h = Math.min(Math.max(Math.floor(height), 1), MAX_DIM);
 
-    const url = `https://maps.googleapis.com/maps/api/staticmap?center=${centerLat},${centerLng}&zoom=${zoom}&size=${w}x${h}&scale=${s}&format=png&maptype=roadmap&markers=size:tiny%7Ccolor:red%7C${centerLat},${centerLng}&key=${apiKey}`;
+    const overlay = `pin-s+ff0000(${centerLng},${centerLat})`;
+    const url = `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${overlay}/${centerLng},${centerLat},${zoom}/${w}x${h}@2x?access_token=${token}`;
 
-    const mapRes = await fetch(url);
+    const mapRes = await fetch(url, { signal: AbortSignal.timeout(10000) });
     if (!mapRes.ok) {
       const txt = await mapRes.text().catch(()=>'');
-      return new Response(JSON.stringify({ error: 'Static map fetch failed', status: mapRes.status, details: txt }), {
+      console.error('static-map: Mapbox fetch failed', mapRes.status, txt);
+      return new Response(JSON.stringify({ error: 'Static map fetch failed', status: mapRes.status }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -89,7 +109,7 @@ Deno.serve(async (req) => {
 
     const blob = await mapRes.blob();
     const arrayBuffer = await blob.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const base64 = arrayBufferToBase64(arrayBuffer);
     const dataUrl = `data:${blob.type};base64,${base64}`;
 
     return new Response(JSON.stringify({ dataUrl }), {
@@ -97,10 +117,10 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err: any) {
-    return new Response(JSON.stringify({ error: 'Internal server error', details: err?.message || String(err) }), {
+    console.error('static-map: internal error', err?.message || String(err));
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
-

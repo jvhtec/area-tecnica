@@ -4,12 +4,6 @@ import {
   persistSecurityAuditLog,
 } from "../_shared/securityAudit.ts";
 
-const MANAGEMENT_ROLES = new Set(["admin", "management"]);
-
-interface ProfileRecord {
-  role: string | null;
-}
-
 interface GetGoogleMapsKeyDeps {
   supabase: {
     auth: {
@@ -18,16 +12,12 @@ interface GetGoogleMapsKeyDeps {
       ) => Promise<{ data: { user: { id: string } | null }; error: unknown }>;
     };
     from: (table: string) => {
-      select?: (columns: string) => {
-        eq: (column: string, value: string) => {
-          single: () => Promise<{ data: ProfileRecord | null; error: unknown }>;
-        };
-      };
       insert: (payload: Record<string, unknown>) => Promise<{ error: unknown }>;
     };
   };
-  getEnv: (name: string) => string | undefined;
-  allowedRoles: string[] | null;
+  // Retained for signature compatibility with index.ts; no longer used.
+  getEnv?: (name: string) => string | undefined;
+  allowedRoles?: string[] | null;
 }
 
 async function auditGoogleMapsKeyAccess(
@@ -35,9 +25,7 @@ async function auditGoogleMapsKeyAccess(
   deps: GetGoogleMapsKeyDeps,
   details: {
     userId?: string | null;
-    success: boolean;
     outcome: string;
-    role?: string | null;
   },
 ): Promise<void> {
   try {
@@ -45,11 +33,10 @@ async function auditGoogleMapsKeyAccess(
       user_id: details.userId ?? null,
       action: "google_maps_key_access",
       resource: "google_maps_api_key",
-      severity: details.success ? "low" : "high",
+      severity: "low",
       metadata: {
-        success: details.success,
+        success: false,
         outcome: details.outcome,
-        role: details.role ?? null,
       },
     });
   } catch (error) {
@@ -57,99 +44,44 @@ async function auditGoogleMapsKeyAccess(
   }
 }
 
+/**
+ * Deprecated endpoint.
+ *
+ * The Google Maps API key is no longer exposed to clients. Maps, geocoding and
+ * autocomplete now use Mapbox (public token via `get-mapbox-token`), photos are
+ * sourced from Wikimedia, and the remaining Google Places restaurant features
+ * call Google only from server-side edge functions where the key stays in
+ * `GOOGLE_MAPS_API_KEY`.
+ *
+ * This handler always returns 410 Gone and never returns the key, while still
+ * recording any access attempt for auditing.
+ */
 export async function handleGetGoogleMapsKeyRequest(
   req: Request,
   deps: GetGoogleMapsKeyDeps,
 ): Promise<Response> {
   const accessToken = extractBearerToken(req);
 
-  if (!accessToken) {
-    await auditGoogleMapsKeyAccess(req, deps, {
-      success: false,
-      outcome: "missing_authorization",
-    });
-    return jsonResponse({ error: "Authorization header required" }, { status: 401 });
-  }
-
-  const {
-    data: { user },
-    error: authError,
-  } = await deps.supabase.auth.getUser(accessToken);
-
-  if (authError || !user) {
-    await auditGoogleMapsKeyAccess(req, deps, {
-      success: false,
-      outcome: "invalid_authentication",
-    });
-    return jsonResponse({ error: "Invalid authentication" }, { status: 401 });
-  }
-
-  const profileQuery = deps.supabase.from("profiles").select?.("role");
-  const { data: profile, error: profileError } = await profileQuery?.eq("id", user.id).single() ?? {
-    data: null,
-    error: new Error("Profile query unavailable"),
-  };
-
-  if (profileError) {
-    await auditGoogleMapsKeyAccess(req, deps, {
-      userId: user.id,
-      success: false,
-      outcome: "db_error",
-    });
-    return jsonResponse({ error: "Failed to load user profile" }, { status: 500 });
-  }
-
-  if (!profile) {
-    await auditGoogleMapsKeyAccess(req, deps, {
-      userId: user.id,
-      success: false,
-      outcome: "profile_not_found",
-    });
-    return jsonResponse({ error: "User profile not found" }, { status: 403 });
-  }
-
-  const role = profile.role ?? "";
-
-  if (
-    !MANAGEMENT_ROLES.has(role)
-    && deps.allowedRoles
-    && !deps.allowedRoles.includes(role)
-  ) {
-    await auditGoogleMapsKeyAccess(req, deps, {
-      userId: user.id,
-      success: false,
-      outcome: "insufficient_permissions",
-      role,
-    });
-    return jsonResponse({ error: "Insufficient permissions" }, { status: 403 });
-  }
-
-  const googleMapsKey = deps.getEnv("GOOGLE_MAPS_API_KEY");
-
-  if (!googleMapsKey) {
-    await auditGoogleMapsKeyAccess(req, deps, {
-      userId: user.id,
-      success: false,
-      outcome: "key_not_configured",
-      role,
-    });
-    return jsonResponse({ error: "Google Maps API key not configured" }, { status: 500 });
+  let userId: string | null = null;
+  if (accessToken) {
+    try {
+      const { data } = await deps.supabase.auth.getUser(accessToken);
+      userId = data?.user?.id ?? null;
+    } catch {
+      userId = null;
+    }
   }
 
   await auditGoogleMapsKeyAccess(req, deps, {
-    userId: user.id,
-    success: true,
-    outcome: "allowed",
-    role,
+    userId,
+    outcome: "deprecated_endpoint",
   });
 
   return jsonResponse(
-    { apiKey: googleMapsKey },
     {
-      status: 200,
-      headers: {
-        "Cache-Control": "no-store, private, max-age=0",
-      },
+      error:
+        "This endpoint has been deprecated. Maps now use Mapbox via get-mapbox-token; Google Places restaurant features run server-side only.",
     },
+    { status: 410 },
   );
 }

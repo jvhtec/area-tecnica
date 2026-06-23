@@ -33,6 +33,7 @@ import type { TourDocument } from "@/hooks/useTourDocuments";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useWeatherData } from "@/hooks/useWeatherData";
 import { queryKeys } from "@/lib/react-query";
+import { getStaticMapUrlForLocation } from "@/lib/mapbox/mapboxClient";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import type { JobDocument, JobWithLocationAndDocs, StaffAssignment } from "@/types/job";
 import type { WeatherData } from "@/types/hoja-de-ruta";
@@ -416,25 +417,7 @@ export const useDetailsModalData = ({ theme, isDark, job, onClose }: DetailsModa
 
         setIsMapLoading(true);
 
-        const { data, error } = await dataLayerClient.functions.invoke("get-google-maps-key");
-        if (error || !data?.apiKey) {
-          setMapPreviewUrl(null);
-          setIsMapLoading(false);
-          return;
-        }
-        const apiKey = data.apiKey as string;
-        const zoom = 15;
-        const width = 600;
-        const height = 300;
-        const scale = 2;
-        const center = Number.isFinite(lat) && Number.isFinite(lng)
-          ? `${lat},${lng}`
-          : encodeURIComponent(address);
-        const markers = Number.isFinite(lat) && Number.isFinite(lng)
-          ? `&markers=color:red|label:A|${lat},${lng}`
-          : (address ? `&markers=color:red|label:A|${encodeURIComponent(address)}` : "");
-        const url = `https://maps.googleapis.com/maps/api/staticmap?center=${center}&zoom=${zoom}&size=${width}x${height}&scale=${scale}${markers}&key=${encodeURIComponent(apiKey)}`;
-
+        const url = await getStaticMapUrlForLocation({ lat, lng, address, width: 600, height: 300, zoom: 15 });
         setMapPreviewUrl(url);
       } catch (e: unknown) {
         const message = e instanceof Error ? e.message : String(e);
