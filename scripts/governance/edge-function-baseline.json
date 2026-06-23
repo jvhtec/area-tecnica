@@ -44,11 +44,6 @@
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
-      "functionName": "create-user",
-      "path": "supabase/functions/create-user/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
       "functionName": "create-whatsapp-group",
       "path": "supabase/functions/create-whatsapp-group/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
@@ -56,11 +51,6 @@
     {
       "functionName": "delete-public-artist-rider",
       "path": "supabase/functions/delete-public-artist-rider/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "delete-user",
-      "path": "supabase/functions/delete-user/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
