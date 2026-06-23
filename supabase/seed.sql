@@ -1,6 +1,12 @@
 -- Seed data for local development
 -- This file is automatically run after migrations when running `supabase db reset`
 
+-- Local seed SQL is executed directly by the Supabase CLI, outside an
+-- authenticated PostgREST request. Set a service-role JWT context so hardened
+-- auth-aware triggers/functions permit bootstrap records without weakening
+-- production policies.
+SELECT set_config('request.jwt.claim.role', 'service_role', false);
+
 -- Create a test admin user
 -- Email: admin@test.com
 -- Password: admin123
