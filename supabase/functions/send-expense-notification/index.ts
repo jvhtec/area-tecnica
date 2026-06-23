@@ -115,7 +115,8 @@ serve(createHttpHandler(async (req) => {
   const categoryLabel = typeof payload.category_label === "string" ? payload.category_label.trim() : "";
   const expenseDate = typeof payload.expense_date === "string" ? payload.expense_date : "";
   const status = typeof payload.status === "string" ? payload.status : "updated";
-  const amountEur = Number(payload.amount_eur ?? 0);
+  const parsedAmountEur = Number(payload.amount_eur ?? 0);
+  const amountEur = Number.isFinite(parsedAmountEur) ? parsedAmountEur : 0;
 
   console.log("[send-expense-notification] Incoming payload", JSON.stringify(redactSensitiveValues({
     correlationId,
@@ -290,6 +291,7 @@ serve(createHttpHandler(async (req) => {
 }, {
   allowedMethods: ["POST"],
   internalErrorMessage: "Expense notification failed",
+  errorHeaders: (req) => correlationHeaders(getCorrelationId(req)),
   onError(error, req) {
     console.error("[send-expense-notification] Request failed", JSON.stringify(redactSensitiveValues({
       correlationId: getCorrelationId(req),

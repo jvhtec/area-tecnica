@@ -528,7 +528,10 @@ serve(createHttpHandler(async (req) => {
         correlationId,
         error: sendError,
       })));
-      // Don't fail the whole operation, just log it
+      throw new HttpError(502, "Notification email delivery failed", {
+        code: "notification_delivery_failed",
+        exposeDetails: false,
+      });
     }
 
     return respond({
@@ -538,6 +541,7 @@ serve(createHttpHandler(async (req) => {
 }, {
   allowedMethods: ["POST"],
   internalErrorMessage: "Payout override notification failed",
+  errorHeaders: (req) => correlationHeaders(getCorrelationId(req)),
   onError(error, req) {
     console.error("[send-payout-override-notification] Request failed", JSON.stringify(redactSensitiveValues({
       correlationId: getCorrelationId(req),

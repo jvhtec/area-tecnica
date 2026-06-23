@@ -116,6 +116,26 @@ describe("shared Edge Function HTTP helpers", () => {
     }
   });
 
+  it("attaches configured headers to handled error responses", async () => {
+    const wrapped = createHttpHandler(
+      async () => {
+        throw new HttpError(400, "bad request", { code: "bad_request" });
+      },
+      {
+        errorHeaders: (req) => correlationHeaders(getCorrelationId(req)),
+      },
+    );
+
+    const response = await wrapped(new Request("https://example.com", {
+      method: "POST",
+      headers: { "x-correlation-id": "trace-12345" },
+    }));
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("x-correlation-id")).toBe("trace-12345");
+    await expect(response.json()).resolves.toEqual({ error: "bad request", code: "bad_request" });
+  });
+
   it("reuses a well-formed inbound correlation id and generates otherwise", () => {
     const withHeader = new Request("https://example.com", {
       headers: { "x-correlation-id": "abc12345-trace-id" },
@@ -128,6 +148,7 @@ describe("shared Edge Function HTTP helpers", () => {
     const generated = getCorrelationId(malformed);
     expect(generated).not.toBe("bad id!");
     expect(generated.length).toBeGreaterThanOrEqual(8);
+    expect(getCorrelationId(malformed)).toBe(generated);
 
     expect(correlationHeaders("trace-123")).toEqual({ "x-correlation-id": "trace-123" });
   });

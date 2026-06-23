@@ -584,6 +584,7 @@ serve(createHttpHandler(async (req) => {
 }, {
   allowedMethods: ["POST"],
   internalErrorMessage: "Payout email request failed",
+  errorHeaders: (req) => correlationHeaders(getCorrelationId(req)),
   onError(error, req) {
     console.error("[send-job-payout-email] Request failed", JSON.stringify(redactSensitiveValues({
       correlationId: getCorrelationId(req),
