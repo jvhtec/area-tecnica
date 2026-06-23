@@ -26,16 +26,19 @@ Automatic photo fetching in 3 locations:
 - Place Details API calls (3,137) were within free tier (100k/month)
 - **Only photo fetches were causing charges**
 
-## Original Solution: Complete Disable
+## Historical Solution: Complete Disable (Superseded in PR 706)
 
-All automatic Google photo fetching was **completely disabled**:
+From January 1, 2026 until PR 706, all automatic Google photo fetching was
+**completely disabled**. This section documents that historical state; current
+automatic photo fetching uses Wikimedia instead of Google.
 
 ### Files Modified
 
 #### 1. `src/components/hoja-de-ruta/sections/ModernVenueSection.tsx`
 ```diff
 - Auto-fetch venue photos from Google Places API
-+ Google Places disabled: users must manually upload venue photos
++ Google Places disabled: users had to manually upload venue photos
++ PR 706 supersedes this by enabling Wikimedia-backed automatic suggestions
 ```
 
 #### 2. `src/utils/hoja-de-ruta/pdf/sections/venue.ts`
@@ -47,7 +50,8 @@ All automatic Google photo fetching was **completely disabled**:
 #### 3. `src/utils/hoja-de-ruta/pdf/sections/accommodation.ts`
 ```diff
 - Auto-fetch hotel images via Places API
-+ Google Places disabled: users must manually upload accommodation photos
++ Google Places disabled: users had to manually upload accommodation photos
++ PR 706 supersedes this by enabling Wikimedia-backed automatic suggestions
 ```
 
 ## Impact
@@ -78,9 +82,9 @@ Implement a monthly budget (e.g., max 200 photos/month) with usage tracking.
 ### Option 4: Database Photo Cache
 Pre-fetch and cache photos for common venues in database, serve from there instead of API.
 
-## Reverting Changes
+## Reverting Changes (Not Recommended)
 
-To re-enable Google automatic photo fetching (will incur cost):
+If you choose to re-enable paid Google automatic photo fetching (incurs cost):
 
 1. Route calls through an edge function; never expose the Google key.
 2. Use persistent caching and a hard monthly budget.
