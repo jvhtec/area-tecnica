@@ -1,81 +1,158 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+import {
+  createHttpHandler,
+  HttpError,
+  jsonResponse,
+  requireBearerToken,
+  requireEnvValues,
+} from "../_shared/http.ts";
+import { persistSecurityAuditLog } from "../_shared/securityAudit.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-};
+// Privileged integrity diagnostics (ENT-OBS-02).
+//
+// Previously this function used the service role with no caller check and
+// returned sample rows plus raw database error messages to anyone who could
+// reach it. It is now:
+//   * gated on an authenticated admin/management caller,
+//   * stripped of business-data samples,
+//   * stripped of internal error message leakage (logged server-side only),
+//   * audited on every access.
+//
+// Unauthenticated liveness lives in the separate `health` function.
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+const PRIVILEGED_ROLES = new Set(["admin", "management"]);
+
+type CheckStatus = "ok" | "warning" | "critical" | "error";
+
+interface CheckResult {
+  status: CheckStatus;
+  count: number;
+}
+
+interface RpcResult {
+  data: unknown;
+  error: { message?: string } | null;
+}
+
+function summarizeCheck(
+  result: RpcResult,
+  nonEmptyStatus: Exclude<CheckStatus, "ok" | "error">,
+): CheckResult {
+  if (result.error) {
+    // Surface only that the probe failed; never the raw DB error text.
+    return { status: "error", count: 0 };
   }
 
-  try {
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
+  const count = Array.isArray(result.data) ? result.data.length : 0;
+  return { status: count === 0 ? "ok" : nonEmptyStatus, count };
+}
 
-    // Run all health checks in parallel
-    const [orphanedResult, doubleBookingResult, declinedResult] = await Promise.all([
-      supabase.rpc('find_orphaned_timesheets'),
-      supabase.rpc('find_double_bookings'),
-      supabase.rpc('find_declined_with_active_timesheets')
-    ]);
+serve(createHttpHandler(async (req) => {
+  const {
+    SUPABASE_URL: supabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+  } = requireEnvValues(
+    ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const,
+    (name) => Deno.env.get(name),
+  );
 
-    // Check for errors
-    const checks = {
-      orphaned_timesheets: {
-        status: orphanedResult.error ? 'error' : (orphanedResult.data?.length === 0 ? 'ok' : 'warning'),
-        count: orphanedResult.data?.length || 0,
-        error: orphanedResult.error?.message,
-        sample: orphanedResult.data?.slice(0, 3) || []
-      },
-      double_bookings: {
-        status: doubleBookingResult.error ? 'error' : (doubleBookingResult.data?.length === 0 ? 'ok' : 'critical'),
-        count: doubleBookingResult.data?.length || 0,
-        error: doubleBookingResult.error?.message,
-        sample: doubleBookingResult.data?.slice(0, 3) || []
-      },
-      declined_with_active_timesheets: {
-        status: declinedResult.error ? 'error' : (declinedResult.data?.length === 0 ? 'ok' : 'warning'),
-        count: declinedResult.data?.length || 0,
-        error: declinedResult.error?.message,
-        sample: declinedResult.data?.slice(0, 3) || []
-      }
-    };
+  const accessToken = requireBearerToken(req);
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
-    // Overall health status
-    const hasErrors = Object.values(checks).some(c => c.status === 'error');
-    const hasCritical = Object.values(checks).some(c => c.status === 'critical');
-    const hasWarnings = Object.values(checks).some(c => c.status === 'warning');
+  const { data: authData, error: authError } = await supabase.auth.getUser(accessToken);
+  const user = authData?.user ?? null;
 
-    const overallStatus = hasErrors ? 'error' : (hasCritical ? 'critical' : (hasWarnings ? 'warning' : 'ok'));
-    const healthy = overallStatus === 'ok';
+  if (authError || !user) {
+    throw new HttpError(401, "Unauthorized", { code: "invalid_token" });
+  }
 
-    return new Response(JSON.stringify({
-      healthy,
-      status: overallStatus,
-      timestamp: new Date().toISOString(),
-      checks
-    }), {
-      status: healthy ? 200 : 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
 
-  } catch (error) {
-    console.error('Health check error:', error);
-    return new Response(JSON.stringify({
-      healthy: false,
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  if (profileError) {
+    // Do not mistake an upstream lookup failure for an authorization denial.
+    console.error("system-health profile lookup failed", profileError?.message);
+    throw new HttpError(500, "Authorization lookup failed", {
+      code: "authorization_lookup_failed",
+      exposeDetails: false,
     });
   }
-});
+
+  const role = typeof profile?.role === "string" ? profile.role.toLowerCase() : "";
+
+  if (!PRIVILEGED_ROLES.has(role)) {
+    await persistSecurityAuditLog(req, supabase, {
+      user_id: user.id,
+      action: "system_health_access_denied",
+      resource: "edge.system-health",
+      severity: "medium",
+      metadata: { role: role || null },
+    }).catch((error) => console.error("system-health audit (denied) failed", error));
+
+    throw new HttpError(403, "Forbidden", { code: "insufficient_role" });
+  }
+
+  const [orphanedResult, doubleBookingResult, declinedResult] = await Promise.all([
+    supabase.rpc("find_orphaned_timesheets"),
+    supabase.rpc("find_double_bookings"),
+    supabase.rpc("find_declined_with_active_timesheets"),
+  ]) as RpcResult[];
+
+  const checks = {
+    orphaned_timesheets: summarizeCheck(orphanedResult, "warning"),
+    double_bookings: summarizeCheck(doubleBookingResult, "critical"),
+    declined_with_active_timesheets: summarizeCheck(declinedResult, "warning"),
+  };
+
+  // Log the raw probe errors server-side for operators without returning them.
+  for (const [name, result] of Object.entries({
+    orphaned_timesheets: orphanedResult,
+    double_bookings: doubleBookingResult,
+    declined_with_active_timesheets: declinedResult,
+  })) {
+    if (result.error) {
+      console.error(`system-health check failed: ${name}`, result.error?.message);
+    }
+  }
+
+  const statuses = Object.values(checks).map((check) => check.status);
+  const overallStatus: CheckStatus = statuses.includes("error")
+    ? "error"
+    : statuses.includes("critical")
+      ? "critical"
+      : statuses.includes("warning")
+        ? "warning"
+        : "ok";
+
+  await persistSecurityAuditLog(req, supabase, {
+    user_id: user.id,
+    action: "system_health_viewed",
+    resource: "edge.system-health",
+    severity: "low",
+    metadata: { overall_status: overallStatus },
+  }).catch((error) => console.error("system-health audit failed", error));
+
+  // The probe itself succeeded; integrity status is carried in the body so
+  // monitors do not treat a data warning as an endpoint outage.
+  return jsonResponse({
+    healthy: overallStatus === "ok",
+    status: overallStatus,
+    timestamp: new Date().toISOString(),
+    checks,
+  });
+}, {
+  allowedMethods: ["GET", "POST"],
+  internalErrorMessage: "Health check failed",
+  onError: (error) => {
+    if (!(error instanceof HttpError)) {
+      console.error("system-health unhandled error", error);
+    }
+  },
+}));

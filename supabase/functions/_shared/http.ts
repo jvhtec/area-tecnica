@@ -121,6 +121,174 @@ function isRecord(value: unknown): value is JsonBody {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+/** Default maximum accepted request body size (1 MiB). */
+export const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
+
+const CORRELATION_HEADER = "x-correlation-id";
+const CORRELATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+
+/**
+ * Returns a stable correlation id for a request: the inbound `x-correlation-id`
+ * header when present and well-formed, otherwise a freshly generated UUID. Use
+ * it to tie browser → Edge → database → provider log lines together.
+ */
+export function getCorrelationId(req: Request): string {
+  const inbound = req.headers.get(CORRELATION_HEADER)?.trim();
+
+  if (inbound && CORRELATION_ID_PATTERN.test(inbound)) {
+    return inbound;
+  }
+
+  return crypto.randomUUID();
+}
+
+/** Returns response headers carrying the correlation id. */
+export function correlationHeaders(correlationId: string): Record<string, string> {
+  return { [CORRELATION_HEADER]: correlationId };
+}
+
+/**
+ * Reads the request body as text while enforcing a maximum size. The
+ * `Content-Length` header is checked first (fast reject), then the body is
+ * streamed and the running byte total is enforced incrementally so an untrusted
+ * payload is never fully buffered beyond `maxBytes` (defends against chunked or
+ * misreported requests). Oversized bodies throw HTTP 413.
+ */
+export async function readBoundedText(
+  req: Request,
+  options: { maxBytes?: number; message?: string; code?: string } = {},
+): Promise<string> {
+  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BODY_BYTES;
+  const message = options.message ?? "Request body too large";
+  const code = options.code ?? "payload_too_large";
+
+  const contentLengthHeader = req.headers.get("content-length");
+  if (contentLengthHeader) {
+    const declared = Number.parseInt(contentLengthHeader, 10);
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      throw new HttpError(413, message, { code });
+    }
+  }
+
+  if (!req.body) {
+    return "";
+  }
+
+  const reader = req.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let raw = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new HttpError(413, message, { code });
+    }
+
+    raw += decoder.decode(value, { stream: true });
+  }
+
+  raw += decoder.decode();
+  return raw;
+}
+
+/** Reads and parses a size-bounded JSON object body, throwing on parse or size errors. */
+export async function readBoundedJsonObject<T extends JsonBody = JsonBody>(
+  req: Request,
+  options: { maxBytes?: number; message?: string; code?: string } = {},
+): Promise<T> {
+  const raw = await readBoundedText(req, options);
+
+  if (!raw.trim()) {
+    throw new HttpError(400, options.message ?? "Request body is required", {
+      code: options.code ?? "empty_body",
+    });
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    throw new HttpError(400, "Invalid JSON body", { code: "invalid_json" });
+  }
+
+  if (!isRecord(parsed)) {
+    throw new HttpError(400, "Invalid JSON body", { code: "invalid_json" });
+  }
+
+  return parsed as T;
+}
+
+const DEFAULT_REDACTED_KEYS = [
+  "authorization",
+  "password",
+  "token",
+  "access_token",
+  "refresh_token",
+  "api_key",
+  "apikey",
+  "secret",
+  "secret_value",
+  "service_role_key",
+  "client_secret",
+  "private_key",
+  "cookie",
+  "set_cookie",
+];
+
+/**
+ * Recursively redacts sensitive fields from an arbitrary value so it is safe to
+ * log or include in telemetry. Key matching is case-insensitive and ignores
+ * separators (so `apiKey`, `api-key`, and `api_key` all match). Cyclic
+ * references are collapsed to "[Circular]".
+ */
+export function redactSensitiveValues(
+  value: unknown,
+  options: { redactKeys?: readonly string[] } = {},
+): unknown {
+  const denySet = new Set(
+    (options.redactKeys ?? DEFAULT_REDACTED_KEYS).map((key) =>
+      key.replace(/[^a-z0-9]/gi, "").toLowerCase(),
+    ),
+  );
+  const seen = new WeakSet<object>();
+
+  const walk = (input: unknown, key?: string): unknown => {
+    const normalizedKey = key?.replace(/[^a-z0-9]/gi, "").toLowerCase();
+    if (normalizedKey && denySet.has(normalizedKey)) {
+      return "[REDACTED]";
+    }
+
+    if (input === null || typeof input !== "object") {
+      return typeof input === "bigint" ? input.toString() : input;
+    }
+
+    if (seen.has(input as object)) {
+      return "[Circular]";
+    }
+    seen.add(input as object);
+
+    if (Array.isArray(input)) {
+      return input.map((item) => walk(item));
+    }
+
+    return Object.fromEntries(
+      Object.entries(input as Record<string, unknown>).map(([childKey, childValue]) => [
+        childKey,
+        walk(childValue, childKey),
+      ]),
+    );
+  };
+
+  return walk(value);
+}
+
 /** Reads and parses the request body as a JSON object. */
 export async function readJsonObject<T extends JsonBody = JsonBody>(
   req: Request,
