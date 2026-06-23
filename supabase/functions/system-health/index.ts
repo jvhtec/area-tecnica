@@ -5,9 +5,9 @@ import {
   createHttpHandler,
   HttpError,
   jsonResponse,
-  requireBearerToken,
   requireEnvValues,
 } from "../_shared/http.ts";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 import { persistSecurityAuditLog } from "../_shared/securityAudit.ts";
 
 // Privileged integrity diagnostics (ENT-OBS-02).
@@ -21,8 +21,6 @@ import { persistSecurityAuditLog } from "../_shared/securityAudit.ts";
 //   * audited on every access.
 //
 // Unauthenticated liveness lives in the separate `health` function.
-
-const PRIVILEGED_ROLES = new Set(["admin", "management"]);
 
 type CheckStatus = "ok" | "warning" | "critical" | "error";
 
@@ -58,46 +56,25 @@ serve(createHttpHandler(async (req) => {
     (name) => Deno.env.get(name),
   );
 
-  const accessToken = requireBearerToken(req);
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const { data: authData, error: authError } = await supabase.auth.getUser(accessToken);
-  const user = authData?.user ?? null;
-
-  if (authError || !user) {
-    throw new HttpError(401, "Unauthorized", { code: "invalid_token" });
-  }
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (profileError) {
-    // Do not mistake an upstream lookup failure for an authorization denial.
-    console.error("system-health profile lookup failed", profileError?.message);
-    throw new HttpError(500, "Authorization lookup failed", {
-      code: "authorization_lookup_failed",
-      exposeDetails: false,
-    });
-  }
-
-  const role = typeof profile?.role === "string" ? profile.role.toLowerCase() : "";
-
-  if (!PRIVILEGED_ROLES.has(role)) {
-    await persistSecurityAuditLog(req, supabase, {
-      user_id: user.id,
-      action: "system_health_access_denied",
-      resource: "edge.system-health",
-      severity: "medium",
-      metadata: { role: role || null },
-    }).catch((error) => console.error("system-health audit (denied) failed", error));
-
-    throw new HttpError(403, "Forbidden", { code: "insufficient_role" });
-  }
+  const caller = await requireAdminOrManagement(supabase, req, {
+    logContext: "system-health",
+    missingMessage: "Unauthorized",
+    invalidMessage: "Unauthorized",
+    invalidCode: "invalid_token",
+    forbiddenMessage: "Forbidden",
+    onForbidden: ({ userId, role }) =>
+      persistSecurityAuditLog(req, supabase, {
+        user_id: userId,
+        action: "system_health_access_denied",
+        resource: "edge.system-health",
+        severity: "medium",
+        metadata: { role: role || null },
+      }).catch((error) => console.error("system-health audit (denied) failed", error)),
+  });
 
   const [orphanedResult, doubleBookingResult, declinedResult] = await Promise.all([
     supabase.rpc("find_orphaned_timesheets"),
@@ -132,7 +109,7 @@ serve(createHttpHandler(async (req) => {
         : "ok";
 
   await persistSecurityAuditLog(req, supabase, {
-    user_id: user.id,
+    user_id: caller.userId,
     action: "system_health_viewed",
     resource: "edge.system-health",
     severity: "low",

@@ -9,9 +9,9 @@ import {
   jsonResponse,
   readBoundedJsonObject,
   redactSensitiveValues,
-  requireBearerToken,
   requireEnvValues,
 } from "../_shared/http.ts";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 
 type CreateUserBody = Record<string, unknown> & {
   email?: unknown;
@@ -33,7 +33,6 @@ type ErrorLike = {
 }
 
 const MAX_CREATE_USER_BODY_BYTES = 16 * 1024;
-const ADMIN_ROLES = new Set(["admin", "management"]);
 
 const normalizeOptional = (value: unknown) => {
   if (typeof value !== "string") {
@@ -83,13 +82,6 @@ const duplicateEmailResponse = (headers: Record<string, string>) =>
     { status: 409, headers },
   );
 
-const failAuthLookup = () => {
-  throw new HttpError(500, "Authorization lookup failed", {
-    code: "authorization_lookup_failed",
-    exposeDetails: false,
-  });
-};
-
 serve(createHttpHandler(async (req) => {
   const correlationId = getCorrelationId(req);
   const headers = correlationHeaders(correlationId);
@@ -116,30 +108,11 @@ serve(createHttpHandler(async (req) => {
 
   const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-  const token = requireBearerToken(req);
-  const { data: { user: requestingUser }, error: userError } = await supabaseAdmin.auth.getUser(token);
-
-  if (userError || !requestingUser) {
-    throw new HttpError(401, "Unauthorized", { code: "invalid_authorization" });
-  }
-
-  const { data: requesterProfile, error: profileErr } = await supabaseAdmin
-    .from("profiles")
-    .select("role")
-    .eq("id", requestingUser.id)
-    .maybeSingle();
-
-  if (profileErr) {
-    failAuthLookup();
-  }
-
-  const requesterRole = typeof requesterProfile?.role === "string"
-    ? requesterProfile.role.toLowerCase()
-    : "";
-
-  if (!ADMIN_ROLES.has(requesterRole)) {
-    throw new HttpError(403, "Unauthorized", { code: "insufficient_role" });
-  }
+  await requireAdminOrManagement(supabaseAdmin, req, {
+    missingMessage: "Unauthorized",
+    invalidMessage: "Unauthorized",
+    forbiddenMessage: "Unauthorized",
+  });
 
   const { data: existingProfile, error: existingProfileErr } = await supabaseAdmin
     .from("profiles")
@@ -236,6 +209,7 @@ serve(createHttpHandler(async (req) => {
 }, {
   allowedMethods: ["POST"],
   internalErrorMessage: "Unexpected error",
+  errorHeaders: (req) => correlationHeaders(getCorrelationId(req)),
   onError: (error, req) => {
     console.error("create-user error:", redactSensitiveValues({
       correlationId: getCorrelationId(req),
