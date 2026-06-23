@@ -10,6 +10,7 @@
 /scripts/governance/** @jvhtec
 /package.json @jvhtec
 /package-lock.json @jvhtec
+/.npmrc @jvhtec
 /public/_headers @jvhtec
 /AGENTS.md @jvhtec
 /ARCHITECTURE.md @jvhtec
