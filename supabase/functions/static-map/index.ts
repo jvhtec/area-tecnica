@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const body = await req.json();
+    const body = await req.json().catch(() => null);
     const {
       lat,
       lng,
@@ -48,11 +48,15 @@ Deno.serve(async (req) => {
       zoom = 15,
     } = body || {};
 
-    let centerLat: number | undefined = typeof lat === 'number' ? lat : undefined;
-    let centerLng: number | undefined = typeof lng === 'number' ? lng : undefined;
+    const isFiniteNumber = (value: unknown): value is number =>
+      typeof value === 'number' && Number.isFinite(value);
 
-    if ((centerLat === undefined || centerLng === undefined) && address) {
-      const geocoded = await mapboxGeocode(address, token);
+    let centerLat: number | undefined = isFiniteNumber(lat) ? lat : undefined;
+    let centerLng: number | undefined = isFiniteNumber(lng) ? lng : undefined;
+    const queryAddress = typeof address === 'string' ? address.trim() : '';
+
+    if ((centerLat === undefined || centerLng === undefined) && queryAddress) {
+      const geocoded = await mapboxGeocode(queryAddress, token);
       if (geocoded) {
         centerLat = geocoded.lat;
         centerLng = geocoded.lng;
@@ -66,6 +70,17 @@ Deno.serve(async (req) => {
 
     if (centerLat === undefined || centerLng === undefined) {
       return new Response(JSON.stringify({ error: 'Latitude/Longitude or address is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (
+      centerLat < -90 || centerLat > 90 ||
+      centerLng < -180 || centerLng > 180 ||
+      !isFiniteNumber(width) || !isFiniteNumber(height) || !isFiniteNumber(zoom)
+    ) {
+      return new Response(JSON.stringify({ error: 'Invalid static map parameters' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

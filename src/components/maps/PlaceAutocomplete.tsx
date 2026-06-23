@@ -89,6 +89,9 @@ export const PlaceAutocomplete: React.FC<PlaceAutocompleteProps> = ({
 
   const resetSessionToken = () => {
     sessionTokenRef.current = null;
+    // Mapbox requires the retrieve call to reuse the suggest session token, so
+    // drop cached suggestions tied to the old session.
+    cacheRef.current = {};
   };
 
   const searchPlaces = async (query: string) => {

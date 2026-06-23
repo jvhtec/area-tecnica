@@ -117,6 +117,9 @@ export const AddressAutocomplete: React.FC<AddressAutocompleteProps> = ({
 
   const resetSessionToken = () => {
     sessionTokenRef.current = null;
+    // Mapbox requires the retrieve call to reuse the suggest session token, so
+    // drop cached suggestions tied to the old session.
+    cacheRef.current = {};
   };
 
   const notifyAutocompleteUnavailable = (error: unknown) => {

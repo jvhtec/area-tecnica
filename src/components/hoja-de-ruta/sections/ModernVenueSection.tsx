@@ -70,7 +70,11 @@ export const ModernVenueSection: React.FC<ModernVenueSectionProps> = ({
     if (!query) return;
     // Only fetch if we have room for suggestions
     if ((imagePreviews.venue?.length || 0) >= 2) return;
-    const key = query.toLowerCase();
+    const coordinates = eventData.venue?.coordinates;
+    const locPart = coordinates
+      ? `${coordinates.lat.toFixed(4)},${coordinates.lng.toFixed(4)}`
+      : 'noloc';
+    const key = `${query.toLowerCase()}::${locPart}`;
     if (fetchedQueriesRef.current.has(key)) return;
 
     let cancelled = false;

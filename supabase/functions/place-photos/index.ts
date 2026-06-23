@@ -154,9 +154,23 @@ Deno.serve(async (req) => {
     }
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
-    const { query, lat, lng, maxPhotos = 2, maxWidthPx = 500 }: PhotoRequest = await req.json()
+    let body: Partial<PhotoRequest>
+    try {
+      body = await req.json()
+    } catch {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON body', photos: [] }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      )
+    }
 
-    if (!query && (typeof lat !== 'number' || typeof lng !== 'number')) {
+    const query = typeof body.query === 'string' ? body.query.trim() : ''
+    const lat = typeof body.lat === 'number' && Number.isFinite(body.lat) ? body.lat : undefined
+    const lng = typeof body.lng === 'number' && Number.isFinite(body.lng) ? body.lng : undefined
+    const maxPhotos = typeof body.maxPhotos === 'number' && Number.isFinite(body.maxPhotos) ? body.maxPhotos : 2
+    const maxWidthPx = typeof body.maxWidthPx === 'number' && Number.isFinite(body.maxWidthPx) ? body.maxWidthPx : 500
+
+    if (!query && (lat === undefined || lng === undefined)) {
       return new Response(
         JSON.stringify({ error: 'A query or coordinates are required', photos: [] }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },

@@ -76,6 +76,9 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
 
   const resetSessionToken = () => {
     sessionTokenRef.current = null;
+    // Mapbox requires the retrieve call to reuse the suggest session token, so
+    // drop cached suggestions tied to the old session.
+    searchCache.current = {};
   };
 
   const searchHotels = async (query: string) => {
@@ -136,14 +139,15 @@ export const HotelAutocomplete: React.FC<HotelAutocompleteProps> = ({
   };
 
   const getPlaceDetails = async (mapboxId: string, hotelName: string, fallbackAddress?: string) => {
-    if (!token) {
+    const key = token || (await getMapboxToken());
+    if (!key) {
       onChange(hotelName, fallbackAddress);
       resetSessionToken();
       return;
     }
 
     try {
-      const place = await searchBoxRetrieve(mapboxId, token, ensureSessionToken());
+      const place = await searchBoxRetrieve(mapboxId, key, ensureSessionToken());
       onChange(
         place?.name || hotelName,
         place?.address || fallbackAddress,

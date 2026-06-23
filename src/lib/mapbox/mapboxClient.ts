@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Centralised Mapbox client helpers.
@@ -143,10 +143,16 @@ export async function geocodeForward(
   if (country) params.set('country', country);
   if (types) params.set('types', types);
 
-  const res = await fetch(`${MAPBOX_API}/search/geocode/v6/forward?${params.toString()}`);
-  if (!res.ok) return null;
+  let data: any;
+  try {
+    const res = await fetch(`${MAPBOX_API}/search/geocode/v6/forward?${params.toString()}`);
+    if (!res.ok) return null;
+    data = await res.json();
+  } catch (err) {
+    console.warn('Mapbox forward geocoding failed:', err);
+    return null;
+  }
 
-  const data = await res.json();
   const feature = data?.features?.[0];
   const coords = feature?.geometry?.coordinates;
   if (!Array.isArray(coords) || typeof coords[0] !== 'number' || typeof coords[1] !== 'number') {
@@ -175,10 +181,16 @@ export async function geocodeReverse(
     language: opts.language ?? 'es',
   });
 
-  const res = await fetch(`${MAPBOX_API}/search/geocode/v6/reverse?${params.toString()}`);
-  if (!res.ok) return null;
+  let data: any;
+  try {
+    const res = await fetch(`${MAPBOX_API}/search/geocode/v6/reverse?${params.toString()}`);
+    if (!res.ok) return null;
+    data = await res.json();
+  } catch (err) {
+    console.warn('Mapbox reverse geocoding failed:', err);
+    return null;
+  }
 
-  const data = await res.json();
   const feature = data?.features?.[0];
   return feature?.properties?.full_address || feature?.properties?.name || null;
 }

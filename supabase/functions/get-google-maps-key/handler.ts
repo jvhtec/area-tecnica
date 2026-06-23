@@ -48,9 +48,10 @@ async function auditGoogleMapsKeyAccess(
  * Deprecated endpoint.
  *
  * The Google Maps API key is no longer exposed to clients. Maps, geocoding and
- * autocomplete now use Mapbox (public token via `get-mapbox-token`), and the
- * remaining Google Places features (restaurants, photos) call Google only from
- * server-side edge functions where the key stays in `GOOGLE_MAPS_API_KEY`.
+ * autocomplete now use Mapbox (public token via `get-mapbox-token`), photos are
+ * sourced from Wikimedia, and the remaining Google Places restaurant features
+ * call Google only from server-side edge functions where the key stays in
+ * `GOOGLE_MAPS_API_KEY`.
  *
  * This handler always returns 410 Gone and never returns the key, while still
  * recording any access attempt for auditing.
@@ -79,7 +80,7 @@ export async function handleGetGoogleMapsKeyRequest(
   return jsonResponse(
     {
       error:
-        "This endpoint has been deprecated. Maps now use Mapbox via get-mapbox-token; Google Places features run server-side only.",
+        "This endpoint has been deprecated. Maps now use Mapbox via get-mapbox-token; Google Places restaurant features run server-side only.",
     },
     { status: 410 },
   );

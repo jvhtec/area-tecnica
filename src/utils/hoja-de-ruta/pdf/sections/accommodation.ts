@@ -39,19 +39,24 @@ export class AccommodationSection {
             const { width: pageWidth } = this.pdfDoc.dimensions;
             const availableWidth = pageWidth - leftMargin - rightMargin;
             const imgHeight = 60;
+            let imageAdded = false;
             try {
               this.pdfDoc.addImage(photos[0], 'JPEG', leftMargin, yPosition, availableWidth, imgHeight);
+              imageAdded = true;
             } catch {
               try {
                 this.pdfDoc.addImage(photos[0], 'PNG', leftMargin, yPosition, availableWidth, imgHeight);
+                imageAdded = true;
               } catch {
                 // ignore image decode errors
               }
             }
-            this.pdfDoc.document.setDrawColor(210, 210, 210);
-            this.pdfDoc.document.setLineWidth(0.3);
-            this.pdfDoc.document.rect(leftMargin, yPosition, availableWidth, imgHeight);
-            yPosition += imgHeight + 10;
+            if (imageAdded) {
+              this.pdfDoc.document.setDrawColor(210, 210, 210);
+              this.pdfDoc.document.setLineWidth(0.3);
+              this.pdfDoc.document.rect(leftMargin, yPosition, availableWidth, imgHeight);
+              yPosition += imgHeight + 10;
+            }
           }
         }
       } catch (e) {
