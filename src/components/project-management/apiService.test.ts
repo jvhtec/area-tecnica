@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { flexApiFetch } from "@/lib/flex-api-client";
-import { getElementTree, type ElementTreeNode } from "./apiService";
+import { getElementTree, type ElementTreeNode } from "@/components/project-management/apiService";
 
 vi.mock("@/lib/flex-api-client", () => ({
   flexApiFetch: vi.fn(),

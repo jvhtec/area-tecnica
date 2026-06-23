@@ -172,6 +172,7 @@ serve(async (req) => {
     headers.set("X-Auth-Token", flexAuthToken);
     headers.set("apikey", flexAuthToken);
 
+    const shouldRetry = method === "GET";
     const response = await fetchWithRetry(
       target.toString(),
       {
@@ -180,7 +181,8 @@ serve(async (req) => {
         body: body || undefined,
       },
       {
-        retryOnTimeout: method === "GET",
+        attempts: shouldRetry ? 3 : 1,
+        retryOnTimeout: shouldRetry,
       },
     );
 
@@ -189,7 +191,12 @@ serve(async (req) => {
     let data: unknown;
 
     if (rawBody && contentType.includes("json")) {
-      data = JSON.parse(rawBody);
+      try {
+        data = JSON.parse(rawBody);
+      } catch (parseError) {
+        console.warn("secure-flex-api upstream returned invalid JSON", parseError);
+        data = rawBody;
+      }
     }
 
     if (method !== "GET" || !response.ok) {

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { flexApiFetch } from '@/lib/flex-api-client';
-import { resolveFlexUrl } from '../resolveFlexUrl';
+import { resolveFlexUrl } from '@/utils/flex-folders/resolveFlexUrl';
 
 vi.mock('@/lib/flex-api-client', () => ({
   flexApiFetch: vi.fn(),

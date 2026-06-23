@@ -25,7 +25,9 @@ export async function createFlexFolder(payload: FlexFolderPayload): Promise<Flex
   });
 
   if (!response.ok) {
-    const errorData = await response.json<FlexApiError>();
+    const errorData = await response
+      .json<FlexApiError>()
+      .catch((): FlexApiError => ({}));
     console.error("Flex folder creation error:", errorData);
     throw new Error(errorData.exceptionMessage || "Failed to create folder in Flex");
   }

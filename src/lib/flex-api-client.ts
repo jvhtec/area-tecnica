@@ -1,5 +1,5 @@
 import { FLEX_API_BASE_URL } from "@/lib/api-config";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 
 interface FlexProxyEnvelope {
   success: boolean;
@@ -72,17 +72,21 @@ export async function flexApiFetch(
     },
   });
 
+  const canTimeoutLocally = method === "GET" || method === "HEAD";
   let timeoutId: ReturnType<typeof globalThis.setTimeout> | undefined;
-  const timeout = new Promise<never>((_, reject) => {
-    timeoutId = globalThis.setTimeout(
-      () => reject(new DOMException("Flex API request timed out", "AbortError")),
-      15_000,
-    );
-  });
-
+  const timeout = canTimeoutLocally
+    ? new Promise<never>((_, reject) => {
+        timeoutId = globalThis.setTimeout(
+          () => reject(new DOMException("Flex API request timed out", "AbortError")),
+          15_000,
+        );
+      })
+    : undefined;
   let result: Awaited<typeof invocation>;
   try {
-    result = await Promise.race([invocation, timeout]);
+    result = timeout
+      ? await Promise.race([invocation, timeout])
+      : await invocation;
   } finally {
     if (timeoutId !== undefined) {
       globalThis.clearTimeout(timeoutId);

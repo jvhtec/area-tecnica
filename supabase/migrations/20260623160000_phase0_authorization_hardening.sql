@@ -81,7 +81,7 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
-  IF v_actor_role NOT IN ('admin', 'management') THEN
+  IF v_actor_role IS NULL OR v_actor_role NOT IN ('admin', 'management') THEN
     RAISE EXCEPTION 'Only administrators and management may change privileged profile fields'
       USING ERRCODE = '42501';
   END IF;
@@ -395,6 +395,86 @@ FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.consume_external_api_quota(uuid, text, integer)
 TO service_role;
 
+CREATE OR REPLACE FUNCTION public.consume_external_api_dual_quota(
+  p_user_actor_id uuid,
+  p_user_service text,
+  p_user_daily_limit integer,
+  p_global_actor_id uuid,
+  p_global_service text,
+  p_global_daily_limit integer
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS $$
+DECLARE
+  v_user_usage_count integer;
+  v_global_usage_count integer;
+  v_user_lock bigint;
+  v_global_lock bigint;
+BEGIN
+  IF auth.role() <> 'service_role' THEN
+    RAISE EXCEPTION 'permission denied' USING ERRCODE = '42501';
+  END IF;
+
+  IF p_user_actor_id IS NULL
+     OR p_global_actor_id IS NULL
+     OR NULLIF(trim(p_user_service), '') IS NULL
+     OR NULLIF(trim(p_global_service), '') IS NULL
+     OR p_user_daily_limit < 1
+     OR p_global_daily_limit < 1 THEN
+    RAISE EXCEPTION 'Invalid external API quota request';
+  END IF;
+
+  v_user_lock := hashtextextended(p_user_actor_id::text || ':' || p_user_service, 0);
+  v_global_lock := hashtextextended(p_global_actor_id::text || ':' || p_global_service, 0);
+
+  IF v_user_lock <= v_global_lock THEN
+    PERFORM pg_advisory_xact_lock(v_user_lock);
+    PERFORM pg_advisory_xact_lock(v_global_lock);
+  ELSE
+    PERFORM pg_advisory_xact_lock(v_global_lock);
+    PERFORM pg_advisory_xact_lock(v_user_lock);
+  END IF;
+
+  SELECT count(*)::integer
+  INTO v_user_usage_count
+  FROM public.external_api_usage usage
+  WHERE usage.actor_id = p_user_actor_id
+    AND usage.service = p_user_service
+    AND usage.request_date = (now() AT TIME ZONE 'UTC')::date;
+
+  SELECT count(*)::integer
+  INTO v_global_usage_count
+  FROM public.external_api_usage usage
+  WHERE usage.actor_id = p_global_actor_id
+    AND usage.service = p_global_service
+    AND usage.request_date = (now() AT TIME ZONE 'UTC')::date;
+
+  IF v_user_usage_count >= p_user_daily_limit
+     OR v_global_usage_count >= p_global_daily_limit THEN
+    RETURN false;
+  END IF;
+
+  INSERT INTO public.external_api_usage (actor_id, service)
+  VALUES
+    (p_user_actor_id, p_user_service),
+    (p_global_actor_id, p_global_service);
+
+  RETURN true;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.consume_external_api_dual_quota(
+  uuid, text, integer, uuid, text, integer
+)
+FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.consume_external_api_dual_quota(
+  uuid, text, integer, uuid, text, integer
+)
+TO service_role;
+
 -- ---------------------------------------------------------------------------
 -- Remove caller-controlled payout authorization and qualify every identifier.
 -- ---------------------------------------------------------------------------
@@ -606,9 +686,7 @@ BEGIN
     RETURN 0;
   END IF;
 
-  SELECT array_agg(updated_timesheets.id)
-  INTO ts_ids
-  FROM (
+  WITH updated_timesheets AS (
     UPDATE public.timesheets t
     SET start_time = COALESCE(t.start_time, '09:00'::time),
         end_time = COALESCE(t.end_time, '17:00'::time),
@@ -623,7 +701,10 @@ BEGIN
         OR t.ends_next_day IS NULL
       )
     RETURNING t.id
-  ) updated_timesheets;
+  )
+  SELECT array_agg(updated_timesheets.id)
+  INTO ts_ids
+  FROM updated_timesheets;
 
   IF ts_ids IS NOT NULL THEN
     FOREACH ts_id IN ARRAY ts_ids LOOP

@@ -5,9 +5,9 @@ import {
   FLEX_VIEW_IDS,
   __resetFlexAuthCacheForTests,
   type FlexTreeNode,
-} from '../../flexUrlResolver';
+} from '@/utils/flexUrlResolver';
 import { flexApiFetch } from '@/lib/flex-api-client';
-import { FLEX_FOLDER_IDS } from '../constants';
+import { FLEX_FOLDER_IDS } from '@/utils/flex-folders/constants';
 
 vi.mock('@/lib/flex-api-client', () => ({
   flexApiFetch: vi.fn(),

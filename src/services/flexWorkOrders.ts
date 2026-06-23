@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { FLEX_API_BASE_URL } from '@/lib/api-config';
 import { flexApiFetch } from '@/lib/flex-api-client';
 import { FLEX_FOLDER_IDS, RESPONSIBLE_PERSON_IDS, DEPARTMENT_SUFFIXES } from '@/utils/flex-folders/constants';
 import { resourceIdForRole, EXTRA_RESOURCE_IDS } from '@/utils/flex-labor-resources';
@@ -50,7 +49,7 @@ async function createWorkOrderElement(options: {
     currencyId: CURRENCY_EUR_ID,
   };
 
-  const response = await flexApiFetch(`${FLEX_API_BASE_URL}/element`, {
+  const response = await flexApiFetch('/element', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -80,7 +79,7 @@ async function createWorkOrderElement(options: {
 }
 
 async function fetchDocumentNumber(documentId: string): Promise<string | null> {
-  const url = `${FLEX_API_BASE_URL}/element/${encodeURIComponent(documentId)}/key-info/`;
+  const url = `/element/${encodeURIComponent(documentId)}/key-info/`;
   try {
     const res = await flexApiFetch(url, { headers: { 'Content-Type': 'application/json' } });
     if (!res.ok) return null;
@@ -101,7 +100,7 @@ async function addResourceLineItem(options: {
   parentLineItemId?: string;
 }): Promise<string | null> {
   const { documentId, parentElementId, resourceId, quantity = 1, managedResourceLineItemType = 'service-offering', parentLineItemId } = options;
-  const baseUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/add-resource/${encodeURIComponent(resourceId)}`;
+  const baseUrl = `/financial-document-line-item/${encodeURIComponent(documentId)}/add-resource/${encodeURIComponent(resourceId)}`;
   const query = new URLSearchParams({
     resourceParentId: parentElementId,
     managedResourceLineItemType,
@@ -157,7 +156,7 @@ async function updateLineItemDates(options: {
   returnDate: string; // YYYY-MM-DD
 }): Promise<boolean> {
   const { documentId, lineItemId, pickupDate, returnDate } = options;
-  const url = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/bulk-update`;
+  const url = `/financial-document-line-item/${encodeURIComponent(documentId)}/bulk-update`;
   try {
     const res = await flexApiFetch(url, {
       method: 'POST',
@@ -182,7 +181,7 @@ async function setLineItemPricingModel(options: {
   pricingModelId: string;
 }): Promise<boolean> {
   const { documentId, lineItemId, pricingModelId } = options;
-  const rowDataUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/row-data/`;
+  const rowDataUrl = `/financial-document-line-item/${encodeURIComponent(documentId)}/row-data/`;
   try {
     const headers = {
       'Content-Type': 'application/json',
@@ -221,7 +220,7 @@ async function setLineItemTimeQty(options: {
   timeQty: number;
 }): Promise<boolean> {
   const { documentId, lineItemId, timeQty } = options;
-  const rowDataUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/row-data/`;
+  const rowDataUrl = `/financial-document-line-item/${encodeURIComponent(documentId)}/row-data/`;
   try {
     const headers = {
       'Content-Type': 'application/json',
@@ -267,7 +266,7 @@ async function setLineItemTimeQtyBulk(options: {
   timeQty: number;
 }): Promise<boolean> {
   const { documentId, lineItemId, timeQty } = options;
-  const url = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/bulk-update`;
+  const url = `/financial-document-line-item/${encodeURIComponent(documentId)}/bulk-update`;
   try {
     const res = await flexApiFetch(url, {
       method: 'POST',
@@ -293,7 +292,7 @@ async function updateLineItemField(options: {
   payloadValue: string | number;
 }): Promise<boolean> {
   const { documentId, lineItemId, fieldType, payloadValue } = options;
-  const url = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/update`;
+  const url = `/financial-document-line-item/${encodeURIComponent(documentId)}/update`;
   try {
     const res = await flexApiFetch(url, {
       method: 'POST',
@@ -318,7 +317,7 @@ async function setLineItemQuantityRow(options: {
   quantity: number;
 }): Promise<boolean> {
   const { documentId, lineItemId, quantity } = options;
-  const rowDataUrl = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/row-data/`;
+  const rowDataUrl = `/financial-document-line-item/${encodeURIComponent(documentId)}/row-data/`;
   try {
     const headers = {
       'Content-Type': 'application/json',
@@ -353,7 +352,7 @@ async function setLineItemQuantityBulk(options: {
   quantity: number;
 }): Promise<boolean> {
   const { documentId, lineItemId, quantity } = options;
-  const url = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/bulk-update`;
+  const url = `/financial-document-line-item/${encodeURIComponent(documentId)}/bulk-update`;
   try {
     const res = await flexApiFetch(url, {
       method: 'POST',
@@ -377,7 +376,7 @@ async function addExtraNoteLineItem(options: {
   note: string;
 }): Promise<void> {
   const { documentId, note } = options;
-  const url = `${FLEX_API_BASE_URL}/financial-document-line-item/${encodeURIComponent(documentId)}/add-note`;
+  const url = `/financial-document-line-item/${encodeURIComponent(documentId)}/add-note`;
 
   const tryJson = async () => {
     try {
@@ -575,7 +574,7 @@ export async function syncFlexWorkOrdersForJob(jobId: string): Promise<FlexWorkO
       name: `Órdenes de Trabajo - ${job.title} [${plannedStartDate} – ${plannedEndDate}]`,
     };
     
-    const flexResponse = await flexApiFetch(`${FLEX_API_BASE_URL}/element`, {
+    const flexResponse = await flexApiFetch('/element', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

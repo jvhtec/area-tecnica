@@ -55,31 +55,21 @@ async function consumePaidApiQuota(
   supabase: ReturnType<typeof createClient>,
   userId: string,
 ): Promise<boolean> {
-  const { data: userAllowed, error: userQuotaError } = await supabase.rpc(
-    'consume_external_api_quota',
+  const { data: allowed, error: quotaError } = await supabase.rpc(
+    'consume_external_api_dual_quota',
     {
-      p_actor_id: userId,
-      p_service: 'google_places',
-      p_daily_limit: USER_DAILY_PAID_API_LIMIT,
+      p_user_actor_id: userId,
+      p_user_service: 'google_places',
+      p_user_daily_limit: USER_DAILY_PAID_API_LIMIT,
+      p_global_actor_id: GLOBAL_QUOTA_ACTOR_ID,
+      p_global_service: 'google_places_global',
+      p_global_daily_limit: GLOBAL_DAILY_PAID_API_LIMIT,
     },
   );
-  if (userQuotaError || userAllowed !== true) {
-    if (userQuotaError) console.error('place-restaurants: user quota check failed', userQuotaError);
-    return false;
+  if (quotaError) {
+    console.error('place-restaurants: quota check failed', quotaError);
   }
-
-  const { data: globalAllowed, error: globalQuotaError } = await supabase.rpc(
-    'consume_external_api_quota',
-    {
-      p_actor_id: GLOBAL_QUOTA_ACTOR_ID,
-      p_service: 'google_places_global',
-      p_daily_limit: GLOBAL_DAILY_PAID_API_LIMIT,
-    },
-  );
-  if (globalQuotaError) {
-    console.error('place-restaurants: global quota check failed', globalQuotaError);
-  }
-  return !globalQuotaError && globalAllowed === true;
+  return !quotaError && allowed === true;
 }
 
 Deno.serve(async (req) => {

@@ -53,7 +53,8 @@ Recommended classification:
 ## What is working well
 
 - `npm run typecheck` passes.
-- `npm run test:run` passes: 169 files and 1,034 tests.
+- At the audit baseline `e00aa3d7`, `npm run test:run` passed: 169 files and 1,034 tests.
+- At the Phase 0 implementation commit `5ab97b6`, `npm run test:run` passed: 169 files and 997 tests. The lower test count is from consolidating Flex-secret delivery tests around the new proxy contract.
 - `npm run build` and the bundle-budget check pass.
 - Production source maps are disabled.
 - Routes are lazy-loaded and heavy map/PDF/spreadsheet dependencies are split.
@@ -892,9 +893,11 @@ Do not label the platform enterprise grade until all of the following are true:
 | --- | --- |
 | Latest `origin/main` isolated audit tree | `e00aa3d7` |
 | `npm run typecheck` | Pass |
-| `npm run lint` | Pass with 2,178 warnings |
+| `npm run lint` at audit baseline `e00aa3d7` | Pass with 2,178 warnings |
+| `npm run lint` at Phase 0 implementation `5ab97b6` | Pass with 405 warnings |
 | `npm run governance` | Pass against grandfathered baselines |
-| `npm run test:run` | 169 files / 1,034 tests pass |
+| `npm run test:run` at audit baseline `e00aa3d7` | 169 files / 1,034 tests pass |
+| `npm run test:run` at Phase 0 implementation `5ab97b6` | 169 files / 997 tests pass |
 | `npm run test:coverage` | Fail; 15.64% line coverage |
 | `npm run build` | Pass |
 | bundle budget | Pass |

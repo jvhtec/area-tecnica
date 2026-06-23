@@ -7,9 +7,9 @@ import {
   getElementDetails,
   isFinancialDocument,
   isSimpleFolder,
-} from "../buildFlexUrl";
-import { FLEX_FOLDER_IDS } from "../constants";
-import { FLEX_CONFIG } from "../config";
+} from "@/utils/flex-folders/buildFlexUrl";
+import { FLEX_FOLDER_IDS } from "@/utils/flex-folders/constants";
+import { FLEX_CONFIG } from "@/utils/flex-folders/config";
 
 vi.mock("@/lib/flex-api-client", () => ({
   flexApiFetch: vi.fn(),
