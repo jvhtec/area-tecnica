@@ -39,9 +39,7 @@ BEGIN
 
   -- Normalize timesheets: set default values for any NULL fields
   -- This ensures all timesheets have complete data before computing amounts
-  SELECT array_agg(id)
-  INTO ts_ids
-  FROM (
+  WITH updated_timesheets AS (
     UPDATE public.timesheets
     SET start_time = COALESCE(start_time, '09:00'::time),
         end_time = COALESCE(end_time, '17:00'::time),
@@ -51,7 +49,10 @@ BEGIN
       AND is_active = true
       AND (start_time IS NULL OR end_time IS NULL OR break_minutes IS NULL OR ends_next_day IS NULL)
     RETURNING id
-  ) updated_timesheets;
+  )
+  SELECT array_agg(id)
+  INTO ts_ids
+  FROM updated_timesheets;
 
   IF ts_ids IS NOT NULL THEN
     FOREACH ts_id IN ARRAY ts_ids LOOP
