@@ -17,10 +17,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.place-photos]
-verify_jwt = false
+verify_jwt = true
 
 [functions.place-restaurants]
-verify_jwt = false
+verify_jwt = true
 
 [functions.staffing-click]
 verify_jwt = false

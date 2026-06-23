@@ -10604,7 +10604,7 @@ export type Database = {
         }[]
       }
       get_job_total_amounts: {
-        Args: { _job_id: string; _user_role?: string }
+        Args: { _job_id: string }
         Returns: {
           breakdown_by_category: Json
           expenses_breakdown: Json

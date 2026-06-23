@@ -6,9 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Department, ALL_DEPARTMENTS, DEPARTMENT_LABELS, getDepartmentLabel } from "@/types/department";
+import { getDepartmentLabel } from "@/types/department";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, CalendarCheck, RefreshCcw, Shield, ExternalLink, Trophy } from "lucide-react";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
@@ -25,7 +24,6 @@ import {
   canUseTechnicianSelfTools,
   canViewAchievements,
   canViewProfilePushControls,
-  isManagementRole,
 } from "@/utils/permissions";
 
 export const Profile = () => {
@@ -114,7 +112,6 @@ export const Profile = () => {
           nickname: profile.nickname,
           last_name: profile.last_name,
           phone: profile.phone,
-          department: profile.department,
           dni: profile.dni,
           residencia: profile.residencia,
           home_latitude: profile.home_latitude,
@@ -334,30 +331,12 @@ export const Profile = () => {
 
                   <div className="space-y-2">
                     <Label htmlFor="department">Departamento</Label>
-                    {isManagementRole(profile.role) || profile.role === 'super_admin' ? (
-                      <Select
-                        value={profile.department || ''}
-                        onValueChange={(value) => setProfile({ ...profile, department: value as Department })}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecciona un departamento" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ALL_DEPARTMENTS.map((dept) => (
-                            <SelectItem key={dept} value={dept}>
-                              {DEPARTMENT_LABELS[dept]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <Input
-                        id="department"
-                        value={getDepartmentLabel(profile.department)}
-                        disabled
-                        className="bg-muted"
-                      />
-                    )}
+                    <Input
+                      id="department"
+                      value={getDepartmentLabel(profile.department)}
+                      disabled
+                      className="bg-muted"
+                    />
                   </div>
 
                   <div className="space-y-2">

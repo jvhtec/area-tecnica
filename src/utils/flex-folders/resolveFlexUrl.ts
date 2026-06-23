@@ -1,5 +1,4 @@
 import { buildFlexUrl, buildFlexUrlWithTypeDetection, ElementContext } from './buildFlexUrl';
-import { supabase } from '@/lib/supabase';
 import {
   detectFlexLinkIntent,
   intentFromSchemaId,
@@ -117,28 +116,7 @@ export async function resolveFlexUrl(options: ResolveFlexUrlOptions): Promise<st
       return url;
     }
 
-    // Fetch auth token via Supabase Function
-    const { data, error } = await supabase.functions.invoke('get-secret', {
-      body: { secretName: 'X_AUTH_TOKEN' },
-    });
-
-    if (error) {
-      console.warn('[resolveFlexUrl] Failed to fetch auth token, using fallback simple-element URL:', error);
-      // Fallback: simple-element URL
-      const fallbackUrl = buildFlexUrl(elementId);
-      return fallbackUrl;
-    }
-
-    const X_AUTH_TOKEN = (data as { X_AUTH_TOKEN?: string } | null)?.X_AUTH_TOKEN || '';
-
-    // If token is missing, fallback to simple-element URL
-    if (!X_AUTH_TOKEN) {
-      console.warn('[resolveFlexUrl] Missing auth token, using fallback simple-element URL');
-      return buildFlexUrl(elementId);
-    }
-
-    // Use the async type detection when token is available
-    const url = await buildFlexUrlWithTypeDetection(elementId, X_AUTH_TOKEN, context);
+    const url = await buildFlexUrlWithTypeDetection(elementId, context);
     console.log('[resolveFlexUrl] Resolved URL via API detection:', {
       url,
       elementId,

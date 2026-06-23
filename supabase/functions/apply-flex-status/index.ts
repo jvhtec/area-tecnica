@@ -200,19 +200,8 @@ serve(async (req) => {
     const type: 'master'|'sub' = isMaster ? 'master' : 'sub';
     const workflowActionId = workflowActions[type][status];
 
-    // Resolve Flex auth token: prefer env, else fetch via get-secret using caller's auth
-    let flexAuthToken = Deno.env.get('X_AUTH_TOKEN') || Deno.env.get('FLEX_X_AUTH_TOKEN') || '';
-    if (!flexAuthToken) {
-      try {
-        const { data: secretData, error: secretError } = await supabase.functions.invoke('get-secret', {
-          body: { secretName: 'X_AUTH_TOKEN' },
-          headers: authHeader ? { authorization: authHeader } : undefined,
-        });
-        if (!secretError && secretData?.X_AUTH_TOKEN) {
-          flexAuthToken = secretData.X_AUTH_TOKEN as string;
-        }
-      } catch {}
-    }
+    const flexAuthToken =
+      Deno.env.get('X_AUTH_TOKEN') || Deno.env.get('FLEX_X_AUTH_TOKEN') || '';
     if (!flexAuthToken) {
       return new Response(JSON.stringify({ success: false, error: 'Flex authentication token missing' }), { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' }});
     }

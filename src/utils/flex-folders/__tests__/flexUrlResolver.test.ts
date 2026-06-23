@@ -6,29 +6,19 @@ import {
   __resetFlexAuthCacheForTests,
   type FlexTreeNode,
 } from '../../flexUrlResolver';
+import { flexApiFetch } from '@/lib/flex-api-client';
 import { FLEX_FOLDER_IDS } from '../constants';
-import { supabase } from '@/lib/supabase';
 
-vi.mock('@/lib/supabase', () => ({
-  supabase: {
-    functions: {
-      invoke: vi.fn(),
-    },
-  },
+vi.mock('@/lib/flex-api-client', () => ({
+  flexApiFetch: vi.fn(),
 }));
 
 describe('resolveFlexUrl', () => {
-  const invokeMock = () => supabase.functions.invoke as unknown as ReturnType<typeof vi.fn>;
-  const getFetchMock = () => globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+  const getProxyMock = () => flexApiFetch as unknown as ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     __resetFlexAuthCacheForTests();
     vi.clearAllMocks();
-    invokeMock().mockResolvedValue({
-      data: { X_AUTH_TOKEN: 'test-token' },
-      error: null,
-    });
-    globalThis.fetch = vi.fn() as any;
   });
 
   it('resolves simple element URL for simple project element domain', async () => {
@@ -42,8 +32,7 @@ describe('resolveFlexUrl', () => {
     expect(url).toBe(
       `${FLEX_UI_BASE_URL}#element/${encodeURIComponent('simple-id')}/view/simple-element/header`
     );
-    expect(invokeMock()).not.toHaveBeenCalled();
-    expect(getFetchMock()).not.toHaveBeenCalled();
+    expect(getProxyMock()).not.toHaveBeenCalled();
   });
 
   it('resolves financial document URL for fin-doc domain', async () => {
@@ -122,7 +111,7 @@ describe('resolveFlexUrl', () => {
     expect(url).toBe(
       `${FLEX_UI_BASE_URL}#element/${encodeURIComponent('dryhire-folder-id')}/view/simple-element/header`
     );
-    expect(getFetchMock()).not.toHaveBeenCalled();
+    expect(getProxyMock()).not.toHaveBeenCalled();
   });
 
   it('falls back to simple element for tourdate job with tourdate hint', async () => {
@@ -136,7 +125,7 @@ describe('resolveFlexUrl', () => {
     expect(url).toBe(
       `${FLEX_UI_BASE_URL}#element/${encodeURIComponent('tourdate-folder-id')}/view/simple-element/header`
     );
-    expect(getFetchMock()).not.toHaveBeenCalled();
+    expect(getProxyMock()).not.toHaveBeenCalled();
   });
 
   it('fetches metadata when schema cannot be determined and applies headers', async () => {
@@ -144,19 +133,17 @@ describe('resolveFlexUrl', () => {
       nodeId: 'metadata-id',
     };
 
-    __resetFlexAuthCacheForTests();
-    invokeMock().mockResolvedValue({
-      data: { X_AUTH_TOKEN: 'metadata-token' },
-      error: null,
-    });
-
-    getFetchMock().mockResolvedValueOnce({
+    getProxyMock().mockResolvedValueOnce({
       ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers(),
       json: async () => ({
         domainId: { data: 'fin-doc' },
         elementDefinitionId: { data: FLEX_FOLDER_IDS.presupuesto },
       }),
-    } as unknown as Response);
+      text: async () => '',
+    });
 
     const url = await resolveFlexUrl(node);
 
@@ -164,13 +151,10 @@ describe('resolveFlexUrl', () => {
       `${FLEX_UI_BASE_URL}#fin-doc/${encodeURIComponent('metadata-id')}/doc-view/${FLEX_VIEW_IDS.FIN_DOC}/header`
     );
 
-    expect(invokeMock()).toHaveBeenCalledTimes(1);
-    expect(getFetchMock()).toHaveBeenCalledTimes(1);
-
-    const [, init] = getFetchMock().mock.calls[0] as [RequestInfo, RequestInit];
-    const headers = init.headers as Headers;
-    expect(headers.get('X-Auth-Token')).toBe('metadata-token');
-    expect(headers.get('apikey')).toBe('metadata-token');
+    expect(getProxyMock()).toHaveBeenCalledWith(
+      '/element/metadata-id/key-info/',
+      { method: 'GET' },
+    );
   });
 
   it('returns null when schema cannot be determined even after metadata fetch', async () => {
@@ -178,18 +162,14 @@ describe('resolveFlexUrl', () => {
       nodeId: 'unknown-id',
     };
 
-    __resetFlexAuthCacheForTests();
-    invokeMock().mockResolvedValue({
-      data: { X_AUTH_TOKEN: 'fail-token' },
-      error: null,
-    });
-
-    getFetchMock().mockResolvedValueOnce({
+    getProxyMock().mockResolvedValueOnce({
       ok: false,
       status: 500,
       statusText: 'Server Error',
+      headers: new Headers(),
       json: async () => ({}),
-    } as unknown as Response);
+      text: async () => '',
+    });
 
     const url = await resolveFlexUrl(node, { jobType: 'single' });
 

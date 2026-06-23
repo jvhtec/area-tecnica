@@ -2,232 +2,103 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { handleGetSecretRequest } from "../handler";
 
-function createProfilesBuilder(result: { data: { role: string | null } | null; error: unknown }) {
-  const builder = {
-    eq: vi.fn(() => ({
-      single: vi.fn().mockResolvedValue(result),
-    })),
-  };
-
-  return {
-    select: vi.fn(() => builder),
-  };
-}
-
 describe("handleGetSecretRequest", () => {
   const getUser = vi.fn();
   const auditInsert = vi.fn();
+  const supabase = {
+    auth: { getUser },
+    from: vi.fn(() => ({
+      insert: auditInsert,
+    })),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
     getUser.mockResolvedValue({
-      data: {
-        user: {
-          id: "user-1",
-        },
-      },
+      data: { user: { id: "user-1" } },
       error: null,
     });
     auditInsert.mockResolvedValue({ error: null });
   });
 
-  it("returns the secret and writes a success audit row", async () => {
-    const profiles = createProfilesBuilder({ data: { role: "management" }, error: null });
-    const supabase = {
-      auth: { getUser },
-      from: vi.fn((table: string) => {
-        if (table === "profiles") {
-          return profiles;
-        }
-
-        return {
-          insert: auditInsert,
-        };
-      }),
-    };
-
+  it("never returns a secret to an authenticated caller", async () => {
     const response = await handleGetSecretRequest(
       new Request("https://example.com/get-secret", {
         method: "POST",
-        headers: {
-          authorization: "Bearer token-1",
-          "user-agent": "Vitest",
-        },
-        body: JSON.stringify({ secretName: "OPENAI_API_KEY" }),
+        headers: { authorization: "Bearer token-1" },
+        body: JSON.stringify({ secretName: "X_AUTH_TOKEN" }),
       }),
-      {
-        supabase,
-        getEnv: (name) => (name === "OPENAI_API_KEY" ? "super-secret-value" : undefined),
-      },
+      { supabase },
     );
 
-    expect(response.status).toBe(200);
-    await expect(response.json()).resolves.toEqual({ OPENAI_API_KEY: "super-secret-value" });
+    expect(response.status).toBe(410);
+    await expect(response.json()).resolves.toEqual({
+      error:
+        "Direct secret delivery is disabled. Use an approved server-side operation.",
+    });
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        action: "secret_access",
-        resource: "secret:OPENAI_API_KEY",
-        metadata: expect.objectContaining({
-          success: true,
-          secret_name: "OPENAI_API_KEY",
-        }),
-      }),
-    );
-    expect(auditInsert.mock.calls[0][0].metadata).not.toHaveProperty("secret_value");
-  });
-
-  it("writes an audit row when the caller lacks permission", async () => {
-    const profiles = createProfilesBuilder({ data: { role: "technician" }, error: null });
-    const supabase = {
-      auth: { getUser },
-      from: vi.fn((table: string) => {
-        if (table === "profiles") {
-          return profiles;
-        }
-
-        return {
-          insert: auditInsert,
-        };
-      }),
-    };
-
-    const response = await handleGetSecretRequest(
-      new Request("https://example.com/get-secret", {
-        method: "POST",
-        headers: {
-          authorization: "Bearer token-1",
-        },
-        body: JSON.stringify({ secretName: "OPENAI_API_KEY" }),
-      }),
-      {
-        supabase,
-        getEnv: () => "super-secret-value",
-      },
-    );
-
-    expect(response.status).toBe(403);
-    expect(auditInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
+        action: "secret_access_blocked",
+        resource: "secret:X_AUTH_TOKEN",
+        severity: "high",
         metadata: expect.objectContaining({
           success: false,
-          outcome: "insufficient_permissions",
-          role: "technician",
+          outcome: "direct_secret_delivery_disabled",
         }),
       }),
     );
   });
 
-  it("returns 500 when the profile lookup fails with a database error", async () => {
-    const profiles = createProfilesBuilder({ data: null, error: new Error("db failed") });
-    const supabase = {
-      auth: { getUser },
-      from: vi.fn((table: string) => {
-        if (table === "profiles") {
-          return profiles;
-        }
-
-        return {
-          insert: auditInsert,
-        };
+  it("requires authentication", async () => {
+    const response = await handleGetSecretRequest(
+      new Request("https://example.com/get-secret", {
+        method: "POST",
+        body: JSON.stringify({ secretName: "OPENAI_API_KEY" }),
       }),
-    };
+      { supabase },
+    );
+
+    expect(response.status).toBe(401);
+    expect(getUser).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid authentication", async () => {
+    getUser.mockResolvedValue({
+      data: { user: null },
+      error: new Error("invalid"),
+    });
 
     const response = await handleGetSecretRequest(
       new Request("https://example.com/get-secret", {
         method: "POST",
-        headers: {
-          authorization: "Bearer token-1",
-        },
-        body: JSON.stringify({ secretName: "OPENAI_API_KEY" }),
+        headers: { authorization: "Bearer invalid" },
+        body: JSON.stringify({ secretName: "GOOGLE_MAPS_API_KEY" }),
       }),
-      {
-        supabase,
-        getEnv: () => "super-secret-value",
-      },
+      { supabase },
     );
 
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(401);
     expect(auditInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         metadata: expect.objectContaining({
-          outcome: "db_error",
+          outcome: "invalid_authentication",
         }),
       }),
     );
   });
 
-  it("fails closed when the success audit write fails", async () => {
-    const profiles = createProfilesBuilder({ data: { role: "management" }, error: null });
-    const supabase = {
-      auth: { getUser },
-      from: vi.fn((table: string) => {
-        if (table === "profiles") {
-          return profiles;
-        }
-
-        return {
-          insert: vi.fn().mockResolvedValue({ error: new Error("audit failed") }),
-        };
-      }),
-    };
+  it("fails closed when the audit write fails", async () => {
+    auditInsert.mockResolvedValue({ error: new Error("audit failed") });
 
     await expect(
       handleGetSecretRequest(
         new Request("https://example.com/get-secret", {
           method: "POST",
-          headers: {
-            authorization: "Bearer token-1",
-          },
-          body: JSON.stringify({ secretName: "OPENAI_API_KEY" }),
+          headers: { authorization: "Bearer token-1" },
+          body: JSON.stringify({ secretName: "X_AUTH_TOKEN" }),
         }),
-        {
-          supabase,
-          getEnv: () => "super-secret-value",
-        },
+        { supabase },
       ),
     ).rejects.toThrow("Failed to persist security audit log");
-  });
-
-  it("truncates oversized secret names in the audit resource", async () => {
-    const profiles = createProfilesBuilder({ data: { role: "technician" }, error: null });
-    const supabase = {
-      auth: { getUser },
-      from: vi.fn((table: string) => {
-        if (table === "profiles") {
-          return profiles;
-        }
-
-        return {
-          insert: auditInsert,
-        };
-      }),
-    };
-    const oversizedSecretName = "A".repeat(400);
-
-    const response = await handleGetSecretRequest(
-      new Request("https://example.com/get-secret", {
-        method: "POST",
-        headers: {
-          authorization: "Bearer token-1",
-        },
-        body: JSON.stringify({ secretName: oversizedSecretName }),
-      }),
-      {
-        supabase,
-        getEnv: () => "super-secret-value",
-      },
-    );
-
-    expect(response.status).toBe(403);
-    expect(auditInsert).toHaveBeenCalledWith(
-      expect.objectContaining({
-        resource: expect.any(String),
-        metadata: expect.objectContaining({
-          secret_name: oversizedSecretName,
-          secret_name_truncated: true,
-        }),
-      }),
-    );
-    expect(auditInsert.mock.calls[0][0].resource.length).toBeLessThanOrEqual(255);
   });
 });

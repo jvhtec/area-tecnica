@@ -40,17 +40,8 @@ serve(async (req: Request) => {
     const cid = body.contact_id || (body.url ? extractUuid(body.url) : null);
     if (!cid) return new Response(JSON.stringify({ error: 'Missing contact_id or url' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
-    // Resolve Flex auth token
-    let flexAuthToken = Deno.env.get("X_AUTH_TOKEN") || "";
-    if (!flexAuthToken) {
-      try {
-        const { data: secretData } = await supabase.functions.invoke('get-secret', {
-          body: { secretName: 'X_AUTH_TOKEN' },
-          headers: { Authorization: authHeader }
-        });
-        if (secretData?.X_AUTH_TOKEN) flexAuthToken = secretData.X_AUTH_TOKEN as string;
-      } catch (_) {}
-    }
+    const flexAuthToken =
+      Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
     if (!flexAuthToken) return new Response(JSON.stringify({ error: 'Flex auth not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     // Call Flex key-info

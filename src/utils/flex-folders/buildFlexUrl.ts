@@ -1,4 +1,4 @@
-import { getFlexApiBaseUrl } from './config';
+import { flexApiFetch } from '@/lib/flex-api-client';
 import {
   detectFlexLinkIntent,
   IntentDetectionContext,
@@ -18,25 +18,20 @@ export interface ElementDetails {
 /**
  * Fetches element details from Flex API to get definitionId
  * @param elementId - The element ID to fetch
- * @param authToken - Flex API authentication token
  * @returns Element details including definitionId
  */
 export async function getElementDetails(
-  elementId: string,
-  authToken: string
+  elementId: string
 ): Promise<ElementDetails> {
   try {
     console.log(`[buildFlexUrl] Fetching element details for ${elementId}`);
     
-    const apiBaseUrl = getFlexApiBaseUrl();
-    const response = await fetch(
-      `${apiBaseUrl}/element/${elementId}/key-info/`,
+    const response = await flexApiFetch(
+      `/element/${encodeURIComponent(elementId)}/key-info/`,
       {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-Auth-Token': authToken,
-          'apikey': authToken,
         },
       }
     );
@@ -46,7 +41,7 @@ export async function getElementDetails(
       return { elementId };
     }
 
-    const data = await response.json();
+    const data = await response.json<Record<string, any>>();
     
     // Extract definitionId from the response
     // The response structure has fields wrapped in objects with data property
@@ -137,7 +132,6 @@ export type ElementContext = IntentDetectionContext;
  * Fetches element details if needed to determine the correct URL format
  * 
  * @param elementId - The element ID to open
- * @param authToken - Flex API authentication token
  * @param context - Optional context about the element to avoid extra API calls
  * @returns Promise with the formatted Flex URL
  * 
@@ -154,7 +148,6 @@ export type ElementContext = IntentDetectionContext;
  */
 export async function buildFlexUrlWithTypeDetection(
   elementId: string,
-  authToken: string,
   context?: ElementContext
 ): Promise<string> {
   console.log('[buildFlexUrl] Starting type detection', {
@@ -166,8 +159,6 @@ export async function buildFlexUrlWithTypeDetection(
     elementIdEmpty: elementId === '',
     elementIdValid: !!elementId && elementId.trim().length > 0,
     elementIdLength: elementId?.length || 0,
-    hasAuthToken: !!authToken,
-    authTokenLength: authToken?.length || 0,
     hasContext: !!context,
     context,
   });
@@ -185,13 +176,6 @@ export async function buildFlexUrlWithTypeDetection(
     throw new Error(error);
   }
 
-  if (!authToken || typeof authToken !== 'string' || authToken.trim().length === 0) {
-    console.warn('[buildFlexUrl] Invalid authToken, will attempt to build URL without API call', {
-      hasAuthToken: !!authToken,
-      authTokenType: typeof authToken,
-    });
-  }
-  
   // If context provides strong, unambiguous information for intent detection, use it
   const hasStrongDefinition = !!context?.definitionId;
   const isExplicitView = !!(context?.viewHint && context.viewHint !== 'auto');
@@ -241,9 +225,8 @@ export async function buildFlexUrlWithTypeDetection(
   try {
     console.log('[buildFlexUrl] No context optimization available, fetching element details from API', {
       elementId,
-      hasAuthToken: !!authToken,
     });
-    const details = await getElementDetails(elementId, authToken);
+    const details = await getElementDetails(elementId);
     console.log('[buildFlexUrl] Element details fetched from API:', {
       elementId,
       definitionId: details.definitionId,

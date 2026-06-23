@@ -29,6 +29,28 @@ interface OrphanCleanupSummary {
   errors: string[];
 }
 
+function timingSafeEqual(left: string, right: string): boolean {
+  const maxLength = Math.max(left.length, right.length);
+  let mismatch = left.length ^ right.length;
+  for (let index = 0; index < maxLength; index += 1) {
+    mismatch |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
+  }
+  return mismatch === 0;
+}
+
+function isServiceRoleRequest(req: Request): boolean {
+  if (!SERVICE_ROLE_KEY) return false;
+  const authorization = req.headers.get("authorization") || "";
+  const bearer = authorization.startsWith("Bearer ")
+    ? authorization.slice("Bearer ".length)
+    : "";
+  const apiKey = req.headers.get("apikey") || "";
+  return (
+    timingSafeEqual(bearer, SERVICE_ROLE_KEY) ||
+    timingSafeEqual(apiKey, SERVICE_ROLE_KEY)
+  );
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -42,6 +64,13 @@ serve(async (req) => {
   }
 
   try {
+    if (!isServiceRoleRequest(req)) {
+      return new Response(JSON.stringify({ success: false, error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
       throw new Error("Missing Supabase configuration");
     }

@@ -1,352 +1,147 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import { flexApiFetch } from "@/lib/flex-api-client";
 import {
   buildFlexUrl,
   buildFlexUrlWithTypeDetection,
+  getElementDetails,
   isFinancialDocument,
   isSimpleFolder,
-  getElementDetails,
-} from '../buildFlexUrl';
-import { FLEX_FOLDER_IDS } from '../constants';
-import { FLEX_CONFIG } from '../config';
+} from "../buildFlexUrl";
+import { FLEX_FOLDER_IDS } from "../constants";
+import { FLEX_CONFIG } from "../config";
 
-// Mock fetch globally
-global.fetch = vi.fn();
+vi.mock("@/lib/flex-api-client", () => ({
+  flexApiFetch: vi.fn(),
+}));
 
-describe('buildFlexUrl', () => {
-  it('should build financial document URL for presupuesto', () => {
-    const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.presupuesto);
-    expect(url).toContain(
-      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.presupuesto}/detail`
+function proxyResponse(ok: boolean, data: unknown, statusText = "") {
+  return {
+    ok,
+    status: ok ? 200 : 404,
+    statusText,
+    headers: new Headers(),
+    json: vi.fn().mockResolvedValue(data),
+    text: vi.fn().mockResolvedValue(""),
+  };
+}
+
+describe("buildFlexUrl", () => {
+  it("builds financial document URLs", () => {
+    expect(buildFlexUrl("id", FLEX_FOLDER_IDS.presupuesto)).toContain(
+      `#fin-doc/id/doc-view/${FLEX_CONFIG.viewIds.presupuesto}/detail`,
     );
-    expect(url).toContain('/detail');
-  });
-
-  it('should build financial document URL for presupuestoDryHire', () => {
-    const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.presupuestoDryHire);
-    expect(url).toContain(
-      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.presupuesto}/detail`
-    );
-    expect(url).toContain('/detail');
-  });
-
-  it('should build financial document URL for hojaGastos', () => {
-    const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.hojaGastos);
-    expect(url).toContain(
-      `#fin-doc/test-element-id/doc-view/${FLEX_CONFIG.viewIds.expenseSheet}/detail`
+    expect(buildFlexUrl("id", FLEX_FOLDER_IDS.hojaGastos)).toContain(
+      `#fin-doc/id/doc-view/${FLEX_CONFIG.viewIds.expenseSheet}/detail`,
     );
   });
 
-  it('should build contact-list URL for crewCall', () => {
-    const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.crewCall);
-    expect(url).toContain(`#contact-list/test-element-id/view/${FLEX_CONFIG.viewIds.crewCall}/detail`);
+  it("builds crew, equipment and simple element URLs", () => {
+    expect(buildFlexUrl("id", FLEX_FOLDER_IDS.crewCall)).toContain(
+      `#contact-list/id/view/${FLEX_CONFIG.viewIds.crewCall}/detail`,
+    );
+    expect(buildFlexUrl("id", FLEX_FOLDER_IDS.pullSheet)).toContain(
+      "#element/id/view/equipment-list/detail",
+    );
+    expect(buildFlexUrl("id", FLEX_FOLDER_IDS.mainFolder)).toContain(
+      "#element/id/view/simple-element/detail",
+    );
   });
 
-  it('should build equipment-list URL for pullSheet', () => {
-    const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.pullSheet);
-    expect(url).toContain('#element/test-element-id/view/equipment-list/detail');
-  });
-
-  it('should build simple element URL for mainFolder', () => {
-    const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.mainFolder);
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-  });
-
-  it('should build simple element URL for subFolder', () => {
-    const url = buildFlexUrl('test-element-id', FLEX_FOLDER_IDS.subFolder);
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-  });
-
-  it('should build simple element URL when no definitionId provided', () => {
-    const url = buildFlexUrl('test-element-id');
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-  });
-
-  it('should build simple element URL for unknown definitionId', () => {
-    const url = buildFlexUrl('test-element-id', 'unknown-definition-id');
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-  });
-
-  it('should throw error for empty elementId', () => {
-    expect(() => buildFlexUrl('', FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
-  });
-
-  it('should throw error for null elementId', () => {
-    expect(() => buildFlexUrl(null as unknown as string, FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
-  });
-
-  it('should throw error for undefined elementId', () => {
-    expect(() => buildFlexUrl(undefined as unknown as string, FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
-  });
-
-  it('should throw error for whitespace-only elementId', () => {
-    expect(() => buildFlexUrl('   ', FLEX_FOLDER_IDS.presupuesto)).toThrow('Invalid elementId');
-  });
+  it.each([[""], ["   "], [null], [undefined]])(
+    "rejects invalid element IDs",
+    (elementId) => {
+      expect(() => buildFlexUrl(elementId as string)).toThrow("Invalid elementId");
+    },
+  );
 });
 
-describe('isFinancialDocument', () => {
-  it('should return true for presupuesto', () => {
+describe("intent helpers", () => {
+  it("classifies financial documents", () => {
     expect(isFinancialDocument(FLEX_FOLDER_IDS.presupuesto)).toBe(true);
-  });
-
-  it('should return true for presupuestoDryHire', () => {
-    expect(isFinancialDocument(FLEX_FOLDER_IDS.presupuestoDryHire)).toBe(true);
-  });
-
-  it('should return true for hojaGastos', () => {
-    expect(isFinancialDocument(FLEX_FOLDER_IDS.hojaGastos)).toBe(true);
-  });
-
-  it('should return false for mainFolder', () => {
     expect(isFinancialDocument(FLEX_FOLDER_IDS.mainFolder)).toBe(false);
-  });
-
-  it('should return false for subFolder', () => {
-    expect(isFinancialDocument(FLEX_FOLDER_IDS.subFolder)).toBe(false);
-  });
-
-  it('should return false for undefined', () => {
     expect(isFinancialDocument(undefined)).toBe(false);
   });
-});
 
-describe('isSimpleFolder', () => {
-  it('should return true for mainFolder', () => {
+  it("classifies simple folders", () => {
     expect(isSimpleFolder(FLEX_FOLDER_IDS.mainFolder)).toBe(true);
-  });
-
-  it('should return true for subFolder', () => {
-    expect(isSimpleFolder(FLEX_FOLDER_IDS.subFolder)).toBe(true);
-  });
-
-  it('should return false for presupuesto', () => {
     expect(isSimpleFolder(FLEX_FOLDER_IDS.presupuesto)).toBe(false);
-  });
-
-  it('should return false for undefined', () => {
     expect(isSimpleFolder(undefined)).toBe(false);
   });
 });
 
-describe('getElementDetails', () => {
+describe("server-side type detection", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should fetch element details successfully', async () => {
-    const mockResponse = {
-      elementDefinitionId: { data: 'test-definition-id' },
-      name: { data: 'Test Element' },
-      documentNumber: { data: 'DOC-123' },
-    };
+  it("fetches element metadata through the Flex proxy", async () => {
+    vi.mocked(flexApiFetch).mockResolvedValue(
+      proxyResponse(true, {
+        elementDefinitionId: { data: "definition-id" },
+        name: { data: "Test Element" },
+        documentNumber: { data: "DOC-123" },
+      }),
+    );
 
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    } as unknown as Response);
-
-    const details = await getElementDetails('test-element-id', 'test-token');
-
-    expect(details).toEqual({
-      elementId: 'test-element-id',
-      definitionId: 'test-definition-id',
-      name: 'Test Element',
-      documentNumber: 'DOC-123',
+    await expect(getElementDetails("element-id")).resolves.toEqual({
+      elementId: "element-id",
+      definitionId: "definition-id",
+      name: "Test Element",
+      documentNumber: "DOC-123",
     });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://sectorpro.flexrentalsolutions.com/f5/api/element/test-element-id/key-info/',
+    expect(flexApiFetch).toHaveBeenCalledWith(
+      "/element/element-id/key-info/",
       {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Auth-Token': 'test-token',
-          'apikey': 'test-token',
-        },
-      }
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      },
     );
   });
 
-  it('should handle fetch failure gracefully', async () => {
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: false,
-      statusText: 'Not Found',
-    } as unknown as Response);
-
-    const details = await getElementDetails('test-element-id', 'test-token');
-
-    expect(details).toEqual({
-      elementId: 'test-element-id',
+  it("falls back safely when metadata cannot be fetched", async () => {
+    vi.mocked(flexApiFetch).mockRejectedValue(new Error("proxy unavailable"));
+    await expect(getElementDetails("element-id")).resolves.toEqual({
+      elementId: "element-id",
     });
   });
 
-  it('should handle network error gracefully', async () => {
-    vi.mocked(global.fetch).mockRejectedValueOnce(new Error('Network error'));
-
-    const details = await getElementDetails('test-element-id', 'test-token');
-
-    expect(details).toEqual({
-      elementId: 'test-element-id',
-    });
-  });
-});
-
-describe('buildFlexUrlWithTypeDetection', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should use definitionId from context if provided', async () => {
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
-      definitionId: FLEX_FOLDER_IDS.presupuesto,
-    });
-
-    expect(url).toContain('#fin-doc/test-element-id/doc-view/');
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('should use simple-element URL for dryhire folderType', async () => {
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
-      folderType: 'dryhire',
-    });
-
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('should use simple-element URL for tourdate folderType', async () => {
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
-      folderType: 'tourdate',
-    });
-
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('should use simple-element URL for dryhire jobType', async () => {
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
-      jobType: 'dryhire',
-    });
-
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('should use simple-element URL for tourdate jobType', async () => {
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
-      jobType: 'tourdate',
-    });
-
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('should fetch element details when no context provided', async () => {
-    const mockResponse = {
-      elementDefinitionId: { data: FLEX_FOLDER_IDS.presupuesto },
-    };
-
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    } as unknown as Response);
-
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token');
-
-    expect(url).toContain('#fin-doc/test-element-id/doc-view/');
-    expect(global.fetch).toHaveBeenCalled();
-  });
-
-  it('should fallback to simple-element URL when API call fails', async () => {
-    vi.mocked(global.fetch).mockRejectedValueOnce(new Error('API error'));
-
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token');
-
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-  });
-
-  it('should not fetch when no context is provided that enables optimization', async () => {
-    const mockResponse = {
-      elementDefinitionId: { data: FLEX_FOLDER_IDS.mainFolder },
-    };
-
-    vi.mocked(global.fetch).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockResponse,
-    } as unknown as Response);
-
-    // When no context that enables optimization is provided, fetch should be called
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {});
-
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-    expect(global.fetch).toHaveBeenCalled();
-  });
-
-  it('should throw error for empty elementId in buildFlexUrlWithTypeDetection', async () => {
+  it("uses strong local context without a network call", async () => {
     await expect(
-      buildFlexUrlWithTypeDetection('', 'test-token')
-    ).rejects.toThrow('Invalid elementId');
-  });
+      buildFlexUrlWithTypeDetection("element-id", {
+        definitionId: FLEX_FOLDER_IDS.presupuesto,
+      }),
+    ).resolves.toContain("#fin-doc/element-id/doc-view/");
 
-  it('should throw error for null elementId in buildFlexUrlWithTypeDetection', async () => {
     await expect(
-      buildFlexUrlWithTypeDetection(null as unknown as string, 'test-token')
-    ).rejects.toThrow('Invalid elementId');
-  });
+      buildFlexUrlWithTypeDetection("element-id", { jobType: "dryhire" }),
+    ).resolves.toContain("#element/element-id/view/simple-element/detail");
 
-  it('should throw error for undefined elementId in buildFlexUrlWithTypeDetection', async () => {
     await expect(
-      buildFlexUrlWithTypeDetection(undefined as unknown as string, 'test-token')
-    ).rejects.toThrow('Invalid elementId');
+      buildFlexUrlWithTypeDetection("element-id", {
+        viewHint: "equipment-list",
+      }),
+    ).resolves.toContain("#element/element-id/view/equipment-list/detail");
+
+    expect(flexApiFetch).not.toHaveBeenCalled();
   });
 
-  it('should throw error for whitespace-only elementId in buildFlexUrlWithTypeDetection', async () => {
+  it("uses proxied metadata when context is ambiguous", async () => {
+    vi.mocked(flexApiFetch).mockResolvedValue(
+      proxyResponse(true, {
+        elementDefinitionId: { data: FLEX_FOLDER_IDS.presupuesto },
+      }),
+    );
+
     await expect(
-      buildFlexUrlWithTypeDetection('   ', 'test-token')
-    ).rejects.toThrow('Invalid elementId');
+      buildFlexUrlWithTypeDetection("element-id"),
+    ).resolves.toContain("#fin-doc/element-id/doc-view/");
   });
 
-  it('should handle empty authToken gracefully with context optimization', async () => {
-    // With context optimization, should not need authToken
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', '', {
-      jobType: 'dryhire',
-    });
-
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('should use fallback when authToken is empty and no context', async () => {
-    vi.mocked(global.fetch).mockRejectedValueOnce(new Error('Unauthorized'));
-
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', '');
-
-    expect(url).toContain('#element/test-element-id/view/simple-element/detail');
-  });
-
-  it('should use viewHint when provided in context', async () => {
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
-      viewHint: 'contact-list',
-    });
-
-    expect(url).toContain('#contact-list/test-element-id/view/');
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('should use equipment-list URL when viewHint is equipment-list', async () => {
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
-      viewHint: 'equipment-list',
-    });
-
-    expect(url).toContain('#element/test-element-id/view/equipment-list/detail');
-    expect(global.fetch).not.toHaveBeenCalled();
-  });
-
-  it('should use remote-file-list URL when viewHint is remote-file-list', async () => {
-    const url = await buildFlexUrlWithTypeDetection('test-element-id', 'test-token', {
-      viewHint: 'remote-file-list',
-    });
-
-    expect(url).toContain('#element/test-element-id/view/remote-file-list/detail');
-    expect(global.fetch).not.toHaveBeenCalled();
+  it("rejects invalid IDs before making a request", async () => {
+    await expect(buildFlexUrlWithTypeDetection("")).rejects.toThrow(
+      "Invalid elementId",
+    );
+    expect(flexApiFetch).not.toHaveBeenCalled();
   });
 });

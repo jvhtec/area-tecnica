@@ -79,21 +79,8 @@ serve(async (req: Request) => {
       });
     }
 
-    // Resolve Flex auth token
-    let flexAuthToken = Deno.env.get("X_AUTH_TOKEN") || "";
-    if (!flexAuthToken) {
-      try {
-        const { data: secretData } = await supabase.functions.invoke("get-secret", {
-          body: { secretName: "X_AUTH_TOKEN" },
-          headers: { Authorization: authHeader },
-        });
-        if (secretData?.X_AUTH_TOKEN) {
-          flexAuthToken = secretData.X_AUTH_TOKEN as string;
-        }
-      } catch (_) {
-        // Ignore secret fetch errors
-      }
-    }
+    const flexAuthToken =
+      Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
 
     if (!flexAuthToken) {
       return new Response(JSON.stringify({ error: "Flex auth not configured" }), {

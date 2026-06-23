@@ -19,7 +19,6 @@ serve(createHttpHandler(async (req) => {
 
   return await handleGetSecretRequest(req, {
     supabase,
-    getEnv: (name) => Deno.env.get(name),
   });
 }, {
   allowedMethods: ["POST"],
