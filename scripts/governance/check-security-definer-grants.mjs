@@ -65,10 +65,55 @@ function normalizeTarget(rawTarget) {
   return `${name}/${arity}`;
 }
 
+// Split a GRANT/REVOKE target list into individual function targets. A single
+// statement may name several functions (`... ON FUNCTION f1(a, b), f2(c) TO x`).
+// We split on top-level commas only, so commas inside an argument list are kept
+// with their function.
+function splitFunctionTargets(rawTargets) {
+  const targets = [];
+  let depth = 0;
+  let current = "";
+
+  for (const ch of rawTargets) {
+    if (ch === "(") {
+      depth += 1;
+    } else if (ch === ")") {
+      depth = Math.max(0, depth - 1);
+    }
+
+    if (ch === "," && depth === 0) {
+      targets.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+
+  if (current.trim()) {
+    targets.push(current);
+  }
+
+  return targets.map((target) => target.trim()).filter(Boolean);
+}
+
 const GRANT_RE =
   /\bGRANT\s+(?:EXECUTE|ALL(?:\s+PRIVILEGES)?)\s+ON\s+FUNCTION\s+([\s\S]+?)\s+TO\s+([^;]+);/gi;
 const REVOKE_RE =
   /\bREVOKE\s+(?:EXECUTE|ALL)(?:\s+PRIVILEGES)?\s+ON\s+FUNCTION\s+([\s\S]+?)\s+FROM\s+([^;]+);/gi;
+
+// Schema-wide grants expose (or revoke) EXECUTE on every function in a schema at
+// once. We cannot enumerate the affected functions statically, so a grant of
+// `ON ALL FUNCTIONS IN SCHEMA <schema> TO anon/PUBLIC` is tracked under a single
+// wildcard key and treated as a hard exposure unless explicitly allowlisted.
+const GRANT_ALL_IN_SCHEMA_RE =
+  /\bGRANT\s+(?:EXECUTE|ALL(?:\s+PRIVILEGES)?)\s+ON\s+ALL\s+FUNCTIONS\s+IN\s+SCHEMA\s+([a-z0-9_".]+)\s+TO\s+([^;]+);/gi;
+const REVOKE_ALL_IN_SCHEMA_RE =
+  /\bREVOKE\s+(?:EXECUTE|ALL)(?:\s+PRIVILEGES)?\s+ON\s+ALL\s+FUNCTIONS\s+IN\s+SCHEMA\s+([a-z0-9_".]+)\s+FROM\s+([^;]+);/gi;
+
+function schemaWildcardKey(rawSchema) {
+  const schema = rawSchema.replace(/"/g, "").trim().toLowerCase();
+  return `${schema}.* (ALL FUNCTIONS IN SCHEMA)`;
+}
 
 function rolesList(rawRoles) {
   return rawRoles
@@ -91,20 +136,24 @@ function computeAnonExecutable() {
     let match;
     GRANT_RE.lastIndex = 0;
     while ((match = GRANT_RE.exec(sql)) !== null) {
-      statements.push({ index: match.index, kind: "grant", target: match[1], roles: match[2] });
+      statements.push({ index: match.index, kind: "grant", scope: "function", target: match[1], roles: match[2] });
     }
     REVOKE_RE.lastIndex = 0;
     while ((match = REVOKE_RE.exec(sql)) !== null) {
-      statements.push({ index: match.index, kind: "revoke", target: match[1], roles: match[2] });
+      statements.push({ index: match.index, kind: "revoke", scope: "function", target: match[1], roles: match[2] });
+    }
+    GRANT_ALL_IN_SCHEMA_RE.lastIndex = 0;
+    while ((match = GRANT_ALL_IN_SCHEMA_RE.exec(sql)) !== null) {
+      statements.push({ index: match.index, kind: "grant", scope: "schema", target: match[1], roles: match[2] });
+    }
+    REVOKE_ALL_IN_SCHEMA_RE.lastIndex = 0;
+    while ((match = REVOKE_ALL_IN_SCHEMA_RE.exec(sql)) !== null) {
+      statements.push({ index: match.index, kind: "revoke", scope: "schema", target: match[1], roles: match[2] });
     }
 
     statements.sort((a, b) => a.index - b.index);
 
     for (const statement of statements) {
-      const key = normalizeTarget(statement.target);
-      if (!key) {
-        continue;
-      }
       const roles = rolesList(statement.roles);
       const touchesAnon = roles.includes("anon") || roles.includes("public");
 
@@ -112,13 +161,19 @@ function computeAnonExecutable() {
         continue;
       }
 
-      if (statement.kind === "grant") {
-        exposed.set(key, {
-          display: statement.target.replace(/\s+/g, " ").trim(),
-          migration: fileName,
-        });
-      } else {
-        exposed.delete(key);
+      // Each statement may carry several function targets (or a schema wildcard).
+      const entries = statement.scope === "schema"
+        ? [{ key: schemaWildcardKey(statement.target), display: `ALL FUNCTIONS IN SCHEMA ${statement.target.replace(/"/g, "").trim()}` }]
+        : splitFunctionTargets(statement.target)
+            .map((target) => ({ key: normalizeTarget(target), display: target.replace(/\s+/g, " ").trim() }))
+            .filter((entry) => entry.key);
+
+      for (const entry of entries) {
+        if (statement.kind === "grant") {
+          exposed.set(entry.key, { display: entry.display, migration: fileName });
+        } else {
+          exposed.delete(entry.key);
+        }
       }
     }
   }

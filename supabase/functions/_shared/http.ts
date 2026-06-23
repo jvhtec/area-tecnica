@@ -149,9 +149,10 @@ export function correlationHeaders(correlationId: string): Record<string, string
 
 /**
  * Reads the request body as text while enforcing a maximum size. The
- * `Content-Length` header is checked first (fast reject) and the decoded byte
- * length is re-checked after reading to defend against a missing or lying
- * header. Oversized bodies throw HTTP 413.
+ * `Content-Length` header is checked first (fast reject), then the body is
+ * streamed and the running byte total is enforced incrementally so an untrusted
+ * payload is never fully buffered beyond `maxBytes` (defends against chunked or
+ * misreported requests). Oversized bodies throw HTTP 413.
  */
 export async function readBoundedText(
   req: Request,
@@ -169,12 +170,31 @@ export async function readBoundedText(
     }
   }
 
-  const raw = await req.text();
-
-  if (new TextEncoder().encode(raw).length > maxBytes) {
-    throw new HttpError(413, message, { code });
+  if (!req.body) {
+    return "";
   }
 
+  const reader = req.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let raw = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new HttpError(413, message, { code });
+    }
+
+    raw += decoder.decode(value, { stream: true });
+  }
+
+  raw += decoder.decode();
   return raw;
 }
 

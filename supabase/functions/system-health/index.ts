@@ -70,11 +70,20 @@ serve(createHttpHandler(async (req) => {
     throw new HttpError(401, "Unauthorized", { code: "invalid_token" });
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", user.id)
     .maybeSingle();
+
+  if (profileError) {
+    // Do not mistake an upstream lookup failure for an authorization denial.
+    console.error("system-health profile lookup failed", profileError?.message);
+    throw new HttpError(500, "Authorization lookup failed", {
+      code: "authorization_lookup_failed",
+      exposeDetails: false,
+    });
+  }
 
   const role = typeof profile?.role === "string" ? profile.role.toLowerCase() : "";
 
