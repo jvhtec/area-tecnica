@@ -15,9 +15,6 @@ test-results/
 *.local
 *.tsbuildinfo
 
-# Lock files - See DEVELOPMENT.md for rationale
-package-lock.json
-
 # Environment variables
 .env
 .env.*

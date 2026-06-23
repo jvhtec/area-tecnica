@@ -6,6 +6,8 @@
 - [ ] I assessed functional, data, and deployment risk.
 - Risk level: <!-- low | medium | high -->
 - Main risks:
+- [ ] If this touches database, auth, CI/CD, dependency, security, or production-header paths, I requested CODEOWNER review.
+- [ ] If risk level is high, I requested two independent approvals before merge.
 
 ## Impact Checklist
 - [ ] Migration impact assessed.
@@ -23,10 +25,13 @@
   - `npm run test:run`
   - `npm run build`
   - `npm run budget:bundle`
+  - `npm run test:e2e`
+  - `npm run ci:db:migrations`
 - Results:
 
 ## Rollback Plan
 - [ ] I documented how to safely revert this change.
+- [ ] I checked the production release checklist for rollback and post-deploy verification.
 - Rollback steps:
 
 ## Migration Impact

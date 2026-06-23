@@ -16,8 +16,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Essential Commands
 ```bash
-# Install dependencies (ALWAYS use --legacy-peer-deps)
-npm install --legacy-peer-deps
+# Clean deterministic install (ALWAYS use --legacy-peer-deps)
+npm ci --legacy-peer-deps
 
 # Development server (runs on localhost:8080)
 npm run dev
@@ -78,9 +78,20 @@ Detects API keys, passwords, and credentials in staged files. Consider setting u
 ## Critical Build Requirements
 
 ### npm Install
-**ALWAYS use**: `npm install --legacy-peer-deps`
+**ALWAYS use `--legacy-peer-deps`**.
+
+For clean verification and CI:
+```bash
+npm ci --legacy-peer-deps
+```
+
+When intentionally updating dependencies:
+```bash
+npm install --legacy-peer-deps
+```
+
 - Required due to peer dependency conflicts (vite 6, date-fns 3, vitest)
-- No package-lock.json in repo (intentional - prevents Cloudflare npm ci issues)
+- `package-lock.json` is committed and must stay in sync with `package.json`
 
 ### Dependency Constraints
 - **date-fns**: Must stay at ^3.6.0 (react-day-picker compatibility)
@@ -89,11 +100,11 @@ Detects API keys, passwords, and credentials in staged files. Consider setting u
 
 ### Cloudflare Build Command
 ```bash
-npm install --legacy-peer-deps && npm run build
+npm ci --legacy-peer-deps && npm run build
 ```
 Output directory: `dist/`
 
-**Do not** change build command or add package-lock.json to repo.
+**Do not** change build command, remove `package-lock.json`, or remove `--legacy-peer-deps` without an approved dependency migration.
 
 ### Common Build Failures
 - "ERESOLVE unable to resolve" → forgot --legacy-peer-deps
@@ -104,7 +115,7 @@ Output directory: `dist/`
 If dependencies get corrupted:
 ```bash
 sudo rm -rf node_modules
-npm install --legacy-peer-deps
+npm ci --legacy-peer-deps
 ```
 
 ## Architecture
@@ -409,17 +420,23 @@ npm run test:e2e        # Playwright smoke tests (requires Chromium)
 
 ### CI/CD Pipeline (GitHub Actions)
 
-Defined in `.github/workflows/tests.yml`, triggered on PRs to `dev`/`main` or manual dispatch:
+Defined in `.github/workflows/tests.yml`, triggered on PRs and pushes to `dev`/`main` or manual dispatch:
 
 | Job | Timeout | What it does |
 |-----|---------|-------------|
 | `lint` | 20 min | ESLint on app code |
+| `typecheck` | 20 min | TypeScript no-emit check |
+| `governance` | 20 min | Source-boundary, Edge Function, workflow pinning, migration ordering, and dependency gates |
 | `test_critical` | 25 min | Critical test files (auth, assignments, timesheets) |
 | `test_run` | 25 min | Full Vitest suite |
-| `build` | 25 min | Vite production build + post-build scripts |
+| `build` | 25 min | Vite production build + bundle budget + retained build artifact |
 | `e2e_smoke` | 30 min | Playwright Chromium smoke tests |
+| `migration_ordering` | 10 min | Supabase migration timestamp/order check |
+| `migration_apply` | 35 min | Full migration apply against an ephemeral local Supabase database |
+| `db_lint` | 35 min | Supabase DB lint with `--fail-on error` |
+| `rls_rpc_security_tests` | 35 min | pgTAP authorization/RPC regression tests |
 
-All jobs use Node 20 and `npm install --legacy-peer-deps`.
+Node jobs use Node 20 and `npm ci --legacy-peer-deps`.
 
 ### Supabase Edge Functions
 
@@ -845,7 +862,7 @@ alias zmain='cd /path/to/area-tecnica && claude'
 - Each worktree works on ONE task. Don't mix concerns.
 - Name worktrees after the task: `feature-auth`, `bugfix-timesheets`, `refactor-pdf`
 - Keep a dedicated "analysis" worktree for read-only investigation (logs, queries, exploration)
-- Always `npm install --legacy-peer-deps` in new worktrees
+- Always `npm ci --legacy-peer-deps` in new worktrees unless intentionally updating dependencies
 - Merge back to dev/main via PR, never cross-merge between worktrees
 
 ### Plan Mode First
@@ -940,8 +957,8 @@ This file is a living document. After every correction or mistake:
 
 _Add rules here as they are discovered. Each rule should reference a specific mistake or pattern._
 
-- **Always use `--legacy-peer-deps`** with npm install (peer dependency conflicts with vite 6, date-fns 3)
-- **Never add package-lock.json** to the repo (breaks Cloudflare CI)
+- **Always use `--legacy-peer-deps`** with npm (peer dependency conflicts with vite 6, date-fns 3)
+- **Keep `package-lock.json` committed** and use `npm ci --legacy-peer-deps` for deterministic installs
 - **Timezone is always Europe/Madrid** for all date operations
 - **UI text is in Spanish** -- don't introduce English strings in user-facing components
 - **date-fns must stay at ^3.6.0** -- react-day-picker breaks on v4

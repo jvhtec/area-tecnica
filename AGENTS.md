@@ -2,19 +2,19 @@
 
 This file provides working guidance for coding agents operating in this repository.
 
-## Project Identity
+## Project identity
 
-- **Product**: Area Tecnica (Sector Pro)
-- **Type**: Mobile-first PWA for live-event technical operations
-- **Primary stack**: React 18 + TypeScript + Vite 6 + Supabase + Tailwind + shadcn/ui + TanStack Query + Zustand
-- **Deployment**:
+- Product: Area Tecnica (Sector Pro)
+- Type: Mobile-first PWA for live-event technical operations
+- Primary stack: React 18 + TypeScript + Vite 6 + Supabase + Tailwind + shadcn/ui + TanStack Query + Zustand
+- Deployment:
   - `main` → production (`sector-pro.work`)
   - `dev` → preview environments
 
-## Non-Negotiable Rules
+## Non-negotiable rules
 
-1. **Branch discipline**
-   - Default to a new feature branch from the current remote `main`:
+1. Branch discipline
+   - Default to a new feature branch from current remote `main`:
      ```bash
      git fetch origin main
      git switch -c codex/<short-description> origin/main
@@ -22,23 +22,29 @@ This file provides working guidance for coding agents operating in this reposito
    - Work from `dev` only when explicitly requested for preview-environment work.
    - Never commit directly to `main`.
 
-2. **Dependency install**
-   - Always run:
+2. Dependency install
+   - CI and clean local verification use:
+     ```bash
+     npm ci --legacy-peer-deps
+     ```
+   - When intentionally updating dependencies, run:
      ```bash
      npm install --legacy-peer-deps
      ```
-   - Do **not** add `package-lock.json`.
+     and commit both `package.json` and `package-lock.json`.
 
-3. **Build/dependency constraints**
+3. Build/dependency constraints
    - Keep `date-fns` at `^3.6.0` unless a planned migration is approved.
-   - Keep Vite major version aligned with current config/build pipeline.
+   - Keep Vite major version aligned with the current config/build pipeline.
    - Do not add or re-introduce `lovable-tagger`.
+   - Do not remove the deterministic `package-lock.json` policy without an approved dependency migration.
 
-4. **Supabase compatibility**
+4. Supabase compatibility
    - Preserve compatibility with existing schema and RLS behavior.
    - Prefer additive, backward-compatible database changes.
+   - Add or update database authorization tests under `supabase/tests/database` for RLS/RPC-sensitive changes.
 
-## Source-of-Truth Architecture
+## Source-of-truth architecture
 
 Follow the repository architecture documented in `ARCHITECTURE.md`.
 
@@ -52,27 +58,27 @@ Follow the repository architecture documented in `ARCHITECTURE.md`.
 - `src/stores/` — Zustand global state
 - `src/integrations/supabase/` — Supabase client + generated DB types
 - `src/utils/` — domain utilities (PDF, weather, role routing, hoja de ruta, flex folders, etc.)
-- `supabase/` — migrations, seed, and Edge Functions
+- `supabase/` — migrations, seed, Edge Functions, and database tests
 - `tests/` — integration/e2e coverage
 
-### Architectural patterns to preserve
+## Architectural patterns to preserve
 
-- **Auth/role flow** centered around optimized auth hooks/providers and role-based routing.
-- **Data layer** uses TanStack Query for server state; avoid ad-hoc fetch state where query patterns exist.
-- **Global UI/app state** belongs in existing Zustand stores when cross-component/global.
-- **Realtime** should use centralized connection/subscription abstractions instead of one-off channel wiring.
-- **Feature organization** should remain domain-based (festival/tours/jobs/etc.) with co-located types/hooks/utils when practical.
+- Auth/role flow centered around optimized auth hooks/providers and role-based routing.
+- Data layer uses TanStack Query for server state; avoid ad-hoc fetch state where query patterns exist.
+- Global UI/app state belongs in existing Zustand stores when cross-component/global.
+- Realtime should use centralized connection/subscription abstractions instead of one-off channel wiring.
+- Feature organization should remain domain-based with co-located types/hooks/utils when practical.
 
-## Coding & Change Guidelines
+## Coding and change guidelines
 
-- Use `@/` imports (configured alias) instead of deep relative paths when possible.
+- Use `@/` imports instead of deep relative paths when possible.
 - Reuse established shadcn/ui primitives from `src/components/ui/`.
 - Keep components focused; extract hooks/utilities rather than growing monolith files.
 - Preserve lazy-loading boundaries in routes/pages.
 - Respect existing TypeScript typing patterns; avoid `any` unless justified.
 - Keep changes minimal, targeted, and consistent with adjacent code.
 
-## Validation Checklist (Before Commit)
+## Validation checklist before commit
 
 Run relevant checks for touched areas:
 
@@ -82,10 +88,28 @@ npm run test:run
 npm run build
 ```
 
+For broad or high-risk changes, also run:
+
+```bash
+npm run typecheck
+npm run governance
+npm run test:critical
+npm run test:e2e
+```
+
 If changes affect Supabase functions, also run:
 
 ```bash
 npm run lint:functions
+```
+
+If changes affect database migrations or authorization behavior, also run:
+
+```bash
+npm run ci:db:migrations
+supabase db reset --local --no-seed
+supabase db lint --local --fail-on error --schema public,auth
+supabase test db supabase/tests/database
 ```
 
 If changes affect mobile runtime behavior, ensure Capacitor sync path remains valid:
@@ -94,7 +118,7 @@ If changes affect mobile runtime behavior, ensure Capacitor sync path remains va
 npm run cap:sync
 ```
 
-## Production PR Workflow
+## Production PR workflow
 
 Use this workflow for production-bound work unless the user explicitly requests a different release path:
 
@@ -104,24 +128,30 @@ Use this workflow for production-bound work unless the user explicitly requests 
    git switch -c codex/<short-description> origin/main
    ```
 2. Keep the change focused. Do not cherry-pick broad historical PRs when only a subset of behavior is needed; backport the intended behavior onto current `main`.
-3. Run the relevant local validation from the checklist above. For broad or shared UI/data changes, prefer the full trio:
+3. Run the relevant local validation from the checklist above. For broad or shared UI/data changes, prefer:
    ```bash
    npm run lint
+   npm run typecheck
+   npm run governance
+   npm run test:critical
    npm run test:run
    npm run build
+   npm run budget:bundle
    ```
 4. Commit, push the branch, and open a PR to `main`.
 5. Wait for all GitHub CI checks and CodeRabbit to finish. Inspect CodeRabbit summary, inline comments, and pre-merge checks.
 6. Address every actionable CI or CodeRabbit issue with follow-up commits, rerun relevant local validation, push, and wait again until clean.
 7. Before merging:
-   - If the PR includes Supabase migrations, run a production `supabase db push --dry-run`, apply the pending migrations to the linked production project, and confirm a follow-up dry run reports the remote database is up to date.
+   - If the PR includes Supabase migrations, run a production `supabase db push --linked --dry-run`, apply the pending migrations to the linked production project, and confirm a follow-up dry run reports the remote database is up to date.
    - If the PR has no database migration, no Supabase production push is required; merging `main` is the production deploy path.
 8. Merge only after CI, CodeRabbit, and any required production migration/deploy steps are clean. Verify the PR is merged and the local worktree is clean.
 
-## Operational Notes
+For the full production release checklist, use `docs/release/production-release-checklist.md`.
+
+## Operational notes
 
 - Keep Cloudflare build compatibility:
-  - Install: `npm install --legacy-peer-deps`
+  - Install: `npm ci --legacy-peer-deps`
   - Build: `npm run build`
-- Do not change build pipeline assumptions unless task explicitly requires it.
+- Do not change build pipeline assumptions unless the task explicitly requires it.
 - If architecture/docs diverge from code, align new work with actual code and update docs.

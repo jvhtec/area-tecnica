@@ -1,6 +1,18 @@
-# CODEOWNERS for release-critical paths
+# CODEOWNERS for release-critical and high-risk paths.
 
+/.github/** @jvhtec
 /supabase/** @jvhtec
-/.github/workflows/** @jvhtec
 /src/integrations/** @jvhtec
 /src/hooks/** @jvhtec
+/src/lib/** @jvhtec
+/src/stores/** @jvhtec
+/scripts/ci/** @jvhtec
+/scripts/governance/** @jvhtec
+/package.json @jvhtec
+/package-lock.json @jvhtec
+/public/_headers @jvhtec
+/AGENTS.md @jvhtec
+/ARCHITECTURE.md @jvhtec
+/CLAUDE.md @jvhtec
+/docs/operations/** @jvhtec
+/docs/release/** @jvhtec

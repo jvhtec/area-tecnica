@@ -67,7 +67,7 @@ A curated gallery lives in `docs/screenshots/`.
 
 ## Local development
 ```bash
-npm install --legacy-peer-deps
+npm ci --legacy-peer-deps
 npm run dev
 # http://localhost:8080
 ```

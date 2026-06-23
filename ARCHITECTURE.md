@@ -638,7 +638,7 @@ under `src/utils/hoja-de-ruta/pdf/` for route-sheet-specific composition.
 | **Hosting** | Cloudflare Pages (static site hosting with edge CDN) |
 | **Production URL** | `sector-pro.work` (main branch) |
 | **Preview** | Automatic preview deployments (dev branch, PRs) |
-| **Build Command** | `npm install --legacy-peer-deps && npm run build` |
+| **Build Command** | `npm ci --legacy-peer-deps && npm run build` |
 | **Output Directory** | `dist/` |
 | **Headers/Redirects** | `public/_headers`, `public/_redirects` |
 
@@ -802,7 +802,7 @@ git clone https://github.com/jvhtec/area-tecnica.git
 cd area-tecnica
 
 # Install dependencies (ALWAYS use --legacy-peer-deps)
-npm install --legacy-peer-deps
+npm ci --legacy-peer-deps
 
 # Set environment variables
 cp .env.example .env
@@ -812,7 +812,7 @@ cp .env.example .env
 npm run dev
 ```
 
-**Critical**: Always use `--legacy-peer-deps` due to peer dependency conflicts (Vite 6, date-fns 3, Vitest). Never add `package-lock.json` to the repo.
+**Critical**: Always use `--legacy-peer-deps` due to peer dependency conflicts (Vite 6, date-fns 3, Vitest). The repository commits `package-lock.json`; use `npm ci --legacy-peer-deps` for deterministic installs and `npm install --legacy-peer-deps` only when intentionally updating the dependency graph.
 
 ### 8.2 Testing Frameworks
 
