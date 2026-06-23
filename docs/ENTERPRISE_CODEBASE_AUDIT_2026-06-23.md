@@ -326,13 +326,13 @@ The workflow also runs typecheck, governance, and E2E, but those are not require
 
 ### ENT-SUPPLY-01 — High — Builds are not reproducible
 
-The repository intentionally ignores `package-lock.json` and CI runs:
+Before Phase 1, the repository intentionally ignored `package-lock.json` and CI ran:
 
 ```bash
 npm install --legacy-peer-deps
 ```
 
-Most dependencies use caret ranges. The same commit can resolve a different dependency graph on a later day. This weakens:
+Most dependencies use caret ranges. Without a committed lockfile, the same commit can resolve a different dependency graph on a later day. This weakens:
 
 - reproducibility
 - rollback confidence
@@ -341,7 +341,7 @@ Most dependencies use caret ranges. The same commit can resolve a different depe
 - forensic comparison
 - vulnerability triage
 
-Enterprise remediation requires an approved change to the current repository rule: commit and enforce a lockfile, or adopt another deterministic package-management mechanism.
+Phase 1 remediation commits and enforces `package-lock.json` as the deterministic package-management mechanism.
 
 ### ENT-SUPPLY-02 — High — Repository security automation is disabled
 
