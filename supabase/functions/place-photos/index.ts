@@ -142,6 +142,13 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed', photos: [] }), {
+      status: 405,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    })
+  }
+
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
@@ -165,8 +172,12 @@ Deno.serve(async (req) => {
     }
 
     const query = typeof body.query === 'string' ? body.query.trim() : ''
-    const lat = typeof body.lat === 'number' && Number.isFinite(body.lat) ? body.lat : undefined
-    const lng = typeof body.lng === 'number' && Number.isFinite(body.lng) ? body.lng : undefined
+    const lat = typeof body.lat === 'number' && Number.isFinite(body.lat) && body.lat >= -90 && body.lat <= 90
+      ? body.lat
+      : undefined
+    const lng = typeof body.lng === 'number' && Number.isFinite(body.lng) && body.lng >= -180 && body.lng <= 180
+      ? body.lng
+      : undefined
     const maxPhotos = typeof body.maxPhotos === 'number' && Number.isFinite(body.maxPhotos) ? body.maxPhotos : 2
     const maxWidthPx = typeof body.maxWidthPx === 'number' && Number.isFinite(body.maxWidthPx) ? body.maxWidthPx : 500
 
@@ -212,7 +223,7 @@ Deno.serve(async (req) => {
     // Cache even empty results so we don't repeatedly hit Wikimedia for venues without photos
     await setCachedPayload(supabase, cacheKey, 'photos', { photos: validPhotos }, PHOTO_CACHE_TTL_SECONDS)
 
-    console.log(`place-photos: returning ${validPhotos.length} photo(s) for "${query ?? `${lat},${lng}`}"`)
+    console.log(`place-photos: returning ${validPhotos.length} photo(s) for "${query || `${lat},${lng}`}"`)
 
     return new Response(
       JSON.stringify({ photos: validPhotos }),

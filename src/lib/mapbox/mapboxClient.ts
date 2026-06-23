@@ -21,6 +21,21 @@ export interface LatLng {
   lng: number;
 }
 
+export function isValidLatLng(value: unknown): value is LatLng {
+  if (!value || typeof value !== 'object') return false;
+  const { lat, lng } = value as Partial<LatLng>;
+  return (
+    typeof lat === 'number' &&
+    typeof lng === 'number' &&
+    Number.isFinite(lat) &&
+    Number.isFinite(lng) &&
+    lat >= -90 &&
+    lat <= 90 &&
+    lng >= -180 &&
+    lng <= 180
+  );
+}
+
 let cachedToken: string | null = null;
 let tokenPromise: Promise<string | null> | null = null;
 
@@ -101,18 +116,19 @@ export async function getStaticMapUrlForLocation(opts: {
   if (!token) return null;
 
   let { lat, lng } = opts;
-  if ((!Number.isFinite(lat) || !Number.isFinite(lng)) && opts.address) {
+  if (!isValidLatLng({ lat, lng }) && opts.address) {
     const geocoded = await geocodeForward(opts.address, token);
     if (!geocoded) return null;
     lat = geocoded.lat;
     lng = geocoded.lng;
   }
 
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const center = { lat, lng };
+  if (!isValidLatLng(center)) return null;
 
   return buildStaticMapUrl(token, {
-    lat,
-    lng,
+    lat: center.lat,
+    lng: center.lng,
     width: opts.width,
     height: opts.height,
     zoom: opts.zoom,

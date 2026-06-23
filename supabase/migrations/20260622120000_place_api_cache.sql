@@ -1,8 +1,8 @@
--- Persistent server-side cache for Google Places API responses.
+-- Persistent server-side cache for paid/remote place API responses.
 --
--- Photos and restaurant search/details remain on Google Places (Mapbox has no
--- equivalent rich-POI / photo data), but caching their responses ensures each
--- venue is fetched at most once, keeping paid Places usage under the free tier.
+-- Restaurant search/details remain on Google Places (Mapbox has no equivalent
+-- ratings / price / phone data), while photos now come from Wikimedia. Caching
+-- ensures each venue is fetched at most once per window.
 --
 -- Used by the `place-photos` and `place-restaurants` edge functions, which run
 -- with the service role. No RLS policies are defined, so only the service role
@@ -28,7 +28,7 @@ alter table public.place_api_cache enable row level security;
 grant select, insert, update, delete on table public.place_api_cache to service_role;
 
 comment on table public.place_api_cache is
-  'Server-side cache for Google Places API responses (place-photos, place-restaurants edge functions). Service-role access only.';
+  'Server-side cache for remote place API responses (place-photos, place-restaurants edge functions). Service-role access only.';
 
 -- Prune expired rows to prevent long-term table/index bloat.
 create or replace function public.prune_place_api_cache()

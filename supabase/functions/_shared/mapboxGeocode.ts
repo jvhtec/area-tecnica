@@ -1,8 +1,8 @@
 // Server-side Mapbox forward geocoding helper.
 //
 // Used to resolve an address to coordinates without spending a Google Geocoding
-// call. Requires the MAPBOX_PUBLIC_TOKEN secret (already configured for the
-// get-mapbox-token function).
+// call. Requires MAPBOX_SERVER_TOKEN because browser public tokens are usually
+// URL-restricted and can be rejected from Edge Functions without a Referer.
 
 export async function mapboxGeocode(
   address: string,

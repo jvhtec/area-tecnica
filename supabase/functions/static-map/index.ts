@@ -28,16 +28,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Prefer an unrestricted server token: the public token is URL-restricted
-    // for browser use and would be rejected for server-side (no-Referer) calls.
-    const token = Deno.env.get('MAPBOX_SERVER_TOKEN') ?? Deno.env.get('MAPBOX_PUBLIC_TOKEN');
-    if (!token) {
-      return new Response(JSON.stringify({ error: 'Mapbox token not available' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
     const body = await req.json().catch(() => null);
     const {
       lat,
@@ -51,9 +41,35 @@ Deno.serve(async (req) => {
     const isFiniteNumber = (value: unknown): value is number =>
       typeof value === 'number' && Number.isFinite(value);
 
-    let centerLat: number | undefined = isFiniteNumber(lat) ? lat : undefined;
-    let centerLng: number | undefined = isFiniteNumber(lng) ? lng : undefined;
+    let centerLat: number | undefined = isFiniteNumber(lat) && lat >= -90 && lat <= 90 ? lat : undefined;
+    let centerLng: number | undefined = isFiniteNumber(lng) && lng >= -180 && lng <= 180 ? lng : undefined;
     const queryAddress = typeof address === 'string' ? address.trim() : '';
+
+    if ((centerLat === undefined || centerLng === undefined) && !queryAddress) {
+      return new Response(JSON.stringify({ error: 'Latitude/Longitude or address is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (
+      !isFiniteNumber(width) ||
+      !isFiniteNumber(height) ||
+      !isFiniteNumber(zoom)
+    ) {
+      return new Response(JSON.stringify({ error: 'Invalid static map parameters' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const token = Deno.env.get('MAPBOX_SERVER_TOKEN');
+    if (!token) {
+      return new Response(JSON.stringify({ error: 'Mapbox server token not available' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if ((centerLat === undefined || centerLng === undefined) && queryAddress) {
       const geocoded = await mapboxGeocode(queryAddress, token);
@@ -70,17 +86,6 @@ Deno.serve(async (req) => {
 
     if (centerLat === undefined || centerLng === undefined) {
       return new Response(JSON.stringify({ error: 'Latitude/Longitude or address is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    if (
-      centerLat < -90 || centerLat > 90 ||
-      centerLng < -180 || centerLng > 180 ||
-      !isFiniteNumber(width) || !isFiniteNumber(height) || !isFiniteNumber(zoom)
-    ) {
-      return new Response(JSON.stringify({ error: 'Invalid static map parameters' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

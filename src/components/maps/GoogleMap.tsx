@@ -6,6 +6,7 @@ import {
   geocodeForward,
   geocodeReverse,
   getMapboxToken,
+  isValidLatLng,
 } from '@/lib/mapbox/mapboxClient';
 
 interface GoogleMapProps {
@@ -49,7 +50,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
   onStaticMapUrlChangeRef.current = onStaticMapUrlChange;
 
   const resolveCenter = async (token: string): Promise<{ lat: number; lng: number }> => {
-    if (coordinates) return coordinates;
+    if (isValidLatLng(coordinates)) return coordinates;
     if (address) {
       const geocoded = await geocodeForward(address, token);
       if (geocoded) return { lat: geocoded.lat, lng: geocoded.lng };
@@ -58,7 +59,7 @@ export const GoogleMap: React.FC<GoogleMapProps> = ({
   };
 
   const emitStaticMapUrl = (center: { lat: number; lng: number }) => {
-    if (onStaticMapUrlChangeRef.current && tokenRef.current) {
+    if (onStaticMapUrlChangeRef.current && tokenRef.current && isValidLatLng(center)) {
       onStaticMapUrlChangeRef.current(
         buildStaticMapUrl(tokenRef.current, { ...center, width: 600, height: 300, zoom: 15 }),
       );

@@ -3,9 +3,10 @@
 ## Goal
 
 Bring the monthly Google Maps Platform bill to €0 with **no loss of features**, by
-moving everything Mapbox can do to Mapbox (free tier) and keeping only the
-genuinely Google-only features (restaurant ratings/price/phone, venue photos) on
-Google — server-side and cached so they stay under Google's free tier.
+moving everything Mapbox can do to Mapbox (free tier), moving photos to
+Wikimedia, and keeping only the genuinely Google-only restaurant enrichment
+(ratings/price/phone/website) on Google — server-side and cached so it stays
+under Google's free tier.
 
 The Google API key is **already restricted** (HTTP referrers + API restrictions +
 budget cap) in Google Cloud Console, so remaining charges were legitimate app
@@ -68,7 +69,7 @@ it used the paid Google Places Photo Media API. It is now **re-enabled and free*
 - All client code that fetched the raw Google key (`get-google-maps-key`) is gone.
 - `get-google-maps-key` is **deprecated**: it now returns `410 Gone` and never
   returns the key (still audited). The Google key now only exists server-side in
-  `GOOGLE_MAPS_API_KEY`, used by `place-restaurants` and `place-photos`.
+  `GOOGLE_MAPS_API_KEY`, used by `place-restaurants`.
 
 ## Deployment steps
 
@@ -80,12 +81,14 @@ it used the paid Google Places Photo Media API. It is now **re-enabled and free*
    ```bash
    npx supabase functions deploy place-photos place-restaurants static-map get-google-maps-key
    ```
-3. **Confirm secrets** (already set, verify): `MAPBOX_PUBLIC_TOKEN`, `GOOGLE_MAPS_API_KEY`.
-   - **Recommended:** set `MAPBOX_SERVER_TOKEN` to an *unrestricted* Mapbox token.
-     The `place-restaurants` and `static-map` edge functions geocode/render
-     server-side (no browser Referer), so a URL-restricted public token can be
-     rejected. They use `MAPBOX_SERVER_TOKEN` when present and fall back to
-     `MAPBOX_PUBLIC_TOKEN` otherwise.
+3. **Confirm secrets**: `MAPBOX_PUBLIC_TOKEN`, `MAPBOX_SERVER_TOKEN`, and
+   `GOOGLE_MAPS_API_KEY`.
+   - `MAPBOX_PUBLIC_TOKEN` is exposed to browser code and should stay
+     URL-restricted.
+   - `MAPBOX_SERVER_TOKEN` must be an unrestricted server-side Mapbox token. The
+     `place-restaurants` and `static-map` edge functions geocode/render
+     server-side (no browser Referer), so they do not fall back to the public
+     token.
      ```bash
      npx supabase secrets set MAPBOX_SERVER_TOKEN=sk.************
      ```
@@ -94,6 +97,6 @@ it used the paid Google Places Photo Media API. It is now **re-enabled and free*
 ## Expected outcome
 
 - Maps, geocoding, and all autocomplete run on Mapbox (free tier covers this volume).
-- Google Places usage drops to restaurant search + photos only, served from cache
+- Google Places usage drops to restaurant search/details only, served from cache
   after the first lookup per venue → under Google's free tier → **€0/month**.
 - No user-facing feature was removed.

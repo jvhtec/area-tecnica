@@ -1,6 +1,18 @@
-# Google Places Photo API - Completely Disabled
+# Google Places Photo API - Disabled
 
-## Problem
+## Current Status
+
+Google Places Photo API remains disabled. Automatic venue/accommodation photo
+fetching has been re-enabled through Wikimedia in PR 706, so this note is now a
+historical record of why Google photo fetching was removed.
+
+Current photo behavior:
+- `place-photos` fetches Wikipedia lead images and Wikimedia Commons geosearch
+  results.
+- Results are cached in `place_api_cache`.
+- No Google Places Photo Media API calls are made.
+
+## Original Problem
 Google Places Photo API was costing **€15/month** (up from €0) after the November 25, 2025 Hoja de Ruta feature deployment.
 
 ## Root Cause
@@ -14,16 +26,16 @@ Automatic photo fetching in 3 locations:
 - Place Details API calls (3,137) were within free tier (100k/month)
 - **Only photo fetches were causing charges**
 
-## Solution: Complete Disable
+## Original Solution: Complete Disable
 
-All automatic photo fetching has been **completely disabled**:
+All automatic Google photo fetching was **completely disabled**:
 
 ### Files Modified
 
 #### 1. `src/components/hoja-de-ruta/sections/ModernVenueSection.tsx`
 ```diff
 - Auto-fetch venue photos from Google Places API
-+ DISABLED: Users must manually upload venue photos
++ Google Places disabled: users must manually upload venue photos
 ```
 
 #### 2. `src/utils/hoja-de-ruta/pdf/sections/venue.ts`
@@ -35,7 +47,7 @@ All automatic photo fetching has been **completely disabled**:
 #### 3. `src/utils/hoja-de-ruta/pdf/sections/accommodation.ts`
 ```diff
 - Auto-fetch hotel images via Places API
-+ DISABLED: Users must manually upload accommodation photos
++ Google Places disabled: users must manually upload accommodation photos
 ```
 
 ## Impact
@@ -45,14 +57,14 @@ All automatic photo fetching has been **completely disabled**:
 - No more automatic API charges
 - Place Details API still available (within free 100k/month tier)
 
-### ⚠️ User Experience Changes
-- **Venue photos**: Users must manually upload venue photos (no auto-suggestions)
-- **PDF generation**: Will only include manually uploaded photos
+### User Experience Changes At The Time
+- **Venue photos**: Users had to manually upload venue photos (no auto-suggestions)
+- **PDF generation**: PDFs only included manually uploaded photos
 - **Accommodation**: No automatic hotel photos in PDFs
 
 ## Alternative Solutions (Not Implemented)
 
-If you want to re-enable photo fetching with controls:
+If Google photo fetching is ever reconsidered:
 
 ### Option 1: Manual "Load Photos" Button
 Add a button in ModernVenueSection that users click to fetch photos (not automatic).
@@ -68,28 +80,28 @@ Pre-fetch and cache photos for common venues in database, serve from there inste
 
 ## Reverting Changes
 
-To re-enable automatic photo fetching (⚠️ will incur €15/month cost):
+To re-enable Google automatic photo fetching (will incur cost):
 
-1. **ModernVenueSection.tsx** (line 58): Uncomment the `useEffect` hook
-2. **venue.ts** (line 53): Uncomment the `else if` block
-3. **accommodation.ts** (line 33): Uncomment the entire `try-catch` block
+1. Route calls through an edge function; never expose the Google key.
+2. Use persistent caching and a hard monthly budget.
+3. Prefer Wikimedia/manual uploads first.
 
 ## Monitoring
 
 - Check Google Cloud Console monthly to verify €0 photo API usage
 - Place Details API usage should stay under 100k/month (currently ~3,137/month)
-- Autocomplete/Text Search are also paid but controlled by rate limiting
+- Autocomplete/Text Search have moved to Mapbox.
 
 ## Recommendations
 
-1. **Create venue photo database**: Pre-populate common venues with photos
-2. **Train users**: Show users how to upload venue photos manually
-3. **PDF templates**: Add placeholder images for venues without photos
-4. **Consider static images**: Use venue logos or generic venue images instead
+1. Keep Wikimedia results cached.
+2. Train users to upload manual photos when Wikimedia has no useful image.
+3. Add placeholder images for venues without photos.
+4. Consider a curated venue photo database for common venues.
 
 ---
 
-**Status**: ✅ Photo API completely disabled
+**Status**: Google Places Photo API disabled; Wikimedia photo fallback enabled
 **Monthly Cost**: €0
-**Date Applied**: 2026-01-01
+**Date Applied**: 2026-01-01; superseded by Wikimedia fallback in PR 706
 **Previously**: €15/month

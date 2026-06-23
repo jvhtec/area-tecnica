@@ -87,7 +87,7 @@ export const useHojaDeRutaImages = () => {
     }
   };
 
-  // Append externally-fetched previews (e.g., Google Places photos)
+  // Append externally-fetched previews (e.g., Wikimedia venue photos)
   const appendVenuePreviews = (dataUrls: string[]) => {
     if (!dataUrls || dataUrls.length === 0) return;
     setImagePreviews((prev) => {
