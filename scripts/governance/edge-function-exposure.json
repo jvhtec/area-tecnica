@@ -45,12 +45,24 @@
     "security-audit": { "class": "privileged-role", "verifyJwt": true },
     "send-bug-resolution-email": { "class": "privileged-role", "verifyJwt": true },
     "send-corporate-email": { "class": "privileged-role", "verifyJwt": true },
-    "send-expense-notification": { "class": "privileged-role", "verifyJwt": true },
-    "send-job-payout-email": { "class": "privileged-role", "verifyJwt": true },
+    "send-expense-notification": {
+      "class": "service-only",
+      "verifyJwt": true,
+      "internalGuard": "Database trigger invokes with the service-role bearer token; function performs a timing-safe compare against SUPABASE_SERVICE_ROLE_KEY before sending."
+    },
+    "send-job-payout-email": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Validates the caller JWT with auth.getUser and requires profiles.role to be admin or management before reading payout overrides or sending email."
+    },
     "send-job-whatsapp-message": { "class": "privileged-role", "verifyJwt": true },
     "send-onboarding-email": { "class": "privileged-role", "verifyJwt": true },
     "send-password-reset": { "class": "privileged-role", "verifyJwt": true },
-    "send-payout-override-notification": { "class": "privileged-role", "verifyJwt": true },
+    "send-payout-override-notification": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Validates the caller JWT with auth.getUser, requires admin/management, and requires payload actorId to match the authenticated user before any service-role reads."
+    },
     "send-staffing-email": { "class": "service-only", "verifyJwt": true },
     "send-timesheet-reminder": { "class": "privileged-role", "verifyJwt": true },
     "send-tour-availability": { "class": "privileged-role", "verifyJwt": true },

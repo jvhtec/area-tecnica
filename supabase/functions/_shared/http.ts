@@ -126,6 +126,7 @@ export const DEFAULT_MAX_BODY_BYTES = 1024 * 1024;
 
 const CORRELATION_HEADER = "x-correlation-id";
 const CORRELATION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+const generatedCorrelationIds = new WeakMap<Request, string>();
 
 /**
  * Returns a stable correlation id for a request: the inbound `x-correlation-id`
@@ -139,7 +140,14 @@ export function getCorrelationId(req: Request): string {
     return inbound;
   }
 
-  return crypto.randomUUID();
+  const existing = generatedCorrelationIds.get(req);
+  if (existing) {
+    return existing;
+  }
+
+  const generated = crypto.randomUUID();
+  generatedCorrelationIds.set(req, generated);
+  return generated;
 }
 
 /** Returns response headers carrying the correlation id. */
@@ -388,6 +396,7 @@ export function errorResponse(
     fallbackMessage?: string;
     includeDetails?: boolean;
     fallbackStatus?: number;
+    headers?: Record<string, string>;
   } = {},
 ) {
   return jsonResponse(
@@ -395,7 +404,10 @@ export function errorResponse(
       fallbackMessage: options.fallbackMessage,
       includeDetails: options.includeDetails,
     }),
-    { status: getErrorStatus(error, options.fallbackStatus ?? 500) },
+    {
+      status: getErrorStatus(error, options.fallbackStatus ?? 500),
+      headers: options.headers,
+    },
   );
 }
 
@@ -438,6 +450,7 @@ export function createHttpHandler(
     methodNotAllowedStatus?: number;
     methodNotAllowedBody?: unknown;
     onError?: (error: unknown, req: Request) => void;
+    errorHeaders?: (req: Request, error: unknown) => Record<string, string>;
     includeErrorDetails?: boolean;
     internalErrorMessage?: string;
   } = {},
@@ -469,9 +482,17 @@ export function createHttpHandler(
         console.error("createHttpHandler onError callback failed", onErrorFailure);
       }
 
+      let headers: Record<string, string> | undefined;
+      try {
+        headers = options.errorHeaders?.(req, error);
+      } catch (errorHeadersFailure) {
+        console.error("createHttpHandler errorHeaders callback failed", errorHeadersFailure);
+      }
+
       return errorResponse(error, {
         fallbackMessage: options.internalErrorMessage,
         includeDetails: options.includeErrorDetails,
+        headers,
       });
     }
   };

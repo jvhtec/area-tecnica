@@ -115,7 +115,11 @@ These are covered by unit tests in `supabase/functions/_shared/http.test.ts`.
   `createHttpHandler` plus the shared correlation/redaction/size-limit
   primitives. The grandfather baseline in `edge-function-baseline.json` still
   lists these. User-admin functions (`create-user`, `delete-user`) were
-  migrated on 2026-06-23 as the first follow-up slice.
+  migrated on 2026-06-23 as the first follow-up slice. Payout/expense
+  notification functions (`send-expense-notification`, `send-job-payout-email`,
+  `send-payout-override-notification`) were migrated on 2026-06-23 as the next
+  follow-up slice, including explicit service-role/privileged-role guards and
+  bounded payload parsing.
 - Add durable, storage-backed rate limiting for public-token endpoints.
 - Continue ratcheting the `anon`/`PUBLIC` grant baseline downward (trigger
   functions can be revoked from `anon` without behavioral impact).

@@ -1,32 +1,27 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 import { addDays, getDaysInMonth } from "npm:date-fns@3.6.0";
 import { formatInTimeZone, fromZonedTime } from "npm:date-fns-tz@3.2.0";
+
+import {
+  correlationHeaders,
+  createHttpHandler,
+  getCorrelationId,
+  HttpError,
+  jsonResponse,
+  readBoundedJsonObject,
+  redactSensitiveValues,
+  requireBearerToken,
+  requireEnvValues,
+} from "../_shared/http.ts";
 import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  throw new Error(
-    "Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY"
-  );
-}
-
-const corsHeaders: Record<string, string> = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
-
-const BREVO_KEY = Deno.env.get("BREVO_API_KEY") ?? "";
-const BREVO_FROM = Deno.env.get("BREVO_FROM") ?? "";
-const ADMIN_BCC = Deno.env.get("PAYOUT_EMAIL_BCC") ?? "";
 const INVOICE_SUBMISSION_EMAIL = "administracion@sector-pro.com";
 const MADRID_TIMEZONE = "Europe/Madrid";
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_PAYOUT_EMAIL_BODY_BYTES = 25 * 1024 * 1024;
+const ADMIN_ROLES = new Set(["admin", "management"]);
 
 interface JobMetadata {
   id: string;
@@ -68,11 +63,54 @@ interface PayoutEmailResult {
   error?: string;
 }
 
-interface JobPayoutRequestBody {
+interface JobPayoutRequestBody extends Record<string, unknown> {
   job?: JobMetadata;
   technicians?: TechnicianPayload[];
   missing_emails?: string[];
   requested_at?: string;
+}
+
+async function requireAdminOrManagement(
+  supabaseAdmin: SupabaseClient,
+  req: Request,
+): Promise<{ userId: string; role: string }> {
+  const token = requireBearerToken(req, {
+    message: "Missing or malformed authorization header",
+    code: "missing_authorization",
+  });
+
+  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+  if (authError || !user) {
+    console.error("[send-job-payout-email] Token verification failed:", authError?.message);
+    throw new HttpError(401, "Invalid or expired token", { code: "invalid_authorization" });
+  }
+
+  const { data: callerProfile, error: profileError } = await supabaseAdmin
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (profileError) {
+    console.error("[send-job-payout-email] Profile lookup failed:", profileError.message);
+    throw new HttpError(500, "Authorization lookup failed", {
+      code: "authorization_lookup_failed",
+      exposeDetails: false,
+    });
+  }
+
+  const role = typeof callerProfile?.role === "string"
+    ? callerProfile.role.toLowerCase()
+    : "";
+
+  if (!ADMIN_ROLES.has(role)) {
+    console.warn("[send-job-payout-email] Forbidden: user", user.id, "role:", role || "<missing>");
+    throw new HttpError(403, "Forbidden: insufficient permissions", {
+      code: "insufficient_role",
+    });
+  }
+
+  return { userId: user.id, role };
 }
 
 async function mapWithConcurrency<T, R>(
@@ -223,80 +261,36 @@ function formatLongDate(date: Date): string {
   return new Intl.DateTimeFormat('es-ES', { dateStyle: 'long', timeZone: MADRID_TIMEZONE }).format(date);
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+serve(createHttpHandler(async (req) => {
+  const correlationId = getCorrelationId(req);
+  const responseHeaders = correlationHeaders(correlationId);
+  const respond = (body: unknown, status = 200) => jsonResponse(body, { status, headers: responseHeaders });
 
-  if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
-  }
+  const {
+    SUPABASE_URL: supabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+    BREVO_API_KEY: brevoKey,
+    BREVO_FROM: brevoFrom,
+  } = requireEnvValues(
+    ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "BREVO_API_KEY", "BREVO_FROM"] as const,
+    (name) => Deno.env.get(name),
+  );
 
-  if (!BREVO_KEY || !BREVO_FROM) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: 'Email channel not configured',
-        missing_env: [
-          ...(BREVO_KEY ? [] : ['BREVO_API_KEY']),
-          ...(BREVO_FROM ? [] : ['BREVO_FROM']),
-        ],
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
-  }
+  // Service-role client for DB queries (bypasses RLS)
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 
-  try {
-    // Service-role client for DB queries (bypasses RLS)
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
-    // ── Authorization: verify caller is admin or management ──
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Missing or malformed authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
-    if (authError || !user) {
-      console.error('[send-job-payout-email] Token verification failed:', authError?.message);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid or expired token' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { data: callerProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError) {
-      console.error('[send-job-payout-email] Profile lookup failed:', profileError.message);
-    }
-
-    if (!callerProfile || !['admin', 'management'].includes(callerProfile.role)) {
-      console.warn('[send-job-payout-email] Forbidden: user', user.id, 'role:', callerProfile?.role);
-      return new Response(
-        JSON.stringify({ success: false, error: 'Forbidden: insufficient permissions' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const body = (await req.json()) as JobPayoutRequestBody;
-    const DEBUG = Deno.env.get('DEBUG_PAYOUT_EMAILS') === 'true';
+  const caller = await requireAdminOrManagement(supabaseAdmin, req);
+  const body = await readBoundedJsonObject<JobPayoutRequestBody>(req, {
+    maxBytes: MAX_PAYOUT_EMAIL_BODY_BYTES,
+  });
+  const DEBUG = Deno.env.get('DEBUG_PAYOUT_EMAILS') === 'true';
 
     // Avoid dumping base64 PDFs / PII into logs.
-    console.log('[send-job-payout-email] Incoming payload', JSON.stringify({
+    console.log('[send-job-payout-email] Incoming payload', JSON.stringify(redactSensitiveValues({
+      correlationId,
+      actor_id: caller.userId,
       job: { id: body.job?.id, title: body.job?.title },
       technicians: body.technicians?.map(t => ({
         technician_id: t.technician_id,
@@ -304,7 +298,7 @@ serve(async (req) => {
         pdf_length: t.pdf_base64?.length ?? 0,
       })),
       technicians_count: body.technicians?.length ?? 0,
-    }));
+    })));
 
     if (DEBUG) {
       console.log('[send-job-payout-email][debug] Incoming payload (full)', {
@@ -314,17 +308,11 @@ serve(async (req) => {
     }
 
     if (!body || !body.job || !body.job.id) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Missing job metadata' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return respond({ success: false, error: 'Missing job metadata' }, 400);
     }
 
     if (!Array.isArray(body.technicians) || body.technicians.length === 0) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'No technician payloads received' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return respond({ success: false, error: 'No technician payloads received' }, 400);
     }
 
     const job = body.job;
@@ -352,8 +340,8 @@ serve(async (req) => {
     }
 
     // Corporate assets (logos)
-    const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || `${SUPABASE_URL}/storage/v1/object/public/company-assets/sectorlogow.png`;
-    const AT_LOGO_URL = Deno.env.get('AT_LOGO_URL') || `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
+    const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || `${supabaseUrl}/storage/v1/object/public/company-assets/sectorlogow.png`;
+    const AT_LOGO_URL = Deno.env.get('AT_LOGO_URL') || `${supabaseUrl}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
     const todayEstimate = calculateEstimatedPayoutRange([new Date()]);
     const todayEstimateText = escapeHtml(`a partir del ${formatLongDate(todayEstimate.fromDate)}`);
 
@@ -544,7 +532,7 @@ serve(async (req) => {
       </html>`;
 
       const emailPayload: Record<string, unknown> = {
-        sender: { email: BREVO_FROM, name: 'Área Técnica' },
+        sender: { email: brevoFrom, name: 'Área Técnica' },
         to: [{ email: trimmedEmail, name: tech.full_name || undefined }],
         subject,
         htmlContent,
@@ -568,7 +556,7 @@ serve(async (req) => {
       }
 
       try {
-        const sendRes = await sendBrevoEmail(BREVO_KEY, emailPayload, { timeoutMs: 10000 });
+        const sendRes = await sendBrevoEmail(brevoKey, emailPayload, { timeoutMs: 10000 });
 
         if (!sendRes.ok) {
           const errText = await sendRes.text();
@@ -584,24 +572,23 @@ serve(async (req) => {
     );
 
     const success = results.every((r) => r.sent);
-    return new Response(
-      JSON.stringify({
+    return respond(
+      {
         success,
         results,
         job,
         missing_emails: body.missing_emails || [],
         requested_at: body.requested_at || new Date().toISOString(),
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      },
     );
-  } catch (err) {
-    console.error('[send-job-payout-email] Unexpected error', err);
-    return new Response(
-      JSON.stringify({ success: false, error: (err as Error).message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-});
+}, {
+  allowedMethods: ["POST"],
+  internalErrorMessage: "Payout email request failed",
+  errorHeaders: (req) => correlationHeaders(getCorrelationId(req)),
+  onError(error, req) {
+    console.error("[send-job-payout-email] Request failed", JSON.stringify(redactSensitiveValues({
+      correlationId: getCorrelationId(req),
+      error: error instanceof Error ? { name: error.name, message: error.message } : error,
+    })));
+  },
+}));

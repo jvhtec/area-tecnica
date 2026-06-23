@@ -1,19 +1,20 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+import {
+  correlationHeaders,
+  createHttpHandler,
+  getCorrelationId,
+  HttpError,
+  jsonResponse,
+  readBoundedJsonObject,
+  redactSensitiveValues,
+  requireBearerToken,
+  requireEnvValues,
+} from "../_shared/http.ts";
 
-if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-  throw new Error("Missing required environment variables: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY");
-};
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+const MAX_PAYOUT_OVERRIDE_BODY_BYTES = 16 * 1024;
+const ADMIN_ROLES = new Set(["admin", "management"]);
 
 /**
  * Escapes HTML special characters to prevent XSS injection in email templates.
@@ -29,7 +30,7 @@ function escapeHtml(value: string | null | undefined): string {
     .replace(/'/g, "&#39;");
 }
 
-interface PayoutOverrideNotificationRequest {
+interface PayoutOverrideNotificationRequest extends Record<string, unknown> {
   jobId: string;
   jobTitle: string;
   jobStartTime: string;
@@ -43,24 +44,80 @@ interface PayoutOverrideNotificationRequest {
   calculatedTotal: number;
 }
 
-serve(async (req) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+async function requireAdminOrManagement(
+  supabase: SupabaseClient,
+  req: Request,
+): Promise<{ userId: string; role: string; authorizationHeader: string }> {
+  const token = requireBearerToken(req, {
+    message: "Missing or malformed authorization header",
+    code: "missing_authorization",
+  });
+
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !user) {
+    console.error("[send-payout-override-notification] Token verification failed:", authError?.message);
+    throw new HttpError(401, "Invalid or expired token", { code: "invalid_authorization" });
   }
 
-  try {
-    const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+  const { data: callerProfile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle();
 
-    // Parse request body
-    const payload: PayoutOverrideNotificationRequest = await req.json();
+  if (profileError) {
+    console.error("[send-payout-override-notification] Profile lookup failed:", profileError.message);
+    throw new HttpError(500, "Authorization lookup failed", {
+      code: "authorization_lookup_failed",
+      exposeDetails: false,
+    });
+  }
+
+  const role = typeof callerProfile?.role === "string"
+    ? callerProfile.role.toLowerCase()
+    : "";
+
+  if (!ADMIN_ROLES.has(role)) {
+    console.warn("[send-payout-override-notification] Forbidden: user", user.id, "role:", role || "<missing>");
+    throw new HttpError(403, "Forbidden: insufficient permissions", {
+      code: "insufficient_role",
+    });
+  }
+
+  return {
+    userId: user.id,
+    role,
+    authorizationHeader: `Bearer ${token}`,
+  };
+}
+
+serve(createHttpHandler(async (req) => {
+  const correlationId = getCorrelationId(req);
+  const responseHeaders = correlationHeaders(correlationId);
+  const respond = (body: unknown, status = 200) => jsonResponse(body, { status, headers: responseHeaders });
+
+  const {
+    SUPABASE_URL: supabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+  } = requireEnvValues(
+    ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const,
+    (name) => Deno.env.get(name),
+  );
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const caller = await requireAdminOrManagement(supabase, req);
+
+  // Parse request body
+  const payload = await readBoundedJsonObject<PayoutOverrideNotificationRequest>(req, {
+    maxBytes: MAX_PAYOUT_OVERRIDE_BODY_BYTES,
+  });
 
     // Validate required fields
     if (!payload.jobId || !payload.technicianId || !payload.actorId) {
-      return new Response(
-        JSON.stringify({ error: "Missing required fields: jobId, technicianId, actorId" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return respond({ error: "Missing required fields: jobId, technicianId, actorId" }, 400);
     }
 
     const {
@@ -76,6 +133,24 @@ serve(async (req) => {
       newOverrideAmountEur,
       calculatedTotal,
     } = payload;
+
+    if (actorId !== caller.userId) {
+      console.warn("[send-payout-override-notification] Actor mismatch", JSON.stringify(redactSensitiveValues({
+        correlationId,
+        caller_id: caller.userId,
+        payload_actor_id: actorId,
+      })));
+      throw new HttpError(403, "Forbidden: actor mismatch", { code: "actor_mismatch" });
+    }
+
+    console.log("[send-payout-override-notification] Incoming payload", JSON.stringify(redactSensitiveValues({
+      correlationId,
+      actor_id: caller.userId,
+      role: caller.role,
+      job_id: jobId,
+      technician_id: technicianId,
+      has_override: newOverrideAmountEur !== null,
+    })));
 
     let resolvedJobType = jobType?.toLowerCase()?.trim() || null;
     if (!resolvedJobType && jobId) {
@@ -93,15 +168,10 @@ serve(async (req) => {
     }
 
     if (resolvedJobType === "ciclo") {
-      return new Response(
-        JSON.stringify({
-          success: true,
-          message: "Notification skipped for ciclo job type",
-        }),
-        {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
+      return respond({
+        success: true,
+        message: "Notification skipped for ciclo job type",
+      });
     }
 
     // Get actor information
@@ -113,10 +183,10 @@ serve(async (req) => {
 
     if (actorError || !actorProfile) {
       console.error("[send-payout-override-notification] Error fetching actor profile:", actorError);
-      return new Response(
-        JSON.stringify({ error: "Failed to fetch actor information" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      throw new HttpError(500, "Failed to fetch actor information", {
+        code: "actor_lookup_failed",
+        exposeDetails: false,
+      });
     }
 
     const actorName = `${actorProfile.first_name || ""} ${actorProfile.last_name || ""}`.trim() || "Unknown User";
@@ -419,8 +489,7 @@ serve(async (req) => {
       console.warn("[send-payout-override-notification] finanzas@sector-pro.com profile not found");
     }
 
-    // Forward caller auth to preserve actor identity/permissions in nested function call.
-    const authHeader = req.headers.get("Authorization");
+    // Forward verified caller auth to preserve actor identity/permissions in nested function call.
     const corporateEmailInvokeOptions: {
       body: {
         subject: string;
@@ -444,13 +513,9 @@ serve(async (req) => {
       },
     };
 
-    if (authHeader) {
-      corporateEmailInvokeOptions.headers = {
-        Authorization: authHeader,
-      };
-    } else {
-      console.warn("[send-payout-override-notification] Missing Authorization header for nested corporate email call");
-    }
+    corporateEmailInvokeOptions.headers = {
+      Authorization: caller.authorizationHeader,
+    };
 
     // Send email via corporate email function to admins and finanzas
     const { error: sendError } = await supabase.functions.invoke(
@@ -459,29 +524,28 @@ serve(async (req) => {
     );
 
     if (sendError) {
-      console.error("[send-payout-override-notification] Error calling send-corporate-email:", sendError);
-      // Don't fail the whole operation, just log it
+      console.error("[send-payout-override-notification] Error calling send-corporate-email:", JSON.stringify(redactSensitiveValues({
+        correlationId,
+        error: sendError,
+      })));
+      throw new HttpError(502, "Notification email delivery failed", {
+        code: "notification_delivery_failed",
+        exposeDetails: false,
+      });
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Notification emails sent",
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  } catch (error) {
-    console.error("[send-payout-override-notification] Error:", error);
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : "Unknown error",
-      }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  }
-});
+    return respond({
+      success: true,
+      message: "Notification emails sent",
+    });
+}, {
+  allowedMethods: ["POST"],
+  internalErrorMessage: "Payout override notification failed",
+  errorHeaders: (req) => correlationHeaders(getCorrelationId(req)),
+  onError(error, req) {
+    console.error("[send-payout-override-notification] Request failed", JSON.stringify(redactSensitiveValues({
+      correlationId: getCorrelationId(req),
+      error: error instanceof Error ? { name: error.name, message: error.message } : error,
+    })));
+  },
+}));
