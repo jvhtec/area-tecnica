@@ -1,7 +1,13 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import {
+  createHttpHandler,
+  HttpError,
+  jsonResponse,
+  readBoundedJsonObject,
+  requireEnvValues,
+} from "../_shared/http.ts";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 
 const SIGNED_URL_TTL_SECONDS = 300;
@@ -9,6 +15,7 @@ const INGRESS_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
 const INGRESS_RATE_LIMIT_MAX_REQUESTS = 300;
 const RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
 const RATE_LIMIT_MAX_REQUESTS = 120;
+const MAX_JSON_BODY_BYTES = 32 * 1024;
 
 const sha256Hex = async (value: string) => {
   const bytes = new TextEncoder().encode(value);
@@ -18,23 +25,14 @@ const sha256Hex = async (value: string) => {
     .join("");
 };
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
+serve(createHttpHandler(async (req) => {
+  const {
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
+  } = requireEnvValues(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const, (name) => Deno.env.get(name));
+  const rateLimitSalt = Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SUPABASE_SERVICE_ROLE_KEY;
 
-  if (req.method !== "POST") {
-    return jsonResponse({ error: "Method not allowed" }, { status: 405 });
-  }
-
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-  if (!supabaseUrl || !serviceRoleKey) {
-    return jsonResponse({ error: "Missing Supabase configuration" }, { status: 500 });
-  }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false },
   });
 
@@ -45,7 +43,7 @@ serve(async (req) => {
     identifierParts: ["document"],
     windowSeconds: INGRESS_RATE_LIMIT_WINDOW_SECONDS,
     maxRequests: INGRESS_RATE_LIMIT_MAX_REQUESTS,
-    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? serviceRoleKey,
+    salt: rateLimitSalt,
   });
 
   if (!ingressRateLimit.allowed) {
@@ -57,9 +55,14 @@ serve(async (req) => {
 
   let body: { token?: unknown; documentId?: unknown };
   try {
-    body = await req.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, { status: 400 });
+    body = await readBoundedJsonObject<Record<string, unknown>>(req, {
+      maxBytes: MAX_JSON_BODY_BYTES,
+    });
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 400) {
+      return jsonResponse({ error: "Invalid JSON body" }, { status: 400 });
+    }
+    throw error;
   }
 
   const token = typeof body.token === "string" ? body.token.trim() : "";
@@ -79,7 +82,7 @@ serve(async (req) => {
     maxRequests: RATE_LIMIT_MAX_REQUESTS,
     includeIp: false,
     includeUserAgent: false,
-    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? serviceRoleKey,
+    salt: rateLimitSalt,
   });
 
   if (!rateLimit.allowed) {
@@ -135,4 +138,7 @@ serve(async (req) => {
     signedUrl: signed.signedUrl,
     expiresIn: SIGNED_URL_TTL_SECONDS,
   });
-});
+}, {
+  allowedMethods: ["POST"],
+  methodNotAllowedBody: { error: "Method not allowed" },
+}));

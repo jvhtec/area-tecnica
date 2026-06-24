@@ -178,9 +178,18 @@ TV polling behavior needs a separate, polling-safe threshold and rollout plan.
   unauthenticated `persist-flex-elements` service-role write path, moved Flex
   lookup/proxy handlers onto bounded payload parsing, removed raw Flex lookup
   payloads from client responses, and made authenticated image responses use
-  private cache headers. The duplicated admin/management caller checks across
-  the hardened user-admin, diagnostics, payout, staffing/message, and Flex
-  proxy handlers now route through the shared auth helper.
+  private cache headers. Public token artist/document/calendar handlers
+  (`submit-public-artist-form`, `upload-public-artist-rider`,
+  `delete-public-artist-rider`, `tour-guest-document-url`,
+  `tech-calendar-ics`) were migrated on 2026-06-24, reducing the legacy Edge
+  Function baseline from 43 to 38 entries. That slice moved browser-facing
+  token endpoints behind the shared CORS/method/error wrapper, added bounded
+  JSON parsing where applicable, added a multipart size preflight for public
+  rider uploads, centralized required environment validation, and stopped
+  returning raw database error text from the calendar job-load path. The
+  duplicated admin/management caller checks across the hardened user-admin,
+  diagnostics, payout, staffing/message, and Flex proxy handlers now route
+  through the shared auth helper.
 - Finish the wallboard auth/feed abuse-control design with TV-safe thresholds
   and rollout telemetry; avoid disrupting deployed APK wallboards.
 - Continue ratcheting the `anon`/`PUBLIC` grant baseline downward (trigger

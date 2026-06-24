@@ -1,13 +1,16 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import {
+  createHttpHandler,
+  HttpError,
+  jsonResponse,
+  requireEnvValues,
+} from "../_shared/http.ts";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 10;
+const MAX_MULTIPART_BODY_BYTES = MAX_FILES_PER_REQUEST * MAX_FILE_SIZE_BYTES + 1024 * 1024;
 const INGRESS_RATE_LIMIT_WINDOW_SECONDS = 60;
 const INGRESS_RATE_LIMIT_MAX_REQUESTS = 30;
 const TOKEN_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
@@ -77,24 +80,14 @@ const buildArtistTableUrl = (jobId?: string | null, artistDate?: string | null) 
   return `/festival-management/${normalizedJobId}/artists?date=${encodeURIComponent(normalizedDate)}`;
 };
 
-serve(async (req) => {
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-    return jsonResponse(
-      { ok: false, error: "server_misconfigured" },
-      { status: 500 },
-    );
-  }
-
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  if (req.method !== "POST") {
-    return jsonResponse({ ok: false, error: "method_not_allowed" }, { status: 405 });
-  }
-
+serve(createHttpHandler(async (req) => {
   try {
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const {
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
+    } = requireEnvValues(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const, (name) => Deno.env.get(name));
+    const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const rateLimitSalt = Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SUPABASE_SERVICE_ROLE_KEY;
     const ingressRateLimit = await checkEdgeRateLimit({
       req,
       supabase: supabaseAdmin,
@@ -102,7 +95,7 @@ serve(async (req) => {
       identifierParts: ["multipart"],
       windowSeconds: INGRESS_RATE_LIMIT_WINDOW_SECONDS,
       maxRequests: INGRESS_RATE_LIMIT_MAX_REQUESTS,
-      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+      salt: rateLimitSalt,
     });
 
     if (!ingressRateLimit.allowed) {
@@ -112,7 +105,18 @@ serve(async (req) => {
       );
     }
 
-    const formData = await req.formData();
+    const contentLength = Number.parseInt(req.headers.get("content-length") ?? "", 10);
+    if (Number.isFinite(contentLength) && contentLength > MAX_MULTIPART_BODY_BYTES) {
+      return jsonResponse({ ok: false, error: "file_too_large" }, { status: 413 });
+    }
+
+    let formData: FormData;
+    try {
+      formData = await req.formData();
+    } catch {
+      return jsonResponse({ ok: false, error: "invalid_form_data" }, { status: 400 });
+    }
+
     const token = String(formData.get("token") ?? "").trim();
     const fileEntries = extractFiles(formData);
 
@@ -162,7 +166,7 @@ serve(async (req) => {
       maxRequests: TOKEN_RATE_LIMIT_MAX_REQUESTS,
       includeIp: false,
       includeUserAgent: false,
-      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+      salt: rateLimitSalt,
     });
 
     if (!tokenRateLimit.allowed) {
@@ -351,7 +355,11 @@ serve(async (req) => {
       { status: 201 },
     );
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     console.error("[upload-public-artist-rider] unexpected error", error);
     return jsonResponse({ ok: false, error: "internal_error" }, { status: 500 });
   }
-});
+}, {
+  allowedMethods: ["POST"],
+  methodNotAllowedBody: { ok: false, error: "method_not_allowed" },
+}));

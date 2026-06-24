@@ -1,9 +1,7 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { createHttpHandler, requireEnvValues } from "../_shared/http.ts";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
-
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 type AssignmentRow = {
   job_id: string;
@@ -96,30 +94,19 @@ function replaceIsoDateKeepingTimeAndOffset(iso: string, ymd: string): string {
   return `${ymd}${iso.slice(10)}`;
 }
 
-serve(async (req) => {
-  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+serve(createHttpHandler(async (req) => {
   const url = new URL(req.url);
-
-  if (req.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Headers":
-          "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
-        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Max-Age": "86400",
-      },
-      status: 204,
-    });
-  }
 
   if (req.method === 'HEAD') {
     return new Response(null, { status: 204, headers: { 'Content-Type': 'text/calendar; charset=UTF-8', 'Cache-Control': 'public, max-age=900' } });
   }
 
-  if (req.method !== 'GET') {
-    return new Response('Method Not Allowed', { status: 405 });
-  }
+  const {
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
+  } = requireEnvValues(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const, (name) => Deno.env.get(name));
+  const rateLimitSalt = Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SUPABASE_SERVICE_ROLE_KEY;
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   const tid = url.searchParams.get('tid');
   const token = url.searchParams.get('token');
@@ -133,7 +120,7 @@ serve(async (req) => {
     identifierParts: ["ics"],
     windowSeconds: 60 * 60,
     maxRequests: INGRESS_RATE_LIMIT_PER_HOUR,
-    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+    salt: rateLimitSalt,
   });
 
   if (!ingressRateLimit.allowed) {
@@ -153,7 +140,7 @@ serve(async (req) => {
     maxRequests: RATE_LIMIT_PER_HOUR,
     includeIp: false,
     includeUserAgent: false,
-    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+    salt: rateLimitSalt,
   });
 
   if (!rateLimit.allowed) {
@@ -200,7 +187,7 @@ serve(async (req) => {
 
     if (jErr) {
       console.error('Jobs query error:', jErr);
-      return new Response(`Failed to load jobs: ${jErr.message}`, { status: 500 });
+      return new Response('Failed to load jobs', { status: 500 });
     }
 
     for (const j of (jobs ?? []) as Array<JobRow & { status?: string; tour_id?: string | null }>) {
@@ -340,7 +327,10 @@ serve(async (req) => {
       'ETag': `W/"${etag}"`,
     },
   });
-});
+}, {
+  allowedMethods: ["GET", "HEAD"],
+  methodNotAllowedBody: { error: "Method not allowed" },
+}));
 
 function buildCalendar(profile: { first_name?: string | null; last_name?: string | null } | null, events: Array<{ uid: string; summary: string; description: string; dtStart: Date; dtEnd: Date }>) {
   const now = new Date();
