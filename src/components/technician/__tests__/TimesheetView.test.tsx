@@ -231,7 +231,14 @@ describe("TimesheetView", () => {
       expect(signTimesheet).toHaveBeenCalledWith("mine", "data:image/png;base64,signature");
     });
 
-    await user.click(screen.getByRole("button", { name: /enviar parte/i }));
+    // Signing is the last step before submitting, so the send nudge pops.
+    expect(await screen.findByText(/parte firmado/i)).toBeInTheDocument();
+
+    // The prompt's button is "Enviar parte"; the card's is "ENVIAR PARTE".
+    // Match the prompt one case-sensitively to disambiguate.
+    await user.click(
+      screen.getByRole("button", { name: (name) => name === "Enviar parte" }),
+    );
 
     expect(submitTimesheet).toHaveBeenCalledWith("mine");
   });

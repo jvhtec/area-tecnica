@@ -203,13 +203,9 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
         category: isPrepDay ? undefined : formData.category,
       });
       setEditingId(null);
-      // Remember this day and immediately nudge the tech to send it, so a saved
-      // parte doesn't sit forgotten as a draft.
+      // Remember this day so the exit guard can catch it if the tech leaves
+      // without sending. The send nudge itself fires after signing (last step).
       setEditedIds(prev => new Set(prev).add(timesheet.id));
-      const sendableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
-      if (!isClosureLocked && sendableStatuses.includes(timesheet.status)) {
-        setSendPromptId(timesheet.id);
-      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error desconocido';
       toast.error(`No se pudo guardar el parte: ${message}`);
@@ -267,8 +263,17 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
     try {
       const signatureData = signaturePadRef.current.toDataURL();
       await signTimesheet(signingTimesheetId, signatureData);
+      const signedId = signingTimesheetId;
       setSignatureDialogOpen(false);
       setSigningTimesheetId(null);
+      // Signing is the last step before submitting — nudge the tech to send it
+      // now so a signed parte doesn't sit forgotten as a draft.
+      setEditedIds(prev => new Set(prev).add(signedId));
+      const signed = myTimesheets.find(t => t.id === signedId);
+      const sendableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
+      if (!isClosureLocked && (!signed || sendableStatuses.includes(signed.status))) {
+        setSendPromptId(signedId);
+      }
     } catch (err) {
       console.error('Error saving signature:', err);
       toast.error('No se pudo guardar la firma');
@@ -805,10 +810,10 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                 <div className="p-2 rounded-full bg-emerald-500/15">
                   <CheckCircle2 size={20} className="text-emerald-500" />
                 </div>
-                <h3 className={`font-bold text-lg ${theme.textMain}`}>Parte guardado</h3>
+                <h3 className={`font-bold text-lg ${theme.textMain}`}>Parte firmado</h3>
               </div>
               <p className={`text-sm ${theme.textMuted} mb-5`}>
-                Tus horas están guardadas pero todavía no se han enviado. Envíalo ahora
+                Has firmado el parte pero todavía no se ha enviado. Envíalo ahora
                 para que pase a aprobación.
               </p>
               <div className="space-y-2">
