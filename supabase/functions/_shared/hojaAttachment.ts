@@ -96,8 +96,7 @@ async function findLatestJobHojaAttachment(
     .from("job_documents")
     .select("id, file_name, file_path, file_type, uploaded_at")
     .eq("job_id", jobId)
-    .order("uploaded_at", { ascending: false })
-    .limit(25);
+    .order("uploaded_at", { ascending: false });
 
   if (error) throw error;
 
@@ -179,8 +178,7 @@ async function findLatestTourHojaAttachment(
     .from("tour_documents")
     .select("id, file_name, file_path, file_type, uploaded_at")
     .eq("tour_id", tourId)
-    .order("uploaded_at", { ascending: false })
-    .limit(25);
+    .order("uploaded_at", { ascending: false });
 
   if (error) throw error;
 

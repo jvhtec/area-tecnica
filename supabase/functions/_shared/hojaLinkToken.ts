@@ -116,7 +116,7 @@ export function buildJobHojaLinkUrl(args: {
   token: string;
 }): string {
   const url = new URL(args.requestUrl);
-  const pathParts = url.pathname.split("/");
+  const pathParts = url.pathname.replace(/\/+$/, "").split("/");
   pathParts[pathParts.length - 1] = "job-hoja-de-ruta-link";
   url.pathname = pathParts.join("/") || "/job-hoja-de-ruta-link";
   url.search = "";

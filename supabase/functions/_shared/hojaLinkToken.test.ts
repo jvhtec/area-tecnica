@@ -74,6 +74,19 @@ describe("Hoja de Ruta stable link tokens", () => {
     );
   });
 
+  it("builds the resolver as a sibling when the source function URL has a trailing slash", () => {
+    const url = buildJobHojaLinkUrl({
+      requestUrl: "https://project.supabase.co/functions/v1/send-job-whatsapp-message/",
+      jobId: "job-1",
+      expiresAt: 1_800_000_000,
+      token: "token-1",
+    });
+
+    expect(url).toBe(
+      "https://project.supabase.co/functions/v1/job-hoja-de-ruta-link?job_id=job-1&exp=1800000000&t=token-1",
+    );
+  });
+
   it("uses a long-lived but bounded default ttl that can be configured", () => {
     expect(computeJobHojaLinkExpiry(100, 60)).toBe(160);
     expect(resolveJobHojaLinkTtlSeconds(() => undefined)).toBe(60 * 60 * 24 * 365);
