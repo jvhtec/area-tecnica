@@ -1,7 +1,12 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import {
+  createHttpHandler,
+  HttpError,
+  jsonResponse,
+  readBoundedJsonObject,
+} from "../_shared/http.ts";
 import { checkAndRecordWhatsappQuota } from "../_shared/whatsappQuota.ts";
 
 /** Request payload for sending a WhatsApp message to multiple assigned users. */
@@ -297,13 +302,7 @@ function logRejection(
   console.warn("send-job-whatsapp-message rejected", { reason, ...details });
 }
 
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") {
-    logRejection("method_not_allowed", { method: req.method });
-    return jsonResponse({ error: "Method Not Allowed" }, { status: 405 });
-  }
-
+serve(createHttpHandler(async (req: Request) => {
   try {
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -347,7 +346,7 @@ serve(async (req: Request) => {
       return jsonResponse({ error: "Forbidden", reason: "User not authorized for WhatsApp operations" }, { status: 403 });
     }
 
-    const body = (await req.json().catch(() => ({}))) as SendRequest;
+    const body = await readBoundedJsonObject<Record<string, unknown>>(req, { maxBytes: 64 * 1024 }) as SendRequest;
     const message = (body.message || "").toString().trim();
     const recipientIds = Array.isArray(body.recipient_ids) ? body.recipient_ids.filter(Boolean) : [];
     const dedupedRecipientIds = Array.from(new Set(recipientIds));
@@ -633,7 +632,8 @@ serve(async (req: Request) => {
       { status: 200 },
     );
   } catch (err) {
+    if (err instanceof HttpError) throw err;
     console.error("send-job-whatsapp-message error:", err);
     return jsonResponse({ error: "Internal Server Error" }, { status: 500 });
   }
-});
+}, { allowedMethods: ["POST"] }));

@@ -1,6 +1,13 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
+import { isServiceRoleRequest, requireAdminOrManagement } from "../_shared/auth.ts";
+import {
+  corsHeaders,
+  createHttpHandler,
+  HttpError,
+  readBoundedJsonObject,
+} from "../_shared/http.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -11,35 +18,23 @@ const COMPANY_TZ = Deno.env.get('COMPANY_TZ') || 'Europe/Madrid';
 const COMPANY_LOGO_URL = Deno.env.get("COMPANY_LOGO_URL_W") || `${SUPABASE_URL}/storage/v1/object/public/company-assets/sectorlogow.png`;
 const AT_LOGO_URL = Deno.env.get("AT_LOGO_URL") || `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-};
-
-async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Request): Promise<string | null> {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  const token = authHeader.replace('Bearer ', '').trim();
-  if (!token) return null;
-  try {
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error) return null;
-    return data.user?.id ?? null;
-  } catch {
-    return null;
-  }
+type CancellationBody = {
+  job_id?: string;
+  profile_id?: string;
+  phase?: 'availability' | 'offer';
+  actor_id?: string;
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-  if (req.method !== 'POST') return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
-
+serve(createHttpHandler(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
-    const actorId = await resolveActorId(supabase, req);
-    const body = await req.json();
+    const body = await readBoundedJsonObject<Record<string, unknown>>(req, { maxBytes: 16 * 1024 }) as CancellationBody;
+    const serviceRequest = isServiceRoleRequest(req, SERVICE_ROLE);
+    const actorId = serviceRequest
+      ? (typeof body.actor_id === 'string' ? body.actor_id : null)
+      : (await requireAdminOrManagement(supabase, req, {
+        logContext: "notify-staffing-cancellation",
+      })).userId;
     const { job_id, profile_id, phase } = body as { job_id: string, profile_id: string, phase: 'availability'|'offer' };
 
     if (!job_id || !profile_id || !['availability','offer'].includes(phase)) {
@@ -259,7 +254,8 @@ serve(async (req) => {
     }
 
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     console.error('notify-staffing-cancellation error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-});
+}, { allowedMethods: ["POST"] }));

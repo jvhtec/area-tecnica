@@ -714,10 +714,13 @@ and enforced in CI — Edge Function exposure classification gate,
 SECURITY DEFINER anonymous-grant gate, liveness/diagnostic health split,
 anonymous-reach revoke migration, shared correlation/size-limit/redaction
 primitives, durable service-role public Edge rate limiting for high-risk
-public/token endpoints, and pgTAP authorization regressions. See
+public/token endpoints, and pgTAP authorization regressions. Follow-up handler
+migration has started: user-admin, payout/expense notification, and
+staffing/message delivery slices are now on the shared HTTP/auth/body parsing
+path, and the legacy Edge Function baseline has been ratcheted down. See
 `docs/operations/phase-2-trust-boundary-hardening.md` for the exit-gate mapping
-and remaining follow-up (priority Edge Function handler migration and
-polling-safe wallboard abuse controls).
+and remaining follow-up (Flex/document handler migration and polling-safe
+wallboard abuse controls).
 
 ### Phase 3 — Test and correctness maturity
 

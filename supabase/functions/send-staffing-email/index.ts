@@ -7,6 +7,13 @@ import {
   normalizeStaffingConfirmBase,
 } from "./messageUtils.ts";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
+import { isServiceRoleRequest, requireAdminOrManagement } from "../_shared/auth.ts";
+import {
+  corsHeaders,
+  createHttpHandler,
+  HttpError,
+  readBoundedJsonObject,
+} from "../_shared/http.ts";
 
 // Inlined from roles.ts for dashboard deployment compatibility
 const CODE_TO_LABEL: Record<string, string> = {
@@ -118,45 +125,6 @@ const DAILY_CAP = parseInt(Deno.env.get("STAFFING_DAILY_CAP") ?? "100", 10);
 const COMPANY_TZ = Deno.env.get('COMPANY_TZ') || 'Europe/Madrid';
 const STAFFING_SYSTEM_ACTOR_ID = Deno.env.get('STAFFING_SYSTEM_ACTOR_ID') || null;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-};
-
-async function resolveActorId(supabase: ReturnType<typeof createClient>, req: Request): Promise<string | null> {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.replace('Bearer ', '').trim();
-  if (!token) return null;
-
-  try {
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error) {
-      console.warn('[send-staffing-email] Unable to resolve actor id:', error);
-      return null;
-    }
-    return data.user?.id ?? null;
-  } catch (err) {
-    console.warn('[send-staffing-email] Error resolving actor id', err);
-    return null;
-  }
-}
-
-function isServiceRoleRequest(req: Request): boolean {
-  const authHeader = req.headers.get('Authorization') || '';
-  const apikey = req.headers.get('apikey') || '';
-  const token = authHeader.startsWith('Bearer ')
-    ? authHeader.slice('Bearer '.length).trim()
-    : '';
-
-  return token === SERVICE_ROLE || apikey === SERVICE_ROLE;
-}
-
 function b64url(u8: Uint8Array) {
   return btoa(String.fromCharCode(...u8)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 }
@@ -247,25 +215,31 @@ function emitStaffingPush(params: {
   }
 }
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
-  
+serve(createHttpHandler(async (req) => {
   try {
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
-    let actorId = await resolveActorId(supabase, req);
-    const body = await req.json();
-    if (!actorId && isServiceRoleRequest(req) && typeof body?.actor_id === 'string') {
+    const body = await readBoundedJsonObject<Record<string, any>>(req, { maxBytes: 128 * 1024 });
+    const serviceRequest = isServiceRoleRequest(req, SERVICE_ROLE);
+    let actorId: string | null = null;
+
+    if (serviceRequest && typeof body?.actor_id === 'string') {
       actorId = body.actor_id;
     }
-    if (!actorId && isServiceRoleRequest(req) && isUuid(STAFFING_SYSTEM_ACTOR_ID)) {
+
+    if (!serviceRequest) {
+      actorId = (await requireAdminOrManagement(supabase, req, {
+        logContext: "send-staffing-email",
+      })).userId;
+    }
+
+    if (!actorId && serviceRequest && isUuid(STAFFING_SYSTEM_ACTOR_ID)) {
       actorId = STAFFING_SYSTEM_ACTOR_ID;
     }
-    console.log('📥 RECEIVED PAYLOAD:', JSON.stringify(body, null, 2));
+    console.log('📥 RECEIVED STAFFING REQUEST:', {
+      serviceRequest,
+      hasActor: Boolean(actorId),
+      fields: Object.keys(body).sort(),
+    });
 
     const { job_id, profile_id, phase, role, message, channel, tour_pdf_path, target_date, single_day, override_conflicts, require_no_conflicts, idempotency_key, request_origin, campaign_id, department } = body;
     const roleCode = typeof role === 'string' && role.trim().length > 0 ? role.trim() : null;
@@ -302,12 +276,12 @@ serve(async (req) => {
       profile_id: { value: profile_id, type: typeof profile_id, isValid: !!profile_id },
       phase: { value: phase, type: typeof phase, isValidPhase: ["availability","offer"].includes(phase) },
       role: { value: role ?? null, normalized: roleCode },
-      message: { value: message ?? null },
+      message: { present: typeof message === 'string' && message.trim().length > 0, length: typeof message === 'string' ? message.length : 0 },
       target_date: { value: target_date ?? null, normalized: normalizedTargetDate },
       single_day: { value: single_day ?? null, effective: isSingleDayRequest },
       dates: normalizedDates,
       require_no_conflicts: shouldRequireNoConflicts,
-      idempotency_key: { value: idempotency_key ?? null }
+      idempotency_key: { present: typeof idempotency_key === 'string' && idempotency_key.length > 0 }
     });
     
     if (!job_id || !profile_id || !["availability","offer"].includes(phase)) {
@@ -466,9 +440,11 @@ serve(async (req) => {
         jobDepartmentsPromise,
       ]);
       
-      console.log('📋 JOB RESULT:', { data: jobResult.data, error: jobResult.error });
+      console.log('📋 JOB RESULT:', { found: Boolean(jobResult.data), error: jobResult.error });
       console.log('👤 PROFILE RESULT:', { 
-        data: techResult.data ? { ...techResult.data, email: techResult.data.email ? '***@***.***' : null } : null, 
+        found: Boolean(techResult.data),
+        has_email: Boolean(techResult.data?.email),
+        has_phone: Boolean(techResult.data?.phone),
         error: techResult.error 
       });
       if (roleDepartmentResult.error) {
@@ -1328,11 +1304,10 @@ serve(async (req) => {
       </html>`;
 
       // Step 6: Deliver via chosen channel
-      console.log('🔗 CONFIRM LINKS:', {
-        emailConfirmUrl,
-        emailDeclineUrl,
-        whatsappConfirmUrl,
-        whatsappDeclineUrl,
+      console.log('🔗 CONFIRM LINKS GENERATED:', {
+        email: desiredChannel === 'email',
+        whatsapp: desiredChannel === 'whatsapp',
+        expires_at: new Date(exp * 1000).toISOString(),
       });
       if (desiredChannel === 'whatsapp') {
         const text = buildWhatsAppStaffingMessage({
@@ -1611,17 +1586,15 @@ serve(async (req) => {
 
     } catch (operationError) {
       console.error('❌ OPERATION ERROR:', operationError);
-      return new Response(JSON.stringify({ 
-        error: "Internal server error", 
-        details: { message: operationError.message, stack: operationError.stack }
-      }), { 
+      return new Response(JSON.stringify({ error: "Internal server error" }), {
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
   } catch (error) {
+    if (error instanceof HttpError) throw error;
     console.error("Server error:", error);
     return new Response("Server error", { status: 500, headers: corsHeaders });
   }
-});
+}, { allowedMethods: ["POST"] }));

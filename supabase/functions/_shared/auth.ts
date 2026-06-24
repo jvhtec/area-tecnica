@@ -34,6 +34,37 @@ type ProfileRoleRow = {
   role?: unknown;
 } | null;
 
+function timingSafeEqual(left: string, right: string): boolean {
+  const maxLength = Math.max(left.length, right.length);
+  let mismatch = left.length ^ right.length;
+
+  for (let index = 0; index < maxLength; index += 1) {
+    mismatch |= (left.charCodeAt(index) || 0) ^ (right.charCodeAt(index) || 0);
+  }
+
+  return mismatch === 0;
+}
+
+function extractBearerValue(req: Request): string {
+  const authorization = req.headers.get("authorization") ?? "";
+  return authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim() ?? "";
+}
+
+export function isServiceRoleRequest(req: Request, serviceRoleKey: string): boolean {
+  if (!serviceRoleKey) return false;
+
+  const bearer = extractBearerValue(req);
+  const apikey = req.headers.get("apikey")?.trim() ?? "";
+
+  return timingSafeEqual(bearer, serviceRoleKey) || timingSafeEqual(apikey, serviceRoleKey);
+}
+
+export function requireServiceRoleRequest(req: Request, serviceRoleKey: string): void {
+  if (!isServiceRoleRequest(req, serviceRoleKey)) {
+    throw new HttpError(403, "Forbidden", { code: "service_role_required" });
+  }
+}
+
 const roleSet = (roles: ReadonlySet<string> | readonly string[]) =>
   new Set(Array.from(roles, (role) => role.toLowerCase()));
 

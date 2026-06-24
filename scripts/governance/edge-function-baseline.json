@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-23T21:57:59.589Z",
+  "generatedAt": "2026-06-24T15:04:03.739Z",
   "note": "Existing manual Edge Functions are grandfathered. New functions must use createHttpHandler or add an explicit reviewed exemption.",
   "manualFunctions": [
     {
@@ -94,11 +94,6 @@
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
-      "functionName": "get-mapbox-token",
-      "path": "supabase/functions/get-mapbox-token/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
       "functionName": "image-proxy",
       "path": "supabase/functions/image-proxy/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
@@ -111,11 +106,6 @@
     {
       "functionName": "manage-flex-crew-assignments",
       "path": "supabase/functions/manage-flex-crew-assignments/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "notify-staffing-cancellation",
-      "path": "supabase/functions/notify-staffing-cancellation/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
@@ -159,11 +149,6 @@
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
-      "functionName": "send-job-whatsapp-message",
-      "path": "supabase/functions/send-job-whatsapp-message/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
       "functionName": "send-onboarding-email",
       "path": "supabase/functions/send-onboarding-email/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
@@ -174,28 +159,13 @@
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
-      "functionName": "send-staffing-email",
-      "path": "supabase/functions/send-staffing-email/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
       "functionName": "send-timesheet-reminder",
       "path": "supabase/functions/send-timesheet-reminder/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
-      "functionName": "send-tour-availability",
-      "path": "supabase/functions/send-tour-availability/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
       "functionName": "send-vacation-decision",
       "path": "supabase/functions/send-vacation-decision/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "send-warehouse-message",
-      "path": "supabase/functions/send-warehouse-message/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {

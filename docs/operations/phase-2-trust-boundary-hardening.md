@@ -161,9 +161,19 @@ TV polling behavior needs a separate, polling-safe threshold and rollout plan.
   notification functions (`send-expense-notification`, `send-job-payout-email`,
   `send-payout-override-notification`) were migrated on 2026-06-23 as the next
   follow-up slice, including explicit service-role/privileged-role guards and
-  bounded payload parsing. The duplicated admin/management caller checks across
-  the hardened user-admin, diagnostics, and payout handlers now route through
-  the shared auth helper.
+  bounded payload parsing. Staffing/message delivery functions
+  (`send-staffing-email`, `notify-staffing-cancellation`,
+  `send-tour-availability`, `send-warehouse-message`,
+  `send-job-whatsapp-message`) were migrated on 2026-06-24, reducing the legacy
+  Edge Function baseline from 53 to 48 entries. That slice also corrected the
+  trust-boundary classification for browser-invoked staffing cancellation and
+  staffing send paths: browser callers now require admin/management where the
+  function uses a service-role client, while service-role automation remains
+  explicit for the staffing orchestrator. The staffing send path also stopped
+  logging full request bodies, profile payloads, and generated confirmation
+  links. The duplicated admin/management caller checks across the hardened
+  user-admin, diagnostics, payout, and staffing/message handlers now route
+  through the shared auth helper.
 - Finish the wallboard auth/feed abuse-control design with TV-safe thresholds
   and rollout telemetry; avoid disrupting deployed APK wallboards.
 - Continue ratcheting the `anon`/`PUBLIC` grant baseline downward (trigger
