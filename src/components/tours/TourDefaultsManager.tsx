@@ -1,5 +1,7 @@
 
 import React, { useState } from 'react';
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -200,6 +202,7 @@ export const TourDefaultsManager = ({
   tour,
 }: TourDefaultsManagerProps) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('sound');
   const [tourDates, setTourDates] = useState<TourDateWithLocation[]>([]);
   const [newSetName, setNewSetName] = useState('');
@@ -216,7 +219,6 @@ export const TourDefaultsManager = ({
     isLoading: defaultSetsLoading,
     createSet,
     updateSet,
-    updateTable,
     duplicateSet,
     deleteSet,
     deleteTable,
@@ -353,6 +355,8 @@ export const TourDefaultsManager = ({
   // Toggle a boolean flag (hoist / FOH schuko) on an already-saved power
   // default. These were previously only settable when the table was first
   // created in the Consumos tool, so a forgotten value could not be corrected.
+  // Persisted directly (no per-toggle success toast) — the checkbox is the
+  // feedback; only failures surface a toast.
   const handleTogglePowerFlag = async (
     table: TourDefaultTable,
     key: 'includes_hoist' | 'foh_schuko',
@@ -360,11 +364,13 @@ export const TourDefaultsManager = ({
   ) => {
     setPendingFlagTableId(table.id);
     try {
-      await updateTable({
-        tableId: table.id,
-        updates: {
-          metadata: { ...(table.metadata || {}), [key]: value },
-        },
+      const { error } = await dataLayerClient
+        .from('tour_default_tables')
+        .update({ metadata: { ...(table.metadata || {}), [key]: value } })
+        .eq('id', table.id);
+      if (error) throw error;
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.scope('tour-default-tables', tour?.id || ''),
       });
     } catch (error) {
       console.error('Error updating power default flag:', error);
@@ -1211,6 +1217,9 @@ export const TourDefaultsManager = ({
                   </div>
                 </div>
                 
+                <p className="text-xs text-muted-foreground mb-3">
+                  {setTables.length} tabla{setTables.length === 1 ? '' : 's'}
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {setTables.map((table) => {
                     const position = getResolvedPowerPosition(
@@ -1221,7 +1230,25 @@ export const TourDefaultsManager = ({
                     return (
                     <div key={table.id} className="border rounded-lg p-4 bg-white transition-colors hover:border-primary/40">
                       <div className="flex justify-between items-start gap-2 mb-2">
-                        <h6 className="font-medium leading-tight">{table.table_name}</h6>
+                        <div className="min-w-0">
+                          <h6 className="font-medium leading-tight">{table.table_name}</h6>
+                          {(table.metadata?.includes_hoist || table.metadata?.foh_schuko) && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {table.metadata?.includes_hoist && (
+                                <Badge variant="outline" className="gap-1 text-[10px] py-0 h-5 border-amber-300 text-amber-700">
+                                  <Anchor className="h-2.5 w-2.5" />
+                                  Hoist
+                                </Badge>
+                              )}
+                              {table.metadata?.foh_schuko && (
+                                <Badge variant="outline" className="gap-1 text-[10px] py-0 h-5 border-sky-300 text-sky-700">
+                                  <Plug className="h-2.5 w-2.5" />
+                                  FOH
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1407,6 +1434,9 @@ export const TourDefaultsManager = ({
                   </div>
                 </div>
                 
+                <p className="text-xs text-muted-foreground mb-3">
+                  {setTables.length} tabla{setTables.length === 1 ? '' : 's'}
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {setTables.map((table) => (
                     <div key={table.id} className="border rounded-lg p-4 bg-white">

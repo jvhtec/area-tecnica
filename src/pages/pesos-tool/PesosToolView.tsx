@@ -521,6 +521,18 @@ export const PesosToolView: React.FC<PesosToolViewProps> = ({
               </div>
             )}
 
+            {/* Empty state for defaults modes so the workflow is discoverable */}
+            {(isDefaults || isTourDefaults) && tables.length === 0 && (
+              <div className="border border-dashed rounded-lg p-8 text-center">
+                <p className="text-sm font-medium">Aún no hay tablas en este conjunto</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Genera tu primera tabla desde el panel de la izquierda. La numeración
+                  (SX) continúa automáticamente desde la última tabla y las nuevas se
+                  añaden al final.
+                </p>
+              </div>
+            )}
+
             {/* Table display with save as default option - First half */}
             {tables.slice(0, Math.ceil(tables.length / 2)).map((table: any) => (
               <div key={table.id} className="border rounded-lg overflow-x-auto">
