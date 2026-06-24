@@ -41,8 +41,8 @@ function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-wallboard-jwt, x-wallboard-token, x-wallboard-shared-token, x-wallboard-shared",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-  "Access-Control-Max-Age": "86400",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
   } as Record<string, string>;
 }
 
