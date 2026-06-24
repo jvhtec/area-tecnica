@@ -1,12 +1,14 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+import { requireAdminOrManagement } from "../_shared/auth.ts";
+import {
+  corsHeaders,
+  createHttpHandler,
+  HttpError,
+  readBoundedJsonObject,
+  requireEnvValues,
+} from "../_shared/http.ts";
 
 interface SendRequest {
   message?: string;
@@ -16,48 +18,34 @@ interface SendRequest {
 
 const WAREHOUSE_SOUND_GROUP = "120363042398076348@g.us"; // "Almacén sonido"
 
-serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-  if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
-  }
-
+serve(createHttpHandler(async (req: Request) => {
+  const {
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
+  } = requireEnvValues(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const, (name) => Deno.env.get(name));
   const supabaseAdmin = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
   );
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Unauthorized', reason: 'Missing Authorization header' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    const token = authHeader.replace('Bearer ', '').trim();
-
-    const { data: userData } = await supabaseAdmin.auth.getUser(token);
-    const actorId = userData?.user?.id || null;
-    if (!actorId) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+    const caller = await requireAdminOrManagement(supabaseAdmin, req, {
+      logContext: "send-warehouse-message",
+    });
+    const actorId = caller.userId;
 
     // Load actor profile to read role and WAHA endpoint
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('id, role, waha_endpoint')
+      .select('id, waha_endpoint')
       .eq('id', actorId)
       .maybeSingle();
 
-    const role = (profile?.role || '').toLowerCase();
-    if (!['admin', 'management'].includes(role)) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
     if (!profile?.waha_endpoint) {
       return new Response(JSON.stringify({ error: 'Forbidden', reason: 'User not authorized for WhatsApp operations' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const body = (await req.json().catch(() => ({}))) as SendRequest;
+    const body = await readBoundedJsonObject<Record<string, unknown>>(req, { maxBytes: 32 * 1024 }) as SendRequest;
     let msg = (body.message || '').toString().trim();
 
     // Fetch job title early if available (to detect default message and build fallback)
@@ -292,7 +280,8 @@ serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ success: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err) {
+    if (err instanceof HttpError) throw err;
     console.error('send-warehouse-message error:', err);
     return new Response(JSON.stringify({ error: 'Unexpected error' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-});
+}, { allowedMethods: ["POST"] }));

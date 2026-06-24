@@ -1,46 +1,42 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
+import {
+  corsHeaders,
+  createHttpHandler,
+  HttpError,
+  readBoundedJsonObject,
+  requireEnvValues,
+} from "../_shared/http.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-};
-
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-  if (req.method !== 'POST') {
-    return new Response('Method Not Allowed', { status: 405, headers: corsHeaders });
-  }
-
+serve(createHttpHandler(async (req) => {
   try {
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
-    const SERVICE_ROLE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const BREVO_KEY = Deno.env.get('BREVO_API_KEY')!;
-    const BREVO_FROM = Deno.env.get('BREVO_FROM')!;
+    const {
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: SERVICE_ROLE,
+    } = requireEnvValues(
+      ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const,
+      (name) => Deno.env.get(name),
+    );
+    const BREVO_KEY = Deno.env.get('BREVO_API_KEY') || '';
+    const BREVO_FROM = Deno.env.get('BREVO_FROM') || '';
     const COMPANY_LOGO_URL = Deno.env.get('COMPANY_LOGO_URL_W') || `${SUPABASE_URL}/storage/v1/object/public/company-assets/sectorlogow.png`;
     const AT_LOGO_URL = Deno.env.get('AT_LOGO_URL') || `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
 
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
 
     // AuthN: require logged-in admin/management
-    const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
-    if (!authHeader) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
-    const token = authHeader.replace('Bearer ', '').trim();
-    const { data: userRes } = await supabase.auth.getUser(token);
-    const requester = userRes?.user;
-    if (!requester) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
-    const { data: requesterProfile } = await supabase.from('profiles').select('role,waha_endpoint').eq('id', requester.id).maybeSingle();
-    const requesterRole = (requesterProfile as any)?.role;
-    if (!['admin','management'].includes(requesterRole || '')) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
-    }
+    const requester = await requireAdminOrManagement(supabase, req, {
+      logContext: "send-tour-availability",
+    });
+    const { data: requesterProfile } = await supabase
+      .from('profiles')
+      .select('waha_endpoint')
+      .eq('id', requester.userId)
+      .maybeSingle();
 
-    const body = await req.json();
+    const body = await readBoundedJsonObject(req, { maxBytes: 64 * 1024 });
     const { tour_id, profile_id, channel, message, tour_pdf_path } = body || {};
     const desiredChannel: 'email'|'whatsapp' = (String(channel || '').toLowerCase() === 'whatsapp') ? 'whatsapp' : 'email';
 
@@ -210,7 +206,8 @@ serve(async (req) => {
     }
     return new Response(JSON.stringify({ success: true, channel: 'email' }), { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } });
   } catch (err) {
+    if (err instanceof HttpError) throw err;
     console.error('[send-tour-availability] error:', err);
     return new Response('Server error', { status: 500, headers: corsHeaders });
   }
-});
+}, { allowedMethods: ["POST"] }));

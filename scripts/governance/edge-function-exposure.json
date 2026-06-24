@@ -35,7 +35,11 @@
     "image-proxy": { "class": "authenticated-user", "verifyJwt": true },
     "import-users": { "class": "privileged-role", "verifyJwt": true },
     "manage-flex-crew-assignments": { "class": "privileged-role", "verifyJwt": true },
-    "notify-staffing-cancellation": { "class": "service-only", "verifyJwt": true },
+    "notify-staffing-cancellation": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; browser callers must be authenticated admin/management, while service-role calls remain available for internal automation."
+    },
     "persist-flex-elements": { "class": "privileged-role", "verifyJwt": true },
     "place-photos": { "class": "authenticated-user", "verifyJwt": true },
     "place-restaurants": { "class": "authenticated-user", "verifyJwt": true },
@@ -55,7 +59,11 @@
       "verifyJwt": true,
       "internalGuard": "Validates the caller JWT with auth.getUser and requires profiles.role to be admin or management before reading payout overrides or sending email."
     },
-    "send-job-whatsapp-message": { "class": "privileged-role", "verifyJwt": true },
+    "send-job-whatsapp-message": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT with auth.getUser and requires admin or production department plus a WAHA endpoint before sending."
+    },
     "send-onboarding-email": { "class": "privileged-role", "verifyJwt": true },
     "send-password-reset": { "class": "privileged-role", "verifyJwt": true },
     "send-payout-override-notification": {
@@ -63,11 +71,23 @@
       "verifyJwt": true,
       "internalGuard": "Validates the caller JWT with auth.getUser, requires admin/management, and requires payload actorId to match the authenticated user before any service-role reads."
     },
-    "send-staffing-email": { "class": "service-only", "verifyJwt": true },
+    "send-staffing-email": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; browser callers must be authenticated admin/management, while the staffing orchestrator may call with the service-role key and an audited actor fallback."
+    },
     "send-timesheet-reminder": { "class": "privileged-role", "verifyJwt": true },
-    "send-tour-availability": { "class": "privileged-role", "verifyJwt": true },
+    "send-tour-availability": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper, bounded JSON parsing, and shared admin/management role guard before signing documents or sending email/WhatsApp availability requests."
+    },
     "send-vacation-decision": { "class": "privileged-role", "verifyJwt": true },
-    "send-warehouse-message": { "class": "authenticated-user", "verifyJwt": true },
+    "send-warehouse-message": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper, bounded JSON parsing, and shared admin/management role guard; also requires the caller profile to have a WAHA endpoint before sending warehouse WhatsApp messages."
+    },
     "set-job-preventive-resource": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "ALLOWED_ROLES set restricts callers to admin/management/logistics." },
     "staffing-click": { "class": "public-token", "verifyJwt": false, "internalGuard": "Opaque per-invitation action token has durable ingress and per-link rate limits, then is validated against the campaign before any state transition." },
     "staffing-orchestrator": { "class": "service-only", "verifyJwt": false, "internalGuard": "Service-role/internal campaign execution; validates caller secret/service role before mutating campaign state." },

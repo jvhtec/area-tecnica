@@ -2,8 +2,10 @@ import { type SupabaseClient, type User } from "npm:@supabase/supabase-js@2";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  isServiceRoleRequest,
   requireAdminOrManagement,
   requireAuthenticatedRole,
+  requireServiceRoleRequest,
 } from "./auth.ts";
 
 type ProfileError = {
@@ -131,5 +133,33 @@ describe("shared Edge Function auth helpers", () => {
     })).resolves.toMatchObject({
       role: "logistics",
     });
+  });
+
+  it("detects service-role requests from bearer or apikey headers without exposing partial matches", () => {
+    const serviceRoleKey = "service-role-secret";
+
+    expect(isServiceRoleRequest(new Request("https://example.com", {
+      headers: { Authorization: `Bearer ${serviceRoleKey}` },
+    }), serviceRoleKey)).toBe(true);
+
+    expect(isServiceRoleRequest(new Request("https://example.com", {
+      headers: { apikey: serviceRoleKey },
+    }), serviceRoleKey)).toBe(true);
+
+    expect(isServiceRoleRequest(new Request("https://example.com", {
+      headers: { Authorization: "Bearer service-role" },
+    }), serviceRoleKey)).toBe(false);
+  });
+
+  it("throws a structured forbidden error when service-role authorization is absent", () => {
+    try {
+      requireServiceRoleRequest(new Request("https://example.com"), "service-role-secret");
+      throw new Error("expected requireServiceRoleRequest to throw");
+    } catch (error) {
+      expect(error).toMatchObject({
+        status: 403,
+        code: "service_role_required",
+      });
+    }
   });
 });
