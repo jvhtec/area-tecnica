@@ -238,16 +238,16 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
 
       if (result.errors.length > 0) {
         toast({
-          title: "Tour date saved with PDF warnings",
-          description: `${result.errors.length} default document(s) could not be refreshed.`,
+          title: "Fecha de gira guardada con avisos de PDF",
+          description: `${result.errors.length} documento(s) predeterminados no se pudieron actualizar.`,
           variant: "destructive",
         });
       }
     } catch (error) {
       console.error("Error syncing tour default documents:", error);
       toast({
-        title: "Tour date saved with PDF warnings",
-        description: "Default package PDFs could not be refreshed for this date.",
+        title: "Fecha de gira guardada con avisos de PDF",
+        description: "No se pudieron actualizar los PDF del paquete para esta fecha.",
         variant: "destructive",
       });
     }
@@ -918,14 +918,6 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         dataLayerClient.from("tour_date_weight_overrides").delete().eq("tour_date_id", dateId)
       ]);
 
-      if (tourId) {
-        try {
-          await cleanupTourDefaultDocumentsForDate({ tourId, tourDateId: dateId });
-        } catch (cleanupError) {
-          console.error("Error cleaning up tour default documents for deleted date:", cleanupError);
-        }
-      }
-
       // Step 5: Finally delete the tour date itself
       console.log("Deleting tour date...");
       const { error: dateError } = await dataLayerClient.from("tour_dates")
@@ -935,6 +927,16 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       if (dateError) {
         console.error("Error deleting tour date:", dateError);
         throw dateError;
+      }
+
+      let defaultDocumentCleanupFailed = false;
+      if (tourId) {
+        try {
+          await cleanupTourDefaultDocumentsForDate({ tourId, tourDateId: dateId });
+        } catch (cleanupError) {
+          defaultDocumentCleanupFailed = true;
+          console.error("Error cleaning up tour default documents for deleted date:", cleanupError);
+        }
       }
 
       console.log("Tour date deletion completed successfully");
@@ -951,15 +953,17 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
       await invalidateTourDocumentQueries();
 
       toast({
-        title: "Success",
-        description: "Tour date deleted successfully"
+        title: defaultDocumentCleanupFailed ? "Fecha eliminada con avisos" : "Fecha eliminada",
+        description: defaultDocumentCleanupFailed
+          ? "La fecha se eliminó, pero no se pudieron limpiar todos los PDF automáticos."
+          : "La fecha de gira se eliminó correctamente."
       });
 
     } catch (error: any) {
       console.error("Error deleting date:", error);
       toast({
-        title: "Error deleting date",
-        description: error.message || "An unexpected error occurred while deleting the tour date",
+        title: "Error al eliminar la fecha",
+        description: error.message || "Se produjo un error inesperado al eliminar la fecha de gira.",
         variant: "destructive",
       });
     } finally {

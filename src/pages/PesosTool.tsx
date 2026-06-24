@@ -24,7 +24,7 @@ import type { TechnicalStage } from '@/features/technical-tools/stage/stageUtils
 import { CopyToStageMenu } from '@/features/technical-tools/table-presets/CopyToStageMenu';
 import { QuickPresetsMenu } from '@/features/technical-tools/table-presets/QuickPresetsMenu';
 import type { TourPackageSize } from '@/utils/tourPackages';
-import { queryKeys } from '@/lib/react-query';
+import { optimizedInvalidation, queryKeys } from '@/lib/react-query';
 import { syncTourDefaultDocuments } from '@/utils/tourDefaultDocumentSync';
 import {
   cloneTablesToStage,
@@ -259,28 +259,28 @@ const PesosTool: React.FC = () => {
   } = useTourDateOverrides(tourDateId || '', 'weight');
 
   const syncDefaultDocumentsAfterMutation = async () => {
-    if (!isTourDefaults || !tourId) return;
+    if ((!isTourDefaults && !isDefaults) || !tourId) return;
 
     try {
       const result = await syncTourDefaultDocuments({ tourId });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobcard-tour-documents') }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents-for-job') }),
+      optimizedInvalidation.invalidateQueryKeys(queryClient, [
+        queryKeys.scope('tour-documents', tourId),
+        queryKeys.scope('jobcard-tour-documents'),
+        queryKeys.scope('tour-documents-for-job'),
       ]);
 
       if (result.errors.length > 0) {
         toast({
-          title: 'PDF sync warning',
-          description: `${result.errors.length} default document(s) could not be refreshed.`,
+          title: 'Aviso de sincronización de PDF',
+          description: `${result.errors.length} documento(s) predeterminados no se pudieron actualizar.`,
           variant: 'destructive',
         });
       }
     } catch (error) {
       console.error('Error syncing tour default documents:', error);
       toast({
-        title: 'PDF sync warning',
-        description: 'Default package PDFs could not be refreshed.',
+        title: 'Aviso de sincronización de PDF',
+        description: 'No se pudieron actualizar los PDF predeterminados del paquete.',
         variant: 'destructive',
       });
     }
@@ -671,8 +671,8 @@ const PesosTool: React.FC = () => {
     table: Table,
     orderIndex?: number,
     options: { syncAfterSave?: boolean } = {}
-  ) => {
-    if (!tourId) return;
+  ): Promise<boolean> => {
+    if (!tourId) return false;
 
     try {
       // Get or create the sound set ID
@@ -714,18 +714,20 @@ const PesosTool: React.FC = () => {
 
       toast({
         title: 'Success',
-        description: 'Tour default saved successfully',
+        description: 'Predeterminado de gira guardado correctamente',
       });
       if (options.syncAfterSave !== false) {
         await syncDefaultDocumentsAfterMutation();
       }
+      return true;
     } catch (error: any) {
       console.error('Error saving tour default:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save tour default',
+        description: 'No se pudo guardar el predeterminado de gira',
         variant: 'destructive',
       });
+      return false;
     }
   };
 
@@ -882,14 +884,19 @@ const PesosTool: React.FC = () => {
 
     // Handle saving based on mode
     if (isTourDefaults) {
+      let savedCount = 0;
       for (const table of createdTablesWithSuffixes) {
-        await saveAsTourDefaults(
+        if (await saveAsTourDefaults(
           table,
           updatedTables.findIndex((candidate) => candidate.id === table.id),
           { syncAfterSave: false }
-        );
+        )) {
+          savedCount += 1;
+        }
       }
-      await syncDefaultDocumentsAfterMutation();
+      if (savedCount > 0) {
+        await syncDefaultDocumentsAfterMutation();
+      }
     } else {
       createdTablesWithSuffixes.forEach(table => {
         if (isTourDateContext || isJobOverrideMode) {

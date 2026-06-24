@@ -1,8 +1,9 @@
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { exportToPDF } from "@/utils/pdfExport";
 import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { getDepartmentLabel } from "@/types/department";
+import { toJobTimezone } from "@/utils/timezoneUtils";
 import {
   PACKAGE_DEPARTMENTS,
   getPackageSetLabel,
@@ -193,7 +194,7 @@ const sortTourDefaultTables = (tables: TourDefaultTableRow[]) =>
     const leftOrder = getNumber(getRecord(left.metadata).order_index) ?? 999;
     const rightOrder = getNumber(getRecord(right.metadata).order_index) ?? 999;
     if (leftOrder !== rightOrder) return leftOrder - rightOrder;
-    return new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+    return toJobTimezone(left.created_at).getTime() - toJobTimezone(right.created_at).getTime();
   });
 
 const getTableRiggingPoint = (metadata: unknown) => {
@@ -206,7 +207,7 @@ const buildWeightPdfTables = (item: Extract<TourDefaultDocumentPlanItem, { actio
     return item.weightOverrides.map((override): PdfTable => ({
       name: override.item_name || "Anulación",
       rows: getRowsFromJson(override.override_data),
-      totalWeight: (override.weight_kg || 0) * (override.quantity || 1),
+      totalWeight: (override.weight_kg ?? 0) * (override.quantity ?? 1),
       toolType: "pesos",
     }));
   }
@@ -527,7 +528,11 @@ const cleanupTourDefaultDocument = async ({
   tourId: string;
   objectPath: string;
 }) => {
-  await client.storage.from(TOUR_DOCUMENTS_BUCKET).remove([objectPath]).catch(() => {});
+  const { error: storageError } = await client.storage
+    .from(TOUR_DOCUMENTS_BUCKET)
+    .remove([objectPath]);
+
+  if (storageError) throw storageError;
 
   const { error } = await client
     .from("tour_documents")
@@ -600,7 +605,17 @@ const uploadTourDefaultDocument = async ({
     visible_to_guest: false,
   });
 
-  if (insertError) throw insertError;
+  if (insertError) {
+    const { error: cleanupError } = await client.storage
+      .from(TOUR_DOCUMENTS_BUCKET)
+      .remove([objectPath]);
+
+    if (cleanupError) {
+      console.error("Error removing uploaded tour default document after insert failure:", cleanupError);
+    }
+
+    throw insertError;
+  }
 };
 
 const generateTourDefaultDocumentPdf = async ({

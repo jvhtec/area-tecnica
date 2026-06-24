@@ -10,7 +10,7 @@ import { useTourDateOverrides } from "@/hooks/useTourDateOverrides";
 import { useTourOverrideMode } from "@/hooks/useTourOverrideMode";
 import type { TourPackageSize } from "@/utils/tourPackages";
 import { dataLayerClient } from "@/services/dataLayerClient";
-import { queryKeys } from "@/lib/react-query";
+import { optimizedInvalidation, queryKeys } from "@/lib/react-query";
 import { exportToPDF } from "@/utils/pdfExport";
 import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 import {
@@ -249,16 +249,16 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
 
     try {
       const result = await syncTourDefaultDocuments({ tourId: tourIdParam });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents", tourIdParam) }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobcard-tour-documents") }),
-        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents-for-job") }),
+      optimizedInvalidation.invalidateQueryKeys(queryClient, [
+        queryKeys.scope("tour-documents", tourIdParam),
+        queryKeys.scope("jobcard-tour-documents"),
+        queryKeys.scope("tour-documents-for-job"),
       ]);
 
       if (result.errors.length > 0) {
         toast({
           title: labels.toastError,
-          description: `${result.errors.length} default document(s) could not be refreshed.`,
+          description: `${result.errors.length} documento(s) predeterminados no se pudieron actualizar.`,
           variant: "destructive",
         });
       }
@@ -266,7 +266,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       console.error("Error syncing tour default documents:", error);
       toast({
         title: labels.toastError,
-        description: "Default package PDFs could not be refreshed.",
+        description: "No se pudieron actualizar los PDF predeterminados del paquete.",
         variant: "destructive",
       });
     }
