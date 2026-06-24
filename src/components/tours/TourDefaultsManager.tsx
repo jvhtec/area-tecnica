@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Weight, Calculator, Trash2, Download, Calendar, Copy, AlertTriangle } from "lucide-react";
+import { FileText, Weight, Calculator, Trash2, Download, Calendar, Copy, AlertTriangle, Anchor, Plug } from "lucide-react";
 import { exportToPDF } from "@/utils/pdfExport";
 import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -205,6 +205,9 @@ export const TourDefaultsManager = ({
   const [newSetName, setNewSetName] = useState('');
   const [newSetDescription, setNewSetDescription] = useState('');
   const [newSetPackageSize, setNewSetPackageSize] = useState<TourPackageSize | null>(null);
+  // Track the single power default currently being toggled so only its row is
+  // disabled (the shared mutation flag would otherwise freeze every card).
+  const [pendingFlagTableId, setPendingFlagTableId] = useState<string | null>(null);
 
   // Use the new tour default sets hook
   const {
@@ -219,7 +222,6 @@ export const TourDefaultsManager = ({
     deleteTable,
     isCreatingSet,
     isUpdatingSet,
-    isUpdatingTable,
     isDuplicatingSet,
     isDeletingSet,
     isDeletingTable
@@ -356,6 +358,7 @@ export const TourDefaultsManager = ({
     key: 'includes_hoist' | 'foh_schuko',
     value: boolean,
   ) => {
+    setPendingFlagTableId(table.id);
     try {
       await updateTable({
         tableId: table.id,
@@ -370,6 +373,8 @@ export const TourDefaultsManager = ({
         description: 'Error al actualizar la tabla',
         variant: 'destructive',
       });
+    } finally {
+      setPendingFlagTableId(null);
     }
   };
 
@@ -1207,44 +1212,52 @@ export const TourDefaultsManager = ({
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {setTables.map((table) => (
-                    <div key={table.id} className="border rounded-lg p-4 bg-white">
-                      <div className="flex justify-between items-start mb-2">
-                        <h6 className="font-medium">{table.table_name}</h6>
+                  {setTables.map((table) => {
+                    const position = getResolvedPowerPosition(
+                      table.metadata?.position,
+                      table.metadata?.custom_position,
+                    );
+                    const rowPending = pendingFlagTableId === table.id;
+                    return (
+                    <div key={table.id} className="border rounded-lg p-4 bg-white transition-colors hover:border-primary/40">
+                      <div className="flex justify-between items-start gap-2 mb-2">
+                        <h6 className="font-medium leading-tight">{table.table_name}</h6>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteTable(table, 'power')}
                           disabled={isDeletingTable}
-                          className="text-destructive hover:text-destructive"
+                          className="text-destructive hover:text-destructive shrink-0 -mt-1 -mr-1"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {table.total_value.toFixed(2)} W
-                      </p>
-                      {table.metadata?.current_per_phase && (
-                        <p className="text-xs text-muted-foreground">
-                          {table.metadata.current_per_phase.toFixed(2)} A por fase
-                        </p>
-                      )}
-                      {getResolvedPowerPosition(table.metadata?.position, table.metadata?.custom_position) && (
-                        <p className="text-xs text-muted-foreground">
-                          Posición: {getResolvedPowerPosition(table.metadata?.position, table.metadata?.custom_position)}
-                        </p>
-                      )}
-                      <div className="mt-3 space-y-2 border-t pt-3">
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge variant="secondary" className="font-mono">
+                          {table.total_value.toFixed(2)} W
+                        </Badge>
+                        {table.metadata?.current_per_phase && (
+                          <Badge variant="secondary" className="font-mono">
+                            {table.metadata.current_per_phase.toFixed(2)} A/fase
+                          </Badge>
+                        )}
+                        {position && <Badge variant="outline">{position}</Badge>}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-3">
                         <div className="flex items-center space-x-2">
                           <Checkbox
                             id={`hoist-${table.id}`}
                             checked={Boolean(table.metadata?.includes_hoist)}
-                            disabled={isUpdatingTable}
+                            disabled={rowPending}
                             onCheckedChange={(checked) =>
                               void handleTogglePowerFlag(table, 'includes_hoist', !!checked)
                             }
                           />
-                          <Label htmlFor={`hoist-${table.id}`} className="text-xs font-normal">
+                          <Label
+                            htmlFor={`hoist-${table.id}`}
+                            className="text-xs font-normal flex items-center gap-1 cursor-pointer"
+                          >
+                            <Anchor className="h-3 w-3 text-muted-foreground" />
                             Incluye hoist/rigging
                           </Label>
                         </div>
@@ -1253,19 +1266,25 @@ export const TourDefaultsManager = ({
                             <Checkbox
                               id={`foh-${table.id}`}
                               checked={Boolean(table.metadata?.foh_schuko)}
-                              disabled={isUpdatingTable}
+                              disabled={rowPending}
                               onCheckedChange={(checked) =>
                                 void handleTogglePowerFlag(table, 'foh_schuko', !!checked)
                               }
                             />
-                            <Label htmlFor={`foh-${table.id}`} className="text-xs font-normal">
+                            <Label
+                              htmlFor={`foh-${table.id}`}
+                              className="text-xs font-normal flex items-center gap-1 cursor-pointer"
+                              title="Se requiere potencia de 16A en formato schuko hembra en posición FoH"
+                            >
+                              <Plug className="h-3 w-3 text-muted-foreground" />
                               FOH (schuko 16A)
                             </Label>
                           </div>
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
