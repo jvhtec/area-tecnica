@@ -222,7 +222,13 @@ describe("TimesheetView", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /añadir firma/i }));
+    // Signing is mandatory: an unsigned parte exposes no submit button.
+    expect(
+      screen.queryByRole("button", { name: (name) => name === "ENVIAR PARTE" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/debes firmar el parte para poder enviarlo/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /firmar y enviar/i }));
     expect(screen.getByTestId("signature-pad")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^guardar$/i }));

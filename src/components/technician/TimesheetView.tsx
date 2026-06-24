@@ -746,24 +746,28 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                                 </Button>
                               )}
 
-                              {/* Sign button */}
+                              {/* Sign button — signing is mandatory before submitting */}
                               {!timesheet.signature_data && canSubmit && (
-                                <Button
-                                  variant="outline"
-                                  className="w-full"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    openSignatureDialog(timesheet.id);
-                                  }}
-                                >
-                                  <PenTool size={16} className="mr-2" />
-                                  Añadir firma
-                                </Button>
+                                <>
+                                  <Button
+                                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      openSignatureDialog(timesheet.id);
+                                    }}
+                                  >
+                                    <PenTool size={16} className="mr-2" />
+                                    FIRMAR Y ENVIAR
+                                  </Button>
+                                  <p className={`text-center text-[11px] ${theme.textMuted}`}>
+                                    Debes firmar el parte para poder enviarlo.
+                                  </p>
+                                </>
                               )}
 
-                              {/* Submit button */}
-                              {canSubmit && (
+                              {/* Submit button — only once the parte is signed */}
+                              {timesheet.signature_data && canSubmit && (
                                 <Button
                                   className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
                                   onClick={(e) => {
@@ -859,20 +863,35 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                   {format(parseISO(editedUnsent[0].date), "d 'de' MMMM", { locale: es })}
                 </span>{' '}
                 pero no lo has enviado. Si sales ahora no pasará a aprobación.
+                {!editedUnsent[0].signature_data && ' Debes firmarlo para poder enviarlo.'}
               </p>
               <div className="space-y-2">
-                <Button
-                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
-                  disabled={isSendingPrompt}
-                  onClick={() => sendDay(editedUnsent[0].id, { closeAfter: editedUnsent.length === 1 })}
-                >
-                  {isSendingPrompt ? (
-                    <Loader2 size={16} className="mr-2 animate-spin" />
-                  ) : (
-                    <CheckCircle2 size={16} className="mr-2" />
-                  )}
-                  Enviar parte{editedUnsent.length === 1 ? ' y salir' : ''}
-                </Button>
+                {editedUnsent[0].signature_data ? (
+                  <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                    disabled={isSendingPrompt}
+                    onClick={() => sendDay(editedUnsent[0].id, { closeAfter: editedUnsent.length === 1 })}
+                  >
+                    {isSendingPrompt ? (
+                      <Loader2 size={16} className="mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={16} className="mr-2" />
+                    )}
+                    Enviar parte{editedUnsent.length === 1 ? ' y salir' : ''}
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                    disabled={isSendingPrompt}
+                    onClick={() => {
+                      setShowExitConfirm(false);
+                      openSignatureDialog(editedUnsent[0].id);
+                    }}
+                  >
+                    <PenTool size={16} className="mr-2" />
+                    Firmar y enviar
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   className="w-full"
