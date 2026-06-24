@@ -133,27 +133,31 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
     enabled: !!jobId
   });
 
-  const handleFileUpload = async (taskId: string, file: File) => {
+  const handleFileUpload = async (taskId: string, files: File[]) => {
+    if (files.length === 0) return;
+
     try {
       setUploading(true);
-      const filePath = `${taskId}/${crypto.randomUUID()}-${file.name}`;
-      
-      const { error: uploadError } = await dataLayerClient.storage
-        .from('task_documents')
-        .upload(filePath, file);
+      for (const file of files) {
+        const filePath = `${taskId}/${crypto.randomUUID()}-${file.name}`;
+        
+        const { error: uploadError } = await dataLayerClient.storage
+          .from('task_documents')
+          .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) throw uploadError;
 
-      const taskDocument: TaskDocumentInsert = {
-          video_task_id: taskId,
-          file_name: file.name,
-          file_path: filePath,
-        };
+        const taskDocument: TaskDocumentInsert = {
+            video_task_id: taskId,
+            file_name: file.name,
+            file_path: filePath,
+          };
 
-      const { error: dbError } = await dataLayerClient.from('task_documents')
-        .insert(taskDocument);
+        const { error: dbError } = await dataLayerClient.from('task_documents')
+          .insert(taskDocument);
 
-      if (dbError) throw dbError;
+        if (dbError) throw dbError;
+      }
 
       await dataLayerClient.from('video_job_tasks')
         .update({ 
@@ -163,8 +167,11 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
         .eq('id', taskId);
 
       toast({
-        title: "File uploaded successfully",
-        description: "The document has been uploaded and task marked as completed.",
+        title: files.length === 1 ? "File uploaded successfully" : "Files uploaded successfully",
+        description:
+          files.length === 1
+            ? "The document has been uploaded and task marked as completed."
+            : `${files.length} documents have been uploaded and the task marked as completed.`,
       });
 
       refetchTasks();
@@ -537,10 +544,12 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                             <div className="relative">
                               <input
                                 type="file"
+                                multiple
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) handleFileUpload(task.id, file);
+                                  const files = Array.from(e.target.files ?? []);
+                                  e.target.value = "";
+                                  if (files.length > 0) handleFileUpload(task.id, files);
                                 }}
                                 disabled={uploading}
                               />

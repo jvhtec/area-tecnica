@@ -353,43 +353,52 @@ export const useOptimizedJobCard = (
 
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
-    const file = e.target.files?.[0];
-    if (!file || !department) return;
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0 || !department) return;
 
     try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${department}/${job.id}/${crypto.randomUUID()}.${fileExt}`;
+      const insertedDocuments: JobDocumentRow[] = [];
 
-      const { error: uploadError } = await supabase.storage
-        .from('job_documents')
-        .upload(filePath, file);
-      if (uploadError) throw uploadError;
+      for (const file of files) {
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${department}/${job.id}/${crypto.randomUUID()}.${fileExt}`;
 
-      const { data: inserted, error: dbError } = await supabase
-        .from('job_documents')
-        .insert({
-          job_id: job.id,
-          file_name: file.name,
-          file_path: filePath,
-          file_type: file.type,
-          file_size: file.size,
-          original_type: null
-        })
-        .select('*')
-        .single();
-      if (dbError) throw dbError;
+        const { error: uploadError } = await supabase.storage
+          .from('job_documents')
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
 
-      // Update local documents state immediately
-      if (inserted) {
-        setDocuments((prev) => Array.isArray(prev) ? [...prev, inserted as JobDocumentRow] : [inserted as JobDocumentRow]);
+        const { data: inserted, error: dbError } = await supabase
+          .from('job_documents')
+          .insert({
+            job_id: job.id,
+            file_name: file.name,
+            file_path: filePath,
+            file_type: file.type,
+            file_size: file.size,
+            original_type: null
+          })
+          .select('*')
+          .single();
+        if (dbError) throw dbError;
+
+        if (inserted) {
+          insertedDocuments.push(inserted as JobDocumentRow);
+        }
+
+        // Broadcast push: new document uploaded
+        try {
+          void supabase.functions.invoke('push', {
+            body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
+          });
+        } catch {}
       }
 
-      // Broadcast push: new document uploaded
-      try {
-        void supabase.functions.invoke('push', {
-          body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
-        });
-      } catch {}
+      // Update local documents state immediately
+      if (insertedDocuments.length > 0) {
+        setDocuments((prev) => Array.isArray(prev) ? [...prev, ...insertedDocuments] : insertedDocuments);
+      }
     } catch (err: any) {
       console.error('Upload error:', err);
     }

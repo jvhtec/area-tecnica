@@ -486,6 +486,7 @@ export const JobCardActionButtons = ({
       <div className="relative">
         <input
           type="file"
+          multiple
           aria-label="Subir documento"
           onChange={handleFileUpload}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"

@@ -210,29 +210,35 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
     }
   };
 
-  const handleFileUpload = async (taskId: string, file: File) => {
+  const handleFileUpload = async (taskId: string, files: File[]) => {
+    if (files.length === 0) return;
+
     try {
       setUploading(true);
-      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const timestamp = new Date().getTime();
-      const filePath = `${taskId}/${timestamp}_${sanitizedFileName}`;
+      const { data: authData } = await dataLayerClient.auth.getUser();
+      const uploadedBy = authData.user?.id;
 
-      const { error: uploadError } = await dataLayerClient.storage
-        .from('task_documents')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      if (uploadError) throw uploadError;
+      for (const file of files) {
+        const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filePath = `${taskId}/${Date.now()}-${crypto.randomUUID()}_${sanitizedFileName}`;
 
-      const { error: dbError } = await dataLayerClient.from('task_documents')
-        .insert({
-          sound_task_id: taskId,
-          file_name: file.name,
-          file_path: filePath,
-          uploaded_by: (await dataLayerClient.auth.getUser()).data.user?.id
-        });
-      if (dbError) throw dbError;
+        const { error: uploadError } = await dataLayerClient.storage
+          .from('task_documents')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+        if (uploadError) throw uploadError;
+
+        const { error: dbError } = await dataLayerClient.from('task_documents')
+          .insert({
+            sound_task_id: taskId,
+            file_name: file.name,
+            file_path: filePath,
+            uploaded_by: uploadedBy
+          });
+        if (dbError) throw dbError;
+      }
 
       await dataLayerClient.from('sound_job_tasks')
         .update({ 
@@ -243,8 +249,11 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
         .eq('id', taskId);
 
       toast({
-        title: "File uploaded successfully",
-        description: "The document has been uploaded and task marked as completed.",
+        title: files.length === 1 ? "File uploaded successfully" : "Files uploaded successfully",
+        description:
+          files.length === 1
+            ? "The document has been uploaded and task marked as completed."
+            : `${files.length} documents have been uploaded and the task marked as completed.`,
       });
 
       refetchTasks();
@@ -600,10 +609,12 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
                               <div className="relative">
                                 <input
                                   type="file"
+                                  multiple
                                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                   onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleFileUpload(task.id, file);
+                                    const files = Array.from(e.target.files ?? []);
+                                    e.target.value = "";
+                                    if (files.length > 0) handleFileUpload(task.id, files);
                                   }}
                                   disabled={uploading}
                                 />

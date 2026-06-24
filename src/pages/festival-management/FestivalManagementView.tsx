@@ -534,6 +534,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                     <div className="relative">
                       <input
                         type="file"
+                        multiple
                         onChange={handleDocumentUpload}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         disabled={isUploadingDocument}
@@ -545,7 +546,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                             Subiendo...
                           </>
                         ) : (
-                          "Elegir Archivo"
+                          "Elegir Archivo(s)"
                         )}
                       </Button>
                     </div>

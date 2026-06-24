@@ -232,14 +232,19 @@ export default function GlobalTasks() {
     completed: tasks.filter((t) => t.status === 'completed').length,
   }), [tasks]);
 
-  const onUpload = async (task: GlobalTask, file?: File) => {
-    if (!file) return;
+  const onUpload = async (task: GlobalTask, files: File[]) => {
+    if (files.length === 0) return;
     try {
-      await mutations.uploadAttachment(task.id, file, {
-        jobId: task.job_id,
-        tourId: task.tour_id,
+      for (const file of files) {
+        await mutations.uploadAttachment(task.id, file, {
+          jobId: task.job_id,
+          tourId: task.tour_id,
+        });
+      }
+      toast({
+        title: files.length === 1 ? 'Archivo subido' : 'Archivos subidos',
+        description: files.length === 1 ? undefined : `${files.length} archivos adjuntados`,
       });
-      toast({ title: 'Archivo subido' });
       await refetch();
     } catch (err: unknown) {
       toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
@@ -773,11 +778,12 @@ export default function GlobalTasks() {
                         <div className="relative inline-block">
                           <input
                             type="file"
+                            multiple
                             className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                             onChange={(e) => {
-                              const file = e.target.files?.[0];
+                              const files = Array.from(e.target.files ?? []);
                               e.target.value = ''; // Clear so same file can be re-selected
-                              onUpload(task, file);
+                              onUpload(task, files);
                             }}
                           />
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0">

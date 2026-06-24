@@ -25,6 +25,12 @@ export interface TourDocument {
   visible_to_guest?: boolean;
 }
 
+type UploadTourDocumentVariables = {
+  file: File;
+  fileName?: string;
+  suppressToast?: boolean;
+};
+
 export const useTourDocuments = (tourId: string) => {
   const { user, userRole } = useOptimizedAuth();
   const queryClient = useQueryClient();
@@ -54,7 +60,7 @@ export const useTourDocuments = (tourId: string) => {
   });
 
   const uploadDocument = useMutation({
-    mutationFn: async ({ file, fileName }: { file: File; fileName?: string }) => {
+    mutationFn: async ({ file, fileName }: UploadTourDocumentVariables) => {
       if (!user?.id) throw new Error("User not authenticated");
       if (!canUploadTourDocuments(userRole)) throw new Error("Not allowed");
 
@@ -101,13 +107,17 @@ export const useTourDocuments = (tourId: string) => {
       console.log('Document uploaded successfully:', data);
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
-      toast.success('Document uploaded successfully');
+      if (!variables.suppressToast) {
+        toast.success('Document uploaded successfully');
+      }
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
       console.error('Upload error:', error);
-      toast.error('Failed to upload document');
+      if (!variables?.suppressToast) {
+        toast.error('Failed to upload document');
+      }
     }
   });
 

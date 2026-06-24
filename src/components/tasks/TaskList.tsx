@@ -188,11 +188,16 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
     }
   };
 
-  const onUpload = async (taskId: string, file?: File) => {
-    if (!file) return;
+  const onUpload = async (taskId: string, files: File[]) => {
+    if (files.length === 0) return;
     try {
-      await uploadAttachment(taskId, file);
-      toast({ title: 'Uploaded', description: 'Attachment uploaded' });
+      for (const file of files) {
+        await uploadAttachment(taskId, file);
+      }
+      toast({
+        title: files.length === 1 ? 'Uploaded' : 'Uploaded files',
+        description: files.length === 1 ? 'Attachment uploaded' : `${files.length} attachments uploaded`,
+      });
       await refetch();
     } catch (e: any) {
       toast({ title: 'Upload failed', description: e?.message || String(e), variant: 'destructive' });
@@ -340,7 +345,16 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
                 </TableCell>
                 <TableCell className="space-x-2">
                   <div className="relative inline-block">
-                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => onUpload(task.id, e.target.files?.[0])} />
+                    <input
+                      type="file"
+                      multiple
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                      onChange={(e) => {
+                        const files = Array.from(e.target.files ?? []);
+                        e.target.value = '';
+                        onUpload(task.id, files);
+                      }}
+                    />
                     <Button size="sm" variant="outline"><Upload className="h-3 w-3 mr-1"/>Upload</Button>
                   </div>
                   {canEdit && (

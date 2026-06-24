@@ -171,43 +171,49 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
-    const file = e.target.files?.[0];
-    if (!file || !department) return;
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0 || !department) return;
 
     try {
-      const fileExt = file.name.split(".").pop();
-      const filePath = `${department}/${job.id}/${crypto.randomUUID()}.${fileExt}`;
+      for (const file of files) {
+        const fileExt = file.name.split(".").pop();
+        const filePath = `${department}/${job.id}/${crypto.randomUUID()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("job_documents")
-        .upload(filePath, file);
-      if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage
+          .from("job_documents")
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
 
-      const { error: dbError } = await supabase
-        .from("job_documents")
-        .insert({
-          job_id: job.id,
-          file_name: file.name,
-          file_path: filePath,
-          file_type: file.type,
-          file_size: file.size,
-          original_type: null
-        });
-      if (dbError) throw dbError;
+        const { error: dbError } = await supabase
+          .from("job_documents")
+          .insert({
+            job_id: job.id,
+            file_name: file.name,
+            file_path: filePath,
+            file_type: file.type,
+            file_size: file.size,
+            original_type: null
+          });
+        if (dbError) throw dbError;
 
-      // Broadcast push: new document uploaded
-      try {
-        void supabase.functions.invoke('push', {
-          body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
-        });
-      } catch {}
+        // Broadcast push: new document uploaded
+        try {
+          void supabase.functions.invoke('push', {
+            body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
+          });
+        } catch {}
+      }
 
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
 
       toast({
-        title: "Document uploaded",
-        description: "The document has been successfully uploaded."
+        title: files.length === 1 ? "Document uploaded" : "Documents uploaded",
+        description:
+          files.length === 1
+            ? "The document has been successfully uploaded."
+            : `${files.length} documents have been successfully uploaded.`
       });
     } catch (err: any) {
       toast({

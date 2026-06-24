@@ -59,42 +59,48 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
   }, [open, artistId]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (selectedFiles.length === 0) return;
 
     setIsUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${artistId}/${crypto.randomUUID()}.${fileExt}`;
+      for (const file of selectedFiles) {
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${artistId}/${crypto.randomUUID()}.${fileExt}`;
 
-      // First upload the file to storage
-      const { error: uploadError } = await dataLayerClient.storage
-        .from('festival_artist_files')
-        .upload(filePath, file);
+        // First upload the file to storage
+        const { error: uploadError } = await dataLayerClient.storage
+          .from('festival_artist_files')
+          .upload(filePath, file);
 
-      if (uploadError) {
-        console.error("Storage upload error:", uploadError);
-        throw uploadError;
-      }
+        if (uploadError) {
+          console.error("Storage upload error:", uploadError);
+          throw uploadError;
+        }
 
-      // Then create the database record
-      const { error: dbError } = await dataLayerClient.from('festival_artist_files')
-        .insert({
-          artist_id: artistId,
-          file_name: file.name,
-          file_path: filePath,
-          file_type: file.type,
-          file_size: file.size,
-        });
+        // Then create the database record
+        const { error: dbError } = await dataLayerClient.from('festival_artist_files')
+          .insert({
+            artist_id: artistId,
+            file_name: file.name,
+            file_path: filePath,
+            file_type: file.type,
+            file_size: file.size,
+          });
 
-      if (dbError) {
-        console.error("Database insert error:", dbError);
-        throw dbError;
+        if (dbError) {
+          console.error("Database insert error:", dbError);
+          throw dbError;
+        }
       }
 
       toast({
         title: "Éxito",
-        description: "Archivo cargado correctamente",
+        description:
+          selectedFiles.length === 1
+            ? "Archivo cargado correctamente"
+            : `${selectedFiles.length} archivos cargados correctamente`,
       });
 
       fetchFiles();
@@ -216,6 +222,7 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
                 <Input
                   id="file-upload"
                   type="file"
+                  multiple
                   onChange={handleFileUpload}
                   disabled={isUploading}
                   className="cursor-pointer"

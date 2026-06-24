@@ -21,6 +21,11 @@ const EMPTY_JOB_DOCUMENTS: JobDocumentEntry[] = [];
 
 const getErrorMessage = (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback);
 
+type UploadFestivalDocumentVariables = {
+  file: File;
+  suppressToast?: boolean;
+};
+
 export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: ToastFn }) => {
   const queryClient = useQueryClient();
   const documentsQueryKey = useMemo(() => queryKeys.scope("festival-documents", jobId ?? "none"), [jobId]);
@@ -65,27 +70,31 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
   }, [documentsQueryKey, jobId, queryClient, refetchDocuments]);
 
   const { isPending: isUploadingDocument, mutateAsync: uploadDocument } = useMutation({
-    mutationFn: (file: File) => {
+    mutationFn: ({ file }: UploadFestivalDocumentVariables) => {
       if (!jobId) {
         throw new Error("No se encontró el trabajo.");
       }
 
       return uploadJobDocument({ file, jobId });
     },
-    onSuccess: async () => {
-      toast({
-        title: "Éxito",
-        description: "Documento subido exitosamente",
-      });
+    onSuccess: async (_data, variables) => {
+      if (!variables.suppressToast) {
+        toast({
+          title: "Éxito",
+          description: "Documento subido exitosamente",
+        });
+      }
       await queryClient.invalidateQueries({ queryKey: documentsQueryKey });
     },
-    onError: (error) => {
+    onError: (error, variables) => {
       console.error("Error uploading document:", error);
-      toast({
-        title: "Error al subir",
-        description: getErrorMessage(error, "Error al subir documento"),
-        variant: "destructive",
-      });
+      if (!variables?.suppressToast) {
+        toast({
+          title: "Error al subir",
+          description: getErrorMessage(error, "Error al subir documento"),
+          variant: "destructive",
+        });
+      }
     },
   });
 
@@ -166,19 +175,35 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
 
   const handleDocumentUpload = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file || !jobId) {
+      const files = Array.from(event.target.files ?? []);
+      if (files.length === 0 || !jobId) {
         event.target.value = "";
         return;
       }
 
       try {
-        await uploadDocument(file);
+        for (const file of files) {
+          await uploadDocument({ file, suppressToast: files.length > 1 });
+        }
+        if (files.length > 1) {
+          toast({
+            title: "Éxito",
+            description: `${files.length} documentos subidos exitosamente`,
+          });
+        }
+      } catch (error) {
+        if (files.length > 1) {
+          toast({
+            title: "Error al subir",
+            description: getErrorMessage(error, "Error al subir documentos"),
+            variant: "destructive",
+          });
+        }
       } finally {
         event.target.value = "";
       }
     },
-    [jobId, uploadDocument],
+    [jobId, toast, uploadDocument],
   );
 
   const groupedRiderFiles = useMemo(() => groupFestivalRiderFiles(artistRiderFiles), [artistRiderFiles]);
