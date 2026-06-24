@@ -2,10 +2,13 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { createHttpHandler, HttpError, requireEnvValues } from "../_shared/http.ts";
+import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 import { persistSecurityAuditLog } from "../_shared/securityAudit.ts";
 
 const MAX_REPORT_BODY_BYTES = 64 * 1024;
 const MAX_REPORTS_PER_REQUEST = 10;
+const RATE_LIMIT_WINDOW_SECONDS = 60;
+const RATE_LIMIT_MAX_REQUESTS = 120;
 const CSP_REPORT_ACTION = "csp_violation_reported";
 const CSP_REPORT_RESOURCE = "browser.csp_report_only";
 const CSP_REPORT_SEVERITY = "low";
@@ -167,14 +170,26 @@ serve(createHttpHandler(async (req) => {
     SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
   } = requireEnvValues(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const, (name) => Deno.env.get(name));
 
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  const rateLimit = await checkEdgeRateLimit({
+    req,
+    supabase,
+    scope: "csp-report",
+    windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+    maxRequests: RATE_LIMIT_MAX_REQUESTS,
+    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? serviceRoleKey,
+  });
+
+  if (!rateLimit.allowed) {
+    return new Response(null, { status: 429, headers: rateLimitHeaders(rateLimit) });
+  }
+
   const body = await readBoundedJson(req);
   const reports = normalizeReports(body);
 
   if (reports.length === 0) {
     throw new HttpError(400, "No CSP report found");
   }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   await persistSecurityAuditLog(req, supabase, {
     action: CSP_REPORT_ACTION,

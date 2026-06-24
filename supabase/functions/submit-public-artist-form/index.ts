@@ -1,9 +1,14 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const INGRESS_RATE_LIMIT_WINDOW_SECONDS = 60;
+const INGRESS_RATE_LIMIT_MAX_REQUESTS = 60;
+const RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const RATE_LIMIT_MAX_REQUESTS = 20;
 
 type SubmitBody = {
   token?: string;
@@ -53,7 +58,31 @@ serve(async (req) => {
   }
 
   try {
-    const body = (await req.json()) as SubmitBody;
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const ingressRateLimit = await checkEdgeRateLimit({
+      req,
+      supabase: supabaseAdmin,
+      scope: "submit-public-artist-form.ingress",
+      identifierParts: ["json"],
+      windowSeconds: INGRESS_RATE_LIMIT_WINDOW_SECONDS,
+      maxRequests: INGRESS_RATE_LIMIT_MAX_REQUESTS,
+      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+    });
+
+    if (!ingressRateLimit.allowed) {
+      return jsonResponse(
+        { ok: false, error: "rate_limited" },
+        { status: 429, headers: rateLimitHeaders(ingressRateLimit) },
+      );
+    }
+
+    let body: SubmitBody;
+    try {
+      body = (await req.json()) as SubmitBody;
+    } catch {
+      return jsonResponse({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
     const token = String(body?.token ?? "").trim();
     const formData = body?.formData;
 
@@ -65,7 +94,24 @@ serve(async (req) => {
       return jsonResponse({ ok: false, error: "missing_form_data" }, { status: 400 });
     }
 
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const rateLimit = await checkEdgeRateLimit({
+      req,
+      supabase: supabaseAdmin,
+      scope: "submit-public-artist-form",
+      identifierParts: [token],
+      windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+      maxRequests: RATE_LIMIT_MAX_REQUESTS,
+      includeIp: false,
+      includeUserAgent: false,
+      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+    });
+
+    if (!rateLimit.allowed) {
+      return jsonResponse(
+        { ok: false, error: "rate_limited" },
+        { status: 429, headers: rateLimitHeaders(rateLimit) },
+      );
+    }
 
     const { data: submitData, error: submitError } = await supabaseAdmin.rpc(
       "submit_public_artist_form",

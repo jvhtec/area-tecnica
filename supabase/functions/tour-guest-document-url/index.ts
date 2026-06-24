@@ -2,8 +2,13 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 
 const SIGNED_URL_TTL_SECONDS = 300;
+const INGRESS_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const INGRESS_RATE_LIMIT_MAX_REQUESTS = 300;
+const RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const RATE_LIMIT_MAX_REQUESTS = 120;
 
 const sha256Hex = async (value: string) => {
   const bytes = new TextEncoder().encode(value);
@@ -29,6 +34,27 @@ serve(async (req) => {
     return jsonResponse({ error: "Missing Supabase configuration" }, { status: 500 });
   }
 
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+  });
+
+  const ingressRateLimit = await checkEdgeRateLimit({
+    req,
+    supabase,
+    scope: "tour-guest-document-url.ingress",
+    identifierParts: ["document"],
+    windowSeconds: INGRESS_RATE_LIMIT_WINDOW_SECONDS,
+    maxRequests: INGRESS_RATE_LIMIT_MAX_REQUESTS,
+    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? serviceRoleKey,
+  });
+
+  if (!ingressRateLimit.allowed) {
+    return jsonResponse(
+      { error: "rate_limited" },
+      { status: 429, headers: rateLimitHeaders(ingressRateLimit) },
+    );
+  }
+
   let body: { token?: unknown; documentId?: unknown };
   try {
     body = await req.json();
@@ -43,11 +69,26 @@ serve(async (req) => {
     return jsonResponse({ error: "Missing token or documentId" }, { status: 400 });
   }
 
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false },
+  const tokenHash = await sha256Hex(token);
+  const rateLimit = await checkEdgeRateLimit({
+    req,
+    supabase,
+    scope: "tour-guest-document-url",
+    identifierParts: [tokenHash, documentId],
+    windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+    maxRequests: RATE_LIMIT_MAX_REQUESTS,
+    includeIp: false,
+    includeUserAgent: false,
+    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? serviceRoleKey,
   });
 
-  const tokenHash = await sha256Hex(token);
+  if (!rateLimit.allowed) {
+    return jsonResponse(
+      { error: "rate_limited" },
+      { status: 429, headers: rateLimitHeaders(rateLimit) },
+    );
+  }
+
   const { data: link, error: linkError } = await supabase
     .from("tour_guest_links")
     .select("id, tour_id, allowed_sections, expires_at, revoked_at")

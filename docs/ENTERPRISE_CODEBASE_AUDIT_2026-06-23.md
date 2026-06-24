@@ -258,7 +258,8 @@ Some other `verify_jwt = false` functions are intentionally public and tokenized
 
 - Classify every function as public-token, authenticated-user, privileged-role, or service-only.
 - Enforce that classification in code and `config.toml`.
-- Add durable rate limits for public-token endpoints.
+- Maintain durable rate limits for high-risk public-token endpoints and finish
+  polling-safe wallboard abuse controls.
 - Make cleanup functions service-only.
 - Remove unused Google proxy functions if the Mapbox/Wikimedia migration superseded them.
 
@@ -708,14 +709,15 @@ The roadmap is ordered by risk reduction and operational dependency. Large refac
 - No health endpoint returns business samples or internal errors to normal users.
 - Public endpoints have durable abuse controls.
 
-**Implementation status (2026-06-23):** The first wave is implemented and
-enforced in CI — Edge Function exposure classification gate, SECURITY DEFINER
-anonymous-grant gate, liveness/diagnostic health split, anonymous-reach revoke
-migration, shared correlation/size-limit/redaction primitives, and pgTAP
-authorization regressions. See
+**Implementation status (updated 2026-06-24):** The first wave is implemented
+and enforced in CI — Edge Function exposure classification gate,
+SECURITY DEFINER anonymous-grant gate, liveness/diagnostic health split,
+anonymous-reach revoke migration, shared correlation/size-limit/redaction
+primitives, durable service-role public Edge rate limiting for high-risk
+public/token endpoints, and pgTAP authorization regressions. See
 `docs/operations/phase-2-trust-boundary-hardening.md` for the exit-gate mapping
-and remaining follow-up (priority Edge Function handler migration and durable
-public-endpoint rate limiting).
+and remaining follow-up (priority Edge Function handler migration and
+polling-safe wallboard abuse controls).
 
 ### Phase 3 — Test and correctness maturity
 

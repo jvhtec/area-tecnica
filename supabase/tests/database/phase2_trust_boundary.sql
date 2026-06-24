@@ -2,7 +2,7 @@ CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
 SET search_path TO public, extensions;
 
-SELECT plan(38);
+SELECT plan(51);
 
 -- ---------------------------------------------------------------------------
 -- Phase 2: anonymous callers cannot execute data-bearing RPCs that were still
@@ -202,6 +202,87 @@ SELECT ok(
       AND NOT tgisinternal
   ),
   'profiles privilege-change trigger is installed'
+);
+
+-- ---------------------------------------------------------------------------
+-- Durable public Edge Function abuse controls remain service-role only.
+-- ---------------------------------------------------------------------------
+SELECT ok(
+  to_regclass('public.edge_rate_limit_counters') IS NOT NULL,
+  'edge rate-limit counter table exists'
+);
+
+SELECT ok(
+  COALESCE((
+    SELECT relrowsecurity
+    FROM pg_class
+    WHERE oid = 'public.edge_rate_limit_counters'::regclass
+  ), false),
+  'edge rate-limit counter table has RLS enabled'
+);
+
+SELECT ok(
+  NOT has_table_privilege('anon', 'public.edge_rate_limit_counters', 'SELECT'),
+  'anonymous users cannot read edge rate-limit counters'
+);
+
+SELECT ok(
+  NOT has_table_privilege('anon', 'public.edge_rate_limit_counters', 'INSERT, UPDATE, DELETE'),
+  'anonymous users cannot write edge rate-limit counters'
+);
+
+SELECT ok(
+  NOT has_table_privilege('authenticated', 'public.edge_rate_limit_counters', 'SELECT'),
+  'authenticated users cannot read edge rate-limit counters'
+);
+
+SELECT ok(
+  NOT has_table_privilege('authenticated', 'public.edge_rate_limit_counters', 'INSERT, UPDATE, DELETE'),
+  'authenticated users cannot write edge rate-limit counters'
+);
+
+SELECT ok(
+  has_table_privilege('service_role', 'public.edge_rate_limit_counters', 'INSERT'),
+  'service_role can write edge rate-limit counters'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conrelid = 'public.edge_rate_limit_counters'::regclass
+      AND conname = 'edge_rate_limit_counters_identifier_hash_check'
+  ),
+  'edge rate-limit counters enforce hashed identifiers'
+);
+
+SELECT ok(
+  to_regprocedure('public.consume_edge_rate_limit(text,text,integer,integer)') IS NOT NULL,
+  'consume_edge_rate_limit RPC exists'
+);
+
+SELECT ok(
+  COALESCE((
+    SELECT proconfig @> ARRAY['search_path=pg_catalog, public']::text[]
+    FROM pg_proc
+    WHERE oid = to_regprocedure('public.consume_edge_rate_limit(text,text,integer,integer)')
+  ), false),
+  'consume_edge_rate_limit pins pg_catalog/public search_path'
+);
+
+SELECT ok(
+  NOT has_function_privilege('anon', 'public.consume_edge_rate_limit(text,text,integer,integer)', 'EXECUTE'),
+  'anonymous users cannot execute consume_edge_rate_limit'
+);
+
+SELECT ok(
+  NOT has_function_privilege('authenticated', 'public.consume_edge_rate_limit(text,text,integer,integer)', 'EXECUTE'),
+  'authenticated users cannot execute consume_edge_rate_limit'
+);
+
+SELECT ok(
+  has_function_privilege('service_role', 'public.consume_edge_rate_limit(text,text,integer,integer)', 'EXECUTE'),
+  'service_role can execute consume_edge_rate_limit'
 );
 
 SELECT * FROM finish();

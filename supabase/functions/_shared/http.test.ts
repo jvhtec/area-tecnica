@@ -64,6 +64,7 @@ describe("shared Edge Function HTTP helpers", () => {
 
     const preflight = await wrapped(new Request("https://example.com", { method: "OPTIONS" }));
     expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("Access-Control-Allow-Methods")).toBe("POST, OPTIONS");
     expect(handler).not.toHaveBeenCalled();
 
     const wrongMethod = await wrapped(new Request("https://example.com", { method: "GET" }));
@@ -80,6 +81,16 @@ describe("shared Edge Function HTTP helpers", () => {
     const thrownError = await wrapped(new Request("https://example.com?mode=error", { method: "POST" }));
     expect(thrownError.status).toBe(422);
     await expect(thrownError.json()).resolves.toEqual({ error: "Nope", code: "nope" });
+  });
+
+  it("advertises all configured methods on preflight responses", async () => {
+    const wrapped = createHttpHandler(async () => new Response("ok"), {
+      allowedMethods: ["GET", "POST"],
+    });
+
+    const preflight = await wrapped(new Request("https://example.com", { method: "OPTIONS" }));
+
+    expect(preflight.headers.get("Access-Control-Allow-Methods")).toBe("GET, POST, OPTIONS");
   });
 
   it("serializes unexpected errors without exposing details by default", async () => {

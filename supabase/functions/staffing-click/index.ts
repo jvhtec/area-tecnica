@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 import { detectConflictForAssignment, type AssignmentCoverage, type JobTimeInfo } from "./conflictUtils.ts";
 import { parseStaffingClickRequest } from "./requestUtils.ts";
 
@@ -9,6 +10,10 @@ const TOKEN_SECRET = Deno.env.get("STAFFING_TOKEN_SECRET")!;
 // Optional branding (same defaults as email)
 const COMPANY_LOGO_URL = Deno.env.get("COMPANY_LOGO_URL") || `${SUPABASE_URL}/storage/v1/object/public/company-assets/sector-pro-logo.png`;
 const AT_LOGO_URL = Deno.env.get("AT_LOGO_URL") || `${SUPABASE_URL}/storage/v1/object/public/company-assets/area-tecnica-logo.png`;
+const INGRESS_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const INGRESS_RATE_LIMIT_MAX_REQUESTS = 240;
+const RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const RATE_LIMIT_MAX_REQUESTS = 60;
 
 function b64uToU8(b64u: string) {
   const b64 = b64u.replace(/-/g,'+').replace(/_/g,'/') + '=='.slice(0,(4-(b64u.length%4))%4);
@@ -54,6 +59,54 @@ serve(async (req) => {
 
     console.log('🔍 STEP 3: Querying database for staffing request', { rid, urlStyle });
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE);
+    const ingressRateLimit = await checkEdgeRateLimit({
+      req,
+      supabase,
+      scope: "staffing-click.ingress",
+      identifierParts: ["link"],
+      windowSeconds: INGRESS_RATE_LIMIT_WINDOW_SECONDS,
+      maxRequests: INGRESS_RATE_LIMIT_MAX_REQUESTS,
+      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE,
+    });
+
+    if (!ingressRateLimit.allowed) {
+      return new Response(renderPage({
+        title: 'Demasiadas solicitudes',
+        status: 'warning',
+        heading: 'Demasiadas solicitudes',
+        message: 'Se han abierto demasiados enlaces en poco tiempo desde este navegador o red.',
+        submessage: 'Inténtalo de nuevo más tarde o contacta con tu responsable si necesitas ayuda.'
+      }), {
+        status: 429,
+        headers: { 'Content-Type': 'text/html; charset=UTF-8', ...rateLimitHeaders(ingressRateLimit) },
+      });
+    }
+
+    const rateLimit = await checkEdgeRateLimit({
+      req,
+      supabase,
+      scope: "staffing-click",
+      identifierParts: [rid, action, t],
+      windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+      maxRequests: RATE_LIMIT_MAX_REQUESTS,
+      includeIp: false,
+      includeUserAgent: false,
+      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE,
+    });
+
+    if (!rateLimit.allowed) {
+      return new Response(renderPage({
+        title: 'Demasiadas solicitudes',
+        status: 'warning',
+        heading: 'Demasiadas solicitudes',
+        message: 'Este enlace se ha usado demasiadas veces en poco tiempo.',
+        submessage: 'Inténtalo de nuevo más tarde o contacta con tu responsable si necesitas ayuda.'
+      }), {
+        status: 429,
+        headers: { 'Content-Type': 'text/html; charset=UTF-8', ...rateLimitHeaders(rateLimit) },
+      });
+    }
+
     const { data: row, error: dbError } = await supabase.from("staffing_requests").select("*").eq("id", rid).maybeSingle();
     
     if (dbError) {

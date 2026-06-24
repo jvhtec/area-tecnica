@@ -459,7 +459,14 @@ export function createHttpHandler(
 
   return async (req: Request) => {
     if (req.method === "OPTIONS") {
-      return preflightResponse(options.preflightStatus);
+      const preflightMethods = [...new Set([...allowedMethods, "OPTIONS"])];
+      return new Response(null, {
+        status: options.preflightStatus ?? 204,
+        headers: {
+          ...corsHeaders,
+          "Access-Control-Allow-Methods": preflightMethods.join(", "),
+        },
+      });
     }
 
     if (allowedMethods.length > 0 && !allowedMethods.includes(req.method.toUpperCase())) {

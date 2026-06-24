@@ -1,12 +1,17 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const MAX_FILES_PER_REQUEST = 10;
+const INGRESS_RATE_LIMIT_WINDOW_SECONDS = 60;
+const INGRESS_RATE_LIMIT_MAX_REQUESTS = 30;
+const TOKEN_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const TOKEN_RATE_LIMIT_MAX_REQUESTS = 50;
 const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "txt", "png", "jpg", "jpeg", "webp"]);
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
@@ -89,6 +94,24 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const ingressRateLimit = await checkEdgeRateLimit({
+      req,
+      supabase: supabaseAdmin,
+      scope: "upload-public-artist-rider.ingress",
+      identifierParts: ["multipart"],
+      windowSeconds: INGRESS_RATE_LIMIT_WINDOW_SECONDS,
+      maxRequests: INGRESS_RATE_LIMIT_MAX_REQUESTS,
+      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+    });
+
+    if (!ingressRateLimit.allowed) {
+      return jsonResponse(
+        { ok: false, error: "rate_limited" },
+        { status: 429, headers: rateLimitHeaders(ingressRateLimit) },
+      );
+    }
+
     const formData = await req.formData();
     const token = String(formData.get("token") ?? "").trim();
     const fileEntries = extractFiles(formData);
@@ -130,7 +153,24 @@ serve(async (req) => {
       };
     });
 
-    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const tokenRateLimit = await checkEdgeRateLimit({
+      req,
+      supabase: supabaseAdmin,
+      scope: "upload-public-artist-rider",
+      identifierParts: [token],
+      windowSeconds: TOKEN_RATE_LIMIT_WINDOW_SECONDS,
+      maxRequests: TOKEN_RATE_LIMIT_MAX_REQUESTS,
+      includeIp: false,
+      includeUserAgent: false,
+      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+    });
+
+    if (!tokenRateLimit.allowed) {
+      return jsonResponse(
+        { ok: false, error: "rate_limited" },
+        { status: 429, headers: rateLimitHeaders(tokenRateLimit) },
+      );
+    }
 
     const { data: formRow, error: formError } = await supabaseAdmin
       .from("festival_artist_forms")
