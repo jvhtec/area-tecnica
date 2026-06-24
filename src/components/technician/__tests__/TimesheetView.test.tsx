@@ -249,6 +249,58 @@ describe("TimesheetView", () => {
     expect(submitTimesheet).toHaveBeenCalledWith("mine");
   });
 
+  it("prompts to send immediately after saving an already-signed draft", async () => {
+    const user = userEvent.setup();
+    const updateTimesheet = vi.fn().mockResolvedValue(undefined);
+    const submitTimesheet = vi.fn().mockResolvedValue(undefined);
+
+    useTimesheetsMock.mockReturnValue({
+      ...baseHookValue(),
+      updateTimesheet,
+      submitTimesheet,
+      timesheets: [
+        createTimesheet({
+          id: "mine",
+          technician_id: "tech-1",
+          date: "2026-03-10",
+          start_time: "09:00",
+          end_time: "17:00",
+          status: "draft",
+          signature_data: "data:image/png;base64,existing-signature",
+        }),
+      ],
+    });
+
+    renderWithProviders(
+      <TimesheetView
+        theme={theme}
+        isDark
+        job={createJob({ id: "job-1", title: "Job 1" }) as any}
+        onClose={vi.fn()}
+        userRole="technician"
+        userId="tech-1"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /editar horario/i }));
+    await user.click(screen.getByRole("button", { name: /guardar/i }));
+
+    await waitFor(() => {
+      expect(updateTimesheet).toHaveBeenCalledWith(
+        "mine",
+        expect.objectContaining({ start_time: "09:00", end_time: "17:00" }),
+      );
+    });
+
+    expect(await screen.findByText(/parte firmado/i)).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: (name) => name === "Enviar parte" }),
+    );
+
+    expect(submitTimesheet).toHaveBeenCalledWith("mine");
+  });
+
   it("hides technician totals until rates are approved and locks actions after closure", () => {
     useJobRatesApprovalMock.mockReturnValue({ data: { rates_approved: false } });
     isJobPastClosureWindowMock.mockReturnValue(true);

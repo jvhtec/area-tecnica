@@ -98,6 +98,8 @@ const getStatusBadge = (status: string, isDark: boolean) => {
   }
 };
 
+const SENDABLE_TIMESHEET_STATUSES: ReadonlyArray<Timesheet['status']> = ['draft', 'rejected'];
+
 export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }: TimesheetViewProps) => {
   const { user } = useOptimizedAuth();
   const {
@@ -130,9 +132,8 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
   // Of those edited days, the ones still saved-but-not-sent (draft/rejected).
   const editedUnsent = useMemo(() => {
     if (isClosureLocked) return [];
-    const sendableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
     return myTimesheets.filter(
-      t => editedIds.has(t.id) && sendableStatuses.includes(t.status)
+      t => editedIds.has(t.id) && SENDABLE_TIMESHEET_STATUSES.includes(t.status)
     );
   }, [myTimesheets, editedIds, isClosureLocked]);
 
@@ -204,8 +205,15 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
       });
       setEditingId(null);
       // Remember this day so the exit guard can catch it if the tech leaves
-      // without sending. The send nudge itself fires after signing (last step).
+      // without sending. If it is already signed, nudge immediately.
       setEditedIds(prev => new Set(prev).add(timesheet.id));
+      if (
+        !isClosureLocked &&
+        timesheet.signature_data &&
+        SENDABLE_TIMESHEET_STATUSES.includes(timesheet.status)
+      ) {
+        setSendPromptId(timesheet.id);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error desconocido';
       toast.error(`No se pudo guardar el parte: ${message}`);
@@ -270,8 +278,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
       // now so a signed parte doesn't sit forgotten as a draft.
       setEditedIds(prev => new Set(prev).add(signedId));
       const signed = myTimesheets.find(t => t.id === signedId);
-      const sendableStatuses: Array<Timesheet['status']> = ['draft', 'rejected'];
-      if (!isClosureLocked && (!signed || sendableStatuses.includes(signed.status))) {
+      if (!isClosureLocked && (!signed || SENDABLE_TIMESHEET_STATUSES.includes(signed.status))) {
         setSendPromptId(signedId);
       }
     } catch (err) {
