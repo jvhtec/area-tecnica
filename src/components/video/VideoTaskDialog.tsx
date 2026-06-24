@@ -34,6 +34,10 @@ import {
 
 import { queryKeys } from "@/lib/react-query";
 import type { Database } from "@/integrations/supabase/types";
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  getDocumentUploadValidationError,
+} from "@/utils/documentUploadValidation";
 interface VideoTaskDialogProps {
   jobId: string;
   open: boolean;
@@ -136,6 +140,18 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
   const handleFileUpload = async (taskId: string, files: File[]) => {
     if (files.length === 0) return;
 
+    const validationError = getDocumentUploadValidationError(files);
+    if (validationError) {
+      toast({
+        title: "Archivo no permitido",
+        description: validationError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const uploadedPaths: string[] = [];
+    const insertedIds: string[] = [];
     try {
       setUploading(true);
       for (const file of files) {
@@ -146,6 +162,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
           .upload(filePath, file);
 
         if (uploadError) throw uploadError;
+        uploadedPaths.push(filePath);
 
         const taskDocument: TaskDocumentInsert = {
             video_task_id: taskId,
@@ -153,32 +170,48 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
             file_path: filePath,
           };
 
-        const { error: dbError } = await dataLayerClient.from('task_documents')
-          .insert(taskDocument);
+        const { data: insertedDocument, error: dbError } = await dataLayerClient.from('task_documents')
+          .insert(taskDocument)
+          .select('id')
+          .single();
 
         if (dbError) throw dbError;
+        if (insertedDocument?.id) {
+          insertedIds.push(insertedDocument.id);
+        }
       }
 
-      await dataLayerClient.from('video_job_tasks')
+      const { error: taskUpdateError } = await dataLayerClient.from('video_job_tasks')
         .update({ 
           status: 'completed',
           progress: 100 
         })
         .eq('id', taskId);
+      if (taskUpdateError) throw taskUpdateError;
 
       toast({
-        title: files.length === 1 ? "File uploaded successfully" : "Files uploaded successfully",
+        title: files.length === 1 ? "Archivo subido correctamente" : "Archivos subidos correctamente",
         description:
           files.length === 1
-            ? "The document has been uploaded and task marked as completed."
-            : `${files.length} documents have been uploaded and the task marked as completed.`,
+            ? "El documento se ha subido y la tarea se ha marcado como completada."
+            : `${files.length} documentos se han subido y la tarea se ha marcado como completada.`,
       });
 
       refetchTasks();
     } catch (error: any) {
+      try {
+        if (insertedIds.length > 0) {
+          await dataLayerClient.from('task_documents').delete().in('id', insertedIds);
+        }
+        if (uploadedPaths.length > 0) {
+          await dataLayerClient.storage.from('task_documents').remove(uploadedPaths);
+        }
+      } catch (cleanupError) {
+        console.error("Error rolling back video task document upload batch:", cleanupError);
+      }
       toast({
-        title: "Upload failed",
-        description: error.message,
+        title: "Error al subir",
+        description: error.message || "No se pudo completar la subida. Se ha revertido la tanda.",
         variant: "destructive",
       });
     } finally {
@@ -545,6 +578,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                               <input
                                 type="file"
                                 multiple
+                                accept={DOCUMENT_UPLOAD_ACCEPT}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                 onChange={(e) => {
                                   const files = Array.from(e.target.files ?? []);
@@ -560,7 +594,7 @@ export const VideoTaskDialog = ({ jobId, open, onOpenChange }: VideoTaskDialogPr
                                 className="w-[100px]"
                               >
                                 <Upload className="h-3 w-3 mr-1" />
-                                Upload
+                                Subir
                               </Button>
                             </div>
                           )}

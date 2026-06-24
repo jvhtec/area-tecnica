@@ -28,6 +28,7 @@ export interface TourDocument {
 type UploadTourDocumentVariables = {
   file: File;
   fileName?: string;
+  suppressInvalidation?: boolean;
   suppressToast?: boolean;
 };
 
@@ -101,6 +102,10 @@ export const useTourDocuments = (tourId: string) => {
 
       if (dbError) {
         console.error('Database insert error:', dbError);
+        const { error: cleanupError } = await supabase.storage.from('tour-documents').remove([filePath]);
+        if (cleanupError) {
+          console.error('Storage cleanup after failed document insert failed:', cleanupError);
+        }
         throw dbError;
       }
 
@@ -108,18 +113,23 @@ export const useTourDocuments = (tourId: string) => {
       return data;
     },
     onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
+      if (!variables.suppressInvalidation) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
+      }
       if (!variables.suppressToast) {
-        toast.success('Document uploaded successfully');
+        toast.success('Documento subido correctamente');
       }
     },
     onError: (error: any, variables) => {
       console.error('Upload error:', error);
       if (!variables?.suppressToast) {
-        toast.error('Failed to upload document');
+        toast.error('No se pudo subir el documento');
       }
     }
   });
+
+  const refreshDocuments = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
 
   const updateVisibility = useMutation({
     mutationFn: async ({ documentId, visibleToTech }: { documentId: string; visibleToTech: boolean }) => {
@@ -257,6 +267,7 @@ export const useTourDocuments = (tourId: string) => {
     isLoading,
     error,
     uploadDocument,
+    refreshDocuments,
     updateVisibility,
     updateGuestVisibility,
     deleteDocument,

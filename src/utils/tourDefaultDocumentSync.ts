@@ -254,7 +254,8 @@ const buildPowerPdfPayload = (
 
   const fohSchukoRequired =
     (item.department === "sound" || item.department === "lights") &&
-    tables.some((table) => table.fohSchukoRequired);
+    (tables.some((table) => table.fohSchukoRequired) ||
+      item.defaultTables.some((table) => getBoolean(getRecord(table.metadata).foh_schuko) ?? false));
 
   return {
     tables: tables as PdfTables,

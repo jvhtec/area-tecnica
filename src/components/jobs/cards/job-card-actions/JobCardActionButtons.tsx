@@ -35,6 +35,7 @@ import type {
   TechnicalPowerPackState,
 } from "@/components/jobs/cards/job-card-actions/types";
 import { cn } from "@/lib/utils";
+import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
 import { hasPrepDayDateType } from "@/utils/timesheetPrepDays";
 import { canSubmitTechnicianIncidentReports } from "@/utils/permissions";
 
@@ -487,6 +488,7 @@ export const JobCardActionButtons = ({
         <input
           type="file"
           multiple
+          accept={DOCUMENT_UPLOAD_ACCEPT}
           aria-label="Subir documento"
           onChange={handleFileUpload}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"

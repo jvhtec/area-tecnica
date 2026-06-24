@@ -13,6 +13,7 @@ import {
   canManageFestivalArtists,
   canUploadDocuments as canUploadDocumentsForRole,
 } from '@/utils/permissions';
+import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -175,8 +176,17 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
     e.target.value = "";
     if (files.length === 0 || !department) return;
 
-    try {
-      for (const file of files) {
+    const validationError = getDocumentUploadValidationError(files);
+    if (validationError) {
+      toast({ title: "Archivo no permitido", description: validationError, variant: "destructive" });
+      return;
+    }
+
+    let uploadedCount = 0;
+    const failedMessages: string[] = [];
+
+    for (const file of files) {
+      try {
         const fileExt = file.name.split(".").pop();
         const filePath = `${department}/${job.id}/${crypto.randomUUID()}.${fileExt}`;
 
@@ -195,7 +205,14 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
             file_size: file.size,
             original_type: null
           });
-        if (dbError) throw dbError;
+        if (dbError) {
+          const { error: cleanupError } = await supabase.storage.from("job_documents").remove([filePath]);
+          if (cleanupError) {
+            console.error("Storage cleanup after failed job document insert failed:", cleanupError);
+          }
+          throw dbError;
+        }
+        uploadedCount += 1;
 
         // Broadcast push: new document uploaded
         try {
@@ -203,25 +220,33 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
             body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
           });
         } catch {}
+      } catch (err: any) {
+        failedMessages.push(`${file.name}: ${err?.message || String(err)}`);
       }
+    }
 
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
 
+    if (failedMessages.length === 0) {
       toast({
-        title: files.length === 1 ? "Document uploaded" : "Documents uploaded",
+        title: files.length === 1 ? "Documento subido" : "Documentos subidos",
         description:
           files.length === 1
-            ? "The document has been successfully uploaded."
-            : `${files.length} documents have been successfully uploaded.`
+            ? "El documento se ha subido correctamente."
+            : `${files.length} documentos se han subido correctamente.`
       });
-    } catch (err: any) {
-      toast({
-        title: "Upload failed",
-        description: err.message,
-        variant: "destructive"
-      });
+      return;
     }
+
+    toast({
+      title: uploadedCount > 0 ? "Subida parcial" : "Error al subir",
+      description:
+        uploadedCount > 0
+          ? `${uploadedCount} de ${files.length} documento(s) se subieron. ${failedMessages[0]}`
+          : failedMessages[0],
+      variant: "destructive"
+    });
   };
 
   const handleDeleteDocument = async (doc: JobDocument) => {

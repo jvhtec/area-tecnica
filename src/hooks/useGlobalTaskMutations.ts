@@ -3,6 +3,7 @@ import { completeTask, revertTask, Department } from '@/services/taskCompletion'
 import type { Database } from '@/integrations/supabase/types';
 import { type Dept } from '@/utils/tasks';
 import { isTaskAssigneeUniqueConflict } from '@/utils/taskAssignment';
+import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
 
 type SoundTaskUpdate = Database['public']['Tables']['sound_job_tasks']['Update'];
 type LightsTaskUpdate = Database['public']['Tables']['lights_job_tasks']['Update'];
@@ -724,6 +725,9 @@ export function useGlobalTaskMutations(department: Dept) {
     file: File,
     context?: { jobId?: string | null; tourId?: string | null },
   ) => {
+    const validationError = getDocumentUploadValidationError([file]);
+    if (validationError) throw new Error(validationError);
+
     const { data: authData } = await supabase.auth.getUser();
     const uploaderId = authData?.user?.id;
     if (!uploaderId) throw new Error('User must be authenticated to upload attachments');
@@ -747,7 +751,13 @@ export function useGlobalTaskMutations(department: Dept) {
     taskDocumentInsert[docFk] = taskId;
 
     const { error: insErr } = await supabase.from('task_documents').insert(taskDocumentInsert);
-    if (insErr) throw insErr;
+    if (insErr) {
+      const { error: cleanupError } = await supabase.storage.from('task_documents').remove([taskKey]);
+      if (cleanupError) {
+        console.error('Storage cleanup after failed task document insert failed:', cleanupError);
+      }
+      throw insErr;
+    }
 
     // 2. Mirror to job bucket if linked (idempotent: delete-before-insert)
     if (jobId) {

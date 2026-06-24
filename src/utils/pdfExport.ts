@@ -47,6 +47,16 @@ export interface SummaryRow {
   clusterWeight: number;
 }
 
+const getMotorCountLabel = (table: ExportTable) => {
+  if (table.riggingPoint) {
+    const motorCount = table.riggingPoint.split(',').filter((point) => point.trim().length > 0).length;
+    if (motorCount > 0) return String(motorCount);
+  }
+
+  if (table.dualMotors) return '2';
+  return table.totalWeight && table.totalWeight > 0 ? '1' : 'N/A';
+};
+
 export const exportToPDF = async (
   projectName: string,
   tables: ExportTable[],
@@ -324,7 +334,7 @@ export const exportToPDF = async (
       if (type === 'weight') {
         generatedSummaryRows = tables.map((table) => ({
           clusterName: table.name,
-          riggingPoints: table.riggingPoint || 'N/A',
+          riggingPoints: getMotorCountLabel(table),
           clusterWeight: table.totalWeight || 0
         }));
       }
@@ -463,10 +473,9 @@ export const exportToPDF = async (
           yPosition += 6;
 
           const summaryData = finalSummaryRows.map((row) => [row.clusterName, row.riggingPoints, row.clusterWeight.toFixed(2)]);
-          const riggingColumnLabel = type === 'weight' ? 'Motores' : 'Puntos de Montaje';
 
           autoTable(doc, {
-            head: [['Truss', riggingColumnLabel, 'Peso Total (kg)']],
+            head: [['Truss', 'Motores', 'Peso Total (kg)']],
             body: summaryData,
             startY: yPosition,
             theme: 'grid',

@@ -13,6 +13,7 @@ import { fetchFestivalDocuments } from "@/features/festival-management/queries";
 import { formatFestivalDateLabel, groupFestivalRiderFiles } from "@/features/festival-management/selectors";
 import type { ArtistRiderFile, JobDocumentEntry } from "@/features/festival-management/types";
 import { queryKeys } from "@/lib/react-query";
+import { getDocumentUploadValidationError } from "@/utils/documentUploadValidation";
 
 type ToastFn = (props: { description?: string; title: string; variant?: "destructive" }) => void;
 
@@ -23,6 +24,7 @@ const getErrorMessage = (error: unknown, fallback: string) => (error instanceof 
 
 type UploadFestivalDocumentVariables = {
   file: File;
+  suppressInvalidation?: boolean;
   suppressToast?: boolean;
 };
 
@@ -84,7 +86,9 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
           description: "Documento subido exitosamente",
         });
       }
-      await queryClient.invalidateQueries({ queryKey: documentsQueryKey });
+      if (!variables.suppressInvalidation) {
+        await queryClient.invalidateQueries({ queryKey: documentsQueryKey });
+      }
     },
     onError: (error, variables) => {
       console.error("Error uploading document:", error);
@@ -182,10 +186,26 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
       }
 
       try {
-        for (const file of files) {
-          await uploadDocument({ file, suppressToast: files.length > 1 });
+        const validationError = getDocumentUploadValidationError(files);
+        if (validationError) {
+          toast({
+            title: "Archivo no permitido",
+            description: validationError,
+            variant: "destructive",
+          });
+          return;
         }
-        if (files.length > 1) {
+
+        const isBatchUpload = files.length > 1;
+        for (const file of files) {
+          await uploadDocument({
+            file,
+            suppressInvalidation: isBatchUpload,
+            suppressToast: isBatchUpload,
+          });
+        }
+        if (isBatchUpload) {
+          await queryClient.invalidateQueries({ queryKey: documentsQueryKey });
           toast({
             title: "Éxito",
             description: `${files.length} documentos subidos exitosamente`,
@@ -203,7 +223,7 @@ export const useFestivalDocuments = ({ jobId, toast }: { jobId?: string; toast: 
         event.target.value = "";
       }
     },
-    [jobId, toast, uploadDocument],
+    [documentsQueryKey, jobId, queryClient, toast, uploadDocument],
   );
 
   const groupedRiderFiles = useMemo(() => groupFestivalRiderFiles(artistRiderFiles), [artistRiderFiles]);

@@ -3,6 +3,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 import { createQueryKey } from '@/lib/optimized-react-query';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
@@ -13,6 +14,7 @@ import {
   canManageFestivalArtists,
   canUploadDocuments as canUploadDocumentsForRole,
 } from '@/utils/permissions';
+import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -41,6 +43,7 @@ export const useOptimizedJobCard = (
 ) => {
   const { theme } = useTheme();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const enableRoleSummary = options?.enableRoleSummary ?? true;
   const enableSoundTasks = options?.enableSoundTasks ?? true;
   const refreshAssignmentsOnMount = options?.refreshAssignmentsOnMount ?? false;
@@ -357,10 +360,17 @@ export const useOptimizedJobCard = (
     e.target.value = "";
     if (files.length === 0 || !department) return;
 
-    try {
-      const insertedDocuments: JobDocumentRow[] = [];
+    const validationError = getDocumentUploadValidationError(files);
+    if (validationError) {
+      toast({ title: 'Archivo no permitido', description: validationError, variant: 'destructive' });
+      return;
+    }
 
-      for (const file of files) {
+    const insertedDocuments: JobDocumentRow[] = [];
+    const failedMessages: string[] = [];
+
+    for (const file of files) {
+      try {
         const fileExt = file.name.split('.').pop();
         const filePath = `${department}/${job.id}/${crypto.randomUUID()}.${fileExt}`;
 
@@ -381,7 +391,13 @@ export const useOptimizedJobCard = (
           })
           .select('*')
           .single();
-        if (dbError) throw dbError;
+        if (dbError) {
+          const { error: cleanupError } = await supabase.storage.from('job_documents').remove([filePath]);
+          if (cleanupError) {
+            console.error('Storage cleanup after failed job document insert failed:', cleanupError);
+          }
+          throw dbError;
+        }
 
         if (inserted) {
           insertedDocuments.push(inserted as JobDocumentRow);
@@ -393,16 +409,31 @@ export const useOptimizedJobCard = (
             body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
           });
         } catch {}
+      } catch (err: any) {
+        failedMessages.push(`${file.name}: ${err?.message || String(err)}`);
       }
-
-      // Update local documents state immediately
-      if (insertedDocuments.length > 0) {
-        setDocuments((prev) => Array.isArray(prev) ? [...prev, ...insertedDocuments] : insertedDocuments);
-      }
-    } catch (err: any) {
-      console.error('Upload error:', err);
     }
-  }, [job.id, department]);
+
+    // Update local documents state immediately
+    if (insertedDocuments.length > 0) {
+      setDocuments((prev) => Array.isArray(prev) ? [...prev, ...insertedDocuments] : insertedDocuments);
+    }
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+
+    if (failedMessages.length === 0) {
+      return;
+    }
+
+    toast({
+      title: insertedDocuments.length > 0 ? 'Subida parcial' : 'Error al subir',
+      description:
+        insertedDocuments.length > 0
+          ? `${insertedDocuments.length} de ${files.length} documento(s) se subieron. ${failedMessages[0]}`
+          : failedMessages[0],
+      variant: 'destructive',
+    });
+  }, [job.id, department, queryClient, toast]);
 
   const handleDeleteDocument = useCallback(async (doc: any) => {
     if (doc?.read_only) {

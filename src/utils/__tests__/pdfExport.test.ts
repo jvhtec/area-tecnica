@@ -98,6 +98,7 @@ describe('exportToPDF', () => {
       pdf,
       expect.objectContaining({
         head: [['Truss', 'Motores', 'Peso Total (kg)']],
+        body: [['Main PA', '2', '250.00']],
       })
     );
   });

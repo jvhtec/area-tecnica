@@ -950,11 +950,18 @@ const PesosTool: React.FC = () => {
       return;
     }
 
+    const getMotorCountLabel = (table: Table) => {
+      const motorCount = getRiggingPointNumbers(table.riggingPoints).length;
+      if (motorCount > 0) return String(motorCount);
+      if (table.dualMotors) return '2';
+      return table.totalWeight > 0 ? '1' : 'N/A';
+    };
+
     const summaryRows: SummaryRow[] = activeTables.map((table) => {
       const cleanName = table.name.split('(')[0].trim();
       return {
         clusterName: cleanName,
-        riggingPoints: table.riggingPoints || '',
+        riggingPoints: getMotorCountLabel(table),
         clusterWeight: table.totalWeight || 0,
       };
     });
@@ -978,7 +985,7 @@ const PesosTool: React.FC = () => {
       cablePickCounter += 1;
       summaryRows.push({
         clusterName: 'CABLE PICK',
-        riggingPoints: `CP${String(cablePickCounter).padStart(2, "0")}`,
+        riggingPoints: '—',
         clusterWeight: parseFloat(tableWithCablePick.cablePickWeight || "0") || 0,
       });
     });

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { completeTask, revertTask, Department } from '@/services/taskCompletion';
+import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
 
 type Dept = 'sound'|'lights'|'video';
 
@@ -323,12 +324,21 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
   };
 
   const uploadAttachment = async (taskId: string, file: File) => {
+    const validationError = getDocumentUploadValidationError([file]);
+    if (validationError) throw new Error(validationError);
+
     const sanitized = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
     const key = `${taskId}/${Date.now()}_${sanitized}`;
     const { error: upErr } = await supabase.storage.from('task_documents').upload(key, file, { upsert: false });
     if (upErr) throw upErr;
     const { error: insErr } = await supabase.from('task_documents').insert({ [docFk]: taskId, file_name: file.name, file_path: key });
-    if (insErr) throw insErr;
+    if (insErr) {
+      const { error: cleanupError } = await supabase.storage.from('task_documents').remove([key]);
+      if (cleanupError) {
+        console.error('Storage cleanup after failed task document insert failed:', cleanupError);
+      }
+      throw insErr;
+    }
     // Do not auto-complete; leave explicit status control in UI
   };
 

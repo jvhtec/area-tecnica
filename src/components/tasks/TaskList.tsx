@@ -12,6 +12,10 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { TASK_TYPES } from '@/constants/taskTypes';
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  getDocumentUploadValidationError,
+} from '@/utils/documentUploadValidation';
 
 import { queryKeys } from "@/lib/react-query";
 const DEPARTMENT_NAME: Record<'sound' | 'lights' | 'video', string> = {
@@ -190,17 +194,52 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
 
   const onUpload = async (taskId: string, files: File[]) => {
     if (files.length === 0) return;
-    try {
-      for (const file of files) {
+
+    const validationError = getDocumentUploadValidationError(files);
+    if (validationError) {
+      toast({ title: 'Archivo no permitido', description: validationError, variant: 'destructive' });
+      return;
+    }
+
+    let uploadedCount = 0;
+    const failedMessages: string[] = [];
+
+    for (const file of files) {
+      try {
         await uploadAttachment(taskId, file);
+        uploadedCount += 1;
+      } catch (e: any) {
+        failedMessages.push(`${file.name}: ${e?.message || String(e)}`);
       }
-      toast({
-        title: files.length === 1 ? 'Uploaded' : 'Uploaded files',
-        description: files.length === 1 ? 'Attachment uploaded' : `${files.length} attachments uploaded`,
-      });
+    }
+
+    if (uploadedCount > 0) {
       await refetch();
-    } catch (e: any) {
-      toast({ title: 'Upload failed', description: e?.message || String(e), variant: 'destructive' });
+    }
+
+    if (failedMessages.length === 0) {
+      toast({
+        title: files.length === 1 ? 'Archivo subido' : 'Archivos subidos',
+        description: files.length === 1 ? 'Adjunto subido' : `${files.length} adjuntos subidos`,
+      });
+      return;
+    }
+
+    toast({
+      title: uploadedCount > 0 ? 'Subida parcial' : 'Error al subir',
+      description:
+        uploadedCount > 0
+          ? `${uploadedCount} de ${files.length} adjunto(s) se subieron. ${failedMessages[0]}`
+          : failedMessages[0],
+      variant: 'destructive',
+    });
+
+    if (uploadedCount === 0) {
+      try {
+        await refetch();
+      } catch (e) {
+        console.error('Error refreshing tasks after failed upload:', e);
+      }
     }
   };
 
@@ -348,6 +387,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
                     <input
                       type="file"
                       multiple
+                      accept={DOCUMENT_UPLOAD_ACCEPT}
                       className="absolute inset-0 opacity-0 cursor-pointer"
                       onChange={(e) => {
                         const files = Array.from(e.target.files ?? []);
@@ -355,7 +395,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
                         onUpload(task.id, files);
                       }}
                     />
-                    <Button size="sm" variant="outline"><Upload className="h-3 w-3 mr-1"/>Upload</Button>
+                    <Button size="sm" variant="outline"><Upload className="h-3 w-3 mr-1"/>Subir</Button>
                   </div>
                   {canEdit && (
                     <Button size="sm" variant="ghost" onClick={() => deleteTask(task.id).then(() => refetch())}>
