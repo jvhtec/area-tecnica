@@ -84,6 +84,29 @@ describe('tourPowerTables', () => {
     expect(normalized.totalVa).toBe(1200);
   });
 
+  it('preserves the persisted FOH schuko flag on normalized tour default tables', () => {
+    const normalized = normalizeTourDefaultPowerTable(
+      {
+        id: 'default-foh',
+        set_id: 'set-1',
+        table_name: 'FoH',
+        table_type: 'power',
+        total_value: 950,
+        metadata: {
+          current_per_phase: 5,
+          pdu_type: '32A',
+          foh_schuko: true,
+        },
+        table_data: { rows: [] },
+        created_at: '2026-04-08T10:00:00.000Z',
+        updated_at: '2026-04-08T10:00:00.000Z',
+      } as any,
+      'sound'
+    );
+
+    expect(normalized.fohSchukoRequired).toBe(true);
+  });
+
   it('normalizes custom positions from legacy defaults and overrides', () => {
     const legacy = normalizeLegacyTourPowerDefault(
       {

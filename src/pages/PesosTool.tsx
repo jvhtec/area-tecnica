@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { exportToPDF } from '@/utils/pdfExport';
 import { useJobSelection, JobSelection } from '@/hooks/useJobSelection';
 import { useToast } from '@/hooks/use-toast';
@@ -23,6 +24,8 @@ import type { TechnicalStage } from '@/features/technical-tools/stage/stageUtils
 import { CopyToStageMenu } from '@/features/technical-tools/table-presets/CopyToStageMenu';
 import { QuickPresetsMenu } from '@/features/technical-tools/table-presets/QuickPresetsMenu';
 import type { TourPackageSize } from '@/utils/tourPackages';
+import { optimizedInvalidation, queryKeys } from '@/lib/react-query';
+import { syncTourDefaultDocuments } from '@/utils/tourDefaultDocumentSync';
 import {
   cloneTablesToStage,
   remapClusterIds,
@@ -113,6 +116,7 @@ interface SummaryRow {
 const PesosTool: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { data: jobs } = useJobSelection();
   const [searchParams] = useSearchParams();
   const jobIdFromUrl = searchParams.get('jobId');
@@ -254,6 +258,34 @@ const PesosTool: React.FC = () => {
     isLoading: overridesLoading
   } = useTourDateOverrides(tourDateId || '', 'weight');
 
+  const syncDefaultDocumentsAfterMutation = async () => {
+    if ((!isTourDefaults && !isDefaults) || !tourId) return;
+
+    try {
+      const result = await syncTourDefaultDocuments({ tourId });
+      optimizedInvalidation.invalidateQueryKeys(queryClient, [
+        queryKeys.scope('tour-documents', tourId),
+        queryKeys.scope('jobcard-tour-documents'),
+        queryKeys.scope('tour-documents-for-job'),
+      ]);
+
+      if (result.errors.length > 0) {
+        toast({
+          title: 'Aviso de sincronización de PDF',
+          description: `${result.errors.length} documento(s) predeterminados no se pudieron actualizar.`,
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Error syncing tour default documents:', error);
+      toast({
+        title: 'Aviso de sincronización de PDF',
+        description: 'No se pudieron actualizar los PDF predeterminados del paquete.',
+        variant: 'destructive',
+      });
+    }
+  };
+
   // Get tour name for display
   const [tourName, setTourName] = useState<string>('');
   const [tourDateInfo, setTourDateInfo] = useState<{ date: string; location: string } | null>(null);
@@ -371,6 +403,11 @@ const PesosTool: React.FC = () => {
     setSelectedDefaultSetId(newSet.id);
     setNewDefaultSetName('');
     return newSet.id;
+  };
+
+  const deleteSetAndSync = async (setId: string) => {
+    await deleteSet(setId);
+    await syncDefaultDocumentsAfterMutation();
   };
 
   // Detect job-based override mode
@@ -608,6 +645,8 @@ const PesosTool: React.FC = () => {
         });
       }
 
+      await syncDefaultDocumentsAfterMutation();
+
       toast({
         title: 'Success',
         description: `Default set "${currentSetName}" saved successfully`,
@@ -628,8 +667,12 @@ const PesosTool: React.FC = () => {
   };
 
   // UPDATED: Save as tour defaults using the new system
-  const saveAsTourDefaults = async (table: Table, orderIndex?: number) => {
-    if (!tourId) return;
+  const saveAsTourDefaults = async (
+    table: Table,
+    orderIndex?: number,
+    options: { syncAfterSave?: boolean } = {}
+  ): Promise<boolean> => {
+    if (!tourId) return false;
 
     try {
       // Get or create the sound set ID
@@ -671,15 +714,20 @@ const PesosTool: React.FC = () => {
 
       toast({
         title: 'Success',
-        description: 'Tour default saved successfully',
+        description: 'Predeterminado de gira guardado correctamente',
       });
+      if (options.syncAfterSave !== false) {
+        await syncDefaultDocumentsAfterMutation();
+      }
+      return true;
     } catch (error: any) {
       console.error('Error saving tour default:', error);
       toast({
         title: 'Error',
-        description: 'Failed to save tour default',
+        description: 'No se pudo guardar el predeterminado de gira',
         variant: 'destructive',
       });
+      return false;
     }
   };
 
@@ -749,7 +797,7 @@ const PesosTool: React.FC = () => {
     }
   };
 
-  const generateTable = () => {
+  const generateTable = async () => {
     if (!tableName) {
       toast({
         title: 'Missing table name',
@@ -835,17 +883,28 @@ const PesosTool: React.FC = () => {
     );
 
     // Handle saving based on mode
-    createdTablesWithSuffixes.forEach(table => {
-      if (isTourDefaults) {
-        saveAsTourDefaults(
+    if (isTourDefaults) {
+      let savedCount = 0;
+      for (const table of createdTablesWithSuffixes) {
+        if (await saveAsTourDefaults(
           table,
-          updatedTables.findIndex((candidate) => candidate.id === table.id)
-        );
-      } else if (isTourDateContext || isJobOverrideMode) {
-        saveAsOverride(table);
+          updatedTables.findIndex((candidate) => candidate.id === table.id),
+          { syncAfterSave: false }
+        )) {
+          savedCount += 1;
+        }
       }
-      // For regular defaults mode, tables are just saved to local state
-    });
+      if (savedCount > 0) {
+        await syncDefaultDocumentsAfterMutation();
+      }
+    } else {
+      createdTablesWithSuffixes.forEach(table => {
+        if (isTourDateContext || isJobOverrideMode) {
+          saveAsOverride(table);
+        }
+        // For regular defaults mode, tables are just saved to local state
+      });
+    }
 
     resetCurrentTable();
     setUseDualMotors(false);
@@ -860,7 +919,24 @@ const PesosTool: React.FC = () => {
     setTableName('');
   };
 
-  const removeTable = (tableId: number) => {
+  const removeTable = async (tableId: number) => {
+    const tableToRemove = tables.find((table) => table.id === tableId);
+
+    if (tableToRemove?.defaultTableId) {
+      try {
+        await deleteDefaultTable(tableToRemove.defaultTableId);
+        await syncDefaultDocumentsAfterMutation();
+      } catch (error) {
+        console.error('Error deleting default weight table:', error);
+        toast({
+          title: 'Error',
+          description: 'No se pudo eliminar la tabla predeterminada.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     updateTablesState((prev) => prev.filter((table) => table.id !== tableId));
   };
 
@@ -874,11 +950,18 @@ const PesosTool: React.FC = () => {
       return;
     }
 
+    const getMotorCountLabel = (table: Table) => {
+      const motorCount = getRiggingPointNumbers(table.riggingPoints).length;
+      if (motorCount > 0) return String(motorCount);
+      if (table.dualMotors) return '2';
+      return table.totalWeight > 0 ? '1' : 'N/A';
+    };
+
     const summaryRows: SummaryRow[] = activeTables.map((table) => {
       const cleanName = table.name.split('(')[0].trim();
       return {
         clusterName: cleanName,
-        riggingPoints: table.riggingPoints || '',
+        riggingPoints: getMotorCountLabel(table),
         clusterWeight: table.totalWeight || 0,
       };
     });
@@ -902,7 +985,7 @@ const PesosTool: React.FC = () => {
       cablePickCounter += 1;
       summaryRows.push({
         clusterName: 'CABLE PICK',
-        riggingPoints: `CP${String(cablePickCounter).padStart(2, "0")}`,
+        riggingPoints: '—',
         clusterWeight: parseFloat(tableWithCablePick.cablePickWeight || "0") || 0,
       });
     });
@@ -1022,7 +1105,7 @@ const PesosTool: React.FC = () => {
       setSelectedDefaultPackageSize={setSelectedDefaultPackageSize}
       newDefaultSetName={newDefaultSetName}
       setNewDefaultSetName={setNewDefaultSetName}
-      deleteSet={deleteSet}
+      deleteSet={deleteSetAndSync}
       weightOverrides={weightOverrides}
       deleteOverride={deleteOverride}
       saveAsDefaultSet={saveAsDefaultSet}

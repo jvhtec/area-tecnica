@@ -35,6 +35,10 @@ import {
 
 import { queryKeys } from "@/lib/react-query";
 import type { Database } from "@/integrations/supabase/types";
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  getDocumentUploadValidationError,
+} from "@/utils/documentUploadValidation";
 
 type SoundPersonnelUpdate = Database["public"]["Tables"]["sound_job_personnel"]["Update"];
 type SoundPersonnelField = Extract<
@@ -210,48 +214,86 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
     }
   };
 
-  const handleFileUpload = async (taskId: string, file: File) => {
+  const handleFileUpload = async (taskId: string, files: File[]) => {
+    if (files.length === 0) return;
+
+    const validationError = getDocumentUploadValidationError(files);
+    if (validationError) {
+      toast({
+        title: "Archivo no permitido",
+        description: validationError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const uploadedPaths: string[] = [];
+    const insertedIds: string[] = [];
     try {
       setUploading(true);
-      const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const timestamp = new Date().getTime();
-      const filePath = `${taskId}/${timestamp}_${sanitizedFileName}`;
+      const { data: authData } = await dataLayerClient.auth.getUser();
+      const uploadedBy = authData.user?.id;
 
-      const { error: uploadError } = await dataLayerClient.storage
-        .from('task_documents')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      if (uploadError) throw uploadError;
+      for (const file of files) {
+        const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filePath = `${taskId}/${Date.now()}-${crypto.randomUUID()}_${sanitizedFileName}`;
 
-      const { error: dbError } = await dataLayerClient.from('task_documents')
-        .insert({
-          sound_task_id: taskId,
-          file_name: file.name,
-          file_path: filePath,
-          uploaded_by: (await dataLayerClient.auth.getUser()).data.user?.id
-        });
-      if (dbError) throw dbError;
+        const { error: uploadError } = await dataLayerClient.storage
+          .from('task_documents')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+        if (uploadError) throw uploadError;
+        uploadedPaths.push(filePath);
 
-      await dataLayerClient.from('sound_job_tasks')
+        const { data: insertedDocument, error: dbError } = await dataLayerClient.from('task_documents')
+          .insert({
+            sound_task_id: taskId,
+            file_name: file.name,
+            file_path: filePath,
+            uploaded_by: uploadedBy
+          })
+          .select('id')
+          .single();
+        if (dbError) throw dbError;
+        if (insertedDocument?.id) {
+          insertedIds.push(insertedDocument.id);
+        }
+      }
+
+      const { error: taskUpdateError } = await dataLayerClient.from('sound_job_tasks')
         .update({ 
           status: 'completed',
           progress: 100,
           updated_at: new Date().toISOString()
         })
         .eq('id', taskId);
+      if (taskUpdateError) throw taskUpdateError;
 
       toast({
-        title: "File uploaded successfully",
-        description: "The document has been uploaded and task marked as completed.",
+        title: files.length === 1 ? "Archivo subido correctamente" : "Archivos subidos correctamente",
+        description:
+          files.length === 1
+            ? "El documento se ha subido y la tarea se ha marcado como completada."
+            : `${files.length} documentos se han subido y la tarea se ha marcado como completada.`,
       });
 
       refetchTasks();
     } catch (error: any) {
+      try {
+        if (insertedIds.length > 0) {
+          await dataLayerClient.from('task_documents').delete().in('id', insertedIds);
+        }
+        if (uploadedPaths.length > 0) {
+          await dataLayerClient.storage.from('task_documents').remove(uploadedPaths);
+        }
+      } catch (cleanupError) {
+        console.error("Error rolling back sound task document upload batch:", cleanupError);
+      }
       toast({
-        title: "Upload failed",
-        description: error.message,
+        title: "Error al subir",
+        description: error.message || "No se pudo completar la subida. Se ha revertido la tanda.",
         variant: "destructive",
       });
     } finally {
@@ -600,10 +642,13 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
                               <div className="relative">
                                 <input
                                   type="file"
+                                  multiple
+                                  accept={DOCUMENT_UPLOAD_ACCEPT}
                                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                   onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleFileUpload(task.id, file);
+                                    const files = Array.from(e.target.files ?? []);
+                                    e.target.value = "";
+                                    if (files.length > 0) handleFileUpload(task.id, files);
                                   }}
                                   disabled={uploading}
                                 />
@@ -614,7 +659,7 @@ export const SoundTaskDialog = ({ jobId, open, onOpenChange }: SoundTaskDialogPr
                                   className="w-[100px]"
                                 >
                                   <Upload className="h-3 w-3 mr-1" />
-                                  Upload
+                                  Subir
                                 </Button>
                               </div>
                             )}

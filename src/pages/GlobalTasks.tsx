@@ -42,6 +42,10 @@ import {
   localInputToUTC,
 } from '@/utils/timezoneUtils';
 import { getErrorMessage } from '@/utils/errorMessage';
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  getDocumentUploadValidationError,
+} from '@/utils/documentUploadValidation';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -232,18 +236,50 @@ export default function GlobalTasks() {
     completed: tasks.filter((t) => t.status === 'completed').length,
   }), [tasks]);
 
-  const onUpload = async (task: GlobalTask, file?: File) => {
-    if (!file) return;
-    try {
-      await mutations.uploadAttachment(task.id, file, {
-        jobId: task.job_id,
-        tourId: task.tour_id,
-      });
-      toast({ title: 'Archivo subido' });
-      await refetch();
-    } catch (err: unknown) {
-      toast({ title: 'Error', description: getErrorMessage(err), variant: 'destructive' });
+  const onUpload = async (task: GlobalTask, files: File[]) => {
+    if (files.length === 0) return;
+
+    const validationError = getDocumentUploadValidationError(files);
+    if (validationError) {
+      toast({ title: 'Archivo no permitido', description: validationError, variant: 'destructive' });
+      return;
     }
+
+    let uploadedCount = 0;
+    const failedMessages: string[] = [];
+
+    for (const file of files) {
+      try {
+        await mutations.uploadAttachment(task.id, file, {
+          jobId: task.job_id,
+          tourId: task.tour_id,
+        });
+        uploadedCount += 1;
+      } catch (err: unknown) {
+        failedMessages.push(`${file.name}: ${getErrorMessage(err)}`);
+      }
+    }
+
+    if (uploadedCount > 0 || failedMessages.length > 0) {
+      await refetch();
+    }
+
+    if (failedMessages.length === 0) {
+      toast({
+        title: files.length === 1 ? 'Archivo subido' : 'Archivos subidos',
+        description: files.length === 1 ? undefined : `${files.length} archivos adjuntados`,
+      });
+      return;
+    }
+
+    toast({
+      title: uploadedCount > 0 ? 'Subida parcial' : 'Error',
+      description:
+        uploadedCount > 0
+          ? `${uploadedCount} de ${files.length} archivo(s) se subieron. ${failedMessages[0]}`
+          : failedMessages[0],
+      variant: 'destructive',
+    });
   };
 
   const onDeleteAttachment = async (task: GlobalTask, docId: string, filePath: string) => {
@@ -773,11 +809,13 @@ export default function GlobalTasks() {
                         <div className="relative inline-block">
                           <input
                             type="file"
+                            multiple
+                            accept={DOCUMENT_UPLOAD_ACCEPT}
                             className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                             onChange={(e) => {
-                              const file = e.target.files?.[0];
+                              const files = Array.from(e.target.files ?? []);
                               e.target.value = ''; // Clear so same file can be re-selected
-                              onUpload(task, file);
+                              onUpload(task, files);
                             }}
                           />
                           <Button size="sm" variant="ghost" className="h-7 w-7 p-0">

@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Weight, Calculator, Trash2, Download, Calendar, Copy, AlertTriangle, Anchor, Plug } from "lucide-react";
+import { FileText, Weight, Calculator, Trash2, Download, Calendar, Copy, AlertTriangle, Anchor, Plug, UploadCloud } from "lucide-react";
 import { exportToPDF } from "@/utils/pdfExport";
 import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -23,6 +23,7 @@ import { buildNormalizedTourPowerTables, computePowerTotalVa } from "@/utils/tou
 import { getDepartmentLabel } from "@/types/department";
 import type { TechnicalPowerDepartment } from "@/utils/technicalPowerTypes";
 import { getResolvedPowerPosition } from "@/utils/powerPositions";
+import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 import {
   DEPARTMENT_PACKAGE_LABELS,
   TOUR_PACKAGE_LABELS,
@@ -208,6 +209,8 @@ export const TourDefaultsManager = ({
   const [newSetName, setNewSetName] = useState('');
   const [newSetDescription, setNewSetDescription] = useState('');
   const [newSetPackageSize, setNewSetPackageSize] = useState<TourPackageSize | null>(null);
+  const [isSyncingDefaultDocs, setIsSyncingDefaultDocs] = useState(false);
+  const defaultDocumentSyncQueueRef = React.useRef<Promise<void>>(Promise.resolve());
   // Track the power default flag currently being toggled so only the affected
   // row/set is disabled (the shared mutation flag would otherwise freeze every
   // card).
@@ -328,6 +331,61 @@ export const TourDefaultsManager = ({
     }
   };
 
+  const invalidateTourDocumentQueries = async () => {
+    if (!tour?.id) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tour.id) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobcard-tour-documents') }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents-for-job') }),
+    ]);
+  };
+
+  const syncDefaultDocuments = async ({ silent = false }: { silent?: boolean } = {}) => {
+    if (!tour?.id) return;
+
+    const runSync = async () => {
+      setIsSyncingDefaultDocs(true);
+      try {
+        const result = await syncTourDefaultDocuments({ tourId: tour.id });
+        await invalidateTourDocumentQueries();
+
+        if (result.errors.length > 0) {
+          toast({
+            title: 'PDFs sincronizados con avisos',
+            description: `${result.errors.length} documento(s) no se pudieron refrescar.`,
+            variant: 'destructive',
+          });
+        } else if (!silent) {
+          toast({
+            title: 'PDFs sincronizados',
+            description: `${result.uploaded} documento(s) actualizados y ${result.removed} ruta(s) limpiadas.`,
+          });
+        }
+      } catch (error) {
+        console.error('Error syncing tour default documents:', error);
+        toast({
+          title: 'Error',
+          description: 'No se pudieron sincronizar los PDFs automáticos de fechas.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsSyncingDefaultDocs(false);
+      }
+    };
+
+    const queuedSync = defaultDocumentSyncQueueRef.current.then(runSync, runSync);
+    defaultDocumentSyncQueueRef.current = queuedSync.catch((): void => undefined);
+    await queuedSync;
+  };
+
+  const updateSetAndSync = async ({
+    setId,
+    updates,
+  }: Parameters<typeof updateSet>[0]) => {
+    await updateSet({ setId, updates });
+    await syncDefaultDocuments({ silent: true });
+  };
+
   // Handle deletion based on format type
   const handleDeleteTable = async (table: CombinedDefaultType, type: 'power' | 'weight') => {
     try {
@@ -335,6 +393,7 @@ export const TourDefaultsManager = ({
       if (isNewFormatTable(table)) {
         // New format - use deleteTable from useTourDefaultSets
         await deleteTable(table.id);
+        await syncDefaultDocuments({ silent: true });
       } else {
         // Legacy format - use the old delete functions
         if (type === 'power' && isLegacyPowerDefault(table)) {
@@ -388,6 +447,7 @@ export const TourDefaultsManager = ({
       await queryClient.invalidateQueries({
         queryKey: queryKeys.scope('tour-default-tables', tour?.id || ''),
       });
+      await syncDefaultDocuments({ silent: true });
     } catch (error) {
       console.error('Error updating power default flag:', error);
       toast({
@@ -404,6 +464,7 @@ export const TourDefaultsManager = ({
   const handleDeleteSet = async (setId: string) => {
     try {
       await deleteSet(setId);
+      await syncDefaultDocuments({ silent: true });
     } catch (error) {
       console.error('Error deleting set:', error);
       toast({
@@ -437,6 +498,7 @@ export const TourDefaultsManager = ({
       setNewSetName('');
       setNewSetDescription('');
       setNewSetPackageSize(null);
+      await syncDefaultDocuments({ silent: true });
     } catch (error) {
       console.error('Error creating set:', error);
     }
@@ -453,13 +515,14 @@ export const TourDefaultsManager = ({
         description: sourceSet.description,
         package_size: sourceSet.package_size,
       });
+      await syncDefaultDocuments({ silent: true });
     } catch (error) {
       console.error('Error duplicating set:', error);
     }
   };
 
   const updateSetPackageSize = async (setId: string, value: string) => {
-    await updateSet({
+    await updateSetAndSync({
       setId,
       updates: {
         package_size: value === 'unassigned' ? null : (value as TourPackageSize),
@@ -491,7 +554,7 @@ export const TourDefaultsManager = ({
           onBlur={(event) => {
             const nextName = event.target.value.trim();
             if (nextName && nextName !== set.name) {
-              void updateSet({ setId: set.id, updates: { name: nextName } });
+              void updateSetAndSync({ setId: set.id, updates: { name: nextName } });
             }
           }}
         />
@@ -502,7 +565,7 @@ export const TourDefaultsManager = ({
           onBlur={(event) => {
             const nextDescription = event.target.value.trim() || null;
             if (nextDescription !== (set.description || null)) {
-              void updateSet({ setId: set.id, updates: { description: nextDescription } });
+              void updateSetAndSync({ setId: set.id, updates: { description: nextDescription } });
             }
           }}
         />
@@ -1521,12 +1584,23 @@ export const TourDefaultsManager = ({
     return (
       <div className="space-y-6">
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <h3 className="text-lg font-semibold flex items-center gap-2 mb-3">
-            <Calendar className="h-5 w-5" />
-            Fechas de Gira ({tourDates.length})
-          </h3>
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-3">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Fechas de Gira ({tourDates.length})
+            </h3>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => syncDefaultDocuments()}
+              disabled={tourDates.length === 0 || isSyncingDefaultDocs}
+            >
+              <UploadCloud className="h-4 w-4 mr-1" />
+              {isSyncingDefaultDocs ? 'Sincronizando...' : 'Sincronizar PDFs'}
+            </Button>
+          </div>
           <p className="text-sm text-green-700 mb-4">
-            Exporta PDFs individuales para cada fecha de gira, incluyendo valores por defecto y anulaciones.
+            Exporta PDFs individuales para cada fecha de gira, incluyendo valores por defecto y anulaciones. Los PDFs automáticos se suben a documentos de gira y se reemplazan cuando cambian paquetes o valores por defecto.
           </p>
         </div>
 

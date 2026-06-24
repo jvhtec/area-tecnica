@@ -8,6 +8,10 @@ import { dataLayerClient } from "@/services/dataLayerClient";
 import { FileText, Loader2, Trash2, Upload, Eye, X } from "lucide-react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { ViewFileDialog } from "./ViewFileDialog";
+import {
+  DOCUMENT_UPLOAD_ACCEPT,
+  getDocumentUploadValidationError,
+} from "@/utils/documentUploadValidation";
 
 interface ArtistFileDialogProps {
   open: boolean;
@@ -59,50 +63,85 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
   }, [open, artistId]);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (selectedFiles.length === 0) return;
 
+    const validationError = getDocumentUploadValidationError(selectedFiles);
+    if (validationError) {
+      toast({
+        title: "Archivo no permitido",
+        description: validationError,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const uploadedPaths: string[] = [];
+    const insertedIds: string[] = [];
     setIsUploading(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${artistId}/${crypto.randomUUID()}.${fileExt}`;
+      for (const file of selectedFiles) {
+        const fileExt = file.name.split('.').pop();
+        const filePath = `${artistId}/${crypto.randomUUID()}.${fileExt}`;
 
-      // First upload the file to storage
-      const { error: uploadError } = await dataLayerClient.storage
-        .from('festival_artist_files')
-        .upload(filePath, file);
+        // First upload the file to storage
+        const { error: uploadError } = await dataLayerClient.storage
+          .from('festival_artist_files')
+          .upload(filePath, file);
 
-      if (uploadError) {
-        console.error("Storage upload error:", uploadError);
-        throw uploadError;
-      }
+        if (uploadError) {
+          console.error("Storage upload error:", uploadError);
+          throw uploadError;
+        }
+        uploadedPaths.push(filePath);
 
-      // Then create the database record
-      const { error: dbError } = await dataLayerClient.from('festival_artist_files')
-        .insert({
-          artist_id: artistId,
-          file_name: file.name,
-          file_path: filePath,
-          file_type: file.type,
-          file_size: file.size,
-        });
+        // Then create the database record
+        const { data: insertedFile, error: dbError } = await dataLayerClient.from('festival_artist_files')
+          .insert({
+            artist_id: artistId,
+            file_name: file.name,
+            file_path: filePath,
+            file_type: file.type,
+            file_size: file.size,
+          })
+          .select("id")
+          .single();
 
-      if (dbError) {
-        console.error("Database insert error:", dbError);
-        throw dbError;
+        if (dbError) {
+          console.error("Database insert error:", dbError);
+          throw dbError;
+        }
+
+        if (insertedFile?.id) {
+          insertedIds.push(insertedFile.id);
+        }
       }
 
       toast({
         title: "Éxito",
-        description: "Archivo cargado correctamente",
+        description:
+          selectedFiles.length === 1
+            ? "Archivo cargado correctamente"
+            : `${selectedFiles.length} archivos cargados correctamente`,
       });
 
       fetchFiles();
     } catch (error: any) {
       console.error("Error uploading file:", error);
+      try {
+        if (insertedIds.length > 0) {
+          await dataLayerClient.from('festival_artist_files').delete().in('id', insertedIds);
+        }
+        if (uploadedPaths.length > 0) {
+          await dataLayerClient.storage.from('festival_artist_files').remove(uploadedPaths);
+        }
+      } catch (cleanupError) {
+        console.error("Error rolling back artist file upload batch:", cleanupError);
+      }
       toast({
         title: "Error",
-        description: "No se pudo cargar el archivo",
+        description: "No se pudo completar la carga. Se han revertido los archivos de esta tanda.",
         variant: "destructive",
       });
     } finally {
@@ -216,6 +255,8 @@ export const ArtistFileDialog = ({ open, onOpenChange, artistId }: ArtistFileDia
                 <Input
                   id="file-upload"
                   type="file"
+                  multiple
+                  accept={DOCUMENT_UPLOAD_ACCEPT}
                   onChange={handleFileUpload}
                   disabled={isUploading}
                   className="cursor-pointer"

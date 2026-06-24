@@ -13,6 +13,7 @@ import {
   canManageFestivalArtists,
   canUploadDocuments as canUploadDocumentsForRole,
 } from '@/utils/permissions';
+import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -171,51 +172,81 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
-    const file = e.target.files?.[0];
-    if (!file || !department) return;
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    if (files.length === 0 || !department) return;
 
-    try {
-      const fileExt = file.name.split(".").pop();
-      const filePath = `${department}/${job.id}/${crypto.randomUUID()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("job_documents")
-        .upload(filePath, file);
-      if (uploadError) throw uploadError;
-
-      const { error: dbError } = await supabase
-        .from("job_documents")
-        .insert({
-          job_id: job.id,
-          file_name: file.name,
-          file_path: filePath,
-          file_type: file.type,
-          file_size: file.size,
-          original_type: null
-        });
-      if (dbError) throw dbError;
-
-      // Broadcast push: new document uploaded
-      try {
-        void supabase.functions.invoke('push', {
-          body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
-        });
-      } catch {}
-
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
-
-      toast({
-        title: "Document uploaded",
-        description: "The document has been successfully uploaded."
-      });
-    } catch (err: any) {
-      toast({
-        title: "Upload failed",
-        description: err.message,
-        variant: "destructive"
-      });
+    const validationError = getDocumentUploadValidationError(files);
+    if (validationError) {
+      toast({ title: "Archivo no permitido", description: validationError, variant: "destructive" });
+      return;
     }
+
+    let uploadedCount = 0;
+    const failedMessages: string[] = [];
+
+    for (const file of files) {
+      try {
+        const fileExt = file.name.split(".").pop();
+        const filePath = `${department}/${job.id}/${crypto.randomUUID()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("job_documents")
+          .upload(filePath, file);
+        if (uploadError) throw uploadError;
+
+        const { error: dbError } = await supabase
+          .from("job_documents")
+          .insert({
+            job_id: job.id,
+            file_name: file.name,
+            file_path: filePath,
+            file_type: file.type,
+            file_size: file.size,
+            original_type: null
+          });
+        if (dbError) {
+          const { error: cleanupError } = await supabase.storage.from("job_documents").remove([filePath]);
+          if (cleanupError) {
+            console.error("Storage cleanup after failed job document insert failed:", cleanupError);
+          }
+          throw dbError;
+        }
+        uploadedCount += 1;
+
+        // Broadcast push: new document uploaded
+        try {
+          void supabase.functions.invoke('push', {
+            body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
+          });
+        } catch {}
+      } catch (err: any) {
+        failedMessages.push(`${file.name}: ${err?.message || String(err)}`);
+      }
+    }
+
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
+
+    if (failedMessages.length === 0) {
+      toast({
+        title: files.length === 1 ? "Documento subido" : "Documentos subidos",
+        description:
+          files.length === 1
+            ? "El documento se ha subido correctamente."
+            : `${files.length} documentos se han subido correctamente.`
+      });
+      return;
+    }
+
+    toast({
+      title: uploadedCount > 0 ? "Subida parcial" : "Error al subir",
+      description:
+        uploadedCount > 0
+          ? `${uploadedCount} de ${files.length} documento(s) se subieron. ${failedMessages[0]}`
+          : failedMessages[0],
+      variant: "destructive"
+    });
   };
 
   const handleDeleteDocument = async (doc: JobDocument) => {

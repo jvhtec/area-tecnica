@@ -38,6 +38,10 @@ import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { TECHNICAL_DEPARTMENTS } from "@/types/department";
 import { syncFlexElementsForTourDateChange } from "@/utils/flex-folders/syncDateChange";
 import {
+  cleanupTourDefaultDocumentsForDate,
+  syncTourDefaultDocuments,
+} from "@/utils/tourDefaultDocumentSync";
+import {
   DateType,
   getDateTypeMeta,
   isSingleDayDateType,
@@ -198,6 +202,33 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     return matches.length === 1 ? matches[0].id : null;
   };
 
+  const defaultSetMatchesPackageSelection = (
+    setId: string | null,
+    department: PackageDepartment,
+    packageSize: TourPackageSize | null
+  ) => {
+    if (!setId) return false;
+
+    const selectedSet = defaultSets.find((set) => set.id === setId);
+    return Boolean(
+      selectedSet &&
+        selectedSet.department === department &&
+        (!packageSize || !selectedSet.package_size || selectedSet.package_size === packageSize)
+    );
+  };
+
+  const resolveDefaultSetIdForPackageSelection = (
+    department: PackageDepartment,
+    packageSize: TourPackageSize | null,
+    selectedSetId: string | null
+  ) => {
+    if (defaultSetMatchesPackageSelection(selectedSetId, department, packageSize)) {
+      return selectedSetId;
+    }
+
+    return getUniqueDefaultSetId(department, packageSize);
+  };
+
   const buildPackageUpdatePayload = (
     packageSizes: PackageSelectionState,
     defaultSetIds: DefaultSetSelectionState
@@ -206,12 +237,48 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     lights_package_size: packageSizes.lights,
     video_package_size: packageSizes.video,
     sound_default_set_id:
-      defaultSetIds.sound || getUniqueDefaultSetId("sound", packageSizes.sound),
+      resolveDefaultSetIdForPackageSelection("sound", packageSizes.sound, defaultSetIds.sound),
     lights_default_set_id:
-      defaultSetIds.lights || getUniqueDefaultSetId("lights", packageSizes.lights),
+      resolveDefaultSetIdForPackageSelection("lights", packageSizes.lights, defaultSetIds.lights),
     video_default_set_id:
-      defaultSetIds.video || getUniqueDefaultSetId("video", packageSizes.video),
+      resolveDefaultSetIdForPackageSelection("video", packageSizes.video, defaultSetIds.video),
   });
+
+  const invalidateTourDocumentQueries = async () => {
+    if (!tourId) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents", tourId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobcard-tour-documents") }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents-for-job") }),
+    ]);
+  };
+
+  const syncTourDefaultDocumentsForDate = async (dateId: string) => {
+    if (!tourId) return;
+
+    try {
+      const result = await syncTourDefaultDocuments({
+        tourId,
+        tourDateIds: [dateId],
+      });
+      await invalidateTourDocumentQueries();
+
+      if (result.errors.length > 0) {
+        toast({
+          title: "Fecha de gira guardada con avisos de PDF",
+          description: `${result.errors.length} documento(s) predeterminados no se pudieron actualizar.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error syncing tour default documents:", error);
+      toast({
+        title: "Fecha de gira guardada con avisos de PDF",
+        description: "No se pudieron actualizar los PDF del paquete para esta fecha.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const applyTourPackShortcut = (
     checked: boolean,
@@ -234,7 +301,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     setPackageSizes((prev) => ({ ...prev, [department]: packageSize }));
     setDefaultSetIds((prev) => ({
       ...prev,
-      [department]: prev[department] && packageSize ? prev[department] : null,
+      [department]: resolveDefaultSetIdForPackageSelection(
+        department,
+        packageSize,
+        prev[department]
+      ),
     }));
   };
 
@@ -484,6 +555,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-folders-existence") }),
       ]);
 
+      await syncTourDefaultDocumentsForDate(newTourDate.id);
+
       toast({
         title: "Success",
         description: "Tour date and job created successfully",
@@ -690,6 +763,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
       ]);
 
+      await syncTourDefaultDocumentsForDate(dateId);
+
       // Only show success toast if flex sync didn't have warnings or errors
       if (!flexSyncHadWarningsOrError) {
         toast({
@@ -885,6 +960,16 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         throw dateError;
       }
 
+      let defaultDocumentCleanupFailed = false;
+      if (tourId) {
+        try {
+          await cleanupTourDefaultDocumentsForDate({ tourId, tourDateId: dateId });
+        } catch (cleanupError) {
+          defaultDocumentCleanupFailed = true;
+          console.error("Error cleaning up tour default documents for deleted date:", cleanupError);
+        }
+      }
+
       console.log("Tour date deletion completed successfully");
 
       // Force refresh all related queries after successful deletion
@@ -896,17 +981,20 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
         queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-folders-existence") }),
       ]);
+      await invalidateTourDocumentQueries();
 
       toast({
-        title: "Success",
-        description: "Tour date deleted successfully"
+        title: defaultDocumentCleanupFailed ? "Fecha eliminada con avisos" : "Fecha eliminada",
+        description: defaultDocumentCleanupFailed
+          ? "La fecha se eliminó, pero no se pudieron limpiar todos los PDF automáticos."
+          : "La fecha de gira se eliminó correctamente."
       });
 
     } catch (error: any) {
       console.error("Error deleting date:", error);
       toast({
-        title: "Error deleting date",
-        description: error.message || "An unexpected error occurred while deleting the tour date",
+        title: "Error al eliminar la fecha",
+        description: error.message || "Se produjo un error inesperado al eliminar la fecha de gira.",
         variant: "destructive",
       });
     } finally {

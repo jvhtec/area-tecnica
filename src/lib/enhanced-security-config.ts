@@ -165,18 +165,18 @@ export function validateFileUpload(file: File): {
   
   // Check file size
   if (file.size > ENHANCED_RATE_LIMITS.MAX_DOCUMENT_SIZE) {
-    errors.push(`File size exceeds ${ENHANCED_RATE_LIMITS.MAX_DOCUMENT_SIZE / 1024 / 1024}MB limit`);
+    errors.push(`El archivo supera el límite de ${ENHANCED_RATE_LIMITS.MAX_DOCUMENT_SIZE / 1024 / 1024} MB`);
   }
   
   // Check filename
   if (!ENHANCED_VALIDATION_PATTERNS.SAFE_FILENAME.test(file.name)) {
-    errors.push('File name contains invalid characters');
+    errors.push('El nombre del archivo contiene caracteres no permitidos');
   }
   
   // Check for double extensions (e.g., file.txt.exe)
   const nameParts = file.name.split('.');
   if (nameParts.length > 2) {
-    errors.push('File name cannot contain multiple extensions');
+    errors.push('El nombre del archivo no puede contener múltiples extensiones');
   }
   
   // Allowed file types
@@ -191,7 +191,7 @@ export function validateFileUpload(file: File): {
   ];
   
   if (!allowedTypes.includes(file.type)) {
-    errors.push('File type not allowed');
+    errors.push('Tipo de archivo no permitido');
   }
   
   return {

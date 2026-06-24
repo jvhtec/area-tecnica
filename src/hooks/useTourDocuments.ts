@@ -25,6 +25,13 @@ export interface TourDocument {
   visible_to_guest?: boolean;
 }
 
+type UploadTourDocumentVariables = {
+  file: File;
+  fileName?: string;
+  suppressInvalidation?: boolean;
+  suppressToast?: boolean;
+};
+
 export const useTourDocuments = (tourId: string) => {
   const { user, userRole } = useOptimizedAuth();
   const queryClient = useQueryClient();
@@ -54,7 +61,7 @@ export const useTourDocuments = (tourId: string) => {
   });
 
   const uploadDocument = useMutation({
-    mutationFn: async ({ file, fileName }: { file: File; fileName?: string }) => {
+    mutationFn: async ({ file, fileName }: UploadTourDocumentVariables) => {
       if (!user?.id) throw new Error("User not authenticated");
       if (!canUploadTourDocuments(userRole)) throw new Error("Not allowed");
 
@@ -95,21 +102,34 @@ export const useTourDocuments = (tourId: string) => {
 
       if (dbError) {
         console.error('Database insert error:', dbError);
+        const { error: cleanupError } = await supabase.storage.from('tour-documents').remove([filePath]);
+        if (cleanupError) {
+          console.error('Storage cleanup after failed document insert failed:', cleanupError);
+        }
         throw dbError;
       }
 
       console.log('Document uploaded successfully:', data);
       return data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
-      toast.success('Document uploaded successfully');
+    onSuccess: (_data, variables) => {
+      if (!variables.suppressInvalidation) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
+      }
+      if (!variables.suppressToast) {
+        toast.success('Documento subido correctamente');
+      }
     },
-    onError: (error: any) => {
+    onError: (error: any, variables) => {
       console.error('Upload error:', error);
-      toast.error('Failed to upload document');
+      if (!variables?.suppressToast) {
+        toast.error('No se pudo subir el documento');
+      }
     }
   });
+
+  const refreshDocuments = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-documents', tourId) });
 
   const updateVisibility = useMutation({
     mutationFn: async ({ documentId, visibleToTech }: { documentId: string; visibleToTech: boolean }) => {
@@ -247,6 +267,7 @@ export const useTourDocuments = (tourId: string) => {
     isLoading,
     error,
     uploadDocument,
+    refreshDocuments,
     updateVisibility,
     updateGuestVisibility,
     deleteDocument,

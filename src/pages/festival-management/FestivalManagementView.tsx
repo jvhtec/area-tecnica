@@ -35,6 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { FestivalManagementVm } from "@/features/festival-management/types";
 import type { Department } from "@/types/department";
+import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
 import { canSubmitTechnicianIncidentReports, isDepartmentManagementRole, isManagementRole } from "@/utils/permissions";
 
 import { FestivalManagementDialogs } from "./FestivalManagementDialogs";
@@ -534,6 +535,8 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                     <div className="relative">
                       <input
                         type="file"
+                        multiple
+                        accept={DOCUMENT_UPLOAD_ACCEPT}
                         onChange={handleDocumentUpload}
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         disabled={isUploadingDocument}
@@ -545,7 +548,7 @@ export const FestivalManagementView = ({ vm }: { vm: FestivalManagementVm }) => 
                             Subiendo...
                           </>
                         ) : (
-                          "Elegir Archivo"
+                          "Elegir Archivo(s)"
                         )}
                       </Button>
                     </div>
