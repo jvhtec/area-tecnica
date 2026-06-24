@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-24T15:24:24.680Z",
+  "generatedAt": "2026-06-24T16:13:10.987Z",
   "note": "Existing manual Edge Functions are grandfathered. New functions must use createHttpHandler or add an explicit reviewed exemption.",
   "manualFunctions": [
     {
@@ -46,11 +46,6 @@
     {
       "functionName": "create-whatsapp-group",
       "path": "supabase/functions/create-whatsapp-group/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "delete-public-artist-rider",
-      "path": "supabase/functions/delete-public-artist-rider/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
@@ -179,28 +174,8 @@
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
-      "functionName": "submit-public-artist-form",
-      "path": "supabase/functions/submit-public-artist-form/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
       "functionName": "sync-flex-crew-for-job",
       "path": "supabase/functions/sync-flex-crew-for-job/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "tech-calendar-ics",
-      "path": "supabase/functions/tech-calendar-ics/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "tour-guest-document-url",
-      "path": "supabase/functions/tour-guest-document-url/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "upload-public-artist-rider",
-      "path": "supabase/functions/upload-public-artist-rider/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
