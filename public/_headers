@@ -10,6 +10,12 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), fullscreen=(self), payment=()
 
+# The LG webOS wallboard launcher embeds the public wallboard URL in an iframe.
+# Keep X-Frame-Options locked down globally, but detach it for this read-only
+# tokenized signage route so already-installed TV launchers can load it.
+/wallboard/public/*
+  ! X-Frame-Options
+
 # Prevent service worker caching to ensure users always get the latest version
 /sw.js
   Cache-Control: no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0
