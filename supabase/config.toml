@@ -67,6 +67,9 @@ verify_jwt = false
 [functions.tour-guest-document-url]
 verify_jwt = false
 
+[functions.job-hoja-de-ruta-link]
+verify_jwt = false
+
 # Browser-posted CSP reports carry no credentials, so the gateway JWT check must
 # be disabled. The function reads a size-bounded body and writes only normalized
 # reports via the service role (see check-edge-function-exposure.mjs).

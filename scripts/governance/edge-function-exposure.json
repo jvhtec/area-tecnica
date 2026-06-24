@@ -46,6 +46,11 @@
     "get-secret": { "class": "privileged-role", "verifyJwt": true, "internalGuard": "Management role check; only client-safe allowlisted keys are returned (see ENT-SEC-02 remediation)." },
     "image-proxy": { "class": "authenticated-user", "verifyJwt": true },
     "import-users": { "class": "privileged-role", "verifyJwt": true },
+    "job-hoja-de-ruta-link": {
+      "class": "public-token",
+      "verifyJwt": false,
+      "internalGuard": "HMAC-signed job-scoped links expire, pass durable ingress and token-scoped rate limits, then resolve the latest Hoja de Ruta and redirect only to a short-lived storage signed URL."
+    },
     "manage-flex-crew-assignments": { "class": "privileged-role", "verifyJwt": true },
     "notify-staffing-cancellation": {
       "class": "privileged-role",
