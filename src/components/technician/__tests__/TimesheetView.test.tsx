@@ -222,7 +222,13 @@ describe("TimesheetView", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /añadir firma/i }));
+    // Signing is mandatory: an unsigned parte exposes no submit button.
+    expect(
+      screen.queryByRole("button", { name: (name) => name === "ENVIAR PARTE" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/debes firmar el parte para poder enviarlo/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /firmar y enviar/i }));
     expect(screen.getByTestId("signature-pad")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^guardar$/i }));
@@ -231,7 +237,66 @@ describe("TimesheetView", () => {
       expect(signTimesheet).toHaveBeenCalledWith("mine", "data:image/png;base64,signature");
     });
 
-    await user.click(screen.getByRole("button", { name: /enviar parte/i }));
+    // Signing is the last step before submitting, so the send nudge pops.
+    expect(await screen.findByText(/parte firmado/i)).toBeInTheDocument();
+
+    // The prompt's button is "Enviar parte"; the card's is "ENVIAR PARTE".
+    // Match the prompt one case-sensitively to disambiguate.
+    await user.click(
+      screen.getByRole("button", { name: (name) => name === "Enviar parte" }),
+    );
+
+    expect(submitTimesheet).toHaveBeenCalledWith("mine");
+  });
+
+  it("prompts to send immediately after saving an already-signed draft", async () => {
+    const user = userEvent.setup();
+    const updateTimesheet = vi.fn().mockResolvedValue(undefined);
+    const submitTimesheet = vi.fn().mockResolvedValue(undefined);
+
+    useTimesheetsMock.mockReturnValue({
+      ...baseHookValue(),
+      updateTimesheet,
+      submitTimesheet,
+      timesheets: [
+        createTimesheet({
+          id: "mine",
+          technician_id: "tech-1",
+          date: "2026-03-10",
+          start_time: "09:00",
+          end_time: "17:00",
+          status: "draft",
+          signature_data: "data:image/png;base64,existing-signature",
+        }),
+      ],
+    });
+
+    renderWithProviders(
+      <TimesheetView
+        theme={theme}
+        isDark
+        job={createJob({ id: "job-1", title: "Job 1" }) as any}
+        onClose={vi.fn()}
+        userRole="technician"
+        userId="tech-1"
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /editar horario/i }));
+    await user.click(screen.getByRole("button", { name: /guardar/i }));
+
+    await waitFor(() => {
+      expect(updateTimesheet).toHaveBeenCalledWith(
+        "mine",
+        expect.objectContaining({ start_time: "09:00", end_time: "17:00" }),
+      );
+    });
+
+    expect(await screen.findByText(/parte firmado/i)).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: (name) => name === "Enviar parte" }),
+    );
 
     expect(submitTimesheet).toHaveBeenCalledWith("mine");
   });

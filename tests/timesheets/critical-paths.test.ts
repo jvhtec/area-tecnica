@@ -196,6 +196,7 @@ describe("Timesheets Critical Paths", () => {
       status: "rejected",
       rejection_reason: "Faltan notas",
       technician_id: "tech-1",
+      signature_data: "data:image/png;base64,existing-signature",
     });
 
     renderTimesheetView({ timesheets: [timesheet] });
@@ -223,7 +224,7 @@ describe("Timesheets Critical Paths", () => {
 
     renderTimesheetView({ timesheets: [timesheet] });
 
-    await user.click(screen.getByRole("button", { name: /añadir firma/i }));
+    await user.click(screen.getByRole("button", { name: /firmar y enviar/i }));
 
     expect(screen.getByText(/firma digital/i)).toBeInTheDocument();
     expect(screen.getByTestId("signature-pad")).toBeInTheDocument();

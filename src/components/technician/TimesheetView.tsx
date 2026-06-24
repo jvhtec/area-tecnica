@@ -98,6 +98,8 @@ const getStatusBadge = (status: string, isDark: boolean) => {
   }
 };
 
+const SENDABLE_TIMESHEET_STATUSES: ReadonlyArray<Timesheet['status']> = ['draft', 'rejected'];
+
 export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }: TimesheetViewProps) => {
   const { user } = useOptimizedAuth();
   const {
@@ -122,6 +124,23 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
     if (!timesheets || !userId) return [];
     return timesheets.filter(t => t.technician_id === userId);
   }, [timesheets, userId]);
+
+  // Days the technician edited & saved in this session. We only force-send the
+  // day(s) they actually touched — never every draft on the job.
+  const [editedIds, setEditedIds] = useState<Set<string>>(new Set());
+
+  // Of those edited days, the ones still saved-but-not-sent (draft/rejected).
+  const editedUnsent = useMemo(() => {
+    if (isClosureLocked) return [];
+    return myTimesheets.filter(
+      t => editedIds.has(t.id) && SENDABLE_TIMESHEET_STATUSES.includes(t.status)
+    );
+  }, [myTimesheets, editedIds, isClosureLocked]);
+
+  // Send prompt (fires right after saving a day) + exit-guard state
+  const [sendPromptId, setSendPromptId] = useState<string | null>(null);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [isSendingPrompt, setIsSendingPrompt] = useState(false);
 
   // Editing state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -185,6 +204,16 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
         category: isPrepDay ? undefined : formData.category,
       });
       setEditingId(null);
+      // Remember this day so the exit guard can catch it if the tech leaves
+      // without sending. If it is already signed, nudge immediately.
+      setEditedIds(prev => new Set(prev).add(timesheet.id));
+      if (
+        !isClosureLocked &&
+        timesheet.signature_data &&
+        SENDABLE_TIMESHEET_STATUSES.includes(timesheet.status)
+      ) {
+        setSendPromptId(timesheet.id);
+      }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Error desconocido';
       toast.error(`No se pudo guardar el parte: ${message}`);
@@ -200,6 +229,37 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
     }
   };
 
+  // Send a single day (the one just edited), then optionally leave the view.
+  const sendDay = async (timesheetId: string, { closeAfter = false }: { closeAfter?: boolean } = {}) => {
+    setIsSendingPrompt(true);
+    try {
+      await submitTimesheet(timesheetId);
+      setEditedIds(prev => {
+        const next = new Set(prev);
+        next.delete(timesheetId);
+        return next;
+      });
+      setSendPromptId(null);
+      setShowExitConfirm(false);
+      toast.success('Parte enviado');
+      if (closeAfter) onClose();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error desconocido';
+      toast.error(`No se pudo enviar el parte: ${message}`);
+    } finally {
+      setIsSendingPrompt(false);
+    }
+  };
+
+  // Guard the exit: if a day was edited but not sent, force a decision first.
+  const handleAttemptClose = () => {
+    if (editedUnsent.length > 0) {
+      setShowExitConfirm(true);
+      return;
+    }
+    onClose();
+  };
+
   const openSignatureDialog = (timesheetId: string) => {
     setSigningTimesheetId(timesheetId);
     setSignatureDialogOpen(true);
@@ -211,8 +271,16 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
     try {
       const signatureData = signaturePadRef.current.toDataURL();
       await signTimesheet(signingTimesheetId, signatureData);
+      const signedId = signingTimesheetId;
       setSignatureDialogOpen(false);
       setSigningTimesheetId(null);
+      // Signing is the last step before submitting — nudge the tech to send it
+      // now so a signed parte doesn't sit forgotten as a draft.
+      setEditedIds(prev => new Set(prev).add(signedId));
+      const signed = myTimesheets.find(t => t.id === signedId);
+      if (!isClosureLocked && (!signed || SENDABLE_TIMESHEET_STATUSES.includes(signed.status))) {
+        setSendPromptId(signedId);
+      }
     } catch (err) {
       console.error('Error saving signature:', err);
       toast.error('No se pudo guardar la firma');
@@ -249,7 +317,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
         <div className="flex justify-between items-center">
           <div>
             <button
-              onClick={onClose}
+              onClick={handleAttemptClose}
               className={`flex items-center gap-1 text-xs font-bold mb-1 ${theme.textMuted}`}
             >
               <ChevronLeft size={14} /> Volver
@@ -258,6 +326,7 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
           </div>
         </div>
       </div>
+
 
       {/* Content */}
       <ScrollArea className="flex-1">
@@ -684,24 +753,28 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
                                 </Button>
                               )}
 
-                              {/* Sign button */}
+                              {/* Sign button — signing is mandatory before submitting */}
                               {!timesheet.signature_data && canSubmit && (
-                                <Button
-                                  variant="outline"
-                                  className="w-full"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    e.preventDefault();
-                                    openSignatureDialog(timesheet.id);
-                                  }}
-                                >
-                                  <PenTool size={16} className="mr-2" />
-                                  Añadir firma
-                                </Button>
+                                <>
+                                  <Button
+                                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      openSignatureDialog(timesheet.id);
+                                    }}
+                                  >
+                                    <PenTool size={16} className="mr-2" />
+                                    FIRMAR Y ENVIAR
+                                  </Button>
+                                  <p className={`text-center text-[11px] ${theme.textMuted}`}>
+                                    Debes firmar el parte para poder enviarlo.
+                                  </p>
+                                </>
                               )}
 
-                              {/* Submit button */}
-                              {canSubmit && (
+                              {/* Submit button — only once the parte is signed */}
+                              {timesheet.signature_data && canSubmit && (
                                 <Button
                                   className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
                                   onClick={(e) => {
@@ -738,6 +811,117 @@ export const TimesheetView = ({ theme, isDark, job, onClose, userRole, userId }:
           )}
         </div>
       </ScrollArea>
+
+      {/* Post-save nudge — prompt to send the day that was just edited */}
+      {sendPromptId && (
+        <div className={`fixed inset-0 z-[80] flex items-center justify-center ${theme.modalOverlay || 'bg-black/90 backdrop-blur-md'} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
+          <div className={`w-full max-w-sm ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}>
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-full bg-emerald-500/15">
+                  <CheckCircle2 size={20} className="text-emerald-500" />
+                </div>
+                <h3 className={`font-bold text-lg ${theme.textMain}`}>Parte firmado</h3>
+              </div>
+              <p className={`text-sm ${theme.textMuted} mb-5`}>
+                Has firmado el parte pero todavía no se ha enviado. Envíalo ahora
+                para que pase a aprobación.
+              </p>
+              <div className="space-y-2">
+                <Button
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                  disabled={isSendingPrompt}
+                  onClick={() => sendDay(sendPromptId)}
+                >
+                  {isSendingPrompt ? (
+                    <Loader2 size={16} className="mr-2 animate-spin" />
+                  ) : (
+                    <CheckCircle2 size={16} className="mr-2" />
+                  )}
+                  Enviar parte
+                </Button>
+                <button
+                  className={`w-full text-center text-xs ${theme.textMuted} py-2 disabled:opacity-50`}
+                  disabled={isSendingPrompt}
+                  onClick={() => setSendPromptId(null)}
+                >
+                  Más tarde
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Exit guard — block leaving with an edited-but-unsent day */}
+      {showExitConfirm && editedUnsent.length > 0 && (
+        <div className={`fixed inset-0 z-[80] flex items-center justify-center ${theme.modalOverlay || 'bg-black/90 backdrop-blur-md'} px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] animate-in fade-in duration-200`}>
+          <div className={`w-full max-w-sm ${isDark ? 'bg-[#0f1219]' : 'bg-white'} rounded-2xl border ${theme.divider} shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200`}>
+            <div className="p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="p-2 rounded-full bg-amber-500/15">
+                  <AlertTriangle size={20} className="text-amber-500" />
+                </div>
+                <h3 className={`font-bold text-lg ${theme.textMain}`}>Parte sin enviar</h3>
+              </div>
+              <p className={`text-sm ${theme.textMuted} mb-5`}>
+                Editaste el parte del{' '}
+                <span className={`font-bold ${theme.textMain}`}>
+                  {format(parseISO(editedUnsent[0].date), "d 'de' MMMM", { locale: es })}
+                </span>{' '}
+                pero no lo has enviado. Si sales ahora no pasará a aprobación.
+                {!editedUnsent[0].signature_data && ' Debes firmarlo para poder enviarlo.'}
+              </p>
+              <div className="space-y-2">
+                {editedUnsent[0].signature_data ? (
+                  <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                    disabled={isSendingPrompt}
+                    onClick={() => sendDay(editedUnsent[0].id, { closeAfter: editedUnsent.length === 1 })}
+                  >
+                    {isSendingPrompt ? (
+                      <Loader2 size={16} className="mr-2 animate-spin" />
+                    ) : (
+                      <CheckCircle2 size={16} className="mr-2" />
+                    )}
+                    Enviar parte{editedUnsent.length === 1 ? ' y salir' : ''}
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                    disabled={isSendingPrompt}
+                    onClick={() => {
+                      setShowExitConfirm(false);
+                      openSignatureDialog(editedUnsent[0].id);
+                    }}
+                  >
+                    <PenTool size={16} className="mr-2" />
+                    Firmar y enviar
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  disabled={isSendingPrompt}
+                  onClick={() => setShowExitConfirm(false)}
+                >
+                  Seguir editando
+                </Button>
+                <button
+                  className={`w-full text-center text-xs ${theme.textMuted} py-2 disabled:opacity-50`}
+                  disabled={isSendingPrompt}
+                  onClick={() => {
+                    setShowExitConfirm(false);
+                    onClose();
+                  }}
+                >
+                  Salir sin enviar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Signature Modal - Custom implementation matching incident report */}
       {signatureDialogOpen && (
