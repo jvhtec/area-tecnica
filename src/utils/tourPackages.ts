@@ -166,6 +166,9 @@ export const resolveDefaultSetForTourDate = <TSet extends TourDefaultSetLike>({
   const explicitPackageSize = getExplicitDepartmentPackageSize(tourDate, department);
   const packageSize = getDepartmentPackageSize(tourDate, department);
   const explicitSetId = getDepartmentDefaultSetId(tourDate, department);
+  const departmentSets = defaultSets.filter(
+    (set) => setMatchesTour(tourDate, set) && setMatchesDepartment(set, department)
+  );
 
   if (explicitSetId) {
     const explicitSet = defaultSets.find((set) => set.id === explicitSetId);
@@ -206,6 +209,29 @@ export const resolveDefaultSetForTourDate = <TSet extends TourDefaultSetLike>({
       explicitSet.package_size &&
       explicitSet.package_size !== explicitPackageSize
     ) {
+      const packageMatches = departmentSets.filter(
+        (set) => set.package_size === explicitPackageSize
+      );
+
+      if (packageMatches.length === 1) {
+        return {
+          status: "resolved",
+          set: packageMatches[0],
+          source: "package_size",
+          packageSize,
+          department,
+        };
+      }
+
+      if (packageMatches.length > 1) {
+        return {
+          status: "ambiguous",
+          packageSize,
+          department,
+          matches: packageMatches,
+        };
+      }
+
       return {
         status: "invalid_explicit",
         packageSize,
@@ -224,10 +250,6 @@ export const resolveDefaultSetForTourDate = <TSet extends TourDefaultSetLike>({
       department,
     };
   }
-
-  const departmentSets = defaultSets.filter(
-    (set) => setMatchesTour(tourDate, set) && setMatchesDepartment(set, department)
-  );
 
   if (packageSize) {
     const matches = departmentSets.filter((set) => set.package_size === packageSize);

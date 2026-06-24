@@ -202,6 +202,33 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     return matches.length === 1 ? matches[0].id : null;
   };
 
+  const defaultSetMatchesPackageSelection = (
+    setId: string | null,
+    department: PackageDepartment,
+    packageSize: TourPackageSize | null
+  ) => {
+    if (!setId) return false;
+
+    const selectedSet = defaultSets.find((set) => set.id === setId);
+    return Boolean(
+      selectedSet &&
+        selectedSet.department === department &&
+        (!packageSize || !selectedSet.package_size || selectedSet.package_size === packageSize)
+    );
+  };
+
+  const resolveDefaultSetIdForPackageSelection = (
+    department: PackageDepartment,
+    packageSize: TourPackageSize | null,
+    selectedSetId: string | null
+  ) => {
+    if (defaultSetMatchesPackageSelection(selectedSetId, department, packageSize)) {
+      return selectedSetId;
+    }
+
+    return getUniqueDefaultSetId(department, packageSize);
+  };
+
   const buildPackageUpdatePayload = (
     packageSizes: PackageSelectionState,
     defaultSetIds: DefaultSetSelectionState
@@ -210,11 +237,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     lights_package_size: packageSizes.lights,
     video_package_size: packageSizes.video,
     sound_default_set_id:
-      defaultSetIds.sound || getUniqueDefaultSetId("sound", packageSizes.sound),
+      resolveDefaultSetIdForPackageSelection("sound", packageSizes.sound, defaultSetIds.sound),
     lights_default_set_id:
-      defaultSetIds.lights || getUniqueDefaultSetId("lights", packageSizes.lights),
+      resolveDefaultSetIdForPackageSelection("lights", packageSizes.lights, defaultSetIds.lights),
     video_default_set_id:
-      defaultSetIds.video || getUniqueDefaultSetId("video", packageSizes.video),
+      resolveDefaultSetIdForPackageSelection("video", packageSizes.video, defaultSetIds.video),
   });
 
   const invalidateTourDocumentQueries = async () => {
@@ -274,7 +301,11 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     setPackageSizes((prev) => ({ ...prev, [department]: packageSize }));
     setDefaultSetIds((prev) => ({
       ...prev,
-      [department]: prev[department] && packageSize ? prev[department] : null,
+      [department]: resolveDefaultSetIdForPackageSelection(
+        department,
+        packageSize,
+        prev[department]
+      ),
     }));
   };
 

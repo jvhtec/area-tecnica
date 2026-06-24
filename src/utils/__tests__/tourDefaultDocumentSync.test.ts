@@ -128,6 +128,36 @@ describe("tour default document sync planning", () => {
     expect(mUpload?.fileName).toContain("Sound M - Medium");
   });
 
+  it("uses the current package size when a date still has a stale explicit default set id", () => {
+    const plan = buildTourDefaultDocumentPlan(
+      buildData({
+        tourDates: [
+          {
+            ...baseDate,
+            sound_package_size: "xl",
+            sound_default_set_id: "set-l",
+          },
+        ],
+        defaultSets: [
+          buildSet({ id: "set-l", name: "Large", package_size: "l" }),
+          buildSet({ id: "set-xl", name: "Extra Large", package_size: "xl" }),
+        ],
+        defaultTables: [
+          buildTable({ id: "table-l", set_id: "set-l" }),
+          buildTable({ id: "table-xl", set_id: "set-xl" }),
+        ],
+      })
+    );
+
+    const soundWeightUpload = findUploadPlanItem(plan);
+
+    expect(soundWeightUpload).toMatchObject({
+      action: "upload",
+      objectPath: "tours/tour-1/auto-generated/default-pdfs/date-1/sound-weight.pdf",
+      fileName: "Enterprise Tour - 2026-07-10 - Madrid - Sound XL - Extra Large peso.pdf",
+    });
+  });
+
   it("cleans the stable slot instead of leaving stale files when package resolution is ambiguous", () => {
     const plan = buildTourDefaultDocumentPlan(
       buildData({

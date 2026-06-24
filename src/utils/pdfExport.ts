@@ -463,9 +463,10 @@ export const exportToPDF = async (
           yPosition += 6;
 
           const summaryData = finalSummaryRows.map((row) => [row.clusterName, row.riggingPoints, row.clusterWeight.toFixed(2)]);
+          const riggingColumnLabel = type === 'weight' ? 'Motores' : 'Puntos de Montaje';
 
           autoTable(doc, {
-            head: [['Truss', 'Puntos de Montaje', 'Peso Total (kg)']],
+            head: [['Truss', riggingColumnLabel, 'Peso Total (kg)']],
             body: summaryData,
             startY: yPosition,
             theme: 'grid',

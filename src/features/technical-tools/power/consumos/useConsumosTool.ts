@@ -349,7 +349,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       );
       if (setTables.length === 0) return;
       try {
-        await Promise.all(
+        const results = await Promise.all(
           setTables.map((table) =>
             dataLayerClient
               .from("tour_default_tables")
@@ -364,7 +364,10 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
               .eq("id", table.id),
           ),
         );
-        queryClient.invalidateQueries({
+        const failedResult = results.find((result) => result.error);
+        if (failedResult?.error) throw failedResult.error;
+
+        await queryClient.invalidateQueries({
           queryKey: queryKeys.scope("tour-default-tables", tourIdParam || "", department),
         });
         await syncDefaultDocumentsAfterMutation();

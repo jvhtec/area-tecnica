@@ -919,7 +919,24 @@ const PesosTool: React.FC = () => {
     setTableName('');
   };
 
-  const removeTable = (tableId: number) => {
+  const removeTable = async (tableId: number) => {
+    const tableToRemove = tables.find((table) => table.id === tableId);
+
+    if (tableToRemove?.defaultTableId) {
+      try {
+        await deleteDefaultTable(tableToRemove.defaultTableId);
+        await syncDefaultDocumentsAfterMutation();
+      } catch (error) {
+        console.error('Error deleting default weight table:', error);
+        toast({
+          title: 'Error',
+          description: 'No se pudo eliminar la tabla predeterminada.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
     updateTablesState((prev) => prev.filter((table) => table.id !== tableId));
   };
 

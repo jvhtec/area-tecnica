@@ -25,6 +25,7 @@ export interface NormalizedTourPowerTable {
   position?: string;
   customPosition?: string;
   includesHoist: boolean;
+  fohSchukoRequired: boolean;
   toolType: 'consumos';
   source: 'tour-default' | 'tour-override' | 'legacy-tour-default';
 }
@@ -140,6 +141,7 @@ export const normalizeTourDefaultPowerTable = (
     position: position || undefined,
     customPosition: customPosition || undefined,
     includesHoist: getBoolean(metadata.includes_hoist) ?? false,
+    fohSchukoRequired: getBoolean(metadata.foh_schuko) ?? false,
     toolType: 'consumos',
     source: 'tour-default',
   };
@@ -167,6 +169,7 @@ export const normalizeLegacyTourPowerDefault = (
   position: table.position || undefined,
   customPosition: table.custom_position || undefined,
   includesHoist: table.includes_hoist || false,
+  fohSchukoRequired: false,
   toolType: 'consumos',
   source: 'legacy-tour-default',
 });
@@ -190,6 +193,7 @@ export const normalizeTourPowerOverride = (
   position: override.position || undefined,
   customPosition: override.custom_position || undefined,
   includesHoist: override.includes_hoist || false,
+  fohSchukoRequired: false,
   toolType: 'consumos',
   source: 'tour-override',
 });
