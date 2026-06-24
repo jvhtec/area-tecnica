@@ -138,6 +138,18 @@ describe("shared Edge Function rate-limit helpers", () => {
     })).rejects.toThrow("function missing");
   });
 
+  it("fails closed when the durable limiter RPC returns no row", async () => {
+    const { client } = makeClient({ data: null });
+
+    await expect(consumeEdgeRateLimit({
+      supabase: client,
+      scope: "test-scope",
+      identifierHash: "a".repeat(64),
+      windowSeconds: 60,
+      maxRequests: 5,
+    })).rejects.toThrow("no row");
+  });
+
   it("combines request bucket hashing with the RPC consume call", async () => {
     const resetAt = new Date("2026-06-24T12:00:00Z").toISOString();
     const { client, rpc } = makeClient({

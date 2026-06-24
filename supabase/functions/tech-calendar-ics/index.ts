@@ -68,13 +68,13 @@ async function sha1(s: string) {
 
 // Durable public-feed rate limit. Calendar clients poll at most every few
 // minutes, so a generous hourly cap only affects scraping/enumeration.
-const configuredRateLimit = Number(Deno.env.get("ICS_RATE_LIMIT_PER_HOUR") || 120);
+const configuredRateLimit = Math.floor(Number(Deno.env.get("ICS_RATE_LIMIT_PER_HOUR") || 120));
 const RATE_LIMIT_PER_HOUR = Number.isFinite(configuredRateLimit) && configuredRateLimit > 0
-  ? Math.floor(configuredRateLimit)
+  ? configuredRateLimit
   : 120;
-const configuredIngressRateLimit = Number(Deno.env.get("ICS_INGRESS_RATE_LIMIT_PER_HOUR") || 1200);
+const configuredIngressRateLimit = Math.floor(Number(Deno.env.get("ICS_INGRESS_RATE_LIMIT_PER_HOUR") || 1200));
 const INGRESS_RATE_LIMIT_PER_HOUR = Number.isFinite(configuredIngressRateLimit) && configuredIngressRateLimit > 0
-  ? Math.floor(configuredIngressRateLimit)
+  ? configuredIngressRateLimit
   : 1200;
 
 // Hash both sides before comparing so the string comparison can't leak
