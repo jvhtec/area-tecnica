@@ -1,15 +1,15 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+import {
+  createHttpHandler,
+  HttpError,
+  jsonResponse,
+  readBoundedJsonObject,
+  requireEnvValues,
+} from "../_shared/http.ts";
 
 const FLEX_API_BASE_URL =
   Deno.env.get("FLEX_API_BASE_URL") ||
@@ -29,16 +29,18 @@ const ALLOWED_FORWARD_HEADERS = new Set([
 const MAX_ENDPOINT_LENGTH = 2_048;
 const MAX_BODY_LENGTH = 1_000_000;
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+interface FlexProxyRequest extends Record<string, unknown> {
+  method?: unknown;
+  endpoint?: unknown;
+  body?: unknown;
+  headers?: unknown;
 }
 
 function validateEndpoint(endpoint: unknown): URL {
   if (typeof endpoint !== "string" || !endpoint.startsWith("/")) {
-    throw new Error("Endpoint must be a relative Flex API path");
+    throw new HttpError(400, "Endpoint must be a relative Flex API path", {
+      code: "invalid_flex_endpoint",
+    });
   }
   if (
     endpoint.length > MAX_ENDPOINT_LENGTH ||
@@ -46,7 +48,9 @@ function validateEndpoint(endpoint: unknown): URL {
     endpoint.includes("\\") ||
     /[\u0000-\u001f\u007f]/.test(endpoint)
   ) {
-    throw new Error("Invalid Flex API endpoint");
+    throw new HttpError(400, "Invalid Flex API endpoint", {
+      code: "invalid_flex_endpoint",
+    });
   }
 
   const baseUrl = new URL(FLEX_API_BASE_URL);
@@ -57,7 +61,9 @@ function validateEndpoint(endpoint: unknown): URL {
     target.origin !== baseUrl.origin ||
     !target.pathname.startsWith(`${basePath}/`)
   ) {
-    throw new Error("Flex API endpoint escaped the configured base path");
+    throw new HttpError(400, "Flex API endpoint escaped the configured base path", {
+      code: "invalid_flex_endpoint",
+    });
   }
 
   const relativePath = target.pathname.slice(basePath.length);
@@ -66,7 +72,9 @@ function validateEndpoint(endpoint: unknown): URL {
       (prefix) => relativePath === prefix || relativePath.startsWith(`${prefix}/`),
     )
   ) {
-    throw new Error("Flex API endpoint is not allowlisted");
+    throw new HttpError(400, "Flex API endpoint is not allowlisted", {
+      code: "flex_endpoint_not_allowed",
+    });
   }
 
   return target;
@@ -91,150 +99,126 @@ function sanitizeHeaders(input: unknown): Headers {
   return output;
 }
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+serve(createHttpHandler(async (req) => {
+  const {
+    SUPABASE_URL: supabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+  } = requireEnvValues(
+    ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const,
+    (name) => Deno.env.get(name),
+  );
+  const flexAuthToken =
+    Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN");
 
-  if (req.method !== "POST") {
-    return jsonResponse({ success: false, error: "Method not allowed" }, 405);
-  }
-
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const flexAuthToken =
-      Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN");
-
-    if (!supabaseUrl || !serviceRoleKey || !flexAuthToken) {
-      console.error("secure-flex-api is missing required environment variables");
-      return jsonResponse({ success: false, error: "Service unavailable" }, 503);
-    }
-
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return jsonResponse({ success: false, error: "Authentication required" }, 401);
-    }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
+  if (!flexAuthToken) {
+    console.error("secure-flex-api is missing required Flex auth token");
+    throw new HttpError(503, "Service unavailable", {
+      code: "flex_auth_missing",
+      exposeDetails: false,
     });
-    const accessToken = authHeader.slice("Bearer ".length);
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(accessToken);
+  }
 
-    if (authError || !user) {
-      return jsonResponse({ success: false, error: "Invalid authentication" }, 401);
-    }
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const caller = await requireAdminOrManagement(supabase, req, {
+    logContext: "secure-flex-api",
+    missingMessage: "Authentication required",
+    invalidMessage: "Invalid authentication",
+    forbiddenMessage: "Insufficient permissions",
+  });
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .maybeSingle();
+  const requestBody = await readBoundedJsonObject<FlexProxyRequest>(req, {
+    maxBytes: MAX_BODY_LENGTH + 16 * 1024,
+  });
 
-    if (profileError) {
-      console.error("secure-flex-api profile lookup failed", profileError);
-      return jsonResponse({ success: false, error: "Authorization check failed" }, 500);
-    }
-    if (!profile || !["admin", "management"].includes(profile.role)) {
-      return jsonResponse({ success: false, error: "Insufficient permissions" }, 403);
-    }
+  const method = String(requestBody.method || "GET").toUpperCase();
+  if (!ALLOWED_METHODS.has(method)) {
+    throw new HttpError(400, "Flex API method is not allowed", {
+      code: "flex_method_not_allowed",
+    });
+  }
 
-    const requestBody = await req.json().catch(() => null);
-    if (!requestBody || typeof requestBody !== "object") {
-      return jsonResponse({ success: false, error: "Invalid request body" }, 400);
-    }
+  const target = validateEndpoint(requestBody.endpoint);
+  const body = requestBody.body;
+  if (body !== undefined && typeof body !== "string") {
+    throw new HttpError(400, "Flex API body must be a string", {
+      code: "invalid_flex_body",
+    });
+  }
+  if (typeof body === "string" && body.length > MAX_BODY_LENGTH) {
+    throw new HttpError(413, "Flex API body is too large", {
+      code: "flex_body_too_large",
+    });
+  }
+  if (["GET", "DELETE"].includes(method) && body) {
+    throw new HttpError(400, `${method} requests may not include a body`, {
+      code: "invalid_flex_body",
+    });
+  }
 
-    const method = String(requestBody.method || "GET").toUpperCase();
-    if (!ALLOWED_METHODS.has(method)) {
-      return jsonResponse({ success: false, error: "Flex API method is not allowed" }, 400);
-    }
+  const headers = sanitizeHeaders(requestBody.headers);
+  headers.set("X-Auth-Token", flexAuthToken);
+  headers.set("apikey", flexAuthToken);
 
-    const target = validateEndpoint(requestBody.endpoint);
-    const body = requestBody.body;
-    if (body !== undefined && typeof body !== "string") {
-      return jsonResponse({ success: false, error: "Flex API body must be a string" }, 400);
-    }
-    if (typeof body === "string" && body.length > MAX_BODY_LENGTH) {
-      return jsonResponse({ success: false, error: "Flex API body is too large" }, 413);
-    }
-    if (["GET", "DELETE"].includes(method) && body) {
-      return jsonResponse(
-        { success: false, error: `${method} requests may not include a body` },
-        400,
-      );
-    }
+  const shouldRetry = method === "GET";
+  const response = await fetchWithRetry(
+    target.toString(),
+    {
+      method,
+      headers,
+      body: body || undefined,
+    },
+    {
+      attempts: shouldRetry ? 3 : 1,
+      retryOnTimeout: shouldRetry,
+    },
+  );
 
-    const headers = sanitizeHeaders(requestBody.headers);
-    headers.set("X-Auth-Token", flexAuthToken);
-    headers.set("apikey", flexAuthToken);
+  const contentType = response.headers.get("content-type") || "";
+  const rawBody = await response.text();
+  let data: unknown;
 
-    const shouldRetry = method === "GET";
-    const response = await fetchWithRetry(
-      target.toString(),
-      {
+  if (rawBody && contentType.includes("json")) {
+    try {
+      data = JSON.parse(rawBody);
+    } catch (parseError) {
+      console.warn("secure-flex-api upstream returned invalid JSON", parseError);
+      data = rawBody;
+    }
+  }
+
+  if (method !== "GET" || !response.ok) {
+    const { error: auditError } = await supabase.from("security_audit_log").insert({
+      user_id: caller.userId,
+      action: "flex_api_proxy",
+      resource: `flex:${target.pathname.slice(0, 240)}`,
+      severity: response.ok ? "low" : "medium",
+      metadata: {
         method,
-        headers,
-        body: body || undefined,
+        status: response.status,
+        success: response.ok,
       },
-      {
-        attempts: shouldRetry ? 3 : 1,
-        retryOnTimeout: shouldRetry,
-      },
-    );
-
-    const contentType = response.headers.get("content-type") || "";
-    const rawBody = await response.text();
-    let data: unknown;
-
-    if (rawBody && contentType.includes("json")) {
-      try {
-        data = JSON.parse(rawBody);
-      } catch (parseError) {
-        console.warn("secure-flex-api upstream returned invalid JSON", parseError);
-        data = rawBody;
-      }
-    }
-
-    if (method !== "GET" || !response.ok) {
-      const { error: auditError } = await supabase.from("security_audit_log").insert({
-        user_id: user.id,
-        action: "flex_api_proxy",
-        resource: `flex:${target.pathname.slice(0, 240)}`,
-        severity: response.ok ? "low" : "medium",
-        metadata: {
-          method,
-          status: response.status,
-          success: response.ok,
-        },
-      });
-      if (auditError) {
-        console.error("secure-flex-api audit write failed", auditError);
-      }
-    }
-
-    return jsonResponse({
-      success: response.ok,
-      status: response.status,
-      statusText: response.statusText,
-      contentType,
-      data,
-      rawBody: data === undefined ? rawBody : undefined,
-      error: response.ok
-        ? undefined
-        : (
-          data && typeof data === "object" &&
-            "exceptionMessage" in data
-            ? String((data as { exceptionMessage?: unknown }).exceptionMessage)
-            : `Flex API returned ${response.status}`
-        ),
     });
-  } catch (error) {
-    console.error("secure-flex-api request failed", error);
-    const message = error instanceof Error ? error.message : "Invalid request";
-    return jsonResponse({ success: false, error: message }, 400);
+    if (auditError) {
+      console.error("secure-flex-api audit write failed", auditError);
+    }
   }
-});
+
+  return jsonResponse({
+    success: response.ok,
+    status: response.status,
+    statusText: response.statusText,
+    contentType,
+    data,
+    rawBody: data === undefined ? rawBody : undefined,
+    error: response.ok
+      ? undefined
+      : `Flex API returned ${response.status}`,
+  });
+}, {
+  allowedMethods: ["POST"],
+  onError(error) {
+    console.error("secure-flex-api request failed", error);
+  },
+}));

@@ -1,13 +1,19 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
+import {
+  createHttpHandler,
+  HttpError,
+  jsonResponse,
+  readBoundedJsonObject,
+  requireEnvValues,
+} from "../_shared/http.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+interface FetchFlexInventoryModelBody extends Record<string, unknown> {
+  model_id?: unknown;
+  url?: unknown;
+}
 
 // Expected structure from Flex API inventory-model endpoint
 interface FlexInventoryModelResponse {
@@ -72,66 +78,66 @@ function validateFlexResponse(data: unknown): ValidatedEquipmentData {
   };
 }
 
-serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405, headers: corsHeaders });
+serve(createHttpHandler(async (req: Request) => {
+  const {
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
+  } = requireEnvValues(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const, (name) => Deno.env.get(name));
+  const flexAuthToken =
+    Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
 
-  try {
-    const body = await req.json() as { model_id?: string; url?: string };
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    // AuthZ: require admin or management
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
-    if (!user) return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle();
-    if (!profile || !['admin','management'].includes(profile.role)) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    // Parse model id
-    const modelId = body.model_id || (body.url ? extractUuid(body.url) : null);
-    if (!modelId) return new Response(JSON.stringify({ error: 'Missing model_id or url' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-
-    const flexAuthToken =
-      Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
-    if (!flexAuthToken) return new Response(JSON.stringify({ error: 'Flex auth not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-
-    // Call Flex inventory-model API
-    const qs = new URLSearchParams();
-    qs.set('_dc', String(Date.now()));
-    const url = `https://sectorpro.flexrentalsolutions.com/f5/api/inventory-model/${encodeURIComponent(modelId)}?${qs.toString()}`;
-    const res = await fetchWithRetry(url, { headers: { 'X-Auth-Token': flexAuthToken, 'apikey': flexAuthToken, 'X-Requested-With': 'XMLHttpRequest' } });
-    if (!res.ok) {
-      const text = await res.text();
-      return new Response(JSON.stringify({ error: `Flex error ${res.status}`, details: text }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-    const rawResponse = await res.json();
-
-    // Validate and sanitize the Flex API response
-    let mapped: ValidatedEquipmentData;
-    try {
-      mapped = validateFlexResponse(rawResponse);
-    } catch (validationError) {
-      return new Response(JSON.stringify({
-        error: 'Invalid response from Flex API',
-        details: (validationError as Error).message
-      }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    return new Response(JSON.stringify({
-      ok: true,
-      model_id: modelId,
-      mapped,
-      // Only include raw in development for debugging - sanitized fields are authoritative
-      raw: rawResponse
-    }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  } catch (e) {
-    const msg = (e as any)?.message || String(e);
-    return new Response(JSON.stringify({ error: msg }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  if (!flexAuthToken) {
+    throw new HttpError(503, "Flex auth not configured", {
+      code: "flex_auth_missing",
+      exposeDetails: false,
+    });
   }
-});
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  await requireAdminOrManagement(supabase, req, {
+    logContext: "fetch-flex-inventory-model",
+  });
+
+  const body = await readBoundedJsonObject<FetchFlexInventoryModelBody>(req, { maxBytes: 16 * 1024 });
+
+  // Parse model id
+  const modelInput = typeof body.model_id === "string" ? body.model_id : "";
+  const urlInput = typeof body.url === "string" ? body.url : "";
+  const modelId = extractUuid(modelInput) || extractUuid(urlInput);
+  if (!modelId) {
+    throw new HttpError(400, "Missing model_id or url", {
+      code: "missing_flex_model_id",
+    });
+  }
+
+  // Call Flex inventory-model API
+  const qs = new URLSearchParams();
+  qs.set('_dc', String(Date.now()));
+  const url = `https://sectorpro.flexrentalsolutions.com/f5/api/inventory-model/${encodeURIComponent(modelId)}?${qs.toString()}`;
+  const res = await fetchWithRetry(url, { headers: { 'X-Auth-Token': flexAuthToken, 'apikey': flexAuthToken, 'X-Requested-With': 'XMLHttpRequest' } });
+  if (!res.ok) {
+    throw new HttpError(502, `Flex error ${res.status}`, {
+      code: "flex_upstream_error",
+    });
+  }
+  const rawResponse = await res.json();
+
+  // Validate and sanitize the Flex API response
+  let mapped: ValidatedEquipmentData;
+  try {
+    mapped = validateFlexResponse(rawResponse);
+  } catch (validationError) {
+    throw new HttpError(502, "Invalid response from Flex API", {
+      code: "invalid_flex_response",
+      details: validationError instanceof Error ? validationError.message : undefined,
+    });
+  }
+
+  return jsonResponse({
+    ok: true,
+    model_id: modelId,
+    mapped,
+  });
+}, {
+  allowedMethods: ["POST"],
+}));
