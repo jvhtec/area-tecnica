@@ -203,8 +203,7 @@ const getTableRiggingPoint = (metadata: unknown) => {
 
 const buildWeightPdfTables = (item: Extract<TourDefaultDocumentPlanItem, { action: "upload" }>): PdfTables => {
   if (item.weightOverrides.length > 0) {
-    return item.weightOverrides.map((override, index): PdfTable => ({
-      id: index + 1,
+    return item.weightOverrides.map((override): PdfTable => ({
       name: override.item_name || "Anulación",
       rows: getRowsFromJson(override.override_data),
       totalWeight: (override.weight_kg || 0) * (override.quantity || 1),
@@ -212,8 +211,7 @@ const buildWeightPdfTables = (item: Extract<TourDefaultDocumentPlanItem, { actio
     }));
   }
 
-  return sortTourDefaultTables(item.defaultTables).map((defaultTable, index): PdfTable => ({
-    id: index + 1,
+  return sortTourDefaultTables(item.defaultTables).map((defaultTable): PdfTable => ({
     name: defaultTable.table_name || "Unnamed",
     rows: getRowsFromJson(defaultTable.table_data),
     totalWeight: defaultTable.total_value || 0,

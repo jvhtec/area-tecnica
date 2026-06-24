@@ -2,10 +2,16 @@ import { describe, expect, it } from "vitest";
 import {
   buildTourDefaultDocumentPlan,
   getTourDefaultDocumentObjectPath,
+  type TourDefaultDocumentPlanItem,
   type TourDefaultDocumentSyncData,
 } from "@/utils/tourDefaultDocumentSync";
 
-const baseDate = {
+type SyncTourDate = TourDefaultDocumentSyncData["tourDates"][number];
+type SyncDefaultSet = TourDefaultDocumentSyncData["defaultSets"][number];
+type SyncDefaultTable = TourDefaultDocumentSyncData["defaultTables"][number];
+type UploadPlanItem = Extract<TourDefaultDocumentPlanItem, { action: "upload" }>;
+
+const baseDate: SyncTourDate = {
   created_at: "2026-06-01T00:00:00Z",
   date: "2026-07-10",
   end_date: "2026-07-10",
@@ -26,7 +32,7 @@ const baseDate = {
   locations: { name: "Madrid" },
 };
 
-const buildSet = (overrides: Partial<TourDefaultDocumentSyncData["defaultSets"][number]>) => ({
+const buildSet = (overrides: Partial<SyncDefaultSet>): SyncDefaultSet => ({
   created_at: "2026-06-01T00:00:00Z",
   department: "sound",
   description: null,
@@ -39,8 +45,8 @@ const buildSet = (overrides: Partial<TourDefaultDocumentSyncData["defaultSets"][
 });
 
 const buildTable = (
-  overrides: Partial<TourDefaultDocumentSyncData["defaultTables"][number]>
-) => ({
+  overrides: Partial<SyncDefaultTable>
+): SyncDefaultTable => ({
   created_at: "2026-06-01T00:00:00Z",
   id: "table-1",
   metadata: { order_index: 0 },
@@ -54,6 +60,20 @@ const buildTable = (
   updated_at: "2026-06-01T00:00:00Z",
   ...overrides,
 });
+
+const findUploadPlanItem = (
+  plan: TourDefaultDocumentPlanItem[],
+  department: UploadPlanItem["department"] = "sound",
+  type: UploadPlanItem["type"] = "weight"
+): UploadPlanItem | undefined => {
+  const item = plan.find(
+    (candidate) =>
+      candidate.action === "upload" &&
+      candidate.department === department &&
+      candidate.type === type
+  );
+  return item?.action === "upload" ? item : undefined;
+};
 
 const buildData = (
   overrides: Partial<TourDefaultDocumentSyncData> = {}
@@ -71,12 +91,7 @@ describe("tour default document sync planning", () => {
   it("uploads the resolved package PDF and cleans unrelated date/dept/type slots", () => {
     const plan = buildTourDefaultDocumentPlan(buildData());
 
-    const soundWeightUpload = plan.find(
-      (item) =>
-        item.action === "upload" &&
-        item.department === "sound" &&
-        item.type === "weight"
-    );
+    const soundWeightUpload = findUploadPlanItem(plan);
     expect(soundWeightUpload).toMatchObject({
       action: "upload",
       objectPath: "tours/tour-1/auto-generated/default-pdfs/date-1/sound-weight.pdf",
@@ -105,12 +120,8 @@ describe("tour default document sync planning", () => {
       })
     );
 
-    const sUpload = sPlan.find(
-      (item) => item.action === "upload" && item.department === "sound" && item.type === "weight"
-    );
-    const mUpload = mPlan.find(
-      (item) => item.action === "upload" && item.department === "sound" && item.type === "weight"
-    );
+    const sUpload = findUploadPlanItem(sPlan);
+    const mUpload = findUploadPlanItem(mPlan);
 
     expect(sUpload?.objectPath).toBe(mUpload?.objectPath);
     expect(sUpload?.fileName).toContain("Sound S - Small");

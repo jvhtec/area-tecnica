@@ -374,7 +374,7 @@ export const TourDefaultsManager = ({
     };
 
     const queuedSync = defaultDocumentSyncQueueRef.current.then(runSync, runSync);
-    defaultDocumentSyncQueueRef.current = queuedSync.catch(() => undefined);
+    defaultDocumentSyncQueueRef.current = queuedSync.catch((): void => undefined);
     await queuedSync;
   };
 
