@@ -208,8 +208,9 @@ export const TourDefaultsManager = ({
   const [newSetName, setNewSetName] = useState('');
   const [newSetDescription, setNewSetDescription] = useState('');
   const [newSetPackageSize, setNewSetPackageSize] = useState<TourPackageSize | null>(null);
-  // Track the single power default currently being toggled so only its row is
-  // disabled (the shared mutation flag would otherwise freeze every card).
+  // Track the power default flag currently being toggled so only the affected
+  // row/set is disabled (the shared mutation flag would otherwise freeze every
+  // card).
   const [pendingFlagTableId, setPendingFlagTableId] = useState<string | null>(null);
 
   // Use the new tour default sets hook
@@ -362,13 +363,28 @@ export const TourDefaultsManager = ({
     key: 'includes_hoist' | 'foh_schuko',
     value: boolean,
   ) => {
-    setPendingFlagTableId(table.id);
+    const pendingKey = key === 'foh_schuko' ? `${key}:${table.set_id}` : table.id;
+    setPendingFlagTableId(pendingKey);
     try {
-      const { error } = await dataLayerClient
-        .from('tour_default_tables')
-        .update({ metadata: { ...(table.metadata || {}), [key]: value } })
-        .eq('id', table.id);
-      if (error) throw error;
+      const tablesToUpdate =
+        key === 'foh_schuko'
+          ? defaultTables.filter(
+              (candidate) =>
+                candidate.set_id === table.set_id && candidate.table_type === 'power'
+            )
+          : [table];
+
+      const results = await Promise.all(
+        tablesToUpdate.map((candidate) =>
+          dataLayerClient
+            .from('tour_default_tables')
+            .update({ metadata: { ...(candidate.metadata || {}), [key]: value } })
+            .eq('id', candidate.id)
+        )
+      );
+      const failedResult = results.find((result) => result.error);
+      if (failedResult?.error) throw failedResult.error;
+
       await queryClient.invalidateQueries({
         queryKey: queryKeys.scope('tour-default-tables', tour?.id || ''),
       });
@@ -1226,7 +1242,9 @@ export const TourDefaultsManager = ({
                       table.metadata?.position,
                       table.metadata?.custom_position,
                     );
-                    const rowPending = pendingFlagTableId === table.id;
+                    const rowPending =
+                      pendingFlagTableId === table.id ||
+                      pendingFlagTableId === `foh_schuko:${table.set_id}`;
                     return (
                     <div key={table.id} className="border rounded-lg p-4 bg-white transition-colors hover:border-primary/40">
                       <div className="flex justify-between items-start gap-2 mb-2">
