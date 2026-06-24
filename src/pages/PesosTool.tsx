@@ -161,6 +161,11 @@ const PesosTool: React.FC = () => {
 
   const formatSuffixNumber = (value: number) => formatRiggingPoint('SX', value);
 
+  const getRiggingPointNumbers = (riggingPoints?: string): number[] =>
+    Array.from(riggingPoints?.matchAll(/SX0*(\d+)/gi) ?? [])
+      .map((match) => Number.parseInt(match[1], 10))
+      .filter((value) => Number.isFinite(value) && value > 0);
+
   const assignSuffixes = (tablesToAssign: Table[]): Table[] => {
     const countersByStage = new Map<string, number>();
 
@@ -168,6 +173,18 @@ const PesosTool: React.FC = () => {
       const baseName = table.baseName || deriveBaseName(table.name);
       const stageKey = table.stageNumber != null ? `stage-${table.stageNumber}` : 'default';
       const counter = countersByStage.get(stageKey) || 1;
+      const persistedRiggingNumbers = getRiggingPointNumbers(table.riggingPoints);
+      const shouldPreservePersistedRigging =
+        Boolean(table.defaultTableId || table.overrideId) && persistedRiggingNumbers.length > 0;
+
+      if (shouldPreservePersistedRigging) {
+        countersByStage.set(stageKey, Math.max(counter, Math.max(...persistedRiggingNumbers) + 1));
+        return {
+          ...table,
+          baseName,
+          name: `${baseName} (${table.riggingPoints})`,
+        };
+      }
 
       if (table.dualMotors) {
         const suffixOne = formatSuffixNumber(counter);
@@ -216,6 +233,12 @@ const PesosTool: React.FC = () => {
   const [selectedDefaultSetId, setSelectedDefaultSetId] = useState<string>('');
   const [selectedDefaultPackageSize, setSelectedDefaultPackageSize] = useState<TourPackageSize | 'unassigned'>('unassigned');
   const [newDefaultSetName, setNewDefaultSetName] = useState('');
+
+  const handleSelectedDefaultSetIdChange = (setId: string) => {
+    setSelectedDefaultSetId(setId);
+    const selectedSet = defaultSets.find((set) => set.id === setId);
+    setSelectedDefaultPackageSize(selectedSet?.package_size || 'unassigned');
+  };
 
   useEffect(() => {
     if (!isTourDefaults && !isDefaults) return;
@@ -430,34 +453,47 @@ const PesosTool: React.FC = () => {
     }
   };
 
-  // Load existing tour defaults when in defaults mode
+  // Load existing tour defaults when in defaults mode.
+  // Also runs for the tour-defaults entry (Tour Management page) so existing
+  // tables are shown and newly generated ones append after them with
+  // continuous SX numbering instead of restarting from the first number.
   useEffect(() => {
-    if (isDefaults && defaultTables.length > 0) {
-      // Group tables by set and convert to our local format
-      const convertedTables = defaultTables
-        .filter(dt => dt.table_type === 'weight' && (!selectedDefaultSetId || dt.set_id === selectedDefaultSetId))
-        .map((dt, index) => ({
-          name: dt.table_name,
-          rows: (dt.table_data?.rows || [{
-            quantity: '1',
-            componentId: '',
-            weight: dt.total_value.toString(),
-            componentName: dt.table_name,
-            totalWeight: dt.total_value
-          }]).map((row: any) => ({ ...row, id: row?.id || createRowId() })),
-          totalWeight: dt.total_value,
-          id: Date.now() + index,
-          clusterId: dt.metadata?.clusterId,
-          dualMotors: dt.metadata?.dualMotors,
-          riggingPoints: dt.metadata?.riggingPoints,
-          cablePick: Boolean(dt.metadata?.cablePick ?? dt.table_data?.cablePick ?? false),
-          cablePickWeight: (dt.metadata?.cablePickWeight ?? dt.table_data?.cablePickWeight ?? "100").toString(),
-          defaultTableId: dt.id,
-          baseName: dt.metadata?.baseName || deriveBaseName(dt.table_name)
-        }));
-      setTables(assignSuffixes(convertedTables));
+    if (!isDefaults && !isTourDefaults) return;
+
+    const resolvedDefaultSetId =
+      selectedDefaultSetId || (defaultSets.length === 1 ? defaultSets[0].id : '');
+
+    if (!resolvedDefaultSetId) {
+      setTables([]);
+      return;
     }
-  }, [isDefaults, defaultTables, selectedDefaultSetId]);
+
+    // Convert only the active set. Loading every set at once makes SX numbering
+    // bleed across packages/default sets; Consumos intentionally gates display
+    // the same way when more than one set exists.
+    const convertedTables = defaultTables
+      .filter(dt => dt.table_type === 'weight' && dt.set_id === resolvedDefaultSetId)
+      .map((dt, index) => ({
+        name: dt.table_name,
+        rows: (dt.table_data?.rows || [{
+          quantity: '1',
+          componentId: '',
+          weight: dt.total_value.toString(),
+          componentName: dt.table_name,
+          totalWeight: dt.total_value
+        }]).map((row: any) => ({ ...row, id: row?.id || createRowId() })),
+        totalWeight: dt.total_value,
+        id: Date.now() + index,
+        clusterId: dt.metadata?.clusterId,
+        dualMotors: dt.metadata?.dualMotors,
+        riggingPoints: dt.metadata?.riggingPoints,
+        cablePick: Boolean(dt.metadata?.cablePick ?? dt.table_data?.cablePick ?? false),
+        cablePickWeight: (dt.metadata?.cablePickWeight ?? dt.table_data?.cablePickWeight ?? "100").toString(),
+        defaultTableId: dt.id,
+        baseName: dt.metadata?.baseName || deriveBaseName(dt.table_name)
+      }));
+    setTables(assignSuffixes(convertedTables));
+  }, [isDefaults, isTourDefaults, defaultSets, defaultTables, selectedDefaultSetId]);
 
   // Load tour date overrides when in tour date context
   useEffect(() => {
@@ -592,7 +628,7 @@ const PesosTool: React.FC = () => {
   };
 
   // UPDATED: Save as tour defaults using the new system
-  const saveAsTourDefaults = async (table: Table) => {
+  const saveAsTourDefaults = async (table: Table, orderIndex?: number) => {
     if (!tourId) return;
 
     try {
@@ -600,7 +636,7 @@ const PesosTool: React.FC = () => {
       const setId = await getOrCreateSoundSetId();
 
       // Create the table with detailed data and metadata
-      await createDefaultTable({
+      const savedTable = await createDefaultTable({
         set_id: setId,
         table_name: table.name,
         table_data: {
@@ -620,9 +656,18 @@ const PesosTool: React.FC = () => {
           clusterId: table.clusterId,
           cablePick: table.cablePick,
           cablePickWeight: table.cablePickWeight,
-          baseName: table.baseName
+          baseName: table.baseName,
+          ...(typeof orderIndex === 'number' ? { order_index: orderIndex } : {})
         }
       });
+
+      setTables((previous) =>
+        previous.map((candidate) =>
+          candidate.id === table.id
+            ? { ...candidate, defaultTableId: savedTable.id }
+            : candidate
+        )
+      );
 
       toast({
         title: 'Success',
@@ -792,7 +837,10 @@ const PesosTool: React.FC = () => {
     // Handle saving based on mode
     createdTablesWithSuffixes.forEach(table => {
       if (isTourDefaults) {
-        saveAsTourDefaults(table);
+        saveAsTourDefaults(
+          table,
+          updatedTables.findIndex((candidate) => candidate.id === table.id)
+        );
       } else if (isTourDateContext || isJobOverrideMode) {
         saveAsOverride(table);
       }
@@ -969,7 +1017,7 @@ const PesosTool: React.FC = () => {
       defaultSets={defaultSets}
       defaultTables={defaultTables}
       selectedDefaultSetId={selectedDefaultSetId}
-      setSelectedDefaultSetId={setSelectedDefaultSetId}
+      setSelectedDefaultSetId={handleSelectedDefaultSetIdChange}
       selectedDefaultPackageSize={selectedDefaultPackageSize}
       setSelectedDefaultPackageSize={setSelectedDefaultPackageSize}
       newDefaultSetName={newDefaultSetName}

@@ -47,7 +47,11 @@ export const buildPowerTableData = (
 
 export const buildPowerTableMetadata = (
   table: PowerTable,
-  settings: PowerElectricalSettings & { orderIndex?: number; powerFactor?: number },
+  settings: PowerElectricalSettings & {
+    orderIndex?: number;
+    powerFactor?: number;
+    fohSchuko?: boolean;
+  },
 ) =>
   ({
     current_per_phase: table.currentPerPhase,
@@ -61,6 +65,7 @@ export const buildPowerTableMetadata = (
     voltage: settings.voltage,
     ...(settings.powerFactor !== undefined ? { pf: settings.powerFactor } : {}),
     ...(settings.orderIndex !== undefined ? { order_index: settings.orderIndex } : {}),
+    ...(settings.fohSchuko !== undefined ? { foh_schuko: settings.fohSchuko } : {}),
   }) as unknown as Json;
 
 const getPowerTableStage = (
@@ -319,7 +324,7 @@ export const buildTourPowerDefaultTable = ({
 }: {
   orderIndex?: number;
   setId: string;
-  settings: PowerElectricalSettings & { powerFactor?: number };
+  settings: PowerElectricalSettings & { powerFactor?: number; fohSchuko?: boolean };
   table: PowerTable;
 }) => ({
   set_id: setId,

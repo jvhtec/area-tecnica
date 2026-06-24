@@ -284,6 +284,78 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     );
   }, [copySourceSetId, defaultTables]);
 
+  // Restore the persisted FOH schuko setting when a default set is loaded so a
+  // value saved earlier is not silently reset to the default on reopen.
+  const fohHydratedSetRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isTourDefaults || !features.fohSchuko || !selectedDefaultSetId) return;
+    if (fohHydratedSetRef.current === selectedDefaultSetId) return;
+    const setTables = defaultTables.filter(
+      (table) => table.set_id === selectedDefaultSetId && table.table_type === "power",
+    );
+    if (setTables.length === 0) return;
+    fohHydratedSetRef.current = selectedDefaultSetId;
+    const anyKeyPresent = setTables.some(
+      (table) =>
+        typeof table.metadata === "object" &&
+        table.metadata !== null &&
+        "foh_schuko" in (table.metadata as Record<string, unknown>),
+    );
+    if (anyKeyPresent) {
+      setFohSchukoRequired(
+        setTables.some(
+          (table) => (table.metadata as { foh_schuko?: boolean })?.foh_schuko === true,
+        ),
+      );
+    }
+  }, [isTourDefaults, features.fohSchuko, selectedDefaultSetId, defaultTables]);
+
+  // Persist the FOH schuko toggle onto the selected set's already-saved tables
+  // so toggling it (without re-saving a table) is remembered too.
+  const persistFohForSelectedSet = useCallback(
+    async (value: boolean) => {
+      if (!isTourDefaults || !features.fohSchuko || !selectedDefaultSetId) return;
+      const setTables = defaultTables.filter(
+        (table) => table.set_id === selectedDefaultSetId && table.table_type === "power",
+      );
+      if (setTables.length === 0) return;
+      try {
+        await Promise.all(
+          setTables.map((table) =>
+            dataLayerClient
+              .from("tour_default_tables")
+              .update({
+                metadata: {
+                  ...(typeof table.metadata === "object" && table.metadata !== null
+                    ? table.metadata
+                    : {}),
+                  foh_schuko: value,
+                },
+              })
+              .eq("id", table.id),
+          ),
+        );
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.scope("tour-default-tables", tourIdParam || "", department),
+        });
+      } catch (error) {
+        console.error("Error persisting FOH schuko setting:", error);
+      }
+    },
+    [isTourDefaults, features.fohSchuko, selectedDefaultSetId, defaultTables, queryClient, tourIdParam, department],
+  );
+
+  const handleSetFohSchukoRequired = useCallback(
+    (value: boolean) => {
+      setFohSchukoRequired(value);
+      // Keep the loaded set marked as hydrated so the restore effect doesn't
+      // overwrite this fresh choice from a stale query snapshot.
+      if (selectedDefaultSetId) fohHydratedSetRef.current = selectedDefaultSetId;
+      void persistFohForSelectedSet(value);
+    },
+    [persistFohForSelectedSet, selectedDefaultSetId],
+  );
+
   const { data: tourName = "" } = useQuery({
     queryKey: queryKeys.scope("tour", tourIdParam, "name"),
     queryFn: async () => {
@@ -705,6 +777,11 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     });
   };
 
+  // FOH schuko is a report-level setting; persist it onto each default table's
+  // metadata (when the department supports it) so it is remembered per set.
+  const fohSchukoSetting = () =>
+    features.fohSchuko ? fohSchukoRequired : undefined;
+
   const persistDefaultTableUpdate = async (table: PowerTable) => {
     if (!table.defaultTableId) return;
     const settings = getTableSnapshotSettings(table);
@@ -714,7 +791,10 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         table_name: table.name,
         table_data: buildPowerTableData(table, settings),
         total_value: table.totalWatts || 0,
-        metadata: buildPowerTableMetadata(table, settings),
+        metadata: buildPowerTableMetadata(table, {
+          ...settings,
+          fohSchuko: fohSchukoSetting(),
+        }),
       },
     });
   };
@@ -908,7 +988,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       const newDefaultTable = await createTourDefaultTable(
         buildTourPowerDefaultTable({
           setId,
-          settings: getTableSnapshotSettings(table),
+          settings: { ...getTableSnapshotSettings(table), fohSchuko: fohSchukoSetting() },
           table,
         }),
       );
@@ -967,7 +1047,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
           buildTourPowerDefaultTable({
             orderIndex: index,
             setId,
-            settings: getTableSnapshotSettings(table),
+            settings: { ...getTableSnapshotSettings(table), fohSchuko: fohSchukoSetting() },
             table,
           }),
         );
@@ -1634,7 +1714,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     pf,
     setPf,
     fohSchukoRequired,
-    setFohSchukoRequired,
+    setFohSchukoRequired: handleSetFohSchukoRequired,
     pduOptions,
     tableName,
     setTableName,

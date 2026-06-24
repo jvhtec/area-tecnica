@@ -1,14 +1,17 @@
 
 import React, { useState } from 'react';
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/react-query";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { FileText, Weight, Calculator, Trash2, Download, Calendar, Copy, AlertTriangle } from "lucide-react";
+import { FileText, Weight, Calculator, Trash2, Download, Calendar, Copy, AlertTriangle, Anchor, Plug } from "lucide-react";
 import { exportToPDF } from "@/utils/pdfExport";
 import { fetchTourLogo } from "@/utils/pdf/logoUtils";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -199,11 +202,16 @@ export const TourDefaultsManager = ({
   tour,
 }: TourDefaultsManagerProps) => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('sound');
   const [tourDates, setTourDates] = useState<TourDateWithLocation[]>([]);
   const [newSetName, setNewSetName] = useState('');
   const [newSetDescription, setNewSetDescription] = useState('');
   const [newSetPackageSize, setNewSetPackageSize] = useState<TourPackageSize | null>(null);
+  // Track the power default flag currently being toggled so only the affected
+  // row/set is disabled (the shared mutation flag would otherwise freeze every
+  // card).
+  const [pendingFlagTableId, setPendingFlagTableId] = useState<string | null>(null);
 
   // Use the new tour default sets hook
   const {
@@ -342,6 +350,53 @@ export const TourDefaultsManager = ({
         description: 'Error al eliminar la tabla',
         variant: 'destructive',
       });
+    }
+  };
+
+  // Toggle a boolean flag (hoist / FOH schuko) on an already-saved power
+  // default. These were previously only settable when the table was first
+  // created in the Consumos tool, so a forgotten value could not be corrected.
+  // Persisted directly (no per-toggle success toast) — the checkbox is the
+  // feedback; only failures surface a toast.
+  const handleTogglePowerFlag = async (
+    table: TourDefaultTable,
+    key: 'includes_hoist' | 'foh_schuko',
+    value: boolean,
+  ) => {
+    const pendingKey = key === 'foh_schuko' ? `${key}:${table.set_id}` : table.id;
+    setPendingFlagTableId(pendingKey);
+    try {
+      const tablesToUpdate =
+        key === 'foh_schuko'
+          ? defaultTables.filter(
+              (candidate) =>
+                candidate.set_id === table.set_id && candidate.table_type === 'power'
+            )
+          : [table];
+
+      const results = await Promise.all(
+        tablesToUpdate.map((candidate) =>
+          dataLayerClient
+            .from('tour_default_tables')
+            .update({ metadata: { ...(candidate.metadata || {}), [key]: value } })
+            .eq('id', candidate.id)
+        )
+      );
+      const failedResult = results.find((result) => result.error);
+      if (failedResult?.error) throw failedResult.error;
+
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.scope('tour-default-tables', tour?.id || ''),
+      });
+    } catch (error) {
+      console.error('Error updating power default flag:', error);
+      toast({
+        title: 'Error',
+        description: 'Error al actualizar la tabla',
+        variant: 'destructive',
+      });
+    } finally {
+      setPendingFlagTableId(null);
     }
   };
 
@@ -595,6 +650,12 @@ export const TourDefaultsManager = ({
             1000,
         };
 
+        const fohSchukoRequired =
+          (department === 'sound' || department === 'lights') &&
+          relevantDefaults.some(
+            (item) => isNewFormatTable(item) && Boolean(item.metadata?.foh_schuko),
+          );
+
         const pdfBlob = await exportToPDF(
           getDefaultsPdfTitle(tour.name, department, type, packageLabel),
           tables,
@@ -604,7 +665,8 @@ export const TourDefaultsManager = ({
           undefined,
           powerSummary,
           safetyMargin,
-          logoUrl
+          logoUrl,
+          fohSchukoRequired
         );
 
         const fileName = getDefaultsPdfFilename(tour.name, department, type, packageLabel);
@@ -854,6 +916,12 @@ export const TourDefaultsManager = ({
       const locationName = getTourDateLocationName(tourDate);
       const dateStr = tourDate.date;
 
+      const fohSchukoRequired =
+        (department === 'sound' || department === 'lights') &&
+        defaultsData.some(
+          (item) => isNewFormatTable(item) && Boolean(item.metadata?.foh_schuko),
+        );
+
       const pdfBlob = await exportToPDF(
         getTourDatePdfTitle(tour.name, locationName, department, type, packageLabel),
         tables,
@@ -863,7 +931,8 @@ export const TourDefaultsManager = ({
         undefined,
         powerSummary,
         safetyMargin,
-        logoUrl
+        logoUrl,
+        fohSchukoRequired
       );
 
       const fileName = getTourDatePdfFilename(
@@ -1011,6 +1080,8 @@ export const TourDefaultsManager = ({
     const powerTables = getDepartmentDefaults(department, 'power');
     const weightTables = getDepartmentDefaults(department, 'weight');
     const duplicateWarnings = getDuplicatePackageWarnings(department);
+    // FOH schuko power only applies to sound & lights (matches the Consumos tool).
+    const fohSupported = department === 'sound' || department === 'lights';
 
     // Group new format tables by sets
     const departmentSets = defaultSets.filter(set => set.department === department);
@@ -1162,36 +1233,103 @@ export const TourDefaultsManager = ({
                   </div>
                 </div>
                 
+                <p className="text-xs text-muted-foreground mb-3">
+                  {setTables.length} tabla{setTables.length === 1 ? '' : 's'}
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {setTables.map((table) => (
-                    <div key={table.id} className="border rounded-lg p-4 bg-white">
-                      <div className="flex justify-between items-start mb-2">
-                        <h6 className="font-medium">{table.table_name}</h6>
+                  {setTables.map((table) => {
+                    const position = getResolvedPowerPosition(
+                      table.metadata?.position,
+                      table.metadata?.custom_position,
+                    );
+                    const rowPending =
+                      pendingFlagTableId === table.id ||
+                      pendingFlagTableId === `foh_schuko:${table.set_id}`;
+                    return (
+                    <div key={table.id} className="border rounded-lg p-4 bg-white transition-colors hover:border-primary/40">
+                      <div className="flex justify-between items-start gap-2 mb-2">
+                        <div className="min-w-0">
+                          <h6 className="font-medium leading-tight">{table.table_name}</h6>
+                          {(table.metadata?.includes_hoist || table.metadata?.foh_schuko) && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {table.metadata?.includes_hoist && (
+                                <Badge variant="outline" className="gap-1 text-[10px] py-0 h-5 border-amber-300 text-amber-700">
+                                  <Anchor className="h-2.5 w-2.5" />
+                                  Hoist
+                                </Badge>
+                              )}
+                              {table.metadata?.foh_schuko && (
+                                <Badge variant="outline" className="gap-1 text-[10px] py-0 h-5 border-sky-300 text-sky-700">
+                                  <Plug className="h-2.5 w-2.5" />
+                                  FOH
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                        </div>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDeleteTable(table, 'power')}
                           disabled={isDeletingTable}
-                          className="text-destructive hover:text-destructive"
+                          className="text-destructive hover:text-destructive shrink-0 -mt-1 -mr-1"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      <p className="text-sm text-muted-foreground">
-                        {table.total_value.toFixed(2)} W
-                      </p>
-                      {table.metadata?.current_per_phase && (
-                        <p className="text-xs text-muted-foreground">
-                          {table.metadata.current_per_phase.toFixed(2)} A por fase
-                        </p>
-                      )}
-                      {getResolvedPowerPosition(table.metadata?.position, table.metadata?.custom_position) && (
-                        <p className="text-xs text-muted-foreground">
-                          Posición: {getResolvedPowerPosition(table.metadata?.position, table.metadata?.custom_position)}
-                        </p>
-                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        <Badge variant="secondary" className="font-mono">
+                          {table.total_value.toFixed(2)} W
+                        </Badge>
+                        {table.metadata?.current_per_phase && (
+                          <Badge variant="secondary" className="font-mono">
+                            {table.metadata.current_per_phase.toFixed(2)} A/fase
+                          </Badge>
+                        )}
+                        {position && <Badge variant="outline">{position}</Badge>}
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-3">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`hoist-${table.id}`}
+                            checked={Boolean(table.metadata?.includes_hoist)}
+                            disabled={rowPending}
+                            onCheckedChange={(checked) =>
+                              void handleTogglePowerFlag(table, 'includes_hoist', !!checked)
+                            }
+                          />
+                          <Label
+                            htmlFor={`hoist-${table.id}`}
+                            className="text-xs font-normal flex items-center gap-1 cursor-pointer"
+                          >
+                            <Anchor className="h-3 w-3 text-muted-foreground" />
+                            Incluye hoist/rigging
+                          </Label>
+                        </div>
+                        {fohSupported && (
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`foh-${table.id}`}
+                              checked={Boolean(table.metadata?.foh_schuko)}
+                              disabled={rowPending}
+                              onCheckedChange={(checked) =>
+                                void handleTogglePowerFlag(table, 'foh_schuko', !!checked)
+                              }
+                            />
+                            <Label
+                              htmlFor={`foh-${table.id}`}
+                              className="text-xs font-normal flex items-center gap-1 cursor-pointer"
+                              title="Se requiere potencia de 16A en formato schuko hembra en posición FoH"
+                            >
+                              <Plug className="h-3 w-3 text-muted-foreground" />
+                              FOH (schuko 16A)
+                            </Label>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -1314,6 +1452,9 @@ export const TourDefaultsManager = ({
                   </div>
                 </div>
                 
+                <p className="text-xs text-muted-foreground mb-3">
+                  {setTables.length} tabla{setTables.length === 1 ? '' : 's'}
+                </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {setTables.map((table) => (
                     <div key={table.id} className="border rounded-lg p-4 bg-white">
