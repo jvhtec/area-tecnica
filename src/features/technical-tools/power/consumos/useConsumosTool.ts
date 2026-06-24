@@ -12,6 +12,7 @@ import type { TourPackageSize } from "@/utils/tourPackages";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { queryKeys } from "@/lib/react-query";
 import { exportToPDF } from "@/utils/pdfExport";
+import { syncTourDefaultDocuments } from "@/utils/tourDefaultDocumentSync";
 import {
   CUSTOM_POWER_POSITION_VALUE,
   NO_POWER_POSITION_VALUE,
@@ -243,6 +244,34 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
     [defaultSets, selectedDefaultSetId],
   );
 
+  const syncDefaultDocumentsAfterMutation = useCallback(async () => {
+    if (!isTourDefaults || !tourIdParam) return;
+
+    try {
+      const result = await syncTourDefaultDocuments({ tourId: tourIdParam });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents", tourIdParam) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobcard-tour-documents") }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents-for-job") }),
+      ]);
+
+      if (result.errors.length > 0) {
+        toast({
+          title: labels.toastError,
+          description: `${result.errors.length} default document(s) could not be refreshed.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error syncing tour default documents:", error);
+      toast({
+        title: labels.toastError,
+        description: "Default package PDFs could not be refreshed.",
+        variant: "destructive",
+      });
+    }
+  }, [isTourDefaults, tourIdParam, queryClient, toast, labels.toastError]);
+
   useEffect(() => {
     if (
       !isTourDefaults ||
@@ -338,11 +367,21 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         queryClient.invalidateQueries({
           queryKey: queryKeys.scope("tour-default-tables", tourIdParam || "", department),
         });
+        await syncDefaultDocumentsAfterMutation();
       } catch (error) {
         console.error("Error persisting FOH schuko setting:", error);
       }
     },
-    [isTourDefaults, features.fohSchuko, selectedDefaultSetId, defaultTables, queryClient, tourIdParam, department],
+    [
+      isTourDefaults,
+      features.fohSchuko,
+      selectedDefaultSetId,
+      defaultTables,
+      queryClient,
+      tourIdParam,
+      department,
+      syncDefaultDocumentsAfterMutation,
+    ],
   );
 
   const handleSetFohSchukoRequired = useCallback(
@@ -797,6 +836,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
         }),
       },
     });
+    await syncDefaultDocumentsAfterMutation();
   };
 
   const generateTable = async () => {
@@ -971,6 +1011,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
   const createEmptyDefaultSet = async () => {
     try {
       await getOrCreateDefaultSetId();
+      await syncDefaultDocumentsAfterMutation();
     } catch (error: unknown) {
       console.error("Error creating default set:", error);
       toast({
@@ -1006,6 +1047,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
             : candidate,
         ),
       );
+      await syncDefaultDocumentsAfterMutation();
       toast({ title: labels.toastSuccess, description: labels.toastDefaultSaved });
     } catch (error: unknown) {
       console.error("Error saving tour default:", error);
@@ -1069,6 +1111,9 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       }
     }
     const saved = unsaved.length - failed.length;
+    if (saved > 0) {
+      await syncDefaultDocumentsAfterMutation();
+    }
     if (failed.length === 0) {
       toast({ title: labels.toastSuccess, description: labels.toastDefaultsSaved(saved) });
     } else if (saved > 0) {
@@ -1092,6 +1137,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       if (editing?.kind === "default" && editing.id === defaultTableId) {
         resetCurrentTable();
       }
+      await syncDefaultDocumentsAfterMutation();
     } catch (error) {
       console.error("Error deleting default table:", error);
       toast({
@@ -1227,6 +1273,7 @@ export const useConsumosTool = (config: ConsumosDepartmentConfig) => {
       setSelectedCopyTableIds([]);
       setSelectedDefaultSetId(targetSetId);
       setIsCreatingDefaultSet(false);
+      await syncDefaultDocumentsAfterMutation();
     } catch (error: unknown) {
       console.error("Error copying default tables:", error);
       toast({

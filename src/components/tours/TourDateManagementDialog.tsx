@@ -38,6 +38,10 @@ import { PlaceAutocomplete } from "@/components/maps/PlaceAutocomplete";
 import { TECHNICAL_DEPARTMENTS } from "@/types/department";
 import { syncFlexElementsForTourDateChange } from "@/utils/flex-folders/syncDateChange";
 import {
+  cleanupTourDefaultDocumentsForDate,
+  syncTourDefaultDocuments,
+} from "@/utils/tourDefaultDocumentSync";
+import {
   DateType,
   getDateTypeMeta,
   isSingleDayDateType,
@@ -212,6 +216,42 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
     video_default_set_id:
       defaultSetIds.video || getUniqueDefaultSetId("video", packageSizes.video),
   });
+
+  const invalidateTourDocumentQueries = async () => {
+    if (!tourId) return;
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents", tourId) }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobcard-tour-documents") }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope("tour-documents-for-job") }),
+    ]);
+  };
+
+  const syncTourDefaultDocumentsForDate = async (dateId: string) => {
+    if (!tourId) return;
+
+    try {
+      const result = await syncTourDefaultDocuments({
+        tourId,
+        tourDateIds: [dateId],
+      });
+      await invalidateTourDocumentQueries();
+
+      if (result.errors.length > 0) {
+        toast({
+          title: "Tour date saved with PDF warnings",
+          description: `${result.errors.length} default document(s) could not be refreshed.`,
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error syncing tour default documents:", error);
+      toast({
+        title: "Tour date saved with PDF warnings",
+        description: "Default package PDFs could not be refreshed for this date.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const applyTourPackShortcut = (
     checked: boolean,
@@ -484,6 +524,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-folders-existence") }),
       ]);
 
+      await syncTourDefaultDocumentsForDate(newTourDate.id);
+
       toast({
         title: "Success",
         description: "Tour date and job created successfully",
@@ -690,6 +732,8 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
       ]);
 
+      await syncTourDefaultDocumentsForDate(dateId);
+
       // Only show success toast if flex sync didn't have warnings or errors
       if (!flexSyncHadWarningsOrError) {
         toast({
@@ -874,6 +918,14 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         dataLayerClient.from("tour_date_weight_overrides").delete().eq("tour_date_id", dateId)
       ]);
 
+      if (tourId) {
+        try {
+          await cleanupTourDefaultDocumentsForDate({ tourId, tourDateId: dateId });
+        } catch (cleanupError) {
+          console.error("Error cleaning up tour default documents for deleted date:", cleanupError);
+        }
+      }
+
       // Step 5: Finally delete the tour date itself
       console.log("Deleting tour date...");
       const { error: dateError } = await dataLayerClient.from("tour_dates")
@@ -896,6 +948,7 @@ export const TourDateManagementDialog: React.FC<TourDateManagementDialogProps> =
         queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") }),
         queryClient.invalidateQueries({ queryKey: queryKeys.scope("flex-folders-existence") }),
       ]);
+      await invalidateTourDocumentQueries();
 
       toast({
         title: "Success",
