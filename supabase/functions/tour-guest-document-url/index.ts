@@ -34,25 +34,10 @@ serve(async (req) => {
     return jsonResponse({ error: "Missing Supabase configuration" }, { status: 500 });
   }
 
-  let body: { token?: unknown; documentId?: unknown };
-  try {
-    body = await req.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body" }, { status: 400 });
-  }
-
-  const token = typeof body.token === "string" ? body.token.trim() : "";
-  const documentId = typeof body.documentId === "string" ? body.documentId.trim() : "";
-
-  if (!token || !documentId) {
-    return jsonResponse({ error: "Missing token or documentId" }, { status: 400 });
-  }
-
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   });
 
-  const tokenHash = await sha256Hex(token);
   const ingressRateLimit = await checkEdgeRateLimit({
     req,
     supabase,
@@ -70,6 +55,21 @@ serve(async (req) => {
     );
   }
 
+  let body: { token?: unknown; documentId?: unknown };
+  try {
+    body = await req.json();
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const token = typeof body.token === "string" ? body.token.trim() : "";
+  const documentId = typeof body.documentId === "string" ? body.documentId.trim() : "";
+
+  if (!token || !documentId) {
+    return jsonResponse({ error: "Missing token or documentId" }, { status: 400 });
+  }
+
+  const tokenHash = await sha256Hex(token);
   const rateLimit = await checkEdgeRateLimit({
     req,
     supabase,
@@ -77,6 +77,8 @@ serve(async (req) => {
     identifierParts: [tokenHash, documentId],
     windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
     maxRequests: RATE_LIMIT_MAX_REQUESTS,
+    includeIp: false,
+    includeUserAgent: false,
     salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? serviceRoleKey,
   });
 

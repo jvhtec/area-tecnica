@@ -42,17 +42,6 @@ serve(async (req) => {
   }
 
   try {
-    const body = (await req.json()) as DeleteBody;
-    const token = String(body?.token ?? "").trim();
-    const fileId = String(body?.fileId ?? "").trim();
-
-    if (!token) {
-      return jsonResponse({ ok: false, error: "missing_token" }, { status: 400 });
-    }
-    if (!fileId) {
-      return jsonResponse({ ok: false, error: "missing_file_id" }, { status: 400 });
-    }
-
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
     const ingressRateLimit = await checkEdgeRateLimit({
       req,
@@ -71,6 +60,23 @@ serve(async (req) => {
       );
     }
 
+    let body: DeleteBody;
+    try {
+      body = (await req.json()) as DeleteBody;
+    } catch {
+      return jsonResponse({ ok: false, error: "invalid_json" }, { status: 400 });
+    }
+
+    const token = String(body?.token ?? "").trim();
+    const fileId = String(body?.fileId ?? "").trim();
+
+    if (!token) {
+      return jsonResponse({ ok: false, error: "missing_token" }, { status: 400 });
+    }
+    if (!fileId) {
+      return jsonResponse({ ok: false, error: "missing_file_id" }, { status: 400 });
+    }
+
     const rateLimit = await checkEdgeRateLimit({
       req,
       supabase: supabaseAdmin,
@@ -78,6 +84,8 @@ serve(async (req) => {
       identifierParts: [token, fileId],
       windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
       maxRequests: RATE_LIMIT_MAX_REQUESTS,
+      includeIp: false,
+      includeUserAgent: false,
       salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
     });
 

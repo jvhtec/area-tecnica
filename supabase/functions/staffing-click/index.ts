@@ -89,6 +89,8 @@ serve(async (req) => {
       identifierParts: [rid, action, t],
       windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
       maxRequests: RATE_LIMIT_MAX_REQUESTS,
+      includeIp: false,
+      includeUserAgent: false,
       salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE,
     });
 

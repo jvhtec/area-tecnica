@@ -126,10 +126,6 @@ serve(async (req) => {
   const daysBack = Math.max(0, Math.min(365, Number(url.searchParams.get('back') || 90)));
   const daysFwd = Math.max(1, Math.min(730, Number(url.searchParams.get('fwd') || 365)));
 
-  if (!isUuid(tid) || !token) {
-    return new Response('Invalid parameters', { status: 400 });
-  }
-
   const ingressRateLimit = await checkEdgeRateLimit({
     req,
     supabase,
@@ -144,6 +140,10 @@ serve(async (req) => {
     return new Response('Too Many Requests', { status: 429, headers: rateLimitHeaders(ingressRateLimit) });
   }
 
+  if (!isUuid(tid) || !token) {
+    return new Response('Invalid parameters', { status: 400 });
+  }
+
   const rateLimit = await checkEdgeRateLimit({
     req,
     supabase,
@@ -151,6 +151,8 @@ serve(async (req) => {
     identifierParts: [tid, token],
     windowSeconds: 60 * 60,
     maxRequests: RATE_LIMIT_PER_HOUR,
+    includeIp: false,
+    includeUserAgent: false,
     salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
   });
 
