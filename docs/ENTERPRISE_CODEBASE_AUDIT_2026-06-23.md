@@ -708,6 +708,15 @@ The roadmap is ordered by risk reduction and operational dependency. Large refac
 - No health endpoint returns business samples or internal errors to normal users.
 - Public endpoints have durable abuse controls.
 
+**Implementation status (2026-06-23):** The first wave is implemented and
+enforced in CI — Edge Function exposure classification gate, SECURITY DEFINER
+anonymous-grant gate, liveness/diagnostic health split, anonymous-reach revoke
+migration, shared correlation/size-limit/redaction primitives, and pgTAP
+authorization regressions. See
+`docs/operations/phase-2-trust-boundary-hardening.md` for the exit-gate mapping
+and remaining follow-up (priority Edge Function handler migration and durable
+public-endpoint rate limiting).
+
 ### Phase 3 — Test and correctness maturity
 
 **Target:** Weeks 3-6  

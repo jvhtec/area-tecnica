@@ -1,12 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  correlationHeaders,
   createHttpHandler,
   errorResponse,
   extractBearerToken,
+  getCorrelationId,
   HttpError,
   jsonResponse,
+  readBoundedJsonObject,
+  readBoundedText,
   readJsonBody,
+  redactSensitiveValues,
   requireBearerToken,
   requireEnvValues,
 } from "./http.ts";
@@ -109,6 +114,103 @@ describe("shared Edge Function HTTP helpers", () => {
     } finally {
       consoleError.mockRestore();
     }
+  });
+
+  it("attaches configured headers to handled error responses", async () => {
+    const wrapped = createHttpHandler(
+      async () => {
+        throw new HttpError(400, "bad request", { code: "bad_request" });
+      },
+      {
+        errorHeaders: (req) => correlationHeaders(getCorrelationId(req)),
+      },
+    );
+
+    const response = await wrapped(new Request("https://example.com", {
+      method: "POST",
+      headers: { "x-correlation-id": "trace-12345" },
+    }));
+
+    expect(response.status).toBe(400);
+    expect(response.headers.get("x-correlation-id")).toBe("trace-12345");
+    await expect(response.json()).resolves.toEqual({ error: "bad request", code: "bad_request" });
+  });
+
+  it("reuses a well-formed inbound correlation id and generates otherwise", () => {
+    const withHeader = new Request("https://example.com", {
+      headers: { "x-correlation-id": "abc12345-trace-id" },
+    });
+    expect(getCorrelationId(withHeader)).toBe("abc12345-trace-id");
+
+    const malformed = new Request("https://example.com", {
+      headers: { "x-correlation-id": "bad id!" },
+    });
+    const generated = getCorrelationId(malformed);
+    expect(generated).not.toBe("bad id!");
+    expect(generated.length).toBeGreaterThanOrEqual(8);
+    expect(getCorrelationId(malformed)).toBe(generated);
+
+    expect(correlationHeaders("trace-123")).toEqual({ "x-correlation-id": "trace-123" });
+  });
+
+  it("rejects oversized bodies via Content-Length and decoded size", async () => {
+    const declared = new Request("https://example.com", {
+      method: "POST",
+      headers: { "content-length": "5000" },
+      body: "{}",
+    });
+    await expect(readBoundedText(declared, { maxBytes: 1000 })).rejects.toMatchObject({
+      status: 413,
+      code: "payload_too_large",
+    });
+
+    const oversized = new Request("https://example.com", {
+      method: "POST",
+      body: "x".repeat(2000),
+    });
+    await expect(readBoundedText(oversized, { maxBytes: 1000 })).rejects.toMatchObject({
+      status: 413,
+    });
+
+    const ok = new Request("https://example.com", { method: "POST", body: "small" });
+    await expect(readBoundedText(ok, { maxBytes: 1000 })).resolves.toBe("small");
+  });
+
+  it("parses bounded JSON objects and rejects non-objects/empties", async () => {
+    const object = new Request("https://example.com", {
+      method: "POST",
+      body: JSON.stringify({ ok: true }),
+    });
+    await expect(readBoundedJsonObject(object)).resolves.toEqual({ ok: true });
+
+    const array = new Request("https://example.com", { method: "POST", body: "[1,2]" });
+    await expect(readBoundedJsonObject(array)).rejects.toMatchObject({ status: 400, code: "invalid_json" });
+
+    const empty = new Request("https://example.com", { method: "POST", body: "   " });
+    await expect(readBoundedJsonObject(empty)).rejects.toMatchObject({ status: 400, code: "empty_body" });
+  });
+
+  it("redacts sensitive fields recursively regardless of key separators", () => {
+    const redacted = redactSensitiveValues({
+      email: "user@example.com",
+      apiKey: "secret-1",
+      nested: { "refresh-token": "secret-2", keep: 1 },
+      list: [{ password: "secret-3" }],
+    });
+
+    expect(redacted).toEqual({
+      email: "user@example.com",
+      apiKey: "[REDACTED]",
+      nested: { "refresh-token": "[REDACTED]", keep: 1 },
+      list: [{ password: "[REDACTED]" }],
+    });
+  });
+
+  it("collapses circular references when redacting", () => {
+    const cyclic: Record<string, unknown> = { name: "x" };
+    cyclic.self = cyclic;
+
+    expect(redactSensitiveValues(cyclic)).toEqual({ name: "x", self: "[Circular]" });
   });
 
   it("validates required environment values", () => {
