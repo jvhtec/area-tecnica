@@ -22,9 +22,21 @@
     "delete-public-artist-rider": { "class": "public-token", "verifyJwt": false, "internalGuard": "Festival artist form access token validated against the submission before any storage delete; guarded by durable ingress and token/document scoped rate limits." },
     "delete-user": { "class": "privileged-role", "verifyJwt": true },
     "evaluate-achievements": { "class": "service-only", "verifyJwt": true },
-    "fetch-flex-contact-info": { "class": "privileged-role", "verifyJwt": true },
-    "fetch-flex-image": { "class": "authenticated-user", "verifyJwt": true },
-    "fetch-flex-inventory-model": { "class": "privileged-role", "verifyJwt": true },
+    "fetch-flex-contact-info": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT and requires admin/management before fetching Flex contact key-info."
+    },
+    "fetch-flex-image": {
+      "class": "authenticated-user",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper; validates the caller JWT before proxying allowlisted Flex image IDs and returns authenticated-user private cache headers."
+    },
+    "fetch-flex-inventory-model": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT and requires admin/management before fetching Flex inventory model details."
+    },
     "generate-lights-memoria-tecnica": { "class": "authenticated-user", "verifyJwt": true },
     "generate-memoria-tecnica": { "class": "authenticated-user", "verifyJwt": true },
     "generate-sv-report": { "class": "authenticated-user", "verifyJwt": true },
@@ -40,12 +52,20 @@
       "verifyJwt": true,
       "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; browser callers must be authenticated admin/management, while service-role calls remain available for internal automation."
     },
-    "persist-flex-elements": { "class": "privileged-role", "verifyJwt": true },
+    "persist-flex-elements": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT, requires admin/management, and validates created Flex element records before service-role persistence."
+    },
     "place-photos": { "class": "authenticated-user", "verifyJwt": true },
     "place-restaurants": { "class": "authenticated-user", "verifyJwt": true },
     "push": { "class": "authenticated-user", "verifyJwt": true },
     "recalc-timesheet-amount": { "class": "service-only", "verifyJwt": true },
-    "secure-flex-api": { "class": "privileged-role", "verifyJwt": true },
+    "secure-flex-api": {
+      "class": "privileged-role",
+      "verifyJwt": true,
+      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; validates the caller JWT, requires admin/management, and preserves the Flex endpoint/method/header allowlists before proxying."
+    },
     "security-audit": { "class": "privileged-role", "verifyJwt": true },
     "send-bug-resolution-email": { "class": "privileged-role", "verifyJwt": true },
     "send-corporate-email": { "class": "privileged-role", "verifyJwt": true },

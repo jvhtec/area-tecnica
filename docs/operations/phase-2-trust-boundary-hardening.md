@@ -171,9 +171,16 @@ TV polling behavior needs a separate, polling-safe threshold and rollout plan.
   function uses a service-role client, while service-role automation remains
   explicit for the staffing orchestrator. The staffing send path also stopped
   logging full request bodies, profile payloads, and generated confirmation
-  links. The duplicated admin/management caller checks across the hardened
-  user-admin, diagnostics, payout, and staffing/message handlers now route
-  through the shared auth helper.
+  links. Flex proxy/support handlers (`secure-flex-api`,
+  `fetch-flex-contact-info`, `fetch-flex-inventory-model`, `fetch-flex-image`,
+  `persist-flex-elements`) were migrated on 2026-06-24, reducing the legacy
+  Edge Function baseline from 48 to 43 entries. That slice closed the
+  unauthenticated `persist-flex-elements` service-role write path, moved Flex
+  lookup/proxy handlers onto bounded payload parsing, removed raw Flex lookup
+  payloads from client responses, and made authenticated image responses use
+  private cache headers. The duplicated admin/management caller checks across
+  the hardened user-admin, diagnostics, payout, staffing/message, and Flex
+  proxy handlers now route through the shared auth helper.
 - Finish the wallboard auth/feed abuse-control design with TV-safe thresholds
   and rollout telemetry; avoid disrupting deployed APK wallboards.
 - Continue ratcheting the `anon`/`PUBLIC` grant baseline downward (trigger

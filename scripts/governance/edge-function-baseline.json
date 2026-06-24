@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generatedAt": "2026-06-24T15:04:03.739Z",
+  "generatedAt": "2026-06-24T15:24:24.680Z",
   "note": "Existing manual Edge Functions are grandfathered. New functions must use createHttpHandler or add an explicit reviewed exemption.",
   "manualFunctions": [
     {
@@ -59,21 +59,6 @@
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
-      "functionName": "fetch-flex-contact-info",
-      "path": "supabase/functions/fetch-flex-contact-info/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "fetch-flex-image",
-      "path": "supabase/functions/fetch-flex-image/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "fetch-flex-inventory-model",
-      "path": "supabase/functions/fetch-flex-inventory-model/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
       "functionName": "generate-lights-memoria-tecnica",
       "path": "supabase/functions/generate-lights-memoria-tecnica/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
@@ -109,11 +94,6 @@
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {
-      "functionName": "persist-flex-elements",
-      "path": "supabase/functions/persist-flex-elements/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
       "functionName": "place-photos",
       "path": "supabase/functions/place-photos/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
@@ -126,11 +106,6 @@
     {
       "functionName": "recalc-timesheet-amount",
       "path": "supabase/functions/recalc-timesheet-amount/index.ts",
-      "reason": "Legacy entrypoint present before the Edge Function compliance gate."
-    },
-    {
-      "functionName": "secure-flex-api",
-      "path": "supabase/functions/secure-flex-api/index.ts",
       "reason": "Legacy entrypoint present before the Edge Function compliance gate."
     },
     {

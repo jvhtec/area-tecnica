@@ -1,140 +1,114 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { fetchWithRetry } from "../_shared/flexFetch.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+import {
+  createHttpHandler,
+  HttpError,
+  jsonResponse,
+  readBoundedJsonObject,
+  requireBearerToken,
+  requireEnvValues,
+} from "../_shared/http.ts";
 
 // Valid image ID pattern (UUID or Flex-specific ID)
 const IMAGE_ID_PATTERN = /^[a-zA-Z0-9-]{1,100}$/;
 
-serve(async (req: Request) => {
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+interface FetchFlexImageBody extends Record<string, unknown> {
+  imageId?: unknown;
+  size?: unknown;
+}
+
+serve(createHttpHandler(async (req: Request) => {
+  let imageId: string | null = null;
+  let size: "thumb" | "full" = "thumb";
+
+  // Support both GET (query params) and POST (JSON body)
+  if (req.method === "GET") {
+    const url = new URL(req.url);
+    imageId = url.searchParams.get("imageId");
+    const sizeParam = url.searchParams.get("size");
+    if (sizeParam === "full") size = "full";
+  } else {
+    const body = await readBoundedJsonObject<FetchFlexImageBody>(req, { maxBytes: 4 * 1024 });
+    imageId = typeof body.imageId === "string" ? body.imageId : null;
+    if (body.size === "full") size = "full";
   }
 
-  try {
-    let imageId: string | null = null;
-    let size: "thumb" | "full" = "thumb";
-
-    // Support both GET (query params) and POST (JSON body)
-    if (req.method === "GET") {
-      const url = new URL(req.url);
-      imageId = url.searchParams.get("imageId");
-      const sizeParam = url.searchParams.get("size");
-      if (sizeParam === "full") size = "full";
-    } else if (req.method === "POST") {
-      const body = await req.json() as { imageId?: string; size?: string };
-      imageId = body.imageId || null;
-      if (body.size === "full") size = "full";
-    } else {
-      return new Response("Method Not Allowed", {
-        status: 405,
-        headers: corsHeaders
-      });
-    }
-
-    // Validate imageId
-    if (!imageId) {
-      return new Response(JSON.stringify({ error: "imageId is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (!IMAGE_ID_PATTERN.test(imageId)) {
-      return new Response(JSON.stringify({ error: "Invalid imageId format" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    // AuthZ: Require authenticated user (any role can view equipment images)
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const { data: { user } } = await supabase.auth.getUser(
-      authHeader.replace("Bearer ", "")
-    );
-    if (!user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const flexAuthToken =
-      Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
-
-    if (!flexAuthToken) {
-      return new Response(JSON.stringify({ error: "Flex auth not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Fetch image from Flex API
-    const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/image/${encodeURIComponent(imageId)}/${size}`;
-
-    const flexResponse = await fetchWithRetry(flexUrl, {
-      headers: {
-        "X-Auth-Token": flexAuthToken,
-        "apikey": flexAuthToken,
-        "X-Requested-With": "XMLHttpRequest",
-      },
-    });
-
-    if (!flexResponse.ok) {
-      // Return a transparent 1x1 pixel for missing images (graceful degradation)
-      if (flexResponse.status === 404) {
-        return new Response(null, {
-          status: 404,
-          headers: { ...corsHeaders },
-        });
-      }
-      return new Response(JSON.stringify({
-        error: `Flex API error: ${flexResponse.status}`
-      }), {
-        status: 502,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Get the image content
-    const imageBlob = await flexResponse.blob();
-    const contentType = flexResponse.headers.get("Content-Type") || "image/jpeg";
-
-    // Return the image with appropriate caching headers
-    return new Response(imageBlob, {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        "Content-Type": contentType,
-        "Cache-Control": "public, max-age=3600", // Cache for 1 hour
-      },
-    });
-
-  } catch (e) {
-    const msg = (e as Error)?.message || String(e);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+  // Validate imageId
+  if (!imageId) {
+    throw new HttpError(400, "imageId is required", {
+      code: "missing_image_id",
     });
   }
-});
+
+  if (!IMAGE_ID_PATTERN.test(imageId)) {
+    throw new HttpError(400, "Invalid imageId format", {
+      code: "invalid_image_id",
+    });
+  }
+
+  const {
+    SUPABASE_URL,
+    SUPABASE_SERVICE_ROLE_KEY,
+  } = requireEnvValues(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const, (name) => Deno.env.get(name));
+
+  // AuthZ: Require authenticated user (any role can view equipment images)
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  const token = requireBearerToken(req);
+  const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  if (authError || !user) {
+    throw new HttpError(401, "Unauthorized", {
+      code: "invalid_authorization",
+    });
+  }
+
+  const flexAuthToken =
+    Deno.env.get("X_AUTH_TOKEN") || Deno.env.get("FLEX_X_AUTH_TOKEN") || "";
+
+  if (!flexAuthToken) {
+    throw new HttpError(503, "Flex auth not configured", {
+      code: "flex_auth_missing",
+      exposeDetails: false,
+    });
+  }
+
+  // Fetch image from Flex API
+  const flexUrl = `https://sectorpro.flexrentalsolutions.com/f5/api/image/${encodeURIComponent(imageId)}/${size}`;
+
+  const flexResponse = await fetchWithRetry(flexUrl, {
+    headers: {
+      "X-Auth-Token": flexAuthToken,
+      "apikey": flexAuthToken,
+      "X-Requested-With": "XMLHttpRequest",
+    },
+  });
+
+  if (!flexResponse.ok) {
+    // Return 404 directly for missing images (graceful degradation)
+    if (flexResponse.status === 404) {
+      return new Response(null, { status: 404 });
+    }
+    return jsonResponse({
+      error: `Flex API error: ${flexResponse.status}`
+    }, { status: 502 });
+  }
+
+  // Get the image content
+  const imageBlob = await flexResponse.blob();
+  const contentType = flexResponse.headers.get("Content-Type") || "image/jpeg";
+
+  if (!contentType.toLowerCase().startsWith("image/")) {
+    throw new HttpError(502, "Flex image response had an invalid content type", {
+      code: "invalid_flex_image_response",
+    });
+  }
+
+  // Return the image with authenticated-user-safe caching headers
+  return new Response(imageBlob, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "private, max-age=3600", // Cache for 1 hour in the user's browser only
+    },
+  });
+}, { allowedMethods: ["GET", "POST"] }));
