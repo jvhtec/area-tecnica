@@ -1,46 +1,49 @@
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with, accept, prefer, x-supabase-info, x-supabase-api-version, x-supabase-client-platform',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
-}
+import { createHttpHandler, HttpError, jsonResponse, requireEnvValues } from "../_shared/http.ts";
+import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+const RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const RATE_LIMIT_MAX_REQUESTS = 120;
+
+serve(createHttpHandler(async (req) => {
+  const {
+    SUPABASE_URL: supabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+    MAPBOX_PUBLIC_TOKEN: mapboxToken,
+  } = requireEnvValues(
+    ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "MAPBOX_PUBLIC_TOKEN"] as const,
+    (name) => Deno.env.get(name),
+  );
+
+  const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false },
+  });
+
+  const rateLimit = await checkEdgeRateLimit({
+    req,
+    supabase,
+    scope: "get-mapbox-token",
+    windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+    maxRequests: RATE_LIMIT_MAX_REQUESTS,
+    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? serviceRoleKey,
+  });
+
+  if (!rateLimit.allowed) {
+    return jsonResponse(
+      { error: "rate_limited" },
+      { status: 429, headers: rateLimitHeaders(rateLimit) },
+    );
   }
 
-  try {
-    const mapboxToken = Deno.env.get('MAPBOX_PUBLIC_TOKEN')
-    
-    if (!mapboxToken) {
-      console.error('MAPBOX_PUBLIC_TOKEN not found in environment')
-      return new Response(
-        JSON.stringify({ error: 'Mapbox token not configured' }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500,
-        },
-      )
+  return jsonResponse({ token: mapboxToken });
+}, {
+  allowedMethods: ["GET", "POST"],
+  internalErrorMessage: "Failed to load Mapbox token",
+  onError: (error) => {
+    if (!(error instanceof HttpError)) {
+      console.error("Error fetching Mapbox token:", error);
     }
-
-    return new Response(
-      JSON.stringify({ token: mapboxToken }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
-    )
-  } catch (error) {
-    console.error('Error fetching Mapbox token:', error)
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      },
-    )
-  }
-})
+  },
+}));

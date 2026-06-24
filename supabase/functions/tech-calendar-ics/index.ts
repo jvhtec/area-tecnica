@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -65,43 +66,16 @@ async function sha1(s: string) {
     .join("");
 }
 
-// Best-effort per-isolate rate limit. Calendar clients poll at most every
-// few minutes, so a generous hourly cap only affects scraping/enumeration.
+// Durable public-feed rate limit. Calendar clients poll at most every few
+// minutes, so a generous hourly cap only affects scraping/enumeration.
 const configuredRateLimit = Number(Deno.env.get("ICS_RATE_LIMIT_PER_HOUR") || 120);
 const RATE_LIMIT_PER_HOUR = Number.isFinite(configuredRateLimit) && configuredRateLimit > 0
   ? Math.floor(configuredRateLimit)
   : 120;
-const MAX_RATE_BUCKETS = 10_000;
-const MAX_BUCKETS_SCANNED_PER_PRUNE = 250;
-const rateBuckets = new Map<string, { count: number; resetAt: number }>();
-
-function pruneExpiredBuckets(now: number): void {
-  let scanned = 0;
-  for (const [key, value] of rateBuckets) {
-    if (value.resetAt <= now) rateBuckets.delete(key);
-    scanned += 1;
-    if (scanned >= MAX_BUCKETS_SCANNED_PER_PRUNE) break;
-  }
-}
-
-function allowRequest(key: string): boolean {
-  const now = Date.now();
-  const bucket = rateBuckets.get(key);
-  if (!bucket || bucket.resetAt <= now) {
-    if (!bucket && rateBuckets.size >= MAX_RATE_BUCKETS) {
-      pruneExpiredBuckets(now);
-      if (rateBuckets.size >= MAX_RATE_BUCKETS) {
-        const oldestKey = rateBuckets.keys().next().value;
-        if (typeof oldestKey !== "string") return false;
-        rateBuckets.delete(oldestKey);
-      }
-    }
-    rateBuckets.set(key, { count: 1, resetAt: now + 3_600_000 });
-    return true;
-  }
-  bucket.count += 1;
-  return bucket.count <= RATE_LIMIT_PER_HOUR;
-}
+const configuredIngressRateLimit = Number(Deno.env.get("ICS_INGRESS_RATE_LIMIT_PER_HOUR") || 1200);
+const INGRESS_RATE_LIMIT_PER_HOUR = Number.isFinite(configuredIngressRateLimit) && configuredIngressRateLimit > 0
+  ? Math.floor(configuredIngressRateLimit)
+  : 1200;
 
 // Hash both sides before comparing so the string comparison can't leak
 // token prefixes through timing.
@@ -156,8 +130,32 @@ serve(async (req) => {
     return new Response('Invalid parameters', { status: 400 });
   }
 
-  if (!allowRequest(tid!)) {
-    return new Response('Too Many Requests', { status: 429, headers: { 'Retry-After': '3600' } });
+  const ingressRateLimit = await checkEdgeRateLimit({
+    req,
+    supabase,
+    scope: "tech-calendar-ics.ingress",
+    identifierParts: ["ics"],
+    windowSeconds: 60 * 60,
+    maxRequests: INGRESS_RATE_LIMIT_PER_HOUR,
+    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+  });
+
+  if (!ingressRateLimit.allowed) {
+    return new Response('Too Many Requests', { status: 429, headers: rateLimitHeaders(ingressRateLimit) });
+  }
+
+  const rateLimit = await checkEdgeRateLimit({
+    req,
+    supabase,
+    scope: "tech-calendar-ics",
+    identifierParts: [tid, token],
+    windowSeconds: 60 * 60,
+    maxRequests: RATE_LIMIT_PER_HOUR,
+    salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+  });
+
+  if (!rateLimit.allowed) {
+    return new Response('Too Many Requests', { status: 429, headers: rateLimitHeaders(rateLimit) });
   }
 
   // Validate token against profiles

@@ -1,9 +1,14 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { corsHeaders, jsonResponse } from "../_shared/cors.ts";
+import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const INGRESS_RATE_LIMIT_WINDOW_SECONDS = 60;
+const INGRESS_RATE_LIMIT_MAX_REQUESTS = 120;
+const RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
+const RATE_LIMIT_MAX_REQUESTS = 60;
 
 type DeleteBody = {
   token?: string;
@@ -49,6 +54,39 @@ serve(async (req) => {
     }
 
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+    const ingressRateLimit = await checkEdgeRateLimit({
+      req,
+      supabase: supabaseAdmin,
+      scope: "delete-public-artist-rider.ingress",
+      identifierParts: ["json"],
+      windowSeconds: INGRESS_RATE_LIMIT_WINDOW_SECONDS,
+      maxRequests: INGRESS_RATE_LIMIT_MAX_REQUESTS,
+      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+    });
+
+    if (!ingressRateLimit.allowed) {
+      return jsonResponse(
+        { ok: false, error: "rate_limited" },
+        { status: 429, headers: rateLimitHeaders(ingressRateLimit) },
+      );
+    }
+
+    const rateLimit = await checkEdgeRateLimit({
+      req,
+      supabase: supabaseAdmin,
+      scope: "delete-public-artist-rider",
+      identifierParts: [token, fileId],
+      windowSeconds: RATE_LIMIT_WINDOW_SECONDS,
+      maxRequests: RATE_LIMIT_MAX_REQUESTS,
+      salt: Deno.env.get("EDGE_RATE_LIMIT_HASH_SECRET") ?? SERVICE_ROLE_KEY,
+    });
+
+    if (!rateLimit.allowed) {
+      return jsonResponse(
+        { ok: false, error: "rate_limited" },
+        { status: 429, headers: rateLimitHeaders(rateLimit) },
+      );
+    }
 
     const { data: formRow, error: formError } = await supabaseAdmin
       .from("festival_artist_forms")
