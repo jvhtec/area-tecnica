@@ -1,97 +1,95 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { corsHeaders, jsonResponse } from "../_shared/http.ts";
+import {
+  correlationHeaders,
+  createHttpHandler,
+  getCorrelationId,
+  HttpError,
+  jsonResponse,
+  readBoundedJsonObject,
+  redactSensitiveValues,
+  requireEnvValues,
+} from "../_shared/http.ts";
+import { requireAdminOrManagement } from "../_shared/auth.ts";
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+type DeleteUserBody = Record<string, unknown> & {
+  userId?: unknown;
+};
+
+const MAX_DELETE_USER_BODY_BYTES = 8 * 1024;
+
+const normalizeRequiredText = (value: unknown) => {
+  if (typeof value !== "string") {
+    return undefined;
   }
 
-  if (req.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405);
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+};
+
+serve(createHttpHandler(async (req) => {
+  const correlationId = getCorrelationId(req);
+  const headers = correlationHeaders(correlationId);
+  const respond = (body: unknown, status = 200) => jsonResponse(body, { status, headers });
+
+  const { userId: rawUserId } = await readBoundedJsonObject<DeleteUserBody>(req, {
+    maxBytes: MAX_DELETE_USER_BODY_BYTES,
+  });
+  const userId = normalizeRequiredText(rawUserId);
+
+  if (!userId) {
+    throw new HttpError(400, "User ID is required", { code: "missing_user_id" });
   }
 
-  try {
-    let userId: string | undefined;
-    try {
-      ({ userId } = await req.json());
-    } catch {
-      return jsonResponse({ error: 'Invalid JSON body' }, 400);
-    }
+  const {
+    SUPABASE_URL: supabaseUrl,
+    SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+  } = requireEnvValues(["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY"] as const, (name) => Deno.env.get(name));
 
-    if (!userId) {
-      return jsonResponse({ error: 'User ID is required' }, 400);
-    }
+  const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey);
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+  const caller = await requireAdminOrManagement(supabaseAdmin, req, {
+    missingMessage: "Unauthorized",
+    invalidMessage: "Unauthorized",
+    forbiddenMessage: "Unauthorized - admin or management role required",
+  });
 
-    // AuthN of requester
-    const authHeader = req.headers.get('Authorization') ?? req.headers.get('authorization');
-    if (!authHeader) {
-      return jsonResponse({ error: 'Unauthorized' }, 401);
-    }
-
-    const token = authHeader.replace('Bearer ', '').trim();
-    const { data: { user: requestingUser } } = await supabaseAdmin.auth.getUser(token);
-    if (!requestingUser) {
-      return jsonResponse({ error: 'Unauthorized' }, 401);
-    }
-
-    // AuthZ: require admin or management
-    const { data: requesterProfile, error: profileErr } = await supabaseAdmin
-      .from('profiles')
-      .select('role')
-      .eq('id', requestingUser.id)
-      .maybeSingle();
-
-    if (profileErr) throw profileErr;
-    if (!requesterProfile || !['admin', 'management'].includes(requesterProfile.role)) {
-      return jsonResponse({ error: 'Unauthorized - admin or management role required' }, 403);
-    }
-
-    // Guard against self-deletion (would orphan the requester's own session/audit trail)
-    if (userId === requestingUser.id) {
-      return jsonResponse({ error: 'You cannot delete your own account' }, 400);
-    }
-
-    // Confirm the target exists for a clear 404 instead of a silent success
-    const { data: targetUser, error: getErr } = await supabaseAdmin.auth.admin.getUserById(userId);
-    if (getErr || !targetUser?.user) {
-      return jsonResponse({ error: 'User not found' }, 404);
-    }
-
-    console.log('Deleting user:', userId, 'requested by:', requestingUser.id);
-
-    // Deleting from auth.users cascades to profiles and, via the normalized
-    // ON DELETE rules, to all dependent records.
-    const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
-
-    if (deleteError) {
-      console.error('Error deleting user:', deleteError);
-      // Surface the underlying reason (e.g. a foreign-key still blocking the
-      // delete) rather than a generic 400, so it is actionable.
-      return jsonResponse(
-        {
-          error: 'Failed to delete user',
-          details: deleteError.message,
-          code: (deleteError as { code?: string }).code,
-        },
-        502,
-      );
-    }
-
-    return jsonResponse({ message: 'User deleted successfully' });
-  } catch (error) {
-    console.error('Error in delete-user function:', error);
-    return jsonResponse(
-      {
-        error: 'Unexpected error',
-        details: (error as Error).message,
-      },
-      500,
-    );
+  // Guard against self-deletion (would orphan the requester's own session/audit trail).
+  if (userId === caller.userId) {
+    throw new HttpError(400, "You cannot delete your own account", {
+      code: "self_delete_blocked",
+    });
   }
-});
+
+  // Confirm the target exists for a clear 404 instead of a silent success.
+  const { data: targetUser, error: getErr } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (getErr || !targetUser?.user) {
+    throw new HttpError(404, "User not found", { code: "user_not_found" });
+  }
+
+  console.log("Deleting user:", redactSensitiveValues({ correlationId, userId, requestedBy: caller.userId }));
+
+  // Deleting from auth.users cascades to profiles and, via the normalized
+  // ON DELETE rules, to all dependent records.
+  const { error: deleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+
+  if (deleteError) {
+    console.error("Error deleting user:", redactSensitiveValues({ correlationId, error: deleteError }));
+    throw new HttpError(502, "Failed to delete user", {
+      code: "delete_user_failed",
+      exposeDetails: false,
+    });
+  }
+
+  return respond({ message: "User deleted successfully" });
+}, {
+  allowedMethods: ["POST"],
+  internalErrorMessage: "Unexpected error",
+  errorHeaders: (req) => correlationHeaders(getCorrelationId(req)),
+  onError: (error, req) => {
+    console.error("delete-user error:", redactSensitiveValues({
+      correlationId: getCorrelationId(req),
+      error,
+    }));
+  },
+}));
