@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { FileText, Weight, Calculator, Trash2, Download, Calendar, Copy, AlertTriangle } from "lucide-react";
@@ -212,11 +213,13 @@ export const TourDefaultsManager = ({
     isLoading: defaultSetsLoading,
     createSet,
     updateSet,
+    updateTable,
     duplicateSet,
     deleteSet,
     deleteTable,
     isCreatingSet,
     isUpdatingSet,
+    isUpdatingTable,
     isDuplicatingSet,
     isDeletingSet,
     isDeletingTable
@@ -340,6 +343,31 @@ export const TourDefaultsManager = ({
       toast({
         title: 'Error',
         description: 'Error al eliminar la tabla',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Toggle a boolean flag (hoist / FOH schuko) on an already-saved power
+  // default. These were previously only settable when the table was first
+  // created in the Consumos tool, so a forgotten value could not be corrected.
+  const handleTogglePowerFlag = async (
+    table: TourDefaultTable,
+    key: 'includes_hoist' | 'foh_schuko',
+    value: boolean,
+  ) => {
+    try {
+      await updateTable({
+        tableId: table.id,
+        updates: {
+          metadata: { ...(table.metadata || {}), [key]: value },
+        },
+      });
+    } catch (error) {
+      console.error('Error updating power default flag:', error);
+      toast({
+        title: 'Error',
+        description: 'Error al actualizar la tabla',
         variant: 'destructive',
       });
     }
@@ -595,6 +623,12 @@ export const TourDefaultsManager = ({
             1000,
         };
 
+        const fohSchukoRequired =
+          (department === 'sound' || department === 'lights') &&
+          relevantDefaults.some(
+            (item) => isNewFormatTable(item) && Boolean(item.metadata?.foh_schuko),
+          );
+
         const pdfBlob = await exportToPDF(
           getDefaultsPdfTitle(tour.name, department, type, packageLabel),
           tables,
@@ -604,7 +638,8 @@ export const TourDefaultsManager = ({
           undefined,
           powerSummary,
           safetyMargin,
-          logoUrl
+          logoUrl,
+          fohSchukoRequired
         );
 
         const fileName = getDefaultsPdfFilename(tour.name, department, type, packageLabel);
@@ -854,6 +889,12 @@ export const TourDefaultsManager = ({
       const locationName = getTourDateLocationName(tourDate);
       const dateStr = tourDate.date;
 
+      const fohSchukoRequired =
+        (department === 'sound' || department === 'lights') &&
+        defaultsData.some(
+          (item) => isNewFormatTable(item) && Boolean(item.metadata?.foh_schuko),
+        );
+
       const pdfBlob = await exportToPDF(
         getTourDatePdfTitle(tour.name, locationName, department, type, packageLabel),
         tables,
@@ -863,7 +904,8 @@ export const TourDefaultsManager = ({
         undefined,
         powerSummary,
         safetyMargin,
-        logoUrl
+        logoUrl,
+        fohSchukoRequired
       );
 
       const fileName = getTourDatePdfFilename(
@@ -1011,6 +1053,8 @@ export const TourDefaultsManager = ({
     const powerTables = getDepartmentDefaults(department, 'power');
     const weightTables = getDepartmentDefaults(department, 'weight');
     const duplicateWarnings = getDuplicatePackageWarnings(department);
+    // FOH schuko power only applies to sound & lights (matches the Consumos tool).
+    const fohSupported = department === 'sound' || department === 'lights';
 
     // Group new format tables by sets
     const departmentSets = defaultSets.filter(set => set.department === department);
@@ -1190,6 +1234,36 @@ export const TourDefaultsManager = ({
                           Posición: {getResolvedPowerPosition(table.metadata?.position, table.metadata?.custom_position)}
                         </p>
                       )}
+                      <div className="mt-3 space-y-2 border-t pt-3">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`hoist-${table.id}`}
+                            checked={Boolean(table.metadata?.includes_hoist)}
+                            disabled={isUpdatingTable}
+                            onCheckedChange={(checked) =>
+                              void handleTogglePowerFlag(table, 'includes_hoist', !!checked)
+                            }
+                          />
+                          <Label htmlFor={`hoist-${table.id}`} className="text-xs font-normal">
+                            Incluye hoist/rigging
+                          </Label>
+                        </div>
+                        {fohSupported && (
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`foh-${table.id}`}
+                              checked={Boolean(table.metadata?.foh_schuko)}
+                              disabled={isUpdatingTable}
+                              onCheckedChange={(checked) =>
+                                void handleTogglePowerFlag(table, 'foh_schuko', !!checked)
+                              }
+                            />
+                            <Label htmlFor={`foh-${table.id}`} className="text-xs font-normal">
+                              FOH (schuko 16A)
+                            </Label>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -430,9 +430,12 @@ const PesosTool: React.FC = () => {
     }
   };
 
-  // Load existing tour defaults when in defaults mode
+  // Load existing tour defaults when in defaults mode.
+  // Also runs for the tour-defaults entry (Tour Management page) so existing
+  // tables are shown and newly generated ones append after them with
+  // continuous SX numbering instead of restarting from the first number.
   useEffect(() => {
-    if (isDefaults && defaultTables.length > 0) {
+    if ((isDefaults || isTourDefaults) && defaultTables.length > 0) {
       // Group tables by set and convert to our local format
       const convertedTables = defaultTables
         .filter(dt => dt.table_type === 'weight' && (!selectedDefaultSetId || dt.set_id === selectedDefaultSetId))
@@ -457,7 +460,7 @@ const PesosTool: React.FC = () => {
         }));
       setTables(assignSuffixes(convertedTables));
     }
-  }, [isDefaults, defaultTables, selectedDefaultSetId]);
+  }, [isDefaults, isTourDefaults, defaultTables, selectedDefaultSetId]);
 
   // Load tour date overrides when in tour date context
   useEffect(() => {
