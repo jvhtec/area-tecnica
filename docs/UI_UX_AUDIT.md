@@ -7,6 +7,24 @@
 
 ---
 
+## 0. Implementation Progress
+
+This audit is being actioned on the same branch. Status as of the latest commit:
+
+| Phase / Item | Status | Notes |
+|---|---|---|
+| **Phase 0 — Quick wins** | ✅ Done | `lang="es"`; light/dark `theme-color`; global reduced-motion + `:focus-visible` baseline; skip-to-content link; focus-ring token cleanup in `MobileNavBar`. |
+| **Phase 1 — Shared primitives** | ✅ Done | `Loading`/`PageLoading`/`Spinner`, `EmptyState`, `SubmitButton` (a11y-correct, token-themed, unit-tested); adopted in `App.tsx` route fallback. |
+| **C-2 — Dark mode (Auth)** | ✅ Done | Auth signup/recovery view migrated from hardcoded slate/white to semantic tokens. |
+| **M-1 — Native confirm/alert** | 🟡 In progress | `ConfirmDialogProvider` + `useConfirm` added & wired; 4 of 14 sites migrated (Sound/Lights/Video/Dashboard job-delete). Remaining 10 are follow-ups. |
+| **Phase 1 — Toast consolidation (H-2)** | ⬜ Pending | Large mechanical migration (~155 files); recommend a dedicated reviewed pass. |
+| **Phase 1 — ESLint guardrails** | ⬜ Pending | Needs `eslint-plugin-jsx-a11y` + color rules (dependency install). |
+| **Phases 2–5** | ⬜ Pending | See roadmap below. |
+
+All shipped changes verified with `vite build` and `vitest` (no regressions across 78 existing touched-area tests + 11 new primitive/confirm tests).
+
+---
+
 ## 1. Executive Summary
 
 Sector Pro is a large, mature, mobile-first PWA with a genuinely solid foundation: a token-based design system (HSL CSS variables + shadcn/ui), a shared `ViewportProvider` with consistent breakpoints, safe-area-aware mobile chrome, route-aware code-splitting, and an `ErrorBoundary` with chunk-recovery. The bones are good.
