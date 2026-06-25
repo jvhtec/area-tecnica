@@ -40,8 +40,11 @@ export const ENHANCED_VALIDATION_PATTERNS = {
   // Strong password requirements
   STRONG_PASSWORD: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
   
-  // File name validation (prevent path traversal)
-  SAFE_FILENAME: /^[a-zA-Z0-9._-]+$/,
+  // File name validation (prevent path traversal). Block only path separators
+  // and reserved/control characters; allow spaces, parentheses and accented
+  // letters that legitimately appear in user file names. Mirrors the invalid
+  // character set used by sanitizeFilenamePart in src/utils/fileName.ts.
+  SAFE_FILENAME: /^[^<>:"/\\|?*\u0000-\u001f]+$/,
   
   // URL validation for external links
   SAFE_URL: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/,
