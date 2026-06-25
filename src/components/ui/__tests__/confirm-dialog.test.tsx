@@ -62,7 +62,7 @@ describe("ConfirmDialogProvider / useConfirm", () => {
   })
 
   it("throws when used outside the provider", () => {
-    const Bare = () => {
+    const Bare = (): null => {
       useConfirm()
       return null
     }

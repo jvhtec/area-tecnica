@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ThemeColorMeta } from "@/components/ThemeColorMeta";
 import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 import { PageLoading } from "@/components/ui/loading";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -55,6 +56,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <ViewportProvider>
           <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme" attribute="class">
+            <ThemeColorMeta />
             <AppBadgeProvider>
               <Router>
                 <OptimizedAuthProvider>

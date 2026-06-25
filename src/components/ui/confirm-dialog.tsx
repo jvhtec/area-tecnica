@@ -46,22 +46,29 @@ interface PendingState extends ConfirmOptions {
 
 export function ConfirmDialogProvider({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = React.useState<PendingState | null>(null)
+  // Mirror of `pending` for reading the in-flight request synchronously without
+  // adding it to callback deps (which would churn the context value identity).
+  const pendingRef = React.useRef<PendingState | null>(null)
+
+  const settle = React.useCallback((value: boolean) => {
+    const current = pendingRef.current
+    pendingRef.current = null
+    setPending(null)
+    // Resolve outside the state updater so the promise settles as a plain
+    // side effect rather than during render (StrictMode-safe).
+    current?.resolve(value)
+  }, [])
 
   const confirm = React.useCallback<ConfirmFn>((options) => {
     return new Promise<boolean>((resolve) => {
-      setPending({ ...options, resolve })
+      // If a request is already in flight, settle it as a cancel first so its
+      // promise never leaks unresolved when a new confirm() overwrites it.
+      pendingRef.current?.resolve(false)
+      const next: PendingState = { ...options, resolve }
+      pendingRef.current = next
+      setPending(next)
     })
   }, [])
-
-  const settle = React.useCallback(
-    (value: boolean) => {
-      setPending((current) => {
-        current?.resolve(value)
-        return null
-      })
-    },
-    [],
-  )
 
   return (
     <ConfirmContext.Provider value={confirm}>

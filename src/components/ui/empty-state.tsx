@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils"
  *   action={<Button onClick={onCreate}>Crear trabajo</Button>}
  * />
  */
-export interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
+export interface EmptyStateProps extends Omit<React.HTMLAttributes<HTMLDivElement>, "title"> {
   icon?: LucideIcon
   title: React.ReactNode
   description?: React.ReactNode
