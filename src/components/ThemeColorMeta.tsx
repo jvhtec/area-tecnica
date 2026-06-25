@@ -19,6 +19,9 @@ export function ThemeColorMeta(): null {
   const { resolvedTheme } = useTheme()
 
   useEffect(() => {
+    // Exit early if theme is not yet resolved
+    if (!resolvedTheme) return
+
     const color = resolvedTheme === "dark" ? THEME_COLORS.dark : THEME_COLORS.light
     let meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')
     if (!meta) {
