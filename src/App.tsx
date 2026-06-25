@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 import { PageLoading } from "@/components/ui/loading";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ViewportProvider } from "@/hooks/use-mobile";
@@ -57,22 +58,24 @@ export default function App() {
             <AppBadgeProvider>
               <Router>
                 <OptimizedAuthProvider>
-                  <AppRuntimeCoordinator />
-                  <RouteAwareGlobalInitializers />
-                  <div className="app">
-                    <Suspense fallback={<PageLoader />}>
-                      <Routes>
-                        {publicRoutes.map(renderRoute)}
-                        <Route element={<AuthenticatedShell />}>
-                          {fullscreenRoutes.map(renderRoute)}
-                          <Route element={<Layout />}>
-                            {appShellRoutes.map(renderRoute)}
+                  <ConfirmDialogProvider>
+                    <AppRuntimeCoordinator />
+                    <RouteAwareGlobalInitializers />
+                    <div className="app">
+                      <Suspense fallback={<PageLoader />}>
+                        <Routes>
+                          {publicRoutes.map(renderRoute)}
+                          <Route element={<AuthenticatedShell />}>
+                            {fullscreenRoutes.map(renderRoute)}
+                            <Route element={<Layout />}>
+                              {appShellRoutes.map(renderRoute)}
+                            </Route>
                           </Route>
-                        </Route>
-                      </Routes>
-                    </Suspense>
-                    <RouteAwareGlobalOverlays />
-                  </div>
+                        </Routes>
+                      </Suspense>
+                      <RouteAwareGlobalOverlays />
+                    </div>
+                  </ConfirmDialogProvider>
                 </OptimizedAuthProvider>
               </Router>
             </AppBadgeProvider>
