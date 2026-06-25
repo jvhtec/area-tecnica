@@ -36,6 +36,7 @@ import {
 
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { AboutCard } from "./AboutCard"
+import { AppBreadcrumbs } from "./AppBreadcrumbs"
 import { HelpButton } from "./HelpButton"
 import { MobileNavBar } from "./MobileNavBar"
 import { NotificationBadge } from "./NotificationBadge"
@@ -504,6 +505,7 @@ const Layout = () => {
                   <HelpButton />
                 </div>
               </div>
+              <AppBreadcrumbs className="mt-2" />
             </header>
           )}
           <main

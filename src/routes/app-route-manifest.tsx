@@ -1,5 +1,5 @@
 import React, { lazy } from "react";
-import { Navigate, matchPath } from "react-router-dom";
+import { Navigate, generatePath, matchPath } from "react-router-dom";
 
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
@@ -959,7 +959,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "tours",
     subscriptionRouteKey: "/tours",
-    breadcrumb: { label: "Pesos", parentPath: "/tours" },
+    breadcrumb: { label: "Pesos", parentPath: "/tour-management/:tourId" },
   },
   {
     id: "tourSoundConsumos",
@@ -969,7 +969,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "tours",
     subscriptionRouteKey: "/tours",
-    breadcrumb: { label: "Consumos", parentPath: "/tours" },
+    breadcrumb: { label: "Consumos", parentPath: "/tour-management/:tourId" },
   },
   {
     id: "tourLightsPesos",
@@ -979,7 +979,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "tours",
     subscriptionRouteKey: "/tours",
-    breadcrumb: { label: "Pesos luces", parentPath: "/tours" },
+    breadcrumb: { label: "Pesos luces", parentPath: "/tour-management/:tourId" },
   },
   {
     id: "tourLightsConsumos",
@@ -989,7 +989,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "tours",
     subscriptionRouteKey: "/tours",
-    breadcrumb: { label: "Consumos luces", parentPath: "/tours" },
+    breadcrumb: { label: "Consumos luces", parentPath: "/tour-management/:tourId" },
   },
   {
     id: "tourVideoPesos",
@@ -999,7 +999,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "tours",
     subscriptionRouteKey: "/tours",
-    breadcrumb: { label: "Pesos vídeo", parentPath: "/tours" },
+    breadcrumb: { label: "Pesos vídeo", parentPath: "/tour-management/:tourId" },
   },
   {
     id: "tourVideoConsumos",
@@ -1009,7 +1009,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "tours",
     subscriptionRouteKey: "/tours",
-    breadcrumb: { label: "Consumos vídeo", parentPath: "/tours" },
+    breadcrumb: { label: "Consumos vídeo", parentPath: "/tour-management/:tourId" },
   },
   {
     id: "tourDateSoundPesos",
@@ -1085,7 +1085,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "festivalManagementArtists",
     subscriptionRouteKey: "/festival-management/artists",
-    breadcrumb: { label: "Artistas", parentPath: "/festivals" },
+    breadcrumb: { label: "Artistas", parentPath: "/festival-management/:jobId" },
   },
   {
     id: "festivalManagementGear",
@@ -1095,7 +1095,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "festivalManagementGear",
     subscriptionRouteKey: "/festival-management/gear",
-    breadcrumb: { label: "Equipamiento", parentPath: "/festivals" },
+    breadcrumb: { label: "Equipamiento", parentPath: "/festival-management/:jobId" },
   },
   {
     id: "festivalManagementScheduling",
@@ -1105,7 +1105,7 @@ export const appRoutes: readonly AppRoute[] = [
     access: "managementAndHouseTech",
     subscriptions: "festivalManagementScheduling",
     subscriptionRouteKey: "/festival-management/scheduling",
-    breadcrumb: { label: "Programación", parentPath: "/festivals" },
+    breadcrumb: { label: "Programación", parentPath: "/festival-management/:jobId" },
   },
 ];
 
@@ -1211,6 +1211,28 @@ export const getSubscriptionConfigForPathname = (
   };
 };
 
+// Substitute the dynamic params resolved from the active pathname into an
+// ancestor route's path template (e.g. "/festival-management/:jobId" -> the
+// concrete URL) so breadcrumb parent links actually navigate somewhere valid.
+const resolveAncestorPath = (
+  pathTemplate: string,
+  params: Record<string, string | undefined>,
+): string => {
+  if (!pathTemplate.includes(":")) {
+    return pathTemplate;
+  }
+
+  try {
+    return generatePath(pathTemplate, params);
+  } catch {
+    // Missing param for this template — fall back to the raw template so the
+    // crumb still renders (it just won't be a working link in that edge case).
+    return pathTemplate;
+  }
+};
+
+const MAX_BREADCRUMB_DEPTH = 10;
+
 export const getBreadcrumbsForPathname = (
   pathname: string,
 ): Array<{ label: string; path: string }> => {
@@ -1220,19 +1242,39 @@ export const getBreadcrumbsForPathname = (
     return [];
   }
 
-  const breadcrumbs: Array<{ label: string; path: string }> = [];
-  if (route.breadcrumb.parentPath) {
-    const parent = matchAppRoute(route.breadcrumb.parentPath);
-    breadcrumbs.push({
-      label: parent?.breadcrumb?.label ?? route.breadcrumb.parentPath,
-      path: route.breadcrumb.parentPath,
+  // Resolve the params for the active route once; ancestor templates reuse the
+  // same param names (e.g. :jobId / :tourId) so they can be substituted too.
+  const match = matchPath({ path: route.path, end: true }, pathname);
+  const params = (match?.params ?? {}) as Record<string, string | undefined>;
+
+  // Walk up the parentPath chain, building the trail from the current page
+  // upward, then reverse so it reads root -> current.
+  const reversed: Array<{ label: string; path: string }> = [
+    { label: route.breadcrumb.label, path: pathname },
+  ];
+
+  let parentPath = route.breadcrumb.parentPath;
+  const visited = new Set<string>([route.path]);
+
+  while (parentPath && reversed.length < MAX_BREADCRUMB_DEPTH) {
+    const parentRoute = appRoutes.find((candidate) => candidate.path === parentPath);
+
+    if (!parentRoute || visited.has(parentRoute.path)) {
+      // Unknown or cyclic parent — still emit a best-effort crumb and stop.
+      reversed.push({
+        label: parentRoute?.breadcrumb?.label ?? parentPath,
+        path: resolveAncestorPath(parentPath, params),
+      });
+      break;
+    }
+
+    visited.add(parentRoute.path);
+    reversed.push({
+      label: parentRoute.breadcrumb?.label ?? parentPath,
+      path: resolveAncestorPath(parentPath, params),
     });
+    parentPath = parentRoute.breadcrumb?.parentPath;
   }
 
-  breadcrumbs.push({
-    label: route.breadcrumb.label,
-    path: pathname,
-  });
-
-  return breadcrumbs;
+  return reversed.reverse();
 };
