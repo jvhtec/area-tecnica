@@ -83,10 +83,29 @@ describe("app route manifest", () => {
     expect(isMobileFullscreenRoutePath("/sound/consumos")).toBe(true);
   });
 
-  it("resolves breadcrumb metadata from the manifest", () => {
+  it("resolves a multi-level breadcrumb trail, substituting route params into parent links", () => {
     expect(getBreadcrumbsForPathname("/festival-management/job-1/gear")).toEqual([
       { label: "Festivales", path: "/festivals" },
+      { label: "Festival", path: "/festival-management/job-1" },
       { label: "Equipamiento", path: "/festival-management/job-1/gear" },
     ]);
+  });
+
+  it("nests tour tool routes under the tour management hub", () => {
+    expect(getBreadcrumbsForPathname("/tours/tour-9/sound/pesos")).toEqual([
+      { label: "Giras", path: "/tours" },
+      { label: "Gestión de gira", path: "/tour-management/tour-9" },
+      { label: "Pesos", path: "/tours/tour-9/sound/pesos" },
+    ]);
+  });
+
+  it("returns a single crumb for a top-level route without a parent", () => {
+    expect(getBreadcrumbsForPathname("/festivals")).toEqual([
+      { label: "Festivales", path: "/festivals" },
+    ]);
+  });
+
+  it("returns no breadcrumbs for an unknown path", () => {
+    expect(getBreadcrumbsForPathname("/this-route-does-not-exist")).toEqual([]);
   });
 });
