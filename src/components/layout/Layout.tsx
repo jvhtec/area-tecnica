@@ -428,6 +428,12 @@ const Layout = () => {
 
   return (
     <SidebarProvider defaultOpen={showSidebar}>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-4 focus:py-2 focus:text-primary-foreground focus:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        Saltar al contenido
+      </a>
       <div className="flex min-h-screen w-full bg-background">
         {showSidebar && (
           <Sidebar className="border-r border-border/50 bg-sidebar text-sidebar-foreground">
@@ -509,8 +515,10 @@ const Layout = () => {
             </header>
           )}
           <main
+            id="main-content"
+            tabIndex={-1}
             className={cn(
-              "flex-1 min-w-0 w-full overflow-y-auto px-3 pt-4 sm:px-6 sm:pt-6",
+              "flex-1 min-w-0 w-full overflow-y-auto px-3 pt-4 sm:px-6 sm:pt-6 focus:outline-none",
               suppressChrome || mobileFullscreenRoutes
                 ? "pb-6"
                 : isMobile

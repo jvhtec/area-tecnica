@@ -161,6 +161,28 @@
   h3 { font-size: var(--text-xl); line-height: 1.3; }
   h4 { font-size: var(--text-lg); line-height: 1.35; }
   small { font-size: var(--text-xs); }
+
+  /* Consistent, token-based keyboard focus indicator for any focusable
+     element that doesn't already define its own focus-visible treatment. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+/* Respect users who prefer reduced motion (WCAG 2.3.3 / 2.2.2).
+   Near-instant animations/transitions and disabled smooth scroll, while
+   preserving final visual state. Components needing motion can opt back in
+   with a `motion-safe:` variant. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Custom scrollbar styles */
