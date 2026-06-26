@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -207,9 +208,9 @@ export const EditShiftDialog = ({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Actualizando..." : "Actualizar Turno"}
-            </Button>
+            <SubmitButton type="submit" loading={isSubmitting} loadingText="Actualizando...">
+              Actualizar Turno
+            </SubmitButton>
           </div>
         </form>
       </DialogContent>

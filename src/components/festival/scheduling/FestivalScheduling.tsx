@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageCircle, Plus, RefreshCw } from "lucide-react";
+import { CalendarX, MessageCircle, Plus, RefreshCw } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Loading } from "@/components/ui/loading";
 import { format } from "date-fns";
 import { SubscriptionIndicator } from "@/components/ui/subscription-indicator";
 import { useFestivalShifts } from "@/hooks/festival/useFestivalShifts";
@@ -282,11 +284,14 @@ export const FestivalScheduling = ({ jobId, jobDates, isViewOnly = false, onCrea
 
           {selectedDate && (
             isLoading ? (
-              <div className="flex justify-center p-8">Cargando...</div>
+              <Loading label="Cargando turnos…" className="p-8" />
             ) : shifts.length === 0 ? (
-              <div className="text-center p-8 text-muted-foreground">
-                No hay turnos programados para esta fecha. {!isViewOnly && "Haz clic en \"Crear Turno\" para añadir uno."}
-              </div>
+              <EmptyState
+                icon={CalendarX}
+                title="No hay turnos programados para esta fecha"
+                description={!isViewOnly ? 'Haz clic en "Crear Turno" para añadir uno.' : undefined}
+                className="my-2"
+              />
             ) : viewMode === "table" ? (
               <ShiftsTable 
                 shifts={shifts} 
