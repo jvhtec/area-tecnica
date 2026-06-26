@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { wrapInCorporateTemplate } from "../_shared/corporateEmailTemplate.ts";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
+import { normalizeRecipientCriteria, type RecipientCriteria } from "./recipientFilters.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -53,14 +54,6 @@ interface PdfAttachment {
   content: string;
   filename: string;
   size: number;
-}
-
-interface RecipientCriteria {
-  profileIds?: string[];
-  /** Direct recipient emails (bypass profiles lookup). */
-  emails?: string[];
-  departments?: string[];
-  roles?: Array<'admin' | 'management' | 'staff' | 'freelance'>;
 }
 
 interface SendCorporateEmailRequest {
@@ -178,12 +171,13 @@ function getSenderName(department: string | null): string {
  * - Department and role filters use AND logic (users must match both)
  * - Within each filter type (departments/roles), it's OR logic
  *
- * Example: departments=[sound, lights] AND roles=[staff]
- * Returns: Users in (Sound OR Lights) AND with Staff role
+ * Example: departments=[sound, lights] AND roles=[technician]
+ * Returns: users in (Sound OR Lights) AND with technician role
  */
 async function fetchRecipientEmails(criteria: RecipientCriteria): Promise<string[]> {
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const emails = new Set<string>();
+  const normalizedCriteria = normalizeRecipientCriteria(criteria);
 
   // 0. Always include explicit emails (if any)
   if (criteria.emails && criteria.emails.length > 0) {
@@ -215,14 +209,23 @@ async function fetchRecipientEmails(criteria: RecipientCriteria): Promise<string
   }
 
   // 2. Fetch by department AND role filters (intersection logic)
-  const hasDepartmentFilter = criteria.departments && criteria.departments.length > 0;
-  const hasRoleFilter = criteria.roles && criteria.roles.length > 0;
+  const hasDepartmentFilter = normalizedCriteria.departments.length > 0;
+  const hasRoleFilter = normalizedCriteria.roles.length > 0;
+  const hasAutonomosFilter = normalizedCriteria.autonomosOnly;
+  const hasUnusableRoleFilter = normalizedCriteria.roleCriteriaProvided && !hasRoleFilter;
 
-  if (hasDepartmentFilter || hasRoleFilter) {
+  if (hasUnusableRoleFilter) {
+    console.warn("[fetchRecipientEmails] Ignoring profile filter query because no usable roles were provided:", {
+      ignoredRoles: normalizedCriteria.ignoredRoles,
+    });
+  } else if (hasDepartmentFilter || hasRoleFilter || hasAutonomosFilter) {
     console.log("[fetchRecipientEmails] Applying filters:", {
-      departments: criteria.departments || [],
-      roles: criteria.roles || [],
-      logic: hasDepartmentFilter && hasRoleFilter ? "AND" : "single filter",
+      departments: normalizedCriteria.departments,
+      roles: normalizedCriteria.roles,
+      techFilters: hasAutonomosFilter ? ["autonomos"] : [],
+      ignoredRoles: normalizedCriteria.ignoredRoles,
+      ignoredTechFilters: normalizedCriteria.ignoredTechFilters,
+      logic: [hasDepartmentFilter, hasRoleFilter, hasAutonomosFilter].filter(Boolean).length > 1 ? "AND" : "single filter",
     });
 
     // Build query with AND logic between department and role
@@ -233,12 +236,18 @@ async function fetchRecipientEmails(criteria: RecipientCriteria): Promise<string
 
     // Add department filter (OR within departments)
     if (hasDepartmentFilter) {
-      query = query.in("department", criteria.departments!);
+      query = query.in("department", normalizedCriteria.departments);
     }
 
     // Add role filter (OR within roles)
     if (hasRoleFilter) {
-      query = query.in("role", criteria.roles!);
+      query = query.in("role", normalizedCriteria.roles);
+    }
+
+    // Autonomous/freelance recipients are regular technicians marked autonomo=true.
+    // The role condition keeps admin/management rows out even though profiles.autonomo defaults true.
+    if (hasAutonomosFilter) {
+      query = query.eq("role", "technician").eq("autonomo", true);
     }
 
     const { data, error } = await query;
@@ -513,6 +522,7 @@ serve(async (req) => {
       profileIds: body.recipients.profileIds?.length || 0,
       departments: body.recipients.departments || [],
       roles: body.recipients.roles || [],
+      techFilters: body.recipients.techFilters || [],
     });
     const fetchedRecipientEmails = await fetchRecipientEmails(body.recipients);
 
