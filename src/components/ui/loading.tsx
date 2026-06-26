@@ -80,8 +80,10 @@ export interface PageLoadingProps extends Omit<LoadingProps, "size"> {
  */
 export const PageLoading = React.forwardRef<HTMLDivElement, PageLoadingProps>(
   ({ label = "Cargando…", minHeightClassName = "min-h-[50vh]", className, ...props }, ref) => (
-    <div ref={ref} className={cn("flex w-full items-center justify-center", minHeightClassName, className)}>
-      <Loading label={label} size="lg" {...props} />
+    // Wrapper carries only layout styling; the forwarded ref and ...props
+    // (id, data-*, ARIA, handlers) land together on the inner status element.
+    <div className={cn("flex w-full items-center justify-center", minHeightClassName, className)}>
+      <Loading ref={ref} label={label} size="lg" {...props} />
     </div>
   ),
 )

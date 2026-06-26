@@ -121,7 +121,7 @@ const Lights = () => {
 
     const confirmed = await confirm({
       title: "Eliminar trabajo",
-      description: "¿Está seguro de que desea eliminar este trabajo?",
+      description: "¿Seguro que quieres eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.",
       confirmText: "Eliminar",
       destructive: true,
     });

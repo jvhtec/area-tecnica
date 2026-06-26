@@ -231,9 +231,9 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
         setEditVersion('')
         setEditDate('')
       }
-      toast({ title: 'Entry deleted' })
+      toast({ title: 'Entrada eliminada' })
     } catch (e: any) {
-      toast({ title: 'Failed to delete', description: e?.message || String(e), variant: 'destructive' })
+      toast({ title: 'No se pudo eliminar', description: e?.message || String(e), variant: 'destructive' })
     }
   }
 

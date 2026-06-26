@@ -518,7 +518,7 @@ const Layout = () => {
             id="main-content"
             tabIndex={-1}
             className={cn(
-              "flex-1 min-w-0 w-full overflow-y-auto px-3 pt-4 sm:px-6 sm:pt-6 focus:outline-none",
+              "flex-1 min-w-0 w-full overflow-y-auto px-3 pt-4 sm:px-6 sm:pt-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
               suppressChrome || mobileFullscreenRoutes
                 ? "pb-6"
                 : isMobile

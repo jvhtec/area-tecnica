@@ -15,7 +15,7 @@ This audit is being actioned on the same branch. Status as of the latest commit:
 |---|---|---|
 | **Phase 0 — Quick wins** | ✅ Done | `lang="es"`; light/dark `theme-color`; global reduced-motion + `:focus-visible` baseline; skip-to-content link; focus-ring token cleanup in `MobileNavBar`. |
 | **Phase 1 — Shared primitives** | ✅ Done | `Loading`/`PageLoading`/`Spinner`, `EmptyState`, `SubmitButton` (a11y-correct, token-themed, unit-tested); adopted in `App.tsx` route fallback. |
-| **C-2 — Dark mode (Auth)** | ✅ Done | Auth signup/recovery view migrated from hardcoded slate/white to semantic tokens. |
+| **C-2 — Dark mode (Auth)** | 🟡 Partial | The Auth **signup/recovery** view is migrated from hardcoded slate/white to semantic tokens (shipped). The **primary login** screen in `Auth.tsx` is *not* token-migrated — it's an intentional dark-branded glassmorphic hero (animated gradient mesh + `BRAND_CONFIG` blob colors), so a full semantic-token migration of `Auth.tsx` is deliberately deferred, not complete. Don't read Auth as fully migrated. |
 | **M-1 — Native confirm/alert** | ✅ Done | `ConfirmDialogProvider` + `useConfirm` added & wired; **all** native `window.confirm` sites migrated (14 `.tsx` + 3 `.ts` job-card hooks). A source-scan test (`no-native-confirm.test.ts`) guards against regressions. |
 | **Phase 1 — Toast consolidation (H-2)** | ⬜ Pending | Large mechanical migration (~155 files); recommend a dedicated reviewed pass. |
 | **Phase 1 — ESLint guardrails** | ⬜ Pending | Needs `eslint-plugin-jsx-a11y` + color rules (dependency install). |
@@ -31,7 +31,7 @@ Sector Pro is a large, mature, mobile-first PWA with a genuinely solid foundatio
 
 The problems are **consistency and accessibility debt accumulated across many parallel features**, not a broken architecture. The single most damaging theme: **two competing styling philosophies coexist** — the canonical CSS-variable token system *and* a sprawl of ad-hoc hardcoded palette colors / per-page `isDark` maps. This produces visible dark-mode breakage, inconsistent surfaces, and high maintenance cost. Accessibility is the second systemic gap: the app is functionally usable but fails several WCAG basics (wrong document language, no reduced-motion support, thin ARIA/live-region coverage).
 
-**Severity tally (issue groups):** 4 Critical · 7 High · 8 Medium · 5 Low
+**Severity tally (issue groups):** 3 Critical · 7 High · 9 Medium · 5 Low
 
 ### Headline metrics
 
@@ -204,7 +204,7 @@ Stop the bleeding before mass migration.
 - **Exit:** New code can't reintroduce the top offenders; one notification language.
 
 ### Phase 2 — Dark Mode & Theming Cleanup (Sprints 2–3)
-- C-1 migrate `TechnicianDashboard`, `TechnicianSuperApp`, `SoundVisionFiles`, `Auth` off `isDark`/hardcoded surfaces to tokens.
+- C-1 migrate `TechnicianDashboard`, `TechnicianSuperApp`, `SoundVisionFiles` off `isDark`/hardcoded surfaces to tokens. (Auth: only the signup/recovery view is tokenized; the primary login is an intentional dark-branded hero — exclude unless a fully theme-aware login is explicitly wanted.)
 - C-2 burn down 143 `bg-white` + 29 `text-black` non-`dark:` sites.
 - H-1 sweep highest-traffic palette-class files → semantic tokens.
 - **Exit:** Dark mode visually correct on all primary routes; theme/brand change is single-source.
