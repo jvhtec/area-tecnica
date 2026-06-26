@@ -85,6 +85,11 @@ export function normalizeRecipientCriteria(criteria: RecipientCriteria): Normali
     ignoredTechFilters.push(filter);
   }
 
+  if (autonomosOnly) {
+    roles.clear();
+    roles.add("technician");
+  }
+
   return {
     departments,
     roles: Array.from(roles),

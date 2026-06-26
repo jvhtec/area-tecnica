@@ -22,9 +22,26 @@ describe("corporate email recipient filters", () => {
   it("keeps the autonomos option separate from app roles", () => {
     expect(normalizeRecipientCriteria({ departments: ["sound"], techFilters: ["autonomos"] })).toMatchObject({
       departments: ["sound"],
-      roles: [],
+      roles: ["technician"],
       autonomosOnly: true,
       ignoredTechFilters: [],
+    });
+  });
+
+  it("makes autonomos override conflicting role selections", () => {
+    expect(normalizeRecipientCriteria({ roles: ["logistics"], techFilters: ["autonomos"] })).toMatchObject({
+      roles: ["technician"],
+      autonomosOnly: true,
+      ignoredRoles: [],
+    });
+  });
+
+  it("preserves valid department filters when role values are unsupported", () => {
+    expect(normalizeRecipientCriteria({ roles: ["not_a_role"], departments: ["sound"] })).toMatchObject({
+      departments: ["sound"],
+      roles: [],
+      autonomosOnly: false,
+      ignoredRoles: ["not_a_role"],
     });
   });
 

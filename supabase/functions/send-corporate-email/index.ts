@@ -214,7 +214,14 @@ async function fetchRecipientEmails(criteria: RecipientCriteria): Promise<string
   const hasAutonomosFilter = normalizedCriteria.autonomosOnly;
   const hasUnusableRoleFilter = normalizedCriteria.roleCriteriaProvided && !hasRoleFilter;
 
-  if (hasUnusableRoleFilter) {
+  if (normalizedCriteria.ignoredRoles.length > 0 || normalizedCriteria.ignoredTechFilters.length > 0) {
+    console.warn("[fetchRecipientEmails] Ignoring unsupported recipient filters:", {
+      ignoredRoles: normalizedCriteria.ignoredRoles,
+      ignoredTechFilters: normalizedCriteria.ignoredTechFilters,
+    });
+  }
+
+  if (hasUnusableRoleFilter && !hasDepartmentFilter && !hasAutonomosFilter) {
     console.warn("[fetchRecipientEmails] Ignoring profile filter query because no usable roles were provided:", {
       ignoredRoles: normalizedCriteria.ignoredRoles,
     });
