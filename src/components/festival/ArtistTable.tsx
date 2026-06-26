@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, type ChangeEvent, type ClipboardEvent as ReactClipboardEvent } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2, FileText, Loader2, Mic, Link, ExternalLink, Printer, ImagePlus, ImageOff, Receipt } from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
@@ -144,6 +145,7 @@ export const ArtistTable = ({
   selectedDate,
   onArtistStagePlotUpdated
 }: ArtistTableProps) => {
+  const confirm = useConfirm();
   const { createExtrasPresupuesto, isCreatingExtrasFor } = useCreateExtrasPresupuesto(jobId);
   const [deletingArtistId, setDeletingArtistId] = useState<string | null>(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
@@ -446,7 +448,13 @@ export const ArtistTable = ({
   const handleDeleteStagePlot = async (artist: Artist) => {
     if (!artist.stage_plot_file_path) return;
 
-    if (!window.confirm(`¿Eliminar el stage plot de ${artist.name}?`)) {
+    const confirmed = await confirm({
+      title: "Eliminar stage plot",
+      description: `¿Eliminar el stage plot de ${artist.name}?`,
+      confirmText: "Eliminar",
+      destructive: true,
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -542,7 +550,13 @@ export const ArtistTable = ({
   const sortedFilteredArtists = sortArtistsChronologically(filteredArtists as any) as Artist[];
   const hasArtistSubmittedData = sortedFilteredArtists.some((artist) => artist.artist_submitted);
   const handleDeleteClick = async (artist: Artist) => {
-    if (window.confirm(`¿Estás seguro de que quieres eliminar ${artist.name}?`)) {
+    const confirmed = await confirm({
+      title: "Eliminar artista",
+      description: `¿Estás seguro de que quieres eliminar ${artist.name}?`,
+      confirmText: "Eliminar",
+      destructive: true,
+    });
+    if (confirmed) {
       setDeletingArtistId(artist.id);
       await onDeleteArtist(artist);
       setDeletingArtistId(null);

@@ -1,10 +1,12 @@
 import React, { Suspense, lazy } from "react";
 import { BrowserRouter as Router, Route, Routes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ThemeColorMeta } from "@/components/ThemeColorMeta";
 import { ThemePreferenceSync } from "@/components/ThemePreferenceSync";
+import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
+import { PageLoading } from "@/components/ui/loading";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ViewportProvider } from "@/hooks/use-mobile";
 import { OptimizedAuthProvider } from "@/hooks/useOptimizedAuth";
@@ -36,11 +38,7 @@ const ReactQueryDevtoolsLazy = import.meta.env.DEV
 const Layout = lazy(() => import("@/components/layout/Layout"));
 const AuthenticatedShell = lazy(() => import("@/routes/AuthenticatedShell"));
 
-const PageLoader = () => (
-  <div className="flex min-h-[50vh] items-center justify-center">
-    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-  </div>
-);
+const PageLoader = () => <PageLoading />;
 
 const renderRoute = (route: AppRoute) => (
   <Route key={route.id} path={route.path} element={createRouteElement(route)} />
@@ -60,26 +58,29 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <ViewportProvider>
           <ThemeProvider defaultTheme="system" storageKey={APP_THEME_STORAGE_KEY} attribute="class">
+            <ThemeColorMeta />
             <AppBadgeProvider>
               <Router>
                 <OptimizedAuthProvider>
                   <ThemePreferenceSync />
-                  <AppRuntimeCoordinator />
-                  <RouteAwareGlobalInitializers />
-                  <div className="app">
-                    <Suspense fallback={<PageLoader />}>
-                      <Routes>
-                        {publicRoutes.map(renderRoute)}
-                        <Route element={<AuthenticatedShell />}>
-                          {fullscreenRoutes.map(renderRoute)}
-                          <Route element={<Layout />}>
-                            {appShellRoutes.map(renderRoute)}
+                  <ConfirmDialogProvider>
+                    <AppRuntimeCoordinator />
+                    <RouteAwareGlobalInitializers />
+                    <div className="app">
+                      <Suspense fallback={<PageLoader />}>
+                        <Routes>
+                          {publicRoutes.map(renderRoute)}
+                          <Route element={<AuthenticatedShell />}>
+                            {fullscreenRoutes.map(renderRoute)}
+                            <Route element={<Layout />}>
+                              {appShellRoutes.map(renderRoute)}
+                            </Route>
                           </Route>
-                        </Route>
-                      </Routes>
-                    </Suspense>
-                    <RouteAwareGlobalOverlays />
-                  </div>
+                        </Routes>
+                      </Suspense>
+                      <RouteAwareGlobalOverlays />
+                    </div>
+                  </ConfirmDialogProvider>
                 </OptimizedAuthProvider>
               </Router>
             </AppBadgeProvider>

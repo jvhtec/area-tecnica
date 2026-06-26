@@ -8,6 +8,7 @@ import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useQueryClient } from "@tanstack/react-query";
@@ -49,6 +50,7 @@ const Video = () => {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const confirm = useConfirm();
   
   useTabVisibility(['optimized-jobs']);
 
@@ -121,7 +123,13 @@ const Video = () => {
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this job?")) return;
+    const confirmed = await confirm({
+      title: "Eliminar trabajo",
+      description: "¿Seguro que quieres eliminar este trabajo?",
+      confirmText: "Eliminar",
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       const { error } = await dataLayerClient.from('jobs')
@@ -142,7 +150,7 @@ const Video = () => {
         variant: "destructive",
       });
     }
-  }, [canManageJobs, queryClient, toast]);
+  }, [canManageJobs, queryClient, toast, confirm]);
 
   const handleAssignmentDialogClose = useCallback(() => {
     setIsAssignmentDialogOpen(false);

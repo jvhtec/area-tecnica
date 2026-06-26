@@ -25,6 +25,7 @@ import { JobCardNewDetailsOnly } from "./job-card-new/JobCardNewDetailsOnly";
 import { JobCardNewView } from "./job-card-new/JobCardNewView";
 import { loadHojaDeRutaPdfData } from "@/utils/hoja-de-ruta/load-hoja-de-ruta-pdf-data";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { CreateFoldersOptions } from "@/utils/flex-folders";
 import { isFestivalLikeJobType } from "@/utils/jobType";
@@ -211,6 +212,7 @@ function JobCardNewFull({
 }: JobCardNewProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
 
@@ -670,7 +672,15 @@ function JobCardNewFull({
         return;
       }
       if (missing.length > 0) {
-        const proceed = window.confirm(`Faltan teléfonos para ${missing.length} técnico(s):\n- ${missing.slice(0, 5).join('\n- ')}${missing.length > 5 ? '\n...' : ''}\n\n¿Crear el grupo igualmente?`);
+        const proceed = await confirm({
+          title: 'Crear grupo de WhatsApp',
+          description: (
+            <span className="whitespace-pre-line">
+              {`Faltan teléfonos para ${missing.length} técnico(s):\n- ${missing.slice(0, 5).join('\n- ')}${missing.length > 5 ? '\n...' : ''}\n\n¿Crear el grupo igualmente?`}
+            </span>
+          ),
+          confirmText: 'Crear grupo',
+        });
         if (!proceed) return;
       }
 
@@ -883,7 +893,13 @@ function JobCardNewFull({
       return;
     }
 
-    if (!window.confirm('Are you sure you want to delete this job? This action cannot be undone and will remove all related data.')) {
+    const confirmedDelete = await confirm({
+      title: 'Eliminar trabajo',
+      description: '¿Seguro que quieres eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.',
+      confirmText: 'Eliminar',
+      destructive: true,
+    });
+    if (!confirmedDelete) {
       return;
     }
 

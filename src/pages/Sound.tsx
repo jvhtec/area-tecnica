@@ -4,6 +4,7 @@ import { useJobs } from "@/hooks/useJobs";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { LightsHeader } from "@/components/lights/LightsHeader";
@@ -62,6 +63,7 @@ const Sound = () => {
   const currentDepartment = "sound";
   const { data: jobs } = useJobs();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { user, userRole, hasSoundVisionAccess, userDepartment, isLoading: authLoading } = useOptimizedAuth();
   const canManageJobs = isManagementRole(userRole);
@@ -222,7 +224,13 @@ const Sound = () => {
       return;
     }
 
-    if (!window.confirm("¿Seguro que quieres eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.")) return;
+    const confirmed = await confirm({
+      title: "Eliminar trabajo",
+      description: "¿Seguro que quieres eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.",
+      confirmText: "Eliminar",
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       const result = await deleteJobOptimistically(jobId);

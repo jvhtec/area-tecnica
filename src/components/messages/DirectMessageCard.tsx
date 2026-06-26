@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { CheckCircle, MessageSquare, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
@@ -35,6 +36,7 @@ export const DirectMessageCard = ({
   theme,
   isDark = false
 }: DirectMessageCardProps) => {
+  const confirm = useConfirm();
   const isRecipient = message.recipient_id === currentUserId;
   const showMarkAsRead = isRecipient && message.status === 'unread';
 
@@ -55,8 +57,14 @@ export const DirectMessageCard = ({
     cluster: isDark ? "bg-white text-black" : "bg-slate-900 text-white"
   };
 
-  const handleDelete = () => {
-    if (window.confirm('¿Seguro que deseas eliminar este mensaje de forma permanente?')) {
+  const handleDelete = async () => {
+    const confirmed = await confirm({
+      title: "Eliminar mensaje",
+      description: "¿Seguro que deseas eliminar este mensaje de forma permanente?",
+      confirmText: "Eliminar",
+      destructive: true,
+    });
+    if (confirmed) {
       onDelete(message.id);
     }
   };

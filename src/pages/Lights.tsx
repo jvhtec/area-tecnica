@@ -7,6 +7,7 @@ import { addDays, endOfMonth, format, startOfMonth, subDays } from "date-fns";
 import { JobAssignmentDialog } from "@/components/jobs/JobAssignmentDialog";
 import { EditJobDialog } from "@/components/jobs/EditJobDialog";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { useQueryClient } from "@tanstack/react-query";
 import { LightsHeader } from "@/components/lights/LightsHeader";
@@ -51,6 +52,7 @@ const Lights = () => {
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
   const { data: jobs, isLoading } = useOptimizedJobs(currentDepartment as any, jobsRangeStart, jobsRangeEnd);
   const { toast } = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
 
   // Keyboard shortcut: Cmd/Ctrl+N to open (disable plain 'c')
@@ -117,7 +119,13 @@ const Lights = () => {
       return;
     }
 
-    if (!window.confirm("¿Está seguro de que desea eliminar este trabajo?")) return;
+    const confirmed = await confirm({
+      title: "Eliminar trabajo",
+      description: "¿Seguro que quieres eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.",
+      confirmText: "Eliminar",
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       console.log("Lights page: Starting optimistic job deletion for:", jobId);
@@ -144,7 +152,7 @@ const Lights = () => {
           variant: "destructive"
         });
       }
-  }, [canManageJobs, queryClient, toast]);
+  }, [canManageJobs, queryClient, toast, confirm]);
 
   const handleAssignmentDialogClose = useCallback(() => {
     setIsAssignmentDialogOpen(false);

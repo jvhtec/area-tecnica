@@ -11,6 +11,7 @@ import { MessageSquare, Mail, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { isJobOnDate } from "@/utils/timezoneUtils";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -95,6 +96,7 @@ const Dashboard = () => {
   const jobsRangeEnd = addDays(endOfMonth(monthAnchor), 14);
   const { data: jobs = [], isLoading } = useOptimizedJobs(undefined, jobsRangeStart, jobsRangeEnd);
   const { toast } = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
 
   const { data: pendingExpensesSummary, isLoading: isLoadingPendingExpenses } = useQuery({
@@ -165,7 +167,13 @@ const Dashboard = () => {
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this job? This action cannot be undone and will remove all related data.")) return;
+    const confirmed = await confirm({
+      title: "Eliminar trabajo",
+      description: "¿Seguro que quieres eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.",
+      confirmText: "Eliminar",
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       // Call optimistic deletion service
@@ -190,7 +198,7 @@ const Dashboard = () => {
         variant: "destructive"
       });
     }
-  }, [queryClient, toast, userRole]);
+  }, [queryClient, toast, userRole, confirm]);
 
   const handleDateTypeChange = useCallback(() => {}, []);
 

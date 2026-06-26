@@ -160,13 +160,13 @@ const Auth = () => {
   // Show legacy forms for signup/recovery
   if (showSignUp || showForgotPassword || isRecovery) {
     return (
-      <div className="auth-no-oauth min-h-screen flex flex-col px-4 py-8 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] md:py-12 bg-slate-50">
+      <div className="auth-no-oauth min-h-screen flex flex-col px-4 py-8 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] md:py-12 bg-background">
         <div className="container max-w-lg mx-auto flex-1 flex flex-col">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold mb-2 text-slate-900">Bienvenido</h1>
-            <p className="text-lg text-slate-500">al Área Técnica Sector-Pro</p>
+            <h1 className="text-4xl font-bold mb-2 text-foreground">Bienvenido</h1>
+            <p className="text-lg text-muted-foreground">al Área Técnica Sector-Pro</p>
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-lg border border-slate-200">
+          <div className="bg-card text-card-foreground p-6 rounded-xl shadow-lg border border-border">
             {isRecovery ? (
               <ResetPasswordForm onSuccess={() => { }} />
             ) : showForgotPassword ? (
