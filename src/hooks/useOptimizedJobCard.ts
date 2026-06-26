@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { useTheme } from 'next-themes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { createQueryKey } from '@/lib/optimized-react-query';
 import { useRequiredRoleSummary } from '@/hooks/useJobRequiredRoles';
 import { resolveJobDocLocation } from '@/utils/jobDocuments';
@@ -44,6 +45,7 @@ export const useOptimizedJobCard = (
   const { theme } = useTheme();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const confirm = useConfirm();
   const enableRoleSummary = options?.enableRoleSummary ?? true;
   const enableSoundTasks = options?.enableSoundTasks ?? true;
   const refreshAssignmentsOnMount = options?.refreshAssignmentsOnMount ?? false;
@@ -440,7 +442,13 @@ export const useOptimizedJobCard = (
       console.error('Attempted to delete read-only document', doc);
       return;
     }
-    if (!window.confirm('Are you sure you want to delete this document?')) return;
+    const confirmed = await confirm({
+      title: 'Eliminar documento',
+      description: '¿Seguro que quieres eliminar este documento?',
+      confirmText: 'Eliminar',
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
@@ -469,7 +477,7 @@ export const useOptimizedJobCard = (
     } catch (err: any) {
       console.error('Delete error:', err);
     }
-  }, [job.id]);
+  }, [job.id, confirm]);
 
   const refreshData = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
