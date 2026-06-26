@@ -303,19 +303,19 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
 
                     {/* Counters */}
                     <div className="grid grid-cols-4 gap-2 text-xs">
-                      <div className="bg-white p-1 rounded text-center">
+                      <div className="bg-muted p-1 rounded text-center">
                         <p className="text-gray-600">Assigned</p>
                         <p className="font-bold">{role.assigned_count}/{requiredCount || '—'}</p>
                       </div>
-                      <div className="bg-white p-1 rounded text-center">
+                      <div className="bg-muted p-1 rounded text-center">
                         <p className="text-gray-600">Avail ✓</p>
                         <p className="font-bold">{role.confirmed_availability}</p>
                       </div>
-                      <div className="bg-white p-1 rounded text-center">
+                      <div className="bg-muted p-1 rounded text-center">
                         <p className="text-gray-600">Offers ⧐</p>
                         <p className="font-bold">{role.pending_offers}</p>
                       </div>
-                      <div className="bg-white p-1 rounded text-center">
+                      <div className="bg-muted p-1 rounded text-center">
                         <p className="text-gray-600">Accept ✓</p>
                         <p className="font-bold">{role.accepted_offers}</p>
                       </div>

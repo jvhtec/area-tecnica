@@ -526,7 +526,7 @@ const FestivalGearManagement = () => {
                 </Button>
                 
                 {editingStage === stage.number ? (
-                  <div className="fixed md:absolute top-1/2 left-1/2 md:top-full md:left-0 -translate-x-1/2 -translate-y-1/2 md:translate-x-0 md:translate-y-0 md:mt-2 p-4 md:p-2 bg-white border rounded-md shadow-lg z-50 w-[90vw] md:w-auto md:min-w-[200px]">
+                  <div className="fixed md:absolute top-1/2 left-1/2 md:top-full md:left-0 -translate-x-1/2 -translate-y-1/2 md:translate-x-0 md:translate-y-0 md:mt-2 p-4 md:p-2 bg-popover text-popover-foreground border rounded-md shadow-lg z-50 w-[90vw] md:w-auto md:min-w-[200px]">
                     <Input
                       value={editingStageName}
                       onChange={(e) => setEditingStageName(e.target.value)}
