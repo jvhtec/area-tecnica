@@ -23,7 +23,7 @@ function collectSourceFiles(dir: string, acc: string[] = []): string[] {
     if (stats.isDirectory()) {
       if (entry === "__tests__" || entry === "node_modules") continue
       collectSourceFiles(full, acc)
-    } else if (/\.tsx?$/.test(entry) && !/\.test\.tsx?$/.test(entry)) {
+    } else if (/\.(tsx?|jsx?)$/.test(entry) && !/\.test\.(tsx?|jsx?)$/.test(entry)) {
       acc.push(full)
     }
   }
