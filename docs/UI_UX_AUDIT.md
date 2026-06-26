@@ -17,6 +17,8 @@ This audit is being actioned on the same branch. Status as of the latest commit:
 | **Phase 1 — Shared primitives** | ✅ Done | `Loading`/`PageLoading`/`Spinner`, `EmptyState`, `SubmitButton` (a11y-correct, token-themed, unit-tested); adopted in `App.tsx` route fallback. |
 | **C-2 — Dark mode (Auth)** | ✅ Done | Auth signup/recovery view migrated from hardcoded slate/white to semantic tokens. |
 | **M-1 — Native confirm/alert** | ✅ Done | `ConfirmDialogProvider` + `useConfirm` added & wired; **all** native `window.confirm` sites migrated (14 `.tsx` + 3 `.ts` job-card hooks). A source-scan test (`no-native-confirm.test.ts`) guards against regressions. |
+| **L-2 — Double-submit guard** | 🟡 Partial | Standalone auth forms (login, signup, forgot/reset password) migrated to the shared `SubmitButton`, adding `aria-busy` and removing duplicated loading markup. Broader app-wide adoption is a follow-up. |
+| **M-3 — Image alt text** | ✅ Verified (no change) | The audit's "~55" was a grep artifact (same-line miss; `alt` sits on adjacent lines in multiline JSX, and `>` inside `opt => …` truncated naive scans). A robust multiline-aware scan finds **0** genuine `<img>`-without-`alt` violations in `src/`. |
 | **Phase 1 — Toast consolidation (H-2)** | ⬜ Pending | Large mechanical migration (~155 files); recommend a dedicated reviewed pass. |
 | **Phase 1 — ESLint guardrails** | ⬜ Pending | Needs `eslint-plugin-jsx-a11y` + color rules (dependency install). |
 | **Phases 2–5** | ⬜ Pending | See roadmap below. |

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
@@ -202,16 +202,9 @@ export const ResetPasswordForm = ({ onSuccess }: ResetPasswordFormProps) => {
         />
       </div>
 
-      <Button type="submit" disabled={isLoading} className="w-full">
-        {isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Updating Password...
-          </>
-        ) : (
-          'Update Password'
-        )}
-      </Button>
+      <SubmitButton type="submit" loading={isLoading} loadingText="Updating Password..." className="w-full">
+        Update Password
+      </SubmitButton>
     </form>
   );
 };
