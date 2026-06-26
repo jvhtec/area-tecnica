@@ -3,6 +3,7 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 import { MANAGEMENT_ALLOWED_ROLES } from '@/utils/permissions';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -77,6 +78,7 @@ function getPublicDisplayUrl(value?: string, slug?: string): string {
 export default function WallboardPresets() {
   useRoleGuard(MANAGEMENT_ALLOWED_ROLES);
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -368,12 +370,13 @@ export default function WallboardPresets() {
   };
 
   const deletePreset = async (preset: WallboardPresetRow) => {
-    if (typeof window !== 'undefined') {
-      const confirmed = window.confirm(
-        `¿Eliminar wallboard "${preset.name}"? Esta acción no se puede deshacer y cualquier pantalla que lo use dejará de actualizarse.`
-      );
-      if (!confirmed) return;
-    }
+    const confirmed = await confirm({
+      title: 'Eliminar wallboard',
+      description: `¿Eliminar wallboard "${preset.name}"? Esta acción no se puede deshacer y cualquier pantalla que lo use dejará de actualizarse.`,
+      confirmText: 'Eliminar',
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     setDeletingId(preset.id);
     try {

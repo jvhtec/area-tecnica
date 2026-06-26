@@ -5,6 +5,7 @@ import {
   HoverCardTrigger,
 } from "@/components/ui/hover-card"
 import { Button } from "@/components/ui/button"
+import { useConfirm } from "@/components/ui/confirm-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Info, Edit3, Save, X, Clock, Plus, Trash2, Bell } from "lucide-react"
@@ -91,6 +92,7 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
   const [sendBroadcast, setSendBroadcast] = useState(false)
   const [hasRecentUpdate, setHasRecentUpdate] = useState(false)
   const { toast } = useToast()
+  const confirm = useConfirm()
 
   // Allow editing for management/admin or Javier by email
   const canDeleteChangelog = isAdminRole(userRole)
@@ -210,7 +212,12 @@ export const AboutCard = ({ userRole, userEmail, autoOpen, onAutoOpenHandled }: 
 
   const deleteEntry = async (id: string) => {
     if (!id) return
-    const proceed = window.confirm('Delete this changelog entry?')
+    const proceed = await confirm({
+      title: 'Eliminar entrada',
+      description: '¿Eliminar esta entrada del changelog?',
+      confirmText: 'Eliminar',
+      destructive: true,
+    })
     if (!proceed) return
     try {
       const { error } = await dataLayerClient.from('app_changelog')

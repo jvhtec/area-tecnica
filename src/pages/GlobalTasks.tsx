@@ -6,6 +6,7 @@ import { canAssignTasks, canCreateTasks, canEditTasks, normalizeDept, type Dept 
 import { CreateGlobalTaskDialog } from '@/components/tasks/CreateGlobalTaskDialog';
 import { LinkJobDialog } from '@/components/tasks/LinkJobDialog';
 import { Button } from '@/components/ui/button';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -158,6 +159,7 @@ export default function GlobalTasks() {
   const canCreate = canCreateTasks(userRole) || isProductionDepartmentUser;
   const canAssign = canAssignTasks(userRole) || isProductionDepartmentUser;
   const { toast } = useToast();
+  const confirm = useConfirm();
 
   // Filters
   const [statusFilter, setStatusFilter] = React.useState<string>('active');
@@ -336,9 +338,12 @@ export default function GlobalTasks() {
     }
 
     const scopeLabel = bulkDeleteScope === 'unassigned' ? 'sin asignar' : 'todas';
-    const confirmed = window.confirm(
-      `Vas a borrar ${candidates.length} tarea(s) ${scopeLabel} de tipo "${bulkDeleteType}". Esta acción no se puede deshacer.`
-    );
+    const confirmed = await confirm({
+      title: 'Borrado masivo',
+      description: `Vas a borrar ${candidates.length} tarea(s) ${scopeLabel} de tipo "${bulkDeleteType}". Esta acción no se puede deshacer.`,
+      confirmText: 'Borrar',
+      destructive: true,
+    });
     if (!confirmed) return;
 
     const results = await Promise.allSettled(candidates.map((task) => mutations.deleteTask(task.id)));
@@ -827,8 +832,14 @@ export default function GlobalTasks() {
                             size="sm"
                             variant="ghost"
                             className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                            onClick={() => {
-                              if (window.confirm('¿Eliminar esta tarea? Esta acción no se puede deshacer.')) {
+                            onClick={async () => {
+                              const confirmed = await confirm({
+                                title: 'Eliminar tarea',
+                                description: '¿Eliminar esta tarea? Esta acción no se puede deshacer.',
+                                confirmText: 'Eliminar',
+                                destructive: true,
+                              });
+                              if (confirmed) {
                                 mutations
                                   .deleteTask(task.id)
                                   .then(() => {

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { useDeletionState } from "@/hooks/useDeletionState";
 import { deleteJobOptimistically } from "@/services/optimisticJobDeletionService";
@@ -13,6 +14,7 @@ import { canUseCustomFolderStructure, isManagementRole } from "@/utils/permissio
 import { queryKeys } from "@/lib/react-query";
 export const useJobActions = (job: any, userRole: string | null, onDeleteClick?: (jobId: string) => void) => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { addDeletingJob, removeDeletingJob, isDeletingJob } = useDeletionState();
   
@@ -38,7 +40,13 @@ export const useJobActions = (job: any, userRole: string | null, onDeleteClick?:
       return;
     }
 
-    if (!window.confirm('Are you sure you want to delete this job? This action cannot be undone and will remove all related data.')) {
+    const confirmed = await confirm({
+      title: "Eliminar trabajo",
+      description: "¿Seguro que quieres eliminar este trabajo? Esta acción no se puede deshacer y eliminará todos los datos relacionados.",
+      confirmText: "Eliminar",
+      destructive: true,
+    });
+    if (!confirmed) {
       return;
     }
 

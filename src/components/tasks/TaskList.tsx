@@ -11,6 +11,7 @@ import { Upload, Download, Trash2, Plus } from 'lucide-react';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { TASK_TYPES } from '@/constants/taskTypes';
 import {
   DOCUMENT_UPLOAD_ACCEPT,
@@ -56,6 +57,7 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
   const [newAssignee, setNewAssignee] = React.useState<string | undefined>(undefined);
   const [bulkDeleteMode, setBulkDeleteMode] = React.useState<'all' | 'unassigned'>('all');
   const { toast } = useToast();
+  const confirm = useConfirm();
   const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -175,9 +177,12 @@ export const TaskList: React.FC<TaskListProps> = ({ jobId, tourId, department, c
     }
 
     const scopeLabel = bulkDeleteMode === 'unassigned' ? 'sin asignar' : 'todas';
-    const confirmed = window.confirm(
-      `Vas a borrar ${ids.length} tarea(s) ${scopeLabel} de tipo "${newType}". Esta acción no se puede deshacer.`
-    );
+    const confirmed = await confirm({
+      title: 'Borrado masivo',
+      description: `Vas a borrar ${ids.length} tarea(s) ${scopeLabel} de tipo "${newType}". Esta acción no se puede deshacer.`,
+      confirmText: 'Borrar',
+      destructive: true,
+    });
     if (!confirmed) return;
 
     try {

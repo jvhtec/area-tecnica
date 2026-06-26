@@ -16,7 +16,7 @@ This audit is being actioned on the same branch. Status as of the latest commit:
 | **Phase 0 — Quick wins** | ✅ Done | `lang="es"`; light/dark `theme-color`; global reduced-motion + `:focus-visible` baseline; skip-to-content link; focus-ring token cleanup in `MobileNavBar`. |
 | **Phase 1 — Shared primitives** | ✅ Done | `Loading`/`PageLoading`/`Spinner`, `EmptyState`, `SubmitButton` (a11y-correct, token-themed, unit-tested); adopted in `App.tsx` route fallback. |
 | **C-2 — Dark mode (Auth)** | ✅ Done | Auth signup/recovery view migrated from hardcoded slate/white to semantic tokens. |
-| **M-1 — Native confirm/alert** | 🟡 In progress | `ConfirmDialogProvider` + `useConfirm` added & wired; 4 of 14 sites migrated (Sound/Lights/Video/Dashboard job-delete). Remaining 10 are follow-ups. |
+| **M-1 — Native confirm/alert** | ✅ Done | `ConfirmDialogProvider` + `useConfirm` added & wired; **all** native `window.confirm` sites migrated (14 `.tsx` + 3 `.ts` job-card hooks). A source-scan test (`no-native-confirm.test.ts`) guards against regressions. |
 | **Phase 1 — Toast consolidation (H-2)** | ⬜ Pending | Large mechanical migration (~155 files); recommend a dedicated reviewed pass. |
 | **Phase 1 — ESLint guardrails** | ⬜ Pending | Needs `eslint-plugin-jsx-a11y` + color rules (dependency install). |
 | **Phases 2–5** | ⬜ Pending | See roadmap below. |

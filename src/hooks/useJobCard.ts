@@ -3,6 +3,7 @@ import { useTheme } from 'next-themes';
 import { useQueryClient, useMutation, useQuery } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ui/confirm-dialog';
 import { JobDocument } from '@/components/jobs/cards/JobCardDocuments';
 import { Department } from '@/types/department';
 import { useDeletionState } from './useDeletionState';
@@ -19,6 +20,7 @@ import { getDocumentUploadValidationError } from '@/utils/documentUploadValidati
 import { queryKeys } from "@/lib/react-query";
 export const useJobCard = (job: any, department: Department, userRole: string | null, onEditClick?: (job: any) => void, onDeleteClick?: (jobId: string) => void, onJobClick?: (jobId: string) => void) => {
   const { toast } = useToast();
+  const confirm = useConfirm();
   const queryClient = useQueryClient();
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -259,7 +261,13 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
       return;
     }
 
-    if (!window.confirm("Are you sure you want to delete this document?")) return;
+    const confirmed = await confirm({
+      title: "Eliminar documento",
+      description: "¿Seguro que quieres eliminar este documento?",
+      confirmText: "Eliminar",
+      destructive: true,
+    });
+    if (!confirmed) return;
     try {
       console.log("useJobCard: Starting document deletion:", doc);
       const { bucket, path } = resolveJobDocLocation(doc.file_path);
