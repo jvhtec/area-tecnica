@@ -91,13 +91,6 @@ export const useUserPreferences = () => {
         if (data) {
           console.log('Preferences loaded:', data);
           setPreferences(data);
-          
-          // Apply dark mode if saved
-          if (data.dark_mode) {
-            document.documentElement.classList.add('dark');
-          } else {
-            document.documentElement.classList.remove('dark');
-          }
         }
       } catch (error) {
         console.error('Error loading preferences:', error);

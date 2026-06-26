@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeColorMeta } from "@/components/ThemeColorMeta";
+import { ThemePreferenceSync } from "@/components/ThemePreferenceSync";
 import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 import { PageLoading } from "@/components/ui/loading";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -11,6 +12,7 @@ import { ViewportProvider } from "@/hooks/use-mobile";
 import { OptimizedAuthProvider } from "@/hooks/useOptimizedAuth";
 import { MultiTabCoordinator } from "@/lib/multitab-coordinator";
 import { queryClient } from "@/lib/react-query";
+import { APP_THEME_STORAGE_KEY } from "@/lib/theme";
 import { AppBadgeProvider } from "@/providers/AppBadgeProvider";
 import { AppRuntimeCoordinator } from "@/runtime/AppRuntimeCoordinator";
 import {
@@ -55,11 +57,12 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <ViewportProvider>
-          <ThemeProvider defaultTheme="system" storageKey="sector-pro-theme" attribute="class">
+          <ThemeProvider defaultTheme="system" storageKey={APP_THEME_STORAGE_KEY} attribute="class">
             <ThemeColorMeta />
             <AppBadgeProvider>
               <Router>
                 <OptimizedAuthProvider>
+                  <ThemePreferenceSync />
                   <ConfirmDialogProvider>
                     <AppRuntimeCoordinator />
                     <RouteAwareGlobalInitializers />
