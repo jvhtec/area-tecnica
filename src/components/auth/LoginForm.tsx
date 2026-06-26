@@ -1,9 +1,9 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
@@ -65,16 +65,9 @@ export const LoginForm = ({ onShowSignUp, onShowForgotPassword }: LoginFormProps
       </div>
 
       <div className="flex flex-col space-y-4">
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Logging in...
-            </>
-          ) : (
-            'Log In'
-          )}
-        </Button>
+        <SubmitButton type="submit" loading={isLoading} loadingText="Logging in...">
+          Log In
+        </SubmitButton>
         
         <Button 
           type="button" 

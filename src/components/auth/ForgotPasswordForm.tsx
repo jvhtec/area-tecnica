@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 
@@ -89,16 +90,9 @@ export const ForgotPasswordForm = ({ onBack }: ForgotPasswordFormProps) => {
       </div>
 
       <div className="flex flex-col space-y-4">
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Sending Reset Link...
-            </>
-          ) : (
-            'Send Reset Link'
-          )}
-        </Button>
+        <SubmitButton type="submit" loading={isLoading} loadingText="Sending Reset Link...">
+          Send Reset Link
+        </SubmitButton>
         
         <Button type="button" variant="ghost" onClick={onBack}>
           <ArrowLeft className="mr-2 h-4 w-4" />
