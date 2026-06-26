@@ -16,6 +16,7 @@ import { useTourRateSubscriptions } from '@/hooks/useTourRateSubscriptions';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { hasPrepDayDateTypeForDate, isPrepDayBreakdown } from '@/utils/timesheetPrepDays';
+import { persistExplicitThemePreference } from '@/lib/theme';
 
 import { DashboardScreen } from '@/components/technician/DashboardScreen';
 import { JobsView } from '@/components/technician/JobsView';
@@ -111,7 +112,9 @@ const TechnicianDashboard = () => {
   );
 
   const toggleTheme = () => {
-    setTheme(isDark ? 'light' : 'dark');
+    const newTheme = isDark ? 'light' : 'dark';
+    persistExplicitThemePreference(newTheme);
+    setTheme(newTheme);
   };
 
   // Modal state

@@ -13,6 +13,7 @@ import { es } from 'date-fns/locale';
 import { getCategoryFromAssignment } from '@/utils/roleCategory';
 import { labelForCode } from '@/utils/roles';
 import { hasPrepDayDateTypeForDate, isPrepDayBreakdown } from '@/utils/timesheetPrepDays';
+import { persistExplicitThemePreference } from '@/lib/theme';
 
 import {
   LayoutDashboard, Calendar as CalendarIcon, User, Menu,
@@ -127,9 +128,8 @@ export default function TechnicianSuperApp() {
 
   const toggleTheme = () => {
     const newTheme = isDark ? 'light' : 'dark';
+    persistExplicitThemePreference(newTheme);
     setTheme(newTheme);
-    // Keep legacy key in sync for backward compat with useTechnicianTheme
-    localStorage.setItem('theme-preference', newTheme);
   };
 
   // Modal state

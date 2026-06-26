@@ -134,6 +134,7 @@ vi.mock("@/components/messages/DirectMessagesList", () => ({
 }));
 
 import TechnicianSuperApp from "../TechnicianSuperApp";
+import { APP_THEME_STORAGE_KEY } from "@/lib/theme";
 
 const LocationProbe = () => {
   const location = useLocation();
@@ -260,7 +261,7 @@ describe("TechnicianSuperApp", () => {
     });
   });
 
-  it("persists the legacy theme-preference key when toggling from the profile tab", async () => {
+  it("persists theme keys when toggling from the profile tab", async () => {
     const user = userEvent.setup();
     configureSupabase();
 
@@ -271,6 +272,7 @@ describe("TechnicianSuperApp", () => {
     await user.click(screen.getByRole("button", { name: /toggle theme/i }));
 
     expect(setThemeMock).toHaveBeenCalledWith("dark");
+    expect(window.localStorage.getItem(APP_THEME_STORAGE_KEY)).toBe("dark");
     expect(window.localStorage.getItem("theme-preference")).toBe("dark");
   });
 });
