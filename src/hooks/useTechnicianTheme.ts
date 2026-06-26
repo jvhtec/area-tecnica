@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Theme } from '@/components/technician/types';
 import { useUserPreferences } from './useUserPreferences';
+import {
+  explicitPreferenceFromDarkMode,
+  getStoredThemePreference,
+  isDarkThemePreference,
+} from '@/lib/theme';
 
 export const useTechnicianTheme = () => {
   const { preferences } = useUserPreferences();
 
   // Get initial theme from localStorage (synchronous, no flash!)
   const getInitialDarkMode = () => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem('theme-preference');
-      if (stored !== null) {
-        return stored === 'dark';
-      }
+    const storedPreference = getStoredThemePreference();
+    if (storedPreference) {
+      return isDarkThemePreference(storedPreference);
     }
+
     // Fallback to document class or system preference
     if (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')) {
       return true;
@@ -27,9 +31,17 @@ export const useTechnicianTheme = () => {
 
   // Sync with user preferences when they load from database
   useEffect(() => {
-    if (preferences?.dark_mode !== undefined) {
-      setIsDark(preferences.dark_mode);
+    if (typeof preferences?.dark_mode !== 'boolean') {
+      return;
     }
+
+    const storedPreference = getStoredThemePreference();
+    if (storedPreference) {
+      setIsDark(isDarkThemePreference(storedPreference));
+      return;
+    }
+
+    setIsDark(explicitPreferenceFromDarkMode(preferences.dark_mode) === 'dark');
   }, [preferences]);
 
   const theme: Theme = {

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Moon, Sun } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
+import { persistExplicitThemePreference } from "@/lib/theme"
 import { useUserPreferences } from "@/hooks/useUserPreferences"
 
 interface ThemeToggleProps {
@@ -18,35 +19,20 @@ export const ThemeToggle = ({
   ariaLabel,
 }: ThemeToggleProps = {}) => {
   const { resolvedTheme, setTheme } = useTheme()
-  const { preferences, updatePreferences } = useUserPreferences()
+  const { updatePreferences } = useUserPreferences()
   const [mounted, setMounted] = useState(false)
-  const hasManuallyToggled = useRef(false)
 
   useEffect(() => setMounted(true), [])
-
-  // Sync with database preferences on initial load only
-  useEffect(() => {
-    if (hasManuallyToggled.current) return
-    if (preferences?.dark_mode !== undefined) {
-      const preferred = preferences.dark_mode ? 'dark' : 'light'
-      setTheme(preferred)
-      // Keep legacy key in sync for backward compat with useTechnicianTheme
-      localStorage.setItem('theme-preference', preferred)
-    }
-  }, [preferences, setTheme])
 
   const isDarkMode = mounted ? resolvedTheme === 'dark' : true
 
   const toggleDarkMode = useCallback(() => {
-    hasManuallyToggled.current = true
     const newTheme = isDarkMode ? 'light' : 'dark'
+    persistExplicitThemePreference(newTheme)
     setTheme(newTheme)
 
-    // Keep legacy key in sync for backward compat with useTechnicianTheme
-    localStorage.setItem('theme-preference', newTheme)
-
     // Update database in background
-    updatePreferences({ dark_mode: !isDarkMode })
+    updatePreferences({ dark_mode: newTheme === 'dark' })
   }, [isDarkMode, setTheme, updatePreferences])
 
   // Global keyboard shortcut: Ctrl+Shift+D (Cmd+Shift+D on Mac)
