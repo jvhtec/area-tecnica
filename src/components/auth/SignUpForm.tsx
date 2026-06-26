@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -350,16 +351,9 @@ export const SignUpForm = ({ onBack, preventAutoLogin = false }: SignUpFormProps
       )}
 
       <div className="flex flex-col space-y-4">
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creando Cuenta...
-            </>
-          ) : (
-            preventAutoLogin ? 'Crear Usuario' : 'Crear Cuenta'
-          )}
-        </Button>
+        <SubmitButton type="submit" loading={isLoading} loadingText="Creando Cuenta...">
+          {preventAutoLogin ? 'Crear Usuario' : 'Crear Cuenta'}
+        </SubmitButton>
 
         {onBack && (
           <Button type="button" variant="ghost" onClick={onBack}>
