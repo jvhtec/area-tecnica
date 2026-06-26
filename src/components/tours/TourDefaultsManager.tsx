@@ -1520,7 +1520,7 @@ export const TourDefaultsManager = ({
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {setTables.map((table) => (
-                    <div key={table.id} className="border rounded-lg p-4 bg-card">
+                    <div key={table.id} className="border rounded-lg p-4 bg-card transition-colors hover:border-primary/40">
                       <div className="flex justify-between items-start mb-2">
                         <h6 className="font-medium">{table.table_name}</h6>
                         <Button
