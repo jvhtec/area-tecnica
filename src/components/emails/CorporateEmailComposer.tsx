@@ -23,6 +23,8 @@ import { X, Upload, FileText, Image as ImageIcon, Send, Users } from "lucide-rea
 import DOMPurify from "dompurify";
 import { RichTextEditor } from "./RichTextEditor";
 import type {
+  CorporateEmailRole,
+  CorporateEmailTechFilter,
   SelectedRecipient,
   SendCorporateEmailRequest,
   SendCorporateEmailResponse,
@@ -378,7 +380,8 @@ export function CorporateEmailComposer() {
     // Build recipient criteria
     const profileIds: string[] = [];
     const departments: string[] = [];
-    const roles: Array<'admin' | 'management' | 'staff' | 'freelance'> = [];
+    const roles: CorporateEmailRole[] = [];
+    const techFilters: CorporateEmailTechFilter[] = [];
 
     selectedRecipients.forEach((recipient) => {
       if (recipient.type === "individual" && recipient.profileId) {
@@ -387,6 +390,8 @@ export function CorporateEmailComposer() {
         departments.push(recipient.department);
       } else if (recipient.type === "role" && recipient.role) {
         roles.push(recipient.role);
+      } else if (recipient.type === "techFilter" && recipient.techFilter) {
+        techFilters.push(recipient.techFilter);
       }
     });
 
@@ -397,6 +402,7 @@ export function CorporateEmailComposer() {
         profileIds: profileIds.length > 0 ? profileIds : undefined,
         departments: departments.length > 0 ? departments : undefined,
         roles: roles.length > 0 ? roles : undefined,
+        techFilters: techFilters.length > 0 ? techFilters : undefined,
       },
       pdfAttachments: pdfAttachments.length > 0 ? pdfAttachments : undefined,
       inlineImages: inlineImages.length > 0 ? inlineImages : undefined,
@@ -407,11 +413,15 @@ export function CorporateEmailComposer() {
 
   // Get unique departments and roles for quick selection
   const uniqueDepartments = Array.from(new Set(profiles.map((p) => p.department).filter(Boolean)));
-  const roleOptions: Array<{ value: 'admin' | 'management' | 'staff' | 'freelance'; label: string }> = [
+  const roleOptions: Array<{ value: CorporateEmailRole; label: string }> = [
     { value: "admin", label: "Administradores" },
     { value: "management", label: "Gestión" },
-    { value: "staff", label: "Personal" },
-    { value: "freelance", label: "Freelance" },
+    { value: "logistics", label: "Logística" },
+    { value: "technician", label: "Técnicos" },
+    { value: "house_tech", label: "Plantilla" },
+  ];
+  const techFilterOptions: Array<{ value: CorporateEmailTechFilter; label: string }> = [
+    { value: "autonomos", label: "Autónomos" },
   ];
 
   return (
@@ -430,7 +440,7 @@ export function CorporateEmailComposer() {
         <div className="space-y-2">
           <Label htmlFor="recipients">Destinatarios</Label>
           <p className="text-xs text-muted-foreground">
-            Múltiples filtros se combinan con lógica AND (ej: "Sonido" + "Personal" = solo personal de sonido)
+            Múltiples filtros se combinan con lógica AND (ej: "Sonido" + "Técnicos" = solo técnicos de sonido)
           </p>
           <div className="flex flex-wrap gap-2 mb-2">
             {selectedRecipients.map((recipient) => (
@@ -480,6 +490,24 @@ export function CorporateEmailComposer() {
                         }}
                       >
                         {role.label}
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+
+                  <CommandGroup heading="Por tipo de técnico">
+                    {techFilterOptions.map((filter) => (
+                      <CommandItem
+                        key={filter.value}
+                        onSelect={() => {
+                          addRecipient({
+                            id: `tech_filter_${filter.value}`,
+                            label: filter.label,
+                            type: "techFilter",
+                            techFilter: filter.value,
+                          });
+                        }}
+                      >
+                        {filter.label}
                       </CommandItem>
                     ))}
                   </CommandGroup>

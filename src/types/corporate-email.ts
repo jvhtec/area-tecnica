@@ -32,16 +32,30 @@ export interface PdfAttachment {
   size: number;
 }
 
+export type CorporateEmailRole =
+  | 'admin'
+  | 'management'
+  | 'logistics'
+  | 'technician'
+  | 'house_tech'
+  | 'oscar';
+
+export type CorporateEmailTechFilter = 'autonomos';
+
 /**
  * Recipient selection criteria
  */
 export interface RecipientCriteria {
   /** Explicit profile IDs to include */
   profileIds?: string[];
+  /** Direct email addresses to include */
+  emails?: string[];
   /** Department names to include all members */
   departments?: string[];
   /** User roles to include all matching profiles */
-  roles?: Array<'admin' | 'management' | 'staff' | 'freelance'>;
+  roles?: CorporateEmailRole[];
+  /** Technician-only filters, such as autonomous/freelance technicians */
+  techFilters?: CorporateEmailTechFilter[];
 }
 
 /**
@@ -124,11 +138,13 @@ export interface SelectedRecipient {
   /** Display label */
   label: string;
   /** Type of recipient */
-  type: 'individual' | 'department' | 'role';
+  type: 'individual' | 'department' | 'role' | 'techFilter';
   /** For individuals, the profile ID */
   profileId?: string;
   /** For departments, the department name */
   department?: string;
   /** For roles, the role name */
-  role?: 'admin' | 'management' | 'staff' | 'freelance';
+  role?: CorporateEmailRole;
+  /** For technician filters, the filter code */
+  techFilter?: CorporateEmailTechFilter;
 }
