@@ -178,7 +178,7 @@ export const FlexElementSelectorDialog: React.FC<
         <div className="flex flex-col gap-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <Loading label="Loading element tree…" size="lg" />
+              <Loading label="Cargando árbol de elementos…" size="lg" />
             </div>
           ) : isError ? (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
