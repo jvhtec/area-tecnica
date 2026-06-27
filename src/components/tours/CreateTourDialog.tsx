@@ -44,7 +44,7 @@ const CreateTourDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] md:max-h-[85vh] overflow-y-auto flex flex-col gap-0 p-0">
         <DialogHeader className="px-4 pt-4 md:px-6 md:pt-6">
-          <DialogTitle className="text-base md:text-lg">Create New Tour</DialogTitle>
+          <DialogTitle className="text-base md:text-lg">Crear Nueva Gira</DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 md:px-6 pb-4 md:pb-6">
@@ -75,15 +75,15 @@ const CreateTourDialog = ({
                 onClick={() => onOpenChange(false)}
                 className="w-full sm:w-auto"
               >
-                Cancel
+                Cancelar
               </Button>
               <SubmitButton
                 type="submit"
                 className="w-full sm:w-auto min-w-[120px]"
                 loading={isCreating}
-                loadingText="Creating..."
+                loadingText="Creando..."
               >
-                Create Tour
+                Crear Gira
               </SubmitButton>
             </div>
           </div>
