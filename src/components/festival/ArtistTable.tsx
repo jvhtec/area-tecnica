@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, type ChangeEvent, type ClipboardEvent as R
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
+import { Loading } from "@/components/ui/loading";
 import { Badge } from "@/components/ui/badge";
 import { Pencil, Trash2, FileText, Loader2, Mic, Link, ExternalLink, Printer, ImagePlus, ImageOff, Receipt } from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
@@ -755,10 +756,7 @@ export const ArtistTable = ({
   };
   if (isLoading) {
     return <div className="w-full">
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="h-8 w-8 animate-spin" />
-          <span className="ml-2">Cargando artistas...</span>
-        </div>
+        <Loading label="Cargando artistas…" size="lg" className="py-8" />
       </div>;
   }
   return (
