@@ -10,6 +10,7 @@ import { dataLayerClient } from '@/services/dataLayerClient';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useToast } from '@/hooks/use-toast';
 import { endOfDay, format, startOfDay } from 'date-fns';
+import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { WeeklySummary } from '@/components/disponibilidad/WeeklySummary';
 import { QuickPresetAssignment } from '@/components/disponibilidad/QuickPresetAssignment';
 import { SubRentalDialog } from '@/components/equipment/SubRentalDialog';
@@ -63,10 +64,21 @@ export default function Disponibilidad() {
   // the hook call — otherwise the number of hooks varies between renders
   // (react-hooks/rules-of-hooks).
 
-  // Jobs happening on the selected date for this department
-  const dayStart = startOfDay(selectedDate);
-  const dayEnd = endOfDay(selectedDate);
-  const { data: jobsToday = [] } = useOptimizedJobs(department ?? undefined, dayStart, dayEnd);
+  // Jobs happening on the selected date for this department.
+  // Derive the day window in Europe/Madrid (the app's canonical timezone) rather
+  // than the browser's local time, then convert back to UTC instants for the query.
+  const MADRID_TZ = 'Europe/Madrid';
+  const zonedSelected = toZonedTime(selectedDate, MADRID_TZ);
+  const dayStart = fromZonedTime(startOfDay(zonedSelected), MADRID_TZ);
+  const dayEnd = fromZonedTime(endOfDay(zonedSelected), MADRID_TZ);
+  // Don't fetch until a department is resolved (auth/restricted states no-op).
+  const { data: jobsToday = [] } = useOptimizedJobs(
+    department ?? undefined,
+    dayStart,
+    dayEnd,
+    true,
+    { enabled: !!department },
+  );
 
   const { data: assignedPresets } = useQuery({
     queryKey: queryKeys.scope('preset-assignments', department, selectedDate),

@@ -2,13 +2,14 @@
 
 ## Scope and method
 
-- **Branch audited:** `claude/codebase-quality-audit-uviv9j` (off `main`)
+- **Branch audited:** a `codebase-quality-audit` feature branch off `main`
 - **Focus:** Code quality — maintainability, type safety, structure, duplication,
   error handling, and test depth. This deliberately **complements** the recent
   security/infrastructure-focused `docs/ENTERPRISE_CODEBASE_AUDIT_2026-06-23.md`
   and does not re-litigate its auth/RLS/secret findings.
 - **What was actually run** (not estimated):
-  - `npm run typecheck` (`tsc --noEmit -p tsconfig.app.json`) → **passes, 0 errors**
+  - `npm run typecheck` (the project-standard `tsc -p tsconfig.app.json`, which CI
+    gates on — not a bare `tsc --noEmit`) → **passes, 0 errors**
   - `npx eslint src tests vite.config.ts` → **0 errors, 1770 warnings**
   - `npm audit` (prod and full)
   - Static metrics across 1,279 TS/TSX source files (~287K LOC), 67 edge functions,

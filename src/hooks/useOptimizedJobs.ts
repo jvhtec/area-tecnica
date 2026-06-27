@@ -20,6 +20,11 @@ export const useOptimizedJobs = (
   includeDryhire: boolean = true,
   options?: {
     refetchOnMount?: boolean | "always";
+    /**
+     * When false, the underlying query is disabled and the hook no-ops (no fetch).
+     * Callers that fetch all departments leave this undefined (defaults to enabled).
+     */
+    enabled?: boolean;
   }
 ) => {
   // Subscribe only to tables that affect this hook's query results
@@ -221,6 +226,7 @@ export const useOptimizedJobs = (
   return useQuery({
     queryKey: queryKeys.scope('optimized-jobs', department, startDate?.toISOString(), endDate?.toISOString(), includeDryhire),
     queryFn: fetchOptimizedJobs,
+    enabled: options?.enabled ?? true,
     staleTime: 1000 * 60 * 5, // 5 minutes - increased for better caching
     gcTime: 1000 * 60 * 10, // 10 minutes - cache jobs longer
     refetchOnMount: options?.refetchOnMount,
