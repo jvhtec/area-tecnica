@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -214,9 +215,9 @@ export const CreateShiftDialog = ({
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Creando..." : "Crear Turno"}
-            </Button>
+            <SubmitButton type="submit" loading={isSubmitting} loadingText="Creando...">
+              Crear Turno
+            </SubmitButton>
           </div>
         </form>
       </DialogContent>
