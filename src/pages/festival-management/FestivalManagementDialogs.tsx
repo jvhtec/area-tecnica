@@ -1,6 +1,7 @@
 import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -262,10 +263,9 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
             <Button variant="outline" onClick={() => setIsArchiveDialogOpen(false)} disabled={isArchiving}>
               Cerrar
             </Button>
-            <Button onClick={handleArchiveToFlex} disabled={isArchiving}>
-              {isArchiving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            <SubmitButton onClick={handleArchiveToFlex} loading={isArchiving}>
               {archiveDryRun ? "Ejecutar Prueba" : "Iniciar"}
-            </Button>
+            </SubmitButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -346,10 +346,9 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
             <Button variant="outline" onClick={() => setIsBackfillDialogOpen(false)} disabled={isBackfilling}>
               Cerrar
             </Button>
-            <Button onClick={handleBackfill} disabled={isBackfilling}>
-              {isBackfilling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+            <SubmitButton onClick={handleBackfill} loading={isBackfilling}>
               Iniciar
-            </Button>
+            </SubmitButton>
           </DialogFooter>
         </DialogContent>
       </Dialog>

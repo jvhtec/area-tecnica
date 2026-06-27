@@ -1,6 +1,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Loader2 } from "lucide-react";
 import { Department, TECHNICAL_DEPARTMENTS } from "@/types/department";
 import { useTourCreation } from "@/hooks/useTourCreation";
@@ -76,20 +77,14 @@ const CreateTourDialog = ({
               >
                 Cancel
               </Button>
-              <Button
+              <SubmitButton
                 type="submit"
                 className="w-full sm:w-auto min-w-[120px]"
-                disabled={isCreating}
+                loading={isCreating}
+                loadingText="Creating..."
               >
-                {isCreating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  "Create Tour"
-                )}
-              </Button>
+                Create Tour
+              </SubmitButton>
             </div>
           </div>
         </form>
