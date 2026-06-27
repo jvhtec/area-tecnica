@@ -40,7 +40,7 @@ export const MessageReplyDialog = ({ message, open, onOpenChange }: MessageReply
       if (!updated || updated.length === 0) {
         throw new Error('No rows updated while marking message as read');
       }
-      try { window.dispatchEvent(new Event('messages_invalidated')); } catch {}
+      try { window.dispatchEvent(new Event('messages_invalidated')); } catch { /* event dispatch is best-effort */ }
 
       // Send reply message
       const { data: { session } } = await dataLayerClient.auth.getSession();
@@ -56,7 +56,7 @@ export const MessageReplyDialog = ({ message, open, onOpenChange }: MessageReply
         });
 
       if (sendError) throw sendError;
-      try { window.dispatchEvent(new Event('messages_invalidated')); } catch {}
+      try { window.dispatchEvent(new Event('messages_invalidated')); } catch { /* event dispatch is best-effort */ }
 
       toast({
         title: "Reply sent",

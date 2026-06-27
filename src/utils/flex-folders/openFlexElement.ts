@@ -152,7 +152,7 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
           if (placeholderWindow) {
             placeholderWindow.close();
           }
-        } catch {}
+        } catch { /* window may already be closed */ }
         navigateWithLinkClick(fallbackUrl);
       } else {
         placeholderWindow!.location.href = fallbackUrl;
@@ -175,7 +175,7 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
         if (placeholderWindow) {
           placeholderWindow.close();
         }
-      } catch {}
+      } catch { /* window may already be closed */ }
       navigateWithLinkClick(resolvedUrl);
     } else {
       placeholderWindow!.location.href = resolvedUrl;

@@ -105,7 +105,7 @@ export const exportToPDF = async (
       if (customLogo) {
         const logoHeight = 7.5;
         const logoWidth = logoHeight * (customLogo.width / customLogo.height);
-        try { doc.addImage(customLogo, 'PNG', 10, 5, logoWidth, logoHeight); } catch {}
+        try { doc.addImage(customLogo, 'PNG', 10, 5, logoWidth, logoHeight); } catch { /* logo is optional; render without it */ }
       }
 
       doc.setFontSize(24);
@@ -376,7 +376,7 @@ export const exportToPDF = async (
         if (headerLogo) {
           const logoHeight = 7.5;
           const logoWidth = logoHeight * (headerLogo.width / headerLogo.height);
-          try { doc.addImage(headerLogo, 'PNG', 10, 5, logoWidth, logoHeight); } catch {}
+          try { doc.addImage(headerLogo, 'PNG', 10, 5, logoWidth, logoHeight); } catch { /* logo is optional; render without it */ }
         }
 
         doc.setFontSize(24);
@@ -500,7 +500,7 @@ export const exportToPDF = async (
           doc.setPage(i);
           const xPosition = (pageWidth - logoWidth) / 2;
           const yLogo = pageHeight - 20;
-          try { doc.addImage(logo, 'PNG', xPosition, yLogo - logoHeight, logoWidth, logoHeight); } catch {}
+          try { doc.addImage(logo, 'PNG', xPosition, yLogo - logoHeight, logoWidth, logoHeight); } catch { /* logo is optional; render without it */ }
         }
         doc.setPage(totalPages);
         doc.setFontSize(10); doc.setTextColor(51, 51, 51);

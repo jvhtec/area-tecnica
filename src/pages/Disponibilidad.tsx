@@ -57,33 +57,21 @@ export default function Disponibilidad() {
       ? (normalizedDepartment as DisponibilidadDepartment)
       : null;
 
-  if (isManagement && !hasDisponibilidadAccess) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-        <h1 className="text-2xl font-semibold mb-4">Acceso restringido</h1>
-        <p className="text-muted-foreground max-w-xl">
-          Esta sección solo está disponible para los departamentos de Sonido y Luces.
-          Solicita acceso a uno de estos departamentos para continuar.
-        </p>
-      </div>
-    );
-  }
-
-  if (!department) {
-    return null;
-  }
-
-  const departmentLabel = DEPARTMENT_LABELS[department];
+  // NOTE: All hooks must be called before any early return below.
+  // `department` can be null on the first render (auth state resolving), so the
+  // data hooks are gated via `enabled`/falsy-department rather than by skipping
+  // the hook call — otherwise the number of hooks varies between renders
+  // (react-hooks/rules-of-hooks).
 
   // Jobs happening on the selected date for this department
   const dayStart = startOfDay(selectedDate);
   const dayEnd = endOfDay(selectedDate);
-  const { data: jobsToday = [] } = useOptimizedJobs(department as any, dayStart, dayEnd);
+  const { data: jobsToday = [] } = useOptimizedJobs(department ?? undefined, dayStart, dayEnd);
 
   const { data: assignedPresets } = useQuery({
     queryKey: queryKeys.scope('preset-assignments', department, selectedDate),
     queryFn: async () => {
-      if (!selectedDate) return null;
+      if (!selectedDate || !department) return null;
 
       const { data, error } = await dataLayerClient.from('day_preset_assignments')
         .select(`
@@ -116,7 +104,7 @@ export default function Disponibilidad() {
 
       return data;
     },
-    enabled: !!selectedDate
+    enabled: !!selectedDate && !!department
   });
 
   // Prefetch tiny logos for the jobs referenced by the presets
@@ -141,6 +129,25 @@ export default function Disponibilidad() {
     })();
     return () => { ignore = true };
   }, [jobIds]);
+
+  // Guards run after all hooks above (see note near the data hooks).
+  if (isManagement && !hasDisponibilidadAccess) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+        <h1 className="text-2xl font-semibold mb-4">Acceso restringido</h1>
+        <p className="text-muted-foreground max-w-xl">
+          Esta sección solo está disponible para los departamentos de Sonido y Luces.
+          Solicita acceso a uno de estos departamentos para continuar.
+        </p>
+      </div>
+    );
+  }
+
+  if (!department) {
+    return null;
+  }
+
+  const departmentLabel = DEPARTMENT_LABELS[department];
 
   if (isMobile) {
     return (

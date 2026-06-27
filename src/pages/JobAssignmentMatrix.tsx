@@ -217,7 +217,7 @@ export default function JobAssignmentMatrix() {
         qc.invalidateQueries({ queryKey: queryKeys.scope('technician-fridge-status') });
       })
       .subscribe();
-    return () => { try { (dataLayerClient as any).removeChannel(ch); } catch { } };
+    return () => { try { (dataLayerClient as any).removeChannel(ch); } catch { /* channel may already be removed */ } };
   }, [qc]);
 
   // Keep the technician roster fresh when users are added or edited in settings.
@@ -232,7 +232,7 @@ export default function JobAssignmentMatrix() {
         qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-technicians') });
       })
       .subscribe();
-    return () => { try { (dataLayerClient as any).removeChannel(ch); } catch { } };
+    return () => { try { (dataLayerClient as any).removeChannel(ch); } catch { /* channel may already be removed */ } };
   }, [qc]);
 
   // Filter technicians based on search term

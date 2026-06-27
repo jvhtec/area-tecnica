@@ -97,7 +97,7 @@ const VideoPesosTool: React.FC = () => {
           .eq('id', jobIdFromUrl)
           .single();
         if (data) setSelectedJob(data);
-      } catch {}
+      } catch { /* optional URL preselection; ignore if it fails */ }
     };
     applyJobFromUrl();
   }, [jobIdFromUrl, jobs]);

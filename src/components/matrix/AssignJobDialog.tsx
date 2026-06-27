@@ -228,7 +228,7 @@ export const AssignJobDialog = ({
 
   React.useEffect(() => {
     if (existingAssignment?.single_day && existingAssignment?.assignment_date) {
-      try { setSingleDate(new Date(`${existingAssignment.assignment_date}T00:00:00`)); } catch { }
+      try { setSingleDate(new Date(`${existingAssignment.assignment_date}T00:00:00`)); } catch { /* keep default on unparseable date */ }
     }
   }, [existingAssignment?.single_day, existingAssignment?.assignment_date]);
 
@@ -698,6 +698,7 @@ export const AssignJobDialog = ({
           }
         });
       } catch (_) {
+        /* best-effort push notification; ignore delivery failures */
       }
 
       window.dispatchEvent(new CustomEvent('assignment-updated', {

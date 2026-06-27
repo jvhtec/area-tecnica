@@ -79,7 +79,7 @@ export const FlexSyncLogDialog: React.FC<FlexSyncLogDialogProps> = ({ jobId, ope
                     try {
                       const msg = r.primaryMessage || r.message || r.error || '';
                       return String(msg);
-                    } catch {}
+                    } catch { /* fall back to empty details */ }
                   }
                   return '';
                 })();

@@ -92,7 +92,7 @@ export const useIncidentReports = () => {
             body: { action: 'broadcast', type: 'document.deleted', job_id: report.job_id, file_name: report.file_name }
           });
         }
-      } catch {}
+      } catch { /* best-effort push notification; ignore delivery failures */ }
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("incident-reports") });
       toast({
         title: "Reporte eliminado",

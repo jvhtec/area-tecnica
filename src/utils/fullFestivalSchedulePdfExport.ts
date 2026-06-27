@@ -1,5 +1,10 @@
 import { format } from 'date-fns';
 import { loadPdfLibs } from '@/utils/pdf/lazyPdf';
+import {
+  loadImageWithTimeout as loadImageSafely,
+  SECTOR_PRO_LOGO_PATH,
+  FALLBACK_BRAND_LOGO_PATH,
+} from '@/utils/pdf/shared/pdfExportShared';
 
 // Artist data interface for full schedule export
 export interface FullScheduleArtist {
@@ -19,35 +24,6 @@ export interface FullFestivalSchedulePdfData {
   stageNames?: Record<number, string>;
   logoUrl?: string;
 }
-
-// Enhanced image loading function
-const loadImageSafely = async (src: string, description: string): Promise<HTMLImageElement | null> => {
-  console.log(`Loading ${description} from:`, src);
-  
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    
-    const timeout = setTimeout(() => {
-      console.warn(`Timeout loading ${description} from:`, src);
-      resolve(null);
-    }, 10000);
-    
-    img.onload = () => {
-      clearTimeout(timeout);
-      console.log(`Successfully loaded ${description}`);
-      resolve(img);
-    };
-    
-    img.onerror = (error) => {
-      clearTimeout(timeout);
-      console.error(`Failed to load ${description} from:`, src, error);
-      resolve(null);
-    };
-    
-    img.src = src;
-  });
-};
 
 export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePdfData): Promise<Blob> => {
   console.log('exportFullFestivalSchedulePDF called with data:', data);
@@ -87,7 +63,7 @@ export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePd
   // If festival logo failed, try fallback logo
   if (!festivalLogoLoaded) {
     console.log("Trying fallback logo");
-    const fallbackImg = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'fallback logo');
+    const fallbackImg = await loadImageSafely(FALLBACK_BRAND_LOGO_PATH, 'fallback logo');
     if (fallbackImg) {
       try {
         const maxHeight = 20;
@@ -215,7 +191,7 @@ export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePd
 
   // === COMPANY LOGO (CENTERED AT BOTTOM) ===
   console.log("Attempting to load Sector Pro logo");
-  const sectorImg = await loadImageSafely('/sector pro logo.png', 'Sector Pro logo');
+  const sectorImg = await loadImageSafely(SECTOR_PRO_LOGO_PATH, 'Sector Pro logo');
   if (sectorImg) {
     try {
       const logoWidth = 30;
@@ -235,7 +211,7 @@ export const exportFullFestivalSchedulePDF = async (data: FullFestivalSchedulePd
       console.error('Error adding Sector Pro logo to PDF:', error);
     }
   } else {
-    const altSectorImg = await loadImageSafely('/lovable-uploads/ce3ff31a-4cc5-43c8-b5bb-a4056d3735e4.png', 'alternative Sector Pro logo');
+    const altSectorImg = await loadImageSafely(FALLBACK_BRAND_LOGO_PATH, 'alternative Sector Pro logo');
     if (altSectorImg) {
       try {
         const logoWidth = 30;

@@ -427,7 +427,7 @@ export const LogisticsEventDialog = ({
         // notify caller on create
         try {
           onCreated?.({ id: newEvent.id, event_type: newEvent.event_type, event_date: newEvent.event_date, event_time: newEvent.event_time });
-        } catch { }
+        } catch { /* optional caller callback; ignore if it throws */ }
 
         if (selectedDepartments.length > 0) {
           const { error: deptError } = await dataLayerClient.from("logistics_event_departments")
@@ -455,7 +455,7 @@ export const LogisticsEventDialog = ({
           }
           try {
             onCreated?.({ id: unloadEvent.id, event_type: unloadEvent.event_type, event_date: unloadEvent.event_date, event_time: unloadEvent.event_time });
-          } catch { }
+          } catch { /* optional caller callback; ignore if it throws */ }
 
           await broadcastLogisticsEvent(newEvent, {
             type: "logistics.event.created",

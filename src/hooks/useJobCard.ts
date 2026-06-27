@@ -221,7 +221,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
           void supabase.functions.invoke('push', {
             body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
           });
-        } catch {}
+        } catch { /* best-effort push notification; ignore delivery failures */ }
       } catch (err: any) {
         failedMessages.push(`${file.name}: ${err?.message || String(err)}`);
       }
@@ -302,7 +302,7 @@ export const useJobCard = (job: any, department: Department, userRole: string | 
         void supabase.functions.invoke('push', {
           body: { action: 'broadcast', type: 'document.deleted', job_id: job.id, file_name: doc.file_name }
         });
-      } catch {}
+      } catch { /* best-effort push notification; ignore delivery failures */ }
     } catch (err: any) {
       console.error("Error in handleDeleteDocument:", err);
       toast({

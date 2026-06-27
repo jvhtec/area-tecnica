@@ -73,7 +73,7 @@ export const JobStatusSelector = ({
             body: { action: 'broadcast', type, job_id: jobId }
           })
         }
-      } catch {}
+      } catch { /* best-effort push notification; ignore delivery failures */ }
 
       // Attempt to sync status with Flex via Edge Function
       const toFlexStatus = (s: JobStatus): 'tentativa' | 'confirmado' | 'cancelado' | null => {

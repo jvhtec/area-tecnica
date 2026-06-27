@@ -106,7 +106,7 @@ export const JobCardDocuments: React.FC<JobCardDocumentsProps> = ({
             file_name: doc.file_name,
           }
         });
-      } catch {}
+      } catch { /* best-effort push notification; ignore delivery failures */ }
     } catch (err: any) {
       console.error('Error toggling document visibility:', err);
       alert(`Error updating visibility: ${err.message}`);

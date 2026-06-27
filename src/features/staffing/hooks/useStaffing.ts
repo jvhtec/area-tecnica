@@ -122,7 +122,7 @@ export function useSendStaffingEmail() {
       qc.invalidateQueries({ queryKey: queryKeys.scope('staffing-matrix') })
       qc.invalidateQueries({ queryKey: queryKeys.scope('assignment-matrix') })
       qc.invalidateQueries({ queryKey: queryKeys.scope('optimized-matrix-assignments') })
-      try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch { /* event dispatch is best-effort */ }
     }
   })
 }
@@ -164,7 +164,7 @@ export function useCancelStaffingRequest() {
       // Fire-and-forget notification via same channel used originally
       try {
         supabase.functions.invoke('notify-staffing-cancellation', { body: payload }).catch(() => {})
-      } catch {}
+      } catch { /* best-effort notification; ignore delivery failures */ }
       return { success: true, rowsAffected: data?.length || 0 }
     },
     onSuccess: (_data, vars) => {
@@ -180,7 +180,7 @@ export function useCancelStaffingRequest() {
       // Also refetch to ensure fresh data
       qc.refetchQueries({ queryKey: queryKeys.scope('staffing-matrix'), type: 'active' })
 
-      try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('staffing-updated')); } catch { /* event dispatch is best-effort */ }
       // Push broadcast: cancellation
       try {
         const type = vars.phase === 'availability' ? 'staffing.availability.cancelled' : 'staffing.offer.cancelled'
@@ -192,7 +192,7 @@ export function useCancelStaffingRequest() {
             recipient_id: vars.profile_id,
           }
         })
-      } catch {}
+      } catch { /* best-effort push notification; ignore delivery failures */ }
     }
   })
 }

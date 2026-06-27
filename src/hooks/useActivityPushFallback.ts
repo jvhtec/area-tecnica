@@ -70,12 +70,12 @@ export function useActivityPushFallback() {
           }
 
           await supabase.functions.invoke('push', { body: payload })
-        } catch {}
+        } catch { /* best-effort; ignore failures */ }
       })
       .subscribe()
 
     return () => {
-      try { supabase.removeChannel(channel) } catch {}
+      try { supabase.removeChannel(channel) } catch { /* channel may already be removed */ }
     }
   }, [enabled, userRole])
 }

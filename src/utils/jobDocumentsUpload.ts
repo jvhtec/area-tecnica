@@ -109,7 +109,7 @@ export const uploadJobPdfWithCleanup = async (
           file_name: sanitizedFileName
         }
       });
-    } catch {}
+    } catch { /* best-effort push notification; ignore delivery failures */ }
   } catch (err) {
     console.error("uploadJobPdfWithCleanup error:", err);
     throw err;
