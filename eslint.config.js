@@ -117,6 +117,19 @@ export default tseslint.config(
             "Use the themed useConfirm() dialog (@/components/ui/confirm-dialog) or a toast instead of native window.confirm/alert/prompt (UI/UX audit M-1).",
         },
       ],
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              // H-2: single toast renderer — the Radix toaster was removed.
+              name: "@/components/ui/toaster",
+              message:
+                "The legacy Radix toaster was removed. Use the single Sonner renderer — toast via @/hooks/use-toast or `sonner` (UI/UX audit H-2).",
+            },
+          ],
+        },
+      ],
     },
   },
   {
