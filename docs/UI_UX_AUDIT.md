@@ -23,7 +23,7 @@ This audit is being actioned on the same branch. Status as of the latest commit:
 | **L-2 — Double-submit guard** | 🟡 Partial | Auth forms (login, signup, forgot/reset password) **and** the festival scheduling dialogs (`CreateShiftDialog`, `EditShiftDialog`) migrated to the shared `SubmitButton` — adds `aria-busy` + spinner, removes duplicated loading markup. Broader app-wide adoption is a follow-up. |
 | **M-9 — Empty states** | 🟡 Started | `EmptyState`/`Loading` primitives adopted in `FestivalScheduling` (no-shifts + loading states) — first adoption beyond the route fallback. Broader rollout is a follow-up. |
 | **M-3 — Image alt text** | ✅ Verified (no change) | The audit's "~55" was a grep artifact (same-line miss; `alt` sits on adjacent lines in multiline JSX, and `>` inside `opt => …` truncated naive scans). A robust multiline-aware scan finds **0** genuine `<img>`-without-`alt` violations in `src/`. |
-| **Phase 1 — Toast consolidation (H-2)** | ⬜ Pending | Large mechanical migration (~155 files); recommend a dedicated reviewed pass. |
+| **Phase 1 — Toast consolidation (H-2)** | ✅ Done | Single toast renderer (**Sonner**). `@/hooks/use-toast` is now a thin Sonner adapter (the ~200 `toast({title,description,variant})` call sites + the `import {toast} from "sonner"` sites all render the same way), the dead Radix `<Toaster>` + `ui/toaster.tsx` were removed, and the Sonner `<Toaster>` now mounts on **all** routes — fixing toasts that were silently dropped on public pages (auth, artist form). Guard test: `single-toaster.test.ts`. |
 | **Phase 1 — ESLint guardrails** | ⬜ Pending | Needs `eslint-plugin-jsx-a11y` + color rules (dependency install). |
 | **Phases 2–5** | ⬜ Pending | See roadmap below. |
 

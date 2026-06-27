@@ -1,230 +1,82 @@
-
-import { toast as toastPrimitive } from "sonner";
+import { toast as sonnerToast } from "sonner";
 import * as React from "react";
 
-type ToasterToast = any;
+/**
+ * Toast API — single notification system (Sonner).
+ *
+ * This module is the shadcn-compatible `useToast()` / `toast()` surface, but it
+ * renders entirely through **Sonner** (the one mounted `<Toaster>`). It exists so
+ * the ~200 existing `toast({ title, description, variant })` call sites keep
+ * working unchanged while there is only one toast system app-wide
+ * (docs/UI_UX_AUDIT.md, H-2). New code may import `toast` from here or directly
+ * from `sonner` — both render the same way.
+ */
 
-const TOAST_LIMIT = 20;
-const TOAST_REMOVE_DELAY = 1000000;
+export type ToastVariant = "default" | "destructive" | "success" | "warning" | "info";
 
-type ToasterActionElement = React.ReactElement<unknown> | null;
-
-type ToasterProps = React.ComponentPropsWithoutRef<typeof toastPrimitive>;
-
-type ToastData = {
-  id: string;
+export interface ToastInput {
   title?: React.ReactNode;
   description?: React.ReactNode;
-  action?: ToasterActionElement;
-  toastProps?: ToasterProps;
-};
-
-const actionTypes = {
-  ADD_TOAST: "ADD_TOAST",
-  UPDATE_TOAST: "UPDATE_TOAST",
-  DISMISS_TOAST: "DISMISS_TOAST",
-  REMOVE_TOAST: "REMOVE_TOAST",
-} as const;
-
-type ActionType = typeof actionTypes;
-
-type Action =
-  | {
-      type: ActionType["ADD_TOAST"];
-      toast: ToastData;
-    }
-  | {
-      type: ActionType["UPDATE_TOAST"];
-      toast: Partial<ToastData>;
-    }
-  | {
-      type: ActionType["DISMISS_TOAST"];
-      toastId?: ToastData["id"];
-    }
-  | {
-      type: ActionType["REMOVE_TOAST"];
-      toastId?: ToastData["id"];
-    };
-
-interface State {
-  toasts: ToastData[];
+  // Accept any string (keeps autocomplete for known variants) so callers typed
+  // loosely (e.g. PDF export `variant?: string`) stay compatible.
+  variant?: ToastVariant | (string & {});
+  id?: string | number;
+  duration?: number;
+  action?: unknown;
+  [key: string]: unknown;
 }
 
-const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
+type SonnerToast = typeof sonnerToast;
 
-const addToRemoveQueue = (toastId: string) => {
-  if (toastTimeouts.has(toastId)) {
-    return;
+// Callable form: supports the shadcn object signature
+// (`{ title, description, variant }`) and plain string/element, mapping the
+// `variant` to the matching Sonner method.
+function baseToast(input: ToastInput | string | React.ReactNode) {
+  if (typeof input === "string" || React.isValidElement(input)) {
+    return sonnerToast(input as React.ReactNode);
   }
 
-  const timeout = setTimeout(() => {
-    toastTimeouts.delete(toastId);
-    dispatch({
-      type: "REMOVE_TOAST",
-      toastId: toastId,
-    });
-  }, TOAST_REMOVE_DELAY);
+  const { title, description, variant, ...rest } = (input ?? {}) as ToastInput;
+  const options = { description, ...rest } as Record<string, unknown>;
 
-  toastTimeouts.set(toastId, timeout);
-};
-
-export const reducer = (state: State, action: Action): State => {
-  switch (action.type) {
-    case "ADD_TOAST":
-      return {
-        ...state,
-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
-      };
-
-    case "UPDATE_TOAST":
-      return {
-        ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === action.toast.id ? { ...t, ...action.toast } : t
-        ),
-      };
-
-    case "DISMISS_TOAST": {
-      const { toastId } = action;
-
-      if (toastId) {
-        addToRemoveQueue(toastId);
-      } else {
-        state.toasts.forEach((toast) => {
-          addToRemoveQueue(toast.id);
-        });
-      }
-
-      return {
-        ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === toastId || toastId === undefined
-            ? {
-                ...t,
-                open: false,
-              }
-            : t
-        ),
-      };
-    }
-
-    case "REMOVE_TOAST":
-      if (action.toastId === undefined) {
-        return {
-          ...state,
-          toasts: [],
-        };
-      }
-      return {
-        ...state,
-        toasts: state.toasts.filter((t) => t.id !== action.toastId),
-      };
+  switch (variant) {
+    case "destructive":
+      return sonnerToast.error(title as React.ReactNode, options);
+    case "success":
+      return sonnerToast.success(title as React.ReactNode, options);
+    case "warning":
+      return sonnerToast.warning(title as React.ReactNode, options);
+    case "info":
+      return sonnerToast.info(title as React.ReactNode, options);
+    default:
+      return sonnerToast(title as React.ReactNode, options);
   }
-};
-
-const listeners: Array<(state: State) => void> = [];
-
-let memoryState: State = { toasts: [] };
-
-function dispatch(action: Action) {
-  memoryState = reducer(memoryState, action);
-  listeners.forEach((listener) => {
-    listener(memoryState);
-  });
 }
 
-// Enhanced toast function that adapts to sonner's API and handles variant conversion
-function toast(options: string | React.ReactNode | Omit<ToastData, "id"> | {
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  action?: ToasterActionElement;
-  id?: string;
-  variant?: "default" | "destructive" | "success" | "warning" | "info";
-  onOpenChange?: (open: boolean) => void;
-}) {
-  // Handle simple string toast
-  if (typeof options === 'string' || React.isValidElement(options)) {
-    return toastPrimitive(options);
-  }
-  
-  const {
-    id,
-    variant,
-    title,
-    description,
-    ...rest
-  } = options as any;
-
-  const toastOptions = {
-    description,
-    ...rest,
-    ...(id !== undefined ? { id } : {}),
-  };
-  
-  // Map variant to the appropriate sonner method
-  if (variant) {
-    switch (variant) {
-      case "destructive":
-        return toastPrimitive.error(title, toastOptions);
-      case "success":
-        return toastPrimitive.success(title, toastOptions);
-      case "warning":
-        return toastPrimitive.warning(title, toastOptions);
-      case "info":
-        return toastPrimitive.info(title, toastOptions);
-      default:
-        // Default case for "default" variant or no variant
-        return toastPrimitive(title, toastOptions);
-    }
-  }
-
-  // Use sonner's API for default case
-  return toastPrimitive(title, toastOptions);
-}
-
-// Add API-compatible methods for backward compatibility
-toast.success = (title: string, options?: any) => {
-  const { description, ...rest } = options || {};
-  return toastPrimitive.success(title, { description, ...rest });
-};
-
-toast.error = (title: string, options?: any) => {
-  const { description, ...rest } = options || {};
-  return toastPrimitive.error(title, { description, ...rest });
-};
-
-toast.warning = (title: string, options?: any) => {
-  const { description, ...rest } = options || {};
-  return toastPrimitive.warning(title, { description, ...rest });
-};
-
-toast.info = (title: string, options?: any) => {
-  const { description, ...rest } = options || {};
-  return toastPrimitive.info(title, { description, ...rest });
-};
-
-toast.loading = toastPrimitive.loading;
-toast.custom = toastPrimitive;
+// Expose Sonner's full method surface so existing helper-style calls
+// (`toast.success/error/warning/info/loading/message/promise/dismiss/custom`)
+// keep working unchanged.
+const toast = Object.assign(baseToast, {
+  success: sonnerToast.success,
+  error: sonnerToast.error,
+  warning: sonnerToast.warning,
+  info: sonnerToast.info,
+  message: sonnerToast.message,
+  loading: sonnerToast.loading,
+  promise: sonnerToast.promise,
+  dismiss: sonnerToast.dismiss,
+  custom: sonnerToast.custom,
+}) as typeof baseToast &
+  Pick<
+    SonnerToast,
+    "success" | "error" | "warning" | "info" | "message" | "loading" | "promise" | "dismiss" | "custom"
+  >;
 
 function useToast() {
-  const [state, setState] = React.useState<State>(memoryState);
-
-  React.useEffect(() => {
-    listeners.push(setState);
-    return () => {
-      const index = listeners.indexOf(setState);
-      if (index > -1) {
-        listeners.splice(index, 1);
-      }
-    };
-  }, [state]);
-
   return {
-    ...state,
     toast,
-    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+    dismiss: (toastId?: string | number) => sonnerToast.dismiss(toastId),
   };
 }
 
-// Export both the hook and the standalone function
 export { toast, useToast };

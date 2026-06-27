@@ -64,10 +64,6 @@ vi.mock("@/components/jobs/GlobalCreateJobDialog", () => ({
   GlobalCreateJobDialog: () => <div data-testid="global-create-job-dialog">Global Create Job</div>,
 }));
 
-vi.mock("@/components/ui/toaster", () => ({
-  Toaster: () => <div data-testid="app-toaster">Toast Container</div>,
-}));
-
 vi.mock("sonner", () => ({
   Toaster: () => <div data-testid="sonner-toaster">Sonner</div>,
 }));
@@ -175,7 +171,6 @@ describe("App route guards and global overlays", () => {
 
     expect(await screen.findByText("Artist Form Route")).toBeInTheDocument();
     expect(screen.queryByTestId("global-create-job-dialog")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("sonner-toaster")).not.toBeInTheDocument();
     expect(serviceWorkerUpdateMock).not.toHaveBeenCalled();
     expect(pushSubscriptionRecoveryMock).not.toHaveBeenCalled();
     expect(shortcutInitializationMock).not.toHaveBeenCalled();
