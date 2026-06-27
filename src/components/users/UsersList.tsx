@@ -6,6 +6,7 @@ import { UsersListContent } from "./UsersListContent";
 import { useTabVisibility } from "@/hooks/useTabVisibility";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, RefreshCw } from "lucide-react";
+import { Loading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
 import { 
@@ -182,9 +183,7 @@ export const UsersList = ({
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center p-4">
-        <Loader2 className="h-6 w-6 animate-spin" />
-      </div>
+      <Loading hideLabel size="md" className="p-4" />
     );
   }
 

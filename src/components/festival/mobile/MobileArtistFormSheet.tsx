@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Save, Loader2, Sliders, Radio, Mic2, Speaker, Cable, StickyNote, ChevronRight, CheckCircle2 } from "lucide-react";
 import { BasicInfoSection } from "../form/sections/BasicInfoSection";
 import { ConsoleSetupSection } from "../form/sections/ConsoleSetupSection";
@@ -291,9 +292,7 @@ export const MobileArtistFormSheet = ({
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-          </div>
+          <Loading hideLabel size="md" className="py-12" />
         ) : (
           <>
             {/* Basic Info - always visible */}

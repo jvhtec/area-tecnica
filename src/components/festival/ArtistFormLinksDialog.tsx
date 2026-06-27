@@ -1,6 +1,7 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import { useState, useEffect, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -340,9 +341,7 @@ export const ArtistFormLinksDialog = ({
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
-          <div className="flex justify-center items-center h-40">
-            <Loader2 className="h-8 w-8 animate-spin" />
-          </div>
+          <Loading hideLabel size="lg" className="h-40" />
         </DialogContent>
       </Dialog>
     );

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { SubmitButton } from "@/components/ui/submit-button";
+import { Loading } from "@/components/ui/loading";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
@@ -140,9 +141,7 @@ export const ResetPasswordForm = ({ onSuccess }: ResetPasswordFormProps) => {
   // Show loading state while checking session
   if (hasValidSession === null) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <Loading hideLabel size="lg" className="py-8" />
     );
   }
 
