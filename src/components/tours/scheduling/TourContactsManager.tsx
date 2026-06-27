@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -468,19 +469,10 @@ export const TourContactsManager: React.FC<TourContactsManagerProps> = ({
 
       {canEdit && contacts.length > 0 && (
         <div className="flex justify-end">
-          <Button onClick={handleSaveAll} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Guardar Contactos
-              </>
-            )}
-          </Button>
+          <SubmitButton onClick={handleSaveAll} loading={isSaving} loadingText="Guardando...">
+            <Save className="h-4 w-4 mr-2" />
+            Guardar Contactos
+          </SubmitButton>
         </div>
       )}
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { dataLayerClient } from "@/services/dataLayerClient";
@@ -1106,9 +1107,9 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
                 </div>
 
                 {!isBlank && (
-                  <Button type="submit" disabled={isSubmitting} className="w-full">
-                    {isSubmitting ? tx("Enviando...", "Sending...") : tx("Enviar Requerimientos", "Submit Requirements")}
-                  </Button>
+                  <SubmitButton type="submit" loading={isSubmitting} loadingText={tx("Enviando...", "Sending...")} className="w-full">
+                    {tx("Enviar Requerimientos", "Submit Requirements")}
+                  </SubmitButton>
                 )}
               </form>
             </CardContent>

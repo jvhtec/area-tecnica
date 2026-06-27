@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -385,16 +386,9 @@ export const EnhancedTourTravelPlanner: React.FC<
               Plan de Viajes Inteligente
             </CardTitle>
             {canEdit && (
-              <Button onClick={generateIntelligentTravelPlan} disabled={isGenerating}>
-                {isGenerating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Generando...
-                  </>
-                ) : (
-                  "Regenerar Plan"
-                )}
-              </Button>
+              <SubmitButton onClick={generateIntelligentTravelPlan} loading={isGenerating} loadingText="Generando...">
+                Regenerar Plan
+              </SubmitButton>
             )}
           </div>
         </CardHeader>
@@ -571,19 +565,10 @@ export const EnhancedTourTravelPlanner: React.FC<
 
       {canEdit && travelPlan.length > 0 && (
         <div className="flex justify-end gap-2">
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Guardar Plan de Viajes
-              </>
-            )}
-          </Button>
+          <SubmitButton onClick={handleSave} loading={isSaving} loadingText="Guardando...">
+            <Save className="h-4 w-4 mr-2" />
+            Guardar Plan de Viajes
+          </SubmitButton>
         </div>
       )}
 
