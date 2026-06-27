@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest"
 
 const SRC_DIR = join(process.cwd(), "src")
 
-const RADIX_TOASTER_IMPORT = /from\s+['"]@\/components\/ui\/toaster['"]/
+const RADIX_TOASTER_IMPORT = /(from\s+['"]@\/components\/ui\/toaster['"]|import\s*\(\s*['"]@\/components\/ui\/toaster['"]\s*\))/
 
 function collectSourceFiles(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir)) {
