@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FolderPlus, Loader2, RefreshCw, ChevronDown, ChevronUp } from "lucide-react";
@@ -212,25 +213,22 @@ export const BulkTourFolderActions = ({
                 )}
               </Button>
 
-              <Button
+              <SubmitButton
                 onClick={handleCreateBulkRootFolders}
-                disabled={isCreating || isVerifying}
+                loading={isCreating}
+                disabled={isVerifying}
                 className="flex-1 touch-manipulation"
-              >
-                {isCreating ? (
+                loadingText={
                   <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     <span className="hidden sm:inline">Creating Root Folders...</span>
                     <span className="sm:hidden">Creating...</span>
                   </>
-                ) : (
-                  <>
-                    <FolderPlus className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Create Root Folders</span>
-                    <span className="sm:hidden">Create</span>
-                  </>
-                )}
-              </Button>
+                }
+              >
+                <FolderPlus className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">Create Root Folders</span>
+                <span className="sm:hidden">Create</span>
+              </SubmitButton>
             </div>
           </div>
         </CardContent>

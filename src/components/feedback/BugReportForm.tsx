@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Bug, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import {
   Form,
   FormControl,
@@ -306,19 +307,10 @@ export function BugReportForm() {
             )}
           />
 
-          <Button type="submit" disabled={isSubmitting} className="w-full">
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enviando...
-              </>
-            ) : (
-              <>
-                <Bug className="mr-2 h-4 w-4" />
-                Enviar informe de error
-              </>
-            )}
-          </Button>
+          <SubmitButton type="submit" loading={isSubmitting} loadingText="Enviando..." className="w-full">
+            <Bug className="mr-2 h-4 w-4" />
+            Enviar informe de error
+          </SubmitButton>
         </form>
       </Form>
 

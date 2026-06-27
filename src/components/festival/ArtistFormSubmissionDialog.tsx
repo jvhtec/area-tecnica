@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { Download, Loader2 } from "lucide-react";
+import { Loading } from "@/components/ui/loading";
 import { useEffect, useState } from "react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Button } from "@/components/ui/button";
@@ -148,9 +149,7 @@ export const ArtistFormSubmissionDialog = ({
         </DialogHeader>
 
         {isLoading ? (
-          <div className="flex items-center justify-center p-4">
-            <Loader2 className="h-6 w-6 animate-spin" />
-          </div>
+          <Loading hideLabel size="md" className="p-4" />
         ) : !submission ? (
           <div className="text-center p-4 text-muted-foreground">
             No se encontró envío para este artista.

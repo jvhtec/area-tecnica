@@ -8,6 +8,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Loading } from '@/components/ui/loading';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
@@ -106,10 +107,7 @@ export const PendingTasksModal: React.FC<PendingTasksModalProps> = ({
 
         <div className="mt-2 overflow-y-auto">
           {isLoading && (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <span className="ml-2 text-sm text-muted-foreground">Cargando tareas pendientes...</span>
-            </div>
+            <Loading label="Cargando tareas pendientes…" size="lg" className="py-8" />
           )}
 
           {error && (

@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { Loading } from "@/components/ui/loading";
 import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import { ConsoleSetupSection } from "../form/sections/ConsoleSetupSection";
 import { WirelessSetupSection } from "../form/sections/WirelessSetupSection";
@@ -544,9 +545,7 @@ export const MobileArtistConfigEditor = ({
   const renderSection = () => {
     if (isLoading) {
       return (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-        </div>
+        <Loading hideLabel size="md" className="py-12" />
       );
     }
 

@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Lightbulb, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SubmitButton } from "@/components/ui/submit-button";
 import {
   Form,
   FormControl,
@@ -169,19 +170,10 @@ export function FeatureRequestForm() {
             )}
           />
 
-          <Button type="submit" disabled={isSubmitting} className="w-full">
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enviando...
-              </>
-            ) : (
-              <>
-                <Lightbulb className="mr-2 h-4 w-4" />
-                Enviar solicitud de función
-              </>
-            )}
-          </Button>
+          <SubmitButton type="submit" loading={isSubmitting} loadingText="Enviando..." className="w-full">
+            <Lightbulb className="mr-2 h-4 w-4" />
+            Enviar solicitud de función
+          </SubmitButton>
         </form>
       </Form>
 
