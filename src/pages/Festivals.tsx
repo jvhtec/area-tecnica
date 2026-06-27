@@ -5,6 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { JobCard } from "@/components/jobs/JobCard";
 import { Separator } from "@/components/ui/separator";
 import { Tent, Printer, Loader2, RefreshCw, AlertTriangle, Eye, EyeOff } from "lucide-react";
+import { Loading } from "@/components/ui/loading";
 import { ensureRealtimeConnection } from "@/lib/supabase";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { Button } from "@/components/ui/button";
@@ -260,8 +261,7 @@ const Festivals = () => {
           
           {isLoading ? (
             <div className="flex flex-col justify-center items-center h-40">
-              <Loader2 className="h-8 w-8 animate-spin mb-2 text-primary" />
-              <p className="text-muted-foreground">Cargando festivales...</p>
+              <Loading label="Cargando festivales…" size="lg" />
               {connectionStatus !== 'connected' && (
                 <p className="text-amber-500 mt-2">Estableciendo conexión...</p>
               )}

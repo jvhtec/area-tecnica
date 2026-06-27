@@ -8,6 +8,7 @@ import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { getDashboardPath } from "@/utils/roleBasedRouting";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Mail, Loader2 } from "lucide-react";
+import { Loading } from "@/components/ui/loading";
 import { Button } from "@/components/ui/button";
 import { isJobOnDate } from "@/utils/timezoneUtils";
 import { useToast } from "@/hooks/use-toast";
@@ -62,9 +63,7 @@ const Dashboard = () => {
   const { userRole, user, isLoading: authLoading } = useOptimizedAuth();
   const userId = user?.id ?? "";
   const lazyFallback = (
-    <div className="flex items-center justify-center py-6">
-      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-    </div>
+    <Loading hideLabel size="sm" className="py-6" />
   );
 
   // Early security check: Only allow dashboard-capable roles

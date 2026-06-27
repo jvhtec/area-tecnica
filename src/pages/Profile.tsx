@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getDepartmentLabel } from "@/types/department";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, Save, UserCircle, AlertTriangle, Calendar as CalendarIcon, CalendarCheck, RefreshCcw, Shield, ExternalLink, Trophy } from "lucide-react";
+import { Loading } from "@/components/ui/loading";
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "@/lib/api-config";
 import { FolderStructureEditor, type FolderStructure } from "@/components/profile/FolderStructureEditor";
 import { ProfilePictureUpload } from "@/components/profile/ProfilePictureUpload";
@@ -249,9 +250,7 @@ export const Profile = () => {
 
   if (!profile) {
     return (
-      <div className="flex items-center justify-center min-h-[200px]">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <Loading hideLabel size="lg" className="min-h-[200px]" />
     );
   }
 

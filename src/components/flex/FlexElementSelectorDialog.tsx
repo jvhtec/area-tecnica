@@ -18,6 +18,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Loader2, FolderTree, FileText } from "lucide-react";
+import { Loading } from "@/components/ui/loading";
 import { cn } from "@/lib/utils";
 import {
   getElementTree,
@@ -177,12 +178,7 @@ export const FlexElementSelectorDialog: React.FC<
         <div className="flex flex-col gap-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="flex flex-col items-center gap-2">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Loading element tree...
-                </p>
-              </div>
+              <Loading label="Loading element tree…" size="lg" />
             </div>
           ) : isError ? (
             <div className="flex flex-col items-center justify-center py-12 gap-4">
