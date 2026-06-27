@@ -228,7 +228,8 @@ export const AssignJobDialog = ({
 
   React.useEffect(() => {
     if (existingAssignment?.single_day && existingAssignment?.assignment_date) {
-      try { setSingleDate(new Date(`${existingAssignment.assignment_date}T00:00:00`)); } catch { /* keep default on unparseable date */ }
+      // keep default on unparseable assignment date
+      try { setSingleDate(new Date(`${existingAssignment.assignment_date}T00:00:00`)); } catch { }
     }
   }, [existingAssignment?.single_day, existingAssignment?.assignment_date]);
 
