@@ -39,10 +39,6 @@ const GlobalCreateJobDialogLazy = lazy(() =>
   })),
 );
 
-const AppToaster = lazy(() =>
-  import("@/components/ui/toaster").then((module) => ({ default: module.Toaster })),
-);
-
 const AppSonnerToaster = lazy(() =>
   import("@/components/ui/sonner").then((module) => ({ default: module.Toaster })),
 );
@@ -105,8 +101,9 @@ export function RouteAwareGlobalOverlays() {
   return (
     <Suspense fallback={null}>
       {canMountNonCritical && isPrivateRoute && <GlobalCreateJobDialogLazy />}
-      {canMountNonCritical && <AppToaster />}
-      {canMountNonCritical && isPrivateRoute && <AppSonnerToaster position="top-right" />}
+      {/* Single toast renderer (Sonner), mounted on all routes so public
+          pages (auth, artist form) also surface toasts. */}
+      {canMountNonCritical && <AppSonnerToaster position="top-right" />}
     </Suspense>
   );
 }
