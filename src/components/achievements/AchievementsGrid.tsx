@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { Loader2, Trophy } from 'lucide-react';
+import { Loading } from '@/components/ui/loading';
 import { useAchievements } from '@/hooks/useAchievements';
 import { AchievementCard } from './AchievementCard';
 import { AchievementsFilters } from './AchievementsFilters';
@@ -41,9 +42,7 @@ export function AchievementsGrid({ targetUserId }: AchievementsGridProps) {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <Loading hideLabel size="lg" className="py-12" />
     );
   }
 

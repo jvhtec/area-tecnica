@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import { Loader2, NotebookPen, Save } from "lucide-react";
+import { Loading } from "@/components/ui/loading";
 
 import {
   Dialog,
@@ -105,9 +106,7 @@ export const ProjectNotesDialog = ({
         >
           <div className="p-5">
             {notesQuery.isLoading ? (
-              <div className="flex min-h-[45vh] items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
+              <Loading hideLabel size="md" className="min-h-[45vh]" />
             ) : notesQuery.isError ? (
               <div className="rounded-md border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
                 No se pudieron cargar las notas.

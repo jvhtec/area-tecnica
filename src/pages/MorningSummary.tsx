@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { Loader2, Calendar, ArrowLeft, Users, Briefcase, Home, Plane, Heart, Sun } from 'lucide-react';
+import { Loading } from '@/components/ui/loading';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -220,9 +221,7 @@ export default function MorningSummary() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <Loading hideLabel size="lg" className="min-h-[400px]" />
       </div>
     );
   }
