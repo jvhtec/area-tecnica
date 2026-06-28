@@ -1,7 +1,5 @@
 
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { createQueryKey } from "@/lib/optimized-react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,9 +18,7 @@ import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { sendTimesheetReminder } from "@/lib/timesheet-reminder-email";
-import { dataLayerClient } from "@/services/dataLayerClient";
 import { formatCurrency } from "@/lib/utils";
-import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,10 +33,11 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ExpenseList, ExpenseSummaryCard } from "@/components/expenses";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
-import { isAdminRole, isManagementRole, isTechnicianRole } from "@/utils/permissions";
+import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
 
 import { TimesheetEditForm } from "./TimesheetEditForm";
 import { TimesheetRejectDialog } from "./TimesheetRejectDialog";
+import { useJobClosureLock } from "@/hooks/useJobClosureLock";
 import { calculateHours } from "./utils";
 import { isPrepDayBreakdown, isPrepDayTimesheet, prepDayHourlyRate } from "@/utils/timesheetPrepDays";
 
@@ -70,37 +67,7 @@ export const TimesheetView = ({
   // Expense state and queries - must be before any early returns
   const { data: expenses = [] } = useJobExpenses(jobId);
 
-  const { data: jobMeta, isError: jobMetaError } = useQuery({
-    queryKey: createQueryKey.jobs.meta(jobId),
-    enabled: !!jobId,
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('jobs')
-        .select('id, end_time, timezone')
-        .eq('id', jobId)
-        .maybeSingle();
-      if (error) throw error;
-      return data as { id: string; end_time: string | null; timezone: string | null } | null;
-    },
-    staleTime: 60_000,
-  });
-
-  const isAdmin = isAdminRole(userRole);
-
-  // On error, allow actions (fail-open) rather than permanently locking users out.
-  // When jobMeta is undefined (loading), default to locked=true to prevent
-  // actions until we know the actual closure status.
-  // When jobMeta is null (not found), allow actions (job doesn't exist or has no end_time).
-  const isPastClosureWindow = (() => {
-    if (jobMetaError) return false; // fail-open on error
-    if (jobMeta === undefined) return true; // treat as locked while loading
-    if (!jobMeta) return false; // job not found, allow actions
-    return isJobPastClosureWindow(jobMeta.end_time, jobMeta.timezone ?? 'Europe/Madrid');
-  })();
-
-  // Admins can approve/edit timesheets even after the 7-day closure window.
-  const isClosureLocked = isPastClosureWindow && !isAdmin;
-  // Surface when an admin is bypassing the closed window so the action is visible.
-  const isAdminOverridingClosure = isPastClosureWindow && isAdmin && jobMeta !== undefined;
+  const { isClosureLocked, isAdminOverridingClosure } = useJobClosureLock(jobId, userRole);
 
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);

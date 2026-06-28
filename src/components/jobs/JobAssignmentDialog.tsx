@@ -1,4 +1,3 @@
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,11 +31,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle } from "lucide-react";
 import { Job } from "@/types/job";
 import { User } from "@/types/user";
 import { useEffect, useState, useMemo } from "react";
-import { Loader2, RefreshCw, ExternalLink, CalendarIcon } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw, ExternalLink, CalendarIcon } from "lucide-react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
@@ -51,7 +49,7 @@ import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 import { isDepartmentManagementRole, isManagementRole } from '@/utils/permissions';
-
+import { useDirectJobAssignments } from '@/hooks/useDirectJobAssignments';
 
 import { queryKeys } from "@/lib/react-query";
 const MADRID_TIME_ZONE = 'Europe/Madrid';
@@ -79,14 +77,6 @@ type JobDateTypeRow = {
 type JobWithDateTypes = Job & {
   job_date_types?: JobDateTypeRow[];
 };
-
-interface Assignment {
-  technician_id: string;
-  sound_role: string;
-  lights_role: string;
-}
-
-// Role options from centralized registry (codes with labels)
 
 // Helper function to sync timesheet categories when assignment roles change
 const syncTimesheetCategories = async (jobId: string, technicianId: string) => {
@@ -185,36 +175,8 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   // Get current user's department or use the passed department
   const currentDepartment = department || user?.department || "sound";
 
-  // Existing assignments are sourced directly from job_assignments rather than
-  // the timesheet-derived realtime hook. Tour-date jobs only have schedule-only
-  // timesheets, which that hook filters out, leaving this dialog empty even
-  // though job_assignments rows exist. Reading job_assignments directly fixes
-  // role editing on tour dates (and keeps standard jobs working).
-  const { data: currentAssignments = [], refetch: refetchCurrentAssignments } = useQuery({
-    queryKey: queryKeys.scope('job-assignments-direct', jobId),
-    enabled: isOpen && !!jobId,
-    queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('job_assignments')
-        .select(`
-          technician_id,
-          sound_role,
-          lights_role,
-          video_role,
-          single_day,
-          assignment_date,
-          profiles (
-            first_name,
-            last_name,
-            email,
-            department
-          )
-        `)
-        .eq('job_id', jobId);
-      if (error) throw error;
-      return (data || []) as any[];
-    },
-    staleTime: 30_000,
-  });
+  const { data: currentAssignments = [], refetch: refetchCurrentAssignments } =
+    useDirectJobAssignments(jobId, isOpen);
 
   // Filter assignments to only show those for the current department
   const departmentAssignments = useMemo(() => {
@@ -435,7 +397,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   };
 
   const handleSaveAssignments = async () => {
-    const assignmentsToProcess: Assignment[] = [];
+    const assignmentsToProcess: Array<{ technician_id: string; sound_role: string; lights_role: string }> = [];
 
     // Process current assignments for Flex integration
     assignments.forEach((assignment) => {

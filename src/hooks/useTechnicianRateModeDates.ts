@@ -117,6 +117,12 @@ export function useSetTechnicianDateRateMode() {
   return useMutation({
     mutationFn: async ({ jobId, technicianId, date, mode, fixedAmountEur }: SetTechnicianDateRateModeParams) => {
       let createdTimesheet = false;
+      const normalizedFixedAmount =
+        mode === 'fixed' && fixedAmountEur != null ? Math.round(Number(fixedAmountEur) * 100) / 100 : null;
+
+      if (mode === 'fixed' && (normalizedFixedAmount == null || !Number.isFinite(normalizedFixedAmount) || normalizedFixedAmount < 0)) {
+        throw new Error('A non-negative fixed amount is required');
+      }
 
       if (mode === 'inherit') {
         const { error } = await supabase
@@ -135,7 +141,7 @@ export function useSetTechnicianDateRateMode() {
           rate_mode: mode,
           // Maintain the legacy boolean so any unmigrated reader still works.
           use_rehearsal_rate: mode === 'rehearsal',
-          fixed_amount_eur: mode === 'fixed' ? (fixedAmountEur ?? 0) : null,
+          fixed_amount_eur: normalizedFixedAmount,
         };
 
         const { error } = await supabase

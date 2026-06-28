@@ -591,17 +591,22 @@ function RateModeDateRow({
   const [fixedInput, setFixedInput] = React.useState<string>(
     fixedAmount != null ? String(fixedAmount) : '',
   );
+  const [isPendingFixedMode, setIsPendingFixedMode] = React.useState(false);
 
   // Keep the local input in sync when the persisted value changes elsewhere.
   React.useEffect(() => {
     setFixedInput(fixedAmount != null ? String(fixedAmount) : '');
-  }, [fixedAmount]);
+    setIsPendingFixedMode(false);
+  }, [fixedAmount, selectedMode]);
 
   const commitFixedAmount = React.useCallback(() => {
     if (!setTechnicianRateModeMutation) return;
-    const parsed = Number.parseFloat(fixedInput.replace(',', '.'));
-    const nextAmount = Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
-    if ((fixedAmount ?? 0) === nextAmount) return;
+    const normalized = fixedInput.trim().replace(',', '.');
+    const parsed = Number.parseFloat(normalized);
+    if (!Number.isFinite(parsed) || parsed < 0) return;
+    const nextAmount = Math.round(parsed * 100) / 100;
+    if (selectedMode === 'fixed' && !isPendingFixedMode && (fixedAmount ?? 0) === nextAmount) return;
+    setIsPendingFixedMode(false);
     setTechnicianRateModeMutation.mutate({
       jobId,
       technicianId: techId,
@@ -609,7 +614,9 @@ function RateModeDateRow({
       mode: 'fixed',
       fixedAmountEur: nextAmount,
     });
-  }, [setTechnicianRateModeMutation, fixedInput, fixedAmount, jobId, techId, dateStr]);
+  }, [setTechnicianRateModeMutation, fixedInput, fixedAmount, selectedMode, isPendingFixedMode, jobId, techId, dateStr]);
+
+  const visibleMode = isPendingFixedMode ? 'fixed' : selectedMode;
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border/60 px-3 py-2">
@@ -620,18 +627,22 @@ function RateModeDateRow({
         </div>
 
         <Select
-          value={selectedMode}
+          value={visibleMode}
           onValueChange={(nextMode) => {
             const mode = nextMode as TechnicianDateRateMode;
-            if (mode === selectedMode) return;
+            if (mode === selectedMode && !isPendingFixedMode) return;
             if (!setTechnicianRateModeMutation) return;
+            if (mode === 'fixed' && fixedAmount == null) {
+              setIsPendingFixedMode(true);
+              return;
+            }
+            setIsPendingFixedMode(false);
             setTechnicianRateModeMutation.mutate({
               jobId,
               technicianId: techId,
               date: dateStr,
               mode,
-              // Seed a fixed amount so the row never violates the NOT NULL check.
-              fixedAmountEur: mode === 'fixed' ? (fixedAmount ?? 0) : undefined,
+              fixedAmountEur: mode === 'fixed' ? fixedAmount : undefined,
             });
           }}
           disabled={disabled}
@@ -655,7 +666,7 @@ function RateModeDateRow({
         </Select>
       </div>
 
-      {selectedMode === 'fixed' && (
+      {visibleMode === 'fixed' && (
         <div className="flex items-center justify-end gap-2">
           <span className="text-xs text-muted-foreground">Importe fijo (€):</span>
           <Input

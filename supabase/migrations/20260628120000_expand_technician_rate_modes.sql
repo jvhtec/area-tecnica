@@ -49,7 +49,7 @@ BEGIN
   ) THEN
     ALTER TABLE public.job_technician_rate_mode_dates
       ADD CONSTRAINT job_technician_rate_mode_dates_fixed_amount_check
-      CHECK (rate_mode <> 'fixed' OR fixed_amount_eur IS NOT NULL);
+      CHECK (rate_mode <> 'fixed' OR (fixed_amount_eur IS NOT NULL AND fixed_amount_eur >= 0));
   END IF;
 END
 $$;
@@ -1171,6 +1171,15 @@ BEGIN
     IF standard_days = 0 THEN
       display_category := 'rehearsal';
     END IF;
+  END IF;
+
+  IF standard_days = 0 AND rehearsal_days = 0 THEN
+    display_category := CASE
+      WHEN hourly_days > 0 AND fixed_days > 0 THEN 'mixed'
+      WHEN hourly_days > 0 THEN 'hourly'
+      WHEN fixed_days > 0 THEN 'fixed'
+      ELSE display_category
+    END;
   END IF;
 
   total_base := ROUND(standard_total + rehearsal_total + hourly_total + fixed_total, 2);

@@ -143,8 +143,8 @@ export const TourAssignmentDialog = ({
     }
   });
 
-  // Update role mutation — relies on tour_assignment_update_trigger to propagate
-  // the new role to every job in the tour (job_assignments).
+  // Update role mutation: tour_assignment_update_trigger propagates the new
+  // role only to today-or-future tour jobs.
   const updateRoleMutation = useMutation({
     mutationFn: async ({ assignmentId, role }: { assignmentId: string; role: string }) => {
       const { error } = await dataLayerClient.from('tour_assignments')
@@ -154,7 +154,7 @@ export const TourAssignmentDialog = ({
       if (error) throw error;
     },
     onSuccess: () => {
-      toast.success('Role updated successfully - automatically applied to all tour jobs');
+      toast.success('Role updated successfully - automatically applied to future tour jobs');
       refetch();
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-details') });
