@@ -152,10 +152,11 @@ export const calculateEquipmentNeeds = (
   Object.entries(stageRequirements).forEach(([stageNum, requirements]) => {
     const stage = parseInt(stageNum);
     const stageSetup = stageSetups[stage];
-    // Stage 1 always resolves from the global festival setup (consistent with
-    // compareArtistRequirements); other stages use their stage-specific setup.
-    const availableGear: AvailableGear = stage === 1 && globalSetup
-      ? mapGlobalSetupToAvailableGear(globalSetup)
+    // Stage 1 is the inherited single/global setup: it always resolves from the
+    // global festival setup (or empty if absent) and never reads a stage-specific
+    // row. Other stages use their stage-specific setup, empty if none.
+    const availableGear: AvailableGear = stage === 1
+      ? (globalSetup ? mapGlobalSetupToAvailableGear(globalSetup) : EMPTY_AVAILABLE_GEAR)
       : stageSetup
         ? mapStageSetupToAvailableGear(stageSetup)
         : EMPTY_AVAILABLE_GEAR;
@@ -165,7 +166,7 @@ export const calculateEquipmentNeeds = (
       const available = availableGear.foh_consoles.find(c => c.model.toLowerCase() === model.toLowerCase())?.quantity || 0;
       const shortage = Math.max(0, required - available);
       if (shortage > 0) {
-        const existing = needs.consoles.foh.find(c => c.model === model);
+        const existing = needs.consoles.foh.find(c => c.model.toLowerCase() === model.toLowerCase());
         if (existing) {
           existing.additionalQuantity += shortage;
           if (!existing.requiredBy.includes(`Stage ${stage}`)) {
@@ -186,7 +187,7 @@ export const calculateEquipmentNeeds = (
       const available = availableGear.mon_consoles.find(c => c.model.toLowerCase() === model.toLowerCase())?.quantity || 0;
       const shortage = Math.max(0, required - available);
       if (shortage > 0) {
-        const existing = needs.consoles.monitor.find(c => c.model === model);
+        const existing = needs.consoles.monitor.find(c => c.model.toLowerCase() === model.toLowerCase());
         if (existing) {
           existing.additionalQuantity += shortage;
           if (!existing.requiredBy.includes(`Stage ${stage}`)) {
@@ -213,7 +214,7 @@ export const calculateEquipmentNeeds = (
       const shortageBP = Math.max(0, required.bp - availableBP);
       
       if (shortageChannels > 0 || shortageHH > 0 || shortageBP > 0) {
-        const existing = needs.wireless.find(w => w.model === model);
+        const existing = needs.wireless.find(w => w.model.toLowerCase() === model.toLowerCase());
         if (existing) {
           existing.additionalChannels += shortageChannels;
           existing.additionalHH += shortageHH;
@@ -242,7 +243,7 @@ export const calculateEquipmentNeeds = (
       const shortageBP = Math.max(0, required.bp - availableBP);
       
       if (shortageChannels > 0 || shortageBP > 0) {
-        const existing = needs.iem.find(i => i.model === model);
+        const existing = needs.iem.find(i => i.model.toLowerCase() === model.toLowerCase());
         if (existing) {
           existing.additionalChannels += shortageChannels;
           existing.additionalBP += shortageBP;
@@ -265,7 +266,7 @@ export const calculateEquipmentNeeds = (
       const available = availableGear.wired_mics.find(m => m.model.toLowerCase() === model.toLowerCase())?.quantity || 0;
       const shortage = Math.max(0, required - available);
       if (shortage > 0) {
-        const existing = needs.microphones.find(m => m.model === model);
+        const existing = needs.microphones.find(m => m.model.toLowerCase() === model.toLowerCase());
         if (existing) {
           existing.additionalQuantity += shortage;
           if (!existing.requiredBy.includes(`Stage ${stage}`)) {

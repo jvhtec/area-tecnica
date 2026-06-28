@@ -134,6 +134,16 @@ describe("compareArtistRequirements", () => {
     expect(result.mismatches.filter((m) => m.type === "console" && m.severity === "error")).toHaveLength(0);
   });
 
+  it("does not fall back to a stage-specific setup for stage 1 when the global setup is missing", () => {
+    const artist = makeArtist({ stage: 1, foh_console: "SD7", foh_console_provided_by: "festival" });
+    const stageSetup = makeStageSetup({ stage_number: 1, foh_consoles: [{ model: "SD7", quantity: 1 }] });
+    // With no global setup, stage 1 resolves to an empty inventory (it never
+    // reads a stage row), so SD7 is treated as unavailable.
+    const result = compareArtistRequirements(artist, null, stageSetup);
+
+    expect(result.mismatches.some((m) => m.type === "console" && m.severity === "error")).toBe(true);
+  });
+
   it("matches console models case-insensitively", () => {
     const artist = makeArtist({ foh_console: "sd7", foh_console_provided_by: "festival" });
     const result = compareArtistRequirements(artist, globalSetupWith([{ model: "SD7", quantity: 1 }]), null);

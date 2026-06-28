@@ -10,10 +10,11 @@ export const compareArtistRequirements = (
 ): ArtistGearComparison => {
   const mismatches: GearMismatch[] = [];
 
-  // Stage 1 always resolves from the global festival setup. Other stages use
-  // their stage-specific setup; missing setup means empty inventory.
-  const availableGear: AvailableGear = artist.stage === 1 && globalSetup
-    ? mapGlobalSetupToAvailableGear(globalSetup)
+  // Stage 1 is the inherited single/global setup: it always resolves from the
+  // global festival setup (or empty if absent) and never reads a stage-specific
+  // row. Other stages use their stage-specific setup; missing setup means empty.
+  const availableGear: AvailableGear = artist.stage === 1
+    ? (globalSetup ? mapGlobalSetupToAvailableGear(globalSetup) : EMPTY_AVAILABLE_GEAR)
     : stageSetup
       ? mapStageSetupToAvailableGear(stageSetup)
       : EMPTY_AVAILABLE_GEAR;

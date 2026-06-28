@@ -145,7 +145,17 @@ const renderWithDetails = (isMobile: boolean, trigger: ReactNode, content: React
 
   return (
     <Tooltip>
-      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipTrigger asChild>
+        {/* A button (not a bare div) so keyboard users can Tab to it and the
+            tooltip opens on focus as well as hover. */}
+        <button
+          type="button"
+          aria-label="Ver detalles del estado del equipo"
+          className="appearance-none border-0 bg-transparent p-0 cursor-default"
+        >
+          {trigger}
+        </button>
+      </TooltipTrigger>
       <TooltipContent>{content}</TooltipContent>
     </Tooltip>
   );
