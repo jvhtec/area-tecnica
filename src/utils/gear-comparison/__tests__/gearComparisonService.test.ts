@@ -4,7 +4,9 @@ import {
   calculateEquipmentNeeds,
   getMismatchSummary,
   type ArtistGearComparison,
+  type ArtistRequirements,
 } from "@/utils/gearComparisonService";
+import type { ConsoleSetup, FestivalGearSetup, StageGearSetup } from "@/types/festival";
 
 // These exercise the public API through the barrel, which also guards the
 // gearComparisonService -> gear-comparison/* module split against regressions.
@@ -12,35 +14,78 @@ import {
 // Minimal artist whose only active requirement is the FOH console; every other
 // section (monitors, wireless, iem, mics, infra, extras) is empty/disabled so
 // the assertions stay focused.
-const makeArtist = (overrides: Record<string, unknown> = {}) =>
-  ({
-    name: "Test Band",
-    stage: 1,
-    foh_console: "",
-    mon_console: "",
-    wireless_systems: [],
-    iem_systems: [],
-    wired_mics: [],
-    monitors_enabled: false,
-    monitors_quantity: 0,
-    extras_sf: false,
-    extras_df: false,
-    extras_djbooth: false,
-    ...overrides,
-  }) as any;
+const makeArtist = (overrides: Partial<ArtistRequirements> = {}): ArtistRequirements => ({
+  name: "Test Band",
+  stage: 1,
+  foh_console: "",
+  mon_console: "",
+  wireless_systems: [],
+  iem_systems: [],
+  wired_mics: [],
+  monitors_enabled: false,
+  monitors_quantity: 0,
+  extras_sf: false,
+  extras_df: false,
+  extras_djbooth: false,
+  ...overrides,
+});
 
-const globalSetupWith = (fohConsoles: Array<{ model: string; quantity: number }>) =>
-  ({
-    foh_consoles: fohConsoles,
-    mon_consoles: [],
-    wireless_systems: [],
-    iem_systems: [],
-    wired_mics: [],
-    available_monitors: 0,
-  }) as any;
+const baseGlobalSetup: FestivalGearSetup = {
+  id: "gear-1",
+  job_id: "job-1",
+  max_stages: 2,
+  foh_consoles: [],
+  mon_consoles: [],
+  wireless_systems: [],
+  iem_systems: [],
+  wired_mics: [],
+  available_monitors: 0,
+  has_side_fills: false,
+  has_drum_fills: false,
+  has_dj_booths: false,
+  available_cat6_runs: 0,
+  available_hma_runs: 0,
+  available_coax_runs: 0,
+  available_analog_runs: 0,
+  available_opticalcon_duo_runs: 0,
+};
+
+const globalSetupWith = (fohConsoles: ConsoleSetup[]): FestivalGearSetup => ({
+  ...baseGlobalSetup,
+  foh_consoles: fohConsoles,
+});
+
+const makeStageSetup = (overrides: Partial<StageGearSetup> = {}): StageGearSetup => ({
+  id: "stage-1",
+  gear_setup_id: "gear-1",
+  stage_number: 1,
+  foh_consoles: [],
+  mon_consoles: [],
+  wireless_systems: [],
+  iem_systems: [],
+  wired_mics: [],
+  monitors_enabled: false,
+  monitors_quantity: 0,
+  extras_sf: false,
+  extras_df: false,
+  extras_djbooth: false,
+  extras_wired: null,
+  infra_cat6: false,
+  infra_cat6_quantity: 0,
+  infra_hma: false,
+  infra_hma_quantity: 0,
+  infra_coax: false,
+  infra_coax_quantity: 0,
+  infra_opticalcon_duo: false,
+  infra_opticalcon_duo_quantity: 0,
+  infra_analog: 0,
+  other_infrastructure: null,
+  notes: null,
+  ...overrides,
+});
 
 describe("compareArtistRequirements", () => {
-  it("reports no mismatches when the requested FOH console is available (stage 1 / global setup)", () => {
+  it("reports no console mismatch when the requested FOH console is available (stage 1 / global setup)", () => {
     const artist = makeArtist({ foh_console: "SD7", foh_console_provided_by: "festival" });
     const result = compareArtistRequirements(artist, globalSetupWith([{ model: "SD7", quantity: 1 }]), null);
 
@@ -78,6 +123,23 @@ describe("compareArtistRequirements", () => {
 
     expect(result.mismatches.some((m) => m.type === "console" && m.severity === "error")).toBe(true);
   });
+
+  it("prefers the global setup over a stage-specific setup for stage 1", () => {
+    const artist = makeArtist({ stage: 1, foh_console: "SD7", foh_console_provided_by: "festival" });
+    // Global has SD7; the stage-1 row only has PM5D. Per the rule, stage 1 must
+    // resolve from the global setup, so SD7 is considered available (no error).
+    const stageSetup = makeStageSetup({ stage_number: 1, foh_consoles: [{ model: "PM5D", quantity: 1 }] });
+    const result = compareArtistRequirements(artist, globalSetupWith([{ model: "SD7", quantity: 1 }]), stageSetup);
+
+    expect(result.mismatches.filter((m) => m.type === "console" && m.severity === "error")).toHaveLength(0);
+  });
+
+  it("matches console models case-insensitively", () => {
+    const artist = makeArtist({ foh_console: "sd7", foh_console_provided_by: "festival" });
+    const result = compareArtistRequirements(artist, globalSetupWith([{ model: "SD7", quantity: 1 }]), null);
+
+    expect(result.mismatches.filter((m) => m.type === "console" && m.severity === "error")).toHaveLength(0);
+  });
 });
 
 describe("calculateEquipmentNeeds", () => {
@@ -102,6 +164,13 @@ describe("calculateEquipmentNeeds", () => {
     expect(pm5d).toBeDefined();
     // needs are attributed by stage label, not artist name.
     expect(pm5d!.requiredBy).toContain("Stage 1");
+  });
+
+  it("does not create a shortage when the available model differs only by case", () => {
+    const artist = makeArtist({ stage: 1, foh_console: "sd7", foh_console_provided_by: "festival" });
+    const needs = calculateEquipmentNeeds([artist], globalSetupWith([{ model: "SD7", quantity: 1 }]), {});
+
+    expect(needs.consoles.foh).toHaveLength(0);
   });
 });
 

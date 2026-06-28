@@ -1,7 +1,7 @@
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { getAvailableWirelessChannels, getRequiredWirelessChannels } from "@/lib/frequencyBands";
-import type { GearMismatch, ArtistGearComparison, ArtistRequirements, AvailableGear } from "./types";
-import { EMPTY_AVAILABLE_GEAR, mapStageSetupToAvailableGear, mapGlobalSetupToAvailableGear } from "./availableGear";
+import type { GearMismatch, ArtistGearComparison, ArtistRequirements, AvailableGear } from "@/utils/gear-comparison/types";
+import { EMPTY_AVAILABLE_GEAR, mapStageSetupToAvailableGear, mapGlobalSetupToAvailableGear } from "@/utils/gear-comparison/availableGear";
 
 export const compareArtistRequirements = (
   artist: ArtistRequirements,
@@ -10,11 +10,12 @@ export const compareArtistRequirements = (
 ): ArtistGearComparison => {
   const mismatches: GearMismatch[] = [];
 
-  // Stage 1 uses global setup. Other stages use only stage-specific setup; missing setup means empty inventory.
-  const availableGear: AvailableGear = stageSetup
-    ? mapStageSetupToAvailableGear(stageSetup)
-    : artist.stage === 1 && globalSetup
-      ? mapGlobalSetupToAvailableGear(globalSetup)
+  // Stage 1 always resolves from the global festival setup. Other stages use
+  // their stage-specific setup; missing setup means empty inventory.
+  const availableGear: AvailableGear = artist.stage === 1 && globalSetup
+    ? mapGlobalSetupToAvailableGear(globalSetup)
+    : stageSetup
+      ? mapStageSetupToAvailableGear(stageSetup)
       : EMPTY_AVAILABLE_GEAR;
 
   // Check FOH Console availability

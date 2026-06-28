@@ -90,7 +90,8 @@ flip global strict flags (CLAUDE.md explicitly warns against this) — tighten f
 
 ### CQ-03 — Medium — Oversized modules (god files)
 
-**49 source files exceed 800 lines** (excluding generated `types.ts`). The extreme tail:
+**46 source files exceed 800 lines** (excluding generated `types.ts` and tests; **45** after
+the `gearComparisonService` split noted in the status update below). The extreme tail:
 
 | Lines | File |
 | --- | --- |

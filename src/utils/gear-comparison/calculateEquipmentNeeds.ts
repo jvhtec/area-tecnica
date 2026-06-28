@@ -1,7 +1,7 @@
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
 import { getAvailableWirelessChannels, getRequiredWirelessChannels } from "@/lib/frequencyBands";
-import type { EquipmentNeeds, ArtistRequirements, AvailableGear } from "./types";
-import { EMPTY_AVAILABLE_GEAR, mapStageSetupToAvailableGear, mapGlobalSetupToAvailableGear } from "./availableGear";
+import type { EquipmentNeeds, ArtistRequirements, AvailableGear } from "@/utils/gear-comparison/types";
+import { EMPTY_AVAILABLE_GEAR, mapStageSetupToAvailableGear, mapGlobalSetupToAvailableGear } from "@/utils/gear-comparison/availableGear";
 
 export const calculateEquipmentNeeds = (
   artists: ArtistRequirements[],
@@ -152,15 +152,17 @@ export const calculateEquipmentNeeds = (
   Object.entries(stageRequirements).forEach(([stageNum, requirements]) => {
     const stage = parseInt(stageNum);
     const stageSetup = stageSetups[stage];
-    const availableGear: AvailableGear = stageSetup
-      ? mapStageSetupToAvailableGear(stageSetup)
-      : stage === 1 && globalSetup
-        ? mapGlobalSetupToAvailableGear(globalSetup)
+    // Stage 1 always resolves from the global festival setup (consistent with
+    // compareArtistRequirements); other stages use their stage-specific setup.
+    const availableGear: AvailableGear = stage === 1 && globalSetup
+      ? mapGlobalSetupToAvailableGear(globalSetup)
+      : stageSetup
+        ? mapStageSetupToAvailableGear(stageSetup)
         : EMPTY_AVAILABLE_GEAR;
 
     // FOH Console shortfalls
     Object.entries(requirements.fohConsoles).forEach(([model, required]) => {
-      const available = availableGear.foh_consoles.find(c => c.model === model)?.quantity || 0;
+      const available = availableGear.foh_consoles.find(c => c.model.toLowerCase() === model.toLowerCase())?.quantity || 0;
       const shortage = Math.max(0, required - available);
       if (shortage > 0) {
         const existing = needs.consoles.foh.find(c => c.model === model);
@@ -181,7 +183,7 @@ export const calculateEquipmentNeeds = (
 
     // Monitor Console shortfalls
     Object.entries(requirements.monConsoles).forEach(([model, required]) => {
-      const available = availableGear.mon_consoles.find(c => c.model === model)?.quantity || 0;
+      const available = availableGear.mon_consoles.find(c => c.model.toLowerCase() === model.toLowerCase())?.quantity || 0;
       const shortage = Math.max(0, required - available);
       if (shortage > 0) {
         const existing = needs.consoles.monitor.find(c => c.model === model);
@@ -202,7 +204,7 @@ export const calculateEquipmentNeeds = (
 
     // Wireless shortfalls
     Object.entries(requirements.wireless).forEach(([model, required]) => {
-      const available = availableGear.wireless_systems.find(w => w.model === model);
+      const available = availableGear.wireless_systems.find(w => w.model.toLowerCase() === model.toLowerCase());
       const availableChannels = available ? getAvailableWirelessChannels(available) : 0;
       const availableHH = available?.quantity_hh || 0;
       const availableBP = available?.quantity_bp || 0;
@@ -233,7 +235,7 @@ export const calculateEquipmentNeeds = (
 
     // IEM shortfalls
     Object.entries(requirements.iem).forEach(([model, required]) => {
-      const available = availableGear.iem_systems.find(i => i.model === model);
+      const available = availableGear.iem_systems.find(i => i.model.toLowerCase() === model.toLowerCase());
       const availableChannels = available?.quantity_hh || available?.quantity || 0;
       const availableBP = available?.quantity_bp || 0;
       const shortageChannels = Math.max(0, required.channels - availableChannels);
@@ -260,7 +262,7 @@ export const calculateEquipmentNeeds = (
 
     // Microphone shortfalls
     Object.entries(requirements.microphones).forEach(([model, required]) => {
-      const available = availableGear.wired_mics.find(m => m.model === model)?.quantity || 0;
+      const available = availableGear.wired_mics.find(m => m.model.toLowerCase() === model.toLowerCase())?.quantity || 0;
       const shortage = Math.max(0, required - available);
       if (shortage > 0) {
         const existing = needs.microphones.find(m => m.model === model);

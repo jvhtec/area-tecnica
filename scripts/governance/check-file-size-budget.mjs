@@ -73,7 +73,8 @@ function collectOversized() {
     .filter((file) => isSourceFile(file.path) && !isTestFile(file.path) && !isExcluded(file.path))
     .map((file) => ({ path: file.path, lines: countLines(file.absolute) }))
     .filter((file) => file.lines > THRESHOLD)
-    .sort((a, b) => b.lines - a.lines);
+    // lines desc, then path asc so equal-sized entries stay stable across runs
+    .sort((a, b) => b.lines - a.lines || a.path.localeCompare(b.path));
 }
 
 function buildBaseline(files) {

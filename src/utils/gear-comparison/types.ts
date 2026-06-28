@@ -67,12 +67,7 @@ export interface ArtistRequirements {
   infra_analog?: number;
   infrastructure_provided_by?: 'festival' | 'band' | 'mixed';
   mic_kit?: 'festival' | 'band' | 'mixed';
-  wired_mics?: Array<{
-    model: string;
-    quantity: number;
-    exclusive_use?: boolean;
-    notes?: string;
-  }>;
+  wired_mics?: WiredMicSetup[];
 }
 
 export interface AvailableGear {

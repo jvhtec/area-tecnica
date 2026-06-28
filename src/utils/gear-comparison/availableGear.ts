@@ -1,5 +1,5 @@
 import { FestivalGearSetup, StageGearSetup } from "@/types/festival";
-import type { AvailableGear } from "./types";
+import type { AvailableGear } from "@/utils/gear-comparison/types";
 
 export const EMPTY_AVAILABLE_GEAR: AvailableGear = {
   foh_consoles: [],

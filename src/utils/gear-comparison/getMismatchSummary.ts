@@ -1,4 +1,4 @@
-import type { ArtistGearComparison } from "./types";
+import type { ArtistGearComparison } from "@/utils/gear-comparison/types";
 
 export const getMismatchSummary = (comparisons: ArtistGearComparison[]) => {
   const totalArtists = comparisons.length;

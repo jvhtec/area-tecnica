@@ -1,4 +1,10 @@
-export type { GearMismatch, ArtistGearComparison, EquipmentNeeds } from "./gear-comparison/types";
-export { compareArtistRequirements } from "./gear-comparison/compareArtistRequirements";
-export { calculateEquipmentNeeds } from "./gear-comparison/calculateEquipmentNeeds";
-export { getMismatchSummary } from "./gear-comparison/getMismatchSummary";
+export type {
+  GearMismatch,
+  ArtistGearComparison,
+  EquipmentNeeds,
+  ArtistRequirements,
+  AvailableGear,
+} from "@/utils/gear-comparison/types";
+export { compareArtistRequirements } from "@/utils/gear-comparison/compareArtistRequirements";
+export { calculateEquipmentNeeds } from "@/utils/gear-comparison/calculateEquipmentNeeds";
+export { getMismatchSummary } from "@/utils/gear-comparison/getMismatchSummary";
