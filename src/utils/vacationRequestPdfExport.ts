@@ -3,36 +3,12 @@ import { VacationRequest } from '@/lib/vacation-requests';
 import { supabase } from '@/integrations/supabase/client';
 import { buildVacationRequestPdfFilename } from '@/utils/pdfFileNames';
 import { loadJsPDF } from '@/utils/pdf/lazyPdf';
+import { loadImageWithTimeout as loadImageSafely } from '@/utils/pdf/shared/pdfExportShared';
 
 interface VacationRequestPDFOptions {
   request: VacationRequest;
   approverName?: string;
 }
-
-// Helper function to load logo image
-const loadImageSafely = (src: string, description: string): Promise<HTMLImageElement | null> => {
-  return new Promise((resolve) => {
-    const img = new Image();
-    const timeout = setTimeout(() => {
-      console.warn(`${description} load timeout`);
-      resolve(null);
-    }, 3000);
-
-    img.onload = () => {
-      clearTimeout(timeout);
-      resolve(img);
-    };
-
-    img.onerror = () => {
-      clearTimeout(timeout);
-      console.warn(`Failed to load ${description}`);
-      resolve(null);
-    };
-
-    img.crossOrigin = 'anonymous';
-    img.src = src;
-  });
-};
 
 // Function to get approver name
 const getApproverName = async (approverId?: string): Promise<string> => {

@@ -260,7 +260,7 @@ export const CreateJobDialog = ({ open, onOpenChange, currentDepartment, initial
         void dataLayerClient.functions.invoke('push', {
           body: { action: 'broadcast', type: 'job.created', job_id: job.id }
         });
-      } catch { }
+      } catch { /* best-effort push notification; ignore delivery failures */ }
 
       // Call onCreated callback if provided (wrapped to prevent propagation of callback errors)
       if (onCreated) {

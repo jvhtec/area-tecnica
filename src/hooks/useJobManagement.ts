@@ -120,7 +120,7 @@ export const useJobManagement = (
         void supabase.functions.invoke('push', {
           body: { action: 'broadcast', type: 'document.deleted', job_id: jobId, file_name: document.file_name }
         });
-      } catch {}
+      } catch { /* best-effort push notification; ignore delivery failures */ }
 
       toast({
         title: "Document deleted",

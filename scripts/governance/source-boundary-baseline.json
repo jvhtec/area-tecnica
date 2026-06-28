@@ -242,7 +242,7 @@
         "src/components/matrix/AssignJobDialog.tsx :: response_time: assignAsConfirmed ? new Date().toISOString() : null,",
         "src/components/matrix/AssignJobDialog.tsx :: return `${format(new Date(start), 'PPP')} – ${format(new Date(end), 'PPP')}`;",
         "src/components/matrix/AssignJobDialog.tsx :: return format(new Date(`${iso}T00:00:00`), 'PPP');",
-        "src/components/matrix/AssignJobDialog.tsx :: try { setSingleDate(new Date(`${existingAssignment.assignment_date}T00:00:00`)); } catch { }",
+        "src/components/matrix/AssignJobDialog.tsx :: const parsedAssignmentDate = new Date(`${existingAssignment.assignment_date}T00:00:00`);",
         "src/components/matrix/AssignJobDialog.tsx :: {format(new Date(job.start_time), 'HH:mm')} - {format(new Date(job.end_time), 'HH:mm')}",
         "src/components/matrix/AssignJobDialog.tsx :: {format(new Date(selectedJob.start_time), 'HH:mm')} - {format(new Date(selectedJob.end_time), 'HH:mm')}",
         "src/components/matrix/AssignmentMatrix.tsx :: const jobEnd = new Date(assignment.jobs.end_time);",

@@ -149,7 +149,7 @@ export const uploadPdfToJob = async (
       void supabase.functions.invoke('push', {
         body: { action: 'broadcast', type: 'document.uploaded', job_id: jobId, file_name: sanitizedFileName }
       });
-    } catch {}
+    } catch { /* best-effort push notification; ignore delivery failures */ }
   } catch (error) {
     console.error("Error uploading PDF:", error);
     throw error;

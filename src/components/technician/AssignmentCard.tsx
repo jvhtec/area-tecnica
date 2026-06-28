@@ -109,7 +109,7 @@ export const AssignmentCard = ({ assignment, techName = '' }: AssignmentCardProp
       eventDate.setDate(festivalStart.getDate() + (parseInt(jobData.day) - 1));
       formattedDate = format(eventDate, "PPP", { locale: es });
     }
-  } catch {}
+  } catch { /* keep default formatted date on parse failure */ }
 
   const isFestivalJob = !!assignment.festival_jobs;
   const location = isFestivalJob

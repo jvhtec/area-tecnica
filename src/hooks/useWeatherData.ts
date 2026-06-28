@@ -39,7 +39,7 @@ export const useWeatherData = ({ venue, eventDates, onWeatherUpdate }: UseWeathe
           return null;
         }
       }
-    } catch {}
+    } catch { /* horizon check is best-effort; ignore parseEventDates errors and continue to fetch */ }
 
     setIsLoading(true);
     setError(null);

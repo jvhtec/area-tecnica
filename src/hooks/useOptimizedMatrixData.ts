@@ -454,9 +454,9 @@ export const useOptimizedMatrixData = ({ technicians, dates, jobs }: OptimizedMa
       })
       .subscribe();
     return () => {
-      try { supabase.removeChannel(ch2); } catch {}
-      try { supabase.removeChannel(ch3); } catch {}
-      try { supabase.removeChannel(ch4); } catch {}
+      try { supabase.removeChannel(ch2); } catch { /* channel may already be removed */ }
+      try { supabase.removeChannel(ch3); } catch { /* channel may already be removed */ }
+      try { supabase.removeChannel(ch4); } catch { /* channel may already be removed */ }
     };
   }, [queryClient, technicianIds.length]);
 

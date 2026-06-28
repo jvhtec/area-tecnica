@@ -390,7 +390,7 @@ export const EditJobDialog = ({ open, onOpenChange, job }: EditJobDialogProps) =
             }
           });
         }
-      } catch { }
+      } catch { /* best-effort push notification; ignore delivery failures */ }
 
       // Sync Flex elements if dates or title changed and job has flex folders
       const datesChanged =

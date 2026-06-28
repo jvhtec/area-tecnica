@@ -228,7 +228,12 @@ export const AssignJobDialog = ({
 
   React.useEffect(() => {
     if (existingAssignment?.single_day && existingAssignment?.assignment_date) {
-      try { setSingleDate(new Date(`${existingAssignment.assignment_date}T00:00:00`)); } catch { }
+      // new Date(...) yields an Invalid Date (it never throws) for a bad string,
+      // so validate the result and keep the default when it isn't a real date.
+      const parsedAssignmentDate = new Date(`${existingAssignment.assignment_date}T00:00:00`);
+      if (!Number.isNaN(parsedAssignmentDate.getTime())) {
+        setSingleDate(parsedAssignmentDate);
+      }
     }
   }, [existingAssignment?.single_day, existingAssignment?.assignment_date]);
 
@@ -698,6 +703,7 @@ export const AssignJobDialog = ({
           }
         });
       } catch (_) {
+        /* best-effort push notification; ignore delivery failures */
       }
 
       window.dispatchEvent(new CustomEvent('assignment-updated', {
