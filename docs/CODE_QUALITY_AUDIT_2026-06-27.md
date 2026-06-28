@@ -106,10 +106,19 @@ These concentrate risk: they are the hardest to test, review, and reason about, 
 correlate with the `any`/hook-warning hotspots above. The largest hooks are also heavy —
 `useOptimizedAuth.tsx` (846), `useGlobalTaskMutations.ts` (843), `useHojaDeRutaPersistence.ts` (777).
 
-**Recommendation:** No big-bang rewrite. Set a soft ceiling (~500 lines for components,
-~400 for hooks) enforced as a **warning** in the governance script, and split the top 5–10
-files opportunistically when they're next touched (extract sub-components, move pure logic
-to colocated `*.service.ts`).
+**Recommendation:** No big-bang rewrite. Freeze the debt, then pay it down opportunistically
+(extract sub-components, move pure logic to colocated modules) when files are next touched.
+
+**Status (update):**
+- A **ratcheting file-size budget** now enforces this: `scripts/governance/check-file-size-budget.mjs`
+  (wired into `npm run governance` as `governance:filesize`) fails CI if any new source file
+  crosses 800 lines or a baselined file grows past its recorded ceiling. Baseline:
+  `scripts/governance/file-size-baseline.json` (regenerate with `npm run governance:filesize -- --write-baseline`).
+- First paydown: `src/utils/gearComparisonService.ts` (1,068 lines, **0 tests**) was split into
+  a focused `src/utils/gear-comparison/` module set (`types`, `availableGear`,
+  `compareArtistRequirements`, `calculateEquipmentNeeds`, `getMismatchSummary`; largest 568 lines)
+  behind a backward-compatible barrel, and given its first characterization tests. God-file count
+  over 800 lines: **46 → 45**.
 
 ### CQ-04 — Medium — Duplicated / forked modules
 

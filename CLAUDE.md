@@ -427,7 +427,7 @@ Defined in `.github/workflows/tests.yml`, triggered on PRs and pushes to `dev`/`
 |-----|---------|-------------|
 | `lint` | 20 min | ESLint on app code |
 | `typecheck` | 20 min | TypeScript no-emit check |
-| `governance` | 20 min | Source-boundary, Edge Function, workflow pinning, migration ordering, and dependency gates |
+| `governance` | 20 min | Source-boundary, file-size budget, Edge Function, workflow pinning, migration ordering, and dependency gates |
 | `test_critical` | 25 min | Critical test files (auth, assignments, timesheets) |
 | `test_run` | 25 min | Full Vitest suite |
 | `build` | 25 min | Vite production build + bundle budget + retained build artifact |
