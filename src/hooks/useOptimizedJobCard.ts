@@ -33,11 +33,66 @@ type JobDocumentRow = {
   [key: string]: unknown;
 };
 
+type JobProfileRef = {
+  first_name?: string | null;
+  nickname?: string | null;
+  last_name?: string | null;
+  department?: string | null;
+  [key: string]: unknown;
+};
+
+type JobAssignmentForCard = {
+  job_id?: string | null;
+  technician_id: string;
+  profiles?: JobProfileRef | JobProfileRef[] | null;
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+  status?: string | null;
+  single_day?: boolean | null;
+  assignment_date?: string | null;
+  assigned_at?: string | null;
+  _timesheet_dates?: string[];
+  _scheduled_work_dates?: string[];
+  [key: string]: unknown;
+};
+
+type TimesheetForCard = {
+  technician_id?: string | null;
+  date?: string | null;
+  profiles?: JobProfileRef | JobProfileRef[] | null;
+};
+
+type JobDateTypeForCard = {
+  date?: string | null;
+  type?: string | null;
+};
+
+type OptimizedJobCardJob = {
+  id: string;
+  color?: string | null;
+  darkColor?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  job_type?: string | null;
+  tour_date?: unknown;
+  job_assignments?: JobAssignmentForCard[] | null;
+  job_documents?: JobDocumentRow[] | null;
+  job_date_types?: JobDateTypeForCard[] | null;
+  [key: string]: unknown;
+};
+
+const normalizeProfile = (profile: JobProfileRef | JobProfileRef[] | null | undefined): JobProfileRef | null =>
+  Array.isArray(profile) ? (profile[0] ?? null) : (profile ?? null);
+
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 export const useOptimizedJobCard = (
-  job: any,
+  job: OptimizedJobCardJob,
   department: string,
   userRole: string | null,
-  onEditClick: (job: any) => void,
+  onEditClick: (job: OptimizedJobCardJob) => void,
   onDeleteClick: (jobId: string) => void,
   onJobClick: (jobId: string) => void,
   options?: UseOptimizedJobCardOptions
@@ -63,7 +118,7 @@ export const useOptimizedJobCard = (
 
   // Local state
   const [collapsed, setCollapsed] = useState(true);
-  const [assignments, setAssignments] = useState(job.job_assignments || []);
+  const [assignments, setAssignments] = useState<JobAssignmentForCard[]>(job.job_assignments || []);
   const [documents, setDocuments] = useState<JobDocumentRow[]>((job.job_documents || []) as JobDocumentRow[]);
   const [soundTaskDialogOpen, setSoundTaskDialogOpen] = useState(false);
   const [lightsTaskDialogOpen, setLightsTaskDialogOpen] = useState(false);
@@ -79,7 +134,6 @@ export const useOptimizedJobCard = (
     setDocuments((job.job_documents || []) as JobDocumentRow[]);
   }, [job.job_documents]);
 
-  const normalizeProfile = (p: any) => Array.isArray(p) ? p[0] : p;
   const jobScheduledWorkDates = useMemo(() => getScheduledWorkDateKeys({
     job_date_types: job?.job_date_types,
     start_time: job?.start_time,
@@ -92,7 +146,7 @@ export const useOptimizedJobCard = (
   const refreshAssignments = useCallback(async () => {
     if (!job?.id) return;
     try {
-      const baseAssignments: any[] = Array.isArray(job?.job_assignments) ? job.job_assignments : [];
+      const baseAssignments: JobAssignmentForCard[] = Array.isArray(job?.job_assignments) ? job.job_assignments : [];
 
       const { data: directTimesheets, error: tsError } = await supabase
         .from('timesheets')
@@ -109,13 +163,13 @@ export const useOptimizedJobCard = (
       }
 
       // Fallback to visibility function to avoid RLS gaps (mirrors JobDetailsDialog)
-      let visibleTimesheets: any[] = [];
+      let visibleTimesheets: TimesheetForCard[] = [];
       try {
         const { data: visible, error: visErr } = await supabase
           .rpc('get_timesheet_amounts_visible')
           .eq('job_id', job.id);
         if (!visErr && Array.isArray(visible)) {
-          visibleTimesheets = visible;
+          visibleTimesheets = visible as TimesheetForCard[];
         }
       } catch (err) {
         console.warn('Error fetching visible timesheets for job card:', err);
@@ -123,8 +177,8 @@ export const useOptimizedJobCard = (
 
       // Merge direct + visible and de-duplicate per technician
       const timesheetsByTech = new Map<string, string[]>();
-      const timesheetProfileByTech = new Map<string, any>();
-      const addTimesheetRow = (t: any) => {
+      const timesheetProfileByTech = new Map<string, JobProfileRef | null>();
+      const addTimesheetRow = (t: TimesheetForCard) => {
         if (!t?.technician_id || !t?.date) return;
         const existing = timesheetsByTech.get(t.technician_id) || [];
         existing.push(t.date);
@@ -134,7 +188,7 @@ export const useOptimizedJobCard = (
         }
       };
 
-      (directTimesheets || []).forEach(addTimesheetRow);
+      ((directTimesheets || []) as TimesheetForCard[]).forEach(addTimesheetRow);
       visibleTimesheets.forEach(addTimesheetRow);
 
       // Deduplicate and sort dates per technician
@@ -163,7 +217,7 @@ export const useOptimizedJobCard = (
         ? computedScheduledWorkDates
         : jobScheduledWorkDates;
 
-      const mergedAssignments: any[] = (baseAssignments || []).map((a: any) => ({
+      const mergedAssignments: JobAssignmentForCard[] = (baseAssignments || []).map((a) => ({
         ...a,
         profiles: normalizeProfile(a.profiles),
         _timesheet_dates: normalizedTimesheetsByTech.get(a.technician_id) || [],
@@ -171,7 +225,7 @@ export const useOptimizedJobCard = (
       }));
 
       // If timesheets exist for technicians not in job_assignments (edge cases), include them so badges still appear
-      const assignmentTechIds = new Set((baseAssignments || []).map((a: any) => a.technician_id));
+      const assignmentTechIds = new Set((baseAssignments || []).map((a) => a.technician_id));
       normalizedTimesheetsByTech.forEach((dates, techId) => {
         if (assignmentTechIds.has(techId)) return;
         mergedAssignments.push({
@@ -199,7 +253,7 @@ export const useOptimizedJobCard = (
   // Keep local state in sync with incoming job prop updates for instant UI
   useEffect(() => {
     const nextAssignments = Array.isArray(job.job_assignments)
-      ? job.job_assignments.map((assignment: any) => ({
+      ? job.job_assignments.map((assignment) => ({
         ...assignment,
         _scheduled_work_dates: jobScheduledWorkDates,
       }))
@@ -300,7 +354,7 @@ export const useOptimizedJobCard = (
       sound: soundSet.size,
       lights: lightsSet.size,
       video: videoSet.size
-    } as any;
+    };
 
     const countsByRole: Record<string, number> = {};
     Object.entries(roleSets).forEach(([role, set]) => countsByRole[role] = set.size);
@@ -312,7 +366,7 @@ export const useOptimizedJobCard = (
   const requiredVsAssigned = useMemo(() => {
     const byDept: Record<string, { required: number; assigned: number; roles: Array<{ role_code: string; required: number; assigned: number }> }> = {};
     for (const dept of ['sound', 'lights', 'video']) {
-      const sum = reqByDept.get?.(dept as any) || (reqSummary.find(r => r.department === dept) ?? null);
+      const sum = reqByDept.get?.(dept) || (reqSummary.find(r => r.department === dept) ?? null);
       const required = sum?.total_required ?? 0;
       const roles = (sum?.roles || []).map((r) => ({
         role_code: r.role_code,
@@ -411,8 +465,8 @@ export const useOptimizedJobCard = (
             body: { action: 'broadcast', type: 'document.uploaded', job_id: job.id, file_name: file.name }
           });
         } catch { /* best-effort push notification; ignore delivery failures */ }
-      } catch (err: any) {
-        failedMessages.push(`${file.name}: ${err?.message || String(err)}`);
+      } catch (err: unknown) {
+        failedMessages.push(`${file.name}: ${getErrorMessage(err)}`);
       }
     }
 
@@ -437,7 +491,7 @@ export const useOptimizedJobCard = (
     });
   }, [job.id, department, queryClient, toast]);
 
-  const handleDeleteDocument = useCallback(async (doc: any) => {
+  const handleDeleteDocument = useCallback(async (doc: JobDocumentRow) => {
     if (doc?.read_only) {
       console.error('Attempted to delete read-only document', doc);
       return;
@@ -474,7 +528,7 @@ export const useOptimizedJobCard = (
           body: { action: 'broadcast', type: 'document.deleted', job_id: job.id, file_name: doc.file_name }
         });
       } catch { /* best-effort push notification; ignore delivery failures */ }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Delete error:', err);
     }
   }, [job.id, confirm]);

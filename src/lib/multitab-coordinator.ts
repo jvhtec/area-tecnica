@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, type QueryKey } from '@tanstack/react-query';
 import {
   UnifiedSubscriptionManager,
   type RealtimeSubscriptionFilter,
@@ -21,8 +21,8 @@ export interface RouteSubscriptionRequest {
 
 interface TabMessage {
   type: 'cache-update' | 'invalidate' | 'leader-election' | 'heartbeat' | 'subscription-request' | 'subscription-release';
-  queryKey?: any;
-  data?: any;
+  queryKey?: QueryKey;
+  data?: unknown;
   tabId?: string;
   timestamp?: number;
   tables?: string[];
@@ -52,7 +52,7 @@ export class MultiTabCoordinator {
   private visibilityUnsubscribe: (() => void) | null = null;
   private queryCacheUnsubscribe: (() => void) | null = null;
   private lastBroadcastedUpdatedAt: Map<string, number> = new Map();
-  private pendingBroadcasts: Map<string, { queryKey: any; data: any; updatedAt: number }> = new Map();
+  private pendingBroadcasts: Map<string, { queryKey: QueryKey; data: unknown; updatedAt: number }> = new Map();
   private broadcastFlushTimeout: number | null = null;
   private lockAcquired: boolean = false;
   private lastLeaderSeen: number = Date.now();
@@ -99,14 +99,15 @@ export class MultiTabCoordinator {
           }
           break;
           
-        case 'invalidate':
+        case 'invalidate': {
           const refetchType = this.isLeader ? 'active' : 'none';
           if (queryKey) {
-            this.queryClient.invalidateQueries({ queryKey, refetchType } as any);
+            this.queryClient.invalidateQueries({ queryKey, refetchType });
           } else {
-            this.queryClient.invalidateQueries({ refetchType } as any);
+            this.queryClient.invalidateQueries({ refetchType });
           }
           break;
+        }
           
         case 'leader-election':
           if (timestamp && timestamp > this.lastLeaderSeen) {
@@ -336,9 +337,9 @@ export class MultiTabCoordinator {
       const query = event.query;
       if (query.state.status !== 'success') return;
 
-      const queryKey = query.queryKey as any;
+      const queryKey = query.queryKey;
       const serializedKey = JSON.stringify(queryKey);
-      const updatedAt = (query.state as any).dataUpdatedAt ?? 0;
+      const updatedAt = query.state.dataUpdatedAt ?? 0;
       const last = this.lastBroadcastedUpdatedAt.get(serializedKey) ?? 0;
       if (updatedAt <= last) return;
 
@@ -454,13 +455,13 @@ export class MultiTabCoordinator {
     }
   }
 
-  public invalidateQueries(queryKey?: any) {
+  public invalidateQueries(queryKey?: QueryKey) {
     // Always invalidate locally first
     const refetchType = this.isLeader ? 'active' : 'none';
     if (queryKey) {
-      this.queryClient.invalidateQueries({ queryKey, refetchType } as any);
+      this.queryClient.invalidateQueries({ queryKey, refetchType });
     } else {
-      this.queryClient.invalidateQueries({ refetchType } as any);
+      this.queryClient.invalidateQueries({ refetchType });
     }
     
     // If we're the leader, broadcast to other tabs

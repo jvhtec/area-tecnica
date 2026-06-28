@@ -35,6 +35,41 @@ interface AvailabilityResponse {
   responded_at?: string | null
 }
 
+type StaffingRequestRow = {
+  id: string
+  profile_id: string | null
+  status: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+type StaffingEventMeta = {
+  phase?: string
+  role?: string
+}
+
+type StaffingEventRow = {
+  staffing_request_id: string | null
+  event: string | null
+  meta: StaffingEventMeta | null
+  created_at: string | null
+}
+
+type StaffingProfileRow = {
+  id: string
+  first_name: string | null
+  last_name: string | null
+  nickname: string | null
+  email: string | null
+}
+
+type SendOffersResult = { sent: number }
+
+const toAvailabilityStatus = (status: string | null): AvailabilityResponse['status'] => {
+  if (status === 'confirmed' || status === 'declined') return status
+  return 'pending'
+}
+
 export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
   campaignId,
   roleCode,
@@ -55,7 +90,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
 
   // Availability responses are job-scoped, but the original send event carries
   // manager intent for which role card should display the response.
-  const { data: responses, isLoading } = useQuery({
+  const { data: responses, isLoading } = useQuery<AvailabilityResponse[]>({
     queryKey: queryKeys.scope('staffing_availability_responses', jobId, roleCode),
     queryFn: async () => {
       const { data: directRequests, error: directError } = await dataLayerClient.from('staffing_requests')
@@ -66,8 +101,8 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
 
       if (directError) throw directError
 
-      const requestRows = directRequests || []
-      const requestIds = requestRows.map((item: any) => item.id).filter(Boolean)
+      const requestRows = (directRequests || []) as StaffingRequestRow[]
+      const requestIds = requestRows.map((item) => item.id).filter(Boolean)
       if (requestIds.length === 0) return []
 
       const { data: sentEvents, error: sentEventsError } = await dataLayerClient.from('staffing_events')
@@ -79,20 +114,20 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
       if (sentEventsError) throw sentEventsError
 
       const latestAvailabilityRoleByRequestId = new Map<string, string>()
-      ;[...(sentEvents || [])]
-        .sort((a: any, b: any) => (
+      ;[...((sentEvents || []) as StaffingEventRow[])]
+        .sort((a, b) => (
           new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
         ))
-        .forEach((event: any) => {
-        const requestId = String(event.staffing_request_id || '')
-        const meta = event?.meta || {}
-        if (!requestId || latestAvailabilityRoleByRequestId.has(requestId)) return
-        if (meta.phase !== 'availability' || !meta.role) return
-        latestAvailabilityRoleByRequestId.set(requestId, String(meta.role))
-      })
+        .forEach((event) => {
+          const requestId = String(event.staffing_request_id || '')
+          const meta = event?.meta || {}
+          if (!requestId || latestAvailabilityRoleByRequestId.has(requestId)) return
+          if (meta.phase !== 'availability' || !meta.role) return
+          latestAvailabilityRoleByRequestId.set(requestId, String(meta.role))
+        })
 
-      const latestRequestByProfileId = new Map<string, any>()
-      requestRows.forEach((item: any) => {
+      const latestRequestByProfileId = new Map<string, StaffingRequestRow>()
+      requestRows.forEach((item) => {
         if (latestAvailabilityRoleByRequestId.get(String(item.id)) !== roleCode) return
         const profileId = String(item.profile_id || '')
         if (!profileId || latestRequestByProfileId.has(profileId)) return
@@ -109,29 +144,30 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
       if (profilesError) throw profilesError
 
       const profilesById = new Map(
-        (profiles || []).map((profile: any) => [String(profile.id), profile])
+        ((profiles || []) as StaffingProfileRow[]).map((profile) => [String(profile.id), profile])
       )
 
       return Array.from(latestRequestByProfileId.entries()).map(([profileId, item]) => {
-        const profile: any = profilesById.get(profileId) || {}
-        const fullName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim()
+        const profile = profilesById.get(profileId)
+        const fullName = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim()
+        const status = toAvailabilityStatus(item.status)
         const respondedAt =
-          item.status && String(item.status).toLowerCase() !== 'pending'
+          status !== 'pending'
             ? (item.updated_at || item.created_at)
             : null
 
         return {
           profile_id: profileId,
-          full_name: fullName || profile.nickname || profile.email || 'Unknown',
-          status: item.status,
+          full_name: fullName || profile?.nickname || profile?.email || 'Unknown',
+          status,
           responded_at: respondedAt,
-        } as AvailabilityResponse
+        }
       })
     }
   })
 
   // Send offers mutation
-  const sendOffersMutation = useMutation({
+  const sendOffersMutation = useMutation<SendOffersResult, Error>({
     mutationFn: async () => {
       const selectedProfiles = Array.from(selectedForOffer)
       if (selectedProfiles.length === 0) {
@@ -163,7 +199,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
           }
         )
 
-        const payload = await response.json().catch(() => ({}))
+        const payload = (await response.json().catch(() => ({}))) as { error?: string }
         if (!response.ok) {
           throw new Error(payload?.error || 'Failed to send offer')
         }
@@ -179,7 +215,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
 
       return { sent: selectedProfiles.length }
     },
-    onSuccess: (data: any) => {
+    onSuccess: (data) => {
       toast({
         title: 'Offers sent',
         description: `Sent offers to ${data?.sent ?? selectedForOffer.size} candidates by ${channel}`
@@ -189,7 +225,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_availability_responses', jobId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_requests', jobId) })
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: 'Error',
         description: error.message,
@@ -198,9 +234,9 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
     }
   })
 
-  const confirmedResponses = responses?.filter((r: any) => r.status === 'confirmed') || []
-  const declinedResponses = responses?.filter((r: any) => r.status === 'declined') || []
-  const pendingResponses = responses?.filter((r: any) => r.status === 'pending') || []
+  const confirmedResponses = responses?.filter((r) => r.status === 'confirmed') || []
+  const declinedResponses = responses?.filter((r) => r.status === 'declined') || []
+  const pendingResponses = responses?.filter((r) => r.status === 'pending') || []
   const hasResponseRows = Boolean(responses && responses.length > 0)
   const displayedConfirmedAvailability = hasResponseRows ? confirmedResponses.length : confirmedAvailability
   const displayedPendingAvailability = hasResponseRows ? pendingResponses.length : pendingAvailability
@@ -278,7 +314,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
 
           {confirmedResponses.length > 0 ? (
             <div className="space-y-2 bg-green-50 p-3 rounded border border-green-200">
-              {confirmedResponses.map((response: any) => (
+              {confirmedResponses.map((response) => (
                 <label
                   key={response.profile_id}
                   className="flex items-center gap-3 p-2 bg-white rounded hover:bg-green-50 cursor-pointer"
@@ -318,7 +354,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
               </span>
             </div>
             <div className="space-y-2 bg-yellow-50 p-3 rounded border border-yellow-200">
-              {pendingResponses.map((response: any) => (
+              {pendingResponses.map((response) => (
                 <div
                   key={response.profile_id}
                   className="flex items-center justify-between p-2 bg-white rounded"
@@ -344,7 +380,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
               </span>
             </div>
             <div className="space-y-2 bg-red-50 p-3 rounded border border-red-200">
-              {declinedResponses.map((response: any) => (
+              {declinedResponses.map((response) => (
                 <div
                   key={response.profile_id}
                   className="flex items-center justify-between p-2 bg-white rounded"

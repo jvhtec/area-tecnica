@@ -6,8 +6,42 @@ import { supabase } from "@/integrations/supabase/client";
 import { useOptimizedAuth } from "@/hooks/useOptimizedAuth";
 import { createQueryKey } from "@/lib/optimized-react-query";
 
-type DynamicSupabaseClient = { from: (table: string) => any };
+type DynamicQueryResult = { data: unknown; error: unknown };
+type DynamicSupabaseQuery = PromiseLike<DynamicQueryResult> & {
+  select: (columns: string) => DynamicSupabaseQuery;
+  eq: (column: string, value: unknown) => DynamicSupabaseQuery;
+};
+type DynamicSupabaseClient = { from: (table: string) => DynamicSupabaseQuery };
 const dynamicSupabase = supabase as unknown as DynamicSupabaseClient;
+
+type TourDateRow = { id?: string; date?: string | null };
+type MyTourRow = {
+  id: string;
+  name: string;
+  description?: string | null;
+  color?: string | null;
+  status?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  tour_dates?: TourDateRow[] | null;
+};
+type CrewTourAssignmentRow = {
+  role?: string | null;
+  department?: string | null;
+  notes?: string | null;
+  tours?: MyTourRow | MyTourRow[] | null;
+};
+type TimesheetTourRow = {
+  date?: string | null;
+  jobs?: {
+    tour?: MyTourRow | MyTourRow[] | null;
+  } | Array<{
+    tour?: MyTourRow | MyTourRow[] | null;
+  }> | null;
+};
+
+const firstRow = <T,>(value: T | T[] | null | undefined): T | null =>
+  Array.isArray(value) ? (value[0] ?? null) : (value ?? null);
 
 export interface MyTour {
   id: string;
@@ -100,11 +134,12 @@ export const useMyTours = () => {
       // NOTE: Use Madrid-local 'today' (yyyy-MM-dd) for date-only comparisons.
 
       const personalStatsByTourId = new Map<string, { total: number; upcoming: number }>();
-      (timeRows || []).forEach((row: any) => {
-        const job = row.jobs as any;
-        const tour = job?.tour as any;
-        const tourId = tour?.id as string | undefined;
-        const dateStr = row.date as string | undefined;
+      const timesheetRows = Array.isArray(timeRows) ? (timeRows as TimesheetTourRow[]) : [];
+      timesheetRows.forEach((row) => {
+        const job = firstRow(row.jobs);
+        const tour = firstRow(job?.tour);
+        const tourId = tour?.id;
+        const dateStr = row.date ?? undefined;
         if (!tourId || !dateStr) return;
         // tour.status already filtered server-side
 
@@ -118,12 +153,12 @@ export const useMyTours = () => {
 
       const byTourId = new Map<string, MyTour>();
 
-      const upsert = (tour: any, meta: Partial<MyTour>) => {
+      const upsert = (tour: MyTourRow | null | undefined, meta: Partial<MyTour>) => {
         if (!tour?.id) return;
 
         const tourDates = tour.tour_dates || [];
         const tourUpcomingDates = tourDates.filter(
-          (dateEntry: any) => (dateEntry?.date as string | undefined) ? dateEntry.date >= today : false
+          (dateEntry) => dateEntry?.date ? dateEntry.date >= today : false
         ).length;
 
         const personalStats = personalStatsByTourId.get(tour.id);
@@ -154,7 +189,7 @@ export const useMyTours = () => {
           id: tour.id,
           name: tour.name,
           description: tour.description,
-          color: tour.color,
+          color: tour.color || '#7E69AB',
           start_date: tour.start_date,
           end_date: tour.end_date,
           assignment_role: meta.assignment_role || 'Por bolo',
@@ -166,25 +201,25 @@ export const useMyTours = () => {
       };
 
       // Crew tours
-      (crewAssignments || []).forEach((assignment: any) => {
-        const tour = assignment.tours as any;
+      ((crewAssignments || []) as CrewTourAssignmentRow[]).forEach((assignment) => {
+        const tour = firstRow(assignment.tours);
         upsert(tour, {
-          assignment_role: assignment.role,
-          assignment_department: assignment.department,
-          assignment_notes: assignment.notes,
+          assignment_role: assignment.role || undefined,
+          assignment_department: assignment.department || undefined,
+          assignment_notes: assignment.notes || undefined,
         });
       });
 
       // Timesheet-based tours (canonical)
-      (timeRows || []).forEach((row: any) => {
-        const job = row.jobs as any;
-        const tour = job?.tour as any;
+      timesheetRows.forEach((row) => {
+        const job = firstRow(row.jobs);
+        const tour = firstRow(job?.tour);
         if (!tour) return;
         // tour.status already filtered server-side
 
         upsert(tour, {
           assignment_role: 'Por bolo',
-          assignment_department: (userDepartment || 'unknown') as any,
+          assignment_department: userDepartment || 'unknown',
         });
       });
 
