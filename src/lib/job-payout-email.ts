@@ -68,7 +68,7 @@ type PayoutBreakdown = {
 };
 
 type PayoutTimesheetRow = {
-  technician_id: string;
+  technician_id: string | null;
   job_id?: string;
   date?: string | null;
   amount_breakdown?: PayoutBreakdown | null;
@@ -79,6 +79,8 @@ type PayoutTimesheetRow = {
 function buildTimesheetMap(rows: PayoutTimesheetRow[]): Map<string, TimesheetLine[]> {
   const map = new Map<string, TimesheetLine[]>();
   rows.forEach((row) => {
+    if (!row.technician_id) return;
+
     const breakdown: PayoutBreakdown = (row.amount_breakdown || row.amount_breakdown_visible) ?? {};
     const line: TimesheetLine = {
       date: row.date ?? null,
@@ -116,8 +118,9 @@ async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<P
   if (data && data.length) return data as PayoutTimesheetRow[];
   const { data: rpcData, error: rpcError } = await client.rpc('get_timesheet_amounts_visible');
   if (rpcError) throw rpcError;
-  return ((rpcData as PayoutTimesheetRow[]) ?? []).filter(
-    (row) => row.job_id === jobId && row.approved_by_manager === true
+  const visibleRows = Array.isArray(rpcData) ? (rpcData as PayoutTimesheetRow[]) : [];
+  return visibleRows.filter(
+    (row) => row.job_id === jobId && row.approved_by_manager === true && Boolean(row.technician_id)
   );
 }
 
@@ -212,7 +215,7 @@ export async function prepareJobPayoutEmailContext(
 export interface SendJobPayoutEmailsResult {
   success: boolean;
   missingEmails: string[];
-  response?: { results?: unknown } | null;
+  response?: { success?: boolean; results?: unknown } | null;
   error?: unknown;
   context: JobPayoutEmailContextResult;
 }
@@ -313,7 +316,7 @@ export async function sendJobPayoutEmails(
   return {
     success: !error && data?.success !== false,
     missingEmails: context.missingEmails,
-    response: (data ?? null) as { results?: unknown } | null,
+    response: (data ?? null) as { success?: boolean; results?: unknown } | null,
     error,
     context,
   };

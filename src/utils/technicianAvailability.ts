@@ -62,8 +62,6 @@ type TechnicianProfile = {
   skills?: unknown;
 };
 
-type ConflictJobInfo = { id: string; start_time: string | null; end_time: string | null; title: string | null };
-
 export async function getAvailableTechnicians(
   department: string,
   jobId: string,
@@ -117,20 +115,6 @@ export async function getAvailableTechnicians(
     if (timesheetsError) {
       throw timesheetsError;
     }
-
-    // Get job info for conflicting jobs
-    const conflictingJobIds = Array.from(new Set((timesheets || []).map(ts => ts.job_id)));
-    const { data: jobs, error: jobsError } = await supabase
-      .from("jobs")
-      .select("id, start_time, end_time, title")
-      .in("id", conflictingJobIds);
-
-    if (jobsError) {
-      throw jobsError;
-    }
-
-    const jobMap = new Map<string, ConflictJobInfo>();
-    (jobs || []).forEach(job => jobMap.set(job.id, job));
 
     // Get unavailability data
     const { data: unavailabilityData, error: unavailabilityError } = await supabase
