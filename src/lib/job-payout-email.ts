@@ -52,10 +52,34 @@ async function blobToBase64(blob: Blob): Promise<string> {
   return btoa(binary);
 }
 
-function buildTimesheetMap(rows: any[]): Map<string, TimesheetLine[]> {
+type PayoutBreakdown = {
+  hours_rounded?: number | string | null;
+  worked_hours_rounded?: number | string | null;
+  base_day_eur?: number | string | null;
+  plus_10_12_hours?: number | string | null;
+  plus_10_12_amount_eur?: number | string | null;
+  overtime_hours?: number | string | null;
+  overtime_hour_eur?: number | string | null;
+  overtime_amount_eur?: number | string | null;
+  total_eur?: number | string | null;
+  is_evento?: boolean;
+  is_prep_day?: boolean;
+  prep_day_hourly_rate_eur?: number | string | null;
+};
+
+type PayoutTimesheetRow = {
+  technician_id: string;
+  job_id?: string;
+  date?: string | null;
+  amount_breakdown?: PayoutBreakdown | null;
+  amount_breakdown_visible?: PayoutBreakdown | null;
+  approved_by_manager?: boolean | null;
+};
+
+function buildTimesheetMap(rows: PayoutTimesheetRow[]): Map<string, TimesheetLine[]> {
   const map = new Map<string, TimesheetLine[]>();
   rows.forEach((row) => {
-    const breakdown = (row.amount_breakdown || row.amount_breakdown_visible || {}) as Record<string, any>;
+    const breakdown: PayoutBreakdown = (row.amount_breakdown || row.amount_breakdown_visible) ?? {};
     const line: TimesheetLine = {
       date: row.date ?? null,
       hours_rounded: Number(breakdown.hours_rounded ?? breakdown.worked_hours_rounded ?? 0) || 0,
@@ -81,7 +105,7 @@ function buildTimesheetMap(rows: any[]): Map<string, TimesheetLine[]> {
   return map;
 }
 
-async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<any[]> {
+async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<PayoutTimesheetRow[]> {
   const { data, error } = await client
     .from('timesheets')
     .select('technician_id, job_id, date, amount_breakdown, approved_by_manager')
@@ -89,10 +113,10 @@ async function fetchTimesheets(client: SupabaseClient, jobId: string): Promise<a
     .eq('approved_by_manager', true)
     .eq('is_active', true);
   if (error) throw error;
-  if (data && data.length) return data as any[];
+  if (data && data.length) return data as PayoutTimesheetRow[];
   const { data: rpcData, error: rpcError } = await client.rpc('get_timesheet_amounts_visible');
   if (rpcError) throw rpcError;
-  return ((rpcData as any[]) || []).filter(
+  return ((rpcData as PayoutTimesheetRow[]) ?? []).filter(
     (row) => row.job_id === jobId && row.approved_by_manager === true
   );
 }
@@ -188,8 +212,8 @@ export async function prepareJobPayoutEmailContext(
 export interface SendJobPayoutEmailsResult {
   success: boolean;
   missingEmails: string[];
-  response?: any;
-  error?: any;
+  response?: { results?: unknown } | null;
+  error?: unknown;
   context: JobPayoutEmailContextResult;
 }
 
@@ -289,7 +313,7 @@ export async function sendJobPayoutEmails(
   return {
     success: !error && data?.success !== false,
     missingEmails: context.missingEmails,
-    response: data,
+    response: (data ?? null) as { results?: unknown } | null,
     error,
     context,
   };
