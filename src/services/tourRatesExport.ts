@@ -360,15 +360,6 @@ export async function buildTourRatesExportPayload(
           breakdown: {},
         }));
       } else {
-        // Additionally, pull approved timesheets breakdowns to compute hours and overtime details
-        const { data: timesheets } = await supabase
-          .from('timesheets')
-          .select('id, technician_id, approved_by_manager, amount_breakdown, amount_breakdown_visible, created_at')
-          .eq('job_id', job.id)
-          .eq('is_active', true)
-          .in('technician_id', techIds)
-          .eq('approved_by_manager', true);
-
         const breakdownByTech = new Map<string, {
           hours_total: number;
           plus_10_12_total_eur: number;
@@ -376,72 +367,10 @@ export async function buildTourRatesExportPayload(
           overtime_amount_total_eur: number;
         }>();
 
-        // Try to use persisted breakdown if present; otherwise compute via RPC per timesheet
-        if ((timesheets || []).length > 0) {
-          // First pass: accumulate any persisted breakdowns
-          ((timesheets || []) as unknown as TimesheetBreakdownRow[]).forEach((row) => {
-            const tech = row.technician_id as string | null;
-            if (!tech) return;
-            const persisted: AmountBreakdown | null = (row.amount_breakdown || row.amount_breakdown_visible) ?? null;
-            if (!persisted) return;
-            const hoursRounded = Number(persisted.hours_rounded ?? persisted.worked_hours_rounded ?? 0) || 0;
-            const plusEur =
-              persisted.plus_10_12_amount_eur != null
-                ? Number(persisted.plus_10_12_amount_eur) || 0
-                : (Number(persisted.plus_10_12_eur ?? 0) || 0) * Math.min(Math.max(hoursRounded - 10, 0), 2);
-            const otHours = Number(persisted.overtime_hours ?? 0) || 0;
-            const otAmount = Number(persisted.overtime_amount_eur ?? 0) || 0;
-            const acc = breakdownByTech.get(tech) || {
-              hours_total: 0,
-              plus_10_12_total_eur: 0,
-              overtime_hours_total: 0,
-              overtime_amount_total_eur: 0,
-            };
-            acc.hours_total += hoursRounded;
-            acc.plus_10_12_total_eur += plusEur;
-            acc.overtime_hours_total += otHours;
-            acc.overtime_amount_total_eur += otAmount;
-            breakdownByTech.set(tech, acc);
-          });
-
-          // Second pass: compute breakdown for any timesheets missing persisted details
-          const toCompute = ((timesheets || []) as unknown as TimesheetBreakdownRow[]).filter((row) => !row.amount_breakdown && !row.amount_breakdown_visible);
-          if (toCompute.length > 0) {
-            const computed = await Promise.all(
-              toCompute.map(async (row) => {
-                const { data, error } = await supabase.rpc('compute_timesheet_amount_2025', {
-                  _timesheet_id: row.id,
-                  _persist: false,
-                });
-                return { tech: row.technician_id as string, breakdown: (error ? null : (data as AmountBreakdown | null)) };
-              })
-            );
-
-            computed.forEach(({ tech, breakdown }) => {
-              if (!tech || !breakdown) return;
-              const hoursRounded = Number(breakdown.hours_rounded ?? breakdown.worked_hours_rounded ?? 0) || 0;
-              const plusEur =
-                breakdown.plus_10_12_amount_eur != null
-                  ? Number(breakdown.plus_10_12_amount_eur) || 0
-                  : (Number(breakdown.plus_10_12_eur ?? 0) || 0) * Math.min(Math.max(hoursRounded - 10, 0), 2);
-              const otHours = Number(breakdown.overtime_hours ?? 0) || 0;
-              const otAmount = Number(breakdown.overtime_amount_eur ?? 0) || 0;
-              const acc = breakdownByTech.get(tech) || {
-                hours_total: 0,
-                plus_10_12_total_eur: 0,
-                overtime_hours_total: 0,
-                overtime_amount_total_eur: 0,
-              };
-              acc.hours_total += hoursRounded;
-              acc.plus_10_12_total_eur += plusEur;
-              acc.overtime_hours_total += otHours;
-              acc.overtime_amount_total_eur += otAmount;
-              breakdownByTech.set(tech, acc);
-            });
-          }
-        }
-
-        // Fallback via security-definer helper if we couldn't read timesheets directly
+        // Approved-timesheet breakdowns come from the get_timesheet_amounts_visible
+        // security-definer helper. (A direct `timesheets` select previously lived here
+        // but requested a non-existent `amount_breakdown_visible` column, so it always
+        // errored and this RPC was already the de-facto source; the dead path is removed.)
         if (breakdownByTech.size === 0) {
           const { data: tsVisible } = await supabase.rpc('get_timesheet_amounts_visible');
           if (Array.isArray(tsVisible) && tsVisible.length) {
