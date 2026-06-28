@@ -621,7 +621,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction
                               onClick={async () => {
-                                await removeAssignment(assignment.technician_id);
+                                await removeAssignment(assignment.technician_id, assignment);
                                 refetchCurrentAssignments();
                               }}
                             >

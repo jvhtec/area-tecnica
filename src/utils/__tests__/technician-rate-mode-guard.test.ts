@@ -56,7 +56,12 @@ describe("technician/date rate-mode migration guard", () => {
 
   it("guards expanded fixed/hourly rate modes from unsafe payout states", () => {
     expect(expandedMigration).toMatch(/rate_mode IN \('rehearsal','standard','tour_multipliers','no_multipliers','hourly','fixed'\)/i);
+    expect(expandedMigration).toMatch(/ALTER COLUMN rate_mode DROP DEFAULT/i);
+    expect(expandedMigration).toMatch(/tg_job_technician_rate_mode_dates_sync_legacy/i);
+    expect(expandedMigration).toMatch(/WHEN COALESCE\(NEW\.use_rehearsal_rate, FALSE\) THEN 'rehearsal'/i);
+    expect(expandedMigration).toMatch(/WHEN COALESCE\(trmd\.use_rehearsal_rate, FALSE\) THEN 'rehearsal'/i);
     expect(expandedMigration).toMatch(/fixed_amount_eur IS NOT NULL AND fixed_amount_eur >= 0/i);
+    expect(expandedMigration).toMatch(/RAISE EXCEPTION 'Invalid fixed amount for timesheet %'/i);
     expect(expandedMigration).toMatch(/COUNT\(\*\) FILTER \(WHERE cpd\.eff_mode = 'hourly'\)::int/i);
     expect(expandedMigration).toMatch(/COUNT\(\*\) FILTER \(WHERE cpd\.eff_mode = 'fixed'\)::int/i);
     expect(expandedMigration).toMatch(/'hourly_total_eur', hourly_total/i);

@@ -25,17 +25,16 @@ export function useJobClosureLock(jobId: string, userRole: string | null | undef
     staleTime: 60_000,
   });
 
+  const isAdmin = isAdminRole(userRole);
   const isPastClosureWindow = (() => {
-    if (jobMetaError) return false;
+    if (jobMetaError) return true;
     if (jobMeta === undefined) return true;
     if (!jobMeta) return false;
     return isJobPastClosureWindow(jobMeta.end_time, jobMeta.timezone ?? 'Europe/Madrid');
   })();
 
-  const isAdmin = isAdminRole(userRole);
-
   return {
     isClosureLocked: isPastClosureWindow && !isAdmin,
-    isAdminOverridingClosure: isPastClosureWindow && isAdmin && jobMeta !== undefined,
+    isAdminOverridingClosure: isPastClosureWindow && isAdmin && jobMeta !== undefined && !jobMetaError,
   };
 }

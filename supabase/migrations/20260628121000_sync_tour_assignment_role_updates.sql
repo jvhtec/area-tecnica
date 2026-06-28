@@ -20,6 +20,10 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  IF NEW.department NOT IN ('sound', 'lights', 'video') THEN
+    RETURN NEW;
+  END IF;
+
   WITH future_tour_jobs AS (
     SELECT j.id AS job_id
     FROM public.jobs j
@@ -93,5 +97,9 @@ DROP TRIGGER IF EXISTS tour_assignment_update_trigger ON public.tour_assignments
 CREATE TRIGGER tour_assignment_update_trigger
   AFTER UPDATE OF role ON public.tour_assignments
   FOR EACH ROW
-  WHEN (NEW.technician_id IS NOT NULL AND NEW.role IS DISTINCT FROM OLD.role)
+  WHEN (
+    NEW.technician_id IS NOT NULL
+    AND NEW.department IN ('sound', 'lights', 'video')
+    AND NEW.role IS DISTINCT FROM OLD.role
+  )
   EXECUTE FUNCTION public.sync_tour_assignment_role_update_to_future_jobs();

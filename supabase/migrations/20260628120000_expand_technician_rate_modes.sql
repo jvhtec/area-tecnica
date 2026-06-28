@@ -29,8 +29,54 @@ SET rate_mode = CASE WHEN use_rehearsal_rate THEN 'rehearsal' ELSE 'standard' EN
 WHERE rate_mode IS NULL;
 
 ALTER TABLE public.job_technician_rate_mode_dates
-  ALTER COLUMN rate_mode SET DEFAULT 'standard',
+  ALTER COLUMN rate_mode DROP DEFAULT,
   ALTER COLUMN rate_mode SET NOT NULL;
+
+CREATE OR REPLACE FUNCTION public.tg_job_technician_rate_mode_dates_sync_legacy()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF NEW.rate_mode IS NULL THEN
+      NEW.rate_mode := CASE
+        WHEN COALESCE(NEW.use_rehearsal_rate, FALSE) THEN 'rehearsal'
+        ELSE 'standard'
+      END;
+    ELSE
+      NEW.use_rehearsal_rate := NEW.rate_mode = 'rehearsal';
+    END IF;
+  ELSIF NEW.rate_mode IS DISTINCT FROM OLD.rate_mode THEN
+    NEW.use_rehearsal_rate := NEW.rate_mode = 'rehearsal';
+  ELSIF NEW.use_rehearsal_rate IS DISTINCT FROM OLD.use_rehearsal_rate
+    AND COALESCE(OLD.rate_mode, 'standard') IN ('standard', 'rehearsal')
+    AND COALESCE(NEW.rate_mode, 'standard') IN ('standard', 'rehearsal') THEN
+    NEW.rate_mode := CASE
+      WHEN COALESCE(NEW.use_rehearsal_rate, FALSE) THEN 'rehearsal'
+      ELSE 'standard'
+    END;
+  ELSIF NEW.rate_mode IS NULL THEN
+    NEW.rate_mode := CASE
+      WHEN COALESCE(NEW.use_rehearsal_rate, FALSE) THEN 'rehearsal'
+      ELSE 'standard'
+    END;
+  ELSE
+    NEW.use_rehearsal_rate := NEW.rate_mode = 'rehearsal';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_job_technician_rate_mode_dates_sync_legacy
+  ON public.job_technician_rate_mode_dates;
+
+CREATE TRIGGER trg_job_technician_rate_mode_dates_sync_legacy
+  BEFORE INSERT OR UPDATE OF rate_mode, use_rehearsal_rate
+  ON public.job_technician_rate_mode_dates
+  FOR EACH ROW
+  EXECUTE FUNCTION public.tg_job_technician_rate_mode_dates_sync_legacy();
 
 DO $$
 BEGIN
@@ -154,7 +200,11 @@ BEGIN
 
     IF FOUND THEN
       v_has_technician_rate_mode_override := TRUE;
-      v_forced_rehearsal := COALESCE(v_rate_mode = 'rehearsal', v_technician_rate_mode_override, FALSE);
+      v_rate_mode := COALESCE(
+        v_rate_mode,
+        CASE WHEN COALESCE(v_technician_rate_mode_override, FALSE) THEN 'rehearsal' ELSE 'standard' END
+      );
+      v_forced_rehearsal := v_rate_mode = 'rehearsal';
       v_rate_mode_source := 'technician_override';
     ELSE
       SELECT EXISTS (
@@ -193,7 +243,11 @@ BEGIN
 
   -- Fixed-amount override short-circuits both rehearsal and standard pricing.
   IF v_rate_mode = 'fixed' THEN
-    v_total_amount := COALESCE(v_fixed_amount, 0);
+    IF v_fixed_amount IS NULL OR v_fixed_amount < 0 THEN
+      RAISE EXCEPTION 'Invalid fixed amount for timesheet %', _timesheet_id;
+    END IF;
+
+    v_total_amount := v_fixed_amount;
     v_billable_hours := v_worked_hours;
 
     v_breakdown := jsonb_build_object(
@@ -658,7 +712,11 @@ BEGIN
       (trmd.job_id IS NOT NULL) AS has_override,
       COALESCE(
         trmd.rate_mode,
-        CASE WHEN jrd.job_id IS NOT NULL THEN 'rehearsal' ELSE 'standard' END
+        CASE
+          WHEN COALESCE(trmd.use_rehearsal_rate, FALSE) THEN 'rehearsal'
+          WHEN jrd.job_id IS NOT NULL THEN 'rehearsal'
+          ELSE 'standard'
+        END
       ) AS eff_mode,
       trmd.fixed_amount_eur,
       (
@@ -903,7 +961,11 @@ BEGIN
         pd.payable_date,
         COALESCE(
           trmd.rate_mode,
-          CASE WHEN jrd.job_id IS NOT NULL THEN 'rehearsal' ELSE 'standard' END
+          CASE
+            WHEN COALESCE(trmd.use_rehearsal_rate, FALSE) THEN 'rehearsal'
+            WHEN jrd.job_id IS NOT NULL THEN 'rehearsal'
+            ELSE 'standard'
+          END
         ) AS eff_mode
       FROM payable_dates pd
       LEFT JOIN public.job_technician_rate_mode_dates trmd
@@ -915,7 +977,11 @@ BEGIN
        AND jrd.date = pd.payable_date
       WHERE COALESCE(
               trmd.rate_mode,
-              CASE WHEN jrd.job_id IS NOT NULL THEN 'rehearsal' ELSE 'standard' END
+              CASE
+                WHEN COALESCE(trmd.use_rehearsal_rate, FALSE) THEN 'rehearsal'
+                WHEN jrd.job_id IS NOT NULL THEN 'rehearsal'
+                ELSE 'standard'
+              END
             ) IN ('standard','tour_multipliers','no_multipliers')
     ),
     date_multipliers AS (

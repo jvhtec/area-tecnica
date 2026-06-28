@@ -22,6 +22,8 @@ describe('tour assignment role update migration guard', () => {
     expect(codeOnly).toMatch(/CREATE OR REPLACE FUNCTION public\.sync_tour_assignment_role_update_to_future_jobs\(\)/i);
     expect(codeOnly).toMatch(/v_today date := \(now\(\) AT TIME ZONE 'Europe\/Madrid'\)::date/i);
     expect(codeOnly).toMatch(/j\.job_type = 'tourdate'/i);
+    expect(codeOnly).toMatch(/NEW\.department NOT IN \('sound', 'lights', 'video'\)/i);
+    expect(codeOnly).toMatch(/NEW\.department IN \('sound', 'lights', 'video'\)/i);
     expect(codeOnly).toMatch(/COALESCE\([\s\S]*?jdt\.schedule_start[\s\S]*?td\.start_date[\s\S]*?j\.start_time AT TIME ZONE 'Europe\/Madrid'[\s\S]*?td\.date[\s\S]*?\) >= v_today/i);
     expect(codeOnly).toMatch(/INSERT INTO public\.job_assignments/i);
     expect(codeOnly).toMatch(/EXECUTE FUNCTION public\.sync_tour_assignment_role_update_to_future_jobs\(\)/i);

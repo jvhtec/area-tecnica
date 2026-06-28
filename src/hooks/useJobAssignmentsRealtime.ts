@@ -16,6 +16,8 @@ export interface AssignmentInsertOptions {
   addAsConfirmed?: boolean;
 }
 
+type AssignmentRemovalContext = Pick<Assignment, 'technician_id' | 'sound_role' | 'lights_role' | 'video_role'>;
+
 export const buildAssignmentInsertPayload = (
   jobId: string,
   technicianId: string,
@@ -360,7 +362,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
     }
   };
 
-  const removeAssignment = async (technicianId: string) => {
+  const removeAssignment = async (technicianId: string, renderedAssignment?: AssignmentRemovalContext) => {
     try {
       setIsRemoving(prev => ({ ...prev, [technicianId]: true }));
 
@@ -378,7 +380,10 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       });
 
       // Get the assignment details before removal for Flex cleanup
-      const assignmentToRemove = assignments.find(a => a.technician_id === technicianId);
+      const assignmentToRemove =
+        renderedAssignment?.technician_id === technicianId
+          ? renderedAssignment
+          : assignments.find(a => a.technician_id === technicianId);
 
       // Remove from database - IMPORTANT: Delete timesheets first to avoid orphaned records
       const { error: timesheetError } = await supabase

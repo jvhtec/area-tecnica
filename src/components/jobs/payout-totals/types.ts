@@ -26,6 +26,7 @@ export interface JobMetadata {
   end_time: string | null;
   timezone: string | null;
   tour_id: string | null;
+  tour_date_id: string | null;
   rates_approved: boolean | null;
   job_type: string | null;
   invoicing_company: string | null;
