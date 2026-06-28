@@ -48,19 +48,20 @@ interface SaveJobRequirementsResult {
   deleted: string[]
 }
 
-function parseSummaryRow(row: any): RequiredRoleSummaryItem | null {
-  if (!row) return null
-  const roles = Array.isArray(row.roles)
-    ? (row.roles as any[]).map((r) => ({
-        role_code: r.role_code as string,
-        quantity: Number(r.quantity || 0),
-        notes: (r.notes ?? null) as string | null,
+function parseSummaryRow(row: unknown): RequiredRoleSummaryItem | null {
+  const record = (row ?? null) as { job_id?: unknown; department?: unknown; total_required?: unknown; roles?: unknown } | null
+  if (!record || typeof record.job_id !== 'string' || typeof record.department !== 'string') return null
+  const roles = Array.isArray(record.roles)
+    ? (record.roles as Array<Record<string, unknown>>).map((role) => ({
+        role_code: typeof role.role_code === 'string' ? role.role_code : String(role.role_code ?? ''),
+        quantity: Number(role.quantity || 0),
+        notes: typeof role.notes === 'string' ? role.notes : null,
       }))
     : []
   return {
-    job_id: row.job_id as string,
-    department: row.department as string,
-    total_required: Number(row.total_required || 0),
+    job_id: record.job_id,
+    department: record.department,
+    total_required: Number(record.total_required || 0),
     roles,
   }
 }
