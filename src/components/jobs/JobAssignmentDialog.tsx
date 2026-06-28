@@ -1,4 +1,3 @@
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,11 +31,10 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { AlertCircle } from "lucide-react";
 import { Job } from "@/types/job";
 import { User } from "@/types/user";
 import { useEffect, useState, useMemo } from "react";
-import { Loader2, RefreshCw, ExternalLink, CalendarIcon } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
@@ -51,7 +49,7 @@ import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { syncTimesheetCategoriesForAssignment } from '@/services/syncTimesheetCategories';
 import { isDepartmentManagementRole, isManagementRole } from '@/utils/permissions';
-
+import { useDirectJobAssignments } from '@/hooks/useDirectJobAssignments';
 
 import { queryKeys } from "@/lib/react-query";
 const MADRID_TIME_ZONE = 'Europe/Madrid';
@@ -79,14 +77,6 @@ type JobDateTypeRow = {
 type JobWithDateTypes = Job & {
   job_date_types?: JobDateTypeRow[];
 };
-
-interface Assignment {
-  technician_id: string;
-  sound_role: string;
-  lights_role: string;
-}
-
-// Role options from centralized registry (codes with labels)
 
 // Helper function to sync timesheet categories when assignment roles change
 const syncTimesheetCategories = async (jobId: string, technicianId: string) => {
@@ -185,9 +175,12 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   // Get current user's department or use the passed department
   const currentDepartment = department || user?.department || "sound";
 
+  const { data: currentAssignments = [], refetch: refetchCurrentAssignments } =
+    useDirectJobAssignments(jobId, isOpen);
+
   // Filter assignments to only show those for the current department
   const departmentAssignments = useMemo(() => {
-    return (assignments || []).filter((assignment: any) => {
+    return (currentAssignments || []).filter((assignment: any) => {
       if (currentDepartment === 'sound') {
         return assignment.sound_role && assignment.sound_role !== 'none';
       } else if (currentDepartment === 'lights') {
@@ -197,7 +190,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
       }
       return false;
     });
-  }, [assignments, currentDepartment]);
+  }, [currentAssignments, currentDepartment]);
 
   // Fetch job data to get start/end times for availability checking
   const { data: jobData, isLoading: isLoadingJob } = useQuery({
@@ -307,12 +300,12 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   const reqForDept = useMemo(() => (reqSummary || []).find(r => r.department === currentDepartment) || null, [reqSummary, currentDepartment]);
   const assignedByRole = useMemo(() => {
     const m = new Map<string, number>();
-    (assignments || []).forEach((a: any) => {
+    (currentAssignments || []).forEach((a: any) => {
       const code = currentDepartment === 'sound' ? a.sound_role : currentDepartment === 'lights' ? a.lights_role : a.video_role;
       if (code) m.set(code, (m.get(code) || 0) + 1);
     });
     return m;
-  }, [assignments, currentDepartment]);
+  }, [currentAssignments, currentDepartment]);
   const remainingByRole = useMemo(() => {
     const m = new Map<string, number>();
     const roles = reqForDept?.roles || [];
@@ -404,7 +397,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
   };
 
   const handleSaveAssignments = async () => {
-    const assignmentsToProcess: Assignment[] = [];
+    const assignmentsToProcess: Array<{ technician_id: string; sound_role: string; lights_role: string }> = [];
 
     // Process current assignments for Flex integration
     assignments.forEach((assignment) => {
@@ -627,7 +620,10 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                           <AlertDialogFooter>
                             <AlertDialogCancel>Cancelar</AlertDialogCancel>
                             <AlertDialogAction
-                              onClick={() => removeAssignment(assignment.technician_id)}
+                              onClick={async () => {
+                                await removeAssignment(assignment.technician_id, assignment);
+                                refetchCurrentAssignments();
+                              }}
                             >
                               Continuar
                             </AlertDialogAction>
@@ -663,6 +659,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                   title: "Rol actualizado",
                                   description: "El rol de sonido se ha actualizado exitosamente",
                                 });
+                                refetchCurrentAssignments();
                                 onAssignmentChange();
                               } catch (error: any) {
                                 console.error("Error updating role:", error);
@@ -715,6 +712,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                   title: "Rol actualizado",
                                   description: "El rol de luces se ha actualizado exitosamente",
                                 });
+                                refetchCurrentAssignments();
                                 onAssignmentChange();
                               } catch (error: any) {
                                 console.error("Error updating role:", error);
@@ -767,6 +765,7 @@ export const JobAssignmentDialog = ({ isOpen, onClose, onAssignmentChange, jobId
                                   title: "Rol actualizado",
                                   description: "El rol de video se ha actualizado exitosamente",
                                 });
+                                refetchCurrentAssignments();
                                 onAssignmentChange();
                               } catch (error: any) {
                                 console.error("Error updating role:", error);

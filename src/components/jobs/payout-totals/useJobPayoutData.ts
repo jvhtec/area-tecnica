@@ -1,12 +1,13 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { formatInTimeZone } from 'date-fns-tz';
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useJobPayoutTotals } from '@/hooks/useJobPayoutTotals';
 import { useManagerJobQuotes } from '@/hooks/useManagerJobQuotes';
 import { useJobTechnicianPayoutOverrides } from '@/hooks/useJobPayoutOverride';
 import { useOptimizedAuth } from '@/hooks/useOptimizedAuth';
 import { useJobRehearsalDates, useToggleDateRehearsalRate, useToggleAllDatesRehearsalRate } from '@/hooks/useToggleJobRehearsalRate';
-import { useJobTechnicianRateModeDates, useSetTechnicianDateRateMode } from '@/hooks/useTechnicianRateModeDates';
+import { useJobTechnicianRateModeDates, useSetTechnicianDateRateMode, type TechnicianDateRateMode } from '@/hooks/useTechnicianRateModeDates';
 import type { TechnicianProfileWithEmail } from '@/lib/job-payout-email';
 import { isJobPastClosureWindow } from '@/utils/jobClosureUtils';
 import { canManagePayouts, isAdminRole, isAdministrativeDepartment } from '@/utils/permissions';
@@ -19,10 +20,62 @@ import { NON_AUTONOMO_DEDUCTION_EUR } from './types';
 
 import { queryKeys } from "@/lib/react-query";
 const FIN_DOC_VIEW_ID = '8238f39c-f42e-11e0-a8de-00e08175e43e';
+const MADRID_TIMEZONE = 'Europe/Madrid';
+
 type TimesheetRow = Pick<
   Database['public']['Tables']['timesheets']['Row'],
   'technician_id' | 'amount_eur' | 'amount_breakdown' | 'approved_by_manager'
 >;
+
+type PayoutDateTimesheetRow = {
+  technician_id: string | null;
+  date: string | null;
+};
+
+type PayoutDateAssignmentRow = {
+  technician_id: string | null;
+  single_day: boolean | null;
+  assignment_date: string | null;
+};
+
+type PayoutDateTypeRow = {
+  date: string | null;
+  type: string | null;
+};
+
+type PayoutTourDateRow = {
+  start_date: string | null;
+  end_date: string | null;
+  date: string | null;
+};
+
+function toMadridDateKey(value: string | null | undefined): string | null {
+  if (!value) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return formatInTimeZone(parsed, MADRID_TIMEZONE, 'yyyy-MM-dd');
+}
+
+function compareDateKeys(left: string, right: string): number {
+  return left.localeCompare(right);
+}
+
+function enumerateDateRange(start: string | null, end: string | null): string[] {
+  if (!start) return [];
+  const [startYear, startMonth, startDay] = start.split('-').map(Number);
+  const [endYear, endMonth, endDay] = (end ?? start).split('-').map(Number);
+  const startDate = Date.UTC(startYear, startMonth - 1, startDay);
+  const endDate = Date.UTC(endYear, endMonth - 1, endDay);
+  const safeEndDate = endDate < startDate ? startDate : endDate;
+  const dates: string[] = [];
+
+  for (let cursor = startDate; cursor <= safeEndDate; cursor += 86_400_000) {
+    dates.push(new Date(cursor).toISOString().slice(0, 10));
+  }
+
+  return dates;
+}
 
 function isPrepDayBreakdown(amountBreakdown: TimesheetRow['amount_breakdown']): boolean {
   if (!amountBreakdown || typeof amountBreakdown !== 'object' || Array.isArray(amountBreakdown)) {
@@ -49,7 +102,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     enabled: !!jobId,
     queryFn: async () => {
       const { data, error } = await dataLayerClient.from('jobs')
-        .select('id, title, start_time, end_time, timezone, tour_id, rates_approved, job_type, invoicing_company')
+        .select('id, title, start_time, end_time, timezone, tour_id, tour_date_id, rates_approved, job_type, invoicing_company')
         .eq('id', jobId)
         .maybeSingle();
       if (error) throw error;
@@ -60,7 +113,14 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   const jobType = jobMeta?.job_type ?? null;
   const isTourDate = jobType === 'tourdate';
-  const isClosureLocked = isJobPastClosureWindow(jobMeta?.end_time, jobMeta?.timezone ?? 'Europe/Madrid');
+  // Admins can approve/edit payouts even after the 7-day closure window.
+  const isClosureLocked =
+    !isAdmin
+    && (
+      jobMetaLoading
+      || Boolean(jobMetaError)
+      || Boolean(jobMeta && isJobPastClosureWindow(jobMeta.end_time, jobMeta.timezone ?? 'Europe/Madrid'))
+    );
   const shouldLoadStandardTotals = !!jobId && !isTourDate && !jobMetaLoading;
   const shouldLoadTourQuotes = !!jobId && isTourDate;
 
@@ -115,26 +175,124 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
 
   const { data: technicianTimesheetDatesMap = new Map<string, string[]>() } = useQuery({
     queryKey: queryKeys.scope('job-tech-timesheet-dates', jobId),
-    enabled: !!jobId && isTourDate && !jobMetaLoading,
+    enabled: !!jobId && !jobMetaLoading,
     queryFn: async () => {
-      const { data, error } = await dataLayerClient.from('timesheets')
-        .select('technician_id, date')
-        .eq('job_id', jobId)
-        .eq('is_active', true);
+      const tourDateQuery = jobMeta?.tour_date_id
+        ? dataLayerClient.from('tour_dates')
+          .select('start_date, end_date, date')
+          .eq('id', jobMeta.tour_date_id)
+          .maybeSingle()
+        : Promise.resolve({ data: null, error: null });
 
-      if (error) throw error;
+      const [timesheetResult, assignmentResult, dateTypeResult, tourDateResult] = await Promise.all([
+        dataLayerClient.from('timesheets')
+          .select('technician_id, date')
+          .eq('job_id', jobId)
+          .eq('is_active', true),
+        dataLayerClient.from('job_assignments')
+          .select('technician_id, single_day, assignment_date')
+          .eq('job_id', jobId),
+        dataLayerClient.from('job_date_types')
+          .select('date, type')
+          .eq('job_id', jobId),
+        tourDateQuery,
+      ]);
+
+      if (timesheetResult.error) throw timesheetResult.error;
+      if (assignmentResult.error) throw assignmentResult.error;
+      if (dateTypeResult.error) throw dateTypeResult.error;
+      if (tourDateResult.error) throw tourDateResult.error;
 
       const byTech = new Map<string, Set<string>>();
-      (data || []).forEach((row) => {
-        if (!row.technician_id || !row.date) return;
-        if (!byTech.has(row.technician_id)) {
-          byTech.set(row.technician_id, new Set());
+      const activeTimesheetDatesByTech = new Map<string, Set<string>>();
+      const singleDayDatesByTech = new Map<string, Set<string>>();
+      const technicianIds = new Set<string>();
+
+      const timesheetRows = (timesheetResult.data || []) as PayoutDateTimesheetRow[];
+      const assignmentRows = (assignmentResult.data || []) as PayoutDateAssignmentRow[];
+      const dateTypeRows = (dateTypeResult.data || []) as PayoutDateTypeRow[];
+      const tourDate = tourDateResult.data as PayoutTourDateRow | null;
+
+      const prepDates = new Set(
+        dateTypeRows
+          .filter((row) => row.type === 'prep_day')
+          .map((row) => toMadridDateKey(row.date))
+          .filter((date): date is string => Boolean(date)),
+      );
+
+      const addDateToMap = (map: Map<string, Set<string>>, techId: string, date: string) => {
+        if (!map.has(techId)) {
+          map.set(techId, new Set());
         }
-        byTech.get(row.technician_id)!.add(row.date);
+        map.get(techId)!.add(date);
+      };
+
+      const addPayableDate = (techId: string | null | undefined, rawDate: string | null | undefined) => {
+        if (!techId) return;
+        const date = toMadridDateKey(rawDate);
+        if (!date || prepDates.has(date)) return;
+        technicianIds.add(techId);
+        addDateToMap(byTech, techId, date);
+      };
+
+      timesheetRows.forEach((row) => {
+        const date = toMadridDateKey(row.date);
+        if (!row.technician_id || !date || prepDates.has(date)) return;
+        technicianIds.add(row.technician_id);
+        addDateToMap(activeTimesheetDatesByTech, row.technician_id, date);
+        addDateToMap(byTech, row.technician_id, date);
+      });
+
+      assignmentRows.forEach((row) => {
+        if (!row.technician_id) return;
+        technicianIds.add(row.technician_id);
+        if (!row.single_day) return;
+
+        const date = toMadridDateKey(row.assignment_date);
+        if (!date || prepDates.has(date)) return;
+        addDateToMap(singleDayDatesByTech, row.technician_id, date);
+        addDateToMap(byTech, row.technician_id, date);
+      });
+
+      const rawScheduledRows = dateTypeRows
+        .map((row) => ({ date: toMadridDateKey(row.date), type: row.type }))
+        .filter((row): row is { date: string; type: string } => Boolean(row.date) && Boolean(row.type) && row.type !== 'prep_day');
+      const hasScheduledDateTypes = rawScheduledRows.length > 0;
+      const scheduledDates = rawScheduledRows
+        .filter((row) => row.type !== 'rigging')
+        .map((row) => row.date);
+      const riggingDates = rawScheduledRows
+        .filter((row) => row.type === 'rigging')
+        .map((row) => row.date);
+
+      const jobStartDate = toMadridDateKey(jobMeta?.start_time);
+      const jobEndDate = toMadridDateKey(jobMeta?.end_time) ?? jobStartDate;
+      const scheduleStart = toMadridDateKey(tourDate?.start_date)
+        ?? jobStartDate
+        ?? toMadridDateKey(tourDate?.date);
+      const scheduleEnd = toMadridDateKey(tourDate?.end_date)
+        ?? jobEndDate
+        ?? toMadridDateKey(tourDate?.start_date)
+        ?? toMadridDateKey(tourDate?.date)
+        ?? jobStartDate;
+      const fallbackScheduleDates = hasScheduledDateTypes
+        ? []
+        : enumerateDateRange(scheduleStart, scheduleEnd).filter((date) => !prepDates.has(date));
+
+      technicianIds.forEach((techId) => {
+        if ((singleDayDatesByTech.get(techId)?.size ?? 0) > 0) return;
+
+        scheduledDates.forEach((date) => addPayableDate(techId, date));
+        riggingDates.forEach((date) => {
+          if (activeTimesheetDatesByTech.get(techId)?.has(date)) {
+            addPayableDate(techId, date);
+          }
+        });
+        fallbackScheduleDates.forEach((date) => addPayableDate(techId, date));
       });
 
       return new Map(
-        Array.from(byTech.entries()).map(([techId, dates]) => [techId, Array.from(dates).sort()]),
+        Array.from(byTech.entries()).map(([techId, dates]) => [techId, Array.from(dates).sort(compareDateKeys)]),
       );
     },
     staleTime: 30_000,
@@ -427,9 +585,9 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     [jobTimesheetDates, rehearsalDateSet]
   );
 
-  /* ── Admin-only technician/date rate-mode exceptions ── */
+  /* ── Admin-only technician/date rate-mode exceptions (tour dates + standard jobs) ── */
   const shouldProbeTechnicianRateModes =
-    !!jobId && isTourDate && !jobMetaLoading && (isManager || isAdminOrAdministrative);
+    !!jobId && !jobMetaLoading && (isManager || isAdminOrAdministrative);
   const {
     data: technicianRateModeDates = [],
     error: technicianRateModeError,
@@ -440,25 +598,40 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
   const canViewTechnicianRateModePanel = shouldProbeTechnicianRateModes && !technicianRateModeError;
 
   const technicianRateModeMap = React.useMemo(() => {
-    const map = new Map<string, Map<string, 'rehearsal' | 'standard'>>();
+    const map = new Map<string, Map<string, TechnicianDateRateMode>>();
 
     technicianRateModeDates.forEach((row) => {
       if (!map.has(row.technician_id)) {
         map.set(row.technician_id, new Map());
       }
 
-      map.get(row.technician_id)!.set(
-        row.date,
-        row.use_rehearsal_rate ? 'rehearsal' : 'standard',
-      );
+      // rate_mode is the source of truth; fall back to the legacy boolean for
+      // any pre-migration row that somehow lacks it.
+      const mode = (row.rate_mode ?? (row.use_rehearsal_rate ? 'rehearsal' : 'standard')) as TechnicianDateRateMode;
+      map.get(row.technician_id)!.set(row.date, mode);
     });
 
     return map;
   }, [technicianRateModeDates]);
 
-  const getTechRateModeDateSelection = React.useCallback((techId: string, date: string) => {
+  const technicianRateModeFixedMap = React.useMemo(() => {
+    const map = new Map<string, Map<string, number | null>>();
+    technicianRateModeDates.forEach((row) => {
+      if (!map.has(row.technician_id)) {
+        map.set(row.technician_id, new Map());
+      }
+      map.get(row.technician_id)!.set(row.date, row.fixed_amount_eur ?? null);
+    });
+    return map;
+  }, [technicianRateModeDates]);
+
+  const getTechRateModeDateSelection = React.useCallback((techId: string, date: string): TechnicianDateRateMode => {
     return technicianRateModeMap.get(techId)?.get(date) ?? 'inherit';
   }, [technicianRateModeMap]);
+
+  const getTechRateModeFixedAmount = React.useCallback((techId: string, date: string): number | null => {
+    return technicianRateModeFixedMap.get(techId)?.get(date) ?? null;
+  }, [technicianRateModeFixedMap]);
 
   /* ── Grand total ── */
   const calculatedGrandTotal = React.useMemo(() => {
@@ -510,6 +683,7 @@ export function useJobPayoutData(jobId: string, technicianId?: string): JobPayou
     toggleDateRehearsalMutation,
     toggleAllDatesRehearsalMutation,
     getTechRateModeDateSelection,
+    getTechRateModeFixedAmount,
     setTechnicianRateModeMutation,
     standardPayoutTotals,
   };
