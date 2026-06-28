@@ -1,7 +1,9 @@
-
+import type { ReactNode } from "react";
 import { AlertTriangle, Info, XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { GearMismatch } from "@/utils/gearComparisonService";
 
 interface GearMismatchIndicatorProps {
@@ -10,6 +12,10 @@ interface GearMismatchIndicatorProps {
 }
 
 export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMismatchIndicatorProps) => {
+  // Touch devices have no hover, so the hover-only Tooltip leaves the details
+  // unreachable. On mobile we surface the same content in a tap-triggered Popover.
+  const isMobile = useIsMobile();
+
   if (mismatches.length === 0) {
     return compact ? (
       <Badge variant="secondary" className="bg-green-100 text-green-800">
@@ -26,7 +32,7 @@ export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMisma
   const warnings = mismatches.filter(m => m.severity === 'warning');
   const infos = mismatches.filter(m => m.severity === 'info');
 
-  const tooltipContent = (
+  const detailsContent = (
     <div className="max-w-sm space-y-2">
       <p className="font-medium">Estado del equipo:</p>
       {errors.length > 0 && (
@@ -65,65 +71,92 @@ export const GearMismatchIndicator = ({ mismatches, compact = false }: GearMisma
     </div>
   );
 
-  if (compact) {
+  const badges = compact ? (
+    <div className="flex items-center gap-1">
+      {errors.length > 0 && (
+        <Badge variant="destructive" className="text-xs px-1">
+          <XCircle className="h-3 w-3 mr-1" />
+          {errors.length}
+        </Badge>
+      )}
+      {warnings.length > 0 && (
+        <Badge variant="outline" className="text-xs px-1 bg-orange-100 text-orange-800 border-orange-300">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          {warnings.length}
+        </Badge>
+      )}
+      {infos.length > 0 && (
+        <Badge variant="outline" className="text-xs px-1 bg-blue-50 text-blue-600 border-blue-200">
+          <Info className="h-3 w-3 mr-1" />
+          {infos.length}
+        </Badge>
+      )}
+    </div>
+  ) : (
+    <div className="flex items-center gap-2">
+      {errors.length > 0 && (
+        <Badge variant="destructive" className="text-xs">
+          <XCircle className="h-3 w-3 mr-1" />
+          {errors.length} Error{errors.length !== 1 ? 'es' : ''}
+        </Badge>
+      )}
+      {warnings.length > 0 && (
+        <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          {warnings.length} Advertencia{warnings.length !== 1 ? 's' : ''}
+        </Badge>
+      )}
+      {infos.length > 0 && (
+        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200">
+          <Info className="h-3 w-3 mr-1" />
+          {infos.length} Información
+        </Badge>
+      )}
+    </div>
+  );
+
+  return renderWithDetails(isMobile, badges, detailsContent);
+};
+
+/**
+ * Wraps the badge row so the details are reachable on every device:
+ * a hover/focus Tooltip on desktop, a tap-triggered Popover on touch.
+ */
+const renderWithDetails = (isMobile: boolean, trigger: ReactNode, content: ReactNode) => {
+  if (isMobile) {
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div className="flex items-center gap-1">
-            {errors.length > 0 && (
-              <Badge variant="destructive" className="text-xs px-1">
-                <XCircle className="h-3 w-3 mr-1" />
-                {errors.length}
-              </Badge>
-            )}
-            {warnings.length > 0 && (
-              <Badge variant="outline" className="text-xs px-1 bg-orange-100 text-orange-800 border-orange-300">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                {warnings.length}
-              </Badge>
-            )}
-            {infos.length > 0 && (
-              <Badge variant="outline" className="text-xs px-1 bg-blue-50 text-blue-600 border-blue-200">
-                <Info className="h-3 w-3 mr-1" />
-                {infos.length}
-              </Badge>
-            )}
-          </div>
-        </TooltipTrigger>
-        <TooltipContent>
-          {tooltipContent}
-        </TooltipContent>
-      </Tooltip>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label="Ver detalles del estado del equipo"
+            className="appearance-none border-0 bg-transparent p-0 cursor-pointer"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {trigger}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto max-w-[90vw]" onClick={(e) => e.stopPropagation()}>
+          {content}
+        </PopoverContent>
+      </Popover>
     );
   }
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="flex items-center gap-2">
-          {errors.length > 0 && (
-            <Badge variant="destructive" className="text-xs">
-              <XCircle className="h-3 w-3 mr-1" />
-              {errors.length} Error{errors.length !== 1 ? 'es' : ''}
-            </Badge>
-          )}
-          {warnings.length > 0 && (
-            <Badge variant="outline" className="text-xs bg-orange-100 text-orange-800 border-orange-300">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              {warnings.length} Advertencia{warnings.length !== 1 ? 's' : ''}
-            </Badge>
-          )}
-          {infos.length > 0 && (
-            <Badge variant="outline" className="text-xs bg-blue-50 text-blue-600 border-blue-200">
-              <Info className="h-3 w-3 mr-1" />
-              {infos.length} Información
-            </Badge>
-          )}
-        </div>
+        {/* A button (not a bare div) so keyboard users can Tab to it and the
+            tooltip opens on focus as well as hover. */}
+        <button
+          type="button"
+          aria-label="Ver detalles del estado del equipo"
+          className="appearance-none border-0 bg-transparent p-0 cursor-default"
+        >
+          {trigger}
+        </button>
       </TooltipTrigger>
-      <TooltipContent>
-        {tooltipContent}
-      </TooltipContent>
+      <TooltipContent>{content}</TooltipContent>
     </Tooltip>
   );
 };
