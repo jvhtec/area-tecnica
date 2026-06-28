@@ -37,7 +37,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ExpenseList, ExpenseSummaryCard } from "@/components/expenses";
 import { useJobExpenses } from "@/hooks/useJobExpenses";
-import { isManagementRole, isTechnicianRole } from "@/utils/permissions";
+import { isAdminRole, isManagementRole, isTechnicianRole } from "@/utils/permissions";
 
 import { TimesheetEditForm } from "./TimesheetEditForm";
 import { TimesheetRejectDialog } from "./TimesheetRejectDialog";
@@ -84,16 +84,23 @@ export const TimesheetView = ({
     staleTime: 60_000,
   });
 
+  const isAdmin = isAdminRole(userRole);
+
   // On error, allow actions (fail-open) rather than permanently locking users out.
   // When jobMeta is undefined (loading), default to locked=true to prevent
   // actions until we know the actual closure status.
   // When jobMeta is null (not found), allow actions (job doesn't exist or has no end_time).
-  const isClosureLocked = (() => {
+  const isPastClosureWindow = (() => {
     if (jobMetaError) return false; // fail-open on error
-    if (jobMeta === undefined) return true; // locked while loading
+    if (jobMeta === undefined) return true; // treat as locked while loading
     if (!jobMeta) return false; // job not found, allow actions
     return isJobPastClosureWindow(jobMeta.end_time, jobMeta.timezone ?? 'Europe/Madrid');
   })();
+
+  // Admins can approve/edit timesheets even after the 7-day closure window.
+  const isClosureLocked = isPastClosureWindow && !isAdmin;
+  // Surface when an admin is bypassing the closed window so the action is visible.
+  const isAdminOverridingClosure = isPastClosureWindow && isAdmin && jobMeta !== undefined;
 
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [editingTimesheet, setEditingTimesheet] = useState<string | null>(null);
@@ -468,6 +475,17 @@ export const TimesheetView = ({
             </div>
           </div>
         </div>
+      )}
+
+      {isAdminOverridingClosure && (
+        <Alert className="border-amber-500/40 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-300" />
+          <AlertTitle>Ventana de cierre vencida</AlertTitle>
+          <AlertDescription>
+            Han pasado más de 7 días desde el fin del trabajo. Como administrador puedes seguir
+            aprobando y editando partes — estas acciones quedan registradas.
+          </AlertDescription>
+        </Alert>
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

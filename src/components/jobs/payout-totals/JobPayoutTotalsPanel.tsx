@@ -257,6 +257,7 @@ export function JobPayoutTotalsPanel({ jobId, technicianId }: JobPayoutTotalsPan
             isClosureLocked={data.isClosureLocked}
             getTechOverride={data.getTechOverride}
             getTechRateModeDateSelection={data.getTechRateModeDateSelection}
+            getTechRateModeFixedAmount={data.getTechRateModeFixedAmount}
             setTechnicianRateModeMutation={data.setTechnicianRateModeMutation}
             overrideActorMap={data.overrideActorMap}
             editingTechId={actions.editingTechId}

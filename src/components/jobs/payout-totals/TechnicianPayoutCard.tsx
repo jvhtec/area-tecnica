@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertCircle, ChevronDown, Clock, CheckCircle, ExternalLink, Send, Receipt } from 'lucide-react';
@@ -54,8 +55,9 @@ interface TechnicianPayoutCardProps {
   /* Override */
   getTechOverride: (techId: string) => JobPayoutOverride | undefined;
   getTechRateModeDateSelection?: (techId: string, date: string) => TechnicianDateRateMode;
+  getTechRateModeFixedAmount?: (techId: string, date: string) => number | null;
   setTechnicianRateModeMutation?: {
-    mutate: (args: { jobId: string; technicianId: string; date: string; mode: TechnicianDateRateMode }) => void;
+    mutate: (args: { jobId: string; technicianId: string; date: string; mode: TechnicianDateRateMode; fixedAmountEur?: number | null }) => void;
     isPending: boolean;
   };
   overrideActorMap: Map<string, { name: string; email: string | null }>;
@@ -97,6 +99,7 @@ export function TechnicianPayoutCard({
   isClosureLocked,
   getTechOverride,
   getTechRateModeDateSelection,
+  getTechRateModeFixedAmount,
   setTechnicianRateModeMutation,
   overrideActorMap,
   editingTechId,
@@ -153,7 +156,14 @@ export function TechnicianPayoutCard({
     }
     return 'inherit' as TechnicianDateRateMode;
   }, [getTechRateModeDateSelection, techId]);
-  const showAdminRateModeSection = isTourDate && canViewTechnicianRateModePanel && technicianTimesheetDates.length > 0;
+  // Available on both tour dates and standard jobs; tour-only modes are filtered in the row.
+  const showAdminRateModeSection = canViewTechnicianRateModePanel && technicianTimesheetDates.length > 0;
+  const safeGetTechRateModeFixedAmount = React.useCallback((date: string) => {
+    if (typeof getTechRateModeFixedAmount === 'function') {
+      return getTechRateModeFixedAmount(techId, date);
+    }
+    return null;
+  }, [getTechRateModeFixedAmount, techId]);
   const activeRateModeOverrideCount = React.useMemo(() => {
     return technicianTimesheetDates.reduce((count, dateStr) => {
       return count + (safeGetTechRateModeDateSelection(dateStr) === 'inherit' ? 0 : 1);
@@ -488,51 +498,20 @@ export function TechnicianPayoutCard({
             </CollapsibleTrigger>
 
             <CollapsibleContent className="space-y-2">
-              {technicianTimesheetDates.map((dateStr) => {
-                const selectedMode = safeGetTechRateModeDateSelection(dateStr);
-                const inheritsRehearsal = rehearsalDateSet.has(dateStr);
-                const inheritedLabel = inheritsRehearsal ? 'Ensayo' : 'Estándar';
-                const dateLabel = formatInTimeZone(parseISO(dateStr), 'Europe/Madrid', 'EEE d MMM', {
-                  locale: es,
-                });
-
-                return (
-                  <div
-                    key={`${techId}-${dateStr}`}
-                    className="flex flex-col gap-2 rounded-md border border-border/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium capitalize">{dateLabel}</div>
-                      <div className="text-xs text-muted-foreground">Tarifa global: {inheritedLabel}</div>
-                    </div>
-
-                    <Select
-                      value={selectedMode}
-                      onValueChange={(nextMode) => {
-                        const mode = nextMode as TechnicianDateRateMode;
-                        if (mode === selectedMode) return;
-                        if (!setTechnicianRateModeMutation) return;
-                        setTechnicianRateModeMutation.mutate({
-                          jobId,
-                          technicianId: techId,
-                          date: dateStr,
-                          mode,
-                        });
-                      }}
-                      disabled={!hasRateModeHandlers || (setTechnicianRateModeMutation?.isPending ?? false)}
-                    >
-                      <SelectTrigger className="h-8 w-full text-xs sm:w-[220px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="inherit">Heredar ({inheritedLabel})</SelectItem>
-                        <SelectItem value="rehearsal">Forzar ensayo</SelectItem>
-                        <SelectItem value="standard">Forzar estándar</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                );
-              })}
+              {technicianTimesheetDates.map((dateStr) => (
+                <RateModeDateRow
+                  key={`${techId}-${dateStr}`}
+                  jobId={jobId}
+                  techId={techId}
+                  dateStr={dateStr}
+                  isTourDate={isTourDate}
+                  selectedMode={safeGetTechRateModeDateSelection(dateStr)}
+                  fixedAmount={safeGetTechRateModeFixedAmount(dateStr)}
+                  inheritsRehearsal={rehearsalDateSet.has(dateStr)}
+                  disabled={!hasRateModeHandlers || (setTechnicianRateModeMutation?.isPending ?? false)}
+                  setTechnicianRateModeMutation={setTechnicianRateModeMutation}
+                />
+              ))}
             </CollapsibleContent>
             {setTechnicianRateModeMutation?.isPending && (
               <div className="text-xs text-muted-foreground animate-pulse">Actualizando tarifa calculada…</div>
@@ -576,6 +555,134 @@ export function TechnicianPayoutCard({
           {formatCurrency(getTechOverride(techId)?.override_amount_eur ?? effectiveTotal)}
         </Badge>
       </div>
+    </div>
+  );
+}
+
+interface RateModeDateRowProps {
+  jobId: string;
+  techId: string;
+  dateStr: string;
+  isTourDate: boolean;
+  selectedMode: TechnicianDateRateMode;
+  fixedAmount: number | null;
+  inheritsRehearsal: boolean;
+  disabled: boolean;
+  setTechnicianRateModeMutation?: {
+    mutate: (args: { jobId: string; technicianId: string; date: string; mode: TechnicianDateRateMode; fixedAmountEur?: number | null }) => void;
+    isPending: boolean;
+  };
+}
+
+function RateModeDateRow({
+  jobId,
+  techId,
+  dateStr,
+  isTourDate,
+  selectedMode,
+  fixedAmount,
+  inheritsRehearsal,
+  disabled,
+  setTechnicianRateModeMutation,
+}: RateModeDateRowProps) {
+  const inheritedLabel = inheritsRehearsal ? 'Ensayo' : 'Estándar';
+  const dateLabel = formatInTimeZone(parseISO(dateStr), 'Europe/Madrid', 'EEE d MMM', { locale: es });
+
+  const [fixedInput, setFixedInput] = React.useState<string>(
+    fixedAmount != null ? String(fixedAmount) : '',
+  );
+
+  // Keep the local input in sync when the persisted value changes elsewhere.
+  React.useEffect(() => {
+    setFixedInput(fixedAmount != null ? String(fixedAmount) : '');
+  }, [fixedAmount]);
+
+  const commitFixedAmount = React.useCallback(() => {
+    if (!setTechnicianRateModeMutation) return;
+    const parsed = Number.parseFloat(fixedInput.replace(',', '.'));
+    const nextAmount = Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
+    if ((fixedAmount ?? 0) === nextAmount) return;
+    setTechnicianRateModeMutation.mutate({
+      jobId,
+      technicianId: techId,
+      date: dateStr,
+      mode: 'fixed',
+      fixedAmountEur: nextAmount,
+    });
+  }, [setTechnicianRateModeMutation, fixedInput, fixedAmount, jobId, techId, dateStr]);
+
+  return (
+    <div className="flex flex-col gap-2 rounded-md border border-border/60 px-3 py-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="text-sm font-medium capitalize">{dateLabel}</div>
+          <div className="text-xs text-muted-foreground">Tarifa global: {inheritedLabel}</div>
+        </div>
+
+        <Select
+          value={selectedMode}
+          onValueChange={(nextMode) => {
+            const mode = nextMode as TechnicianDateRateMode;
+            if (mode === selectedMode) return;
+            if (!setTechnicianRateModeMutation) return;
+            setTechnicianRateModeMutation.mutate({
+              jobId,
+              technicianId: techId,
+              date: dateStr,
+              mode,
+              // Seed a fixed amount so the row never violates the NOT NULL check.
+              fixedAmountEur: mode === 'fixed' ? (fixedAmount ?? 0) : undefined,
+            });
+          }}
+          disabled={disabled}
+        >
+          <SelectTrigger className="h-8 w-full text-xs sm:w-[240px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="inherit">Heredar ({inheritedLabel})</SelectItem>
+            <SelectItem value="rehearsal">Forzar ensayo</SelectItem>
+            <SelectItem value="standard">Forzar estándar</SelectItem>
+            {isTourDate && (
+              <>
+                <SelectItem value="tour_multipliers">Forzar multiplicadores de gira</SelectItem>
+                <SelectItem value="no_multipliers">Sin multiplicadores (base)</SelectItem>
+                <SelectItem value="hourly">Tarifa por horas</SelectItem>
+              </>
+            )}
+            <SelectItem value="fixed">Importe fijo</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {selectedMode === 'fixed' && (
+        <div className="flex items-center justify-end gap-2">
+          <span className="text-xs text-muted-foreground">Importe fijo (€):</span>
+          <Input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0"
+            value={fixedInput}
+            onChange={(e) => setFixedInput(e.target.value)}
+            onBlur={commitFixedAmount}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            disabled={disabled}
+            className="h-8 w-28 text-xs"
+          />
+        </div>
+      )}
+
+      {selectedMode === 'hourly' && (
+        <div className="text-[11px] text-muted-foreground text-right">
+          Se factura por horas del parte de esta fecha.
+        </div>
+      )}
     </div>
   );
 }
