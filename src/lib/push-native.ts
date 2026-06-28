@@ -96,7 +96,7 @@ const waitForRegistrationToken = async (): Promise<string> => {
             return
           }
           resolved = true
-          const message = error?.message || 'Unable to register for native push notifications.'
+          const message = error?.error || error?.message || 'Unable to register for native push notifications.'
           void cleanup().then(() => reject(new Error(message)))
         })
 
