@@ -26,6 +26,7 @@ export interface JobMetadata {
   end_time: string | null;
   timezone: string | null;
   tour_id: string | null;
+  tour_date_id: string | null;
   rates_approved: boolean | null;
   job_type: string | null;
   invoicing_company: string | null;
@@ -65,8 +66,9 @@ export interface JobPayoutData {
   toggleDateRehearsalMutation: { mutate: (args: { jobId: string; date: string; enabled: boolean }) => void; isPending: boolean };
   toggleAllDatesRehearsalMutation: { mutate: (args: { jobId: string; dates: string[]; enabled: boolean }) => void; isPending: boolean };
   getTechRateModeDateSelection: (techId: string, date: string) => TechnicianDateRateMode;
+  getTechRateModeFixedAmount: (techId: string, date: string) => number | null;
   setTechnicianRateModeMutation: {
-    mutate: (args: { jobId: string; technicianId: string; date: string; mode: TechnicianDateRateMode }) => void;
+    mutate: (args: { jobId: string; technicianId: string; date: string; mode: TechnicianDateRateMode; fixedAmountEur?: number | null }) => void;
     isPending: boolean;
   };
   standardPayoutTotals: JobPayoutTotals[];

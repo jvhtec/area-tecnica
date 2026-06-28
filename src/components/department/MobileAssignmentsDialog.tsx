@@ -254,7 +254,7 @@ export const MobileAssignmentsDialog: React.FC<MobileAssignmentsDialogProps> = (
                             variant="ghost"
                             size="sm"
                             className="text-red-300 hover:bg-red-500/10"
-                            onClick={() => removeAssignment(assignment.technician_id)}
+                            onClick={() => removeAssignment(assignment.technician_id, assignment)}
                             disabled={isRemoving[assignment.technician_id]}
                           >
                             {isRemoving[assignment.technician_id] ? (
