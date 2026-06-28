@@ -3,6 +3,56 @@ import { syncFlexWorkOrdersForJob } from '@/services/flexWorkOrders';
 import type { TourJobRateQuote } from '@/types/tourRates';
 import { attachPayoutOverridesToTourQuotes } from '@/services/tourPayoutOverrides';
 
+// Timesheet amount breakdown blob (all fields optional; values may be numeric or
+// numeric strings depending on source). Used only for read/coercion here.
+type AmountBreakdown = {
+  hours_rounded?: number | string | null;
+  worked_hours_rounded?: number | string | null;
+  plus_10_12_amount_eur?: number | string | null;
+  plus_10_12_eur?: number | string | null;
+  overtime_hours?: number | string | null;
+  overtime_amount_eur?: number | string | null;
+};
+
+type TimesheetBreakdownRow = {
+  id: string;
+  job_id?: string;
+  technician_id: string | null;
+  approved_by_manager?: boolean | null;
+  amount_breakdown?: AmountBreakdown | null;
+  amount_breakdown_visible?: AmountBreakdown | null;
+};
+
+type LpoRow = { technician_id: string; lpo_number: string | null };
+
+// Loosely-typed row returned by the rate-quote RPC; values are coerced below.
+// extras/vehicle_disclaimer/breakdown reuse the output contract so they assign cleanly.
+type RpcQuoteRow = {
+  job_id?: string;
+  technician_id?: string;
+  start_time?: string;
+  end_time?: string;
+  job_type?: string;
+  tour_id?: string;
+  title?: string;
+  is_house_tech?: boolean;
+  is_tour_team_member?: boolean;
+  category?: string;
+  base_day_eur?: number | string | null;
+  week_count?: number | string | null;
+  multiplier?: number | string | null;
+  per_job_multiplier?: number | string | null;
+  iso_year?: number | null;
+  iso_week?: number | null;
+  total_eur?: number | string | null;
+  extras?: TourJobRateQuote['extras'];
+  extras_total_eur?: number | string | null;
+  total_with_extras_eur?: number | string | null;
+  vehicle_disclaimer?: TourJobRateQuote['vehicle_disclaimer'];
+  vehicle_disclaimer_text?: string;
+  breakdown?: TourJobRateQuote['breakdown'];
+};
+
 export interface TourRatesExportJob {
   id: string;
   title: string;
@@ -34,7 +84,7 @@ const mapRpcResultToQuote = (
   jobId: string,
   tourId: string,
   techId: string,
-  raw: Record<string, any>
+  raw: RpcQuoteRow
 ): TourJobRateQuote => ({
   job_id: raw.job_id ?? jobId,
   technician_id: raw.technician_id ?? techId,
@@ -131,7 +181,7 @@ export async function buildTourRatesExportPayload(
           .eq('job_id', j.id);
         if (refreshed) {
           const map = new Map<string, string | null>();
-          refreshed.forEach((r: any) => map.set(r.technician_id, r.lpo_number));
+          (refreshed as LpoRow[]).forEach((r) => map.set(r.technician_id, r.lpo_number));
           lpoByJob.set(j.id, map);
         }
       } catch (_) {
@@ -188,7 +238,7 @@ export async function buildTourRatesExportPayload(
             } as TourJobRateQuote;
           }
 
-          const raw = (data || {}) as Record<string, any>;
+          const raw = (data || {}) as RpcQuoteRow;
           return mapRpcResultToQuote(job.id, tourId, techId, raw);
         })
       );
@@ -207,12 +257,12 @@ export async function buildTourRatesExportPayload(
         .eq('approved_by_manager', true);
       const agg = new Map<string, { h: number; plus: number; otH: number; otAmt: number }>();
       if (ts && ts.length) {
-        const toCompute: any[] = [];
-        ts.forEach((row: any) => {
+        const toCompute: TimesheetBreakdownRow[] = [];
+        (ts as TimesheetBreakdownRow[]).forEach((row) => {
           const tech = row.technician_id as string;
-          const persisted = row.amount_breakdown as Record<string, any> | null;
+          const persisted = row.amount_breakdown ?? null;
           if (!persisted) toCompute.push(row);
-          const b = persisted || {};
+          const b: AmountBreakdown = persisted ?? {};
           const h = Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0;
           const plus =
             b.plus_10_12_amount_eur != null
@@ -225,12 +275,12 @@ export async function buildTourRatesExportPayload(
         });
         if (toCompute.length) {
           const computed = await Promise.all(
-            toCompute.map(async (row: any) => {
+            toCompute.map(async (row) => {
               const { data, error } = await supabase.rpc('compute_timesheet_amount_2025', {
                 _timesheet_id: row.id,
                 _persist: false,
               });
-              return { tech: row.technician_id as string, br: error ? null : (data as any) };
+              return { tech: row.technician_id as string, br: error ? null : (data as AmountBreakdown | null) };
             })
           );
           computed.forEach(({ tech, br }) => {
@@ -251,11 +301,11 @@ export async function buildTourRatesExportPayload(
       if ((!ts || ts.length === 0) && agg.size === 0) {
         const { data: tsVisible } = await supabase.rpc('get_timesheet_amounts_visible');
         if (Array.isArray(tsVisible) && tsVisible.length) {
-          (tsVisible as any[])
-            .filter((row) => row.job_id === job.id && techIds.includes(row.technician_id) && row.approved_by_manager === true)
-            .forEach((row: any) => {
+          (tsVisible as TimesheetBreakdownRow[])
+            .filter((row) => row.job_id === job.id && techIds.includes(row.technician_id ?? '') && row.approved_by_manager === true)
+            .forEach((row) => {
               const tech = row.technician_id as string;
-              const b = (row.amount_breakdown || row.amount_breakdown_visible || {}) as Record<string, any>;
+              const b: AmountBreakdown = (row.amount_breakdown || row.amount_breakdown_visible) ?? {};
               const h = Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0;
               const plus = h > 10 ? Number(b.plus_10_12_eur ?? 0) || 0 : 0;
               const otH = Number(b.overtime_hours ?? 0) || 0;
@@ -329,10 +379,10 @@ export async function buildTourRatesExportPayload(
         // Try to use persisted breakdown if present; otherwise compute via RPC per timesheet
         if ((timesheets || []).length > 0) {
           // First pass: accumulate any persisted breakdowns
-          (timesheets || []).forEach((row: any) => {
+          ((timesheets || []) as unknown as TimesheetBreakdownRow[]).forEach((row) => {
             const tech = row.technician_id as string | null;
             if (!tech) return;
-            const persisted = (row.amount_breakdown || row.amount_breakdown_visible) as Record<string, any> | null;
+            const persisted: AmountBreakdown | null = (row.amount_breakdown || row.amount_breakdown_visible) ?? null;
             if (!persisted) return;
             const hoursRounded = Number(persisted.hours_rounded ?? persisted.worked_hours_rounded ?? 0) || 0;
             const plusEur =
@@ -355,15 +405,15 @@ export async function buildTourRatesExportPayload(
           });
 
           // Second pass: compute breakdown for any timesheets missing persisted details
-          const toCompute = (timesheets || []).filter((row: any) => !row.amount_breakdown && !row.amount_breakdown_visible);
+          const toCompute = ((timesheets || []) as unknown as TimesheetBreakdownRow[]).filter((row) => !row.amount_breakdown && !row.amount_breakdown_visible);
           if (toCompute.length > 0) {
             const computed = await Promise.all(
-              toCompute.map(async (row: any) => {
+              toCompute.map(async (row) => {
                 const { data, error } = await supabase.rpc('compute_timesheet_amount_2025', {
                   _timesheet_id: row.id,
                   _persist: false,
                 });
-                return { tech: row.technician_id as string, breakdown: (error ? null : (data as any)) as Record<string, any> | null };
+                return { tech: row.technician_id as string, breakdown: (error ? null : (data as AmountBreakdown | null)) };
               })
             );
 
@@ -395,11 +445,11 @@ export async function buildTourRatesExportPayload(
         if (breakdownByTech.size === 0) {
           const { data: tsVisible } = await supabase.rpc('get_timesheet_amounts_visible');
           if (Array.isArray(tsVisible) && tsVisible.length) {
-            (tsVisible as any[])
-              .filter((row) => row.job_id === job.id && techIds.includes(row.technician_id) && row.approved_by_manager === true)
-              .forEach((row: any) => {
+            (tsVisible as TimesheetBreakdownRow[])
+              .filter((row) => row.job_id === job.id && techIds.includes(row.technician_id ?? '') && row.approved_by_manager === true)
+              .forEach((row) => {
                 const tech = row.technician_id as string;
-                const b = (row.amount_breakdown || row.amount_breakdown_visible || {}) as Record<string, any>;
+                const b: AmountBreakdown = (row.amount_breakdown || row.amount_breakdown_visible) ?? {};
                 const hoursRounded = Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0;
                 const plusEur =
                   b.plus_10_12_amount_eur != null
@@ -427,7 +477,7 @@ export async function buildTourRatesExportPayload(
           technician_id: p.technician_id!,
           start_time: job.start_time,
           end_time: job.end_time ?? job.start_time,
-          job_type: (job.job_type as any) || 'single',
+          job_type: job.job_type || 'single',
           tour_id: tourId,
           title: job.title,
           is_house_tech: false,
