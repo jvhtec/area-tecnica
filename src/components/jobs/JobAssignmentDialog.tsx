@@ -34,7 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Job } from "@/types/job";
 import { User } from "@/types/user";
 import { useEffect, useState, useMemo } from "react";
-import { AlertCircle, Loader2, RefreshCw, ExternalLink, CalendarIcon } from "lucide-react";
+import { AlertCircle, Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import { dataLayerClient } from "@/services/dataLayerClient";
 import { useJobAssignmentsRealtime } from "@/hooks/useJobAssignmentsRealtime";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
