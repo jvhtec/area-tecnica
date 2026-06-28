@@ -330,7 +330,7 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
     });
   } catch (error: unknown) {
     const code = errorCode(error);
-    if (code && code !== "42P01") throw error;
+    if (code !== "42P01") throw error;
   }
 
   try {
@@ -372,7 +372,7 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
     }
   } catch (error: unknown) {
     const code = errorCode(error);
-    if (code && code !== "42P01") throw error;
+    if (code !== "42P01") throw error;
   }
 
   return Array.from(perDay.values());
@@ -446,18 +446,18 @@ export function formatLabel(value: string) {
 
 export function parseSummaryRow(row: unknown): StaffingSummaryRow | null {
   const record = (row ?? null) as { job_id?: unknown; department?: unknown; roles?: unknown } | null;
-  if (!record || !record.job_id || !record.department) return null;
+  if (!record || typeof record.job_id !== "string" || typeof record.department !== "string") return null;
   const rawRoles = Array.isArray(record.roles) ? (record.roles as Array<Record<string, unknown>>) : [];
   const roles = rawRoles
     .map((r) => ({
       role_code: typeof r?.role_code === "string" ? r.role_code : String(r?.role_code ?? ""),
       quantity: Number(r?.quantity ?? 0),
-      notes: (r?.notes ?? null) as string | null,
+      notes: typeof r?.notes === "string" ? r.notes : null,
     }))
     .filter((r: StaffingSummaryRole) => r.role_code);
   return {
-    job_id: record.job_id as string,
-    department: record.department as string,
+    job_id: record.job_id,
+    department: record.department,
     roles,
   };
 }

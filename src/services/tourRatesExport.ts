@@ -25,6 +25,8 @@ type TimesheetBreakdownRow = {
 
 type LpoRow = { technician_id: string; lpo_number: string | null };
 
+type TimesheetTotals = { hours: number; plus: number; overtimeHours: number; overtimeAmount: number };
+
 // Loosely-typed row returned by the rate-quote RPC; values are coerced below.
 // extras/vehicle_disclaimer/breakdown reuse the output contract so they assign cleanly.
 type RpcQuoteRow = {
@@ -81,18 +83,18 @@ export interface TourRatesExportPayload {
 }
 
 const mapRpcResultToQuote = (
-  jobId: string,
+  job: TourRatesExportJob,
   tourId: string,
   techId: string,
   raw: RpcQuoteRow
 ): TourJobRateQuote => ({
-  job_id: raw.job_id ?? jobId,
+  job_id: raw.job_id ?? job.id,
   technician_id: raw.technician_id ?? techId,
-  start_time: raw.start_time,
-  end_time: raw.end_time,
+  start_time: raw.start_time ?? job.start_time,
+  end_time: raw.end_time ?? job.end_time ?? job.start_time,
   job_type: raw.job_type ?? 'tourdate',
   tour_id: raw.tour_id ?? tourId,
-  title: raw.title ?? '',
+  title: raw.title ?? job.title,
   is_house_tech: !!raw.is_house_tech,
   is_tour_team_member: !!raw.is_tour_team_member,
   category: raw.category ?? '',
@@ -111,6 +113,19 @@ const mapRpcResultToQuote = (
   vehicle_disclaimer_text: raw.vehicle_disclaimer_text,
   breakdown: raw.breakdown ?? {},
 });
+
+const readTimesheetTotals = (breakdown: AmountBreakdown | null | undefined): TimesheetTotals => {
+  const b = breakdown ?? {};
+  const hours = Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0;
+  const plus =
+    b.plus_10_12_amount_eur != null
+      ? Number(b.plus_10_12_amount_eur) || 0
+      : (Number(b.plus_10_12_eur ?? 0) || 0) * Math.min(Math.max(hours - 10, 0), 2);
+  const overtimeHours = Number(b.overtime_hours ?? 0) || 0;
+  const overtimeAmount = Number(b.overtime_amount_eur ?? 0) || 0;
+
+  return { hours, plus, overtimeHours, overtimeAmount };
+};
 
 export async function buildTourRatesExportPayload(
   tourId: string,
@@ -191,6 +206,13 @@ export async function buildTourRatesExportPayload(
   );
 
   const jobsWithQuotes: TourJobQuotesWithLPO[] = [];
+  let visibleTimesheetsPromise: Promise<TimesheetBreakdownRow[]> | null = null;
+  const getVisibleTimesheets = async (): Promise<TimesheetBreakdownRow[]> => {
+    visibleTimesheetsPromise ??= Promise.resolve(supabase.rpc('get_timesheet_amounts_visible')).then(({ data }) =>
+      Array.isArray(data) ? (data as TimesheetBreakdownRow[]) : []
+    );
+    return visibleTimesheetsPromise;
+  };
 
   for (const job of jobs) {
     const techIds = Array.from(assignmentsByJob.get(job.id) ?? []);
@@ -239,7 +261,7 @@ export async function buildTourRatesExportPayload(
           }
 
           const raw = (data || {}) as RpcQuoteRow;
-          return mapRpcResultToQuote(job.id, tourId, techId, raw);
+          return mapRpcResultToQuote(job, tourId, techId, raw);
         })
       );
       filteredQuotes = (quotes.filter(Boolean) as TourJobRateQuote[]).filter(q => q.technician_id);
@@ -262,16 +284,14 @@ export async function buildTourRatesExportPayload(
           const tech = row.technician_id as string;
           const persisted = row.amount_breakdown ?? null;
           if (!persisted) toCompute.push(row);
-          const b: AmountBreakdown = persisted ?? {};
-          const h = Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0;
-          const plus =
-            b.plus_10_12_amount_eur != null
-              ? Number(b.plus_10_12_amount_eur) || 0
-              : (Number(b.plus_10_12_eur ?? 0) || 0) * Math.min(Math.max(h - 10, 0), 2);
-          const otH = Number(b.overtime_hours ?? 0) || 0;
-          const otAmt = Number(b.overtime_amount_eur ?? 0) || 0;
+          const totals = readTimesheetTotals(persisted);
           const cur = agg.get(tech) || { h: 0, plus: 0, otH: 0, otAmt: 0 };
-          agg.set(tech, { h: cur.h + h, plus: cur.plus + plus, otH: cur.otH + otH, otAmt: cur.otAmt + otAmt });
+          agg.set(tech, {
+            h: cur.h + totals.hours,
+            plus: cur.plus + totals.plus,
+            otH: cur.otH + totals.overtimeHours,
+            otAmt: cur.otAmt + totals.overtimeAmount,
+          });
         });
         if (toCompute.length) {
           const computed = await Promise.all(
@@ -285,33 +305,33 @@ export async function buildTourRatesExportPayload(
           );
           computed.forEach(({ tech, br }) => {
             if (!tech || !br) return;
-            const h = Number(br.hours_rounded ?? br.worked_hours_rounded ?? 0) || 0;
-            const plus =
-              br.plus_10_12_amount_eur != null
-                ? Number(br.plus_10_12_amount_eur) || 0
-                : (Number(br.plus_10_12_eur ?? 0) || 0) * Math.min(Math.max(h - 10, 0), 2);
-            const otH = Number(br.overtime_hours ?? 0) || 0;
-            const otAmt = Number(br.overtime_amount_eur ?? 0) || 0;
+            const totals = readTimesheetTotals(br);
             const cur = agg.get(tech) || { h: 0, plus: 0, otH: 0, otAmt: 0 };
-            agg.set(tech, { h: cur.h + h, plus: cur.plus + plus, otH: cur.otH + otH, otAmt: cur.otAmt + otAmt });
+            agg.set(tech, {
+              h: cur.h + totals.hours,
+              plus: cur.plus + totals.plus,
+              otH: cur.otH + totals.overtimeHours,
+              otAmt: cur.otAmt + totals.overtimeAmount,
+            });
           });
         }
       }
       // Fallback to security-definer helper if direct timesheets access returned nothing
       if ((!ts || ts.length === 0) && agg.size === 0) {
-        const { data: tsVisible } = await supabase.rpc('get_timesheet_amounts_visible');
-        if (Array.isArray(tsVisible) && tsVisible.length) {
-          (tsVisible as TimesheetBreakdownRow[])
+        const tsVisible = await getVisibleTimesheets();
+        if (tsVisible.length) {
+          tsVisible
             .filter((row) => row.job_id === job.id && techIds.includes(row.technician_id ?? '') && row.approved_by_manager === true)
             .forEach((row) => {
               const tech = row.technician_id as string;
-              const b: AmountBreakdown = (row.amount_breakdown || row.amount_breakdown_visible) ?? {};
-              const h = Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0;
-              const plus = h > 10 ? Number(b.plus_10_12_eur ?? 0) || 0 : 0;
-              const otH = Number(b.overtime_hours ?? 0) || 0;
-              const otAmt = Number(b.overtime_amount_eur ?? 0) || 0;
+              const totals = readTimesheetTotals(row.amount_breakdown || row.amount_breakdown_visible);
               const cur = agg.get(tech) || { h: 0, plus: 0, otH: 0, otAmt: 0 };
-              agg.set(tech, { h: cur.h + h, plus: cur.plus + plus, otH: cur.otH + otH, otAmt: cur.otAmt + otAmt });
+              agg.set(tech, {
+                h: cur.h + totals.hours,
+                plus: cur.plus + totals.plus,
+                otH: cur.otH + totals.overtimeHours,
+                otAmt: cur.otAmt + totals.overtimeAmount,
+              });
             });
         }
       }
@@ -372,30 +392,23 @@ export async function buildTourRatesExportPayload(
         // but requested a non-existent `amount_breakdown_visible` column, so it always
         // errored and this RPC was already the de-facto source; the dead path is removed.)
         if (breakdownByTech.size === 0) {
-          const { data: tsVisible } = await supabase.rpc('get_timesheet_amounts_visible');
-          if (Array.isArray(tsVisible) && tsVisible.length) {
-            (tsVisible as TimesheetBreakdownRow[])
+          const tsVisible = await getVisibleTimesheets();
+          if (tsVisible.length) {
+            tsVisible
               .filter((row) => row.job_id === job.id && techIds.includes(row.technician_id ?? '') && row.approved_by_manager === true)
               .forEach((row) => {
                 const tech = row.technician_id as string;
-                const b: AmountBreakdown = (row.amount_breakdown || row.amount_breakdown_visible) ?? {};
-                const hoursRounded = Number(b.hours_rounded ?? b.worked_hours_rounded ?? 0) || 0;
-                const plusEur =
-                  b.plus_10_12_amount_eur != null
-                    ? Number(b.plus_10_12_amount_eur) || 0
-                    : (Number(b.plus_10_12_eur ?? 0) || 0) * Math.min(Math.max(hoursRounded - 10, 0), 2);
-                const otHours = Number(b.overtime_hours ?? 0) || 0;
-                const otAmount = Number(b.overtime_amount_eur ?? 0) || 0;
+                const totals = readTimesheetTotals(row.amount_breakdown || row.amount_breakdown_visible);
                 const acc = breakdownByTech.get(tech) || {
                   hours_total: 0,
                   plus_10_12_total_eur: 0,
                   overtime_hours_total: 0,
                   overtime_amount_total_eur: 0,
                 };
-                acc.hours_total += hoursRounded;
-                acc.plus_10_12_total_eur += plusEur;
-                acc.overtime_hours_total += otHours;
-                acc.overtime_amount_total_eur += otAmount;
+                acc.hours_total += totals.hours;
+                acc.plus_10_12_total_eur += totals.plus;
+                acc.overtime_hours_total += totals.overtimeHours;
+                acc.overtime_amount_total_eur += totals.overtimeAmount;
                 breakdownByTech.set(tech, acc);
               });
           }
