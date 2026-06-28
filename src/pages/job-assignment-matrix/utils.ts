@@ -32,6 +32,71 @@ type MatrixJobAssignment = {
   production_role?: string | null;
 };
 
+// Clean shapes for the rows these queries read. The typed Supabase client infers
+// very complex types for these nested selects, so we assert the fields we use at
+// the query boundary instead of threading the inferred relation types around.
+type RawMatrixJobRow = {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  color?: string | null;
+  status: string;
+  job_type: string;
+  job_date_types?: Array<{ date: string; type: string }>;
+  job_assignments?: MatrixJobAssignment[];
+};
+
+type RawJobDateTypeRow = {
+  jobs?: RawMatrixJobRow | RawMatrixJobRow[] | null;
+};
+
+type RawAssignmentJobRef = {
+  id: string;
+  title: string;
+  start_time: string;
+  end_time: string;
+  color?: string | null;
+};
+
+type RawAssignmentRow = {
+  job_id: string;
+  technician_id: string;
+  sound_role: string | null;
+  lights_role: string | null;
+  video_role: string | null;
+  production_role: string | null;
+  single_day: boolean | null;
+  assignment_date: string | null;
+  status: string | null;
+  assigned_at: string | null;
+  jobs?: RawAssignmentJobRef | RawAssignmentJobRef[] | null;
+};
+
+type AssignmentQueryResult = { data: RawAssignmentRow[] | null; error: { message?: string } | null };
+
+export type MatrixAssignment = {
+  job_id: string;
+  technician_id: string;
+  sound_role: string | null;
+  lights_role: string | null;
+  video_role: string | null;
+  production_role: string | null;
+  single_day: boolean | null;
+  assignment_date: string | null;
+  status: string | null;
+  assigned_at: string | null;
+  job: MatrixJob | RawAssignmentJobRef | undefined;
+};
+
+type AvailabilityScheduleRow = { user_id: string; date: string; status: string; notes?: string | null; source?: string | null };
+type LegacyAvailabilityRow = { technician_id: string; date: string; status: string };
+type VacationRow = { technician_id: string; start_date: string | null; end_date: string | null; status: string };
+
+/** Reads a Postgres error code off an unknown thrown value without using `any`. */
+const errorCode = (error: unknown): string | undefined =>
+  (error as { code?: string } | null | undefined)?.code;
+
 const ROLE_FIELD_BY_DEPARTMENT = {
   sound: "sound_role",
   lights: "lights_role",
@@ -111,19 +176,19 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
   if (error) throw error;
   if (typedRes.error) throw typedRes.error;
 
-  const mergedById = new Map<string, any>();
-  for (const row of overlapData || []) {
+  const mergedById = new Map<string, RawMatrixJobRow>();
+  for (const row of (overlapData ?? []) as RawMatrixJobRow[]) {
     mergedById.set(row.id, row);
   }
-  for (const typed of typedRes.data || []) {
-    const job = Array.isArray((typed as any).jobs) ? (typed as any).jobs[0] : (typed as any).jobs;
+  for (const typed of (typedRes.data ?? []) as RawJobDateTypeRow[]) {
+    const job = Array.isArray(typed.jobs) ? typed.jobs[0] : typed.jobs;
     if (job?.id && !mergedById.has(job.id)) {
       mergedById.set(job.id, job);
     }
   }
 
   return Array.from(mergedById.values())
-    .map((j: any) => {
+    .map((j) => {
       const assigns = Array.isArray(j.job_assignments) ? j.job_assignments : [];
       return {
         id: j.id,
@@ -140,7 +205,11 @@ export async function fetchJobsForWindow(start: Date, end: Date, department: str
     .filter(shouldShowMatrixJob);
 }
 
-export async function fetchAssignmentsForWindow(jobIds: string[], technicianIds: string[], jobs: MatrixJob[]) {
+export async function fetchAssignmentsForWindow(
+  jobIds: string[],
+  technicianIds: string[],
+  jobs: MatrixJob[],
+): Promise<MatrixAssignment[]> {
   if (!jobIds.length || !technicianIds.length) return [];
 
   const jobsById = new Map<string, MatrixJob>();
@@ -149,7 +218,8 @@ export async function fetchAssignmentsForWindow(jobIds: string[], technicianIds:
   });
 
   const batchSize = 25;
-  const promises: any[] = [];
+  // The query builders are PromiseLike; the awaited result is asserted below.
+  const promises = [];
 
   for (let i = 0; i < jobIds.length; i += batchSize) {
     const jobBatch = jobIds.slice(i, i + batchSize);
@@ -182,17 +252,17 @@ export async function fetchAssignmentsForWindow(jobIds: string[], technicianIds:
     );
   }
 
-  const results = await Promise.all(promises);
-  const allData = results.flatMap((result: any) => {
+  const results = (await Promise.all(promises)) as AssignmentQueryResult[];
+  const allData = results.flatMap((result) => {
     if (result.error) {
       console.error("Assignment prefetch error:", result.error);
-      return [];
+      return [] as RawAssignmentRow[];
     }
     return result.data || [];
   });
 
   return allData
-    .map((item: any) => ({
+    .map((item) => ({
       job_id: item.job_id,
       technician_id: item.technician_id,
       sound_role: item.sound_role,
@@ -229,7 +299,7 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
       .lte("date", endDateKey)
       .or("status.eq.unavailable,source.eq.vacation");
     if (schedErr) throw schedErr;
-    (schedRows || []).forEach((row: any) => {
+    ((schedRows ?? []) as AvailabilityScheduleRow[]).forEach((row) => {
       const key = `${row.user_id}-${row.date}`;
       if (!perDay.has(key)) {
         perDay.set(key, { user_id: row.user_id, date: row.date, status: "unavailable", notes: row.notes || undefined });
@@ -252,14 +322,15 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
     if (legacyErr) {
       if (legacyErr.code !== "42P01") throw legacyErr;
     }
-    (legacyRows || []).forEach((row: any) => {
+    ((legacyRows ?? []) as LegacyAvailabilityRow[]).forEach((row) => {
       const key = `${row.technician_id}-${row.date}`;
       if (!perDay.has(key)) {
         perDay.set(key, { user_id: row.technician_id, date: row.date, status: "unavailable" });
       }
     });
-  } catch (error: any) {
-    if (error?.code && error.code !== "42P01") throw error;
+  } catch (error: unknown) {
+    const code = errorCode(error);
+    if (code !== "42P01") throw error;
   }
 
   try {
@@ -278,7 +349,7 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
       if (vacErr) {
         if (vacErr.code !== "42P01") throw vacErr;
       }
-      (vacs || []).forEach((vac: any) => {
+      ((vacs ?? []) as VacationRow[]).forEach((vac) => {
         const vacationStart = String(vac.start_date ?? "");
         const vacationEnd = String(vac.end_date ?? "");
         if (!vacationStart || !vacationEnd) return;
@@ -299,8 +370,9 @@ export async function fetchAvailabilityForWindow(technicianIds: string[], start:
         }
       });
     }
-  } catch (error: any) {
-    if (error?.code && error.code !== "42P01") throw error;
+  } catch (error: unknown) {
+    const code = errorCode(error);
+    if (code !== "42P01") throw error;
   }
 
   return Array.from(perDay.values());
@@ -372,19 +444,20 @@ export function formatLabel(value: string) {
     .join(" ");
 }
 
-export function parseSummaryRow(row: any): StaffingSummaryRow | null {
-  if (!row || !row.job_id || !row.department) return null;
-  const rawRoles = Array.isArray(row.roles) ? row.roles : [];
+export function parseSummaryRow(row: unknown): StaffingSummaryRow | null {
+  const record = (row ?? null) as { job_id?: unknown; department?: unknown; roles?: unknown } | null;
+  if (!record || typeof record.job_id !== "string" || typeof record.department !== "string") return null;
+  const rawRoles = Array.isArray(record.roles) ? (record.roles as Array<Record<string, unknown>>) : [];
   const roles = rawRoles
-    .map((r: any) => ({
+    .map((r) => ({
       role_code: typeof r?.role_code === "string" ? r.role_code : String(r?.role_code ?? ""),
       quantity: Number(r?.quantity ?? 0),
-      notes: (r?.notes ?? null) as string | null,
+      notes: typeof r?.notes === "string" ? r.notes : null,
     }))
     .filter((r: StaffingSummaryRole) => r.role_code);
   return {
-    job_id: row.job_id as string,
-    department: row.department as string,
+    job_id: record.job_id,
+    department: record.department,
     roles,
   };
 }
