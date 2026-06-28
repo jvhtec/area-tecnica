@@ -46,6 +46,22 @@ export function datesOverlap(
  * OPTIMIZED: Get all technicians with their conflict information for a specific job
  * Uses timesheets table to determine actual work dates (simplified architecture)
  */
+type TechnicianProfile = {
+  id: string;
+  department: string | null;
+  role: string | null;
+  assignable_as_tech: boolean | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  nickname?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  dni?: string | null;
+  bg_color?: string | null;
+  profile_picture_url?: string | null;
+  skills?: unknown;
+};
+
 export async function getAvailableTechnicians(
   department: string,
   jobId: string,
@@ -62,13 +78,13 @@ export async function getAvailableTechnicians(
       throw profileError;
     }
 
-    const allTechnicians = (profileData || []).filter((tech: any) => tech.department === department);
+    const allTechnicians = ((profileData ?? []) as TechnicianProfile[]).filter((tech) => tech.department === department);
 
     if (allTechnicians.length === 0) {
       return [];
     }
 
-    const eligibleTechnicians = allTechnicians.filter((tech: any) =>
+    const eligibleTechnicians = allTechnicians.filter((tech) =>
       hasTechnicianSelfServiceAccess(tech.role, tech.assignable_as_tech)
     );
 
@@ -76,7 +92,7 @@ export async function getAvailableTechnicians(
       return [];
     }
 
-    const technicianIds = eligibleTechnicians.map((tech: any) => tech.id);
+    const technicianIds = eligibleTechnicians.map((tech) => tech.id);
 
     // OPTIMIZED: Query timesheets directly to see which days technicians are actually working
     const normalizedTargetDate = assignmentDate
@@ -99,20 +115,6 @@ export async function getAvailableTechnicians(
     if (timesheetsError) {
       throw timesheetsError;
     }
-
-    // Get job info for conflicting jobs
-    const conflictingJobIds = Array.from(new Set((timesheets || []).map(ts => ts.job_id)));
-    const { data: jobs, error: jobsError } = await supabase
-      .from("jobs")
-      .select("id, start_time, end_time, title")
-      .in("id", conflictingJobIds);
-
-    if (jobsError) {
-      throw jobsError;
-    }
-
-    const jobMap = new Map<string, any>();
-    (jobs || []).forEach(job => jobMap.set(job.id, job));
 
     // Get unavailability data
     const { data: unavailabilityData, error: unavailabilityError } = await supabase
@@ -148,7 +150,7 @@ export async function getAvailableTechnicians(
     });
 
     // Filter out technicians who have conflicts
-    const availableTechnicians = eligibleTechnicians.filter((technician: any) => {
+    const availableTechnicians = eligibleTechnicians.filter((technician) => {
       // Check if already assigned to current job
       const assignedJobs = technicianJobs.get(technician.id);
       if (assignedJobs?.has(jobId)) {

@@ -79,6 +79,17 @@ async function fetchPayouts(
  * `v_job_tech_payout_2025` already reflects the effective override total, but not the audit trail.
  * This enrichment adds override audit fields used by PDFs and email payloads.
  */
+type BasePayoutRow = { technician_id: string; total_eur: number | string | null };
+type PayoutOverrideRow = {
+  technician_id: string;
+  override_amount_eur: number | string | null;
+  set_by: string | null;
+  set_at: string | null;
+  updated_at: string | null;
+};
+type ActorProfileRow = { id: string; first_name: string | null; last_name: string | null; email: string | null };
+type JobPayoutLpoRow = { technician_id: string; lpo_number: string | null };
+
 export async function attachOverrideMetadataToJobPayouts(
   client: SupabaseClient,
   jobId: string,
@@ -110,14 +121,14 @@ export async function attachOverrideMetadataToJobPayouts(
   }
 
   const baseTotalMap = new Map<string, number>();
-  (baseRows || []).forEach((row: any) => {
+  ((baseRows ?? []) as BasePayoutRow[]).forEach((row) => {
     if (!row?.technician_id) return;
     baseTotalMap.set(row.technician_id, Number(row.total_eur ?? 0));
   });
 
-  const overrideByTech = new Map<string, any>();
+  const overrideByTech = new Map<string, PayoutOverrideRow>();
   const actorIds = new Set<string>();
-  (overrides || []).forEach((row: any) => {
+  ((overrides ?? []) as PayoutOverrideRow[]).forEach((row) => {
     if (!row?.technician_id) return;
     overrideByTech.set(row.technician_id, row);
     if (row.set_by) actorIds.add(row.set_by);
@@ -134,7 +145,7 @@ export async function attachOverrideMetadataToJobPayouts(
       console.warn('[attachOverrideMetadataToJobPayouts] override actor lookup failed', actorError);
     } else {
       actorMap = new Map(
-        (actors || []).map((actor: any) => [
+        ((actors ?? []) as ActorProfileRow[]).map((actor) => [
           actor.id,
           {
             name: `${actor.first_name ?? ''} ${actor.last_name ?? ''}`.trim() || actor.id,
@@ -243,7 +254,7 @@ async function fetchLpoMap(
 
   if (error) throw error;
 
-  return new Map((data || []).map((row: any) => [row.technician_id, row.lpo_number || null]));
+  return new Map(((data ?? []) as JobPayoutLpoRow[]).map((row) => [row.technician_id, row.lpo_number || null]));
 }
 
 export async function prepareJobPayoutData(input: JobPayoutDataInput): Promise<JobPayoutDataResult> {
