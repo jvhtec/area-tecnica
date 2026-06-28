@@ -56,7 +56,7 @@ const updatePushPreference = async (enabled: boolean) => {
 }
 
 const waitForRegistrationToken = async (): Promise<string> => {
-  return await new Promise<string>(async (resolve, reject) => {
+  return await new Promise<string>((resolve, reject) => {
     let timeoutId: number | undefined
     let resolved = false
     let registrationHandle: { remove: () => Promise<void> } | null = null
@@ -78,30 +78,45 @@ const waitForRegistrationToken = async (): Promise<string> => {
       }
     }
 
-    registrationHandle = await PushNotifications.addListener('registration', (token: Token) => {
-      if (resolved) {
-        return
-      }
-      resolved = true
-      void cleanup().then(() => resolve(token.value))
-    })
+    // The listener setup is async, so it runs in an IIFE rather than an async
+    // Promise executor — that way a failure while registering listeners rejects
+    // the promise instead of being silently swallowed (and hanging the caller).
+    void (async () => {
+      try {
+        registrationHandle = await PushNotifications.addListener('registration', (token: Token) => {
+          if (resolved) {
+            return
+          }
+          resolved = true
+          void cleanup().then(() => resolve(token.value))
+        })
 
-    errorHandle = await PushNotifications.addListener('registrationError', (error: any) => {
-      if (resolved) {
-        return
-      }
-      resolved = true
-      const message = error?.message || 'Unable to register for native push notifications.'
-      void cleanup().then(() => reject(new Error(message)))
-    })
+        errorHandle = await PushNotifications.addListener('registrationError', (error: any) => {
+          if (resolved) {
+            return
+          }
+          resolved = true
+          const message = error?.error || error?.message || 'Unable to register for native push notifications.'
+          void cleanup().then(() => reject(new Error(message)))
+        })
 
-    timeoutId = window.setTimeout(() => {
-      if (resolved) {
-        return
+        timeoutId = window.setTimeout(() => {
+          if (resolved) {
+            return
+          }
+          resolved = true
+          void cleanup().then(() => reject(new Error('Timed out waiting for native push registration.')))
+        }, REGISTRATION_TIMEOUT_MS)
+      } catch (err) {
+        if (resolved) {
+          return
+        }
+        resolved = true
+        void cleanup().then(() =>
+          reject(err instanceof Error ? err : new Error('Failed to set up native push registration listeners.'))
+        )
       }
-      resolved = true
-      void cleanup().then(() => reject(new Error('Timed out waiting for native push registration.')))
-    }, REGISTRATION_TIMEOUT_MS)
+    })()
   })
 }
 

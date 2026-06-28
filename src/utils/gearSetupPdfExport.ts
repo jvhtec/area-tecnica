@@ -9,7 +9,10 @@ export const generateStageGearPDF = async (
   stageName?: string,
   logoUrl?: string,
 ): Promise<Blob> => {
-  return new Promise(async (resolve, reject) => {
+  return new Promise<Blob>((resolve, reject) => {
+    // The work is async, so it runs in an IIFE rather than an async Promise
+    // executor; the existing try/catch below forwards any failure to reject().
+    void (async () => {
     try {
       const { jsPDF, autoTable } = await loadPdfLibs();
       console.log(`Starting PDF generation for stage ${stageNumber} (${stageName})`);
@@ -519,5 +522,6 @@ export const generateStageGearPDF = async (
       console.error('Error generating stage gear PDF:', error);
       reject(error);
     }
+    })();
   });
 };
