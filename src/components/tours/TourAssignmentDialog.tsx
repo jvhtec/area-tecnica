@@ -143,6 +143,29 @@ export const TourAssignmentDialog = ({
     }
   });
 
+  // Update role mutation: tour_assignment_update_trigger propagates the new
+  // role only to today-or-future tour jobs.
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ assignmentId, role }: { assignmentId: string; role: string }) => {
+      const { error } = await dataLayerClient.from('tour_assignments')
+        .update({ role })
+        .eq('id', assignmentId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Role updated successfully - automatically applied to future tour jobs');
+      refetch();
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-assignments') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('job-details') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to update role: ${error.message}`);
+    }
+  });
+
   // Delete assignment mutation
   const deleteAssignmentMutation = useMutation({
     mutationFn: async (assignmentId: string) => {
@@ -200,16 +223,18 @@ export const TourAssignmentDialog = ({
     }
   };
 
-  const getAvailableRoles = () => {
-    if (!selectedDepartment) return [] as Array<{ value: string; label: string }>;
+  const getRolesForDepartment = (department: string): Array<{ value: string; label: string }> => {
+    if (!department) return [];
     // Technical departments: use role codes registry
-    if (['sound','lights','video'].includes(selectedDepartment)) {
-      return roleOptionsForDiscipline(selectedDepartment).map(opt => ({ value: opt.code, label: opt.label }));
+    if (['sound','lights','video'].includes(department)) {
+      return roleOptionsForDiscipline(department).map(opt => ({ value: opt.code, label: opt.label }));
     }
     // Non-technical: use static labels
-    const labels = NON_TECH_ROLE_LABELS[selectedDepartment] || [];
+    const labels = NON_TECH_ROLE_LABELS[department] || [];
     return labels.map(l => ({ value: l, label: l }));
   };
+
+  const getAvailableRoles = () => getRolesForDepartment(selectedDepartment);
 
   const groupedAssignments = assignments.reduce((acc, assignment) => {
     if (!acc[assignment.department]) {
@@ -222,7 +247,7 @@ export const TourAssignmentDialog = ({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl w-[95vw] md:w-full max-h-[95vh] md:max-h-[90vh] overflow-y-auto pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <DialogHeader>
           <DialogTitle className="flex flex-wrap items-center gap-2 text-base md:text-lg">
             <Users className="h-4 w-4 md:h-5 md:w-5" />
@@ -282,44 +307,79 @@ export const TourAssignmentDialog = ({
                         {dept.label}
                       </h4>
                       <div className="space-y-2">
-                        {deptAssignments.map(assignment => (
-                          <div key={assignment.id} className="flex items-center justify-between p-2 bg-muted rounded">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium">
-                                  {assignment.profiles 
-                                    ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
-                                    : assignment.external_technician_name
-                                  }
-                                </span>
-                                <Badge variant="outline" className="text-xs">
-                                  {labelForCode(assignment.role) || assignment.role}
-                                </Badge>
-                                {assignment.external_technician_name && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    External
-                                  </Badge>
+                        {deptAssignments.map(assignment => {
+                          const opts = getRolesForDepartment(assignment.department);
+                          const canSyncRoleToJobs =
+                            Boolean(assignment.technician_id)
+                            && ['sound', 'lights', 'video'].includes(assignment.department)
+                            && opts.length > 0;
+                          const hasCurrent = opts.some(o => o.value === assignment.role);
+                          const finalOpts = hasCurrent || !assignment.role
+                            ? opts
+                            : [{ value: assignment.role, label: labelForCode(assignment.role) || assignment.role }, ...opts];
+
+                          return (
+                            <div key={assignment.id} className="flex items-center justify-between p-2 bg-muted rounded">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium">
+                                    {assignment.profiles
+                                      ? `${assignment.profiles.first_name} ${assignment.profiles.last_name}`
+                                      : assignment.external_technician_name
+                                    }
+                                  </span>
+                                  {readOnly || !canSyncRoleToJobs ? (
+                                    <Badge variant="outline" className="text-xs">
+                                      {labelForCode(assignment.role) || assignment.role}
+                                    </Badge>
+                                  ) : (
+                                    <Select
+                                      value={assignment.role}
+                                      onValueChange={(role) => {
+                                        if (role && role !== assignment.role) {
+                                          updateRoleMutation.mutate({ assignmentId: assignment.id, role });
+                                        }
+                                      }}
+                                      disabled={updateRoleMutation.isPending}
+                                    >
+                                      <SelectTrigger className="h-7 w-auto min-w-[160px] text-xs">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {finalOpts.map(opt => (
+                                          <SelectItem key={opt.value} value={opt.value}>
+                                            {opt.label}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  )}
+                                  {assignment.external_technician_name && (
+                                    <Badge variant="secondary" className="text-xs">
+                                      External
+                                    </Badge>
+                                  )}
+                                </div>
+                                {assignment.profiles?.email && (
+                                  <p className="text-sm text-muted-foreground">{assignment.profiles.email}</p>
+                                )}
+                                {assignment.notes && (
+                                  <p className="text-sm text-muted-foreground italic">{assignment.notes}</p>
                                 )}
                               </div>
-                              {assignment.profiles?.email && (
-                                <p className="text-sm text-muted-foreground">{assignment.profiles.email}</p>
-                              )}
-                              {assignment.notes && (
-                                <p className="text-sm text-muted-foreground italic">{assignment.notes}</p>
+                              {!readOnly && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteAssignment(assignment.id)}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
                               )}
                             </div>
-                            {!readOnly && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDeleteAssignment(assignment.id)}
-                                className="text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   );

@@ -47,6 +47,8 @@ export const invalidateRehearsalRateQueries = (queryClient: QueryClient, jobId: 
     ['tour-job-rate-quotes-manager'],
     ['technician-tour-rate-quotes'],
     ['timesheets'],
+    ['job-timesheet-dates', jobId],
+    ['job-tech-timesheet-dates', jobId],
     ['job-tech-payout', jobId, 'tour-timesheet-data'],
   ]);
 };
