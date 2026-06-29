@@ -6,6 +6,11 @@
  * for tour settings, schedules, contacts, and itinerary data.
  */
 
+import type { Database, Json } from "@/integrations/supabase/types";
+
+type PublicTableRow<TableName extends keyof Database["public"]["Tables"]> =
+  Database["public"]["Tables"][TableName]["Row"];
+
 // ============================================================================
 // TOUR SETTINGS TYPES
 // ============================================================================
@@ -64,7 +69,7 @@ export interface TravelSegment {
     bus_company?: string;
     vehicle_registration?: string;
     seats?: number;
-    [key: string]: any;
+    [key: string]: Json | undefined;
   };
 }
 
@@ -288,7 +293,7 @@ export interface TimelineEventMetadata {
   // General
   color?: string;
   icon?: string;
-  [key: string]: any;
+  [key: string]: Json | undefined;
 }
 
 // ============================================================================
@@ -323,11 +328,11 @@ export interface DefaultTiming {
 // ============================================================================
 
 export interface CompleteTourDateInfo {
-  tour_date: any; // from tour_dates table
-  hoja_de_ruta: any; // from hoja_de_ruta table
-  accommodation: any | null; // from tour_accommodations table
-  travel_from: any[] | null; // from tour_travel_segments table
-  travel_to: any[] | null; // from tour_travel_segments table
+  tour_date: PublicTableRow<"tour_dates">;
+  hoja_de_ruta: PublicTableRow<"hoja_de_ruta"> | null;
+  accommodation: PublicTableRow<"tour_accommodations"> | null;
+  travel_from: PublicTableRow<"tour_travel_segments">[] | null;
+  travel_to: PublicTableRow<"tour_travel_segments">[] | null;
 }
 
 // ============================================================================

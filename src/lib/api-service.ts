@@ -31,7 +31,7 @@ export class ApiService {
     }
   }
   
-  async post<T>(url: string, data: any): Promise<T> {
+  async post<T>(url: string, data: unknown): Promise<T> {
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -52,7 +52,7 @@ export class ApiService {
     }
   }
   
-  async put<T>(url: string, data: any): Promise<T> {
+  async put<T>(url: string, data: unknown): Promise<T> {
     try {
       const response = await fetch(url, {
         method: 'PUT',
