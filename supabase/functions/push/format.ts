@@ -94,15 +94,14 @@ export function summarizeTaskChanges(changes: BroadcastBody['changes']): string 
   }
 
   const entries: Array<{ field: string; from?: unknown; to?: unknown; hasFrom: boolean; hasTo: boolean }> = [];
-  for (const [field, raw] of Object.entries(changes as Record<string, any>)) {
+  for (const [field, raw] of Object.entries(changes as Record<string, unknown>)) {
     if (field === 'updated_at' || field === 'updatedAt') continue;
     if (raw && typeof raw === 'object' && ('from' in raw || 'to' in raw)) {
-      const from = (raw as any).from;
-      const to = (raw as any).to;
+      const change = raw as { from?: unknown; to?: unknown };
       entries.push({
         field,
-        from: normalizeTaskChangeValue(field, from),
-        to: normalizeTaskChangeValue(field, to),
+        from: normalizeTaskChangeValue(field, change.from),
+        to: normalizeTaskChangeValue(field, change.to),
         hasFrom: Object.prototype.hasOwnProperty.call(raw, 'from'),
         hasTo: Object.prototype.hasOwnProperty.call(raw, 'to'),
       });
@@ -142,4 +141,3 @@ export function summarizeTaskChanges(changes: BroadcastBody['changes']): string 
 
   return parts.join('; ');
 }
-

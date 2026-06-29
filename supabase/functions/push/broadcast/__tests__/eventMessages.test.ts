@@ -44,6 +44,7 @@ import { CARLOS_AGENT_NAME } from "../staffingIdentity.ts";
 import {
   getActiveAssignmentDepartmentsFromRow,
   getJobDepartment,
+  normalizeDepartmentRolesPayload,
 } from "../../data.ts";
 
 function createStaffingContext(overrides: Partial<BroadcastEventContext> = {}): BroadcastEventContext {
@@ -418,6 +419,37 @@ describe("push broadcast event message builders", () => {
       video_role: null,
       production_role: "pm",
     })).toEqual(["lights", "production"]);
+  });
+
+  it("normalizes department role payloads from unknown input", () => {
+    expect(normalizeDepartmentRolesPayload([
+      null,
+      { department: "", total_required: 3, roles: [{ role_code: "foh", quantity: 1 }] },
+      {
+        department: "sound",
+        total_required: "2",
+        roles: [
+          { role_code: "foh", quantity: "1", notes: "lead" },
+          { role_code: 123, quantity: 1 },
+        ],
+      },
+      {
+        department: "video",
+        total_required: "invalid",
+        roles: [{ role_code: "cam", quantity: "2", notes: 7 }],
+      },
+    ])).toEqual([
+      {
+        department: "sound",
+        total_required: 2,
+        roles: [{ role_code: "foh", quantity: 1, notes: "lead" }],
+      },
+      {
+        department: "video",
+        total_required: 0,
+        roles: [{ role_code: "cam", quantity: 2, notes: "7" }],
+      },
+    ]);
   });
 
   it("resolves unambiguous job departments from job_departments", async () => {

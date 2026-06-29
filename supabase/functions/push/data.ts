@@ -1,31 +1,55 @@
 import { createClient } from "./deps.ts";
 import type { BroadcastBody, DepartmentRoleSummary } from "./types.ts";
 
+type IdRow = { id?: string | null };
+type ProfileDepartmentRow = { department?: string | null };
+type TimesheetTechnicianRow = { technician_id?: string | null };
+type AdminStaffingPreferenceRow = IdRow & {
+  department?: string | null;
+  notification_preferences?: Array<{ staffing_scope?: string | null }> | null;
+};
+type SoundVisionFileVenueRow = {
+  venue?: { name?: string | null } | Array<{ name?: string | null }> | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getStringIds(rows: IdRow[] | null | undefined): string[] {
+  return (rows ?? [])
+    .map((row) => row.id)
+    .filter((id): id is string => Boolean(id));
+}
+
 export async function getManagementUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
   const { data, error } = await client
     .from('profiles')
     .select('id')
-    .in('role', ['admin','management','logistics']);
+    .in('role', ['admin','management','logistics'])
+    .returns<IdRow[]>();
   if (error || !data) return [];
-  return data.map((r: any) => r.id).filter(Boolean);
+  return getStringIds(data);
 }
 
 export async function getSoundDepartmentUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
   const { data, error } = await client
     .from('profiles')
     .select('id')
-    .eq('department', 'sound');
+    .eq('department', 'sound')
+    .returns<IdRow[]>();
   if (error || !data) return [];
-  return data.map((r: any) => r.id).filter(Boolean);
+  return getStringIds(data);
 }
 
 export async function getManagementOnlyUserIds(client: ReturnType<typeof createClient>): Promise<string[]> {
   const { data, error } = await client
     .from('profiles')
     .select('id')
-    .eq('role', 'management');
+    .eq('role', 'management')
+    .returns<IdRow[]>();
   if (error || !data) return [];
-  return data.map((r: any) => r.id).filter(Boolean);
+  return getStringIds(data);
 }
 
 export async function getLogisticsManagementRecipients(client: ReturnType<typeof createClient>): Promise<string[]> {
@@ -33,9 +57,10 @@ export async function getLogisticsManagementRecipients(client: ReturnType<typeof
     .from('profiles')
     .select('id')
     .eq('role', 'management')
-    .in('department', ['logistics', 'production']);
+    .in('department', ['logistics', 'production'])
+    .returns<IdRow[]>();
   if (error || !data) return [];
-  return data.map((r: any) => r.id).filter(Boolean);
+  return getStringIds(data);
 }
 
 // Admin helpers and department-scoped management targeting
@@ -43,9 +68,10 @@ export async function getAdminUserIds(client: ReturnType<typeof createClient>): 
   const { data, error } = await client
     .from('profiles')
     .select('id')
-    .eq('role', 'admin');
+    .eq('role', 'admin')
+    .returns<IdRow[]>();
   if (error || !data) return [];
-  return data.map((r: any) => r.id).filter(Boolean);
+  return getStringIds(data);
 }
 
 /**
@@ -67,7 +93,8 @@ export async function getAdminUserIdsForStaffingNotifications(
         department,
         notification_preferences!inner(staffing_scope)
       `)
-      .eq('role', 'admin');
+      .eq('role', 'admin')
+      .returns<AdminStaffingPreferenceRow[]>();
 
     if (error || !admins) {
       console.error('Failed to fetch admin notification preferences:', error);
@@ -75,8 +102,8 @@ export async function getAdminUserIdsForStaffingNotifications(
       return [];
     }
 
-    const relevantAdmins = admins.filter((admin: any) => {
-      const prefs = admin.notification_preferences;
+    const relevantAdmins = admins.filter((admin) => {
+      const prefs = admin.notification_preferences ?? [];
       // If no preferences set, default to all_departments
       if (!prefs || !prefs.length) return true;
 
@@ -87,13 +114,13 @@ export async function getAdminUserIdsForStaffingNotifications(
 
       // If preference is own_department, only include if job department matches admin's department
       if (staffingScope === 'own_department') {
-        return jobDepartment && admin.department === jobDepartment;
+        return Boolean(jobDepartment && admin.department === jobDepartment);
       }
 
       return false;
     });
 
-    return relevantAdmins.map((admin: any) => admin.id).filter(Boolean);
+    return getStringIds(relevantAdmins);
   } catch (err) {
     console.error('Exception in getAdminUserIdsForStaffingNotifications:', err);
     // Fail-closed: return empty so scoped notifications stay limited to deptMgmt
@@ -107,9 +134,10 @@ export async function getManagementByDepartmentUserIds(client: ReturnType<typeof
     .from('profiles')
     .select('id')
     .eq('role', 'management')
-    .eq('department', department);
+    .eq('department', department)
+    .returns<IdRow[]>();
   if (error || !data) return [];
-  return data.map((r: any) => r.id).filter(Boolean);
+  return getStringIds(data);
 }
 
 export async function getManagementAndAdminByDepartmentUserIds(
@@ -121,9 +149,10 @@ export async function getManagementAndAdminByDepartmentUserIds(
     .from('profiles')
     .select('id')
     .in('role', ['admin', 'management'])
-    .eq('department', department);
+    .eq('department', department)
+    .returns<IdRow[]>();
   if (error || !data) return [];
-  return data.map((r: any) => r.id).filter(Boolean);
+  return getStringIds(data);
 }
 
 /**
@@ -182,14 +211,16 @@ export async function getTimesheetSubmittingTechDepartment(
         .eq('job_id', jobId)
         .eq('technician_id', actorId)
         .eq('status', 'submitted')
-        .limit(1);
+        .limit(1)
+        .returns<IdRow[]>();
       if (anySubmitted && anySubmitted.length) {
         const { data: prof } = await client
           .from('profiles')
           .select('department')
           .eq('id', actorId)
+          .returns<ProfileDepartmentRow>()
           .maybeSingle();
-        return (prof as any)?.department ?? null;
+        return prof?.department ?? null;
       }
     }
 
@@ -202,15 +233,17 @@ export async function getTimesheetSubmittingTechDepartment(
         .eq('status', 'submitted')
         .order('updated_at', { ascending: false })
         .limit(1)
+        .returns<TimesheetTechnicianRow>()
         .maybeSingle();
-      const techId = (row as any)?.technician_id as string | undefined;
+      const techId = row?.technician_id ?? undefined;
       if (techId) {
         const { data: prof } = await client
           .from('profiles')
           .select('department')
           .eq('id', techId)
+          .returns<ProfileDepartmentRow>()
           .maybeSingle();
-        return (prof as any)?.department ?? null;
+        return prof?.department ?? null;
       }
     }
   } catch (_) {
@@ -223,8 +256,9 @@ export async function getTimesheetSubmittingTechDepartment(
         .from('profiles')
         .select('department')
         .eq('id', actorId)
+        .returns<ProfileDepartmentRow>()
         .maybeSingle();
-      return (prof as any)?.department ?? null;
+      return prof?.department ?? null;
     } catch (_) { /* ignore */ }
   }
   return null;
@@ -235,24 +269,35 @@ export async function getJobParticipantUserIds(client: ReturnType<typeof createC
   const { data, error } = await client
     .from('job_assignments')
     .select('technician_id')
-    .eq('job_id', jobId);
+    .eq('job_id', jobId)
+    .returns<TimesheetTechnicianRow[]>();
   if (error || !data) return [];
-  const ids = data.map((r: any) => r.technician_id).filter(Boolean);
+  const ids = data
+    .map((row) => row.technician_id)
+    .filter((id): id is string => Boolean(id));
   return Array.from(new Set(ids));
 }
 
-function parseDepartmentRoleSummary(raw: any): DepartmentRoleSummary | null {
-  if (!raw) return null;
+function parseDepartmentRoleSummary(raw: unknown): DepartmentRoleSummary | null {
+  if (!isRecord(raw)) return null;
   const department = typeof raw.department === 'string' ? raw.department : '';
   if (!department) return null;
   const total = Number(raw.total_required ?? 0);
   const roles = Array.isArray(raw.roles)
     ? raw.roles
-        .map((role: any) => ({
-          role_code: typeof role?.role_code === 'string' ? role.role_code : '',
-          quantity: Number(role?.quantity ?? 0),
-          notes: role?.notes ?? null,
-        }))
+        .map((role) => {
+          const roleRecord = isRecord(role) ? role : {};
+          const notes = roleRecord.notes == null
+            ? null
+            : typeof roleRecord.notes === 'string'
+              ? roleRecord.notes
+              : String(roleRecord.notes);
+          return {
+            role_code: typeof roleRecord.role_code === 'string' ? roleRecord.role_code : '',
+            quantity: Number(roleRecord.quantity ?? 0),
+            notes,
+          };
+        })
         .filter((role) => role.role_code)
     : [];
   return {
@@ -482,8 +527,10 @@ export async function resolveSoundVisionVenueName(
         .from('soundvision_files')
         .select('venue:venues(name)')
         .eq('id', body.file_id)
+        .returns<SoundVisionFileVenueRow>()
         .maybeSingle();
-      const venueName = (data as any)?.venue?.name as string | undefined;
+      const venue = Array.isArray(data?.venue) ? data.venue[0] : data?.venue;
+      const venueName = typeof venue?.name === 'string' ? venue.name : undefined;
       if (venueName) {
         return venueName;
       }
