@@ -7,7 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import { Mail, MessageCircle } from 'lucide-react'
 
 
@@ -504,7 +504,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
                     <div className="min-w-0">
                       <p className="text-sm font-medium">{offer.full_name}</p>
                       <p className="text-xs text-gray-600">
-                        {offer.sent_at ? format(new Date(offer.sent_at), 'PPp') : 'No send time'}
+                        {offer.sent_at ? format(parseISO(offer.sent_at), 'PPp') : 'No send time'}
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">

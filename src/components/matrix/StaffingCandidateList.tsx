@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
+import { parseISO } from 'date-fns'
 import { Info, Mail, MessageCircle } from 'lucide-react'
 import {
   JOB_PROFILE_LABELS,
@@ -279,7 +280,8 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
         } else {
           ;[...((sentEvents || []) as CandidateEventRow[])]
             .sort((a, b) => (
-              new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+              parseISO(b.created_at || '1970-01-01T00:00:00.000Z').getTime() -
+              parseISO(a.created_at || '1970-01-01T00:00:00.000Z').getTime()
             ))
             .forEach((event) => {
               const requestId = String(event.staffing_request_id || '')
