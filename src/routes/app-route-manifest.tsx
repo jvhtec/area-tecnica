@@ -236,6 +236,7 @@ const ExpensesPage = lazyPage(() => import("@/pages/Expenses"));
 const Feedback = lazyPage(() => import("@/pages/Feedback"));
 const SoundVisionFiles = lazyPage(() => import("@/pages/SoundVisionFiles"));
 const Privacy = lazyPage(() => import("@/pages/Privacy"));
+const Landing = lazyPage(() => import("@/pages/Landing"));
 const StagePlot = lazyPage(() => import("@/pages/StagePlot"));
 const SysCalc = lazyPage(() => import("@/pages/SysCalc"));
 const GlobalTasks = lazyPage(() => import("@/pages/GlobalTasks"));
@@ -404,6 +405,14 @@ export const appRoutes: readonly AppRoute[] = [
     component: Auth,
     layout: "public",
     access: "public",
+  },
+  {
+    id: "landing",
+    path: "/landing",
+    component: Landing,
+    layout: "public",
+    access: "public",
+    breadcrumb: { label: "Landing" },
   },
   {
     id: "wallboard.public",

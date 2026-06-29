@@ -1,169 +1,148 @@
 import { motion } from "framer-motion";
-import { useInView } from "framer-motion";
-import { useRef } from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { 
-  FileText, 
-  Users, 
-  FolderOpen, 
-  Smartphone, 
-  Layers, 
-  Zap,
-  Shield,
-  Clock,
-  Download
-} from "lucide-react";
+import { CheckCircle2, RefreshCw, ShieldCheck, Smartphone, Sparkles, Zap } from "lucide-react";
+import festivalManagement from "@/assets/landing/festival-management.jpg";
+import soundEquipment from "@/assets/landing/sound-equipment.jpg";
+import { GLASS, GRADIENT_TEXT, useRevealVariants } from "./_shared";
+import { SectionHeading } from "./SectionHeading";
 
-const features = [
+const showcase = [
   {
-    icon: FileText,
-    title: "Professional PDF Reports",
-    description: "Generate comprehensive technical reports with custom logos, detailed equipment lists, and professional formatting for every department.",
-    highlight: "50+ Report Types"
+    image: festivalManagement,
+    eyebrow: "Festivales",
+    title: "Del rider al escenario, sin perder un cable",
+    points: [
+      "Riders técnicos y necesidades por artista",
+      "Configuración de gear multi-escenario con validación",
+      "Detección de colisiones de agenda",
+      "Memorias técnicas en PDF con tu logo",
+    ],
   },
   {
-    icon: Users,
-    title: "Real-time Collaboration",
-    description: "Work seamlessly with your team across all departments with live updates, instant notifications, and synchronized data.",
-    highlight: "Live Updates"
+    image: soundEquipment,
+    eyebrow: "Operación técnica",
+    title: "Cálculos de ingeniería integrados",
+    points: [
+      "Consumos de potencia por circuito y fase",
+      "Pesos y rigging con límites por punto",
+      "Tablas de RF / IEM sin solapamientos",
+      "Todo exportable a informe firmable",
+    ],
+    reverse: true,
   },
+];
+
+const capabilities = [
   {
-    icon: FolderOpen,
-    title: "Flex Integration",
-    description: "Native integration with Flex systems for automated folder creation, document management, and seamless workflow integration.",
-    highlight: "Native Integration"
+    icon: RefreshCw,
+    title: "Tiempo real multi-pestaña",
+    description: "Elección de líder y sincronización entre pestañas: sin llamadas duplicadas ni datos obsoletos.",
   },
   {
     icon: Smartphone,
-    title: "Mobile Responsive",
-    description: "Access all features on any device with our fully responsive design optimized for tablets, phones, and desktop computers.",
-    highlight: "Any Device"
+    title: "PWA móvil + push",
+    description: "Instálala como app en iOS y Android (Capacitor) con notificaciones push nativas y web.",
   },
   {
-    icon: Layers,
-    title: "Multi-Department Support",
-    description: "Specialized interfaces and tools for Sound, Lighting, Video, Production, Personnel, and Commercial departments.",
-    highlight: "6 Departments"
+    icon: ShieldCheck,
+    title: "Seguridad por defecto",
+    description: "Row Level Security, roles por departamento, rate limiting y validación de subidas.",
   },
   {
     icon: Zap,
-    title: "Lightning Fast",
-    description: "Built with modern technology stack for optimal performance, instant loading, and smooth user experience.",
-    highlight: "< 1s Load Time"
+    title: "Rápida de verdad",
+    description: "Code-splitting, vistas materializadas y scroll virtual para datasets enormes.",
   },
   {
-    icon: Shield,
-    title: "Enterprise Security",
-    description: "Bank-level security with encrypted data transmission, secure authentication, and compliance with industry standards.",
-    highlight: "Bank-Level Security"
+    icon: Sparkles,
+    title: "Pensada para Madrid",
+    description: "Zona horaria Europe/Madrid y festivos aplicados a las nóminas automáticamente.",
   },
   {
-    icon: Clock,
-    title: "Automated Scheduling",
-    description: "Smart scheduling algorithms that prevent conflicts, optimize resource allocation, and send automatic notifications.",
-    highlight: "Smart Algorithms"
+    icon: CheckCircle2,
+    title: "Motor de PDF propio",
+    description: "Más de 50 documentos: memorias, riders, day sheets, informes de incidencias y payouts.",
   },
-  {
-    icon: Download,
-    title: "Offline Capabilities",
-    description: "Continue working even without internet connection with offline data synchronization and local storage capabilities.",
-    highlight: "Offline Ready"
-  }
 ];
 
 export const FeatureHighlights = () => {
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const { container, item } = useRevealVariants();
 
   return (
-    <section ref={ref} className="py-20 bg-muted/50">
-      <div className="container mx-auto px-4">
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-16"
-        >
-          <Badge variant="secondary" className="mb-4">
-            Advanced Features
-          </Badge>
-          <h2 className="text-3xl lg:text-4xl font-bold mb-4">
-            Built for Professional Excellence
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Every feature is designed with professional technical teams in mind, 
-            ensuring reliability, efficiency, and comprehensive functionality.
-          </p>
-        </motion.div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {features.map((feature, index) => (
+    <section id="caracteristicas" className="relative px-6 py-24 scroll-mt-20">
+      <div className="mx-auto max-w-6xl space-y-24">
+        {showcase.map((row) => (
+          <div
+            key={row.title}
+            className={`grid items-center gap-10 lg:grid-cols-2 ${row.reverse ? "lg:[&>*:first-child]:order-2" : ""}`}
+          >
             <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 50 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.8, delay: index * 0.1 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.6 }}
+              className="relative"
             >
-              <Card className="h-full hover:shadow-lg transition-all duration-300 group">
-                <CardContent className="p-6">
-                  <motion.div
-                    whileHover={{ scale: 1.1 }}
-                    className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-full mb-4 group-hover:bg-primary/20 transition-colors"
-                  >
-                    <feature.icon className="w-6 h-6 text-primary" />
-                  </motion.div>
-
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-lg font-semibold">{feature.title}</h3>
-                    <Badge variant="outline" className="text-xs">
-                      {feature.highlight}
-                    </Badge>
-                  </div>
-
-                  <p className="text-muted-foreground leading-relaxed">
-                    {feature.description}
-                  </p>
-                </CardContent>
-              </Card>
+              <div className="absolute -inset-4 -z-10 rounded-3xl bg-gradient-to-tr from-sky-500/20 via-violet-500/15 to-cyan-400/15 blur-2xl" />
+              <img
+                src={row.image}
+                alt={row.title}
+                loading="lazy"
+                className="w-full rounded-2xl border border-white/10 object-cover shadow-2xl shadow-black/40"
+              />
             </motion.div>
-          ))}
-        </div>
 
-        {/* Additional CTA Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8, delay: 0.5 }}
-          className="text-center mt-16"
-        >
-          <div className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-2xl p-8 lg:p-12">
-            <h3 className="text-2xl lg:text-3xl font-bold mb-4">
-              Ready to Transform Your Technical Operations?
-            </h3>
-            <p className="text-muted-foreground text-lg mb-6 max-w-2xl mx-auto">
-              Join the hundreds of technical professionals who trust Sector Pro 
-              for their most critical events and projects.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="bg-primary text-primary-foreground px-8 py-3 rounded-lg font-semibold hover:bg-primary/90 transition-colors"
-              >
-                Start Free Trial
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="border border-primary text-primary px-8 py-3 rounded-lg font-semibold hover:bg-primary hover:text-primary-foreground transition-colors"
-              >
-                Schedule Demo
-              </motion.button>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-80px" }}
+              transition={{ duration: 0.6 }}
+            >
+              <span className="text-xs font-semibold uppercase tracking-widest text-sky-300/90">
+                {row.eyebrow}
+              </span>
+              <h3 className="mt-3 text-2xl font-bold text-white sm:text-3xl">{row.title}</h3>
+              <ul className="mt-6 space-y-3">
+                {row.points.map((p) => (
+                  <li key={p} className="flex items-start gap-3 text-slate-300">
+                    <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-400" />
+                    <span>{p}</span>
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
           </div>
-        </motion.div>
+        ))}
+
+        <div>
+          <SectionHeading
+            eyebrow="Construida para producción"
+            title="No solo bonita."
+            highlight="Sólida."
+            lead="Las decisiones de arquitectura están al servicio de quien está a pie de escenario con el reloj en contra."
+          />
+          <motion.div
+            variants={container}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: "-80px" }}
+            className="mt-14 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+          >
+            {capabilities.map(({ icon: Icon, title, description }) => (
+              <motion.div key={title} variants={item} className={`${GLASS} p-6`}>
+                <Icon className="h-6 w-6 text-sky-400" />
+                <h4 className="mt-4 font-semibold text-white">{title}</h4>
+                <p className="mt-2 text-sm leading-relaxed text-slate-400">{description}</p>
+              </motion.div>
+            ))}
+          </motion.div>
+          <p className="mt-10 text-center text-sm text-slate-500">
+            Stack: React 18 · TypeScript · Supabase · TanStack Query ·{" "}
+            <span className={GRADIENT_TEXT}>Cloudflare</span>
+          </p>
+        </div>
       </div>
     </section>
   );
 };
+
+export default FeatureHighlights;

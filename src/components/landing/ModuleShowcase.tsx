@@ -1,248 +1,155 @@
 import { motion } from "framer-motion";
-import { useInView } from "framer-motion";
-import { useRef, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { 
-  Calendar, 
-  Music, 
-  Lightbulb, 
-  Video, 
-  Users, 
-  FileText, 
-  Settings,
+import {
+  Boxes,
+  CalendarDays,
+  FileText,
+  Gauge,
+  Grid3x3,
+  MapPinned,
+  Megaphone,
+  Music,
+  Plug,
   Truck,
-  Calculator,
-  MessageSquare,
-  ArrowRight,
-  ChevronDown,
-  ChevronUp
+  UsersRound,
+  Wand2,
 } from "lucide-react";
-import festivalManagement from "@/assets/landing/festival-management.jpg";
-import soundEquipment from "@/assets/landing/sound-equipment.jpg";
+import { useRevealVariants } from "./_shared";
+import { SectionHeading } from "./SectionHeading";
 
-const modules = [
+type Module = {
+  icon: typeof Music;
+  title: string;
+  description: string;
+  span?: string;
+  accent: string;
+};
+
+const modules: Module[] = [
   {
     icon: Music,
-    title: "Festival Management",
-    subtitle: "Complete Festival Operations",
-    description: "Manage artists, requirements, gear setup, and scheduling all in one place. Generate professional PDF reports with technical riders and stage plots.",
-    image: festivalManagement,
-    features: [
-      "Artist requirements and technical riders",
-      "Multi-stage gear configuration",
-      "Automated scheduling and time management",
-      "PDF report generation with logos",
-      "Real-time gear comparison and validation"
-    ],
-    badge: "Most Popular"
+    title: "Festivales",
+    description:
+      "Artistas, riders técnicos, configuración de escenarios y detección de colisiones. Formulario público para que el artista envíe sus necesidades sin cuenta.",
+    span: "lg:col-span-2",
+    accent: "from-fuchsia-500/20 to-violet-500/10 text-fuchsia-300",
   },
   {
-    icon: Calendar,
-    title: "Tour Management",
-    subtitle: "Multi-Date Coordination",
-    description: "Streamline tour operations with date management, folder creation, and automated defaults system for consistent technical standards.",
-    image: soundEquipment,
-    features: [
-      "Multi-date tour coordination",
-      "Flex folder integration",
-      "Tour defaults and templates",
-      "Logistics coordination",
-      "Weight and power calculations"
-    ]
+    icon: CalendarDays,
+    title: "Giras",
+    description:
+      "Fechas, itinerarios, hoteles, travel y asignación de crew por show con cascada automática a cada fecha.",
+    accent: "from-sky-500/20 to-cyan-500/10 text-sky-300",
   },
   {
-    icon: Lightbulb,
-    title: "Technical Departments",
-    subtitle: "Sound, Lights & Video",
-    description: "Specialized tools for each technical department with memoria técnica generation, equipment management, and technical calculations.",
-    image: soundEquipment,
-    features: [
-      "Department-specific interfaces",
-      "Technical memoria generation",
-      "Equipment inventory tracking",
-      "Power and weight calculations",
-      "Professional PDF reports"
-    ]
+    icon: Grid3x3,
+    title: "Matriz de asignación",
+    description:
+      "Técnicos × trabajos en una vista multi-departamento, con detección de dobles reservas y operaciones por lotes.",
+    accent: "from-emerald-500/20 to-teal-500/10 text-emerald-300",
   },
   {
-    icon: Calculator,
-    title: "Weight & Power Tools",
-    subtitle: "Pesos & Consumos Calculators",
-    description: "Advanced calculators for technical load planning with automatic PDF export and professional technical documentation.",
-    image: soundEquipment,
-    features: [
-      "Weight distribution calculations",
-      "Power consumption analysis",
-      "Automatic PDF generation",
-      "Technical load planning",
-      "Safety compliance reports"
-    ]
+    icon: Wand2,
+    title: "Motor de Staffing",
+    description:
+      "Campañas que rankean candidatos por distancia, fiabilidad y disponibilidad, lanzan invitaciones y procesan respuestas automáticamente.",
+    span: "lg:col-span-2",
+    accent: "from-amber-500/20 to-orange-500/10 text-amber-300",
   },
   {
-    icon: Users,
-    title: "Assignment Matrix",
-    subtitle: "Staff Scheduling",
-    description: "Real-time staff assignment matrix with availability tracking, conflict resolution, and automated notifications.",
-    image: soundEquipment,
-    features: [
-      "Real-time availability tracking",
-      "Conflict detection and resolution",
-      "Automated assignment notifications",
-      "Skills-based matching",
-      "Overtime and schedule optimization"
-    ]
+    icon: FileText,
+    title: "Fichajes y nóminas",
+    description:
+      "Partes de horas con horas extra, nocturnidad y festivos calculados en servidor. Tarifas personalizadas por técnico, gira o trabajo.",
+    accent: "from-indigo-500/20 to-blue-500/10 text-indigo-300",
   },
   {
-    icon: Settings,
-    title: "Equipment Management",
-    subtitle: "Inventory & Stock Control",
-    description: "Complete equipment lifecycle management with stock tracking, maintenance schedules, and availability monitoring.",
-    image: soundEquipment,
-    features: [
-      "Real-time inventory tracking",
-      "Maintenance scheduling",
-      "Availability monitoring",
-      "Equipment history logs",
-      "Automated reorder alerts"
-    ]
-  }
+    icon: Truck,
+    title: "Logística y almacén",
+    description:
+      "Load-in / load-out, control de tiempos, movimientos de stock y solicitudes de subalquiler.",
+    accent: "from-rose-500/20 to-red-500/10 text-rose-300",
+  },
+  {
+    icon: MapPinned,
+    title: "Hoja de ruta",
+    description:
+      "Constructor de hojas de ruta con paradas, imágenes y plantillas reutilizables, exportables a PDF corporativo.",
+    accent: "from-cyan-500/20 to-sky-500/10 text-cyan-300",
+  },
+  {
+    icon: Gauge,
+    title: "Herramientas técnicas",
+    description:
+      "Cálculo de consumos de potencia, pesos/rigging y tablas de RF/IEM, con exportación a informe.",
+    accent: "from-lime-500/20 to-green-500/10 text-lime-300",
+  },
+  {
+    icon: Plug,
+    title: "Integración Flex",
+    description:
+      "Sincronización nativa con Flex Rental Solutions: jerarquía de carpetas, work orders y crew calls.",
+    accent: "from-violet-500/20 to-purple-500/10 text-violet-300",
+  },
+  {
+    icon: Boxes,
+    title: "Equipos e inventario",
+    description: "Catálogo unificado, presets de paquetes y disponibilidad calculada con asignaciones.",
+    accent: "from-teal-500/20 to-emerald-500/10 text-teal-300",
+  },
+  {
+    icon: Megaphone,
+    title: "Wallboard",
+    description: "Pantallas en tiempo real para crew y anuncios, con acceso público por token.",
+    accent: "from-orange-500/20 to-amber-500/10 text-orange-300",
+  },
+  {
+    icon: UsersRound,
+    title: "Mensajería y actividad",
+    description: "Mensajes internos, anuncios y feed de auditoría con notificaciones push.",
+    accent: "from-blue-500/20 to-indigo-500/10 text-blue-300",
+  },
 ];
 
 export const ModuleShowcase = () => {
-  const [expandedModule, setExpandedModule] = useState<number | null>(null);
-  const ref = useRef(null);
-  const isInView = useInView(ref, { once: true, margin: "-100px" });
+  const { container, item } = useRevealVariants();
 
   return (
-    <section ref={ref} className="py-20">
-      <div className="container mx-auto px-4">
+    <section id="modulos" className="relative px-6 py-24 scroll-mt-20">
+      <div className="mx-auto max-w-6xl">
+        <SectionHeading
+          eyebrow="Una plataforma, todos los flujos"
+          title="Doce módulos que sustituyen"
+          highlight="diez herramientas sueltas"
+          lead="Cada equipo trabaja en su módulo y todo queda conectado: la asignación alimenta los fichajes, los fichajes alimentan las nóminas, y todo se sincroniza en tiempo real."
+        />
+
         <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          animate={isInView ? { opacity: 1, y: 0 } : {}}
-          transition={{ duration: 0.8 }}
-          className="text-center mb-16"
+          variants={container}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, margin: "-80px" }}
+          className="mt-14 grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
-          <Badge variant="secondary" className="mb-4">
-            Complete Feature Set
-          </Badge>
-          <h2 className="text-3xl lg:text-4xl font-bold mb-4">
-            Everything You Need in One Platform
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            From festival management to tour coordination, our specialized modules cover every aspect 
-            of technical event management with professional-grade tools and reporting.
-          </p>
-        </motion.div>
-
-        <div className="space-y-8">
-          {modules.map((module, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 50 }}
-              animate={isInView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.8, delay: index * 0.1 }}
+          {modules.map(({ icon: Icon, title, description, span, accent }) => (
+            <motion.article
+              key={title}
+              variants={item}
+              className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.06] ${span ?? ""}`}
             >
-              <Card className="overflow-hidden hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-0">
-                  <div className={`grid lg:grid-cols-2 gap-0 ${index % 2 === 1 ? 'lg:grid-flow-dense' : ''}`}>
-                    {/* Content Section */}
-                    <div className={`p-8 lg:p-12 flex flex-col justify-center ${index % 2 === 1 ? 'lg:col-start-2' : ''}`}>
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className="inline-flex items-center justify-center w-12 h-12 bg-primary/10 rounded-full">
-                          <module.icon className="w-6 h-6 text-primary" />
-                        </div>
-                        {module.badge && (
-                          <Badge variant="default" className="bg-primary">
-                            {module.badge}
-                          </Badge>
-                        )}
-                      </div>
-
-                      <h3 className="text-2xl lg:text-3xl font-bold mb-2">
-                        {module.title}
-                      </h3>
-                      <p className="text-primary font-semibold mb-4">
-                        {module.subtitle}
-                      </p>
-                      <p className="text-muted-foreground text-lg mb-6 leading-relaxed">
-                        {module.description}
-                      </p>
-
-                      <Button
-                        variant="ghost"
-                        onClick={() => setExpandedModule(expandedModule === index ? null : index)}
-                        className="justify-between w-fit mb-4"
-                      >
-                        View Features
-                        {expandedModule === index ? 
-                          <ChevronUp className="w-4 h-4 ml-2" /> : 
-                          <ChevronDown className="w-4 h-4 ml-2" />
-                        }
-                      </Button>
-
-                      <motion.div
-                        initial={false}
-                        animate={{
-                          height: expandedModule === index ? "auto" : 0,
-                          opacity: expandedModule === index ? 1 : 0
-                        }}
-                        transition={{ duration: 0.3 }}
-                        className="overflow-hidden"
-                      >
-                        <div className="space-y-3 pb-6">
-                          {module.features.map((feature, featureIndex) => (
-                            <div key={featureIndex} className="flex items-center gap-3">
-                              <div className="w-2 h-2 bg-primary rounded-full" />
-                              <span className="text-muted-foreground">{feature}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </motion.div>
-
-                      <Button className="w-fit group">
-                        Learn More
-                        <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                      </Button>
-                    </div>
-
-                    {/* Image Section */}
-                    <div className={`relative overflow-hidden ${index % 2 === 1 ? 'lg:col-start-1 lg:row-start-1' : ''}`}>
-                      <motion.div
-                        whileHover={{ scale: 1.05 }}
-                        transition={{ duration: 0.3 }}
-                        className="h-full min-h-[400px] lg:min-h-[500px]"
-                      >
-                        <img
-                          src={module.image}
-                          alt={module.title}
-                          width={1200}
-                          height={800}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover"
-                        />
-                        
-                        {/* Gradient Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
-                        
-                        {/* Feature Badge */}
-                        <div className="absolute top-6 left-6">
-                          <Badge variant="secondary" className="bg-background/80 backdrop-blur-sm">
-                            <module.icon className="w-4 h-4 mr-2" />
-                            {module.title}
-                          </Badge>
-                        </div>
-                      </motion.div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+              <div
+                className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${accent}`}
+              >
+                <Icon className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">{title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-slate-400">{description}</p>
+              <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-gradient-to-br from-white/10 to-transparent opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100" />
+            </motion.article>
           ))}
-        </div>
+        </motion.div>
       </div>
     </section>
   );
 };
+
+export default ModuleShowcase;
