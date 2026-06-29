@@ -70,7 +70,7 @@ export function ViewportProvider({
     }
 
     // Prefer visualViewport when available to better reflect on-screen size
-    const vv = (window as any).visualViewport as VisualViewport | undefined
+    const vv = window.visualViewport
     const width = Math.round((vv?.width ?? window.innerWidth) || 0)
     const height = Math.round((vv?.height ?? window.innerHeight) || 0)
     return { width, height }
@@ -84,7 +84,7 @@ export function ViewportProvider({
     window.addEventListener("resize", handleResize)
     window.addEventListener("orientationchange", handleResize)
 
-    const vv = (window as any).visualViewport as VisualViewport | undefined
+    const vv = window.visualViewport
     vv?.addEventListener("resize", handleResize)
 
     return () => {
