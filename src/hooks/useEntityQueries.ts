@@ -3,6 +3,11 @@ import { useQuery, useMutation, UseQueryOptions, UseMutationOptions } from "@tan
 import { queryKeys, queryClient } from "@/lib/react-query";
 import { ApiService } from "@/lib/api-service";
 
+type EntityMutationVariables = {
+  id?: string | number;
+  isDelete?: boolean;
+} & Record<string, unknown>;
+
 // Create custom hooks for specific data types with appropriate overrides
 export const useEntityQuery = <T>(
   entityType: string,
@@ -21,7 +26,7 @@ export const useEntityQuery = <T>(
 // Create a hook for entity list queries
 export const useEntityListQuery = <T>(
   entityType: string,
-  filters?: Record<string, any>,
+  filters?: Record<string, unknown>,
   options?: UseQueryOptions<T[]>
 ) => {
   const apiService = ApiService.getInstance();
@@ -46,7 +51,7 @@ interface MutationContext<T> {
 }
 
 // Create a hook for entity mutations with optimistic updates
-export const useEntityMutation = <T, TVariables extends object>(
+export const useEntityMutation = <T, TVariables extends EntityMutationVariables>(
   entityType: string,
   options?: UseMutationOptions<T, Error, TVariables, MutationContext<T>> & {
     optimisticUpdate?: (variables: TVariables) => void;
@@ -54,52 +59,53 @@ export const useEntityMutation = <T, TVariables extends object>(
   }
 ) => {
   const apiService = ApiService.getInstance();
+  const { optimisticUpdate, onSuccessInvalidation, ...mutationOptions } = options ?? {};
   
   return useMutation({
+    ...mutationOptions,
     mutationFn: (variables: TVariables) => {
       const isCreate = !('id' in variables);
-      const isDelete = 'isDelete' in variables && (variables as any).isDelete;
+      const isDelete = variables.isDelete === true;
       
       if (isDelete) {
-        const id = (variables as any).id;
+        const id = variables.id;
         return apiService.delete<T>(`/api/${entityType}/${id}`);
       } else if (isCreate) {
         return apiService.post<T>(`/api/${entityType}`, variables);
       } else {
-        const id = (variables as any).id;
+        const id = variables.id;
         return apiService.put<T>(`/api/${entityType}/${id}`, variables);
       }
     },
-    onMutate: async (variables): Promise<MutationContext<T>> => {
-      if (options?.optimisticUpdate) {
+    onMutate: async (variables, mutationContext): Promise<MutationContext<T>> => {
+      const optionContext = (await mutationOptions.onMutate?.(variables, mutationContext)) ?? {};
+      if (optimisticUpdate) {
         await queryClient.cancelQueries({ queryKey: queryKeys.custom(entityType) });
         
         // Get the current data and type cast it
         const previousData = queryClient.getQueryData<T>([entityType]);
         
         // Perform optimistic update
-        options.optimisticUpdate(variables);
+        optimisticUpdate(variables);
         
         // Return typed context
-        return { previousData };
+        return { ...optionContext, previousData };
       }
-      return {};
+      return optionContext ?? {};
     },
-    onError: (err, variables, context) => {
+    onError: (err, variables, context, mutationContext) => {
       // If we have previous data, roll back to it
       if (context?.previousData) {
         queryClient.setQueryData([entityType], context.previousData);
       }
       
       // Call the original onError if it exists
-      if (options?.onError) {
-        (options.onError as any)(err, variables, context);
-      }
+      mutationOptions.onError?.(err, variables, context, mutationContext);
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, variables, context, mutationContext) => {
       // Invalidate relevant queries
-      if (options?.onSuccessInvalidation) {
-        options.onSuccessInvalidation.forEach(key => {
+      if (onSuccessInvalidation) {
+        onSuccessInvalidation.forEach(key => {
           queryClient.invalidateQueries({ queryKey: queryKeys.custom(key) });
         });
       } else {
@@ -108,10 +114,7 @@ export const useEntityMutation = <T, TVariables extends object>(
       }
       
       // Call the original onSuccess if it exists
-      if (options?.onSuccess) {
-        (options.onSuccess as any)(data, variables, context);
-      }
+      mutationOptions.onSuccess?.(data, variables, context, mutationContext);
     },
-    ...options,
   });
 };
