@@ -71,6 +71,49 @@ const SENSITIVE_PATTERNS = [
   /api.?key/i,
 ];
 
+const DOCUMENT_UPLOAD_ALLOWED_EXTENSIONS = new Set([
+  'pdf',
+  'doc',
+  'docx',
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp',
+  'txt',
+  'xmlp',
+  'xmlc',
+  'xmls',
+  'dwg',
+  'dfx',
+  'dxf',
+]);
+
+const DOCUMENT_UPLOAD_ALLOWED_MIME_TYPES = new Set([
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'text/plain',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/xml',
+  'text/xml',
+  'application/octet-stream',
+  'application/acad',
+  'application/x-acad',
+  'application/autocad_dwg',
+  'application/dwg',
+  'application/x-dwg',
+  'image/vnd.dwg',
+  'application/dxf',
+  'application/x-dxf',
+  'application/vnd.dxf',
+  'image/vnd.dxf',
+  'drawing/x-dxf',
+]);
+
 /**
  * Enhanced input sanitization with XSS protection
  */
@@ -181,19 +224,14 @@ export function validateFileUpload(file: File): {
   if (nameParts.length > 2) {
     errors.push('El nombre del archivo no puede contener múltiples extensiones');
   }
-  
-  // Allowed file types
-  const allowedTypes = [
-    'application/pdf',
-    'image/jpeg',
-    'image/png',
-    'image/gif',
-    'text/plain',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  ];
-  
-  if (!allowedTypes.includes(file.type)) {
+
+  const extension = nameParts.length > 1 ? nameParts[nameParts.length - 1].toLowerCase() : '';
+  if (!extension || !DOCUMENT_UPLOAD_ALLOWED_EXTENSIONS.has(extension)) {
+    errors.push('Tipo de archivo no permitido');
+  }
+
+  const mimeType = file.type.toLowerCase();
+  if (mimeType && !DOCUMENT_UPLOAD_ALLOWED_MIME_TYPES.has(mimeType)) {
     errors.push('Tipo de archivo no permitido');
   }
   

@@ -4,11 +4,23 @@
 // .xmlp - Archivo de proyecto (proyecto SoundVision completo)
 // .xmls - Archivo de escena (contexto de recinto/geometría)
 // .xmlc - Archivo de configuración (exportaciones como posiciones de altavoces)
-export const ALLOWED_FILE_TYPES = ['.xmlp', '.xmls', '.xmlc'];
+// .dwg/.dxf/.dfx - Planos CAD usados como referencia técnica
+export const ALLOWED_FILE_TYPES = ['.xmlp', '.xmls', '.xmlc', '.dwg', '.dxf', '.dfx'];
 export const ALLOWED_MIME_TYPES = [
   'application/xml',
   'text/xml',
   'application/octet-stream', // Some systems may report XML files as octet-stream
+  'application/acad',
+  'application/x-acad',
+  'application/autocad_dwg',
+  'application/dwg',
+  'application/x-dwg',
+  'image/vnd.dwg',
+  'application/dxf',
+  'application/x-dxf',
+  'application/vnd.dxf',
+  'image/vnd.dxf',
+  'drawing/x-dxf',
 ];
 export const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB in bytes
 

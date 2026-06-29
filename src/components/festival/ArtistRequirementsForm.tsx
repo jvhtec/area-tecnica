@@ -19,11 +19,11 @@ import { ArtistSectionProps } from "@/types/artist-form";
 import { Download, Eye, FileText, Loader2, Printer, Trash2 } from "lucide-react";
 import { normalizeWirelessSystem, normalizeWirelessSystems } from "@/lib/wirelessSystemNormalizer";
 import { mapFestivalGearSetup } from "@/utils/festivalGearMappers";
+import { DOCUMENT_UPLOAD_ACCEPT } from "@/utils/documentUploadValidation";
 
 interface ArtistRequirementsFormProps {
   isBlank?: boolean;
 }
-
 interface PublicFormContextResponse {
   ok: boolean;
   error?: string;
@@ -1012,12 +1012,12 @@ export const ArtistRequirementsForm = ({ isBlank = false }: ArtistRequirementsFo
 
                     <div className="space-y-2">
                       <label htmlFor="public-rider-upload" className="text-sm font-medium">
-                        {tx("Subir rider(s) (PDF, Word o imagen)", "Upload rider file(s) (PDF, Word, or image)")}
+                        {tx("Subir rider(s) (PDF, Word, imagen, SoundVision o CAD)", "Upload rider file(s) (PDF, Word, image, SoundVision, or CAD)")}
                       </label>
                       <Input
                         id="public-rider-upload"
                         type="file"
-                        accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.webp"
+                        accept={DOCUMENT_UPLOAD_ACCEPT}
                         multiple
                         onChange={handleRiderUpload}
                         disabled={isUploadingRider}
