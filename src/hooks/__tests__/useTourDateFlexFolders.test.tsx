@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import React from "react";
+import type { ReactNode } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,7 +33,7 @@ import { useTourDateFlexFolders } from "@/hooks/useTourDateFlexFolders";
 const createWrapper = () => {
   const queryClient = createTestQueryClient();
 
-  return ({ children }: { children: React.ReactNode }) => (
+  return ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
 };
