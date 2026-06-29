@@ -17,9 +17,8 @@ export const BRAND = {
   domain: "sector-pro.work",
 } as const;
 
-/** sky -> violet -> cyan gradient text. */
-export const GRADIENT_TEXT =
-  "bg-gradient-to-r from-sky-400 via-violet-400 to-cyan-300 bg-clip-text text-transparent";
+/** Restrained single-hue accent for highlighted words in headings. */
+export const GRADIENT_TEXT = "text-sky-300";
 
 /** Primary brand button background. */
 export const GRADIENT_BTN =

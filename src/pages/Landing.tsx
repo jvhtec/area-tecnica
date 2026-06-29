@@ -7,34 +7,37 @@ import { ProductShowcase } from "@/components/landing/ProductShowcase";
 import { PlatformMap } from "@/components/landing/PlatformMap";
 import { FeatureHighlights } from "@/components/landing/FeatureHighlights";
 import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
+import { TestimonialsSection } from "@/components/landing/TestimonialsSection";
 import { TechnicalSpecs } from "@/components/landing/TechnicalSpecs";
 import { CallToAction } from "@/components/landing/CallToAction";
 import { BRAND, GRADIENT_BTN } from "@/components/landing/_shared";
 
 /**
- * Disciplined technical backdrop: a fine engineering grid masked toward the top,
- * a faint scanline texture, and a single restrained brand glow. Deliberately
- * avoids the floating multi-blob "aurora" look.
+ * Flat, disciplined technical backdrop: a near-black surface with a single fine
+ * engineering grid masked toward the top and a faint neutral highlight. No
+ * colored blur blobs — deliberately avoids the "aurora" look.
  */
 function TechBackground() {
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#05070F]">
-      {/* single restrained top glow */}
-      <div className="absolute -top-40 left-1/2 h-[28rem] w-[52rem] -translate-x-1/2 rounded-full bg-sky-600/10 blur-[130px]" />
-      <div className="absolute right-0 top-1/3 h-[26rem] w-[26rem] rounded-full bg-violet-700/[0.07] blur-[130px]" />
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#070910]">
+      {/* faint neutral top highlight (no color cast) */}
+      <div
+        className="absolute inset-x-0 top-0 h-[40rem]"
+        style={{
+          background: "radial-gradient(ellipse 70% 100% at 50% 0%, rgba(255,255,255,0.035), transparent 70%)",
+        }}
+      />
       {/* fine engineering grid */}
       <div
-        className="absolute inset-0 opacity-[0.05]"
+        className="absolute inset-0 opacity-[0.04]"
         style={{
           backgroundImage:
             "linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-          maskImage: "radial-gradient(ellipse 90% 70% at 50% -10%, black 30%, transparent 75%)",
-          WebkitMaskImage: "radial-gradient(ellipse 90% 70% at 50% -10%, black 30%, transparent 75%)",
+          backgroundSize: "44px 44px",
+          maskImage: "radial-gradient(ellipse 85% 60% at 50% -5%, black 25%, transparent 70%)",
+          WebkitMaskImage: "radial-gradient(ellipse 85% 60% at 50% -5%, black 25%, transparent 70%)",
         }}
       />
-      {/* subtle vignette to ground content */}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_55%,#05070F_100%)]" />
     </div>
   );
 }
@@ -59,7 +62,7 @@ function Navbar() {
   return (
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
-        scrolled ? "border-b border-white/10 bg-[#060A18]/80 backdrop-blur-xl" : "border-b border-transparent"
+        scrolled ? "border-b border-white/10 bg-[#070910]/80 backdrop-blur-xl" : "border-b border-transparent"
       }`}
     >
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
@@ -130,7 +133,7 @@ export default function Landing() {
   }, []);
 
   return (
-    <div className="dark min-h-screen scroll-smooth bg-[#060A18] text-slate-100 antialiased">
+    <div className="dark min-h-screen scroll-smooth bg-[#070910] text-slate-100 antialiased">
       <TechBackground />
       <Navbar />
       <main>
@@ -140,6 +143,7 @@ export default function Landing() {
         <PlatformMap />
         <IntegrationsSection />
         <FeatureHighlights />
+        <TestimonialsSection />
         <TechnicalSpecs />
         <CallToAction />
       </main>
