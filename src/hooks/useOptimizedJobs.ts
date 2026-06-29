@@ -5,6 +5,7 @@ import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { Department } from "@/types/department";
 import { sanitizeLogData } from "@/lib/enhanced-security-config";
 import { OPS_JOB_TYPES_NO_DRYHIRE, OPS_JOB_TYPES_WITH_DRYHIRE } from "@/utils/jobType";
+import { shouldHideJobForTourState } from "@/utils/cancelledTourJobs";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -200,15 +201,7 @@ export const useOptimizedJobs = (
         ...job,
         tour_meta: job.tour_id ? tourMetaMap[job.tour_id] ?? null : null,
       }))
-      .filter(job => {
-        const meta = job.tour_meta;
-        // Hide anything tied to a cancelled/deleted tour
-        if (meta && (meta.status === 'cancelled' || meta.deleted === true)) {
-          return false;
-        }
-        // Also hide jobs explicitly cancelled
-        return job.status !== 'Cancelado';
-      });
+      .filter(job => !shouldHideJobForTourState(job, job.tour_meta));
 
     const duration = Date.now() - startTime;
     if (debug) {
