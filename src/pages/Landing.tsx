@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { StatsSection } from "@/components/landing/StatsSection";
-import { ModuleShowcase } from "@/components/landing/ModuleShowcase";
+import { ProductShowcase } from "@/components/landing/ProductShowcase";
+import { PlatformMap } from "@/components/landing/PlatformMap";
 import { FeatureHighlights } from "@/components/landing/FeatureHighlights";
 import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
 import { TechnicalSpecs } from "@/components/landing/TechnicalSpecs";
@@ -39,9 +40,9 @@ function TechBackground() {
 }
 
 const navLinks = [
-  { label: "Módulos", href: "modulos" },
+  { label: "Producto", href: "producto" },
+  { label: "Plataforma", href: "modulos" },
   { label: "Integraciones", href: "integraciones" },
-  { label: "Características", href: "caracteristicas" },
 ];
 
 function Navbar() {
@@ -135,9 +136,10 @@ export default function Landing() {
       <main>
         <HeroSection />
         <StatsSection />
-        <ModuleShowcase />
-        <FeatureHighlights />
+        <ProductShowcase />
+        <PlatformMap />
         <IntegrationsSection />
+        <FeatureHighlights />
         <TechnicalSpecs />
         <CallToAction />
       </main>
