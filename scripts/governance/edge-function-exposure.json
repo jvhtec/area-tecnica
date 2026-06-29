@@ -98,8 +98,8 @@
     },
     "send-staffing-email": {
       "class": "privileged-role",
-      "verifyJwt": true,
-      "internalGuard": "Uses the shared HTTP wrapper and bounded JSON parsing; browser callers must be authenticated admin/management, while the staffing orchestrator may call with the service-role key and an audited actor fallback."
+      "verifyJwt": false,
+      "internalGuard": "Gateway JWT is disabled so browser CORS preflight reaches the shared HTTP wrapper. Runtime auth accepts service-role bearer/apikey for automation, otherwise requireAdminOrManagement validates the caller JWT and requires admin/management before any staffing send."
     },
     "send-timesheet-reminder": { "class": "privileged-role", "verifyJwt": true },
     "send-tour-availability": {

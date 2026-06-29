@@ -32,6 +32,18 @@ const staffingSweeperScheduleMigration = readFileSync(
   "utf-8",
 );
 
+const supabaseConfig = readFileSync(
+  join(process.cwd(), "supabase/config.toml"),
+  "utf-8",
+);
+
+const edgeFunctionExposure = JSON.parse(
+  readFileSync(
+    join(process.cwd(), "scripts/governance/edge-function-exposure.json"),
+    "utf-8",
+  ),
+);
+
 const sendStaffingEmailFunction = readFileSync(
   join(process.cwd(), "supabase/functions/send-staffing-email/index.ts"),
   "utf-8",
@@ -164,6 +176,18 @@ describe("smarter staffing recommendation migration", () => {
     expect(sendStaffingEmailFunction).toContain("isServiceRoleRequest");
     expect(sendStaffingEmailFunction).toContain("body?.actor_id");
     expect(staffingOrchestratorFunction).toContain("actor_id: campaign.created_by");
+  });
+
+  it("lets send-staffing-email handle CORS before enforcing internal auth", () => {
+    expect(supabaseConfig).toMatch(/\[functions\.send-staffing-email\]\s+verify_jwt = false/);
+    expect(edgeFunctionExposure.functions["send-staffing-email"]).toMatchObject({
+      class: "privileged-role",
+      verifyJwt: false,
+    });
+    expect(edgeFunctionExposure.functions["send-staffing-email"].internalGuard).toContain("requireAdminOrManagement");
+    expect(sendStaffingEmailFunction).toContain("createHttpHandler");
+    expect(sendStaffingEmailFunction).toContain("isServiceRoleRequest");
+    expect(sendStaffingEmailFunction).toContain("requireAdminOrManagement");
   });
 
   it("scopes staffing push notifications to the staffing department", () => {
