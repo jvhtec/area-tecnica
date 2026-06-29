@@ -247,11 +247,12 @@ test("auto-staffing shows role-less consultations and refreshes candidates after
   await expect(page.getByText("No hay candidatos disponibles para SND-PA-T")).toBeVisible();
 
   await page.getByRole("tab", { name: "Offers" }).click();
+  const confirmedResponses = page.getByTestId("staffing-confirmed-responses");
   await expect(page.getByText("Availability: 1 yes")).toBeVisible();
-  await expect(page.getByText("Confirmed Tech")).toBeVisible();
-  await expect(page.getByText("Other Role")).toHaveCount(0);
-  await expect(page.getByText("Availability yes")).toBeVisible();
-  await expect(page.getByText("Job availability").first()).toBeVisible();
+  await expect(confirmedResponses.getByText("Confirmed Tech")).toBeVisible();
+  await expect(confirmedResponses.getByText("Other Role")).toHaveCount(0);
+  await expect(confirmedResponses.getByText("Availability yes")).toBeVisible();
+  await expect(confirmedResponses.getByText("Job availability")).toBeVisible();
   await page.getByRole("checkbox", { name: /select confirmed tech for offer/i }).click();
   await page.getByRole("button", { name: /send offers \(1\) by email/i }).click();
 

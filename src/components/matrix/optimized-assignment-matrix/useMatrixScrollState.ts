@@ -43,6 +43,7 @@ export const useMatrixScrollState = ({
   const updateScheduledRef = useRef(false);
   const autoScrolledRef = useRef(false);
   const prevDatesRef = useRef<Date[] | null>(null);
+  const isMountedRef = useRef(true);
 
   const [visibleRows, setVisibleRows] = useState({ start: 0, end: Math.min(techniciansLength - 1, 20) });
   const [visibleCols, setVisibleCols] = useState({ start: 0, end: Math.min(dates.length - 1, 14) });
@@ -59,6 +60,11 @@ export const useMatrixScrollState = ({
     syncInProgressRef.current = true;
 
     requestAnimationFrame(() => {
+      if (!isMountedRef.current) {
+        syncInProgressRef.current = false;
+        return;
+      }
+
       try {
         if (source !== "dateHeaders" && dateHeadersRef.current) {
           dateHeadersRef.current.scrollLeft = scrollLeft;
@@ -115,6 +121,7 @@ export const useMatrixScrollState = ({
     updateScheduledRef.current = true;
     requestAnimationFrame(() => {
       updateScheduledRef.current = false;
+      if (!isMountedRef.current) return;
       updateVisibleWindow();
     });
   }, [updateVisibleWindow]);
@@ -177,9 +184,8 @@ export const useMatrixScrollState = ({
     syncScrollPositions,
   ]);
 
-  const handleDateHeadersScrollCore = useCallback((e: React.UIEvent<HTMLDivElement>) => {
+  const handleDateHeadersScrollCore = useCallback((scrollLeft: number) => {
     if (syncInProgressRef.current) return;
-    const scrollLeft = e.currentTarget.scrollLeft;
     syncScrollPositions(scrollLeft, mainScrollRef.current?.scrollTop || 0, "dateHeaders");
     lastKnownScrollRef.current.left = scrollLeft;
     updateNavAvailability();
@@ -194,10 +200,23 @@ export const useMatrixScrollState = ({
   }, [scheduleVisibleWindowUpdate, syncScrollPositions]);
 
   const handleMainScroll = handleMainScrollCore;
-  const handleDateHeadersScroll = useMemo(
-    () => throttle(handleDateHeadersScrollCore, 12),
-    [handleDateHeadersScrollCore],
-  );
+  const handleDateHeadersScroll = useMemo(() => {
+    const throttled = throttle(handleDateHeadersScrollCore, 12);
+    const handler = ((e: React.UIEvent<HTMLDivElement>) => {
+      throttled(e.currentTarget.scrollLeft);
+    }) as ((e: React.UIEvent<HTMLDivElement>) => void) & { cancel: () => void };
+    handler.cancel = throttled.cancel;
+    return handler;
+  }, [handleDateHeadersScrollCore]);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      syncInProgressRef.current = false;
+      updateScheduledRef.current = false;
+    };
+  }, []);
 
   useEffect(() => () => {
     handleDateHeadersScroll.cancel();
@@ -239,8 +258,11 @@ export const useMatrixScrollState = ({
 
     let retries = 0;
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    let cancelled = false;
 
     const attemptScroll = () => {
+      if (cancelled || !isMountedRef.current) return;
+
       const success = scrollToToday();
       if (success) {
         autoScrolledRef.current = true;
@@ -248,13 +270,14 @@ export const useMatrixScrollState = ({
       }
 
       retries += 1;
-      if (retries < MAX_AUTO_SCROLL_RETRIES) {
+      if (retries < MAX_AUTO_SCROLL_RETRIES && !cancelled) {
         timeoutId = setTimeout(attemptScroll, 100 * retries);
       }
     };
 
     timeoutId = setTimeout(attemptScroll, 50);
     return () => {
+      cancelled = true;
       if (timeoutId) {
         clearTimeout(timeoutId);
       }

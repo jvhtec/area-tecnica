@@ -57,6 +57,16 @@ export const OptimizedMatrixCellTooltip = ({
         : [staffingStatusByDate?.offer_job_title],
     ),
   );
+  const availabilityActorLabel =
+    staffingStatusByDate?.availability_actor_label ||
+    (staffingStatusByDate?.availability_requested_by && profileNamesMap.has(staffingStatusByDate.availability_requested_by)
+      ? profileNamesMap.get(staffingStatusByDate.availability_requested_by)
+      : null);
+  const offerActorLabel =
+    staffingStatusByDate?.offer_actor_label ||
+    (staffingStatusByDate?.offer_requested_by && profileNamesMap.has(staffingStatusByDate.offer_requested_by)
+      ? profileNamesMap.get(staffingStatusByDate.offer_requested_by)
+      : null);
 
   return (
     <div className="space-y-1 text-sm">
@@ -104,9 +114,9 @@ export const OptimizedMatrixCellTooltip = ({
                   {availabilityJobLabel}
                 </div>
               )}
-              {staffingStatusByDate.availability_requested_by && profileNamesMap.has(staffingStatusByDate.availability_requested_by) && (
+              {availabilityActorLabel && (
                 <div className="text-muted-foreground">
-                  Enviado por: {profileNamesMap.get(staffingStatusByDate.availability_requested_by)}
+                  Enviado por: {availabilityActorLabel}
                 </div>
               )}
               {staffingStatusByDate.availability_created_at && formatDateTimeEs(staffingStatusByDate.availability_created_at) && (
@@ -126,9 +136,9 @@ export const OptimizedMatrixCellTooltip = ({
                   {offerJobLabel}
                 </div>
               )}
-              {staffingStatusByDate.offer_requested_by && profileNamesMap.has(staffingStatusByDate.offer_requested_by) && (
+              {offerActorLabel && (
                 <div className="text-muted-foreground">
-                  Enviado por: {profileNamesMap.get(staffingStatusByDate.offer_requested_by)}
+                  Enviado por: {offerActorLabel}
                 </div>
               )}
               {staffingStatusByDate.offer_created_at && formatDateTimeEs(staffingStatusByDate.offer_created_at) && (

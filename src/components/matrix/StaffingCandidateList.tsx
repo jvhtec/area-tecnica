@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { dataLayerClient } from '@/services/dataLayerClient';
 import { useToast } from '@/hooks/use-toast'
+import { parseISO } from 'date-fns'
 import { Info, Mail, MessageCircle } from 'lucide-react'
 import {
   JOB_PROFILE_LABELS,
@@ -27,6 +28,9 @@ interface StaffingCandidateListProps {
   assignedCount?: number
   confirmedAvailability?: number
   pendingAvailability?: number
+  mode?: 'assisted' | 'auto'
+  readOnly?: boolean
+  actorLabel?: string
 }
 
 type StaffingChannel = 'email' | 'whatsapp'
@@ -55,6 +59,41 @@ interface RolelessConsultation {
   updated_at: string | null
 }
 
+interface CandidateRequestRow {
+  id: string
+  profile_id: string | null
+  phase: string | null
+  status: string | null
+  target_date: string | null
+  single_day: boolean | null
+  updated_at: string | null
+  created_at: string | null
+  role_code: string | null
+}
+
+interface CandidateEventMeta {
+  phase?: string
+  role?: string
+  request_origin?: string
+}
+
+interface CandidateEventRow {
+  staffing_request_id: string | null
+  event: string | null
+  meta: CandidateEventMeta | null
+  created_at: string | null
+}
+
+interface CandidatePhaseActivity {
+  phase: 'availability' | 'offer'
+  status: string
+  created_at: string | null
+  updated_at: string | null
+  request_origin?: string | null
+}
+
+type CandidateActivity = Partial<Record<'availability' | 'offer', CandidatePhaseActivity>>
+
 const ROLELESS_PHASE_LABELS: Record<string, string> = {
   availability: 'disponibilidad',
   offer: 'oferta'
@@ -76,6 +115,47 @@ const getRolelessConsultationLabel = (consultation: RolelessConsultation) => {
   return `Solicitud previa de ${phase} sin rol: ${status}${scope}`
 }
 
+const ROLE_ACTIVITY_STATUS_LABELS: Record<string, string> = {
+  pending: 'enviada',
+  confirmed: 'confirmada',
+  declined: 'rechazada'
+}
+
+const getActivityTimestamp = (activity?: CandidatePhaseActivity) => {
+  const value = activity?.updated_at || activity?.created_at
+  const timestamp = value ? parseISO(value).getTime() : 0
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+const getLatestCandidateActivity = (activity?: CandidateActivity) => {
+  const availability = activity?.availability
+  const offer = activity?.offer
+
+  if (!availability) return offer
+  if (!offer) return availability
+
+  return getActivityTimestamp(offer) >= getActivityTimestamp(availability)
+    ? offer
+    : availability
+}
+
+const getCandidateActivityLabel = (activity?: CandidateActivity) => {
+  const latest = getLatestCandidateActivity(activity)
+  if (!latest) return null
+
+  const phaseLabel = latest.phase === 'offer' ? 'Oferta' : 'Disponibilidad'
+  const statusLabel = ROLE_ACTIVITY_STATUS_LABELS[latest.status] ?? latest.status
+  return `${phaseLabel} ${statusLabel}`
+}
+
+const getCandidateActivityClassName = (activity?: CandidateActivity) => {
+  const latest = getLatestCandidateActivity(activity)
+  if (!latest) return ''
+  if (latest.status === 'confirmed') return 'bg-green-100 text-green-800'
+  if (latest.status === 'declined') return 'bg-red-100 text-red-800'
+  return latest.phase === 'offer' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'
+}
+
 export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   campaignId,
   roleCode,
@@ -85,7 +165,10 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   requiredCount = 0,
   assignedCount = 0,
   confirmedAvailability = 0,
-  pendingAvailability = 0
+  pendingAvailability = 0,
+  mode = 'assisted',
+  readOnly = false,
+  actorLabel
 }) => {
   const { toast } = useToast()
   const queryClient = useQueryClient()
@@ -99,14 +182,14 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
 
   // Fetch ranked candidates
   const { data: candidates, isLoading } = useQuery({
-    queryKey: queryKeys.scope('staffing_candidates', jobId, department, roleCode),
+    queryKey: queryKeys.scope('staffing_candidates', jobId, department, roleCode, mode),
     queryFn: async () => {
       try {
         const { data, error } = await dataLayerClient.rpc('rank_staffing_candidates', {
           p_job_id: jobId,
           p_department: department,
           p_role_code: roleCode,
-          p_mode: 'assisted',
+          p_mode: mode,
           p_policy: policy
         })
 
@@ -181,6 +264,78 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
     enabled: candidateIds.length > 0
   })
 
+  const { data: roleActivity = {} } = useQuery<Record<string, CandidateActivity>>({
+    queryKey: queryKeys.scope('staffing_candidate_role_activity', jobId, roleCode, candidateIds),
+    queryFn: async () => {
+      if (candidateIds.length === 0) return {}
+
+      const { data: requests, error } = await dataLayerClient.from('staffing_requests')
+        .select('id, profile_id, phase, status, target_date, single_day, updated_at, created_at, role_code')
+        .eq('job_id', jobId)
+        .in('profile_id', candidateIds)
+        .in('phase', ['availability', 'offer'])
+        .in('status', ['pending', 'confirmed', 'declined'])
+        .order('updated_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching candidate staffing activity:', error)
+        return {}
+      }
+
+      const requestRows = (requests || []) as CandidateRequestRow[]
+      const requestIds = requestRows.map((request) => request.id).filter(Boolean)
+      const eventMetaByRequestId = new Map<string, CandidateEventMeta>()
+
+      if (requestIds.length > 0) {
+        const { data: sentEvents, error: sentEventsError } = await dataLayerClient.from('staffing_events')
+          .select('staffing_request_id, event, meta, created_at')
+          .in('staffing_request_id', requestIds)
+          .in('event', ['email_sent', 'whatsapp_sent'])
+          .order('created_at', { ascending: false })
+
+        if (sentEventsError) {
+          console.error('Error fetching candidate staffing events:', sentEventsError)
+        } else {
+          ;[...((sentEvents || []) as CandidateEventRow[])]
+            .sort((a, b) => (
+              parseISO(b.created_at || '1970-01-01T00:00:00.000Z').getTime() -
+              parseISO(a.created_at || '1970-01-01T00:00:00.000Z').getTime()
+            ))
+            .forEach((event) => {
+              const requestId = String(event.staffing_request_id || '')
+              if (!requestId || eventMetaByRequestId.has(requestId)) return
+              eventMetaByRequestId.set(requestId, event.meta || {})
+            })
+        }
+      }
+
+      return requestRows.reduce((acc, request) => {
+        const phase = request.phase === 'availability' || request.phase === 'offer'
+          ? request.phase
+          : null
+        const profileId = String(request.profile_id || '')
+        if (!phase || !profileId) return acc
+
+        const eventMeta = eventMetaByRequestId.get(String(request.id)) || {}
+        const requestRole = String(request.role_code || eventMeta.role || '')
+        if (requestRole !== roleCode) return acc
+
+        if (!acc[profileId]) acc[profileId] = {}
+        if (acc[profileId][phase]) return acc
+
+        acc[profileId][phase] = {
+          phase,
+          status: request.status || 'pending',
+          created_at: request.created_at,
+          updated_at: request.updated_at,
+          request_origin: eventMeta.request_origin || null
+        }
+        return acc
+      }, {} as Record<string, CandidateActivity>)
+    },
+    enabled: candidateIds.length > 0
+  })
+
   // Send availability mutation
   const sendAvailabilityMutation = useMutation({
     mutationFn: async () => {
@@ -240,6 +395,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_availability_responses', jobId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_candidates', jobId) })
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_roleless_consultations', jobId) })
+      queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_candidate_role_activity', jobId, roleCode) })
     },
     onError: (error: any) => {
       toast({
@@ -304,6 +460,14 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
     const wave = recommendedWaveNumber(index, requiredCount, waveBuffer)
     return wave > maxWaves ? `Tras oleada ${maxWaves}` : `Oleada ${wave}`
   }
+  const nextCandidateProfileId = useMemo(() => {
+    if (!readOnly || !candidates?.length) return null
+
+    return candidates.find((candidate) => {
+      const activity = roleActivity[candidate.profile_id]
+      return !activity?.availability && !activity?.offer
+    })?.profile_id ?? null
+  }, [candidates, readOnly, roleActivity])
 
   if (isLoading) {
     return (
@@ -330,46 +494,58 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{roleCode} - Recomendaciones de candidatos</CardTitle>
+        <CardTitle>
+          {roleCode} - {readOnly && actorLabel ? `Decisión de ${actorLabel}` : 'Recomendaciones de candidatos'}
+        </CardTitle>
         <CardDescription>
-          Los {candidates.length} candidatos mejor clasificados por habilidades, experiencia en el rol, proximidad y confiabilidad
+          {readOnly && actorLabel
+            ? `${actorLabel} evalúa estos ${candidates.length} candidatos por ranking y estado de contacto`
+            : `Los ${candidates.length} candidatos mejor clasificados por habilidades, experiencia en el rol, proximidad y confiabilidad`}
         </CardDescription>
         {roleSummary}
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded border bg-background p-3">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            {channel === 'whatsapp' ? <MessageCircle size={16} /> : <Mail size={16} />}
-            Enviar disponibilidad por
+        {!readOnly && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded border bg-background p-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              {channel === 'whatsapp' ? <MessageCircle size={16} /> : <Mail size={16} />}
+              Enviar disponibilidad por
+            </div>
+            <Select value={channel} onValueChange={(value) => setChannel(value as StaffingChannel)}>
+              <SelectTrigger aria-label="Seleccionar canal de disponibilidad" className="w-[160px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="email">Email</SelectItem>
+                <SelectItem value="whatsapp">WhatsApp</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
-          <Select value={channel} onValueChange={(value) => setChannel(value as StaffingChannel)}>
-            <SelectTrigger aria-label="Seleccionar canal de disponibilidad" className="w-[160px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="email">Email</SelectItem>
-              <SelectItem value="whatsapp">WhatsApp</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        )}
 
         {/* Select all checkbox */}
-        <div className="flex items-center gap-2 p-2 bg-muted rounded">
-          <Checkbox
-            aria-label="Seleccionar todos los candidatos"
-            checked={selectedCandidates.size === candidates.length && candidates.length > 0}
-            onCheckedChange={toggleSelectAll}
-          />
-          <span className="text-sm font-medium">
-            Seleccionar todos ({selectedCandidates.size} seleccionados)
-          </span>
-        </div>
+        {!readOnly && (
+          <div className="flex items-center gap-2 p-2 bg-muted rounded">
+            <Checkbox
+              aria-label="Seleccionar todos los candidatos"
+              checked={selectedCandidates.size === candidates.length && candidates.length > 0}
+              onCheckedChange={toggleSelectAll}
+            />
+            <span className="text-sm font-medium">
+              Seleccionar todos ({selectedCandidates.size} seleccionados)
+            </span>
+          </div>
+        )}
 
         {/* Candidate list */}
         <div className="space-y-2 max-h-96 overflow-y-auto">
           {candidates.map((candidate, index) => {
             const rolelessConsultation = rolelessConsultations[candidate.profile_id]
+            const activity = roleActivity[candidate.profile_id]
+            const latestActivity = getLatestCandidateActivity(activity)
+            const activityLabel = getCandidateActivityLabel(activity)
+            const isNextCandidate = candidate.profile_id === nextCandidateProfileId
             const reasons = Array.isArray(candidate.reasons) ? candidate.reasons.map(String) : []
             const rateReason = reasons.find((reason) => /rate adjustment|custom rate|candidate rate|standard role rate/i.test(reason))
             const waveLabel = waveLabelForIndex(index)
@@ -379,12 +555,14 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                 key={candidate.profile_id}
                 className="flex items-start gap-3 p-3 border rounded hover:bg-muted"
               >
-                <Checkbox
-                  aria-label={`Seleccionar ${candidate.full_name}`}
-                  checked={selectedCandidates.has(candidate.profile_id)}
-                  onCheckedChange={() => toggleCandidate(candidate.profile_id)}
-                  className="mt-1"
-                />
+                {!readOnly && (
+                  <Checkbox
+                    aria-label={`Seleccionar ${candidate.full_name}`}
+                    checked={selectedCandidates.has(candidate.profile_id)}
+                    onCheckedChange={() => toggleCandidate(candidate.profile_id)}
+                    className="mt-1"
+                  />
+                )}
 
                 <Avatar className="h-10 w-10 shrink-0">
                   <AvatarImage
@@ -402,7 +580,20 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                     <Badge variant="outline">Puesto #{index + 1}</Badge>
                     <Badge variant="secondary">Perfil: {JOB_PROFILE_LABELS[roleProfileName] || roleProfileName}</Badge>
                     <Badge variant="outline">{waveLabel}</Badge>
-                    <Badge variant="outline">Estado: No contactado</Badge>
+                    {activityLabel ? (
+                      <Badge className={getCandidateActivityClassName(activity)}>
+                        {activityLabel}
+                      </Badge>
+                    ) : isNextCandidate ? (
+                      <Badge className="bg-blue-100 text-blue-800">
+                        Siguiente candidato
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">Estado: No contactado</Badge>
+                    )}
+                    {activityLabel && readOnly && actorLabel && latestActivity?.request_origin === 'auto_staffing' && (
+                      <Badge variant="outline">Enviado por {actorLabel}</Badge>
+                    )}
                     {candidate.final_score >= 80 && (
                       <Badge className="bg-green-100 text-green-800">⭐ Destacado</Badge>
                     )}
@@ -490,16 +681,18 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
         </div>
 
         {/* Action buttons */}
-        <div className="flex gap-2 pt-4 border-t">
-          <Button
-            onClick={() => sendAvailabilityMutation.mutate()}
-            disabled={selectedCandidates.size === 0 || sendAvailabilityMutation.isPending}
-          >
-            {sendAvailabilityMutation.isPending
-              ? 'Enviando...'
-              : `Enviar disponibilidad (${selectedCandidates.size}) por ${channel === 'whatsapp' ? 'WhatsApp' : 'Email'}`}
-          </Button>
-        </div>
+        {!readOnly && (
+          <div className="flex gap-2 pt-4 border-t">
+            <Button
+              onClick={() => sendAvailabilityMutation.mutate()}
+              disabled={selectedCandidates.size === 0 || sendAvailabilityMutation.isPending}
+            >
+              {sendAvailabilityMutation.isPending
+                ? 'Enviando...'
+                : `Enviar disponibilidad (${selectedCandidates.size}) por ${channel === 'whatsapp' ? 'WhatsApp' : 'Email'}`}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   )

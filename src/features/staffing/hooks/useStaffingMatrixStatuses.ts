@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/integrations/supabase/client'
 import { format } from 'date-fns'
+import { CARLOS_AGENT_NAME } from '@/features/staffing/carlos'
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -36,8 +37,10 @@ interface ByDateStatus extends ByJobStatus {
   offer_job_id?: string | null
   offer_job_title?: string | null
   availability_requested_by?: string | null
+  availability_actor_label?: string | null
   availability_created_at?: string | null
   offer_requested_by?: string | null
+  offer_actor_label?: string | null
   offer_created_at?: string | null
   // Arrays of ALL job IDs with pending requests for this date (for bulk cancel)
   pending_availability_job_ids?: string[]
@@ -47,6 +50,7 @@ interface ByDateStatus extends ByJobStatus {
 }
 
 interface StaffingRequestRow {
+  id?: string | null
   job_id: string
   profile_id: string
   phase: 'availability' | 'offer'
@@ -56,6 +60,15 @@ interface StaffingRequestRow {
   target_date: string | Date | null
   created_at: string | null
   requested_by: string | null
+}
+
+interface StaffingEventRow {
+  staffing_request_id: string | null
+  event: string | null
+  meta: {
+    request_origin?: string | null
+  } | null
+  created_at: string | null
 }
 
 interface LatestByPhaseAccumulator {
@@ -68,8 +81,10 @@ interface LatestByPhaseAccumulator {
   offer_job_id: string | null
   offer_job_title: string | null
   availability_requested_by: string | null
+  availability_actor_label: string | null
   availability_created_at: string | null
   offer_requested_by: string | null
+  offer_actor_label: string | null
   offer_created_at: string | null
   pending_availability_job_ids: string[]
   pending_availability_job_titles: string[]
@@ -87,8 +102,10 @@ const createLatestByPhaseAccumulator = (): LatestByPhaseAccumulator => ({
   offer_job_id: null,
   offer_job_title: null,
   availability_requested_by: null,
+  availability_actor_label: null,
   availability_created_at: null,
   offer_requested_by: null,
+  offer_actor_label: null,
   offer_created_at: null,
   pending_availability_job_ids: [],
   pending_availability_job_titles: [],
@@ -171,22 +188,79 @@ export function useStaffingMatrixStatuses(
 
       // 2) Date-based statuses derived from staffing_requests across visible jobs
       const reqRows: StaffingRequestRow[] = []
+      let shouldFallbackToRequestsRpc = false
       try {
         const { data, error } = await supabase
-          .rpc('get_staffing_requests_matrix_filtered', {
-            p_job_ids: jobIds,
-            p_profile_ids: technicianIds
-          })
+          .from('staffing_requests')
+          .select('id, job_id, profile_id, phase, status, updated_at, single_day, target_date, created_at, requested_by')
+          .in('job_id', jobIds)
+          .in('profile_id', technicianIds)
+          .in('phase', ['availability', 'offer'])
+          .order('updated_at', { ascending: false })
 
         if (error) {
-          console.warn('Staffing matrix requests RPC error:', error)
+          console.warn('Staffing matrix requests query error:', error)
+          shouldFallbackToRequestsRpc = true
         } else if (data?.length) {
           data.forEach(row => {
             reqRows.push(row as StaffingRequestRow)
           })
         }
       } catch (e) {
-        console.warn('Staffing matrix requests RPC error:', e)
+        console.warn('Staffing matrix requests query error:', e)
+        shouldFallbackToRequestsRpc = true
+      }
+
+      if (shouldFallbackToRequestsRpc) {
+        try {
+          const { data, error } = await supabase
+            .rpc('get_staffing_requests_matrix_filtered', {
+              p_job_ids: jobIds,
+              p_profile_ids: technicianIds
+            })
+
+          if (error) {
+            console.warn('Staffing matrix requests RPC error:', error)
+          } else if (data?.length) {
+            data.forEach(row => {
+              reqRows.push(row as StaffingRequestRow)
+            })
+          }
+        } catch (e) {
+          console.warn('Staffing matrix requests RPC error:', e)
+        }
+      }
+
+      const autoStaffingRequestIds = new Set<string>()
+      try {
+        const requestIds = Array.from(new Set(reqRows.map((row) => row.id).filter(Boolean) as string[]))
+        if (requestIds.length > 0) {
+          const requestIdBatches = chunk(requestIds, 200)
+          const eventPromises = requestIdBatches.map((batch) => (
+            Promise.resolve(supabase
+              .from('staffing_events')
+              .select('staffing_request_id, event, meta, created_at')
+              .in('staffing_request_id', batch)
+              .in('event', ['email_sent', 'whatsapp_sent'])
+              .order('created_at', { ascending: false }))
+          ))
+          const eventResults = await Promise.all(eventPromises)
+          eventResults.forEach((res) => {
+            if (res.error) {
+              console.warn('Staffing matrix events query error:', res.error)
+              return
+            }
+            ;((res.data || []) as StaffingEventRow[]).forEach((event) => {
+              const requestId = String(event.staffing_request_id || '')
+              if (!requestId || autoStaffingRequestIds.has(requestId)) return
+              if (event.meta?.request_origin === 'auto_staffing') {
+                autoStaffingRequestIds.add(requestId)
+              }
+            })
+          })
+        }
+      } catch (e) {
+        console.warn('Staffing matrix events query error:', e)
       }
 
       // Build job lookup with parsed dates for overlap check
@@ -251,12 +325,15 @@ export function useStaffingMatrixStatuses(
               }
               const accT = acc.availability_updated_at || 0
               if (t > accT) {
-	                const mapped = r.status === 'pending' ? 'requested' : (r.status === 'expired' ? null : toMatrixStatus(r.status))
+                const mapped = r.status === 'pending' ? 'requested' : (r.status === 'expired' ? null : toMatrixStatus(r.status))
                 acc.availability_status = mapped
                 acc.availability_updated_at = t
                 acc.availability_job_id = r.job_id
                 acc.availability_job_title = jobTitle
                 acc.availability_requested_by = r.requested_by ?? null
+                acc.availability_actor_label = r.id && autoStaffingRequestIds.has(r.id)
+                  ? CARLOS_AGENT_NAME
+                  : null
                 acc.availability_created_at = r.created_at ?? null
               }
             } else if (r.phase === 'offer') {
@@ -267,12 +344,15 @@ export function useStaffingMatrixStatuses(
               }
               const accT = acc.offer_updated_at || 0
               if (t > accT) {
-	                const mapped = r.status === 'pending' ? 'sent' : (r.status === 'expired' ? null : toMatrixStatus(r.status))
+                const mapped = r.status === 'pending' ? 'sent' : (r.status === 'expired' ? null : toMatrixStatus(r.status))
                 acc.offer_status = mapped
                 acc.offer_updated_at = t
                 acc.offer_job_id = r.job_id
                 acc.offer_job_title = jobTitle
                 acc.offer_requested_by = r.requested_by ?? null
+                acc.offer_actor_label = r.id && autoStaffingRequestIds.has(r.id)
+                  ? CARLOS_AGENT_NAME
+                  : null
                 acc.offer_created_at = r.created_at ?? null
               }
             }
@@ -289,8 +369,10 @@ export function useStaffingMatrixStatuses(
               offer_job_id: latest.offer_job_id,
               offer_job_title: latest.offer_job_title,
               availability_requested_by: latest.availability_requested_by,
+              availability_actor_label: latest.availability_actor_label,
               availability_created_at: latest.availability_created_at,
               offer_requested_by: latest.offer_requested_by,
+              offer_actor_label: latest.offer_actor_label,
               offer_created_at: latest.offer_created_at,
               pending_availability_job_ids: latest.pending_availability_job_ids,
               pending_availability_job_titles: latest.pending_availability_job_titles,

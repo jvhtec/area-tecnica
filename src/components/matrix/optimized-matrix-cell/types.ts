@@ -33,8 +33,10 @@ export interface MatrixStaffingStatus {
   offer_job_id?: string | null;
   offer_job_title?: string | null;
   availability_requested_by?: string | null;
+  availability_actor_label?: string | null;
   availability_created_at?: string | null;
   offer_requested_by?: string | null;
+  offer_actor_label?: string | null;
   offer_created_at?: string | null;
   pending_availability_job_ids?: string[];
   pending_availability_job_titles?: string[];
