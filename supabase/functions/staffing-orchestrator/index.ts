@@ -6,6 +6,11 @@ import {
   normalizeCampaignPolicy,
   type CampaignPolicy,
 } from "./policyUtils.ts";
+import {
+  buildMissingCampaignRoleInserts,
+  buildRequiredRoleQuantityMap,
+  canResumeCampaignStatus,
+} from "./orchestrationUtils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -108,6 +113,62 @@ async function canManageCampaignOrThrow(
     throw new Error('Not authorized to manage campaigns for this department');
   }
   return true;
+}
+
+async function syncCampaignRolesWithCurrentRequirements(
+  supabase: ReturnType<typeof createClient>,
+  campaign: { id: string; job_id: string; department: string },
+  requiredRoles?: any[] | null,
+  campaignRoles?: any[] | null,
+) {
+  let resolvedRequiredRoles = requiredRoles || null;
+  let resolvedCampaignRoles = campaignRoles || null;
+
+  if (!resolvedRequiredRoles) {
+    const { data, error } = await supabase
+      .from('job_required_roles')
+      .select('role_code, quantity')
+      .eq('job_id', campaign.job_id)
+      .eq('department', campaign.department);
+
+    if (error) return { error };
+    resolvedRequiredRoles = data || [];
+  }
+
+  if (!resolvedCampaignRoles) {
+    const { data, error } = await supabase
+      .from('staffing_campaign_roles')
+      .select('*')
+      .eq('campaign_id', campaign.id);
+
+    if (error) return { error };
+    resolvedCampaignRoles = data || [];
+  }
+
+  const missingRoleRows = buildMissingCampaignRoleInserts(
+    campaign.id,
+    resolvedRequiredRoles,
+    resolvedCampaignRoles,
+  );
+
+  if (missingRoleRows.length === 0) {
+    return { campaignRoles: resolvedCampaignRoles, insertedCount: 0 };
+  }
+
+  const { data: insertedRoles, error } = await supabase
+    .from('staffing_campaign_roles')
+    .upsert(missingRoleRows, {
+      onConflict: 'campaign_id,role_code',
+      ignoreDuplicates: true,
+    })
+    .select('*');
+
+  if (error) return { error };
+
+  return {
+    campaignRoles: [...resolvedCampaignRoles, ...((insertedRoles || []) as any[])],
+    insertedCount: insertedRoles?.length || 0,
+  };
 }
 
 // START action: Create new campaign
@@ -305,7 +366,7 @@ async function pauseCampaign(
   }
 }
 
-// RESUME action: Resume paused or stopped campaign
+// RESUME action: Resume paused, stopped, or completed campaign
 async function resumeCampaign(
   supabase: ReturnType<typeof createClient>,
   user: any,
@@ -321,7 +382,7 @@ async function resumeCampaign(
     // Check authorization
     const { data: campaign } = await supabase
       .from('staffing_campaigns')
-      .select('id, department, status')
+      .select('id, job_id, department, status')
       .eq('id', campaign_id)
       .single();
 
@@ -333,8 +394,13 @@ async function resumeCampaign(
       return { status: 403, body: { error: 'Not authorized' } };
     }
 
-    if (!['paused', 'stopped'].includes(campaign.status)) {
-      return { status: 400, body: { error: 'Campaign must be paused or stopped to resume' } };
+    if (!canResumeCampaignStatus(campaign.status)) {
+      return { status: 400, body: { error: 'Campaign must be paused, stopped, or completed to resume' } };
+    }
+
+    const syncResult = await syncCampaignRolesWithCurrentRequirements(supabase, campaign);
+    if (syncResult.error) {
+      return { status: 500, body: { error: syncResult.error.message } };
     }
 
     const { data: updated } = await supabase
@@ -348,7 +414,21 @@ async function resumeCampaign(
       .select()
       .single();
 
-    return { status: 200, body: updated };
+    const tickResult = await tickCampaign(supabase, campaign_id);
+    const { data: refreshed } = await supabase
+      .from('staffing_campaigns')
+      .select('*')
+      .eq('id', campaign_id)
+      .maybeSingle();
+
+    return {
+      status: 200,
+      body: {
+        ...(refreshed || updated),
+        tick_result: tickResult.body,
+        tick_warning: tickResult.status < 200 || tickResult.status >= 300 ? tickResult.body : null,
+      },
+    };
   } catch (err) {
     console.error('[staffing-orchestrator] Resume campaign error:', err);
     return { status: 500, body: { error: 'Internal server error' } };
@@ -559,10 +639,18 @@ async function tickCampaign(
     if (assignmentsError) return { status: 500, body: { error: assignmentsError.message } };
     if (requestsError) return { status: 500, body: { error: requestsError.message } };
 
-    const requiredByRole = new Map<string, number>();
-    (requiredRoles || []).forEach((r: any) => {
-      requiredByRole.set(String(r.role_code).trim(), Number(r.quantity || 0));
-    });
+    const syncResult = await syncCampaignRolesWithCurrentRequirements(
+      supabase,
+      campaign,
+      requiredRoles || [],
+      campaignRoles || [],
+    );
+    if (syncResult.error) {
+      return { status: 500, body: { error: syncResult.error.message } };
+    }
+
+    const syncedCampaignRoles = syncResult.campaignRoles || [];
+    const requiredByRole = buildRequiredRoleQuantityMap(requiredRoles || []);
 
     // Assigned counts (matches JobAssignmentMatrix logic)
     const assignedCounts = new Map<string, number>();
@@ -626,7 +714,7 @@ async function tickCampaign(
     }
 
     const campaignRoleCodes = new Set<string>(
-      (campaignRoles || []).map((r: any) => String(r.role_code).trim()).filter(Boolean),
+      syncedCampaignRoles.map((r: any) => String(r.role_code).trim()).filter(Boolean),
     );
 
     type PhaseCounts = {
@@ -709,7 +797,7 @@ async function tickCampaign(
     const autoChannel = policy.channel === 'whatsapp' ? 'whatsapp' : 'email';
     const shouldPrioritizeAssistedHandoff = campaign.mode === 'auto' && policy.assisted_handoff_priority !== false;
 
-    for (const role of (campaignRoles || []) as any[]) {
+    for (const role of syncedCampaignRoles as any[]) {
       const roleCode = String(role.role_code).trim();
       const required = requiredByRole.get(roleCode) || 0;
       const assignedProfiles = assignedProfilesByRole.get(roleCode) || new Set<string>();

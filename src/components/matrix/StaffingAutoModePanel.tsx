@@ -11,6 +11,11 @@ import {
   CARLOS_AGENT_DESCRIPTION,
   CARLOS_AGENT_NAME,
 } from '@/features/staffing/carlos'
+import {
+  canResumeStaffingCampaign,
+  staffingCampaignResumeLabel,
+  staffingCampaignResumeToastTitle,
+} from '@/features/staffing/campaignLifecycle'
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -85,9 +90,7 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
     },
     onSuccess: () => {
       toast({
-        title: campaign.status === 'stopped'
-          ? `${CARLOS_AGENT_NAME} reiniciado`
-          : `${CARLOS_AGENT_NAME} reanudado`,
+        title: staffingCampaignResumeToastTitle(CARLOS_AGENT_NAME, campaign.status),
       })
       invalidateAll()
     },
@@ -204,9 +207,9 @@ export const StaffingAutoModePanel: React.FC<StaffingAutoModePanelProps> = ({
   }
 
   const progress = calculateProgress()
-  const canResumeCampaign = campaign.status === 'paused' || campaign.status === 'stopped'
+  const canResumeCampaign = canResumeStaffingCampaign(campaign.status)
   const canStopCampaign = campaign.status === 'active' || campaign.status === 'paused'
-  const resumeActionLabel = campaign.status === 'stopped' ? 'Reiniciar' : 'Reanudar'
+  const resumeActionLabel = staffingCampaignResumeLabel(campaign.status)
 
   return (
     <div className="space-y-4">
