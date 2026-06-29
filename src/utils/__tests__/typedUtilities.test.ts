@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
 import { findClosestFestival, calculatePageForFestival } from "@/utils/dateUtils";
-import { shouldAutoComplete } from "@/utils/jobStatusUtils";
+import { shouldAutoComplete, type AutoCompleteJobResult } from "@/utils/jobStatusUtils";
 import { throttle } from "@/utils/throttle";
 import {
   aggregateJobTimesheets,
@@ -44,6 +44,25 @@ describe("typed utility regressions", () => {
       status: "Cancelado",
       timezone: "Europe/Madrid",
     })).toBe(false);
+  });
+
+  it("widens auto-completed job status without erasing caller fields", () => {
+    type ConfirmedJob = {
+      id: string;
+      end_time: string;
+      status: "Confirmado";
+      projectCode: string;
+    };
+
+    expectTypeOf<AutoCompleteJobResult<ConfirmedJob>>().toMatchTypeOf<
+      | ConfirmedJob
+      | {
+          id: string;
+          end_time: string;
+          status: "Confirmado" | "Completado";
+          projectCode: string;
+        }
+    >();
   });
 
   it("runs throttled calls immediately, then flushes or cancels trailing calls", () => {

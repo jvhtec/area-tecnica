@@ -8,6 +8,9 @@ export type AutoCompletableJob = {
   timezone?: string | null;
   status?: JobStatus | string | null;
 };
+export type AutoCompleteJobResult<T extends AutoCompletableJob> =
+  | T
+  | (Omit<T, "status"> & { status: T["status"] | "Completado" });
 
 /**
  * Checks if a job should be automatically completed based on its end date
@@ -26,7 +29,7 @@ export const shouldAutoComplete = (job: AutoCompletableJob | null | undefined): 
  */
 export const autoCompleteJobs = async <T extends AutoCompletableJob>(
   jobs: T[],
-): Promise<{ updatedJobs: T[], updatedCount: number }> => {
+): Promise<{ updatedJobs: AutoCompleteJobResult<T>[], updatedCount: number }> => {
   const jobsToUpdate = jobs.filter(shouldAutoComplete);
   
   if (jobsToUpdate.length === 0) {
@@ -44,12 +47,12 @@ export const autoCompleteJobs = async <T extends AutoCompletableJob>(
     if (error) throw error;
 
     // Update local job data
-    const updatedJobs = jobs.map(job => {
+    const updatedJobs = jobs.map((job): AutoCompleteJobResult<T> => {
       if (jobsToUpdate.some(updateJob => updateJob.id === job.id)) {
         return { ...job, status: 'Completado' };
       }
       return job;
-    }) as T[];
+    });
 
     return { updatedJobs, updatedCount: jobsToUpdate.length };
   } catch (error) {
