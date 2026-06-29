@@ -400,7 +400,10 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
           </div>
 
           {confirmedResponses.length > 0 ? (
-            <div className="space-y-2 bg-green-50 p-3 rounded border border-green-200">
+            <div
+              className="space-y-2 bg-green-50 p-3 rounded border border-green-200"
+              data-testid="staffing-confirmed-responses"
+            >
               {confirmedResponses.map((response) => (
                 <div
                   key={response.profile_id}
@@ -495,7 +498,10 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
               </span>
             </div>
             {sentOffers.length > 0 ? (
-              <div className="space-y-2 bg-blue-50 p-3 rounded border border-blue-200">
+              <div
+                className="space-y-2 bg-blue-50 p-3 rounded border border-blue-200"
+                data-testid="staffing-offer-activity"
+              >
                 {sentOffers.map((offer) => (
                   <div
                     key={offer.profile_id}
