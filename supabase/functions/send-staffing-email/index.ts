@@ -1313,7 +1313,7 @@ serve(createHttpHandler(async (req) => {
       console.log('🔗 CONFIRM LINKS GENERATED:', {
         email: desiredChannel === 'email',
         whatsapp: desiredChannel === 'whatsapp',
-        expires_at: new Date(exp * 1000).toISOString(),
+        expires_at: exp,
       });
       if (desiredChannel === 'whatsapp') {
         const text = buildWhatsAppStaffingMessage({

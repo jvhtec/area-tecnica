@@ -190,6 +190,12 @@ describe("smarter staffing recommendation migration", () => {
     expect(sendStaffingEmailFunction).toContain("requireAdminOrManagement");
   });
 
+  it("does not convert the ISO staffing token expiry into an invalid date", () => {
+    expect(sendStaffingEmailFunction).toContain("const exp = new Date(Date.now() + 1000*60*60*48).toISOString()");
+    expect(sendStaffingEmailFunction).toContain("expires_at: exp");
+    expect(sendStaffingEmailFunction).not.toContain("new Date(exp * 1000)");
+  });
+
   it("scopes staffing push notifications to the staffing department", () => {
     expect(sendStaffingEmailFunction).toContain("department: staffingDepartment");
     expect(sendStaffingEmailFunction).toContain('supabase.from("job_departments")');
