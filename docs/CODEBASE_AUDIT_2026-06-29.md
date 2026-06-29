@@ -15,7 +15,8 @@ of ~15 hits was hand-verified with zero false positives.
 
 | Area | Finding | Severity |
 | --- | --- | --- |
-| Dead code | **108 unreferenced files = ~17,400 LOC** (96 app files + 12 unused shadcn/ui kit) | **High** |
+| Dead code | **102 removable files = ~16,200 LOC** (90 app files + 12 unused shadcn/ui kit) | **High** |
+| Future use | `src/components/landing/` (6 files, ~1,246 LOC) is unwired but **intentionally kept** | — |
 | Dead subsystem | Entire **tour-scheduling** module (~4,400 LOC) superseded by `features/tour-ops/` | **High** |
 | Doc drift | CLAUDE.md lists 4 dead hooks as "active patterns" | **High** |
 | Dependencies | **11 npm advisories** (6 high, 5 moderate) | **High** |
@@ -40,11 +41,13 @@ baseline).
 ### H1. ~17,400 LOC of dead (unreferenced) code
 
 108 files are imported by no other module. Verified samples (`LoginForm`, `useAuth`,
-`useJobManagement`, `HeroSection`, `ArtistForm`, `useTimezone`, `useLocations`,
+`useJobManagement`, `ArtistForm`, `useTimezone`, `useLocations`,
 `useVirtualizedMatrix`, …) have **zero** references anywhere in `src/`. Lazy-loaded pages are
 correctly excluded (the route manifest uses literal `import()` paths the scan resolves).
 
-Breakdown: **96 app files** + **12 unused shadcn/ui primitives**. Full list in
+Of these, **6 are the `src/components/landing/` files — intentionally retained** for a future
+landing page (see H1b) and **excluded** from removal. That leaves **102 removable files**:
+**90 app files** + **12 unused shadcn/ui primitives**. Full list in
 [Appendix A](#appendix-a--dead-file-inventory).
 
 Highest-impact clusters:
@@ -64,10 +67,12 @@ deleted:
 | `src/types/tourScheduling.ts` | 350 |
 | `src/services/tours/createFoldersForDate.ts` | 326 |
 
-#### H1b. Unused landing/marketing page (~1,246 LOC)
-The entire `src/components/landing/` directory is internally dead — no page assembles it:
-`HeroSection`, `ModuleShowcase`, `FeatureHighlights`, `CallToAction`, `StatsSection`,
-`TechnicalSpecs`.
+#### H1b. Landing/marketing page — NOT dead, intentionally retained (~1,246 LOC)
+The `src/components/landing/` directory (`HeroSection`, `ModuleShowcase`, `FeatureHighlights`,
+`CallToAction`, `StatsSection`, `TechnicalSpecs`) is currently unwired — no page assembles it —
+but it is **kept on purpose for a future landing page**, not abandoned. **Do not delete.** Note
+that it will need updating before reuse, since many newer features aren't represented in it.
+Excluded from the deletion totals below.
 
 #### H1c. Superseded matrix + equipment components
 - `src/components/matrix/AssignmentMatrix.tsx` (490) + `MatrixPerformanceWrapper`,
@@ -186,7 +191,9 @@ declarations — flagged by the path scan but **likely intentional**; verify the
 
 ## Appendix A — Dead File Inventory
 
-### A1. App code (96 files, ~16.1k LOC) — safe-to-remove candidates
+### A1. App code (90 files, ~14.9k LOC) — safe-to-remove candidates
+
+> `src/components/landing/*` is **excluded** here — unwired but intentionally kept (see A4).
 
 ```
 src/components/PerformanceMonitor.tsx
@@ -216,12 +223,6 @@ src/components/hoja-de-ruta/components/ModernTemplateManager.tsx
 src/components/hoja-de-ruta/dialogs/RoomAssignmentsDialog.tsx
 src/components/hoja-de-ruta/sections/VenueLocationSection.tsx
 src/components/jobs/JobAssignments.tsx
-src/components/landing/CallToAction.tsx
-src/components/landing/FeatureHighlights.tsx
-src/components/landing/HeroSection.tsx
-src/components/landing/ModuleShowcase.tsx
-src/components/landing/StatsSection.tsx
-src/components/landing/TechnicalSpecs.tsx
 src/components/layout/LazyNotificationBadge.tsx
 src/components/lights/LightsCalendar.tsx
 src/components/lights/LightsSchedule.tsx
@@ -307,6 +308,21 @@ src/components/ui/toggle-group.tsx
 ```
 src/types/google-maps.d.ts   # likely referenced via global/ambient types
 src/types/badging.d.ts        # likely referenced via global/ambient types
+```
+
+### A4. Unwired but intentionally retained — DO NOT delete
+
+`src/components/landing/` — kept for a future landing page; not currently mounted by any route.
+Will need updating before reuse (many newer features aren't represented). Excluded from all
+removal totals above.
+
+```
+src/components/landing/CallToAction.tsx
+src/components/landing/FeatureHighlights.tsx
+src/components/landing/HeroSection.tsx
+src/components/landing/ModuleShowcase.tsx
+src/components/landing/StatsSection.tsx
+src/components/landing/TechnicalSpecs.tsx
 ```
 
 ---
