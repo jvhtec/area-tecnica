@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useRealtimeQuery } from "./useRealtimeQuery";
 import { useFlexCrewAssignments } from "@/hooks/useFlexCrewAssignments";
 import { getAssignmentNotificationDepartments } from "@/utils/assignmentNotificationDepartments";
-
+import type { Database } from "@/integrations/supabase/types";
 
 import { queryKeys } from "@/lib/react-query";
 export interface AssignmentInsertOptions {
@@ -17,6 +17,114 @@ export interface AssignmentInsertOptions {
 }
 
 type AssignmentRemovalContext = Pick<Assignment, 'technician_id' | 'sound_role' | 'lights_role' | 'video_role'>;
+type JobAssignmentRow = Database["public"]["Tables"]["job_assignments"]["Row"];
+type TimesheetRow = Database["public"]["Tables"]["timesheets"]["Row"];
+type VisibleTimesheetRow = Database["public"]["Functions"]["get_timesheet_amounts_visible"]["Returns"][number];
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type AssignmentProfile = Assignment["profiles"];
+type ProfileProjection = Pick<ProfileRow, "first_name" | "last_name" | "email" | "department" | "nickname">;
+type JoinedProfile = Partial<ProfileProjection> | Array<Partial<ProfileProjection>> | null | undefined;
+type TimesheetAssignmentRow = Pick<TimesheetRow, "technician_id" | "date"> & {
+  profiles?: JoinedProfile;
+};
+type VisibleAssignmentTimesheetRow = Pick<VisibleTimesheetRow, "technician_id" | "date">;
+type AssignmentTimesheetRow = TimesheetAssignmentRow | VisibleAssignmentTimesheetRow;
+type AssignmentMetadataRow = Pick<
+  JobAssignmentRow,
+  | "id"
+  | "technician_id"
+  | "sound_role"
+  | "lights_role"
+  | "video_role"
+  | "production_role"
+  | "status"
+  | "single_day"
+  | "assignment_date"
+  | "assigned_at"
+  | "assigned_by"
+> & {
+  profiles?: JoinedProfile;
+};
+export type AssignmentWithTimesheetDates = Assignment & {
+  status?: JobAssignmentRow["status"];
+  _timesheet_dates: string[];
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const normalizeProfile = (profile: JoinedProfile): Partial<ProfileProjection> | null => {
+  if (Array.isArray(profile)) return profile[0] ?? null;
+  return profile ?? null;
+};
+
+const buildAssignmentProfile = (profile: Partial<ProfileProjection> | null | undefined): AssignmentProfile => ({
+  first_name: typeof profile?.first_name === "string" ? profile.first_name : "",
+  nickname: typeof profile?.nickname === "string" ? profile.nickname : null,
+  last_name: typeof profile?.last_name === "string" ? profile.last_name : "",
+  email: typeof profile?.email === "string" ? profile.email : "",
+  department: typeof profile?.department === "string" ? profile.department : "",
+});
+
+export const mergeTimesheetAssignmentsForDisplay = ({
+  jobId,
+  timesheets,
+  assignmentRows,
+}: {
+  jobId: string;
+  timesheets: AssignmentTimesheetRow[];
+  assignmentRows: AssignmentMetadataRow[];
+}): AssignmentWithTimesheetDates[] => {
+  const timesheetsByTech = new Map<string, { profile: Partial<ProfileProjection> | null; dates: Set<string> }>();
+
+  for (const row of timesheets) {
+    const techId = row.technician_id;
+    if (!techId) continue;
+    if (!timesheetsByTech.has(techId)) {
+      timesheetsByTech.set(techId, {
+        profile: "profiles" in row ? normalizeProfile(row.profiles) : null,
+        dates: new Set(),
+      });
+    }
+    const entry = timesheetsByTech.get(techId)!;
+    if (!entry.profile && "profiles" in row && row.profiles) {
+      entry.profile = normalizeProfile(row.profiles);
+    }
+    if (row.date) {
+      entry.dates.add(row.date);
+    }
+  }
+
+  const assignmentMap = new Map(
+    assignmentRows.map((assignment) => [
+      assignment.technician_id,
+      { ...assignment, profiles: normalizeProfile(assignment.profiles) },
+    ]),
+  );
+
+  return Array.from(timesheetsByTech.keys()).map((techId) => {
+    const assignment = assignmentMap.get(techId);
+    const timesheet = timesheetsByTech.get(techId);
+    const timesheetDates = timesheet ? Array.from(timesheet.dates).sort() : [];
+
+    return {
+      id: assignment?.id ?? `timesheet-${jobId}-${techId}`,
+      job_id: jobId,
+      technician_id: techId,
+      profiles: buildAssignmentProfile(assignment?.profiles || timesheet?.profile),
+      sound_role: assignment?.sound_role ?? null,
+      lights_role: assignment?.lights_role ?? null,
+      video_role: assignment?.video_role ?? null,
+      production_role: assignment?.production_role ?? null,
+      status: assignment?.status ?? null,
+      single_day: assignment?.single_day ?? null,
+      assignment_date: assignment?.assignment_date ?? null,
+      assigned_at: assignment?.assigned_at ?? "",
+      assigned_by: assignment?.assigned_by ?? null,
+      _timesheet_dates: timesheetDates,
+    };
+  });
+};
 
 export const buildAssignmentInsertPayload = (
   jobId: string,
@@ -58,13 +166,13 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
     isLoading,
     manualRefresh,
     isRefreshing: isQueryRefreshing
-  } = useRealtimeQuery<Assignment[]>(
+  } = useRealtimeQuery<AssignmentWithTimesheetDates[]>(
     ["job-assignments", jobId],
     async () => {
       console.log("Fetching assignments (from timesheets) for job:", jobId);
 
       // Add retry logic
-      const fetchWithRetry = async (retries = 3): Promise<Assignment[]> => {
+      const fetchWithRetry = async (retries = 3): Promise<AssignmentWithTimesheetDates[]> => {
         try {
           // Query timesheets first (source of truth for display)
           const { data: timesheetData, error: tsError } = await supabase
@@ -86,22 +194,22 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             .not("is_schedule_only", "is", true);
 
           // RLS-safe fallback mirroring JobDetailsDialog to avoid gaps for non-manager roles
-          let visibleTimesheets: any[] = [];
+          let visibleTimesheets: VisibleAssignmentTimesheetRow[] = [];
           if (tsError?.code === 'PGRST200' || tsError?.code === 'PGRST301' || tsError?.code === '42501') {
             try {
               const { data: vis, error: visErr } = await supabase
                 .rpc('get_timesheet_amounts_visible')
                 .eq('job_id', jobId);
               if (!visErr && Array.isArray(vis)) {
-                visibleTimesheets = vis;
+                visibleTimesheets = vis as VisibleAssignmentTimesheetRow[];
               }
             } catch (err) {
               console.warn('Visible timesheets fallback failed', err);
             }
           }
 
-          const combinedTimesheets = [
-            ...(timesheetData || []),
+          const combinedTimesheets: AssignmentTimesheetRow[] = [
+            ...((timesheetData || []) as TimesheetAssignmentRow[]),
             ...visibleTimesheets
           ];
 
@@ -113,26 +221,9 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             }
           }
 
-          const normalizeProfile = (p: any) => (Array.isArray(p) ? p[0] : p);
-
-          // Group timesheets by technician once (avoids O(n²) find/filter)
-          const timesheetsByTech = new Map<string, { profile: any | null; dates: Set<string> }>();
-          for (const row of combinedTimesheets) {
-            const techId = row?.technician_id;
-            if (!techId) continue;
-            if (!timesheetsByTech.has(techId)) {
-              timesheetsByTech.set(techId, { profile: normalizeProfile(row?.profiles) ?? null, dates: new Set() });
-            }
-            const entry = timesheetsByTech.get(techId)!;
-            if (!entry.profile && row?.profiles) {
-              entry.profile = normalizeProfile(row.profiles);
-            }
-            if (row?.date) {
-              entry.dates.add(row.date);
-            }
-          }
-
-          const techIds = Array.from(timesheetsByTech.keys());
+          const techIds = Array.from(new Set(combinedTimesheets
+            .map((row) => row.technician_id)
+            .filter((technicianId): technicianId is string => Boolean(technicianId))));
 
           if (techIds.length === 0) {
             console.log(`No timesheets found for job ${jobId}`);
@@ -144,9 +235,11 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             .from("job_assignments")
             .select(`
               technician_id,
+              id,
               sound_role,
               lights_role,
               video_role,
+              production_role,
               status,
               single_day,
               assignment_date,
@@ -167,28 +260,10 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
           }
 
           // Merge: timesheets for presence, job_assignments for roles
-          const assignmentMap = new Map(
-            (assignmentData || []).map((a: any) => [a.technician_id, { ...a, profiles: normalizeProfile(a?.profiles) }]),
-          );
-
-          const mergedAssignments = techIds.map((techId) => {
-            const assignment = assignmentMap.get(techId);
-            const ts = timesheetsByTech.get(techId);
-            const tsDates = ts ? Array.from(ts.dates).sort() : [];
-            return {
-              job_id: jobId,
-              technician_id: techId,
-              profiles: assignment?.profiles || ts?.profile,
-              sound_role: assignment?.sound_role,
-              lights_role: assignment?.lights_role,
-              video_role: assignment?.video_role,
-              status: assignment?.status,
-              single_day: assignment?.single_day,
-              assignment_date: assignment?.assignment_date,
-              assigned_at: assignment?.assigned_at,
-              assigned_by: assignment?.assigned_by,
-              _timesheet_dates: tsDates,
-            } as unknown as Assignment;
+          const mergedAssignments = mergeTimesheetAssignmentsForDisplay({
+            jobId,
+            timesheets: combinedTimesheets,
+            assignmentRows: (assignmentData || []) as AssignmentMetadataRow[],
           });
 
           console.log(`Successfully fetched ${mergedAssignments.length} assignments for job ${jobId}`);
@@ -267,6 +342,9 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
     lightsRole: string,
     options?: AssignmentInsertOptions
   ) => {
+    const previousJobs = queryClient.getQueryData(['jobs']);
+    let assignmentPersisted = false;
+
     try {
       const { data: authData } = await supabase.auth.getUser();
       const assignedBy = authData?.user?.id ?? null;
@@ -280,10 +358,10 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       );
 
       // Optimistic cache update for 'jobs' list so cards update instantly
-      queryClient.setQueryData(['jobs'], (old: any) => {
+      queryClient.setQueryData(['jobs'], (old: unknown) => {
         if (!Array.isArray(old)) return old;
-        return old.map((j) => {
-          if (j.id !== jobId) return j;
+        return old.map((job) => {
+          if (!isRecord(job) || job.id !== jobId) return job;
           const optimist = {
             job_id: jobId,
             technician_id: technicianId,
@@ -295,8 +373,8 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
             assigned_by: payload.assigned_by,
             profiles: { first_name: '', last_name: '' },
           };
-          const current = Array.isArray(j.job_assignments) ? j.job_assignments : [];
-          return { ...j, job_assignments: [...current, optimist] };
+          const current = Array.isArray(job.job_assignments) ? job.job_assignments : [];
+          return { ...job, job_assignments: [...current, optimist] };
         });
       });
 
@@ -306,9 +384,11 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
       if (error) {
         console.error('Error adding assignment:', error);
+        queryClient.setQueryData(['jobs'], previousJobs);
         toast.error("Failed to add assignment");
         return;
       }
+      assignmentPersisted = true;
 
       // Send push notification for direct assignment
       try {
@@ -356,25 +436,34 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       // Invalidate jobs so JobCard lists refresh assignments relation
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error in addAssignment:', error);
+      if (!assignmentPersisted) {
+        queryClient.setQueryData(['jobs'], previousJobs);
+      }
       toast.error("Failed to add assignment");
     }
   };
 
   const removeAssignment = async (technicianId: string, renderedAssignment?: AssignmentRemovalContext) => {
+    const previousJobs = queryClient.getQueryData(['jobs']);
+    let assignmentRemoved = false;
+
     try {
       setIsRemoving(prev => ({ ...prev, [technicianId]: true }));
 
       // Optimistic cache update for 'jobs'
-      queryClient.setQueryData(['jobs'], (old: any) => {
+      queryClient.setQueryData(['jobs'], (old: unknown) => {
         if (!Array.isArray(old)) return old;
-        return old.map((j) => {
-          if (j.id !== jobId) return j;
-          const current = Array.isArray(j.job_assignments) ? j.job_assignments : [];
+        return old.map((job) => {
+          if (!isRecord(job) || job.id !== jobId) return job;
+          const current = Array.isArray(job.job_assignments) ? job.job_assignments : [];
           return {
-            ...j,
-            job_assignments: current.filter((a: any) => a.technician_id !== technicianId),
+            ...job,
+            job_assignments: current.filter((assignment): boolean => {
+              if (!isRecord(assignment)) return true;
+              return assignment.technician_id !== technicianId;
+            }),
           };
         });
       });
@@ -394,6 +483,7 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
       if (timesheetError) {
         console.error('Error removing timesheets:', timesheetError);
+        queryClient.setQueryData(['jobs'], previousJobs);
         toast.error("Failed to remove assignment timesheets");
         return;
       }
@@ -406,9 +496,11 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
 
       if (assignmentError) {
         console.error('Error removing assignment:', assignmentError);
+        queryClient.setQueryData(['jobs'], previousJobs);
         toast.error("Failed to remove assignment");
         return;
       }
+      assignmentRemoved = true;
 
       // Remove from Flex crew calls if applicable
       if (assignmentToRemove) {
@@ -425,8 +517,11 @@ export const useJobAssignmentsRealtime = (jobId: string) => {
       // Invalidate jobs so JobCard lists refresh assignments relation
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("optimized-jobs") });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope("jobs") });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error in removeAssignment:', error);
+      if (!assignmentRemoved) {
+        queryClient.setQueryData(['jobs'], previousJobs);
+      }
       toast.error("Failed to remove assignment");
     } finally {
       setIsRemoving(prev => ({ ...prev, [technicianId]: false }));
