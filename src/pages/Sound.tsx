@@ -258,7 +258,7 @@ const Sound = () => {
     <div className="min-h-screen bg-background text-foreground">
       {/* Mobile View - Full Screen Hub */}
       {isMobile && (
-        <div className="px-4 pt-safe pb-24 space-y-4" style={{ paddingTop: 'max(env(safe-area-inset-top), 1rem)' }}>
+        <div className="px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-24 space-y-4">
           <DepartmentMobileHub
             department={currentDepartment}
             title="Departamento de sonido"

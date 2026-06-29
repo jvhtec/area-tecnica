@@ -47,24 +47,14 @@ export default {
         '32': ['32px', { lineHeight: '1.2' }],
         '30': ['30px', { lineHeight: '1.2' }],
       },
-      // Extended spacing scale including common gaps and iOS safe area tokens
+      // Extended spacing scale for common gaps. Safe-area handling uses
+      // arbitrary values (max(base,env(safe-area-inset-*))) or the .pt-safe-*
+      // utilities in index.css — see docs/mobile-guidelines.md.
       spacing: {
         18: "4.5rem",
         22: "5.5rem",
         26: "6.5rem",
         30: "7.5rem",
-        // Safe-area raw tokens
-        "safe-top": "env(safe-area-inset-top)",
-        "safe-bottom": "env(safe-area-inset-bottom)",
-        "safe-left": "env(safe-area-inset-left)",
-        "safe-right": "env(safe-area-inset-right)",
-        // Safe-area plus common paddings
-        "safe-top-2": "calc(env(safe-area-inset-top) + 0.5rem)",
-        "safe-top-3": "calc(env(safe-area-inset-top) + 0.75rem)",
-        "safe-top-4": "calc(env(safe-area-inset-top) + 1rem)",
-        "safe-bottom-2": "calc(env(safe-area-inset-bottom) + 0.5rem)",
-        "safe-bottom-3": "calc(env(safe-area-inset-bottom) + 0.75rem)",
-        "safe-bottom-4": "calc(env(safe-area-inset-bottom) + 1rem)",
       },
       colors: {
         border: "hsl(var(--border))",
