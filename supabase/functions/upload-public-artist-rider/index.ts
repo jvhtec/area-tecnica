@@ -15,7 +15,22 @@ const INGRESS_RATE_LIMIT_WINDOW_SECONDS = 60;
 const INGRESS_RATE_LIMIT_MAX_REQUESTS = 30;
 const TOKEN_RATE_LIMIT_WINDOW_SECONDS = 60 * 60;
 const TOKEN_RATE_LIMIT_MAX_REQUESTS = 50;
-const ALLOWED_EXTENSIONS = new Set(["pdf", "doc", "docx", "txt", "png", "jpg", "jpeg", "webp"]);
+const ALLOWED_EXTENSIONS = new Set([
+  "pdf",
+  "doc",
+  "docx",
+  "txt",
+  "png",
+  "jpg",
+  "jpeg",
+  "webp",
+  "xmlp",
+  "xmlc",
+  "xmls",
+  "dwg",
+  "dfx",
+  "dxf",
+]);
 const ALLOWED_MIME_TYPES = new Set([
   "application/pdf",
   "application/msword",
@@ -24,6 +39,20 @@ const ALLOWED_MIME_TYPES = new Set([
   "image/png",
   "image/jpeg",
   "image/webp",
+  "application/xml",
+  "text/xml",
+  "application/octet-stream",
+  "application/acad",
+  "application/x-acad",
+  "application/autocad_dwg",
+  "application/dwg",
+  "application/x-dwg",
+  "image/vnd.dwg",
+  "application/dxf",
+  "application/x-dxf",
+  "application/vnd.dxf",
+  "image/vnd.dxf",
+  "drawing/x-dxf",
 ]);
 
 type UploadFormRow = {
