@@ -177,4 +177,71 @@ describe("useTourOverrideMode", () => {
       description: "Override saved successfully",
     });
   });
+
+  it("saves power overrides with hook context taking precedence over payload keys", async () => {
+    const insertBuilder = createMockQueryBuilder({ data: null, error: null });
+    const powerBuilders = [
+      createMockQueryBuilder({ data: [], error: null }),
+      insertBuilder,
+    ];
+
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === "tours") {
+        return createMockQueryBuilder({ data: { name: "Summer Tour" }, error: null });
+      }
+      if (table === "tour_dates") {
+        return createMockQueryBuilder({
+          data: {
+            date: "2026-07-05",
+            tour_id: "tour-1",
+            is_tour_pack_only: false,
+            sound_package_size: null,
+            sound_default_set_id: null,
+            locations: { name: "Madrid" },
+          },
+          error: null,
+        });
+      }
+      if (table === "tour_default_sets") {
+        return createMockQueryBuilder({ data: [], error: null });
+      }
+      if (table === "tour_date_power_overrides") {
+        return powerBuilders.shift() ?? createMockQueryBuilder({ data: [], error: null });
+      }
+      if (table === "tour_date_weight_overrides") {
+        return createMockQueryBuilder({ data: [], error: null });
+      }
+      return createMockQueryBuilder();
+    });
+
+    const { result } = renderHook(() => useTourOverrideMode("tour-1", "tour-date-1", "sound"));
+
+    await waitFor(() => {
+      expect(result.current.overrideData?.locationName).toBe("Madrid");
+    });
+
+    const payloadWithConflictingContext = {
+      table_name: "Main power",
+      total_watts: 1200,
+      current_per_phase: 5.2,
+      pdu_type: "CEE",
+      tour_date_id: "wrong-date",
+      department: "lights",
+    };
+
+    await result.current.saveOverride("power", payloadWithConflictingContext);
+
+    expect(insertBuilder.insert).toHaveBeenCalledWith({
+      table_name: "Main power",
+      total_watts: 1200,
+      current_per_phase: 5.2,
+      pdu_type: "CEE",
+      tour_date_id: "tour-date-1",
+      department: "sound",
+    });
+    expect(toastMock).toHaveBeenCalledWith({
+      title: "Success",
+      description: "Override saved successfully",
+    });
+  });
 });

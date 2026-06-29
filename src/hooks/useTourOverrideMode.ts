@@ -36,7 +36,14 @@ type PowerOverrideRow = Database['public']['Tables']['tour_date_power_overrides'
 type WeightOverrideRow = Database['public']['Tables']['tour_date_weight_overrides']['Row'];
 type PowerOverrideInsert = Database['public']['Tables']['tour_date_power_overrides']['Insert'];
 type WeightOverrideInsert = Database['public']['Tables']['tour_date_weight_overrides']['Insert'];
-type OverrideInput = Record<string, unknown>;
+type OverrideContextKey = 'tour_date_id' | 'department';
+type OverrideSnapshotKey = 'override_data';
+type OverrideInputPayload<TInsert> = Omit<TInsert, OverrideContextKey | OverrideSnapshotKey> & {
+  override_data?: unknown;
+};
+type PowerOverrideInput = OverrideInputPayload<PowerOverrideInsert>;
+type WeightOverrideInput = OverrideInputPayload<WeightOverrideInsert>;
+type OverrideInput = PowerOverrideInput | WeightOverrideInput;
 type TourOverrideRow = PowerOverrideRow | WeightOverrideRow;
 type LocationJoin =
   | { name?: string | null }
@@ -195,10 +202,18 @@ export const useTourOverrideMode = (
     loadOverrideData();
   }, [tourId, tourDateId, department, isOverrideMode, toast]);
 
-  const saveOverride = async (
+  async function saveOverride(
+    type: 'power',
+    overrideData: PowerOverrideInput
+  ): Promise<boolean | undefined>;
+  async function saveOverride(
+    type: 'weight',
+    overrideData: WeightOverrideInput
+  ): Promise<boolean | undefined>;
+  async function saveOverride(
     type: 'power' | 'weight',
     overrideData: OverrideInput
-  ) => {
+  ): Promise<boolean | undefined> {
     if (!tourDateId || !department) return;
 
     try {
@@ -206,16 +221,16 @@ export const useTourOverrideMode = (
         ? await supabase
           .from('tour_date_power_overrides')
           .insert({
+            ...(overrideData as PowerOverrideInput),
             tour_date_id: tourDateId,
-            department,
-            ...overrideData
+            department
           } as PowerOverrideInsert)
         : await supabase
           .from('tour_date_weight_overrides')
           .insert({
+            ...(overrideData as WeightOverrideInput),
             tour_date_id: tourDateId,
-            department,
-            ...overrideData
+            department
           } as WeightOverrideInsert);
 
       if (result.error) throw result.error;
@@ -235,7 +250,7 @@ export const useTourOverrideMode = (
       });
       return false;
     }
-  };
+  }
 
   return {
     isOverrideMode,
