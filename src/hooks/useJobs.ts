@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useMultiTableSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { trackError } from "@/lib/errorTracking";
+import { shouldHideJobForTourState } from "@/utils/cancelledTourJobs";
 
 
 import { queryKeys } from "@/lib/react-query";
@@ -109,16 +110,10 @@ export const useJobs = () => {
 
           const allJobs = jobs || [];
 
-          // Filter out jobs from cancelled/deleted tours and explicitly cancelled jobs
+          // Keep historical/completed jobs visible when a started tour is cancelled.
           const filteredJobs = allJobs.filter((job: any) => {
-            if (job.status === 'Cancelado') return false;
-
             const tourMeta = job?.tour_date?.tour;
-            if (tourMeta && (tourMeta.status === 'cancelled' || tourMeta.deleted === true)) {
-              return false;
-            }
-
-            return true;
+            return !shouldHideJobForTourState(job, tourMeta);
           });
 
           return filteredJobs;
