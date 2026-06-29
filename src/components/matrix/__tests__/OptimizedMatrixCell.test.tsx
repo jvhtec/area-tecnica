@@ -673,7 +673,8 @@ describe('OptimizedMatrixCell', () => {
       availability_status: ' Requested ',
       availability_job_title: 'Load-in Day',
       pending_availability_job_titles: ['Load-in Day', 'Arena Show'],
-      availability_requested_by: null,
+      availability_requested_by: 'manager-1',
+      availability_actor_label: 'C.A.R.L.O.S.',
       availability_created_at: '2026-04-08T09:15:00.000Z',
       offer_status: ' SENT ',
       offer_job_title: 'Arena Show',
@@ -691,7 +692,7 @@ describe('OptimizedMatrixCell', () => {
         onSelect={vi.fn()}
         onClick={vi.fn()}
         staffingStatusByDateProvided={staffingStatus}
-        profileNamesMap={new Map([['manager-2', 'Second Manager']])}
+        profileNamesMap={new Map([['manager-1', 'First Manager'], ['manager-2', 'Second Manager']])}
       />
     );
 
@@ -702,8 +703,10 @@ describe('OptimizedMatrixCell', () => {
       expect(screen.getAllByText(/Oferta: Enviada/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/Trabajos: Load-in Day, Arena Show/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/Trabajo: Arena Show/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Enviado por: C\.A\.R\.L\.O\.S\./i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/Enviado por: Second Manager/i).length).toBeGreaterThan(0);
     });
+    expect(screen.queryByText(/Enviado por: First Manager/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Enviado por:\s*null/i)).not.toBeInTheDocument();
   });
 

@@ -8,6 +8,7 @@ import { StaffingCampaignPanel } from './StaffingCampaignPanel'
 import { StaffingCandidateList } from './StaffingCandidateList'
 import { StaffingOfferList } from './StaffingOfferList'
 import { StaffingAutoModePanel } from './StaffingAutoModePanel'
+import { CARLOS_AGENT_NAME } from '@/features/staffing/carlos'
 import { parseSummaryRow } from '@/pages/job-assignment-matrix/utils'
 import {
   useStaffingCampaignRealtime,
@@ -207,78 +208,79 @@ export const StaffingOrchestratorPanel: React.FC<StaffingOrchestratorPanelProps>
         )}
       </TabsContent>
 
-      {/* Candidates tab - Assisted mode only */}
-      {campaign.mode === 'assisted' && (
-        <TabsContent value="candidates" className="space-y-4">
-          {campaignRoles && campaignRoles.length > 0 ? (
-            <div className="space-y-4">
-              {campaignRoles
-                .filter((r) => r.stage !== 'filled')
-                .map((role) => (
-                  <StaffingCandidateList
-                    key={role.id}
-                    campaignId={campaign.id}
-                    roleCode={role.role_code}
-                    jobId={jobId}
-                    department={department}
-                    policy={campaign.policy}
-                    requiredCount={getRequiredCount(role.role_code)}
-                    assignedCount={Number(role.assigned_count || 0)}
-                    confirmedAvailability={Number(role.confirmed_availability || 0)}
-                    pendingAvailability={Number(role.pending_availability || 0)}
-                  />
-                ))}
-              {campaignRoles.every((r) => r.stage === 'filled') && (
-                <Card>
-                  <CardContent className="pt-6">
-                    <p className="text-center text-gray-600">
-                      All roles are filled! 🎉
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-gray-500">No roles configured for this campaign.</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      )}
-
-      {/* Offers tab - Assisted mode only */}
-      {campaign.mode === 'assisted' && (
-        <TabsContent value="offers" className="space-y-4">
-          {campaignRoles && campaignRoles.length > 0 ? (
-            <div className="space-y-4">
-              {campaignRoles.map((role) => (
-                <StaffingOfferList
+      {/* Candidates tab */}
+      <TabsContent value="candidates" className="space-y-4">
+        {campaignRoles && campaignRoles.length > 0 ? (
+          <div className="space-y-4">
+            {campaignRoles
+              .filter((r) => campaign.mode === 'auto' || r.stage !== 'filled')
+              .map((role) => (
+                <StaffingCandidateList
                   key={role.id}
                   campaignId={campaign.id}
                   roleCode={role.role_code}
                   jobId={jobId}
                   department={department}
-                  offerMessage={campaign.offer_message}
+                  policy={campaign.policy}
                   requiredCount={getRequiredCount(role.role_code)}
                   assignedCount={Number(role.assigned_count || 0)}
                   confirmedAvailability={Number(role.confirmed_availability || 0)}
                   pendingAvailability={Number(role.pending_availability || 0)}
-                  acceptedOffers={Number(role.accepted_offers || 0)}
-                  pendingOffers={Number(role.pending_offers || 0)}
+                  mode={campaign.mode}
+                  readOnly={campaign.mode === 'auto'}
+                  actorLabel={campaign.mode === 'auto' ? CARLOS_AGENT_NAME : undefined}
                 />
               ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-gray-500">No roles configured for this campaign.</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      )}
+            {campaign.mode === 'assisted' && campaignRoles.every((r) => r.stage === 'filled') && (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-center text-gray-600">
+                    All roles are filled!
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-gray-500">No roles configured for this campaign.</p>
+            </CardContent>
+          </Card>
+        )}
+      </TabsContent>
+
+      {/* Offers tab */}
+      <TabsContent value="offers" className="space-y-4">
+        {campaignRoles && campaignRoles.length > 0 ? (
+          <div className="space-y-4">
+            {campaignRoles.map((role) => (
+              <StaffingOfferList
+                key={role.id}
+                campaignId={campaign.id}
+                roleCode={role.role_code}
+                jobId={jobId}
+                department={department}
+                offerMessage={campaign.offer_message}
+                requiredCount={getRequiredCount(role.role_code)}
+                assignedCount={Number(role.assigned_count || 0)}
+                confirmedAvailability={Number(role.confirmed_availability || 0)}
+                pendingAvailability={Number(role.pending_availability || 0)}
+                acceptedOffers={Number(role.accepted_offers || 0)}
+                pendingOffers={Number(role.pending_offers || 0)}
+                readOnly={campaign.mode === 'auto'}
+                actorLabel={campaign.mode === 'auto' ? CARLOS_AGENT_NAME : undefined}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-gray-500">No roles configured for this campaign.</p>
+            </CardContent>
+          </Card>
+        )}
+      </TabsContent>
 
       {/* Settings tab */}
       <TabsContent value="settings" className="space-y-4">

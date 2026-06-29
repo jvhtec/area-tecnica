@@ -451,8 +451,8 @@ export const OptimizedAssignmentMatrix = ({
       if (assignment?.assigned_by) ids.add(assignment.assigned_by);
     });
     staffingMaps?.byDate?.forEach((status) => {
-      if (status?.availability_requested_by) ids.add(status.availability_requested_by);
-      if (status?.offer_requested_by) ids.add(status.offer_requested_by);
+      if (!status?.availability_actor_label && status?.availability_requested_by) ids.add(status.availability_requested_by);
+      if (!status?.offer_actor_label && status?.offer_requested_by) ids.add(status.offer_requested_by);
     });
     return Array.from(ids);
   }, [allAssignments, staffingMaps]);
