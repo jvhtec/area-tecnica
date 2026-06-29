@@ -15,6 +15,18 @@ export interface ElementDetails {
   documentNumber?: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function unwrapFlexField(value: unknown): unknown {
+  return isRecord(value) && 'data' in value ? value.data : value;
+}
+
+function optionalString(value: unknown): string | undefined {
+  return value == null ? undefined : String(value);
+}
+
 /**
  * Fetches element details from Flex API to get definitionId
  * @param elementId - The element ID to fetch
@@ -41,13 +53,13 @@ export async function getElementDetails(
       return { elementId };
     }
 
-    const data = await response.json<Record<string, any>>();
+    const data = await response.json<Record<string, unknown>>();
     
     // Extract definitionId from the response
     // The response structure has fields wrapped in objects with data property
-    const definitionId = data?.elementDefinitionId?.data || data?.definitionId?.data || data?.definitionId;
-    const name = data?.name?.data || data?.documentName?.data;
-    const documentNumber = data?.documentNumber?.data;
+    const definitionId = optionalString(unwrapFlexField(data.elementDefinitionId) || unwrapFlexField(data.definitionId));
+    const name = optionalString(unwrapFlexField(data.name) || unwrapFlexField(data.documentName));
+    const documentNumber = optionalString(unwrapFlexField(data.documentNumber));
 
     console.log(`[buildFlexUrl] Element details fetched:`, { elementId, definitionId, name, documentNumber });
 

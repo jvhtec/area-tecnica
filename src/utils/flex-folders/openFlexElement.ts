@@ -111,7 +111,7 @@ export async function openFlexElement(options: OpenFlexElementOptions): Promise<
     if (placeholderWindow) {
       try {
         // Manually nullify opener to replicate 'noopener' behavior
-        (placeholderWindow as any).opener = null;
+        placeholderWindow.opener = null;
         // Ensure it starts blank (some browsers may reuse content)
         placeholderWindow.location.href = 'about:blank';
       } catch (noop) {

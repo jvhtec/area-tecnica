@@ -3,12 +3,17 @@
  * Utility functions for date operations
  */
 
+export type FestivalDateCandidate = {
+  id: string;
+  start_time: string | number | Date;
+};
+
 /**
  * Find the festival closest to today's date
  * @param festivals Array of festival jobs
  * @returns The festival closest to today or null if no festivals
  */
-export const findClosestFestival = (festivals: any[]) => {
+export const findClosestFestival = <T extends FestivalDateCandidate>(festivals: T[] | null | undefined): T | null => {
   if (!festivals || festivals.length === 0) return null;
 
   const today = new Date();
@@ -40,7 +45,11 @@ export const findClosestFestival = (festivals: any[]) => {
  * @param itemsPerPage Number of items per page
  * @returns Page number (1-based) or 1 if not found
  */
-export const calculatePageForFestival = (festivals: any[], targetFestival: any, itemsPerPage: number) => {
+export const calculatePageForFestival = <T extends { id: string }>(
+  festivals: T[],
+  targetFestival: T | null | undefined,
+  itemsPerPage: number,
+): number => {
   if (!targetFestival || !festivals.length) return 1;
   
   const index = festivals.findIndex(festival => festival.id === targetFestival.id);

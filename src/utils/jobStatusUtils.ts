@@ -2,11 +2,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { isJobPastClosureWindow } from "@/utils/jobClosureUtils";
 
 export type JobStatus = "Tentativa" | "Confirmado" | "Completado" | "Cancelado";
+export type AutoCompletableJob = {
+  id: string;
+  end_time?: string | null;
+  timezone?: string | null;
+  status?: JobStatus | string | null;
+};
 
 /**
  * Checks if a job should be automatically completed based on its end date
  */
-export const shouldAutoComplete = (job: any): boolean => {
+export const shouldAutoComplete = (job: AutoCompletableJob | null | undefined): boolean => {
   if (!job?.end_time || job.status === "Cancelado" || job.status === "Completado") {
     return false;
   }
@@ -18,7 +24,9 @@ export const shouldAutoComplete = (job: any): boolean => {
 /**
  * Automatically updates job statuses for past jobs
  */
-export const autoCompleteJobs = async (jobs: any[]): Promise<{ updatedJobs: any[], updatedCount: number }> => {
+export const autoCompleteJobs = async <T extends AutoCompletableJob>(
+  jobs: T[],
+): Promise<{ updatedJobs: T[], updatedCount: number }> => {
   const jobsToUpdate = jobs.filter(shouldAutoComplete);
   
   if (jobsToUpdate.length === 0) {
@@ -41,7 +49,7 @@ export const autoCompleteJobs = async (jobs: any[]): Promise<{ updatedJobs: any[
         return { ...job, status: 'Completado' };
       }
       return job;
-    });
+    }) as T[];
 
     return { updatedJobs, updatedCount: jobsToUpdate.length };
   } catch (error) {

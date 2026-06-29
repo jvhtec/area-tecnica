@@ -30,12 +30,21 @@ export interface AggregatedTimesheetAssignment {
     lights_role?: string;
     video_role?: string;
   };
-  original_assignment?: any;
+  original_assignment?: AssignmentLookupRow;
+}
+
+export interface AssignmentLookupRow {
+  technician_id: string;
+  status?: string | null;
+  sound_role?: string | null;
+  lights_role?: string | null;
+  video_role?: string | null;
+  profiles?: TimesheetRowWithTechnician['technician'] | null;
 }
 
 export function aggregateJobTimesheets(
   timesheetRows: TimesheetRowWithTechnician[],
-  assignmentLookup: Record<string, any[]>
+  assignmentLookup: Record<string, AssignmentLookupRow[]>
 ): Record<string, AggregatedTimesheetAssignment[]> {
   const result: Record<string, AggregatedTimesheetAssignment[]> = {};
 
