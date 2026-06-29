@@ -454,6 +454,8 @@ export const TourCard = memo(function TourCard({ tour, onTourClick, onManageDate
       // Invalidate queries to refresh the UI
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope('tours') });
       await queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour', tour.id) });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.scope('optimized-jobs') });
 
       toast({
         title: "Success",
