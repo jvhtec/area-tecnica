@@ -10656,6 +10656,7 @@ export type Database = {
         Args: { p_job_ids: string[]; p_profile_ids: string[] }
         Returns: {
           created_at: string
+          id: string
           job_id: string
           phase: string
           profile_id: string

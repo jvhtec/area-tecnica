@@ -52,6 +52,7 @@ type OfferRequestRow = StaffingRequestRow & {
 type StaffingEventMeta = {
   phase?: string
   role?: string
+  request_origin?: string | null
 }
 
 type StaffingEventRow = {
@@ -77,6 +78,7 @@ type SentOffer = {
   status: 'confirmed' | 'declined' | 'pending'
   sent_at: string | null
   updated_at: string | null
+  request_origin: string | null
 }
 
 const toAvailabilityStatus = (status: string | null): AvailabilityResponse['status'] => {
@@ -94,6 +96,11 @@ const offerStatusBadgeClassName = (status: SentOffer['status']) => {
   if (status === 'confirmed') return 'bg-green-100 text-green-800'
   if (status === 'declined') return 'bg-red-100 text-red-800'
   return 'bg-blue-100 text-blue-800'
+}
+
+const getEventTimestamp = (value: string | null | undefined) => {
+  const timestamp = value ? parseISO(value).getTime() : 0
+  return Number.isFinite(timestamp) ? timestamp : 0
 }
 
 export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
@@ -201,15 +208,39 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
         .select('id, profile_id, status, created_at, updated_at, role_code')
         .eq('job_id', jobId)
         .eq('phase', 'offer')
-        .eq('role_code', roleCode)
         .in('status', ['pending', 'confirmed', 'declined'])
         .order('updated_at', { ascending: false })
 
       if (error) throw error
 
+      const requestRows = (offerRequests || []) as OfferRequestRow[]
+      const requestIds = requestRows.map((request) => request.id).filter(Boolean)
+      const latestOfferEventByRequestId = new Map<string, StaffingEventMeta>()
+
+      if (requestIds.length > 0) {
+        const { data: sentEvents, error: sentEventsError } = await dataLayerClient.from('staffing_events')
+          .select('staffing_request_id, event, meta, created_at')
+          .in('staffing_request_id', requestIds)
+          .in('event', ['email_sent', 'whatsapp_sent'])
+          .order('created_at', { ascending: false })
+
+        if (sentEventsError) throw sentEventsError
+
+        ;[...((sentEvents || []) as StaffingEventRow[])]
+          .sort((a, b) => getEventTimestamp(b.created_at) - getEventTimestamp(a.created_at))
+          .forEach((event) => {
+            const requestId = String(event.staffing_request_id || '')
+            if (!requestId || latestOfferEventByRequestId.has(requestId)) return
+            latestOfferEventByRequestId.set(requestId, event.meta || {})
+          })
+      }
+
       const latestOfferByProfile = new Map<string, OfferRequestRow>()
-      ;((offerRequests || []) as OfferRequestRow[]).forEach((request) => {
+      requestRows.forEach((request) => {
         const profileId = String(request.profile_id || '')
+        const eventMeta = latestOfferEventByRequestId.get(String(request.id)) || {}
+        const requestRole = String(request.role_code || eventMeta.role || '')
+        if (requestRole !== roleCode) return
         if (!profileId || latestOfferByProfile.has(profileId)) return
         latestOfferByProfile.set(profileId, request)
       })
@@ -230,6 +261,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
       return Array.from(latestOfferByProfile.entries()).map(([profileId, offer]) => {
         const profile = profilesById.get(profileId)
         const fullName = `${profile?.first_name || ''} ${profile?.last_name || ''}`.trim()
+        const eventMeta = latestOfferEventByRequestId.get(String(offer.id)) || {}
 
         return {
           profile_id: profileId,
@@ -237,6 +269,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
           status: toAvailabilityStatus(offer.status),
           sent_at: offer.created_at,
           updated_at: offer.updated_at,
+          request_origin: eventMeta.request_origin || null,
         }
       })
     }
@@ -514,7 +547,7 @@ export const StaffingOfferList: React.FC<StaffingOfferListProps> = ({
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
-                      {readOnly && actorLabel && (
+                      {readOnly && actorLabel && offer.request_origin === 'auto_staffing' && (
                         <Badge variant="outline">Enviado por {actorLabel}</Badge>
                       )}
                       <Badge className={offerStatusBadgeClassName(offer.status)}>

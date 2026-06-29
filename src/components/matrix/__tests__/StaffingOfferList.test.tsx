@@ -56,6 +56,14 @@ const createQueryBuilder = (table: string) => {
             status: 'pending',
             created_at: '2026-04-10T09:00:00.000Z',
             updated_at: '2026-04-10T09:00:00.000Z',
+            role_code: null,
+          },
+          {
+            id: 'offer-2',
+            profile_id: 'tech-2',
+            status: 'pending',
+            created_at: '2026-04-10T09:05:00.000Z',
+            updated_at: '2026-04-10T09:05:00.000Z',
             role_code: 'foh',
           },
         ],
@@ -90,6 +98,26 @@ const createQueryBuilder = (table: string) => {
             },
             created_at: '2026-04-10T08:05:00.000Z',
           },
+          {
+            staffing_request_id: 'offer-1',
+            event: 'email_sent',
+            meta: {
+              phase: 'offer',
+              role: 'foh',
+              request_origin: 'auto_staffing',
+            },
+            created_at: '2026-04-10T09:00:00.000Z',
+          },
+          {
+            staffing_request_id: 'offer-2',
+            event: 'email_sent',
+            meta: {
+              phase: 'offer',
+              role: 'foh',
+              request_origin: 'manual',
+            },
+            created_at: '2026-04-10T09:05:00.000Z',
+          },
         ],
         error: null,
       }
@@ -104,6 +132,13 @@ const createQueryBuilder = (table: string) => {
             last_name: 'Tech',
             nickname: null,
             email: 'offer@example.com',
+          },
+          {
+            id: 'tech-2',
+            first_name: 'Manual',
+            last_name: 'Offer',
+            nickname: null,
+            email: 'manual@example.com',
           },
         ],
         error: null,
@@ -148,10 +183,11 @@ describe('StaffingOfferList', () => {
 
     await waitFor(() => {
       expect(screen.getAllByText('Offer Tech').length).toBeGreaterThan(0)
+      expect(screen.getByText('Manual Offer')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Offer sent')).toBeInTheDocument()
-    expect(screen.getByText(`Enviado por ${CARLOS_AGENT_NAME}`)).toBeInTheDocument()
+    expect(screen.getAllByText('Offer sent')).toHaveLength(2)
+    expect(screen.getAllByText(`Enviado por ${CARLOS_AGENT_NAME}`)).toHaveLength(1)
     expect(screen.queryByText('Send offers by')).not.toBeInTheDocument()
     expect(screen.queryByText(/Send Offers/i)).not.toBeInTheDocument()
   })

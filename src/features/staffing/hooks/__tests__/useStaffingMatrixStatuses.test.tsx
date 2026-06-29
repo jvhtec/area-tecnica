@@ -164,4 +164,80 @@ describe('useStaffingMatrixStatuses', () => {
     expect(status?.pending_availability_job_titles).toEqual(['Load-in Day', 'Arena Show'])
     expect(status?.pending_offer_job_titles).toEqual(['Arena Show'])
   })
+
+  it('uses request ids from the RPC fallback to attribute Carlos activity', async () => {
+    rpcMock.mockImplementation((fn: string) => {
+      if (fn === 'get_assignment_matrix_staffing_filtered') {
+        return Promise.resolve({ data: [], error: null })
+      }
+
+      if (fn === 'get_staffing_requests_matrix_filtered') {
+        return Promise.resolve({
+          data: [
+            {
+              id: 'rpc-availability-1',
+              job_id: 'job-1',
+              profile_id: 'tech-1',
+              phase: 'availability',
+              status: 'pending',
+              updated_at: '2026-04-10T08:00:00.000Z',
+              single_day: false,
+              target_date: null,
+              created_at: '2026-04-10T07:55:00.000Z',
+              requested_by: 'manager-1',
+            },
+          ],
+          error: null,
+        })
+      }
+
+      return Promise.resolve({ data: [], error: null })
+    })
+
+    fromMock.mockImplementation((table: string) => {
+      if (table === 'staffing_requests') {
+        return createQueryBuilder({ data: [], error: new Error('direct read blocked') })
+      }
+
+      if (table === 'staffing_events') {
+        return createQueryBuilder({
+          data: [
+            {
+              staffing_request_id: 'rpc-availability-1',
+              event: 'email_sent',
+              meta: { request_origin: 'auto_staffing' },
+              created_at: '2026-04-10T07:56:00.000Z',
+            },
+          ],
+          error: null,
+        })
+      }
+
+      return createQueryBuilder({ data: [], error: null })
+    })
+
+    const { result } = renderHook(
+      () => useStaffingMatrixStatuses(
+        ['tech-1'],
+        [
+          {
+            id: 'job-1',
+            title: 'Fallback Show',
+            start_time: '2026-04-10T06:00:00.000Z',
+            end_time: '2026-04-10T23:00:00.000Z',
+          },
+        ],
+        [new Date('2026-04-10T12:00:00.000Z')],
+      ),
+      { wrapper: createWrapper() },
+    )
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+
+    const status = result.current.data?.byDate.get('tech-1-2026-04-10')
+    expect(status).toMatchObject({
+      availability_status: 'requested',
+      availability_actor_label: CARLOS_AGENT_NAME,
+    })
+  })
 })

@@ -121,8 +121,26 @@ const ROLE_ACTIVITY_STATUS_LABELS: Record<string, string> = {
   declined: 'rechazada'
 }
 
+const getActivityTimestamp = (activity?: CandidatePhaseActivity) => {
+  const value = activity?.updated_at || activity?.created_at
+  const timestamp = value ? parseISO(value).getTime() : 0
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
+const getLatestCandidateActivity = (activity?: CandidateActivity) => {
+  const availability = activity?.availability
+  const offer = activity?.offer
+
+  if (!availability) return offer
+  if (!offer) return availability
+
+  return getActivityTimestamp(offer) >= getActivityTimestamp(availability)
+    ? offer
+    : availability
+}
+
 const getCandidateActivityLabel = (activity?: CandidateActivity) => {
-  const latest = activity?.offer || activity?.availability
+  const latest = getLatestCandidateActivity(activity)
   if (!latest) return null
 
   const phaseLabel = latest.phase === 'offer' ? 'Oferta' : 'Disponibilidad'
@@ -131,7 +149,7 @@ const getCandidateActivityLabel = (activity?: CandidateActivity) => {
 }
 
 const getCandidateActivityClassName = (activity?: CandidateActivity) => {
-  const latest = activity?.offer || activity?.availability
+  const latest = getLatestCandidateActivity(activity)
   if (!latest) return ''
   if (latest.status === 'confirmed') return 'bg-green-100 text-green-800'
   if (latest.status === 'declined') return 'bg-red-100 text-red-800'
@@ -525,6 +543,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
           {candidates.map((candidate, index) => {
             const rolelessConsultation = rolelessConsultations[candidate.profile_id]
             const activity = roleActivity[candidate.profile_id]
+            const latestActivity = getLatestCandidateActivity(activity)
             const activityLabel = getCandidateActivityLabel(activity)
             const isNextCandidate = candidate.profile_id === nextCandidateProfileId
             const reasons = Array.isArray(candidate.reasons) ? candidate.reasons.map(String) : []
@@ -572,7 +591,7 @@ export const StaffingCandidateList: React.FC<StaffingCandidateListProps> = ({
                     ) : (
                       <Badge variant="outline">Estado: No contactado</Badge>
                     )}
-                    {activityLabel && readOnly && actorLabel && (
+                    {activityLabel && readOnly && actorLabel && latestActivity?.request_origin === 'auto_staffing' && (
                       <Badge variant="outline">Enviado por {actorLabel}</Badge>
                     )}
                     {candidate.final_score >= 80 && (

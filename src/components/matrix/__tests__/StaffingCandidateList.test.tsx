@@ -54,6 +54,7 @@ const createQueryBuilder = (table: string) => {
         data: [
           { id: 'tech-1', profile_picture_url: null },
           { id: 'tech-2', profile_picture_url: null },
+          { id: 'tech-3', profile_picture_url: null },
         ],
         error: null,
       }
@@ -71,6 +72,26 @@ const createQueryBuilder = (table: string) => {
               request_origin: 'auto_staffing',
             },
             created_at: '2026-04-10T08:05:00.000Z',
+          },
+          {
+            staffing_request_id: 'req-offer-old-1',
+            event: 'email_sent',
+            meta: {
+              phase: 'offer',
+              role: 'foh',
+              request_origin: 'auto_staffing',
+            },
+            created_at: '2026-04-10T07:00:00.000Z',
+          },
+          {
+            staffing_request_id: 'req-offer-manual-1',
+            event: 'email_sent',
+            meta: {
+              phase: 'offer',
+              role: 'foh',
+              request_origin: 'manual',
+            },
+            created_at: '2026-04-10T08:30:00.000Z',
           },
         ],
         error: null,
@@ -90,6 +111,28 @@ const createQueryBuilder = (table: string) => {
             updated_at: '2026-04-10T08:05:00.000Z',
             created_at: '2026-04-10T08:00:00.000Z',
             role_code: null,
+          },
+          {
+            id: 'req-offer-old-1',
+            profile_id: 'tech-1',
+            phase: 'offer',
+            status: 'pending',
+            target_date: null,
+            single_day: false,
+            updated_at: '2026-04-10T07:00:00.000Z',
+            created_at: '2026-04-10T07:00:00.000Z',
+            role_code: 'foh',
+          },
+          {
+            id: 'req-offer-manual-1',
+            profile_id: 'tech-2',
+            phase: 'offer',
+            status: 'pending',
+            target_date: null,
+            single_day: false,
+            updated_at: '2026-04-10T08:30:00.000Z',
+            created_at: '2026-04-10T08:30:00.000Z',
+            role_code: 'foh',
           },
         ],
         error: null,
@@ -139,7 +182,7 @@ describe('StaffingCandidateList', () => {
         },
         {
           profile_id: 'tech-2',
-          full_name: 'Next Tech',
+          full_name: 'Manual Tech',
           department: 'sound',
           skills_score: 78,
           distance_to_madrid_km: 20.1,
@@ -150,6 +193,21 @@ describe('StaffingCandidateList', () => {
           soft_conflict: false,
           hard_conflict: false,
           final_score: 81,
+          reasons: [],
+        },
+        {
+          profile_id: 'tech-3',
+          full_name: 'Next Tech',
+          department: 'sound',
+          skills_score: 75,
+          distance_to_madrid_km: 22.3,
+          proximity_score: 68,
+          experience_score: 70,
+          reliability_score: 74,
+          fairness_score: 76,
+          soft_conflict: false,
+          hard_conflict: false,
+          final_score: 79,
           reasons: [],
         },
       ],
@@ -174,11 +232,13 @@ describe('StaffingCandidateList', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Confirmed Tech')).toBeInTheDocument()
+      expect(screen.getByText('Manual Tech')).toBeInTheDocument()
       expect(screen.getByText('Next Tech')).toBeInTheDocument()
     })
 
     expect(screen.getByText('Disponibilidad enviada')).toBeInTheDocument()
-    expect(screen.getByText(`Enviado por ${CARLOS_AGENT_NAME}`)).toBeInTheDocument()
+    expect(screen.getByText('Oferta enviada')).toBeInTheDocument()
+    expect(screen.getAllByText(`Enviado por ${CARLOS_AGENT_NAME}`)).toHaveLength(1)
     expect(screen.getByText('Siguiente candidato')).toBeInTheDocument()
     expect(screen.queryByText('Enviar disponibilidad por')).not.toBeInTheDocument()
   })
