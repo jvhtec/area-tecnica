@@ -1,28 +1,28 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, RefreshCw, ShieldCheck, Smartphone, Sparkles, Zap } from "lucide-react";
-import festivalManagement from "@/assets/landing/festival-management.jpg";
-import soundEquipment from "@/assets/landing/sound-equipment.jpg";
 import { GLASS, GRADIENT_TEXT, useRevealVariants } from "./_shared";
 import { SectionHeading } from "./SectionHeading";
+import { StaffingMock } from "./visuals/StaffingMock";
+import { PowerMock } from "./visuals/PowerMock";
 
 const showcase = [
   {
-    image: festivalManagement,
-    eyebrow: "Festivales",
-    title: "Del rider al escenario, sin perder un cable",
+    visual: StaffingMock,
+    eyebrow: "Staffing",
+    title: "El crew correcto, propuesto en segundos",
     points: [
-      "Riders técnicos y necesidades por artista",
-      "Configuración de gear multi-escenario con validación",
-      "Detección de colisiones de agenda",
-      "Memorias técnicas en PDF con tu logo",
+      "Rankeo por distancia, fiabilidad y disponibilidad",
+      "Invitaciones automáticas y respuesta con un clic",
+      "Tarifas personalizadas por técnico, gira o trabajo",
+      "Detección de dobles reservas en la matriz",
     ],
   },
   {
-    image: soundEquipment,
+    visual: PowerMock,
     eyebrow: "Operación técnica",
     title: "Cálculos de ingeniería integrados",
     points: [
-      "Consumos de potencia por circuito y fase",
+      "Consumos de potencia por fase con reequilibrado",
       "Pesos y rigging con límites por punto",
       "Tablas de RF / IEM sin solapamientos",
       "Todo exportable a informe firmable",
@@ -83,12 +83,7 @@ export const FeatureHighlights = () => {
               className="relative"
             >
               <div className="absolute -inset-4 -z-10 rounded-3xl bg-gradient-to-tr from-sky-500/20 via-violet-500/15 to-cyan-400/15 blur-2xl" />
-              <img
-                src={row.image}
-                alt={row.title}
-                loading="lazy"
-                className="w-full rounded-2xl border border-white/10 object-cover shadow-2xl shadow-black/40"
-              />
+              <row.visual />
             </motion.div>
 
             <motion.div

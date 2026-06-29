@@ -2,8 +2,8 @@ import { motion, useReducedMotion } from "framer-motion";
 import { ArrowRight, PlayCircle, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import dashboardHero from "@/assets/landing/dashboard-hero.jpg";
 import { GRADIENT_BTN, GRADIENT_TEXT } from "./_shared";
+import { MatrixMock } from "./visuals/MatrixMock";
 
 const trustBadges = [
   { icon: Zap, label: "Tiempo real" },
@@ -84,22 +84,8 @@ export const HeroSection = () => {
         >
           {/* glow */}
           <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-sky-500/30 via-violet-500/20 to-cyan-400/20 blur-3xl" />
-          <div
-            className="overflow-hidden rounded-2xl border border-white/10 bg-slate-900/60 shadow-2xl shadow-black/50 ring-1 ring-white/5"
-            style={reduce ? undefined : { transform: "perspective(1400px) rotateY(-7deg) rotateX(3deg)" }}
-          >
-            <div className="flex items-center gap-1.5 border-b border-white/5 bg-white/[0.03] px-4 py-3">
-              <span className="h-3 w-3 rounded-full bg-red-400/70" />
-              <span className="h-3 w-3 rounded-full bg-yellow-400/70" />
-              <span className="h-3 w-3 rounded-full bg-green-400/70" />
-              <span className="ml-3 truncate text-xs text-slate-500">sector-pro.work/dashboard</span>
-            </div>
-            <img
-              src={dashboardHero}
-              alt="Panel de control de Sector Pro"
-              loading="eager"
-              className="aspect-[16/10] w-full object-cover object-top"
-            />
+          <div style={reduce ? undefined : { transform: "perspective(1600px) rotateY(-6deg) rotateX(2deg)" }}>
+            <MatrixMock />
           </div>
 
           {/* floating chip */}
