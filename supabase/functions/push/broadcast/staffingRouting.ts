@@ -7,6 +7,10 @@ import {
 } from "../data.ts";
 
 type BroadcastClient = ReturnType<typeof createClient>;
+type ProfileDepartmentRow = {
+  id?: string | null;
+  department?: string | null;
+};
 
 export function isStaffingEventCode(type: string): boolean {
   return type.startsWith("staffing.");
@@ -77,7 +81,8 @@ export async function filterStaffingRoutesForDepartment(
     const { data, error } = await client
       .from("profiles")
       .select("id, department")
-      .in("id", targetedManagementUserIds);
+      .in("id", targetedManagementUserIds)
+      .returns<ProfileDepartmentRow[]>();
 
     if (error) {
       console.error("[push/broadcast] Failed to scope staffing management_user routes", {
@@ -86,8 +91,8 @@ export async function filterStaffingRoutesForDepartment(
       });
     } else {
       for (const profile of data || []) {
-        if (normalizeDepartment((profile as any).department) === scopedDepartment) {
-          managementUsersInScope.add((profile as any).id);
+        if (normalizeDepartment(profile.department) === scopedDepartment && profile.id) {
+          managementUsersInScope.add(profile.id);
         }
       }
     }

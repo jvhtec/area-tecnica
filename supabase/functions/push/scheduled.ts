@@ -3,7 +3,65 @@ import { EVENT_TYPES } from "./config.ts";
 import { jsonResponse } from "./http.ts";
 import { sendNativePushNotification } from "./apns.ts";
 import { sendPushNotification } from "./webpush.ts";
-import type { CheckScheduledBody, NativePushTokenRow, PushPayload } from "./types.ts";
+import type {
+  CheckScheduledBody,
+  NativePushTokenRow,
+  PushPayload,
+  PushSendResult,
+  PushSubscriptionRow,
+} from "./types.ts";
+
+type MorningSummaryAssignment = MorningSummaryData["assignments"][number];
+type MorningSummaryUnavailable = MorningSummaryData["unavailable"][number];
+type MorningSummaryTech = MorningSummaryData["allTechs"][number];
+
+type LegacyAvailabilityRow = {
+  technician_id?: string | null;
+  status?: string | null;
+};
+
+type ScheduleConfigRow = {
+  enabled: boolean;
+  timezone?: string | null;
+  schedule_time: string;
+  days_of_week?: number[] | null;
+  last_sent_at?: string | null;
+};
+
+type MorningSummarySubscriptionRow = {
+  user_id: string;
+  subscribed_departments: string[] | null;
+};
+
+type PushDeliveryResult = {
+  endpoint: string;
+  ok: boolean;
+  status?: number;
+  skipped?: boolean;
+  user_id: string;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function getErrorCode(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+  return typeof value.code === 'string' ? value.code : null;
+}
+
+function getErrorMessage(value: unknown): string | unknown {
+  if (value instanceof Error) return value.message;
+  if (isRecord(value) && typeof value.message === 'string') return value.message;
+  return value;
+}
+
+function getPushSendMetadata(result: PushSendResult): Pick<PushDeliveryResult, 'status' | 'skipped'> {
+  return {
+    status: 'status' in result ? result.status : undefined,
+    skipped: 'skipped' in result ? result.skipped : undefined,
+  };
+}
 
 const loadNativeTokens = async (
   client: ReturnType<typeof createClient>,
@@ -81,7 +139,8 @@ async function getMorningSummaryDataForDepartment(
     .eq('date', targetDate)
     .eq('profile.department', department)
     .eq('profile.role', 'house_tech')
-    .eq('profile.warehouse_duty_exempt', false);
+    .eq('profile.warehouse_duty_exempt', false)
+    .returns<MorningSummaryAssignment[]>();
 
   // 2) Get today's unavailability for this department (primary source)
   const { data: unavailable = [] } = await client
@@ -95,8 +154,9 @@ async function getMorningSummaryDataForDepartment(
     .eq('status', 'unavailable')
     .eq('profile.department', department)
     .eq('profile.role', 'house_tech')
-    .eq('profile.warehouse_duty_exempt', false);
-  const unavailableHouseOnly = unavailable as any[];
+    .eq('profile.warehouse_duty_exempt', false)
+    .returns<MorningSummaryUnavailable[]>();
+  const unavailableHouseOnly: MorningSummaryUnavailable[] = [...unavailable];
 
   // 3) Get all house techs in department (population)
   const { data: allTechs = [] } = await client
@@ -104,53 +164,56 @@ async function getMorningSummaryDataForDepartment(
     .select('id, first_name, last_name, nickname')
     .eq('department', department)
     .eq('role', 'house_tech')
-    .eq('warehouse_duty_exempt', false);
+    .eq('warehouse_duty_exempt', false)
+    .returns<MorningSummaryTech[]>();
 
   // 4) Legacy fallback: include legacy table marks (technician_availability)
   // Some environments still record travel/sick/day_off/vacation here.
   // We treat these as 'unavailable' for the day if they aren't already present.
   try {
-    const techIds = (allTechs as any[]).map(t => t.id);
+    const techIds = allTechs.map(t => t.id);
     if (techIds.length) {
       const { data: legacyRows, error: legacyErr } = await client
         .from('technician_availability')
         .select('technician_id, date, status')
         .in('technician_id', techIds)
         .eq('date', targetDate)
-        .in('status', ['vacation', 'travel', 'sick', 'day_off']);
+        .in('status', ['vacation', 'travel', 'sick', 'day_off'])
+        .returns<LegacyAvailabilityRow[]>();
       if (!legacyErr && legacyRows && legacyRows.length) {
-        const existing = new Set<string>((unavailableHouseOnly as any[]).map(u => (u as any).user_id));
-        for (const row of legacyRows as any[]) {
-          if (!existing.has(row.technician_id)) {
-            const prof = (allTechs as any[]).find(t => t.id === row.technician_id);
+        const existing = new Set<string>(unavailableHouseOnly.map(u => u.user_id));
+        for (const row of legacyRows) {
+          const technicianId = row.technician_id;
+          if (technicianId && !existing.has(technicianId)) {
+            const prof = allTechs.find(t => t.id === technicianId);
             if (prof) {
-              (unavailableHouseOnly as any[]).push({
-                user_id: row.technician_id,
-                source: row.status,
+              unavailableHouseOnly.push({
+                user_id: technicianId,
+                source: row.status ?? 'legacy',
                 profile: {
                   first_name: prof.first_name,
                   last_name: prof.last_name,
                   nickname: prof.nickname,
                 },
               });
-              existing.add(row.technician_id);
+              existing.add(technicianId);
             }
           }
         }
       }
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     // Ignore if legacy table missing
-    if (!(e && e.code === '42P01')) {
+    if (getErrorCode(e) !== '42P01') {
       // Log non-table-missing errors for visibility
-      console.log('morning summary legacy availability lookup warning:', e?.message || e);
+      console.log('morning summary legacy availability lookup warning:', getErrorMessage(e));
     }
   }
 
   return {
-    assignments: assignments as any,
-    unavailable: unavailableHouseOnly as any,
-    allTechs: allTechs as any,
+    assignments,
+    unavailable: unavailableHouseOnly,
+    allTechs,
   };
 }
 
@@ -408,12 +471,13 @@ async function checkAndGetScheduleConfig(
   client: ReturnType<typeof createClient>,
   eventType: string,
   force: boolean = false,
-): Promise<{ shouldSend: boolean; config: any | null }> {
+): Promise<{ shouldSend: boolean; config: ScheduleConfigRow | null }> {
   // Get schedule configuration
   const { data: config, error } = await client
     .from('push_notification_schedules')
     .select('*')
     .eq('event_type', eventType)
+    .returns<ScheduleConfigRow>()
     .maybeSingle();
 
   if (error || !config) {
@@ -526,7 +590,7 @@ export async function handleCheckScheduled(
   // Check if it's time to send
   const { shouldSend, config } = await checkAndGetScheduleConfig(client, type, body.force);
 
-  if (!shouldSend) {
+  if (!shouldSend || !config) {
     return jsonResponse({ status: 'skipped', reason: 'Not scheduled time or already sent' });
   }
 
@@ -552,7 +616,8 @@ export async function handleCheckScheduled(
     const { data: subscriptions, error: subsError } = await client
       .from('morning_summary_subscriptions')
       .select('user_id, subscribed_departments')
-      .eq('enabled', true);
+      .eq('enabled', true)
+      .returns<MorningSummarySubscriptionRow[]>();
 
     if (subsError) {
       console.error('❌ Failed to load subscriptions:', subsError);
@@ -570,12 +635,12 @@ export async function handleCheckScheduled(
     const departmentDataCache = new Map<string, MorningSummaryData>();
 
     // Process each user
-    const allResults: Array<{ endpoint: string; ok: boolean; status?: number; skipped?: boolean; user_id: string }> = [];
+    const allResults: PushDeliveryResult[] = [];
     let successfulUsers = 0;
 
     for (const subscription of subscriptions) {
       const userId = subscription.user_id;
-      const departments = subscription.subscribed_departments as string[];
+      const departments = subscription.subscribed_departments ?? [];
 
       if (!departments || departments.length === 0) {
         console.log(`⚠️ User ${userId} has no departments subscribed`);
@@ -614,7 +679,8 @@ export async function handleCheckScheduled(
       const { data: pushSubs, error: pushSubsErr } = await client
         .from('push_subscriptions')
         .select('endpoint, p256dh, auth')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .returns<PushSubscriptionRow[]>();
 
       if (pushSubsErr) {
         console.error(`  ❌ Failed to load push subscriptions for user ${userId}:`, pushSubsErr);
@@ -655,8 +721,7 @@ export async function handleCheckScheduled(
           allResults.push({
             endpoint: pushSub.endpoint,
             ok: result.ok,
-            status: 'status' in result ? (result as any).status : undefined,
-            skipped: 'skipped' in result ? (result as any).skipped : undefined,
+            ...getPushSendMetadata(result),
             user_id: userId,
           });
           if (result.ok) userSent = true;
@@ -669,8 +734,7 @@ export async function handleCheckScheduled(
           allResults.push({
             endpoint: `apns:${tokenRow.device_token}`,
             ok: result.ok,
-            status: 'status' in result ? (result as any).status : undefined,
-            skipped: 'skipped' in result ? (result as any).skipped : undefined,
+            ...getPushSendMetadata(result),
             user_id: userId,
           });
           if (result.ok) userSent = true;

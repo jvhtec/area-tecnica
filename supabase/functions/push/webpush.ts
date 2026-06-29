@@ -2,6 +2,19 @@ import { createClient, webpush } from "./deps.ts";
 import { CONTACT_EMAIL, PUSH_CONFIG, VAPID_PRIVATE_KEY, VAPID_PUBLIC_KEY } from "./config.ts";
 import type { PushPayload, PushSendResult, PushSubscriptionRow } from "./types.ts";
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function numberFromUnknown(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
 console.log('🔐 VAPID keys loaded:', {
   publicKeyPresent: !!VAPID_PUBLIC_KEY,
   privateKeyPresent: !!VAPID_PRIVATE_KEY,
@@ -53,11 +66,12 @@ export async function sendPushNotification(
     console.log('✅ Push notification sent successfully');
     return { ok: true };
   } catch (err) {
-    const status = (err as any)?.statusCode ?? (err as any)?.status ?? 500;
+    const errorInfo = isRecord(err) ? err : {};
+    const status = numberFromUnknown(errorInfo.statusCode) ?? numberFromUnknown(errorInfo.status) ?? 500;
     console.error('❌ Push send error:', {
       status,
-      message: (err as any)?.message,
-      body: (err as any)?.body,
+      message: typeof errorInfo.message === 'string' ? errorInfo.message : undefined,
+      body: errorInfo.body,
       endpoint: subscription.endpoint.substring(0, 50) + '...',
       error: err
     });
@@ -76,4 +90,3 @@ export async function sendPushNotification(
     return { ok: false, status };
   }
 }
-

@@ -4,6 +4,14 @@ import type { PushPayload, PushSendResult } from "./types.ts";
 const APNS_HOST = APNS_ENV === "sandbox" ? "https://api.sandbox.push.apple.com" : "https://api.push.apple.com";
 const JWT_TTL_SECONDS = 50 * 60;
 
+type TokenCleanupClient = {
+  from: (table: string) => {
+    delete: () => {
+      eq: (column: string, value: string) => Promise<unknown> | unknown;
+    };
+  };
+};
+
 let cachedJwt: { token: string; issuedAt: number } | null = null;
 
 const base64UrlEncode = (input: Uint8Array | string): string => {
@@ -77,7 +85,7 @@ const getApnsJwt = async (): Promise<string | null> => {
 };
 
 export async function sendNativePushNotification(
-  client: { from: (table: string) => any },
+  client: TokenCleanupClient,
   deviceToken: string,
   payload: PushPayload,
 ): Promise<PushSendResult> {
