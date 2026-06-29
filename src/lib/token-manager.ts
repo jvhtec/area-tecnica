@@ -4,7 +4,8 @@ import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runt
 
 export type TokenRefreshResult = {
   session: Session | null;
-  error: AuthError | Error | null | false;
+  error: AuthError | Error | null;
+  skipped: boolean;
 };
 
 export type SessionExpiry = Pick<Session, 'expires_at'> | null | undefined;
@@ -138,13 +139,13 @@ export class TokenManager {
   public async refreshToken(): Promise<TokenRefreshResult> {
     if (this.isRefreshing) {
       console.log('Token refresh already in progress');
-      return { session: null, error: false };
+      return { session: null, error: null, skipped: true };
     }
     
     // Circuit breaker check
     if (this.isCircuitBreakerOpen()) {
       console.log('Circuit breaker is open, skipping refresh');
-      return { session: null, error: new Error('Circuit breaker open') };
+      return { session: null, error: new Error('Circuit breaker open'), skipped: false };
     }
     
     try {
@@ -155,7 +156,7 @@ export class TokenManager {
       if (error) {
         console.error('Error refreshing token:', error);
         this.recordFailure();
-        return { session: null, error };
+        return { session: null, error, skipped: false };
       }
       
       if (data.session) {
@@ -164,14 +165,14 @@ export class TokenManager {
         this.recordSuccess();
         this.notifySubscribers();
         this.scheduleNextRefresh(data.session);
-        return { session: data.session, error: null };
+        return { session: data.session, error: null, skipped: false };
       }
       
-      return { session: null, error: null };
+      return { session: null, error: null, skipped: false };
     } catch (error) {
       console.error('Exception during token refresh:', error);
       this.recordFailure();
-      return { session: null, error: normalizeError(error) };
+      return { session: null, error: normalizeError(error), skipped: false };
     } finally {
       this.isRefreshing = false;
     }

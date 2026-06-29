@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, beforeEach, describe, expect, expectTypeOf, it, vi } from "vitest";
-import type { Session } from "@supabase/supabase-js";
+import type { AuthError, Session } from "@supabase/supabase-js";
 
 import { TokenManager, type TokenRefreshResult } from "@/lib/token-manager";
 
@@ -34,6 +34,11 @@ vi.mock("@/runtime/app-runtime-events", () => ({
 function resetTokenManagerSingleton(): void {
   (TokenManager as unknown as { instance?: TokenManager }).instance = undefined;
 }
+
+type RefreshSessionResponse = {
+  data: { session: Session | null };
+  error: AuthError | null;
+};
 
 describe("TokenManager typing and expiry helpers", () => {
   beforeEach(() => {
@@ -69,9 +74,36 @@ describe("TokenManager typing and expiry helpers", () => {
     expect(manager.checkTokenExpiration(undefined)).toBe(false);
   });
 
+  it("reports concurrent refresh attempts as skipped without using the error field", async () => {
+    let resolveRefresh: (value: RefreshSessionResponse) => void = () => {};
+    mocks.refreshSession.mockReturnValue(new Promise<RefreshSessionResponse>((resolve) => {
+      resolveRefresh = resolve;
+    }));
+
+    const manager = TokenManager.getInstance();
+    const inFlightRefresh = manager.refreshToken();
+
+    expect(mocks.refreshSession).toHaveBeenCalledTimes(1);
+    await expect(manager.refreshToken()).resolves.toEqual({
+      session: null,
+      error: null,
+      skipped: true,
+    });
+
+    resolveRefresh({ data: { session: null }, error: null });
+    await expect(inFlightRefresh).resolves.toEqual({
+      session: null,
+      error: null,
+      skipped: false,
+    });
+  });
+
   it("exposes typed session and refresh result contracts", () => {
     expectTypeOf<ReturnType<TokenManager["getSession"]>>().toEqualTypeOf<Promise<Session | null>>();
     expectTypeOf<ReturnType<TokenManager["refreshToken"]>>().toEqualTypeOf<Promise<TokenRefreshResult>>();
     expectTypeOf<ReturnType<TokenManager["refreshTokenWithBackoff"]>>().toEqualTypeOf<Promise<TokenRefreshResult>>();
+    expectTypeOf<ReturnType<TokenManager["signOut"]>>().toEqualTypeOf<
+      Promise<{ error: AuthError | Error | null }>
+    >();
   });
 });
