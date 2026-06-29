@@ -95,6 +95,7 @@ describe("useTourDefaultSets", () => {
     });
 
     await waitFor(() => {
+      expect(result.current.defaultSets).toHaveLength(1);
       expect(result.current.defaultTables).toHaveLength(1);
     });
 

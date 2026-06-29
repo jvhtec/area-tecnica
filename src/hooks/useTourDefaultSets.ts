@@ -41,7 +41,7 @@ const getMutationErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
-export const useTourDefaultSets = (tourId: string, department?: string) => {
+export const useTourDefaultSets = (tourId: string, department?: TourDefaultDepartment) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
