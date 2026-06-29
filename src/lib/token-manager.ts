@@ -1,6 +1,18 @@
 import { supabase } from '@/lib/supabase';
-import { Session } from '@supabase/supabase-js';
+import type { AuthError, Session } from '@supabase/supabase-js';
 import { APP_RUNTIME_EVENTS, subscribeAppRuntimeEvent } from '@/runtime/app-runtime-events';
+
+export type TokenRefreshResult = {
+  session: Session | null;
+  error: AuthError | Error | null;
+  skipped: boolean;
+};
+
+export type SessionExpiry = Pick<Session, 'expires_at'> | null | undefined;
+
+function normalizeError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
 
 /**
  * Token Manager - Singleton class for managing auth tokens and refresh logic
@@ -124,16 +136,16 @@ export class TokenManager {
   /**
    * Refresh the token
    */
-  public async refreshToken(): Promise<any> {
+  public async refreshToken(): Promise<TokenRefreshResult> {
     if (this.isRefreshing) {
       console.log('Token refresh already in progress');
-      return { session: null, error: false };
+      return { session: null, error: null, skipped: true };
     }
     
     // Circuit breaker check
     if (this.isCircuitBreakerOpen()) {
       console.log('Circuit breaker is open, skipping refresh');
-      return { session: null, error: new Error('Circuit breaker open') };
+      return { session: null, error: new Error('Circuit breaker open'), skipped: false };
     }
     
     try {
@@ -144,7 +156,7 @@ export class TokenManager {
       if (error) {
         console.error('Error refreshing token:', error);
         this.recordFailure();
-        return { session: null, error };
+        return { session: null, error, skipped: false };
       }
       
       if (data.session) {
@@ -153,14 +165,14 @@ export class TokenManager {
         this.recordSuccess();
         this.notifySubscribers();
         this.scheduleNextRefresh(data.session);
-        return { session: data.session, error: null };
+        return { session: data.session, error: null, skipped: false };
       }
       
-      return { session: null, error: null };
+      return { session: null, error: null, skipped: false };
     } catch (error) {
       console.error('Exception during token refresh:', error);
       this.recordFailure();
-      return { session: null, error };
+      return { session: null, error: normalizeError(error), skipped: false };
     } finally {
       this.isRefreshing = false;
     }
@@ -169,7 +181,7 @@ export class TokenManager {
   /**
    * Get the current session, optionally refreshing it if needed
    */
-  public async getSession(forceRefresh = false): Promise<any> {
+  public async getSession(forceRefresh = false): Promise<Session | null> {
     if (forceRefresh) {
       await this.refreshToken();
     }
@@ -180,7 +192,7 @@ export class TokenManager {
   /**
    * Sign the user out
    */
-  public async signOut(): Promise<{ error: any }> {
+  public async signOut(): Promise<{ error: AuthError | Error | null }> {
     try {
       // Clear cached session
       this.updateCachedSession(null);
@@ -189,14 +201,14 @@ export class TokenManager {
       return { error };
     } catch (error) {
       console.error('Error during sign out:', error);
-      return { error };
+      return { error: normalizeError(error) };
     }
   }
   
   /**
    * Schedule the next token refresh based on expiry time
    */
-  private scheduleNextRefresh(session: any): void {
+  private scheduleNextRefresh(session: SessionExpiry): void {
     if (this.refreshTimeout) {
       clearTimeout(this.refreshTimeout);
       this.refreshTimeout = null;
@@ -264,7 +276,7 @@ export class TokenManager {
    * @param session Current authentication session
    * @returns Milliseconds until next refresh
    */
-  public calculateRefreshTime(session: any): number {
+  public calculateRefreshTime(session: SessionExpiry): number {
     if (!session?.expires_at) {
       // Default refresh every 30 minutes if no expiry
       return 30 * 60 * 1000;
@@ -290,7 +302,7 @@ export class TokenManager {
    * @param thresholdMs Time in milliseconds that is considered "close to expiration"
    * @returns Boolean indicating if token is close to expiration
    */
-  public checkTokenExpiration(session: any, thresholdMs: number = 5 * 60 * 1000): boolean {
+  public checkTokenExpiration(session: SessionExpiry, thresholdMs: number = 5 * 60 * 1000): boolean {
     if (!session?.expires_at) {
       return false;
     }
@@ -391,7 +403,7 @@ export class TokenManager {
   /**
    * Enhanced refresh with backoff
    */
-  public async refreshTokenWithBackoff(): Promise<any> {
+  public async refreshTokenWithBackoff(): Promise<TokenRefreshResult> {
     const backoffDelay = this.calculateBackoffDelay();
     
     if (backoffDelay > 0) {
