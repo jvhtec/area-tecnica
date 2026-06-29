@@ -1,57 +1,46 @@
 import { useEffect, useState } from "react";
-import { motion, useReducedMotion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { HeroSection } from "@/components/landing/HeroSection";
 import { StatsSection } from "@/components/landing/StatsSection";
 import { ModuleShowcase } from "@/components/landing/ModuleShowcase";
 import { FeatureHighlights } from "@/components/landing/FeatureHighlights";
+import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
 import { TechnicalSpecs } from "@/components/landing/TechnicalSpecs";
 import { CallToAction } from "@/components/landing/CallToAction";
 import { BRAND, GRADIENT_BTN } from "@/components/landing/_shared";
 
-/** Animated brand aurora + grid backdrop for the dark landing canvas. */
-function Aurora() {
-  const reduce = useReducedMotion();
-  const float = (delay: number) =>
-    reduce
-      ? {}
-      : {
-          animate: { x: [0, 30, -20, 0], y: [0, -25, 20, 0], scale: [1, 1.08, 0.96, 1] },
-          transition: { duration: 22, repeat: Infinity, ease: "easeInOut", delay },
-        };
-
+/**
+ * Disciplined technical backdrop: a fine engineering grid masked toward the top,
+ * a faint scanline texture, and a single restrained brand glow. Deliberately
+ * avoids the floating multi-blob "aurora" look.
+ */
+function TechBackground() {
   return (
-    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#060A18]">
-      <motion.div
-        {...float(0)}
-        className="absolute -left-32 -top-32 h-[36rem] w-[36rem] rounded-full bg-sky-600/20 blur-[120px]"
-      />
-      <motion.div
-        {...float(4)}
-        className="absolute -right-40 top-1/4 h-[34rem] w-[34rem] rounded-full bg-violet-600/20 blur-[120px]"
-      />
-      <motion.div
-        {...float(8)}
-        className="absolute bottom-0 left-1/3 h-[32rem] w-[32rem] rounded-full bg-cyan-500/15 blur-[120px]"
-      />
-      {/* grid */}
+    <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden bg-[#05070F]">
+      {/* single restrained top glow */}
+      <div className="absolute -top-40 left-1/2 h-[28rem] w-[52rem] -translate-x-1/2 rounded-full bg-sky-600/10 blur-[130px]" />
+      <div className="absolute right-0 top-1/3 h-[26rem] w-[26rem] rounded-full bg-violet-700/[0.07] blur-[130px]" />
+      {/* fine engineering grid */}
       <div
-        className="absolute inset-0 opacity-[0.04]"
+        className="absolute inset-0 opacity-[0.05]"
         style={{
           backgroundImage:
             "linear-gradient(to right, white 1px, transparent 1px), linear-gradient(to bottom, white 1px, transparent 1px)",
-          backgroundSize: "56px 56px",
-          maskImage: "radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%)",
-          WebkitMaskImage: "radial-gradient(ellipse 80% 60% at 50% 0%, black 40%, transparent 100%)",
+          backgroundSize: "40px 40px",
+          maskImage: "radial-gradient(ellipse 90% 70% at 50% -10%, black 30%, transparent 75%)",
+          WebkitMaskImage: "radial-gradient(ellipse 90% 70% at 50% -10%, black 30%, transparent 75%)",
         }}
       />
+      {/* subtle vignette to ground content */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,transparent_55%,#05070F_100%)]" />
     </div>
   );
 }
 
 const navLinks = [
   { label: "Módulos", href: "modulos" },
+  { label: "Integraciones", href: "integraciones" },
   { label: "Características", href: "caracteristicas" },
 ];
 
@@ -141,13 +130,14 @@ export default function Landing() {
 
   return (
     <div className="dark min-h-screen scroll-smooth bg-[#060A18] text-slate-100 antialiased">
-      <Aurora />
+      <TechBackground />
       <Navbar />
       <main>
         <HeroSection />
         <StatsSection />
         <ModuleShowcase />
         <FeatureHighlights />
+        <IntegrationsSection />
         <TechnicalSpecs />
         <CallToAction />
       </main>

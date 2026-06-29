@@ -13,14 +13,29 @@ const DEPTS = {
 
 type Dept = keyof typeof DEPTS;
 
-const techs: { name: string; dept: Dept; role: string; row: Status[] }[] = [
-  { name: "Javier Ruiz", dept: "sound", role: "FOH", row: ["accepted", "accepted", "accepted", "pending"] },
-  { name: "Marta León", dept: "sound", role: "Monitores", row: ["accepted", "pending", "accepted", "empty"] },
-  { name: "Carlos Vidal", dept: "lights", role: "Responsable", row: ["accepted", "accepted", "conflict", "accepted"] },
-  { name: "Ana Soto", dept: "lights", role: "Spot", row: ["pending", "accepted", "accepted", "accepted"] },
-  { name: "Diego Marín", dept: "video", role: "Realización", row: ["accepted", "declined", "pending", "accepted"] },
-  { name: "Lucía Gómez", dept: "logistics", role: "Carga", row: ["empty", "accepted", "accepted", "pending"] },
+type Medal = 1 | 2 | 3 | null;
+
+const techs: { name: string; dept: Dept; role: string; medal: Medal; row: Status[] }[] = [
+  { name: "Javier Ruiz", dept: "sound", role: "FOH", medal: 1, row: ["accepted", "accepted", "accepted", "pending"] },
+  { name: "Marta León", dept: "sound", role: "Monitores", medal: 2, row: ["accepted", "pending", "accepted", "empty"] },
+  { name: "Carlos Vidal", dept: "lights", role: "Responsable", medal: 3, row: ["accepted", "accepted", "conflict", "accepted"] },
+  { name: "Ana Soto", dept: "lights", role: "Spot", medal: null, row: ["pending", "accepted", "accepted", "accepted"] },
+  { name: "Diego Marín", dept: "video", role: "Realización", medal: null, row: ["accepted", "declined", "pending", "accepted"] },
+  { name: "Lucía Gómez", dept: "logistics", role: "Carga", medal: null, row: ["empty", "accepted", "accepted", "pending"] },
 ];
+
+const medalStyle: Record<1 | 2 | 3, string> = {
+  1: "bg-gradient-to-br from-amber-300 to-yellow-500 text-amber-950",
+  2: "bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800",
+  3: "bg-gradient-to-br from-orange-300 to-amber-700 text-amber-950",
+};
+
+const initials = (n: string) =>
+  n
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("");
 
 const cols = ["Vie 12", "Sáb 13", "Dom 14", "Lun 15"];
 
@@ -73,7 +88,21 @@ export function MatrixMock() {
         {techs.map((t, ri) => (
           <div key={t.name} className="contents">
             <div className="flex items-center gap-2 py-1 pr-2">
-              <span className={`h-2 w-2 shrink-0 rounded-full ${DEPTS[t.dept].dot}`} />
+              <span className="relative shrink-0">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.06] text-[10px] font-semibold text-slate-300 ring-1 ring-white/10">
+                  {initials(t.name)}
+                </span>
+                {t.medal && (
+                  <span
+                    className={`absolute -bottom-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full text-[8px] font-bold shadow ${medalStyle[t.medal]}`}
+                  >
+                    {t.medal}
+                  </span>
+                )}
+                <span
+                  className={`absolute -left-0.5 top-0 h-2 w-2 rounded-full ring-2 ring-slate-900 ${DEPTS[t.dept].dot}`}
+                />
+              </span>
               <span className="min-w-0">
                 <span className="block truncate text-[12px] font-medium text-slate-200">{t.name}</span>
                 <span className="block truncate text-[10px] text-slate-500">{t.role}</span>

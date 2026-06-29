@@ -3,9 +3,20 @@ import { CheckCircle2, RefreshCw, ShieldCheck, Smartphone, Sparkles, Zap } from 
 import { GLASS, GRADIENT_TEXT, useRevealVariants } from "./_shared";
 import { SectionHeading } from "./SectionHeading";
 import { StaffingMock } from "./visuals/StaffingMock";
-import { PowerMock } from "./visuals/PowerMock";
+import { PesosMock } from "./visuals/PesosMock";
 
 const showcase = [
+  {
+    visual: PesosMock,
+    eyebrow: "Herramientas técnicas",
+    title: "Cálculos de ingeniería, no estimaciones",
+    points: [
+      "Pesos y rigging con puntos de carga y motores",
+      "Consumos de potencia por fase con reequilibrado",
+      "Tablas de RF / IEM sin solapamientos",
+      "Todo exportable a informe firmable en PDF",
+    ],
+  },
   {
     visual: StaffingMock,
     eyebrow: "Staffing",
@@ -15,17 +26,6 @@ const showcase = [
       "Invitaciones automáticas y respuesta con un clic",
       "Tarifas personalizadas por técnico, gira o trabajo",
       "Detección de dobles reservas en la matriz",
-    ],
-  },
-  {
-    visual: PowerMock,
-    eyebrow: "Operación técnica",
-    title: "Cálculos de ingeniería integrados",
-    points: [
-      "Consumos de potencia por fase con reequilibrado",
-      "Pesos y rigging con límites por punto",
-      "Tablas de RF / IEM sin solapamientos",
-      "Todo exportable a informe firmable",
     ],
     reverse: true,
   },

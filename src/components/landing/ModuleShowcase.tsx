@@ -130,20 +130,21 @@ export const ModuleShowcase = () => {
           viewport={{ once: true, margin: "-80px" }}
           className="mt-14 grid auto-rows-fr grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
-          {modules.map(({ icon: Icon, title, description, span, accent }) => (
+          {modules.map(({ icon: Icon, title, description, span, accent }, i) => (
             <motion.article
               key={title}
               variants={item}
-              className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-6 backdrop-blur-sm transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:bg-white/[0.06] ${span ?? ""}`}
+              className={`group relative rounded-xl border border-white/[0.08] bg-white/[0.015] p-6 transition-colors duration-200 hover:border-white/20 hover:bg-white/[0.04] ${span ?? ""}`}
             >
-              <div
-                className={`mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${accent}`}
-              >
-                <Icon className="h-5 w-5" />
+              <div className="flex items-center justify-between">
+                <Icon className={`h-5 w-5 ${accent}`} strokeWidth={1.6} />
+                <span className="font-mono text-[11px] text-slate-600">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
               </div>
-              <h3 className="text-lg font-semibold text-white">{title}</h3>
-              <p className="mt-2 text-sm leading-relaxed text-slate-400">{description}</p>
-              <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-gradient-to-br from-white/10 to-transparent opacity-0 blur-2xl transition-opacity duration-300 group-hover:opacity-100" />
+              <h3 className="mt-4 text-[15px] font-semibold text-white">{title}</h3>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-slate-400">{description}</p>
+              <span className="absolute inset-x-6 bottom-0 h-px origin-left scale-x-0 bg-gradient-to-r from-sky-400/60 to-transparent transition-transform duration-300 group-hover:scale-x-100" />
             </motion.article>
           ))}
         </motion.div>
