@@ -24,7 +24,7 @@ import {
   CARLOS_AGENT_NAME,
   CARLOS_AUTO_MODE_LABEL,
 } from '@/features/staffing/carlos'
-
+import { canResumeStaffingCampaign, staffingCampaignResumeLabel } from '@/features/staffing/campaignLifecycle'
 
 import { queryKeys } from "@/lib/react-query";
 
@@ -520,7 +520,7 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
       return payload
     },
     onSuccess: () => {
-      toast({ title: campaign?.status === 'stopped' ? 'Campaña reiniciada' : 'Campaña reanudada' })
+      toast({ title: campaign?.status === 'paused' ? 'Campaña reanudada' : 'Campaña reiniciada' })
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('staffing_campaign', jobId, department) })
     }
   })
@@ -1281,13 +1281,13 @@ export const StaffingCampaignPanel: React.FC<StaffingCampaignPanelProps> = ({
                 Stop
               </Button>
             </>
-          ) : campaign.status === 'stopped' ? (
+          ) : canResumeStaffingCampaign(campaign.status) ? (
             <Button
               size="sm"
               onClick={() => resumeMutation.mutate()}
               disabled={resumeMutation.isPending}
             >
-              Reiniciar
+              {staffingCampaignResumeLabel(campaign.status)}
             </Button>
           ) : null}
         </div>
