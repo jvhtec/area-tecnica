@@ -143,14 +143,16 @@ export const TourManagementDialog = ({
 
       if (error) throw error;
 
-      // When cancelling a tour, mark all its tourdate jobs as Cancelado
+      // When cancelling a started tour, only future tour dates should stop happening.
       if (newStatus === 'cancelled') {
         const { error: jobsErr } = await dataLayerClient.from('jobs')
           .update({ status: 'Cancelado' })
           .eq('tour_id', tour.id)
-          .eq('job_type', 'tourdate');
+          .eq('job_type', 'tourdate')
+          .neq('status', 'Completado')
+          .gt('start_time', new Date().toISOString());
         if (jobsErr) {
-          console.warn('Failed to mark tour jobs as Cancelado:', jobsErr);
+          console.warn('Failed to mark future tour jobs as Cancelado:', jobsErr);
         }
       }
 
