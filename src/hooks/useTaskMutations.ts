@@ -3,6 +3,27 @@ import { completeTask, revertTask, Department } from '@/services/taskCompletion'
 import { getDocumentUploadValidationError } from '@/utils/documentUploadValidation';
 
 type Dept = 'sound'|'lights'|'video';
+type TaskUpdateFields = Record<string, unknown>;
+type TaskInsertPayload = {
+  task_type: string;
+  status: 'not_started';
+  progress: number;
+  job_id?: string;
+  tour_id?: string;
+  assigned_to?: string;
+  due_at?: string;
+};
+type TaskRow = {
+  id?: string;
+  task_type?: string;
+  assigned_to?: string | null;
+  job_id?: string | null;
+  tour_id?: string | null;
+  [field: string]: unknown;
+};
+type ExistingTaskAssigneeRow = {
+  assigned_to: string | null;
+};
 
 const TASK_TABLE: Record<Dept, string> = {
   sound: 'sound_job_tasks',
@@ -22,7 +43,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
   const contextId = tourId || jobId;
   const TRACKED_TASK_FIELDS = ['due_at', 'priority', 'requirements', 'notes', 'details'];
 
-  const sanitizeTaskUpdateValue = (field: string, value: any) => {
+  const sanitizeTaskUpdateValue = (field: string, value: unknown) => {
     if (value === undefined) return undefined;
     if (value === null) return null;
 
@@ -36,7 +57,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     return value;
   };
 
-  const normalizeTaskValue = (field: string, value: any): any => {
+  const normalizeTaskValue = (field: string, value: unknown): unknown => {
     if (value === undefined) return undefined;
     if (value === null) return null;
 
@@ -62,8 +83,8 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     return value;
   };
 
-  const trackedUpdatesFrom = (fields: Record<string, any>) => {
-    const tracked: Record<string, any> = {};
+  const trackedUpdatesFrom = (fields: TaskUpdateFields) => {
+    const tracked: TaskUpdateFields = {};
     for (const [key, value] of Object.entries(fields)) {
       if (TRACKED_TASK_FIELDS.includes(key)) {
         tracked[key] = sanitizeTaskUpdateValue(key, value);
@@ -72,7 +93,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     return tracked;
   };
 
-  const notifyTaskUpdated = async (task: any, updates: Record<string, any>) => {
+  const notifyTaskUpdated = async (task: TaskRow, updates: TaskUpdateFields) => {
     if (!task?.assigned_to) return;
 
     const changes: Record<string, { from: unknown; to: unknown }> = {};
@@ -114,8 +135,8 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     }
   };
 
-  const updateTaskWithNotification = async (id: string, fields: Record<string, any>) => {
-    const sanitizedFields: Record<string, any> = {};
+  const updateTaskWithNotification = async (id: string, fields: TaskUpdateFields) => {
+    const sanitizedFields: TaskUpdateFields = {};
     for (const [key, value] of Object.entries(fields)) {
       const sanitized = sanitizeTaskUpdateValue(key, value);
       if (sanitized !== undefined) {
@@ -128,7 +149,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     }
 
     const trackedUpdates = trackedUpdatesFrom(sanitizedFields);
-    let existingTask: any | null = null;
+    let existingTask: TaskRow | null = null;
 
     if (Object.keys(trackedUpdates).length > 0) {
       const { data, error } = await supabase
@@ -140,7 +161,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
       if (error) {
         console.warn('useTaskMutations.updateTaskWithNotification fetch failed', error);
       } else {
-        existingTask = data;
+        existingTask = data as TaskRow | null;
       }
     }
 
@@ -153,7 +174,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
   };
 
   const createTask = async (task_type: string, assigned_to?: string | null, due_at?: string | null) => {
-    const payload: any = { task_type, status: 'not_started', progress: 0 };
+    const payload: TaskInsertPayload = { task_type, status: 'not_started', progress: 0 };
     if (tourId) {
       payload.tour_id = tourId;
     } else if (jobId) {
@@ -185,7 +206,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
       return { created: [], skippedAssigneeIds: assigneeIds };
     }
 
-    const payloadBase: any = { task_type, status: 'not_started', progress: 0 };
+    const payloadBase: TaskInsertPayload = { task_type, status: 'not_started', progress: 0 };
     if (tourId) {
       payloadBase.tour_id = tourId;
     } else if (jobId) {
@@ -210,9 +231,9 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     if (existingError) throw existingError;
 
     const existingAssignees = new Set(
-      (existingTasks || [])
-        .map((row: any) => row.assigned_to)
-        .filter((id: string | null) => Boolean(id))
+      ((existingTasks || []) as ExistingTaskAssigneeRow[])
+        .map((row) => row.assigned_to)
+        .filter((id): id is string => typeof id === 'string' && id.length > 0)
     );
 
     const assigneeIdsToCreate = normalizedAssigneeIds.filter((id) => !existingAssignees.has(id));
@@ -232,7 +253,7 @@ export function useTaskMutations(jobId?: string, department?: Dept, tourId?: str
     return { created: data || [], skippedAssigneeIds };
   };
 
-  const updateTask = async (id: string, fields: Record<string, any>) => {
+  const updateTask = async (id: string, fields: TaskUpdateFields) => {
     await updateTaskWithNotification(id, fields);
   };
 

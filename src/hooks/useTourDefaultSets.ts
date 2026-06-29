@@ -7,12 +7,14 @@ import { useToast } from "@/hooks/use-toast";
 import { queryKeys } from "@/lib/react-query";
 import type { TourPackageSize } from "@/utils/tourPackages";
 
+type TourDefaultDepartment = 'sound' | 'lights' | 'video';
+
 export interface TourDefaultSet {
   id: string;
   tour_id: string;
   name: string;
   description?: string | null;
-  department: 'sound' | 'lights' | 'video';
+  department: TourDefaultDepartment;
   package_size?: TourPackageSize | null;
   created_at: string;
   updated_at: string;
@@ -30,7 +32,16 @@ export interface TourDefaultTable {
   updated_at: string;
 }
 
-export const useTourDefaultSets = (tourId: string, department?: string) => {
+const getMutationErrorMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof Error && error.message) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) return message;
+  }
+  return fallback;
+};
+
+export const useTourDefaultSets = (tourId: string, department?: TourDefaultDepartment) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -94,10 +105,10 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
         description: "Default set created successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create default set",
+        description: getMutationErrorMessage(error, "Failed to create default set"),
         variant: "destructive",
       });
     },
@@ -125,10 +136,10 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
         description: "Default set updated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update default set",
+        description: getMutationErrorMessage(error, "Failed to update default set"),
         variant: "destructive",
       });
     },
@@ -153,10 +164,10 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
         description: "Default table saved successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to save default table",
+        description: getMutationErrorMessage(error, "Failed to save default table"),
         variant: "destructive",
       });
     },
@@ -182,10 +193,10 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
         description: "Default table updated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update default table",
+        description: getMutationErrorMessage(error, "Failed to update default table"),
         variant: "destructive",
       });
     },
@@ -210,10 +221,10 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
         description: "Default set deleted successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete default set",
+        description: getMutationErrorMessage(error, "Failed to delete default set"),
         variant: "destructive",
       });
     },
@@ -279,10 +290,10 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
         description: "Default set duplicated successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to duplicate default set",
+        description: getMutationErrorMessage(error, "Failed to duplicate default set"),
         variant: "destructive",
       });
     },
@@ -329,10 +340,10 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
         description: "Default table(s) copied successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to copy default tables",
+        description: getMutationErrorMessage(error, "Failed to copy default tables"),
         variant: "destructive",
       });
     },
@@ -356,10 +367,10 @@ export const useTourDefaultSets = (tourId: string, department?: string) => {
         description: "Default table deleted successfully",
       });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to delete default table",
+        description: getMutationErrorMessage(error, "Failed to delete default table"),
         variant: "destructive",
       });
     },
