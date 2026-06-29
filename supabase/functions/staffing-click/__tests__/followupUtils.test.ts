@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { buildStaffingClickWhatsappFollowupMessage } from "../followupUtils.ts";
+import {
+  buildStaffingClickWhatsappFollowupMessage,
+  shouldSendStaffingClickWhatsappFollowup,
+} from "../followupUtils.ts";
 
 describe("staffing click follow-up messages", () => {
   it("builds availability follow-up WhatsApp copy", () => {
@@ -19,5 +22,11 @@ describe("staffing click follow-up messages", () => {
     expect(buildStaffingClickWhatsappFollowupMessage("offer", "declined")).toBe(
       "Lamentamos que no estés disponible, en otra ocasión será. Gracias igualmente.",
     );
+  });
+
+  it("sends follow-up when the request used WhatsApp even if another send event is newer", () => {
+    expect(shouldSendStaffingClickWhatsappFollowup("whatsapp", null)).toBe(true);
+    expect(shouldSendStaffingClickWhatsappFollowup("", { event: "whatsapp_sent" })).toBe(true);
+    expect(shouldSendStaffingClickWhatsappFollowup("email", null)).toBe(false);
   });
 });

@@ -1,6 +1,13 @@
 export type StaffingClickPhase = "availability" | "offer";
 export type StaffingClickStatus = "confirmed" | "declined";
 
+export function shouldSendStaffingClickWhatsappFollowup(
+  channelHint: string,
+  whatsappSend: unknown,
+): boolean {
+  return channelHint === "whatsapp" || Boolean(whatsappSend);
+}
+
 export function buildStaffingClickWhatsappFollowupMessage(
   phase: StaffingClickPhase | string,
   status: StaffingClickStatus,

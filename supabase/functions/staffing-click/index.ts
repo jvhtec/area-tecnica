@@ -2,7 +2,10 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 import { detectConflictForAssignment, type AssignmentCoverage, type JobTimeInfo } from "./conflictUtils.ts";
-import { buildStaffingClickWhatsappFollowupMessage } from "./followupUtils.ts";
+import {
+  buildStaffingClickWhatsappFollowupMessage,
+  shouldSendStaffingClickWhatsappFollowup,
+} from "./followupUtils.ts";
 import { parseStaffingClickRequest } from "./requestUtils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -66,13 +69,12 @@ async function sendStaffingClickWhatsappFollowup(params: {
   const { supabase, staffingRequestId, channelHint, profileId, requestedBy, phase, status } = params;
 
   try {
-    const [{ data: latestSend, error: latestSendError }, { data: tech, error: techError }, { data: requester, error: requesterError }] = await Promise.all([
+    const [{ data: whatsappSend, error: whatsappSendError }, { data: tech, error: techError }, { data: requester, error: requesterError }] = await Promise.all([
       supabase
         .from('staffing_events')
-        .select('event, created_at')
+        .select('event')
         .eq('staffing_request_id', staffingRequestId)
-        .in('event', ['whatsapp_sent', 'email_sent'])
-        .order('created_at', { ascending: false })
+        .eq('event', 'whatsapp_sent')
         .limit(1)
         .maybeSingle(),
       supabase
@@ -89,8 +91,8 @@ async function sendStaffingClickWhatsappFollowup(params: {
         : Promise.resolve({ data: null, error: null }),
     ]);
 
-    if (latestSendError) {
-      console.warn('[staffing-click] Follow-up channel lookup failed', latestSendError);
+    if (whatsappSendError) {
+      console.warn('[staffing-click] Follow-up channel lookup failed', whatsappSendError);
     }
     if (techError) {
       console.warn('[staffing-click] Follow-up technician lookup failed', techError);
@@ -100,7 +102,7 @@ async function sendStaffingClickWhatsappFollowup(params: {
       console.warn('[staffing-click] Follow-up requester lookup failed', requesterError);
     }
 
-    const wasWhatsappRequest = channelHint === 'whatsapp' || latestSend?.event === 'whatsapp_sent';
+    const wasWhatsappRequest = shouldSendStaffingClickWhatsappFollowup(channelHint, whatsappSend);
     if (!wasWhatsappRequest) return;
 
     const normalizedPhone = normalizePhone(tech?.phone || '', Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34');

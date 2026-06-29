@@ -706,4 +706,42 @@ describe('OptimizedMatrixCell', () => {
     });
     expect(screen.queryByText(/Enviado por:\s*null/i)).not.toBeInTheDocument();
   });
+
+  it('does not render internal job ids as staffing tooltip labels', async () => {
+    const user = userEvent.setup();
+    const staffingStatus: MatrixStaffingStatus = {
+      availability_status: 'requested',
+      availability_job_id: 'job-internal-availability',
+      availability_job_title: null,
+      pending_availability_job_ids: ['job-internal-availability'],
+      pending_availability_job_titles: [],
+      offer_status: 'sent',
+      offer_job_id: 'job-internal-offer',
+      offer_job_title: null,
+      pending_offer_job_ids: ['job-internal-offer'],
+      pending_offer_job_titles: [],
+    };
+
+    render(
+      <OptimizedMatrixCell
+        technician={mockTechnician}
+        date={mockDate}
+        width={160}
+        height={60}
+        isSelected={false}
+        onSelect={vi.fn()}
+        onClick={vi.fn()}
+        staffingStatusByDateProvided={staffingStatus}
+      />
+    );
+
+    await user.hover(getCellElement());
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Disponibilidad: Solicitada/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Oferta: Enviada/i).length).toBeGreaterThan(0);
+    });
+    expect(screen.queryByText(/job-internal-availability/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/job-internal-offer/i)).not.toBeInTheDocument();
+  });
 });

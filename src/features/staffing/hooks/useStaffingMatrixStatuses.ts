@@ -247,7 +247,7 @@ export function useStaffingMatrixStatuses(
               // Collect ALL non-expired job IDs for this phase (to ensure complete cell clearing)
               if (r.status !== 'expired' && !acc.pending_availability_job_ids.includes(r.job_id)) {
                 acc.pending_availability_job_ids.push(r.job_id)
-                acc.pending_availability_job_titles.push(jobTitle || r.job_id)
+                if (jobTitle) acc.pending_availability_job_titles.push(jobTitle)
               }
               const accT = acc.availability_updated_at || 0
               if (t > accT) {
@@ -263,7 +263,7 @@ export function useStaffingMatrixStatuses(
               // Collect ALL non-expired job IDs for this phase (to ensure complete cell clearing)
               if (r.status !== 'expired' && !acc.pending_offer_job_ids.includes(r.job_id)) {
                 acc.pending_offer_job_ids.push(r.job_id)
-                acc.pending_offer_job_titles.push(jobTitle || r.job_id)
+                if (jobTitle) acc.pending_offer_job_titles.push(jobTitle)
               }
               const accT = acc.offer_updated_at || 0
               if (t > accT) {
