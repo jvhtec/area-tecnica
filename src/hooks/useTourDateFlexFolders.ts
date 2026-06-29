@@ -4,16 +4,39 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { createAllFoldersForJob } from "@/utils/flex-folders/folders";
 import { toast } from "sonner";
-
+import type { Database } from "@/integrations/supabase/types";
+import type { FlexFolderJob } from "@/utils/flex-folders/folder-creation/types";
 
 import { queryKeys } from "@/lib/react-query";
+
+type JobRow = Database["public"]["Tables"]["jobs"]["Row"];
+type TourDateRow = Database["public"]["Tables"]["tour_dates"]["Row"];
+type TourDateFolderInput = Pick<TourDateRow, "id" | "date">;
+type JobFolderStatusRow = Pick<JobRow, "flex_folders_created">;
+type FolderCreationResult = {
+  job: FlexFolderJob;
+  tourDate: TourDateFolderInput;
+};
+type FolderBatchResult =
+  | { tourDate: TourDateFolderInput; success: true }
+  | { tourDate: TourDateFolderInput; success: false; error: unknown };
+
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "object" && error !== null && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string") return message;
+  }
+  return "Unknown error";
+};
+
 export const useTourDateFlexFolders = (tourId: string) => {
   const [creatingAll, setCreatingAll] = useState(false);
   const [creatingIndividual, setCreatingIndividual] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   const createFoldersForTourDate = useMutation({
-    mutationFn: async (tourDate: any) => {
+    mutationFn: async (tourDate: TourDateFolderInput): Promise<FolderCreationResult> => {
       console.log('Creating Flex folders for tour date:', tourDate);
       
       const { data: job, error: jobError } = await supabase
@@ -65,18 +88,18 @@ export const useTourDateFlexFolders = (tourId: string) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('jobs') });
       queryClient.invalidateQueries({ queryKey: queryKeys.scope('tour-dates', tourId) });
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       console.error('Error creating Flex folders:', error);
-      toast.error(`Failed to create Flex folders: ${error.message}`);
+      toast.error(`Failed to create Flex folders: ${getErrorMessage(error)}`);
     }
   });
 
   const createFoldersForAllTourDates = useMutation({
-    mutationFn: async (tourDates: any[]) => {
+    mutationFn: async (tourDates: TourDateFolderInput[]) => {
       console.log('Creating Flex folders for all tour dates:', tourDates.length);
       setCreatingAll(true);
       
-      const results = [];
+      const results: FolderBatchResult[] = [];
       let successCount = 0;
       let errorCount = 0;
 
@@ -88,7 +111,8 @@ export const useTourDateFlexFolders = (tourId: string) => {
             .eq('tour_date_id', tourDate.id)
             .single();
 
-          if (job?.flex_folders_created) {
+          const folderStatus = job as JobFolderStatusRow | null;
+          if (folderStatus?.flex_folders_created) {
             console.log(`Skipping ${tourDate.id} - folders already exist`);
             continue;
           }
@@ -124,14 +148,14 @@ export const useTourDateFlexFolders = (tourId: string) => {
         toast.error(`Failed to create folders for ${data.errorCount} tour dates`);
       }
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       setCreatingAll(false);
       console.error('Error creating all Flex folders:', error);
-      toast.error(`Failed to create Flex folders: ${error.message}`);
+      toast.error(`Failed to create Flex folders: ${getErrorMessage(error)}`);
     }
   });
 
-  const createIndividualFolders = async (tourDate: any) => {
+  const createIndividualFolders = async (tourDate: TourDateFolderInput) => {
     // Prevent multiple clicks for the same tour date
     if (creatingIndividual.has(tourDate.id)) {
       console.log('Folder creation already in progress for tour date:', tourDate.id);
@@ -150,7 +174,7 @@ export const useTourDateFlexFolders = (tourId: string) => {
     }
   };
 
-  const createAllFolders = async (tourDates: any[]) => {
+  const createAllFolders = async (tourDates: TourDateFolderInput[]) => {
     if (creatingAll) {
       console.log('Bulk folder creation already in progress');
       return;

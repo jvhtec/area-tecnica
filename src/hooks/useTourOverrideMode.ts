@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 import {
   getPackageResolutionMessage,
   isPackageDepartment,
@@ -11,16 +12,58 @@ import {
   type TourPackageDateLike,
 } from '@/utils/tourPackages';
 
+type TourDefaultTableRow = Database['public']['Tables']['tour_default_tables']['Row'];
+type TourDefaultTableData = {
+  rows?: Array<{
+    quantity: string;
+    componentId: string;
+    watts: string;
+    weight: string;
+    componentName?: string;
+    lineName?: string;
+    totalWatts?: number;
+    totalWeight?: number;
+    pf?: string;
+    fixtureType?: string;
+    [key: string]: unknown;
+  }>;
+  [key: string]: unknown;
+};
+type TourDefaultTableWithData = Omit<TourDefaultTableRow, 'table_data'> & {
+  table_data: TourDefaultTableData;
+};
+type PowerOverrideRow = Database['public']['Tables']['tour_date_power_overrides']['Row'];
+type WeightOverrideRow = Database['public']['Tables']['tour_date_weight_overrides']['Row'];
+type PowerOverrideInsert = Database['public']['Tables']['tour_date_power_overrides']['Insert'];
+type WeightOverrideInsert = Database['public']['Tables']['tour_date_weight_overrides']['Insert'];
+type OverrideInput = Record<string, unknown>;
+type TourOverrideRow = PowerOverrideRow | WeightOverrideRow;
+type LocationJoin =
+  | { name?: string | null }
+  | Array<{ name?: string | null }>
+  | null
+  | undefined;
+
+type TourDateWithLocation = TourPackageDateLike & {
+  date: string;
+  locations?: LocationJoin;
+};
+
 interface TourOverrideData {
   tourId: string;
   tourDateId: string;
   tourName: string;
   tourDate: string;
   locationName: string;
-  defaults: any[];
-  overrides: any[];
+  defaults: TourDefaultTableWithData[];
+  overrides: TourOverrideRow[];
   defaultSetResolution?: ResolveDefaultSetResult<TourDefaultSetLike>;
 }
+
+const getLocationName = (locations: LocationJoin): string => {
+  const location = Array.isArray(locations) ? locations[0] : locations;
+  return location?.name || 'Unknown Location';
+};
 
 export const useTourOverrideMode = (
   tourId?: string,
@@ -67,7 +110,8 @@ export const useTourOverrideMode = (
 
         if (tourDateError) throw tourDateError;
 
-        let defaultTables: any[] = [];
+        const tourDate = tourDateData as TourDateWithLocation;
+        let defaultTables: TourDefaultTableWithData[] = [];
         let defaultSetResolution: ResolveDefaultSetResult<TourDefaultSetLike> | undefined;
 
         if (isPackageDepartment(department)) {
@@ -80,7 +124,7 @@ export const useTourOverrideMode = (
           if (setsError) throw setsError;
 
           defaultSetResolution = resolveDefaultSetForTourDate({
-            tourDate: tourDateData as TourPackageDateLike,
+            tourDate,
             department,
             defaultSets: (defaultSets || []) as TourDefaultSetLike[],
           });
@@ -92,7 +136,7 @@ export const useTourOverrideMode = (
               .eq('set_id', defaultSetResolution.set.id);
 
             if (defaultsError) throw defaultsError;
-            defaultTables = data || [];
+            defaultTables = (data || []) as TourDefaultTableWithData[];
           } else {
             const message = getPackageResolutionMessage(defaultSetResolution);
             if (message) {
@@ -127,12 +171,12 @@ export const useTourOverrideMode = (
           tourId,
           tourDateId,
           tourName: tourData.name,
-          tourDate: tourDateData.date,
-          locationName: (tourDateData.locations as any)?.name || 'Unknown Location',
+          tourDate: tourDate.date,
+          locationName: getLocationName(tourDate.locations),
           defaults: defaultTables,
           overrides: [
-            ...(powerOverrides.data || []),
-            ...(weightOverrides.data || [])
+            ...((powerOverrides.data || []) as PowerOverrideRow[]),
+            ...((weightOverrides.data || []) as WeightOverrideRow[])
           ],
           defaultSetResolution,
         });
@@ -153,24 +197,28 @@ export const useTourOverrideMode = (
 
   const saveOverride = async (
     type: 'power' | 'weight',
-    overrideData: any
+    overrideData: OverrideInput
   ) => {
     if (!tourDateId || !department) return;
 
     try {
-      const tableName = type === 'power' 
-        ? 'tour_date_power_overrides' 
-        : 'tour_date_weight_overrides';
+      const result = type === 'power'
+        ? await supabase
+          .from('tour_date_power_overrides')
+          .insert({
+            tour_date_id: tourDateId,
+            department,
+            ...overrideData
+          } as PowerOverrideInsert)
+        : await supabase
+          .from('tour_date_weight_overrides')
+          .insert({
+            tour_date_id: tourDateId,
+            department,
+            ...overrideData
+          } as WeightOverrideInsert);
 
-      const { error } = await supabase
-        .from(tableName)
-        .insert({
-          tour_date_id: tourDateId,
-          department,
-          ...overrideData
-        });
-
-      if (error) throw error;
+      if (result.error) throw result.error;
 
       toast({
         title: 'Success',
