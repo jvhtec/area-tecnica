@@ -62,7 +62,7 @@ export function buildWhatsAppStaffingMessage(
   const lines: string[] = [fullName ? `Hola ${fullName},` : "Hola,"];
 
   if (args.phase === "availability") {
-    lines.push(`Consulta de disponibilidad para ${jobTitle}.`);
+    lines.push("Consulta de disponibilidad.");
   } else {
     lines.push(`Tienes una oferta para ${jobTitle}.`);
   }
@@ -70,7 +70,7 @@ export function buildWhatsAppStaffingMessage(
   lines.push("");
   lines.push("Resumen:");
 
-  if (roleLabel) {
+  if (args.phase === "offer" && roleLabel) {
     lines.push(`- Rol: ${roleLabel}`);
   }
 
@@ -85,15 +85,17 @@ export function buildWhatsAppStaffingMessage(
     lines.push(`- Fechas: ${args.startDate}${args.endDate ? ` — ${args.endDate}` : ""}`);
   }
 
-  lines.push(`- Horario: ${args.callTime}`);
-  lines.push(`- Ubicación: ${args.location}`);
+  if (args.phase === "offer") {
+    lines.push(`- Horario: ${args.callTime}`);
+    lines.push(`- Ubicación: ${args.location}`);
+  }
 
-  if (note) {
+  if (args.phase === "offer" && note) {
     lines.push("");
     lines.push(note);
   }
 
-  if (args.tourPdfSignedUrl) {
+  if (args.phase === "offer" && args.tourPdfSignedUrl) {
     lines.push("");
     lines.push(`Calendario del tour (PDF): ${args.tourPdfSignedUrl}`);
   }

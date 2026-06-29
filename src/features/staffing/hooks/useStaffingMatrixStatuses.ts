@@ -20,6 +20,7 @@ const toMatrixStatus = (value: string | null): Status => {
 
 export interface MatrixJobLite {
   id: string
+  title?: string | null
   start_time: string
   end_time: string
 }
@@ -31,14 +32,18 @@ interface ByJobStatus {
 
 interface ByDateStatus extends ByJobStatus {
   availability_job_id?: string | null
+  availability_job_title?: string | null
   offer_job_id?: string | null
+  offer_job_title?: string | null
   availability_requested_by?: string | null
   availability_created_at?: string | null
   offer_requested_by?: string | null
   offer_created_at?: string | null
   // Arrays of ALL job IDs with pending requests for this date (for bulk cancel)
   pending_availability_job_ids?: string[]
+  pending_availability_job_titles?: string[]
   pending_offer_job_ids?: string[]
+  pending_offer_job_titles?: string[]
 }
 
 interface StaffingRequestRow {
@@ -59,13 +64,17 @@ interface LatestByPhaseAccumulator {
   availability_updated_at: number
   offer_updated_at: number
   availability_job_id: string | null
+  availability_job_title: string | null
   offer_job_id: string | null
+  offer_job_title: string | null
   availability_requested_by: string | null
   availability_created_at: string | null
   offer_requested_by: string | null
   offer_created_at: string | null
   pending_availability_job_ids: string[]
+  pending_availability_job_titles: string[]
   pending_offer_job_ids: string[]
+  pending_offer_job_titles: string[]
 }
 
 const createLatestByPhaseAccumulator = (): LatestByPhaseAccumulator => ({
@@ -74,13 +83,17 @@ const createLatestByPhaseAccumulator = (): LatestByPhaseAccumulator => ({
   availability_updated_at: 0,
   offer_updated_at: 0,
   availability_job_id: null,
+  availability_job_title: null,
   offer_job_id: null,
+  offer_job_title: null,
   availability_requested_by: null,
   availability_created_at: null,
   offer_requested_by: null,
   offer_created_at: null,
   pending_availability_job_ids: [],
-  pending_offer_job_ids: []
+  pending_availability_job_titles: [],
+  pending_offer_job_ids: [],
+  pending_offer_job_titles: []
 })
 
 export function useStaffingMatrixStatuses(
@@ -177,11 +190,11 @@ export function useStaffingMatrixStatuses(
       }
 
       // Build job lookup with parsed dates for overlap check
-      const jobLookup = new Map<string, { id: string, start: Date, end: Date }>()
+      const jobLookup = new Map<string, { id: string, title: string | null, start: Date, end: Date }>()
       jobs.forEach(j => {
         const start = j.start_time ? new Date(j.start_time) : new Date()
         const end = j.end_time ? new Date(j.end_time) : new Date()
-        jobLookup.set(j.id, { id: j.id, start, end })
+        jobLookup.set(j.id, { id: j.id, title: j.title?.trim() || null, start, end })
       })
 
       // Group requests by technician for faster lookups
@@ -229,10 +242,12 @@ export function useStaffingMatrixStatuses(
           const initialAcc = createLatestByPhaseAccumulator()
           const latest = matchingRequests.reduce((acc, r) => {
             const t = r.updated_at ? new Date(r.updated_at).getTime() : 0
+            const jobTitle = jobLookup.get(r.job_id)?.title ?? null
             if (r.phase === 'availability') {
               // Collect ALL non-expired job IDs for this phase (to ensure complete cell clearing)
               if (r.status !== 'expired' && !acc.pending_availability_job_ids.includes(r.job_id)) {
                 acc.pending_availability_job_ids.push(r.job_id)
+                if (jobTitle) acc.pending_availability_job_titles.push(jobTitle)
               }
               const accT = acc.availability_updated_at || 0
               if (t > accT) {
@@ -240,6 +255,7 @@ export function useStaffingMatrixStatuses(
                 acc.availability_status = mapped
                 acc.availability_updated_at = t
                 acc.availability_job_id = r.job_id
+                acc.availability_job_title = jobTitle
                 acc.availability_requested_by = r.requested_by ?? null
                 acc.availability_created_at = r.created_at ?? null
               }
@@ -247,6 +263,7 @@ export function useStaffingMatrixStatuses(
               // Collect ALL non-expired job IDs for this phase (to ensure complete cell clearing)
               if (r.status !== 'expired' && !acc.pending_offer_job_ids.includes(r.job_id)) {
                 acc.pending_offer_job_ids.push(r.job_id)
+                if (jobTitle) acc.pending_offer_job_titles.push(jobTitle)
               }
               const accT = acc.offer_updated_at || 0
               if (t > accT) {
@@ -254,6 +271,7 @@ export function useStaffingMatrixStatuses(
                 acc.offer_status = mapped
                 acc.offer_updated_at = t
                 acc.offer_job_id = r.job_id
+                acc.offer_job_title = jobTitle
                 acc.offer_requested_by = r.requested_by ?? null
                 acc.offer_created_at = r.created_at ?? null
               }
@@ -267,13 +285,17 @@ export function useStaffingMatrixStatuses(
               availability_status: latest.availability_status as Status,
               offer_status: latest.offer_status as Status,
               availability_job_id: latest.availability_job_id,
+              availability_job_title: latest.availability_job_title,
               offer_job_id: latest.offer_job_id,
+              offer_job_title: latest.offer_job_title,
               availability_requested_by: latest.availability_requested_by,
               availability_created_at: latest.availability_created_at,
               offer_requested_by: latest.offer_requested_by,
               offer_created_at: latest.offer_created_at,
               pending_availability_job_ids: latest.pending_availability_job_ids,
-              pending_offer_job_ids: latest.pending_offer_job_ids
+              pending_availability_job_titles: latest.pending_availability_job_titles,
+              pending_offer_job_ids: latest.pending_offer_job_ids,
+              pending_offer_job_titles: latest.pending_offer_job_titles
             })
           }
         })

@@ -16,8 +16,11 @@ import {
 import { requireAdminOrManagement } from "../_shared/auth.ts";
 import { getInvoicingCompanyDetails } from "../_shared/invoicing-company-data.ts";
 import { sendBrevoEmail } from "../_shared/brevo.ts";
+import {
+  buildInvoiceRecipientListItems,
+  INVOICE_CC_EMAIL,
+} from "./invoiceInstructions.ts";
 
-const INVOICE_SUBMISSION_EMAIL = "administracion@sector-pro.com";
 const MADRID_TIMEZONE = "Europe/Madrid";
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_PAYOUT_EMAIL_BODY_BYTES = 25 * 1024 * 1024;
@@ -442,7 +445,7 @@ serve(createHttpHandler(async (req) => {
                       <ul style="margin:8px 0 0 18px;padding:0;line-height:1.55;">
                         ${companyDetails ? `<li><b>Empresa de facturación:</b> ${escapeHtml(companyDetails.legalName)} (CIF: ${escapeHtml(companyDetails.cif)}, ${escapeHtml(companyDetails.address)})</li>` : ''}
                         ${tech.lpo_number ? `<li><b>LPO:</b> ${escapeHtml(tech.lpo_number)}</li>` : ''}
-                        <li><b>Enviar factura a:</b> <a href="mailto:${INVOICE_SUBMISSION_EMAIL}" style="color:#1e40af;text-decoration:underline;">${INVOICE_SUBMISSION_EMAIL}</a></li>
+                        ${buildInvoiceRecipientListItems()}
                       </ul>
                     </div>
                   </td>
@@ -503,7 +506,7 @@ serve(createHttpHandler(async (req) => {
       };
 
       // Always CC administration
-      emailPayload['cc'] = [{ email: 'administracion@mfo-producciones.com' }];
+      emailPayload['cc'] = [{ email: INVOICE_CC_EMAIL }];
 
       if (DEBUG) {
         console.log('[send-job-payout-email][debug] Sending email with attachment:', {
