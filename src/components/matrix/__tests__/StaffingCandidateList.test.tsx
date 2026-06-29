@@ -236,10 +236,12 @@ describe('StaffingCandidateList', () => {
       expect(screen.getByText('Next Tech')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Disponibilidad enviada')).toBeInTheDocument()
-    expect(screen.getByText('Oferta enviada')).toBeInTheDocument()
-    expect(screen.getAllByText(`Enviado por ${CARLOS_AGENT_NAME}`)).toHaveLength(1)
-    expect(screen.getByText('Siguiente candidato')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Disponibilidad enviada')).toBeInTheDocument()
+      expect(screen.getByText('Oferta enviada')).toBeInTheDocument()
+      expect(screen.getAllByText(`Enviado por ${CARLOS_AGENT_NAME}`)).toHaveLength(1)
+      expect(screen.getByText('Siguiente candidato')).toBeInTheDocument()
+    })
     expect(screen.queryByText('Enviar disponibilidad por')).not.toBeInTheDocument()
   })
 })
