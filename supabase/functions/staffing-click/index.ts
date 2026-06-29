@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { checkEdgeRateLimit, rateLimitHeaders } from "../_shared/rateLimit.ts";
 import { detectConflictForAssignment, type AssignmentCoverage, type JobTimeInfo } from "./conflictUtils.ts";
+import { buildStaffingClickWhatsappFollowupMessage } from "./followupUtils.ts";
 import { parseStaffingClickRequest } from "./requestUtils.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -19,6 +20,183 @@ function b64uToU8(b64u: string) {
   const b64 = b64u.replace(/-/g,'+').replace(/_/g,'/') + '=='.slice(0,(4-(b64u.length%4))%4);
   const bin = atob(b64);
   return new Uint8Array([...bin].map(c => c.charCodeAt(0)));
+}
+
+function scheduleBackgroundTask(task: Promise<unknown>) {
+  if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
+    EdgeRuntime.waitUntil(task);
+  } else {
+    void task;
+  }
+}
+
+function normalizeBase(value: string): string {
+  let base = (value || '').trim();
+  if (!/^https?:\/\//i.test(base)) base = `https://${base}`;
+  return base.replace(/\/+$/, '');
+}
+
+function normalizePhone(raw: string, defaultCountry: string): { ok: true; value: string } | { ok: false; reason: string } {
+  if (!raw) return { ok: false, reason: 'empty' } as const;
+  const trimmed = raw.trim();
+  if (!trimmed) return { ok: false, reason: 'empty' } as const;
+  let digits = trimmed.replace(/[\s\-()]/g, '');
+  if (digits.startsWith('00')) digits = `+${digits.slice(2)}`;
+  if (!digits.startsWith('+')) {
+    if (/^[67]\d{8}$/.test(digits)) {
+      digits = `+34${digits}`;
+    } else {
+      const countryCode = defaultCountry.startsWith('+') ? defaultCountry : `+${defaultCountry}`;
+      digits = `${countryCode}${digits}`;
+    }
+  }
+  if (!/^\+\d{7,15}$/.test(digits)) return { ok: false, reason: 'invalid_format' } as const;
+  return { ok: true, value: digits } as const;
+}
+
+async function sendStaffingClickWhatsappFollowup(params: {
+  supabase: ReturnType<typeof createClient>;
+  staffingRequestId: string;
+  channelHint: string;
+  profileId: string;
+  requestedBy: string | null;
+  phase: string;
+  status: 'confirmed' | 'declined';
+}) {
+  const { supabase, staffingRequestId, channelHint, profileId, requestedBy, phase, status } = params;
+
+  try {
+    const [{ data: latestSend, error: latestSendError }, { data: tech, error: techError }, { data: requester, error: requesterError }] = await Promise.all([
+      supabase
+        .from('staffing_events')
+        .select('event, created_at')
+        .eq('staffing_request_id', staffingRequestId)
+        .in('event', ['whatsapp_sent', 'email_sent'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', profileId)
+        .maybeSingle(),
+      requestedBy
+        ? supabase
+          .from('profiles')
+          .select('waha_endpoint')
+          .eq('id', requestedBy)
+          .maybeSingle()
+        : Promise.resolve({ data: null, error: null }),
+    ]);
+
+    if (latestSendError) {
+      console.warn('[staffing-click] Follow-up channel lookup failed', latestSendError);
+    }
+    if (techError) {
+      console.warn('[staffing-click] Follow-up technician lookup failed', techError);
+      return;
+    }
+    if (requesterError) {
+      console.warn('[staffing-click] Follow-up requester lookup failed', requesterError);
+    }
+
+    const wasWhatsappRequest = channelHint === 'whatsapp' || latestSend?.event === 'whatsapp_sent';
+    if (!wasWhatsappRequest) return;
+
+    const normalizedPhone = normalizePhone(tech?.phone || '', Deno.env.get('WA_DEFAULT_COUNTRY_CODE') || '+34');
+    if (!normalizedPhone.ok) {
+      await supabase.from('staffing_events').insert({
+        staffing_request_id: staffingRequestId,
+        event: 'whatsapp_followup_failed',
+        meta: { phase, status, reason: normalizedPhone.reason },
+      });
+      return;
+    }
+
+    const base = normalizeBase(requester?.waha_endpoint || 'https://waha.sector-pro.work');
+    const { data: cfg } = await supabase.rpc('get_waha_config', { base_url: base });
+    const apiKey = (cfg?.[0] as any)?.api_key || Deno.env.get('WAHA_API_KEY') || '';
+    const session = (cfg?.[0] as any)?.session || Deno.env.get('WAHA_SESSION') || 'default';
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (apiKey) headers['X-API-Key'] = apiKey;
+
+    const chatId = normalizedPhone.value.replace(/^\+/, '').replace(/\D/g, '') + '@c.us';
+    const text = buildStaffingClickWhatsappFollowupMessage(phase, status);
+    const basePayload = { chatId, text, linkPreview: false } as const;
+    const attemptCandidates = [
+      { url: `${base}/api/${encodeURIComponent(session)}/sendText`, body: { ...basePayload } },
+      { url: `${base}/api/sendText`, body: { ...basePayload, session } },
+      { url: `${base}/api/sendText?session=${encodeURIComponent(session)}`, body: { ...basePayload } },
+      { url: `${base}/api/sendText`, body: { ...basePayload } },
+    ] as const;
+    const attempts = attemptCandidates.filter((candidate, index, array) => {
+      const key = `${candidate.url}|${JSON.stringify(candidate.body)}`;
+      return array.findIndex((item) => `${item.url}|${JSON.stringify(item.body)}` === key) === index;
+    });
+
+    const timeoutMs = Number(Deno.env.get('WAHA_FETCH_TIMEOUT_MS') || 15000);
+    const overallMs = Number(Deno.env.get('STAFFING_WA_OVERALL_TIMEOUT_MS') || 14000);
+    const started = Date.now();
+    const attemptErrors: Array<{ url: string; status?: number; message?: string; body?: string }> = [];
+    let sent = false;
+    let lastStatus: number | undefined;
+
+    for (const attempt of attempts) {
+      const remaining = overallMs - (Date.now() - started) - 200;
+      if (remaining <= 200) {
+        attemptErrors.push({ url: attempt.url, message: 'skipped_due_to_time_budget' });
+        continue;
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(new DOMException('timeout', 'AbortError')), Math.min(timeoutMs, remaining));
+      try {
+        const response = await fetch(attempt.url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(attempt.body),
+          signal: controller.signal,
+        });
+        lastStatus = response.status;
+        const responseBody = await response.text().catch(() => '');
+        if (response.ok) {
+          sent = true;
+          break;
+        }
+        attemptErrors.push({ url: attempt.url, status: response.status, body: responseBody.slice(0, 500) });
+      } catch (error) {
+        attemptErrors.push({
+          url: attempt.url,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    await supabase.from('staffing_events').insert({
+      staffing_request_id: staffingRequestId,
+      event: sent ? 'whatsapp_followup_sent' : 'whatsapp_followup_failed',
+      meta: {
+        phase,
+        status,
+        http_status: sent ? 200 : (lastStatus ?? 0),
+        attempts: sent ? undefined : attemptErrors,
+        chat_suffix: chatId.slice(-10),
+      },
+    });
+  } catch (error) {
+    console.warn('[staffing-click] WhatsApp follow-up failed', error);
+    await supabase.from('staffing_events').insert({
+      staffing_request_id: staffingRequestId,
+      event: 'whatsapp_followup_failed',
+      meta: {
+        phase,
+        status,
+        message: error instanceof Error ? error.message : String(error),
+      },
+    });
+  }
 }
 
 serve(async (req) => {
@@ -654,6 +832,16 @@ serve(async (req) => {
         });
       }
     }
+
+    scheduleBackgroundTask(sendStaffingClickWhatsappFollowup({
+      supabase,
+      staffingRequestId: rid,
+      channelHint: c,
+      profileId: row.profile_id,
+      requestedBy: row.requested_by ?? null,
+      phase: row.phase,
+      status: newStatus,
+    }));
 
     const phaseText = row.phase === 'offer' ? 'la oferta' : 'la disponibilidad';
     const isOk = newStatus === 'confirmed';

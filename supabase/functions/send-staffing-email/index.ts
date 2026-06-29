@@ -1195,6 +1195,14 @@ serve(createHttpHandler(async (req) => {
       const multiDatesHtml = normalizedDates.length > 1
         ? `<div><b>Fechas seleccionadas:</b></div><ul style="margin:8px 0 0 16px;padding:0;">${normalizedDates.map(d => `<li>${fmtDate(`${d}T00:00:00Z`)}</li>`).join('')}</ul>`
         : '';
+      const dateDetailsHtml = normalizedDates.length > 1 ? multiDatesHtml : datesRowHtml;
+      const offerDetailsHtml = phase === 'offer'
+        ? `
+                            <div><b>Horario:</b> ${callTime}</div>
+                            <div><b>Ubicación:</b> ${loc}</div>
+                            ${roleLabel ? `<div><b>Rol:</b> ${roleLabel}</div>` : ''}`
+        : '';
+      const detailsTitle = phase === 'availability' ? 'Fechas consultadas' : 'Detalles del trabajo';
 
       // Determine singular vs plural for availability message
       const isMultipleDates = normalizedDates.length > 1;
@@ -1250,19 +1258,17 @@ serve(createHttpHandler(async (req) => {
                     <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;">
                       <tr>
                         <td style="padding:16px;">
-                          <div style="color:#111827;font-weight:bold;margin-bottom:4px;">Detalles del trabajo</div>
+                          <div style="color:#111827;font-weight:bold;margin-bottom:4px;">${detailsTitle}</div>
                           <div style="color:#374151;line-height:1.55;">
-                            ${normalizedDates.length > 1 ? multiDatesHtml : datesRowHtml}
-                            <div><b>Horario:</b> ${callTime}</div>
-                            <div><b>Ubicación:</b> ${loc}</div>
-                            ${roleLabel ? `<div><b>Rol:</b> ${roleLabel}</div>` : ''}
+                            ${dateDetailsHtml}
+                            ${offerDetailsHtml}
                           </div>
                         </td>
                       </tr>
                     </table>
                   </td>
                 </tr>
-                ${tourPdfSignedUrl ? `
+                ${phase === 'offer' && tourPdfSignedUrl ? `
                 <tr>
                   <td style="padding:12px 24px 0 24px;">
                     <div style=\"background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px;\">
@@ -1323,7 +1329,7 @@ serve(createHttpHandler(async (req) => {
           endDate,
           callTime,
           location: loc,
-          tourPdfSignedUrl,
+          tourPdfSignedUrl: phase === 'offer' ? tourPdfSignedUrl : null,
           confirmUrl: whatsappConfirmUrl,
           declineUrl: whatsappDeclineUrl,
         });

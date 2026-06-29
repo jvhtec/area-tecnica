@@ -29,13 +29,17 @@ export interface MatrixStaffingStatus {
   availability_status: string | null;
   offer_status: string | null;
   availability_job_id?: string | null;
+  availability_job_title?: string | null;
   offer_job_id?: string | null;
+  offer_job_title?: string | null;
   availability_requested_by?: string | null;
   availability_created_at?: string | null;
   offer_requested_by?: string | null;
   offer_created_at?: string | null;
   pending_availability_job_ids?: string[];
+  pending_availability_job_titles?: string[];
   pending_offer_job_ids?: string[];
+  pending_offer_job_titles?: string[];
 }
 
 export interface OptimizedMatrixCellProps {

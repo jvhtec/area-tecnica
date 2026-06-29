@@ -18,6 +18,7 @@ import { HOUSE_TECH_LABEL } from '@/utils/autonomo';
 const MADRID_TIMEZONE = 'Europe/Madrid';
 const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
 const INVOICE_SUBMISSION_EMAIL = 'administracion@sector-pro.com';
+const INVOICE_CC_EMAIL = 'administracion@mfo-producciones.com';
 
 function escapeHtml(value: string): string {
   return value
@@ -300,6 +301,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
                   ${safeCompanyDetails ? `<li><b>Empresa de facturación:</b> ${safeCompanyDetails.legalName} (CIF: ${safeCompanyDetails.cif}, ${safeCompanyDetails.address})</li>` : ''}
                   ${safeLpoNumber ? `<li><b>LPO:</b> ${safeLpoNumber}</li>` : ''}
                   <li><b>Enviar factura a:</b> <a href="mailto:${INVOICE_SUBMISSION_EMAIL}" style="color:#1e40af;text-decoration:underline;">${INVOICE_SUBMISSION_EMAIL}</a></li>
+                  <li><b>Poner en copia a:</b> <a href="mailto:${INVOICE_CC_EMAIL}" style="color:#1e40af;text-decoration:underline;">${INVOICE_CC_EMAIL}</a></li>
                 </ul>
               </div>
             </td>
@@ -392,7 +394,7 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
                   </div>
                   <div>
                     <div className="font-semibold">CC:</div>
-                    <div>administracion@mfo-producciones.com</div>
+                    <div>{INVOICE_CC_EMAIL}</div>
                   </div>
                   <div>
                     <div className="font-semibold">Asunto:</div>
@@ -417,10 +419,16 @@ export function PayoutEmailPreview({ open, onClose, context, jobTitle }: PayoutE
                     <div>{selectedAttachment.full_name} ({selectedAttachment.is_house_tech ? HOUSE_TECH_LABEL : selectedAttachment.autonomo ? 'Autónomo' : 'No autónomo'})</div>
                   </div>
                   {selectedAttachment.autonomo && !selectedAttachment.is_house_tech && (
-                    <div>
-                      <div className="font-semibold">Enviar factura a:</div>
-                      <div>{INVOICE_SUBMISSION_EMAIL}</div>
-                    </div>
+                    <>
+                      <div>
+                        <div className="font-semibold">Enviar factura a:</div>
+                        <div>{INVOICE_SUBMISSION_EMAIL}</div>
+                      </div>
+                      <div>
+                        <div className="font-semibold">Poner en copia a:</div>
+                        <div>{INVOICE_CC_EMAIL}</div>
+                      </div>
+                    </>
                   )}
                   <div>
                     <div className="font-semibold">Fechas trabajadas:</div>

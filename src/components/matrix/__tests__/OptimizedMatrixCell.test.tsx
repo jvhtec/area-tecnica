@@ -671,9 +671,12 @@ describe('OptimizedMatrixCell', () => {
     const user = userEvent.setup();
     const staffingStatus: MatrixStaffingStatus = {
       availability_status: ' Requested ',
+      availability_job_title: 'Load-in Day',
+      pending_availability_job_titles: ['Load-in Day', 'Arena Show'],
       availability_requested_by: null,
       availability_created_at: '2026-04-08T09:15:00.000Z',
       offer_status: ' SENT ',
+      offer_job_title: 'Arena Show',
       offer_requested_by: 'manager-2',
       offer_created_at: '2026-04-09T11:00:00.000Z',
     };
@@ -697,6 +700,8 @@ describe('OptimizedMatrixCell', () => {
     await waitFor(() => {
       expect(screen.getAllByText(/Disponibilidad: Solicitada/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/Oferta: Enviada/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Trabajos: Load-in Day, Arena Show/i).length).toBeGreaterThan(0);
+      expect(screen.getAllByText(/Trabajo: Arena Show/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/Enviado por: Second Manager/i).length).toBeGreaterThan(0);
     });
     expect(screen.queryByText(/Enviado por:\s*null/i)).not.toBeInTheDocument();
