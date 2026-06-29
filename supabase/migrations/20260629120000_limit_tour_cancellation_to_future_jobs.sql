@@ -53,7 +53,6 @@ WITH worked_cancelled_past_tour_jobs AS (
             'submitted'::public.timesheet_status,
             'approved'::public.timesheet_status
           )
-        )
       )
     )
 )
