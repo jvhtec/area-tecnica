@@ -443,7 +443,7 @@ export const OptimizedAssignmentMatrix = ({
   }, [orderedTechnicians, visibleRows.start, visibleRows.end]);
   // Fetch staffing statuses for ALL currently loaded dates and jobs for the visible technicians
   // This avoids re-fetching when scrolling horizontally, making badges render immediately.
-  const allJobsLite = useMemo(() => jobs.map(j => ({ id: j.id, start_time: j.start_time, end_time: j.end_time })), [jobs]);
+  const allJobsLite = useMemo(() => jobs.map(j => ({ id: j.id, title: j.title, start_time: j.start_time, end_time: j.end_time })), [jobs]);
   const { data: staffingMaps } = useStaffingMatrixStatuses(visibleTechIds, allJobsLite, dates);
   const actorIdsForTooltip = useMemo(() => {
     const ids = new Set<string>();

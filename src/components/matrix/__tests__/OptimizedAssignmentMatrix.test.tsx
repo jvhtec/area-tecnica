@@ -223,6 +223,29 @@ describe('OptimizedAssignmentMatrix', () => {
     expect(screen.getByTestId('dates-count')).toHaveTextContent('3');
   });
 
+  it('passes job titles into staffing status lookups for hover labels', () => {
+    render(
+      <OptimizedAssignmentMatrix
+        technicians={mockTechnicians}
+        dates={mockDates}
+        jobs={mockJobs}
+      />
+    );
+
+    expect(useStaffingMatrixStatusesMock).toHaveBeenCalledWith(
+      expect.any(Array),
+      [
+        {
+          id: 'job-1',
+          title: 'Concert A',
+          start_time: '2024-05-01T10:00:00Z',
+          end_time: '2024-05-01T22:00:00Z',
+        },
+      ],
+      mockDates,
+    );
+  });
+
   it('shows loading state initially', () => {
     useOptimizedMatrixDataMock.mockReturnValue({
       ...useOptimizedMatrixDataMock(),
