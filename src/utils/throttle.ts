@@ -1,11 +1,11 @@
-export type ThrottledFunction<T extends (...args: any[]) => void> = ((...args: Parameters<T>) => void) & {
+export type ThrottledFunction<T extends (...args: never[]) => void> = ((...args: Parameters<T>) => void) & {
   cancel: () => void;
 };
 
 /**
  * Lightweight throttle implementation to avoid extra dependencies on critical paths.
  */
-export function throttle<T extends (...args: any[]) => void>(fn: T, wait: number): ThrottledFunction<T> {
+export function throttle<T extends (...args: never[]) => void>(fn: T, wait: number): ThrottledFunction<T> {
   let timeout: ReturnType<typeof setTimeout> | null = null;
   let lastArgs: Parameters<T> | null = null;
   let lastCall = 0;

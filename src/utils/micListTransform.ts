@@ -13,22 +13,28 @@ export interface WiredMic {
   notes?: string;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 /**
  * Hydrate microphone data from database format to UI format
  *
  * @param dbData - Raw data from database (could be JSONB string or array)
  * @returns Array of WiredMic objects for UI consumption
  */
-export function hydrateFromDB(dbData: any): WiredMic[] {
+export function hydrateFromDB(dbData: unknown): WiredMic[] {
   // Handle null or undefined
   if (!dbData) {
     return [];
   }
 
+  let parsedData = dbData;
+
   // Handle JSON string (from some database queries)
-  if (typeof dbData === 'string') {
+  if (typeof parsedData === 'string') {
     try {
-      dbData = JSON.parse(dbData);
+      parsedData = JSON.parse(parsedData);
     } catch (e) {
       console.error('Failed to parse microphone data:', e);
       return [];
@@ -36,13 +42,13 @@ export function hydrateFromDB(dbData: any): WiredMic[] {
   }
 
   // Handle empty array
-  if (!Array.isArray(dbData) || dbData.length === 0) {
+  if (!Array.isArray(parsedData) || parsedData.length === 0) {
     return [];
   }
 
   // Validate and normalize data
-  return dbData
-    .filter(mic => mic && typeof mic === 'object' && mic.model)
+  return parsedData
+    .filter((mic): mic is Record<string, unknown> => isRecord(mic) && Boolean(mic.model))
     .map(mic => ({
       model: String(mic.model),
       quantity: typeof mic.quantity === 'number' && mic.quantity > 0 ? mic.quantity : 1,
@@ -150,7 +156,7 @@ export function getTotalMicCount(micList: WiredMic[]): number {
  * @param data - Data to validate
  * @returns Validation result with errors if any
  */
-export function validateMicList(data: any): { valid: boolean; errors: string[] } {
+export function validateMicList(data: unknown): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   if (!data) {
@@ -163,7 +169,7 @@ export function validateMicList(data: any): { valid: boolean; errors: string[] }
   }
 
   data.forEach((mic, index) => {
-    if (!mic || typeof mic !== 'object') {
+    if (!isRecord(mic)) {
       errors.push(`Item at index ${index} is not a valid object`);
       return;
     }
