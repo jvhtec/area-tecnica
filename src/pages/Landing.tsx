@@ -8,6 +8,7 @@ import { ShowDayTimeline } from "@/components/landing/ShowDayTimeline";
 import { ProductShowcase } from "@/components/landing/ProductShowcase";
 import { DocTicker } from "@/components/landing/DocTicker";
 import { PlatformMap } from "@/components/landing/PlatformMap";
+import { DeepFeatures } from "@/components/landing/DeepFeatures";
 import { FeatureHighlights } from "@/components/landing/FeatureHighlights";
 import { IntegrationsSection } from "@/components/landing/IntegrationsSection";
 import { PricingSection } from "@/components/landing/PricingSection";
@@ -148,6 +149,7 @@ export default function Landing() {
         <ProductShowcase />
         <DocTicker />
         <PlatformMap />
+        <DeepFeatures />
         <IntegrationsSection />
         <PricingSection />
         <FeatureHighlights />

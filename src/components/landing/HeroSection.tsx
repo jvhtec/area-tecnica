@@ -85,7 +85,7 @@ export const HeroSection = () => {
           {/* glow */}
           <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-to-tr from-sky-500/30 via-violet-500/20 to-cyan-400/20 blur-3xl" />
           <div style={reduce ? undefined : { transform: "perspective(1600px) rotateY(-6deg) rotateX(2deg)" }}>
-            <MatrixMock />
+            <MatrixMock live />
           </div>
 
           {/* floating chip */}

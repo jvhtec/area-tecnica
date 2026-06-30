@@ -9,12 +9,12 @@ import { WallboardMock } from "./visuals/WallboardMock";
 import { TimesheetMock } from "./visuals/TimesheetMock";
 
 const phases = [
-  { tc: "08:00", label: "Montaje", sub: "Load-in y tiempos de almacén", dept: "Logística", dot: "bg-emerald-400", Comp: LogisticsMock },
-  { tc: "13:30", label: "Rigging", sub: "Pesos, motores y puntos de carga", dept: "Estructuras", dot: "bg-lime-400", Comp: PesosMock },
-  { tc: "16:00", label: "Prueba de sonido", sub: "Plan de RF, IEM y consumos", dept: "Sonido", dot: "bg-sky-400", Comp: RfMock },
-  { tc: "18:30", label: "Entra el crew", sub: "Matriz, fichajes y conflictos", dept: "Crew", dot: "bg-violet-400", Comp: MatrixMock },
-  { tc: "21:00", label: "Show", sub: "Wallboard y turnos en vivo", dept: "Producción", dot: "bg-rose-400", Comp: WallboardMock },
-  { tc: "01:30", label: "Cierre", sub: "Payouts, festivos y PDF", dept: "Administración", dot: "bg-amber-400", Comp: TimesheetMock },
+  { tc: "08:00", label: "Montaje", sub: "Load-in y tiempos de almacén", dept: "Logística", dot: "bg-emerald-400", Comp: LogisticsMock, premium: true },
+  { tc: "13:30", label: "Rigging", sub: "Pesos, motores y puntos de carga", dept: "Estructuras", dot: "bg-lime-400", Comp: PesosMock, premium: false },
+  { tc: "16:00", label: "Prueba de sonido", sub: "Plan de RF, IEM y consumos", dept: "Sonido", dot: "bg-sky-400", Comp: RfMock, premium: false },
+  { tc: "18:30", label: "Entra el crew", sub: "Matriz, fichajes y conflictos", dept: "Crew", dot: "bg-violet-400", Comp: MatrixMock, premium: false },
+  { tc: "21:00", label: "Show", sub: "Wallboard y turnos en vivo", dept: "Producción", dot: "bg-rose-400", Comp: WallboardMock, premium: false },
+  { tc: "01:30", label: "Cierre", sub: "Payouts, festivos y PDF", dept: "Administración", dot: "bg-amber-400", Comp: TimesheetMock, premium: true },
 ];
 
 export function ShowDayTimeline() {
@@ -79,6 +79,11 @@ export function ShowDayTimeline() {
                         <span className="flex items-center gap-2">
                           <span className="font-mono text-sm text-slate-400">{p.tc}</span>
                           <span className="text-[10px] font-medium uppercase tracking-wide text-slate-600">{p.dept}</span>
+                          {p.premium && (
+                            <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1 py-0.5 font-mono text-[9px] uppercase text-amber-300">
+                              Módulo
+                            </span>
+                          )}
                         </span>
                         <span className="block text-lg font-semibold text-white">{p.label}</span>
                         <span className="block text-sm text-slate-400">{p.sub}</span>

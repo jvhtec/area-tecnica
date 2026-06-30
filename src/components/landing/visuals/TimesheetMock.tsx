@@ -14,7 +14,7 @@ const eur = (n: number) => n.toLocaleString("es-ES");
 
 export function TimesheetMock() {
   return (
-    <AppWindow url="sector-pro.work/payouts" title="Payouts · quincena">
+    <AppWindow url="sector-pro.work/payouts" title="Payouts · quincena" badge="Módulo">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-white">2ª quincena · Junio</p>

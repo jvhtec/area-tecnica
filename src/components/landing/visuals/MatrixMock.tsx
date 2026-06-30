@@ -1,4 +1,5 @@
-import { motion, useReducedMotion } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { useReducedMotion } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 import { AppWindow } from "./AppWindow";
 
@@ -12,7 +13,6 @@ const DEPTS = {
 } as const;
 
 type Dept = keyof typeof DEPTS;
-
 type Medal = 1 | 2 | 3 | null;
 
 const techs: { name: string; dept: Dept; role: string; medal: Medal; row: Status[] }[] = [
@@ -30,12 +30,7 @@ const medalStyle: Record<1 | 2 | 3, string> = {
   3: "bg-gradient-to-br from-orange-300 to-amber-700 text-amber-950",
 };
 
-const initials = (n: string) =>
-  n
-    .split(" ")
-    .map((p) => p[0])
-    .slice(0, 2)
-    .join("");
+const initials = (n: string) => n.split(" ").map((p) => p[0]).slice(0, 2).join("");
 
 const cols = ["Vie 12", "Sáb 13", "Dom 14", "Lun 15"];
 
@@ -55,8 +50,50 @@ const cellLabel: Record<Status, string> = {
   empty: "—",
 };
 
-export function MatrixMock() {
+const advance = (s: Status): Status =>
+  s === "empty" ? "pending" : s === "declined" ? "pending" : s === "pending" ? "accepted" : "pending";
+
+/**
+ * Crew-assignment matrix. With `live`, cells confirm in real time — a random
+ * pending/empty cell advances toward "accepted" every ~1.4s with a flash pulse,
+ * and the "confirmados" counter climbs, giving the hero a live ops-board feel.
+ */
+export function MatrixMock({ live = false }: { live?: boolean }) {
   const reduce = useReducedMotion();
+  const [grid, setGrid] = useState<Status[][]>(() => techs.map((t) => [...t.row]));
+  const [flash, setFlash] = useState<string | null>(null);
+  const gridRef = useRef(grid);
+  gridRef.current = grid;
+
+  useEffect(() => {
+    if (!live || reduce) return;
+    const id = window.setInterval(() => {
+      const prev = gridRef.current;
+      const mutable: [number, number][] = [];
+      const accepted: [number, number][] = [];
+      prev.forEach((row, r) =>
+        row.forEach((s, c) => {
+          if (s === "conflict") return;
+          if (s === "accepted") accepted.push([r, c]);
+          else mutable.push([r, c]);
+        }),
+      );
+      const pool = mutable.length ? mutable : accepted;
+      if (!pool.length) return;
+      const [r, c] = pool[Math.floor(Math.random() * pool.length)];
+      const key = `${r}-${c}`;
+      setFlash(key);
+      setGrid((p) => {
+        const n = p.map((row) => row.slice());
+        n[r][c] = advance(n[r][c]);
+        return n;
+      });
+      window.setTimeout(() => setFlash((f) => (f === key ? null : f)), 700);
+    }, 1400);
+    return () => window.clearInterval(id);
+  }, [live, reduce]);
+
+  const confirmed = grid.flat().filter((s) => s === "accepted").length;
 
   return (
     <AppWindow url="sector-pro.work/matrix" title="Matriz de asignación">
@@ -99,32 +136,32 @@ export function MatrixMock() {
                     {t.medal}
                   </span>
                 )}
-                <span
-                  className={`absolute -left-0.5 top-0 h-2 w-2 rounded-full ring-2 ring-slate-900 ${DEPTS[t.dept].dot}`}
-                />
+                <span className={`absolute -left-0.5 top-0 h-2 w-2 rounded-full ring-2 ring-slate-900 ${DEPTS[t.dept].dot}`} />
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-[12px] font-medium text-slate-200">{t.name}</span>
                 <span className="block truncate text-[10px] text-slate-500">{t.role}</span>
               </span>
             </div>
-            {t.row.map((s, ci) => (
-              <motion.div
-                key={ci}
-                initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.6 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: reduce ? 0 : 0.04 * (ri + ci) }}
-                className={`relative flex h-9 items-center justify-center rounded-md border text-[11px] font-semibold ${cellStyle[s]}`}
-              >
-                {cellLabel[s]}
-                {s === "conflict" && (
-                  <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-500 text-[8px] text-white shadow">
-                    !
-                  </span>
-                )}
-              </motion.div>
-            ))}
+            {grid[ri].map((s, ci) => {
+              const key = `${ri}-${ci}`;
+              const on = flash === key;
+              return (
+                <div
+                  key={ci}
+                  className={`relative flex h-9 items-center justify-center rounded-md border text-[11px] font-semibold transition-all duration-500 ${cellStyle[s]} ${
+                    on ? "z-10 scale-110 shadow-lg ring-2 ring-white/40" : "scale-100"
+                  }`}
+                >
+                  {cellLabel[s]}
+                  {s === "conflict" && (
+                    <span className="absolute -right-1 -top-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-500 text-[8px] text-white shadow">
+                      !
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
@@ -132,7 +169,15 @@ export function MatrixMock() {
       {/* footer stat */}
       <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-3 text-[11px] text-slate-400">
         <span>6 técnicos · 4 fechas · 3 departamentos</span>
-        <span className="text-emerald-300">18 confirmados</span>
+        <span className="flex items-center gap-1.5 text-emerald-300">
+          {live && !reduce && (
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
+            </span>
+          )}
+          {confirmed} confirmados
+        </span>
       </div>
     </AppWindow>
   );

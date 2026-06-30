@@ -48,6 +48,7 @@ const tabs = [
     component: TimesheetMock,
     title: "Fichajes y nóminas",
     desc: "Horas extra, nocturnidad y festivos calculados en servidor, agrupados en payouts por quincena.",
+    premium: true,
   },
 ];
 
@@ -82,6 +83,7 @@ export function ProductShowcase() {
               >
                 <Icon className="h-4 w-4" strokeWidth={1.8} />
                 {t.label}
+                {t.premium && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title="Módulo premium" />}
               </button>
             );
           })}
@@ -98,8 +100,13 @@ export function ProductShowcase() {
               transition={{ duration: 0.25 }}
               className="order-2 lg:order-1"
             >
-              <span className="text-xs font-semibold uppercase tracking-widest text-sky-300/90">
+              <span className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-sky-300/90">
                 {tabs[active].label}
+                {tabs[active].premium && (
+                  <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[9px] tracking-wide text-amber-300">
+                    Módulo premium
+                  </span>
+                )}
               </span>
               <h3 className="mt-3 text-2xl font-bold text-white sm:text-3xl">{tabs[active].title}</h3>
               <p className="mt-4 text-pretty leading-relaxed text-slate-400">{tabs[active].desc}</p>

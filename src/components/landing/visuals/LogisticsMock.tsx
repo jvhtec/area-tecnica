@@ -11,7 +11,7 @@ const trucks = [
 
 export function LogisticsMock() {
   return (
-    <AppWindow url="sector-pro.work/logistica" title="Load-in · almacén">
+    <AppWindow url="sector-pro.work/logistica" title="Load-in · almacén" badge="Módulo">
       <div className="mb-3 flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-white">Montaje · Escenario Principal</p>

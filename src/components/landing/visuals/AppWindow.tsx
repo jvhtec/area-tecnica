@@ -9,11 +9,14 @@ import type { ReactNode } from "react";
 export function AppWindow({
   url,
   title,
+  badge,
   children,
   className = "",
 }: {
   url: string;
   title?: string;
+  /** Optional label (e.g. "Módulo") shown as a pill in the chrome header. */
+  badge?: string;
   children: ReactNode;
   className?: string;
 }) {
@@ -26,11 +29,16 @@ export function AppWindow({
         <span className="h-3 w-3 rounded-full bg-yellow-400/70" />
         <span className="h-3 w-3 rounded-full bg-green-400/70" />
         <span className="ml-3 truncate text-xs text-slate-500">{url}</span>
-        {title ? (
-          <span className="ml-auto hidden truncate text-xs font-medium text-slate-400 sm:block">
-            {title}
-          </span>
-        ) : null}
+        <span className="ml-auto flex items-center gap-2">
+          {badge ? (
+            <span className="rounded border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wide text-amber-300">
+              {badge}
+            </span>
+          ) : null}
+          {title ? (
+            <span className="hidden truncate text-xs font-medium text-slate-400 sm:block">{title}</span>
+          ) : null}
+        </span>
       </div>
       <div className="p-4 sm:p-5">{children}</div>
     </div>
