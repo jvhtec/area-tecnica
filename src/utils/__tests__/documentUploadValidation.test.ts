@@ -14,7 +14,7 @@ const createFile = (name: string, type = "") =>
   new File(["technical file"], name, { type });
 
 describe("document upload validation", () => {
-  const technicalExtensions = [".xmlp", ".xmlc", ".xmls", ".dwg", ".dfx", ".dxf"];
+  const technicalExtensions = [".xmlp", ".xmlc", ".xmls", ".nwm", ".dwg", ".dfx", ".dxf"];
 
   it("exposes technical and CAD formats in the shared accept string", () => {
     for (const extension of technicalExtensions) {
@@ -27,6 +27,7 @@ describe("document upload validation", () => {
       createFile("project.xmlp", "application/xml"),
       createFile("config.xmlc", "text/xml"),
       createFile("scene.xmls"),
+      createFile("model.nwm", "application/octet-stream"),
       createFile("plot.dwg", "application/octet-stream"),
       createFile("legacy.dfx"),
       createFile("cad-export.dxf", "application/dxf"),
@@ -44,7 +45,7 @@ describe("document upload validation", () => {
 
 describe("SoundVision file validation", () => {
   it("accepts the SoundVision and CAD formats used by technical teams", () => {
-    for (const extension of [".xmlp", ".xmlc", ".xmls", ".dwg", ".dfx", ".dxf"]) {
+    for (const extension of [".xmlp", ".xmlc", ".xmls", ".nwm", ".dwg", ".dfx", ".dxf"]) {
       expect(SOUNDVISION_ALLOWED_FILE_TYPES).toContain(extension);
       expect(validateSoundVisionFile(createFile(`venue${extension}`, "application/octet-stream"))).toEqual({
         valid: true,

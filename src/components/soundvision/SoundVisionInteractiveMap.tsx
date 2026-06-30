@@ -969,7 +969,7 @@ export const SoundVisionInteractiveMap = ({ theme, isDark, onClose }: SoundVisio
                                         <SelectItem value="all">Todos los tipos</SelectItem>
                                         <SelectItem value=".xmlp">.xmlp (Proyecto)</SelectItem>
                                         <SelectItem value=".xmls">.xmls (Escena)</SelectItem>
-                                        <SelectItem value=".xmlc">.xmlc (Config)</SelectItem>
+                                        <SelectItem value=".xmlc">.xmlc (Config)</SelectItem><SelectItem value=".nwm">.nwm (NWM)</SelectItem>
                                     </SelectContent>
                                 </Select>
 
