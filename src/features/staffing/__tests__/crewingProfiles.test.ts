@@ -91,6 +91,10 @@ describe('crewing profile inference', () => {
     expect(policy.weights.skills).toBe(0.4);
     expect(policy.weights.cost_efficiency).toBe(0.03);
     expect(policy.cost_scoring.enabled).toBe(true);
+    expect(policy.surrounding_jobs).toEqual({
+      enabled: true,
+      max_location_distance_km: 25,
+    });
     expect(policy.waves).toMatchObject({
       mode: 'controlled_waves',
       buffer: 1,
@@ -106,4 +110,3 @@ describe('crewing profile inference', () => {
     expect(recommendedWaveNumber(3, 2, 1)).toBe(2);
   });
 });
-

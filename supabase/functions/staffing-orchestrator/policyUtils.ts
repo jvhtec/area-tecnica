@@ -39,6 +39,10 @@ export interface CampaignPolicy {
   auto_close?: Record<string, boolean>;
   audit?: Record<string, boolean>;
   escalation?: Record<string, unknown>;
+  surrounding_jobs?: {
+    enabled?: boolean;
+    max_location_distance_km?: number;
+  };
   escalation_steps: string[];
 }
 
@@ -311,6 +315,10 @@ export function normalizeCampaignPolicy(
       escalate_weak_critical_pool: true,
       require_manager_approval_for_low_confidence: true,
       ...(basePolicy.escalation || {}),
+    },
+    surrounding_jobs: {
+      enabled: basePolicy.surrounding_jobs?.enabled ?? true,
+      max_location_distance_km: Number(basePolicy.surrounding_jobs?.max_location_distance_km ?? 25),
     },
     audit: {
       log_inferred_profile: true,

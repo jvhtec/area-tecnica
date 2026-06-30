@@ -469,6 +469,10 @@ export function buildCampaignPolicy(input: BuildCampaignPolicyInput) {
       escalate_weak_critical_pool: true,
       require_manager_approval_for_low_confidence: true,
     },
+    surrounding_jobs: {
+      enabled: true,
+      max_location_distance_km: 25,
+    },
     audit: {
       log_inferred_profile: true,
       log_profile_override: true,
