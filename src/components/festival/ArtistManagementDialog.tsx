@@ -23,7 +23,7 @@ export const ArtistManagementDialog = ({
   selectedDate,
   dayStartTime = "07:00"
 }: ArtistManagementDialogProps) => {
-  const { createArtist, updateArtist, isCreating, isUpdating } = useArtistMutations(jobId, selectedDate);
+  const { createArtistAsync, updateArtistAsync, isCreating, isUpdating } = useArtistMutations(jobId, selectedDate);
   const isMobile = useIsMobile();
   const formId = artist ? "artist-management-edit-form" : "artist-management-create-form";
 
@@ -31,10 +31,10 @@ export const ArtistManagementDialog = ({
     try {
       if (artist) {
         // Update existing artist
-        await updateArtist({ id: artist.id, ...data });
+        await updateArtistAsync({ id: artist.id, ...data });
       } else {
         // Create new artist
-        await createArtist(data);
+        await createArtistAsync(data);
       }
 
       // Close dialog and notify that there was an update

@@ -942,7 +942,7 @@ export const appRoutes: readonly AppRoute[] = [
     path: "/hoja-de-ruta",
     component: ModernHojaDeRuta,
     layout: "app",
-    access: "managementAndHouseTech",
+    access: "management",
     subscriptions: "hojaDeRuta",
     breadcrumb: { label: "Hoja de ruta" },
     nav: {

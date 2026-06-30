@@ -8,7 +8,7 @@ import { EquipmentSelect } from "../form/shared/EquipmentSelect";
 import { useEquipmentModels } from "@/hooks/useEquipmentModels";
 import { FESTIVAL_CONSOLE_OPTIONS } from "@/constants/festivalConsoleOptions";
 
-export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps) => {
+export const ConsoleConfig = ({ consoles, onChange, label, readOnly = false }: ConsoleConfigProps) => {
   const { models } = useEquipmentModels();
 
   const addConsole = () => {
@@ -49,6 +49,7 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
           variant="outline"
           size="sm"
           onClick={addConsole}
+          disabled={readOnly}
         >
           <Plus className="h-4 w-4 mr-2" />
           Añadir Console
@@ -64,6 +65,7 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
               options={mergedConsoleOptions}
               fallbackOptions={FESTIVAL_CONSOLE_OPTIONS}
               placeholder="Seleccionar console"
+              disabled={readOnly}
             />
           </div>
           <div className="w-24">
@@ -72,6 +74,7 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
               min="1"
               value={console.quantity}
               onChange={(e) => updateConsole(index, 'quantity', parseInt(e.target.value) || 0)}
+              disabled={readOnly}
             />
           </div>
           <Button
@@ -79,6 +82,7 @@ export const ConsoleConfig = ({ consoles, onChange, label }: ConsoleConfigProps)
             variant="ghost"
             size="icon"
             onClick={() => removeConsole(index)}
+            disabled={readOnly}
           >
             <Minus className="h-4 w-4" />
           </Button>

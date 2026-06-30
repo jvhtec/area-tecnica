@@ -105,8 +105,9 @@ export const canPrintFestivalDocuments = (role: UserRole) => canUploadDocuments(
 
 export const canCreateFolders = (role: UserRole) => PROJECT_MANAGEMENT_ALLOWED_ROLES.includes(role as AppUserRole);
 
+// House techs may view assignments but must not add or remove them.
 export const canManageJobAssignments = (role: UserRole): boolean =>
-  isManagementRole(role) || role === 'house_tech';
+  isManagementRole(role);
 
 export const canViewAchievements = (role: UserRole): boolean =>
   isTechnicianRole(role) || isManagementRole(role);
@@ -122,6 +123,23 @@ export const canSubmitTechnicianIncidentReports = (role: UserRole): boolean =>
 
 export const canManageFestivalArtists = (role: UserRole) =>
   FESTIVAL_ARTIST_ALLOWED_ROLES.includes(role as AppUserRole);
+
+export const isHouseTechRole = (role: UserRole): boolean => role === 'house_tech';
+
+// Festival planning (scheduling) and gear setup are read-only for house techs;
+// only management roles may edit them.
+export const canManageFestivalScheduling = (role: UserRole): boolean => isManagementRole(role);
+
+export const canManageFestivalGear = (role: UserRole): boolean => isManagementRole(role);
+
+// House techs may add/edit artists but must not delete them or create Flex extras budgets.
+export const canDeleteFestivalArtists = (role: UserRole): boolean => isManagementRole(role);
+
+export const canCreateFestivalArtistExtras = (role: UserRole): boolean => isManagementRole(role);
+
+// House techs may upload documents to a job but get no other festival quick actions.
+export const canUploadFestivalDocuments = (role: UserRole): boolean =>
+  canUploadDocuments(role) || isHouseTechRole(role);
 
 export const canUploadSoundVisionFiles = (role: UserRole) =>
   SOUND_VISION_UPLOAD_ALLOWED_ROLES.includes(role as AppUserRole);

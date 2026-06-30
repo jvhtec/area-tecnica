@@ -101,6 +101,8 @@ export const useArtistMutations = (jobId: string | undefined, selectedDate: stri
   return {
     createArtist: createArtistMutation.mutate,
     updateArtist: updateArtistMutation.mutate,
+    createArtistAsync: createArtistMutation.mutateAsync,
+    updateArtistAsync: updateArtistMutation.mutateAsync,
     isCreating: createArtistMutation.isPending,
     isUpdating: updateArtistMutation.isPending,
   };

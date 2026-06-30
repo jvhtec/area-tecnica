@@ -17,6 +17,7 @@ export interface ConsoleConfigProps {
   consoles: ConsoleSetup[];
   onChange: (consoles: ConsoleSetup[]) => void;
   label: string;
+  readOnly?: boolean;
 }
 
 export interface GearSetupFormData {

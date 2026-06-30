@@ -26,7 +26,8 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
     navigate,
     isSchedulingRoute,
     jobDates,
-    isViewOnly,
+    isPlanningViewOnly,
+    isHouseTech,
     isManagementUser,
 
     isAssignmentDialogOpen,
@@ -144,11 +145,13 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
         initialOptions={flexPickerOptions}
       />
 
-      <Dialog open={isRouteSheetOpen} onOpenChange={setIsRouteSheetOpen}>
-        <DialogContent className="max-w-[96vw] w-[96vw] max-h-[90vh] md:h-[90vh] p-0 overflow-hidden flex flex-col">
-          <div className="h-full overflow-auto">{jobId && <ModernHojaDeRuta jobId={jobId} />}</div>
-        </DialogContent>
-      </Dialog>
+      {!isHouseTech && (
+        <Dialog open={isRouteSheetOpen} onOpenChange={setIsRouteSheetOpen}>
+          <DialogContent className="max-w-[96vw] w-[96vw] max-h-[90vh] md:h-[90vh] p-0 overflow-hidden flex flex-col">
+            <div className="h-full overflow-auto">{jobId && <ModernHojaDeRuta jobId={jobId} />}</div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {isSchedulingRoute && (
         <div>
@@ -162,7 +165,7 @@ export const FestivalManagementDialogs = ({ vm }: { vm: FestivalManagementVm }) 
             <FestivalScheduling
               jobId={jobId}
               jobDates={jobDates}
-              isViewOnly={isViewOnly}
+              isViewOnly={isPlanningViewOnly}
               onCreateWhatsappGroup={isManagementUser ? () => setIsWhatsappDialogOpen(true) : undefined}
             />
           ) : (

@@ -25,6 +25,7 @@ interface FestivalGearSetupFormProps {
   jobId: string;
   stageNumber?: number;
   onSave?: () => void;
+  readOnly?: boolean;
 }
 
 const buildEmptyStageSetup = (maxStages = 1): GearSetupFormData => ({
@@ -91,7 +92,8 @@ const mapGearSetupRow = (row: FestivalGearSetupRow): FestivalGearSetup => ({
 export const FestivalGearSetupForm = ({
   jobId,
   stageNumber = 1,
-  onSave
+  onSave,
+  readOnly = false
 }: FestivalGearSetupFormProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -102,6 +104,7 @@ export const FestivalGearSetupForm = ({
   const [hasStageSpecificSetup, setHasStageSpecificSetup] = useState(false);
   const [showPushDialog, setShowPushDialog] = useState(false);
   const isPrimaryStage = stageNumber === 1;
+  const readOnlyField = () => readOnly;
 
   useEffect(() => {
     const fetchExistingSetup = async () => {
@@ -242,6 +245,7 @@ export const FestivalGearSetupForm = ({
   }, [jobId, stageNumber, toast, isPrimaryStage]);
 
   const handleChange = (changes: Partial<GearSetupFormData>) => {
+    if (readOnly) return;
     console.log('=== HANDLE CHANGE DEBUG ===');
     console.log('Changes received:', changes);
     console.log('Current setup wired_mics before change:', setup.wired_mics);
@@ -256,6 +260,7 @@ export const FestivalGearSetupForm = ({
   };
 
   const handlePushToFlex = () => {
+    if (readOnly) return;
     if (!existingSetupId) {
       toast({
         title: "Configuración no guardada",
@@ -269,6 +274,7 @@ export const FestivalGearSetupForm = ({
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     setIsLoading(true);
 
     try {
@@ -506,11 +512,13 @@ export const FestivalGearSetupForm = ({
         <FestivalConsoleSetupSection
           formData={setup}
           onChange={(changes) => handleChange(changes)}
+          readOnly={readOnly}
         />
 
         <WirelessSetupSection
           formData={getCompatibleFormData()}
           onChange={(changes) => handleChange(changes)}
+          readOnly={readOnly}
         />
 
         <FestivalMicKitConfig
@@ -521,24 +529,28 @@ export const FestivalGearSetupForm = ({
             console.log('FestivalMicKitConfig onChange called with:', wiredMics);
             handleChange({ wired_mics: wiredMics });
           }}
+          readOnly={readOnly}
         />
 
         <MonitorSetupSection
           formData={getCompatibleFormData()}
           onChange={(changes) => handleChange(changes)}
           gearSetup={globalSetup}
+          isFieldLocked={readOnlyField}
         />
 
         <ExtraRequirementsSection
           formData={getCompatibleFormData()}
           onChange={(changes) => handleChange(changes)}
           gearSetup={globalSetup}
+          isFieldLocked={readOnlyField}
         />
 
         <InfrastructureSection
           formData={getCompatibleFormData()}
           onChange={(changes) => handleChange(changes)}
           gearSetup={globalSetup}
+          isFieldLocked={readOnlyField}
         />
 
         <div className="space-y-4">
@@ -552,6 +564,7 @@ export const FestivalGearSetupForm = ({
         <NotesSection
           formData={getCompatibleFormData()}
           onChange={(changes) => handleChange(changes)}
+          isFieldLocked={readOnlyField}
         />
       </div>
 
@@ -566,6 +579,7 @@ export const FestivalGearSetupForm = ({
               <FestivalConsoleSetupSection
                 formData={setup}
                 onChange={(changes) => handleChange(changes)}
+                readOnly={readOnly}
               />
             </AccordionContent>
           </AccordionItem>
@@ -578,6 +592,7 @@ export const FestivalGearSetupForm = ({
               <WirelessSetupSection
                 formData={getCompatibleFormData()}
                 onChange={(changes) => handleChange(changes)}
+                readOnly={readOnly}
               />
             </AccordionContent>
           </AccordionItem>
@@ -595,6 +610,7 @@ export const FestivalGearSetupForm = ({
                   console.log('FestivalMicKitConfig onChange called with:', wiredMics);
                   handleChange({ wired_mics: wiredMics });
                 }}
+                readOnly={readOnly}
               />
             </AccordionContent>
           </AccordionItem>
@@ -608,6 +624,7 @@ export const FestivalGearSetupForm = ({
                 formData={getCompatibleFormData()}
                 onChange={(changes) => handleChange(changes)}
                 gearSetup={globalSetup}
+                isFieldLocked={readOnlyField}
               />
             </AccordionContent>
           </AccordionItem>
@@ -621,6 +638,7 @@ export const FestivalGearSetupForm = ({
                 formData={getCompatibleFormData()}
                 onChange={(changes) => handleChange(changes)}
                 gearSetup={globalSetup}
+                isFieldLocked={readOnlyField}
               />
             </AccordionContent>
           </AccordionItem>
@@ -634,6 +652,7 @@ export const FestivalGearSetupForm = ({
                 formData={getCompatibleFormData()}
                 onChange={(changes) => handleChange(changes)}
                 gearSetup={globalSetup}
+                isFieldLocked={readOnlyField}
               />
             </AccordionContent>
           </AccordionItem>
@@ -660,35 +679,44 @@ export const FestivalGearSetupForm = ({
               <NotesSection
                 formData={getCompatibleFormData()}
                 onChange={(changes) => handleChange(changes)}
+                isFieldLocked={readOnlyField}
               />
             </AccordionContent>
           </AccordionItem>
         </Accordion>
       </div>
 
-      <div className="flex gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={handlePushToFlex}
-          disabled={!existingSetupId || isLoading}
-          className="flex-1"
-        >
-          <Upload className="h-4 w-4 mr-2" />
-          Push to Flex Pullsheet
-        </Button>
+      {readOnly ? (
+        <Alert>
+          <AlertDescription className="text-sm">
+            Solo lectura: no tienes permisos para modificar la configuración de equipo.
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePushToFlex}
+            disabled={!existingSetupId || isLoading}
+            className="flex-1"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Push to Flex Pullsheet
+          </Button>
 
-        <Button type="submit" disabled={isLoading} className="flex-1">
-          <Save className="h-4 w-4 mr-2" />
-          {isLoading ? "Guardando..." : (
-            isPrimaryStage
-              ? "Guardar Configuración Global"
-              : hasStageSpecificSetup
-                ? `Actualizar Configuración de Stage ${stageNumber}`
-                : `Crear Configuración Personalizada para Stage ${stageNumber}`
-          )}
-        </Button>
-      </div>
+          <Button type="submit" disabled={isLoading} className="flex-1">
+            <Save className="h-4 w-4 mr-2" />
+            {isLoading ? "Guardando..." : (
+              isPrimaryStage
+                ? "Guardar Configuración Global"
+                : hasStageSpecificSetup
+                  ? `Actualizar Configuración de Stage ${stageNumber}`
+                  : `Crear Configuración Personalizada para Stage ${stageNumber}`
+            )}
+          </Button>
+        </div>
+      )}
 
       <PushToFlexPullsheetDialog
         open={showPushDialog}

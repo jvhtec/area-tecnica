@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Loading } from "@/components/ui/loading";
 import { Badge } from "@/components/ui/badge";
-import { Pencil, Trash2, FileText, Loader2, Mic, Link, ExternalLink, Printer, ImagePlus, ImageOff, Receipt } from "lucide-react";
+import { ExternalLink, ImageOff, ImagePlus, Loader2, Mic } from "lucide-react";
 import { format, parseISO, isAfter, setHours, setMinutes } from "date-fns";
 import { ArtistFormLinkDialog } from "./ArtistFormLinkDialog";
 import { ArtistFormLinksDialog } from "./ArtistFormLinksDialog";
@@ -23,6 +23,7 @@ import { mapFestivalGearSetup, mapStageGearSetups } from "@/utils/festivalGearMa
 import { buildReadableFilename } from "@/utils/fileName";
 import { MobileArtistList } from "./mobile/MobileArtistList";
 import { useCreateExtrasPresupuesto } from "@/hooks/festival/useCreateExtrasPresupuesto";
+import { ArtistActionButtons } from "./ArtistActionButtons";
 
 interface Artist {
   id: string;
@@ -96,6 +97,8 @@ interface ArtistTableProps {
   jobId?: string;
   selectedDate?: string;
   onArtistStagePlotUpdated?: () => void;
+  canDelete: boolean;
+  canCreateExtras: boolean;
 }
 
 type EquipmentSystem = {
@@ -144,7 +147,9 @@ export const ArtistTable = ({
   dayStartTime,
   jobId,
   selectedDate,
-  onArtistStagePlotUpdated
+  onArtistStagePlotUpdated,
+  canDelete,
+  canCreateExtras
 }: ArtistTableProps) => {
   const confirm = useConfirm();
   const { createExtrasPresupuesto, isCreatingExtrasFor } = useCreateExtrasPresupuesto(jobId);
@@ -551,6 +556,7 @@ export const ArtistTable = ({
   const sortedFilteredArtists = sortArtistsChronologically(filteredArtists as any) as Artist[];
   const hasArtistSubmittedData = sortedFilteredArtists.some((artist) => artist.artist_submitted);
   const handleDeleteClick = async (artist: Artist) => {
+    if (!canDelete) return;
     const confirmed = await confirm({
       title: "Eliminar artista",
       description: `¿Estás seguro de que quieres eliminar ${artist.name}?`,
@@ -1054,57 +1060,25 @@ export const ArtistTable = ({
                       </TableCell>
                       
                       <TableCell className="min-w-[200px]">
-                        <div className="flex items-center gap-1 flex-wrap">
-                          <Button variant="ghost" size="icon" onClick={() => handleGenerateLink(artist)} title="Generate form link">
-                            <Link className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleManageFiles(artist)} title="Manage files/riders">
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handlePrintArtist(artist)} disabled={printingArtistId === artist.id} title="Print artist details">
-                            {printingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />}
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenStagePlotCapture(artist)}
-                            disabled={uploadingStagePlotArtistId === artist.id}
-                            title="Capture/upload stage plot"
-                          >
-                            {uploadingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                          </Button>
-                          {artist.stage_plot_file_path && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteStagePlot(artist)}
-                              disabled={deletingStagePlotArtistId === artist.id}
-                              title="Delete stage plot"
-                            >
-                              {deletingStagePlotArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImageOff className="h-4 w-4" />}
-                            </Button>
-                          )}
-                          {gearComparison?.mismatches.some(m => m.severity === 'error') && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => createExtrasPresupuesto(artist.id, artist.name, artist.date, artist.show_start, artist.show_end, artist.isaftermidnight || false)}
-                              disabled={isCreatingExtrasFor(artist.id)}
-                              title="Crear presupuesto extras en Flex"
-                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                            >
-                              {isCreatingExtrasFor(artist.id)
-                                ? <Loader2 className="h-4 w-4 animate-spin" />
-                                : <Receipt className="h-4 w-4" />}
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="icon" onClick={() => onEditArtist(artist)} title="Edit artist">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(artist)} disabled={deletingArtistId === artist.id} title="Delete artist">
-                            {deletingArtistId === artist.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                          </Button>
-                        </div>
+                        <ArtistActionButtons
+                          artist={artist}
+                          gearComparison={gearComparison}
+                          printingArtistId={printingArtistId}
+                          uploadingStagePlotArtistId={uploadingStagePlotArtistId}
+                          deletingStagePlotArtistId={deletingStagePlotArtistId}
+                          deletingArtistId={deletingArtistId}
+                          canDelete={canDelete}
+                          canCreateExtras={canCreateExtras}
+                          isCreatingExtrasFor={isCreatingExtrasFor}
+                          onGenerateLink={handleGenerateLink}
+                          onManageFiles={handleManageFiles}
+                          onPrintArtist={handlePrintArtist}
+                          onOpenStagePlotCapture={handleOpenStagePlotCapture}
+                          onDeleteStagePlot={handleDeleteStagePlot}
+                          onEditArtist={onEditArtist}
+                          onDeleteArtist={handleDeleteClick}
+                          onCreateFlexExtras={createExtrasPresupuesto}
+                        />
                       </TableCell>
                     </TableRow>
                   );
@@ -1136,6 +1110,8 @@ export const ArtistTable = ({
               deletingStagePlotArtistId={deletingStagePlotArtistId}
               onCreateFlexExtras={createExtrasPresupuesto}
               isCreatingExtrasFor={isCreatingExtrasFor}
+              canDelete={canDelete}
+              canCreateExtras={canCreateExtras}
             />
           </div>
 

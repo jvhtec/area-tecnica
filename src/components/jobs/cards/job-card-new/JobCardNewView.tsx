@@ -355,7 +355,7 @@ export function JobCardNewView({
 
         <div className="flex flex-wrap items-center justify-between gap-2 px-6">
           <div className="flex flex-wrap items-center gap-2">
-            {isProjectManagementPage && job.job_type !== "dryhire" && (
+            {isProjectManagementPage && !isHouseTech && job.job_type !== "dryhire" && (
               <button
                 type="button"
                 onClick={(e) => {

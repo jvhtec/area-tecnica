@@ -125,7 +125,9 @@ export async function fetchHouseTechOverrides(): Promise<HouseTechOverrideListIt
   const { data: technicians, error: techniciansError } = await supabase
     .from('profiles')
     .select('id, first_name, last_name, default_timesheet_category, role')
-    .in('role', ['house_tech', 'technician'])
+    // Technicians and house techs always qualify; admin/management users only
+    // when they are flagged assignable as tech (they can be staffed on jobs).
+    .or('role.in.(house_tech,technician),and(assignable_as_tech.eq.true,role.in.(admin,management))')
     .order('first_name', { ascending: true });
 
   if (techniciansError) throw techniciansError;
