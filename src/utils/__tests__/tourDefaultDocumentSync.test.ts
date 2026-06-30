@@ -94,9 +94,11 @@ describe("tour default document sync planning", () => {
     const soundWeightUpload = findUploadPlanItem(plan);
     expect(soundWeightUpload).toMatchObject({
       action: "upload",
-      objectPath: "tours/tour-1/auto-generated/default-pdfs/date-1/sound-weight.pdf",
       fileName: "Enterprise Tour - 2026-07-10 - Madrid - Sound S - Small peso.pdf",
     });
+    expect(soundWeightUpload?.objectPath).toMatch(
+      /^tours\/tour-1\/auto-generated\/default-pdfs\/date-1\/sound-weight-[a-z0-9]+\.pdf$/
+    );
 
     expect(
       plan.some(
@@ -110,7 +112,7 @@ describe("tour default document sync planning", () => {
     expect(plan).toHaveLength(6);
   });
 
-  it("keeps the same object path when a date switches package size", () => {
+  it("uses a new object path when a date switches package size", () => {
     const sPlan = buildTourDefaultDocumentPlan(buildData());
     const mPlan = buildTourDefaultDocumentPlan(
       buildData({
@@ -123,9 +125,37 @@ describe("tour default document sync planning", () => {
     const sUpload = findUploadPlanItem(sPlan);
     const mUpload = findUploadPlanItem(mPlan);
 
-    expect(sUpload?.objectPath).toBe(mUpload?.objectPath);
+    expect(sUpload?.objectPath).not.toBe(mUpload?.objectPath);
+    expect(sUpload?.objectPath).toContain(
+      "tours/tour-1/auto-generated/default-pdfs/date-1/sound-weight-"
+    );
+    expect(mUpload?.objectPath).toContain(
+      "tours/tour-1/auto-generated/default-pdfs/date-1/sound-weight-"
+    );
     expect(sUpload?.fileName).toContain("Sound S - Small");
     expect(mUpload?.fileName).toContain("Sound M - Medium");
+  });
+
+  it("uses a new object path when resolved table content changes", () => {
+    const firstPlan = buildTourDefaultDocumentPlan(buildData());
+    const changedPlan = buildTourDefaultDocumentPlan(
+      buildData({
+        defaultTables: [
+          buildTable({
+            table_data: {
+              rows: [{ quantity: "2", componentName: "K1", weight: "106", totalWeight: 212 }],
+            },
+            total_value: 212,
+          }),
+        ],
+      })
+    );
+
+    const firstUpload = findUploadPlanItem(firstPlan);
+    const changedUpload = findUploadPlanItem(changedPlan);
+
+    expect(firstUpload?.objectPath).not.toBe(changedUpload?.objectPath);
+    expect(changedUpload?.fileName).toContain("Sound S - Small");
   });
 
   it("uses the current package size when a date still has a stale explicit default set id", () => {
@@ -153,9 +183,11 @@ describe("tour default document sync planning", () => {
 
     expect(soundWeightUpload).toMatchObject({
       action: "upload",
-      objectPath: "tours/tour-1/auto-generated/default-pdfs/date-1/sound-weight.pdf",
       fileName: "Enterprise Tour - 2026-07-10 - Madrid - Sound XL - Extra Large peso.pdf",
     });
+    expect(soundWeightUpload?.objectPath).toMatch(
+      /^tours\/tour-1\/auto-generated\/default-pdfs\/date-1\/sound-weight-[a-z0-9]+\.pdf$/
+    );
   });
 
   it("cleans the stable slot instead of leaving stale files when package resolution is ambiguous", () => {

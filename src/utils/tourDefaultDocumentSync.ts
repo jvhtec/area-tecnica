@@ -138,7 +138,31 @@ const getPdfTypeLabel = (type: TourDefaultDocumentType) =>
 const cleanDisplayFilePart = (value: string): string =>
   value.replace(/[\\/\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 
-export const getTourDefaultDocumentObjectPath = ({
+const stableStringify = (value: unknown): string => {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "undefined";
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+
+  return `{${Object.entries(value as JsonRecord)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`)
+    .join(",")}}`;
+};
+
+const hashString = (value: string): string => {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+};
+
+const getTourDefaultDocumentSlotPrefix = ({
   tourId,
   tourDateId,
   department,
@@ -149,7 +173,29 @@ export const getTourDefaultDocumentObjectPath = ({
   department: PackageDepartment;
   type: TourDefaultDocumentType;
 }) =>
-  `tours/${tourId}/${AUTO_DEFAULT_DOCUMENT_ROOT}/${tourDateId}/${department}-${type}.pdf`;
+  `tours/${tourId}/${AUTO_DEFAULT_DOCUMENT_ROOT}/${tourDateId}/${department}-${type}`;
+
+export const getTourDefaultDocumentObjectPath = ({
+  tourId,
+  tourDateId,
+  department,
+  type,
+  versionKey,
+}: {
+  tourId: string;
+  tourDateId: string;
+  department: PackageDepartment;
+  type: TourDefaultDocumentType;
+  versionKey?: string;
+}) => {
+  const slotPrefix = getTourDefaultDocumentSlotPrefix({
+    tourId,
+    tourDateId,
+    department,
+    type,
+  });
+  return versionKey ? `${slotPrefix}-${versionKey}.pdf` : `${slotPrefix}.pdf`;
+};
 
 export const getTourDefaultDocumentFileName = ({
   tourName,
@@ -196,6 +242,104 @@ const sortTourDefaultTables = (tables: TourDefaultTableRow[]) =>
     if (leftOrder !== rightOrder) return leftOrder - rightOrder;
     return toJobTimezone(left.created_at).getTime() - toJobTimezone(right.created_at).getTime();
   });
+
+const sortOverrides = <
+  TOverride extends {
+    id: string;
+    created_at?: string | null;
+    updated_at?: string | null;
+  },
+>(
+  overrides: TOverride[]
+) =>
+  [...overrides].sort((left, right) => {
+    const leftTime = left.created_at ? toJobTimezone(left.created_at).getTime() : 0;
+    const rightTime = right.created_at ? toJobTimezone(right.created_at).getTime() : 0;
+    if (leftTime !== rightTime) return leftTime - rightTime;
+    return left.id.localeCompare(right.id);
+  });
+
+const buildTourDefaultDocumentVersionKey = ({
+  tour,
+  tourDate,
+  department,
+  type,
+  defaultSet,
+  defaultTables,
+  powerOverrides,
+  weightOverrides,
+  packageLabel,
+}: {
+  tour: TourRow;
+  tourDate: TourDateRow;
+  department: PackageDepartment;
+  type: TourDefaultDocumentType;
+  defaultSet: TourDefaultSetRow;
+  defaultTables: TourDefaultTableRow[];
+  powerOverrides: TourDatePowerOverrideRow[];
+  weightOverrides: TourDateWeightOverrideRow[];
+  packageLabel: string;
+}) =>
+  hashString(
+    stableStringify({
+      department,
+      type,
+      packageLabel,
+      tour: {
+        id: tour.id,
+        name: tour.name,
+      },
+      tourDate: {
+        id: tourDate.id,
+        date: tourDate.date,
+        start_date: tourDate.start_date,
+        locationName: getTourDateLocationName(tourDate),
+        sound_package_size: tourDate.sound_package_size,
+        lights_package_size: tourDate.lights_package_size,
+        video_package_size: tourDate.video_package_size,
+        sound_default_set_id: tourDate.sound_default_set_id,
+        lights_default_set_id: tourDate.lights_default_set_id,
+        video_default_set_id: tourDate.video_default_set_id,
+      },
+      defaultSet: {
+        id: defaultSet.id,
+        name: defaultSet.name,
+        package_size: defaultSet.package_size,
+        updated_at: defaultSet.updated_at,
+      },
+      defaultTables: sortTourDefaultTables(defaultTables).map((table) => ({
+        id: table.id,
+        table_name: table.table_name,
+        table_type: table.table_type,
+        total_value: table.total_value,
+        table_data: table.table_data,
+        metadata: table.metadata,
+        updated_at: table.updated_at,
+      })),
+      powerOverrides: sortOverrides(powerOverrides).map((override) => ({
+        id: override.id,
+        table_name: override.table_name,
+        total_watts: override.total_watts,
+        current_per_phase: override.current_per_phase,
+        pdu_type: override.pdu_type,
+        custom_pdu_type: override.custom_pdu_type,
+        position: override.position,
+        custom_position: override.custom_position,
+        includes_hoist: override.includes_hoist,
+        override_data: override.override_data,
+        updated_at: override.updated_at,
+      })),
+      weightOverrides: sortOverrides(weightOverrides).map((override) => ({
+        id: override.id,
+        item_name: override.item_name,
+        weight_kg: override.weight_kg,
+        quantity: override.quantity,
+        category: override.category,
+        override_data: override.override_data,
+        updated_at: override.updated_at,
+      })),
+    })
+  );
 
 const getTableRiggingPoint = (metadata: unknown) => {
   const record = getRecord(metadata);
@@ -288,6 +432,17 @@ const buildUploadPlanItem = ({
 }): Extract<TourDefaultDocumentPlanItem, { action: "upload" }> => {
   const locationName = getTourDateLocationName(tourDate);
   const jobDate = tourDate.date || tourDate.start_date;
+  const versionKey = buildTourDefaultDocumentVersionKey({
+    tour,
+    tourDate,
+    department,
+    type,
+    defaultSet,
+    defaultTables,
+    powerOverrides,
+    weightOverrides,
+    packageLabel,
+  });
 
   return {
     action: "upload",
@@ -305,6 +460,7 @@ const buildUploadPlanItem = ({
       tourDateId: tourDate.id,
       department,
       type,
+      versionKey,
     }),
     fileName: getTourDefaultDocumentFileName({
       tourName: tour.name,
@@ -520,26 +676,55 @@ const loadTourDefaultDocumentSyncData = async ({
   };
 };
 
-const cleanupTourDefaultDocument = async ({
+const cleanupTourDefaultDocumentSlot = async ({
   client,
   tourId,
-  objectPath,
+  tourDateId,
+  department,
+  type,
 }: {
   client: SupabaseClientLike;
   tourId: string;
-  objectPath: string;
+  tourDateId: string;
+  department: PackageDepartment;
+  type: TourDefaultDocumentType;
 }) => {
-  const { error: storageError } = await client.storage
-    .from(TOUR_DOCUMENTS_BUCKET)
-    .remove([objectPath]);
+  const slotPrefix = getTourDefaultDocumentSlotPrefix({
+    tourId,
+    tourDateId,
+    department,
+    type,
+  });
 
-  if (storageError) throw storageError;
+  const { data: existingDocuments, error: loadError } = await client
+    .from("tour_documents")
+    .select("file_path")
+    .eq("tour_id", tourId)
+    .like("file_path", `${slotPrefix}%`);
+
+  if (loadError) throw loadError;
+
+  const paths = Array.from(
+    new Set(
+      (existingDocuments || [])
+        .map((document) => document.file_path)
+        .filter((path): path is string => typeof path === "string" && path.length > 0)
+    )
+  );
+
+  if (paths.length > 0) {
+    const { error: storageError } = await client.storage
+      .from(TOUR_DOCUMENTS_BUCKET)
+      .remove(paths);
+
+    if (storageError) throw storageError;
+  }
 
   const { error } = await client
     .from("tour_documents")
     .delete()
     .eq("tour_id", tourId)
-    .eq("file_path", objectPath);
+    .like("file_path", `${slotPrefix}%`);
 
   if (error) throw error;
 };
@@ -555,15 +740,12 @@ export const cleanupTourDefaultDocumentsForDate = async ({
 }) => {
   for (const department of PACKAGE_DEPARTMENTS) {
     for (const type of TOUR_DEFAULT_DOCUMENT_TYPES) {
-      await cleanupTourDefaultDocument({
+      await cleanupTourDefaultDocumentSlot({
         client,
         tourId,
-        objectPath: getTourDefaultDocumentObjectPath({
-          tourId,
-          tourDateId,
-          department,
-          type,
-        }),
+        tourDateId,
+        department,
+        type,
       });
     }
   }
@@ -572,22 +754,34 @@ export const cleanupTourDefaultDocumentsForDate = async ({
 const uploadTourDefaultDocument = async ({
   client,
   tourId,
+  tourDateId,
+  department,
+  type,
   objectPath,
   fileName,
   pdfBlob,
 }: {
   client: SupabaseClientLike;
   tourId: string;
+  tourDateId: string;
+  department: PackageDepartment;
+  type: TourDefaultDocumentType;
   objectPath: string;
   fileName: string;
   pdfBlob: Blob;
 }) => {
-  await cleanupTourDefaultDocument({ client, tourId, objectPath });
+  await cleanupTourDefaultDocumentSlot({
+    client,
+    tourId,
+    tourDateId,
+    department,
+    type,
+  });
 
   const { error: uploadError } = await client.storage
     .from(TOUR_DOCUMENTS_BUCKET)
     .upload(objectPath, pdfBlob, {
-      cacheControl: "3600",
+      cacheControl: "0",
       upsert: false,
       contentType: "application/pdf",
     });
@@ -687,7 +881,13 @@ export const syncTourDefaultDocuments = async ({
   for (const item of plan) {
     try {
       if (item.action === "cleanup") {
-        await cleanupTourDefaultDocument({ client, tourId, objectPath: item.objectPath });
+        await cleanupTourDefaultDocumentSlot({
+          client,
+          tourId,
+          tourDateId: item.tourDate.id,
+          department: item.department,
+          type: item.type,
+        });
         result.removed += 1;
         if (item.reason !== "no_tables") result.skipped += 1;
         continue;
@@ -701,6 +901,9 @@ export const syncTourDefaultDocuments = async ({
       await uploadTourDefaultDocument({
         client,
         tourId,
+        tourDateId: item.tourDate.id,
+        department: item.department,
+        type: item.type,
         objectPath: item.objectPath,
         fileName: item.fileName,
         pdfBlob,

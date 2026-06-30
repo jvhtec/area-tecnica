@@ -15,6 +15,9 @@ const sanitizePathSegment = (value: string) =>
     .replace(/\.+/g, ".")
     .replace(/^\.+|\.+$/g, "") || "scope";
 
+const createDocumentVersionSegment = () =>
+  globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
 /**
  * Upload a job-related PDF to the job-documents bucket under a category folder,
  * first cleaning up any previous versions for that job and category.
@@ -35,7 +38,7 @@ export const uploadJobPdfWithCleanup = async (
     ? `/${sanitizePathSegment(options.cleanupScope)}`
     : "";
   const baseFolder = `${category}/${jobId}${scopeFolder}`; // e.g. calculators/pesos/<jobId>/<stage>
-  const objectPath = `${baseFolder}/${sanitizedFileName}`;
+  const objectPath = `${baseFolder}/${createDocumentVersionSegment()}-${sanitizedFileName}`;
 
   try {
     // 1) Remove any existing files for this job/category
@@ -72,7 +75,7 @@ export const uploadJobPdfWithCleanup = async (
     const { error: uploadError } = await supabase.storage
       .from("job-documents")
       .upload(objectPath, pdfBlob, {
-        cacheControl: "3600",
+        cacheControl: "0",
         upsert: false,
         contentType: "application/pdf",
       });
