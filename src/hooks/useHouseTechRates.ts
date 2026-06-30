@@ -2,6 +2,37 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RATES_QUERY_KEYS } from '@/constants/ratesQueryKeys';
+import { recalculateTimesheets } from '@/hooks/useToggleJobRehearsalRate';
+
+/**
+ * Recomputes a technician's non-approved timesheets so existing drafts pick up a
+ * newly saved custom rate. Approved timesheets are intentionally left untouched
+ * to avoid silently changing settled amounts. Failures are logged but never fail
+ * the rate save itself (the rate is already persisted at this point).
+ */
+async function recalcTechnicianDraftTimesheets(profileId: string): Promise<number> {
+  const { data: timesheets, error } = await supabase
+    .from('timesheets')
+    .select('id')
+    .eq('technician_id', profileId)
+    .eq('is_active', true)
+    .neq('status', 'approved');
+
+  if (error) {
+    console.warn('Could not load timesheets to recalc after rate change:', error);
+    return 0;
+  }
+
+  const ids = (timesheets || []).map((ts) => ts.id);
+  if (ids.length === 0) return 0;
+
+  try {
+    return await recalculateTimesheets(ids);
+  } catch (recalcError) {
+    console.warn('Some timesheets failed to recalc after rate change:', recalcError);
+    return 0;
+  }
+}
 
 export interface HouseTechRate {
   profile_id: string;
@@ -73,11 +104,22 @@ export function useSaveHouseTechRate() {
         .single();
 
       if (error) throw error;
-      return data;
+
+      // Recompute the technician's existing (non-approved) timesheets so they
+      // reflect the new custom rate instead of the previously cached base rate.
+      const recalculated = await recalcTechnicianDraftTimesheets(input.profile_id);
+
+      return { rate: data, recalculated };
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: RATES_QUERY_KEYS.houseTechRate(variables.profile_id) });
-      toast.success('House tech rate saved successfully');
+      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+      toast.success(
+        'House tech rate saved successfully',
+        result.recalculated > 0
+          ? { description: `${result.recalculated} parte(s) recalculado(s)` }
+          : undefined,
+      );
     },
     onError: (error) => {
       console.error('Error saving house tech rate:', error);
